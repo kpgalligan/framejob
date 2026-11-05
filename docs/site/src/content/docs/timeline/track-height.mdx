@@ -1,0 +1,58 @@
+---
+title: Track height
+description: Choose small, medium or large track rows, and see how a track's contents and the row size change what a clip shows.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Track height sets how tall the timeline's rows are. Go small to see more tracks at once, or large to get more room for filmstrips, waveforms and actions.
+
+<AtAGlance
+  menu={['View ▸ Timeline Track Height ▸ Small', 'View ▸ Timeline Track Height ▸ Medium', 'View ▸ Timeline Track Height ▸ Large']}
+  where="The S / M / L control at the right end of the timeline bar"
+/>
+
+## Small, Medium, Large
+
+Click **S**, **M** or **L** at the right end of the timeline bar, or choose a size from **View ▸ Timeline Track Height**. The menu checks the size you're on.
+
+Medium is the default. Your choice is remembered between launches and applies to every project, because it's a view setting and not part of the project. It makes no undo step, and no agent tool sets it.
+
+## Height follows contents
+
+A track's height also depends on what it holds, so sound-only and text tracks draw shorter than picture tracks.
+
+| Track holds | Small | Medium | Large |
+| --- | --- | --- | --- |
+| Only text and shapes | 30 pt | 44 pt | 58 pt |
+| Only clips with sound and no picture | 40 pt | 60 pt | 82 pt |
+| Anything else, an empty track included | 54 pt | 84 pt | 116 pt |
+
+The row changes as the track's contents do. A music track grows to picture height when you drop a video on it, for example. An adjustment clip, a graphic or a nest counts as picture.
+
+A clip's own switches count. A detached sound, with its picture off, is a clip with sound and no picture.
+
+## What each size shows
+
+Every clip keeps its 16 pt name strip, and the rest of the row goes to its filmstrip, its waveform and its actions. So at Small a clip shows little more than its name: 8 pt is left under the strip on a text row, 18 pt on a sound row and 32 pt on a picture row.
+
+The action lane under the name strip changes with the size:
+
+| Size | Lane height | Each action band shows |
+| --- | --- | --- |
+| Small | 5 pt | A plain bar. |
+| Medium | 12 pt | Its number in time order, and a zoom glyph for a zoom action. |
+| Large | 18 pt | The same, plus the properties it changes. |
+
+See [Reading a clip on the timeline](/timeline/reading-a-clip/) for what each part of a clip means.
+
+## Good to know
+
+- A size change applies to the window you made it in. Other windows that are already open keep their size, and the next one you open uses your latest choice.
+- While you drag a clip, lanes keep their heights, so the track you're aiming at doesn't move under the pointer. They settle when you drop.
+
+## Related
+
+- [Tracks](/timeline/tracks/)
+- [Reading a clip on the timeline](/timeline/reading-a-clip/)
+- [Zoom and scroll the timeline](/timeline/zoom-and-scroll/)

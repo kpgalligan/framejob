@@ -1,0 +1,64 @@
+---
+title: "What can be transcribed"
+description: "Which clips Generate Captions can read, why a clip gets left out of a run, and the limits on how much one run can do."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Generate Captions can only read clips that play recorded sound. Before a run starts, Frame Job works out which clips those are. Use this page when a clip gets left out, or when a long project stops a run.
+
+<AtAGlance menu="File ▸ Generate Captions…" tools="transcribe" />
+
+## Which clips can be transcribed
+
+A clip can be transcribed when all of these are true:
+
+- It plays a movie or sound file that has an audio track.
+- It plays forwards.
+- Its audio is on.
+- Its file is present.
+
+**File ▸ Generate Captions…** is greyed out when no clip on the open timeline plays sound from a media file, forwards, with its audio on.
+
+Mute doesn't turn a clip's audio off here. A clip that's muted, turned down to silence, or on a muted or [soloed-out](/audio/mute-and-solo/) track is still read and captioned, even though you can't hear it. To leave one out, choose **Selected clips** in the sheet and leave it unselected.
+
+## Why a clip is skipped
+
+A clip that can't be read isn't part of the run. In the [Generate Captions](/captions/generate-captions/) sheet it doesn't count towards the summary line, so if the sheet says 2 clips and you expected 3, the third is here. The sheet doesn't list these clips one by one. If it leaves nothing at all, it reads "Nothing to transcribe".
+
+An agent that names the clips it wants gets the reason back for each one, in these words:
+
+| Reason | What it means | What to do |
+| --- | --- | --- |
+| its source is not a media file, so it has no speech | It's a text, shape, still, image, graphic, adjustment or nest clip. | For a nest, [open it](/editing/inside-a-nest/) and caption inside it. |
+| it plays in reverse, so its speech cannot be transcribed | The words would come out backwards. | Only a clip playing forwards can be read. See [Reverse a clip](/speed/reverse/). |
+| its media has no audio track | The file has no sound. | Nothing to transcribe here. |
+| its audio is switched off | For example, the picture half of a clip after [Detach Audio](/audio/detach-and-attach/). | After Detach Audio, the audio-only clip below it holds the sound and is read instead. **Clip ▸ Attach Audio** joins the two again. |
+| its media file is missing | Frame Job can't find the file. | [Relink it](/projects/relink-media/). |
+| its speed ramps, and no speed map was read for it | Frame Job couldn't work out where the ramp puts the words, so it won't guess. | Remove the [ramp](/speed/speed-ramps/) if you need this clip captioned. |
+| its speed or length is degenerate | The clip has no usable speed or no length. | Add the clip to the timeline again. |
+
+A clip that's read but holds no words shows up afterwards, in the [run report](/captions/generate-captions/#the-run-report), as "no speech was recognised in it".
+
+## Retimed clips land correctly
+
+On a sped-up, slowed or speed-ramped clip, each word lands where it's heard on the timeline, not where it sits in the file. Transcribing a ramped clip places each word where the ramp plays it.
+
+Captions keep following afterwards. Change the speed later and they move with the speech. See [Captions follow a speed change](/speed/captions-and-speed/).
+
+## The 10-hour and 4,096-clip limits
+
+**AssemblyAI takes at most 10 hours per file.** What counts is the length of the whole file, not the part your clip uses, because the whole file is what's sent. Frame Job won't extract or send a longer file, and its clips are listed in the [run report](/captions/generate-captions/#the-run-report) with "“name” is longer than AssemblyAI's 10-hour limit for one file." The other files in the run carry on.
+
+**On this Mac there's no limit on length.** There is a limit on time: each clip gets four times the length of its audio, and at least two minutes. A clip still going after that is stopped and reported with "Transcribing “name” took too long and was stopped."
+
+**A project holds at most 4,096 clips.** When a run's captions wouldn't fit, none of them are placed and the project doesn't change. The card says "5000 captions is more than this project has room for: 900 more clips would fit, out of 4096." Frame Job can only count captions once the words are in, so this comes at the end of the run. With **Replace** ticked, the clips on the tracks it would remove don't count against you.
+
+Every caption or page is one clip, so word styles usually use more clips than **Subtitles**, and **One Word** uses one clip for every word. [Limits](/reference/limits/) lists the rest of the project's limits.
+
+## Related
+
+- [Generate Captions](/captions/generate-captions/)
+- [Transcribe on this Mac](/captions/on-device-transcription/)
+- [Transcribe with AssemblyAI](/captions/assemblyai-transcription/)
+- [Captions follow a speed change](/speed/captions-and-speed/)

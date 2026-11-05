@@ -1,0 +1,91 @@
+---
+title: The Picture tab
+description: Find every section of the Clip tab's Picture sub-tab, see which clips get which section, and learn how the sections behave.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+The Picture tab is where you place a clip in the frame and style what it draws. It's one sub-tab of the inspector's **Clip** tab, and the sections it shows depend on what you've selected.
+
+<AtAGlance where="Clip tab ▸ Picture" tools="set_video" />
+
+<Shot
+  name="05-clip-picture.inspector"
+  alt="The Clip tab with a video clip selected and its Picture sub-tab chosen beside Color, Sound and Clip. The Transform section is open, with rows for Scale, Position X, Position Y, Rotation, Opacity, Blend and Motion Blur, then the Fit to Canvas and Fill Canvas buttons. Behind Subject and Layout sit below it."
+/>
+
+## Open the Picture tab
+
+Select a clip, open the inspector's **Clip** tab and choose **Picture**. A video or image clip opens on it, while a text clip opens on **Text**, a shape on **Shape** and a graphic on **Graphic**.
+
+The sub-tabs you get depend on the clip:
+
+| Selected | Sub-tabs |
+| --- | --- |
+| Video clip, image clip or freeze frame | Picture, Color, Clip |
+| Text clip | Text, Picture, Clip |
+| Shape clip | Shape, Picture, Clip |
+| Graphic clip | Graphic, Picture, Clip |
+| Nest clip | Picture, Clip |
+| Adjustment clip | Color, Clip |
+| Clip of an audio-only file | Sound, Clip |
+
+**Sound** joins the list, before **Clip**, on any clip with live audio, such as a video clip with its sound on or a nest with sound inside.
+
+A selection with an [adjustment clip](/color/adjustment-clips/) in it has no **Picture** sub-tab, because an adjustment clip draws nothing of its own.
+
+## Sections in order
+
+The sections run top to bottom in this order. **Blend** and **Motion Blur** are rows inside Transform.
+
+| Section | What it's for | Shown for |
+| --- | --- | --- |
+| [Transform](/canvas/transform/) | Scale, position, rotation, opacity, [blend](/canvas/blend-modes/) and [motion blur](/motion/motion-blur/) | Every clip that draws |
+| [Behind Subject](/effects/text-behind-subject/) | Drawing a clip behind the person in the shot | Every clip that draws except adjustment and nest clips, and only while no nest is open |
+| [Layout](/framing/layout-section/) | How a camera and a screen recording share the frame | One selected clip of a video file with a known picture size |
+| [Hide While Silent](/effects/hide-while-silent/) | Fading a camera out while nobody's talking | Every clip that draws except nests |
+| [Crop](/canvas/crop/) | Trimming the picture's edges | Video clips, image clips and freeze frames |
+| [Corner Radius](/canvas/corner-radius/) | Rounding the picture's corners | Video clips, image clips and freeze frames |
+| [Chroma Key](/effects/chroma-key/) | Keying out a green screen | Video clips, image clips and freeze frames |
+| [Background](/effects/remove-background/) | Removing the background behind a person or subject | Clips of a video file, freeze frames of one, and image clips |
+| [Cursor](/recording/cursor-settings/) | Styling a recorded pointer | Clips of a video file with a cursor file its picture doesn't already show |
+| [Shadow](/effects/shadow/) | A drop shadow | Every clip that draws |
+| [Filters](/effects/filters/) | A stack of up to four filters | Every clip that draws |
+| [Reflection](/effects/reflection/) | A mirrored copy under the clip | Every clip that draws |
+| [Spotlight](/effects/spotlight/) | Dimming the clip outside one area | Every clip that draws |
+| [Obscure](/effects/obscure/) | Blurring or pixelating regions of the picture | Every clip that draws |
+
+Every clip that draws includes text, shapes, graphics and nests. A section that doesn't apply isn't there at all, rather than greyed out. With several clips selected, a section shows only when it applies to all of them.
+
+A graphic clip can be moved, scaled, faded and blended here. It has no Crop, Corner Radius or Chroma Key, and no **Color** sub-tab.
+
+## How sections behave
+
+**Fold a section.** Click its header to open or close it. Transform starts open and the rest start closed, and Frame Job remembers what you open and close. A closed section still shows a short summary of its settings.
+
+**Reset a section.** **Reset** appears in a section's header only while the section differs from its default. It puts the whole section back. To put back a single row, right-click its label and choose **Reset to default**.
+
+**Edit several clips at once.** With several clips selected, a field shows the first clip's value, with a `mixed` badge when the others differ. An edit applies to every selected clip.
+
+**Pick a colour.** A colour swatch opens the macOS Colors panel, with opacity.
+
+**Edit inside an action.** With an [action](/motion/actions/) selected, the rows that can animate read and write the action's end state, and the sections it animates open by themselves. In a section with such rows, **Reset** is hidden, and **Clear** appears once the action changes something there. **Clear** takes that section out of the action. See [Set what an action animates to](/motion/edit-an-action/).
+
+[Inspector fields](/getting-started/inspector-fields/) covers typing, sliders and the quick picks in a field's menu.
+
+## Good to know
+
+A nest clip has no picture of its own, so most of this tab doesn't reach it. Position, scale, rotation and opacity apply to the clips inside. Blend and Motion Blur are greyed, and Shadow, Filters, Reflection, Spotlight and Obscure show but have no effect on the nest clip. Set those on the clips inside the [nest](/editing/nests/). A nest's opacity fades each clip inside separately, rather than the group as one picture.
+
+## With an agent
+
+`set_video` changes the placement and look of as many clips as you name. You send only the settings to change, at any depth, and everything you leave out keeps its value. An optional group such as `shadow` clears when you set it to `null`, and the `filters` and `obscure` lists are replaced whole.
+
+An unknown key or a bad value gets an error naming it, and nothing is dropped or pulled back into its range. Animating a property takes an action, and reaching a clip inside a nest takes `scope`. See [Tools: picture and grade](/mcp/tools-set-video/#set_video).
+
+## Related
+
+- [The inspector](/getting-started/inspector/)
+- [Inspector fields](/getting-started/inspector-fields/)
+- [The Color tab](/color/color-tab/)

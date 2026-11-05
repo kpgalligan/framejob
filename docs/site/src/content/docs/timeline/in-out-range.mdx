@@ -1,0 +1,79 @@
+---
+title: "The in/out range"
+description: Mark a span of the timeline with I and O, so Loop, deletes, exports and other commands work on that passage alone.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The in/out range marks one passage of the timeline. Set it when you want to loop a section, cut it out, export it on its own, or point another command at it.
+
+<AtAGlance
+  menu={['Mark ▸ Set In', 'Mark ▸ Set Out', 'Mark ▸ Clear Range']}
+  keys={['I', 'O', '⌥X']}
+  where="Shaded across the timeline's ruler and lanes"
+  tools="set_range"
+/>
+
+## Set In
+
+Move the playhead to where the passage starts and press <kbd>I</kbd>, or choose **Mark ▸ Set In**. With no range yet, the out point goes to the end of the timeline, so the range runs from the playhead to the end.
+
+## Set Out
+
+Move the playhead to where the passage ends and press <kbd>O</kbd>, or choose **Mark ▸ Set Out**. With no range yet, the in point goes to the start of the timeline.
+
+<kbd>I</kbd> and <kbd>O</kbd> are single-letter keys, so the menu shows no shortcut beside them, and they don't fire while you're typing in a field. See [Keys and typing](/getting-started/keys-and-typing/).
+
+## Clear Range
+
+Press <kbd>⌥X</kbd> or choose **Mark ▸ Clear Range**. The item is available only while a range is set.
+
+## What the range is
+
+The range is a span shaded across the ruler and the lanes. It changes nothing by itself. These commands read it:
+
+| Command | What it does with the range |
+| --- | --- |
+| [Loop](/timeline/loop/) | Plays the range over and over, instead of the whole timeline. A range that ends at the very end of the timeline plays once, then goes back to its start and stops. |
+| <kbd>⌫</kbd> and <kbd>⌘⌫</kbd> | With no clip selected, [Lift or Ripple Delete](/editing/delete-clips/) the range. With nothing selected and no range, they beep. |
+| [Speed ramp presets](/speed/make-a-ramp/) | Cover the range when it lies entirely inside the clip. |
+| [**Insert ▸ Adjustment Clip**](/color/adjustment-clips/) | Covers the range. With no range it covers the selected clips, or the whole timeline. |
+| [Export](/export/range/) | Writes only the range when you set **Range:** to **In/out range**. |
+| [Retime Range](/speed/retime-range/) | Changes the speed of everything in the range. |
+| [New Project from Range](/projects/new-project-from-range/) | Opens a new project made of the range. |
+| [Generate Captions](/captions/generate-captions/) | Offers **In/out range** under **From**, which takes every clip that overlaps the range, whole. |
+| [Switch by Speaker](/multicam/switch-by-speaker/) | Works over the range. With no range it works over the selected angle clips. |
+
+Two other things set the range for you. Selecting words in the [Transcript tab](/captions/delete-words/) makes them the range, and clearing that selection clears it. **Preview** for a [motion preset](/motion/motion-presets/) sets the range to the clip and turns Loop on, and both stay until you clear them.
+
+## Crossing points
+
+Setting an in point after the out point moves the out point to match, and setting an out point before the in point moves the in point. Both points then sit on the playhead, which is a range of no length, until you set the other end.
+
+A range of no length isn't shaded, and Loop plays the whole timeline. <kbd>⌫</kbd> and <kbd>⌘⌫</kbd> treat it as no range at all, and the export sheet doesn't offer it. **Mark ▸ Clear Range** still clears it.
+
+## The range isn't saved
+
+The range belongs to the window you're working in, not to the project:
+
+- Setting or clearing it isn't an undo step, and it doesn't mark the project as edited.
+- It isn't saved, so a project always opens with no range.
+- It clears when you enter or leave a [nest](/editing/inside-a-nest/), because a nest's time counts from its own start.
+
+## Good to know
+
+- Edits don't move the range. It stays at the same times while the clips under it change. After <kbd>⌘⌫</kbd> on a range, the range is still there and now covers what moved up into it, so a second <kbd>⌘⌫</kbd> cuts again. Cutting words in the Transcript tab is the exception, and clears the range.
+- Inside a nest you can set a range for Loop, deleting and **Retime Range**, but not for an export. The export sheet's **Range:** stays on **Whole project**, and its tooltip explains that the range belongs to the nest. **New Project from Range** is off while a nest is open.
+
+## With an agent
+
+[`set_range`](/mcp/tools-view-state/#set_range) sets either end or both, and clears the range when called with neither. Given one end, the other keeps its value, or falls back to the start or the end of the project when there's no range yet. Unlike Set In and Set Out, it won't move the other point for you, so an end at or before the start is an error.
+
+[`get_project`](/mcp/get-project/) reports the range as `in_out_range`, and [`export`](/mcp/tools-render-and-export/#export) with `range` set to `in_out` writes only that span. See [Tools: playhead, range and selection](/mcp/tools-view-state/).
+
+## Related
+
+- [Loop playback](/timeline/loop/)
+- [Delete, Ripple Delete and Lift](/editing/delete-clips/)
+- [Export a range](/export/range/)
+- [Markers](/timeline/markers/)

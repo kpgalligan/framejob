@@ -1,0 +1,98 @@
+---
+title: "Captions are text clips"
+description: "How captions behave in Frame Job: ordinary text clips on a track of their own, burned into the picture, with the same few rules however they were made."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Every caption in Frame Job is an ordinary text clip on a track of its own. That one fact explains most of how captions behave: where they show up, how you change them, and what happens to them in an export.
+
+<AtAGlance
+  menu={['File ▸ Import Captions…', 'File ▸ Generate Captions…', 'File ▸ Export Captions…']}
+  where="Inspector ▸ Clip tab ▸ Text"
+  tools={['import_captions', 'transcribe', 'export_captions', 'render_frame', 'export']}
+/>
+
+## Get captions in and out
+
+Three commands sit next to each other in the **File** menu. None of them has a keyboard shortcut.
+
+| Command | What it does |
+| --- | --- |
+| [**File ▸ Import Captions…**](/captions/import-captions/) | Reads a SubRip (`.srt`) file onto a new caption track. |
+| [**File ▸ Generate Captions…**](/captions/generate-captions/) | Transcribes the speech in your clips onto a new caption track. |
+| [**File ▸ Export Captions…**](/captions/export-captions/) | Writes one track out as SubRip (`.srt`) or WebVTT (`.vtt`). |
+
+## Captions are ordinary text clips
+
+However a caption gets onto the timeline, it lands the same way: one text clip per caption, on a new track at the front of the stack, so it draws over everything else. An imported caption and a generated one are the same kind of thing afterwards.
+
+So the tools you already use work on them:
+
+- Drag a caption to retime it.
+- Trim its edges, split it or delete it.
+- Select a run of captions and restyle them together in the Clip tab, under **Text**.
+
+[Edit captions](/captions/edit-captions/) covers what's particular to them, such as changing the words on a word caption.
+
+## Captions burn in with no extra step
+
+Captions are part of the picture, so the preview, an exported movie and a frame an agent renders all show them. There's nothing to switch on.
+
+That also means an export always carries them burned in. They aren't a soft-subtitle track that a viewer can turn on and off. If you need that, write a separate subtitle file with [**File ▸ Export Captions…**](/captions/export-captions/).
+
+## Two kinds of caption: subtitles and word captions
+
+When you generate captions, the **Style** row chooses the kind.
+
+| Kind | What you get |
+| --- | --- |
+| [Subtitles](/captions/subtitles/) | Classic two-line captions. |
+| [Word captions](/captions/word-caption-styles/) | Large captions in one of five styles, where the word being said stands out. |
+
+Speech is recognised [on this Mac](/captions/on-device-transcription/), with nothing uploaded, or [by AssemblyAI](/captions/assemblyai-transcription/) in the cloud, on your own key. Either engine can make either kind.
+
+An imported file always comes in as plain text in the **Caption** preset, the look subtitles use.
+
+## Caption track names
+
+The first caption track is called **Captions**, then **Captions 2**, **Captions 3** and so on, taking the next free number, so you can tell separate runs apart in the track headers.
+
+The name does some work. **Replace** in [Generate Captions](/captions/restyle-captions/), [**Re-lay Captions for This Canvas**](/captions/re-lay-captions/) and [captions following a speed change](/speed/captions-and-speed/) only touch a track called **Captions** or **Captions** and a number, and only when it holds nothing but text clips. [Rename a track](/timeline/manage-tracks/) to anything else and all three leave it alone.
+
+## A caption track is never guessed
+
+Nothing in a project marks a track as the caption track. A name alone doesn't make one, and you can rename a track whenever you like. So a command that writes a caption file shows you the choice instead of assuming.
+
+Any track can be exported when it has at least one clip, every clip on it is a text clip, and at least one of those clips has text. A track of titles qualifies as well.
+
+[**File ▸ Export Captions…**](/captions/export-captions/) lists every such track in its **Track** pop-up, front-most first, with the front-most selected. With only one to choose from, the pop-up is greyed. With none, the menu item is greyed.
+
+An agent has no pop-up to look at. When a project has several such tracks and the agent doesn't name one, `export_captions` won't pick for it, and it replies with the list. With none, it says there are no captions to write.
+
+## Frame grid and no overlaps
+
+These rules apply to every caption that's imported or generated.
+
+- **Times land on frames.** Every caption's start and end snap to the nearest frame of the project, so a caption can come out up to a frame shorter or longer than its source says. A caption that would snap to no length at all gets one frame.
+- **Captions on one track never overlap.** When a caption starts before the previous one ends, the earlier one is cut back to meet it, and the run reports how many were shortened.
+- **A caption needs at least one frame.** One that would be left shorter than that is skipped and reported.
+
+## Captions inside a nest
+
+The caption commands work on the timeline you have open. With a [nest open](/editing/inside-a-nest/):
+
+- **Import Captions…** and **Generate Captions…** put the new track at the front of the nest.
+- **Export Captions…** lists that nest's tracks.
+
+To caption the main timeline, close the nest first.
+
+## Related
+
+- [Import captions](/captions/import-captions/)
+- [Generate Captions](/captions/generate-captions/)
+- [Subtitles](/captions/subtitles/)
+- [Word caption styles](/captions/word-caption-styles/)
+- [Edit captions](/captions/edit-captions/)
+- [Export captions](/captions/export-captions/)
+- [Text clips](/text-and-shapes/text-clips/)

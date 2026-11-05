@@ -1,0 +1,128 @@
+---
+title: Add, rename and reorder tracks
+description: Add a track, name it, change its place in the stack, remove it, and use the Track menu and a track's right-click menu.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Add a track when you need another layer, name it so the stack stays readable, and clear out the tracks you've stopped using.
+
+<AtAGlance
+  menu={['Track ▸ New Track', 'Track ▸ Remove Track', 'Track ▸ Remove Empty Tracks']}
+  keys="⇧⌘N"
+  where={['Double-click or drag a track header', 'Right-click a track header or an empty stretch of its lane']}
+  tools={['add_track', 'remove_track', 'move_track', 'set_track', 'remove_empty_tracks']}
+/>
+
+## New Track
+
+Choose **Track ▸ New Track** or press <kbd>⇧⌘N</kbd>. An empty track appears at the front, as the top lane. It's named from the track count, such as `Track 4` when there are three tracks.
+
+A project holds at most 64 tracks, and the tracks inside nests count towards that. Past the limit, Frame Job shows an error and adds nothing.
+
+## Drop past the stack
+
+You can make a track and fill it in one move:
+
+- Drag clips above the top lane to make a new front track for them.
+- Drag clips below the bottom lane to make a new back track for them.
+
+Clips selected on more than one track can only make a new back track. The new track and the move are one undo step, and this works for a <kbd>⌥</kbd>-drag duplicate too. See [Move clips](/editing/move-clips/).
+
+Dropping a file from the Media tab on the preview also adds a new front track for it.
+
+## Rename a track
+
+<Steps>
+
+1. Double-click the track's header, away from its switches. A name field opens in place.
+
+2. Type the new name.
+
+3. Press <kbd>Return</kbd> or <kbd>Tab</kbd>, or click somewhere else.
+
+</Steps>
+
+<kbd>Esc</kbd> closes the field and keeps the old name. So does clearing the field, because this field can't leave a track with no name. Spaces at either end of the name are dropped. [Clips](/timeline/names-and-labels/#rename-a-clip) and [markers](/timeline/markers/#move-rename-and-remove-a-marker) rename in the same kind of field.
+
+## Reorder tracks
+
+Drag a track's header up or down. A coral line shows where it will land, and the track moves there when you let go.
+
+Dragging a header changes what draws in front of what. It also changes what a [matte track](/canvas/matte-tracks/) cuts, because a matte cuts the track directly behind it. A locked track can be moved like any other.
+
+## Remove Track
+
+**Track ▸ Remove Track** removes the [current track](/timeline/tracks/#the-current-track). **Remove Track** in the [track context menu](#the-track-context-menu) removes the track you clicked, which is how you remove an empty track that isn't the front-most, since an empty track has no clip to select.
+
+An empty track goes at once. A track that still holds clips asks first, in an alert titled with the track's name: "The track still holds 3 clips, which will be removed with it." Choose **Remove** or **Cancel**. One undo brings back the track and its clips.
+
+A project always keeps one track, so the last one can't be removed. **Remove Track** is greyed out on it in the context menu. **Track ▸ Remove Track** stays available, but Frame Job beeps and says why at the foot of the inspector. If that last track holds clips, the alert comes first.
+
+## Remove Empty Tracks
+
+**Track ▸ Remove Empty Tracks** drops every track that holds no clips, as one undo step. Hidden, locked and named tracks go too if they're empty. If every track is empty, the back-most one stays. If no track is empty, Frame Job beeps.
+
+## The Track menu
+
+The **Track** menu's commands work on the [current track](/timeline/tracks/#the-current-track), apart from **New Track** and **Remove Empty Tracks**.
+
+| Item | Key | What it does |
+| --- | --- | --- |
+| **New Track** | <kbd>⇧⌘N</kbd> | Adds an empty track at the front. |
+| **Remove Track** | | Removes the current track. |
+| **Remove Empty Tracks** | | Drops every track with no clips. |
+| **Hide Video** | | Flips the current track's [Hide Video](/timeline/hide-and-lock-tracks/#hide-video) switch. |
+| **Mute Audio** | | Flips its [Mute Audio](/audio/mute-and-solo/) switch. |
+| **Lock Track** | | Flips its [Lock Track](/timeline/hide-and-lock-tracks/#lock-track) switch. |
+| **Solo** | | Flips its [Solo](/audio/mute-and-solo/) switch. |
+| **Mix…** | | Opens its [mix panel](/audio/track-volume-and-pan/). |
+| **Matte** | | Makes it a [matte track](/canvas/matte-tracks/): **Off**, **Alpha**, **Inverted Alpha**, **Luma** or **Inverted Luma**. |
+
+Of the four switches, only **Solo** shows a checkmark in this menu, because a soloed track with nothing on it still silences the rest and you can't always hear that. For the other three, read the track's header.
+
+## The track context menu
+
+Right-click or <kbd>⌃</kbd>-click a track's header, or the empty part of its lane, to get a menu for that track:
+
+- **Hide Video**, **Mute Audio**, **Lock Track** and **Solo**, each checked when it's on
+- **Mix…**
+- **Matte**, with the track's mode checked
+- **Remove Track**, greyed out on the last track
+
+Every item acts on the track you clicked, not the current track, and shows that track's own state. A right-click on a clip, the ruler or the corner above the headers opens no menu.
+
+## Undo names
+
+Every switch flip, rename and reorder is one undo step, and **Edit ▸ Undo** (<kbd>⌘Z</kbd>) names the edit it will reverse. The names for edits to tracks, markers and clip labels are:
+
+| Edit | Undo name |
+| --- | --- |
+| Track switches | Hide Track, Mute Track, Lock Track, Solo Track |
+| A track's matte | Track Matte |
+| A track's mix | Track Volume, Track Pan, Track Compressor, Track Limiter, Reset Track Mix |
+| Track names and order | Rename Track, Reorder Track |
+| Adding and removing tracks | New Track, Remove Track, Remove Empty Tracks |
+| Markers | Add Marker, Move Marker, Rename Marker, Chapter Marker, Remove Marker |
+| Clip names and labels | Rename Clip, Label Clip |
+
+## Good to know
+
+- With a [nest](/editing/nests/) open, everything on this page works on the nest's own tracks, except that the mix panel's compressor and limiter are turned off there.
+- **Remove Track** takes only the clips on that track. A linked picture or sound on another track stays, and is no longer linked.
+
+## With an agent
+
+[`add_track`](/mcp/tools-tracks-and-markers/#add_track) can put a new track anywhere in the stack and name it as it's made, where you'd add it at the front and then drag it. [`move_track`](/mcp/tools-tracks-and-markers/#move_track) moves a track to a numbered place in the stack, 0 being the back. To do what a drop past the stack does, an agent adds the track and then moves the clips onto it with [`move_clip`](/mcp/tools-move-and-trim/#move_clip).
+
+[`remove_track`](/mcp/tools-tracks-and-markers/#remove_track) never asks: it leaves a track that holds clips alone unless it's told to take them too, and it won't remove the last track.
+
+These tools also work on the tracks inside a nest. See [Tools: tracks, markers and canvas](/mcp/tools-tracks-and-markers/) and [Editing inside a nest](/mcp/nests/).
+
+## Related
+
+- [Tracks](/timeline/tracks/)
+- [Hide and lock tracks](/timeline/hide-and-lock-tracks/)
+- [Move clips](/editing/move-clips/)
+- [Undo and saving](/getting-started/undo-and-saving/)

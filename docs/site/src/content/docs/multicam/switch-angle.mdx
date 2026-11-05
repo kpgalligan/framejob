@@ -1,0 +1,108 @@
+---
+title: "Switch Angle"
+description: Re-pick one shot of your program from another camera, in sync, over exactly the same span.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Switch Angle replaces one shot with another camera's picture over exactly the same span. Use it to fix a single cut after [Switch by Speaker](/multicam/switch-by-speaker/), or to pick shots by hand. Your cameras need to be [lined up on tracks of their own](/multicam/set-up/) first.
+
+<AtAGlance menu="Clip ▸ Switch Angle ▸" tools="switch_angle" />
+
+## Switch to another camera
+
+<Steps>
+
+1. Select the one shot you want to change, usually a clip on your [program track](/multicam/set-up/#the-program-track).
+
+2. Open **Clip ▸ Switch Angle ▸**. The submenu [lists the cameras](#the-camera-list) that cover the whole shot.
+
+3. Choose a camera.
+
+</Steps>
+
+The whole switch is one undo step, called **Switch Angle**. The new clip is selected afterwards, or all of them if the shot became [several pieces](#a-camera-that-stopped-and-started). Switch Angle has no keyboard shortcut, so you can't switch cameras with number keys while the show plays.
+
+## The camera list
+
+The submenu lists, front track first, every other track whose video clips cover the shot's whole span. Frame Job writes the list each time the menu opens, so it always matches the current selection.
+
+- Only clips of a video file with a picture count. Pictures, freeze frames, text, shapes, graphics and nests don't.
+- A clip with its picture switched off still counts, and so does a clip on a hidden track. That's what keeps your cameras in the list after [Switch by Speaker](/multicam/switch-by-speaker/) has hidden them or turned their pictures off.
+- The list stops at nine tracks. A tenth covering track, further back, isn't listed.
+
+### Tracks with the same name
+
+When two listed tracks share a name, each gets its position counted from the back track, for example **Camera (2)** and **Camera (3)**. A name only one listed track has appears as it is.
+
+### No Covering Angle
+
+The submenu holds a single greyed item, **No Covering Angle**, when there's nothing to switch to. That happens when you haven't selected exactly one clip, or when no track covers the selected clip. This item is never available.
+
+### Greyed cameras
+
+The cameras are listed but greyed when the switch can't be made:
+
+| Why it's greyed | What to do |
+| --- | --- |
+| The shot's track is locked. | [Unlock the track](/timeline/hide-and-lock-tracks/). |
+| The shot is linked to a detached sound. | Choose [**Clip ▸ Attach Audio**](/audio/detach-and-attach/) first. |
+| A sheet is open on the window. | Close the sheet. |
+
+## What the switch does
+
+The shot is replaced by the camera's picture on the shot's own track, over the same span and in sync. The new clip shows the camera's own frame at every moment, so a cut to it lands exactly where the old shot's cut did.
+
+### A camera that stopped and started
+
+A shot can cross the end of one of the camera's clips and the start of the next, when the camera stopped and started again. The shot then becomes two pieces, one from each file, meeting at a plain cut. A shot that crosses more of the camera's clips gets one piece for each.
+
+### Overlapping camera clips
+
+Where two of a camera's clips overlap, as they do across a transition, the later one takes over at its own start. The shot gets a piece of each, meeting at a plain cut, so a transition between those two clips doesn't appear in the shot.
+
+## What the shot keeps and loses
+
+The shot keeps:
+
+- Its span on the timeline.
+- Whether its picture and its sound are on. A shot with its sound off gives you a new clip with its sound off, whatever the camera's clip has.
+- The [transitions](/motion/transitions/) at both of its edges, with their kind, curve and audio shape.
+
+Nothing else carries over. A punch-in, a grade or an action on the old shot isn't copied to the new camera's piece. The piece is cut from the camera's own clip, so it has that clip's settings instead.
+
+## A transition that no longer fits
+
+A transition needs the two clips to overlap by its length. When the camera's first or last piece is too short for that, Frame Job drops that transition and makes the switch anyway, leaving a plain cut at that edge. The undo step then reads **Switch Angle (transition removed)**, so you can see that it happened.
+
+## When a switch fails
+
+When a switch can't be done, nothing changes. Frame Job beeps and shows the reason at the foot of the inspector, after the word "Refused:". The message gives clips and tracks by number, and times in ticks, 600,000 to the second.
+
+| The message says | What it means |
+| --- | --- |
+| "clip 7's edge is held at tick …, short of tick …, so clip 9 cannot be re-picked" | The clip next to the shot plays a [speed ramp](/speed/speed-ramps/) that can't give up the transition's frames. The message names that clip and the shot. |
+| "track 3 does not cover clip 12: nothing with a picture plays on it at tick …" | The camera doesn't cover the shot, and the message names the first moment it doesn't. The menu only lists cameras that cover the shot, so this one normally comes back to an agent calling `switch_angle`. |
+
+## Good to know
+
+- Switch Angle works inside an open [nest](/editing/nests/), on the nest's own tracks.
+- Only the shot's track has to be unlocked. A locked camera track is still listed, and you can switch to it.
+- Frame Job doesn't check what kind of clip you've selected. A text or picture clip with a camera covering it gets replaced in the same way.
+- A shot that becomes several pieces adds clips. At the project's limit of 4,096 clips, Frame Job beeps and nothing changes, with no message.
+
+## With an agent
+
+[`switch_angle`](/mcp/tools-multicam/#switch_angle) makes the same switch, and it takes the shot and the camera's track directly, so an agent isn't held to the menu's nine tracks. It returns the new clips rather than selecting them. To work inside a nest, open it with `set_scope` first, because the tool doesn't take `scope`.
+
+To lay a whole program out at once rather than one shot at a time, an agent can use [`copy_pieces`](/multicam/copy-pieces/).
+
+## Related
+
+- [Set up several cameras](/multicam/set-up/)
+- [Switch by Speaker](/multicam/switch-by-speaker/)
+- [Transitions](/motion/transitions/)
+- [Detach and Attach Audio](/audio/detach-and-attach/)
+- [The Clip menu](/reference/clip-menu/)
+- [Tools: multicam](/mcp/tools-multicam/)

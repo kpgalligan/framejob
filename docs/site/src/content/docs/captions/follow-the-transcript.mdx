@@ -1,0 +1,75 @@
+---
+title: "Follow along and jump"
+description: "Watch the spoken word light up as the video plays, and use the transcript to move around the timeline."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+The [Transcript tab](/captions/transcript-tab/) stays in step with the playhead, and works the other way too: click the text and the playhead goes there. Use it to find a moment by what was said, instead of scrubbing for it.
+
+<AtAGlance
+  menu="View ▸ Transcript"
+  keys="⌃⌘T"
+  where="Inspector ▸ Transcript"
+  tools={['get_timeline_transcript', 'set_playhead']}
+/>
+
+## The word being spoken
+
+While the video plays, the word being spoken is highlighted. It stays lit through the pause after it, until the next word starts. Before the first word, nothing is lit.
+
+The highlight follows the playhead when you're paused too, so moving the playhead by hand lights the word there.
+
+## The text scrolls with playback
+
+During playback the text scrolls to keep the spoken word in view.
+
+If you scroll the text yourself, it stays where you put it for three seconds before it follows again. With playback paused, the text doesn't scroll on its own.
+
+## Click a word to jump
+
+Click a word to move the playhead to it and select it. The playhead lands on a whole frame. If the video is playing, it keeps playing from there.
+
+The selected word becomes the timeline's in/out range, so clicking a word replaces any range you've set. See [Cut by deleting words](/captions/delete-words/).
+
+## Click a timecode to jump
+
+Click a paragraph's timecode to move the playhead to the start of that paragraph. Unlike a click on a word, this doesn't change the selection.
+
+## A selected clip scrolls to its words
+
+Click a clip that's already selected, on the timeline or the canvas, while the Transcript shows. The tab stays, and the clip's first word scrolls to the top. The playhead doesn't move.
+
+The click that selects a clip doesn't bring its words up, so click it a second time. Leave a moment between the clicks: a double-click on the timeline renames the clip, or opens a nest.
+
+For a nest clip, that's the first word inside the nest. A clip with no words in the tab scrolls nothing.
+
+## Loop plays the selected words
+
+Whatever you select in the text becomes the in/out range, so [Loop](/timeline/loop/) can play it. Use it to hear a cut before you make it.
+
+<Steps>
+
+1. Select the words: drag across them, or click the first and <kbd>⇧</kbd>-click the last.
+
+2. Turn on **Loop**, the repeat button in the toolbar.
+
+3. Press <kbd>Space</kbd>.
+
+</Steps>
+
+Change the selection and the next pass plays the new range. <kbd>⎋</kbd> clears the selection and the range with it, and Loop then plays to the end of the timeline, goes back to its start and stops there.
+
+Words at the very end of the timeline play once, then playback goes back to the first selected word and stops. Press <kbd>Space</kbd> to hear them again.
+
+## With an agent
+
+[`get_timeline_transcript`](/mcp/tools-captions/#get_timeline_transcript) gives each word's time on the timeline, and [`set_playhead`](/mcp/tools-view-state/#set_playhead) moves the playhead there.
+
+## Related
+
+- [The Transcript tab](/captions/transcript-tab/)
+- [Cut by deleting words](/captions/delete-words/)
+- [Transcript keys](/captions/transcript-keys/)
+- [Loop playback](/timeline/loop/)

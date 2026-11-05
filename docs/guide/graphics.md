@@ -31,7 +31,7 @@ in the editor.
   graphic is drawn in, Frame Job adds a fixed, fine pattern under half a
   level, so a dark gradient shades smoothly instead of in steps. Flat
   colours, pictures, text and transparency are drawn exactly. The pattern
-  survives `render_frame`, Save Frame… and ProRes. A 10-bit export
+  survives `render_frame`, Save Frame… as PNG and ProRes. A 10-bit export
   (`hevc_10bit`) smooths most of it away but keeps the in-between shades,
   so the gradient stays smooth; an 8-bit H.264 or HEVC export smooths it
   away too, and its steps come back.
@@ -45,7 +45,7 @@ the fonts installed on your Mac, so a project draws the same everywhere.
 
 ## Adding a graphic
 
-**Insert ▸ Graphic…** opens the Graphic dialog. On the left are the
+**Insert ▸ Graphic…** opens the Insert Graphic dialog. On the left are the
 categories: **This Project** first, when the project's `graphics/` folder
 holds a module (every module in it, whatever its own category), then the
 bundled templates' categories, in alphabetical order. In the middle are the
@@ -76,7 +76,7 @@ The bundled templates:
 | Countdown | Data & Time | A timer counting down (or up) one step a second inside a ring that empties or fills, pulsing on each tick and flashing at the end | 330 frames |
 | Counter | Data & Time | A number counting from one value to another with thousands separators, a prefix and a label | 90 frames |
 | Donut chart | Data & Time | A titled donut whose slices sweep in turn from comma-separated values and labels, the first slice's share counting up in the centre, with a legend beside it (below it in portrait) | 150 frames |
-| End screen | Social & YouTube | A full-frame card with a title, two 16:9 placeholders for the videos you link, side by side, and a subscribe circle centred under them (a column in portrait) | 300 frames |
+| End screen | Social & YouTube | A full-frame card with a title, two 16:9 placeholders where the platform's own video elements go, side by side, and a subscribe circle centred under them (a column in portrait) | 300 frames |
 | Gauge | Data & Time | A dial with ticks whose accent arc and needle swing to a value, with the value counting up and its units and label | 120 frames |
 | Handle tag | Social & YouTube | An accent tile holding a generic glyph (play, camera, speech bubble, note or globe) and a pill with your @handle, at a corner | 120 frames |
 | Keyboard keys | Screencast | A shortcut such as cmd+shift+4 as keycaps popping in, each pressed in turn, with ⌘ ⇧ ⌥ ⌃ and the arrows drawn as symbols, and a label under them | 90 frames |
@@ -152,7 +152,8 @@ shape.
 Placing the clip is one undo step, **Insert Graphic**. Copying the file into
 the project is not undone. If the module doesn't compile, no clip is placed:
 the dialog stays open with the first error and its line under the lists (for
-From File…, an alert says it); a template's copy stays in `graphics/`. A file
+From File…, an alert says it); the copy of the template or file stays in
+`graphics/`. A file
 that isn't UTF-8 text is refused.
 
 Insert ▸ Graphic… is greyed until the project's window is open.
@@ -164,7 +165,7 @@ then `add_graphic_clip` (`track`, `at`, `name`, and optionally `duration`,
 
 ### Sharing a graphic
 
-**Export…** in the Graphic dialog saves the chosen graphic as a
+**Export…** in the Insert Graphic dialog saves the chosen graphic as a
 `.fjgraphic` file (Finder calls it a Frame Job Graphic): a zip holding a
 `manifest.json`, the module, and the project fonts and pictures it uses. It
 is enabled when the chosen graphic compiles. A save panel slides down over
@@ -176,8 +177,8 @@ Exporting changes nothing in the project and is not an undo step.
 To find which fonts and pictures belong in the package, Frame Job draws the
 graphic: every frame (up to 900; a longer graphic has 900 frames spread over
 it) with its default properties, then each choice of each `enum` property
-and the other value of each `boolean` property, one at a time, over 30
-frames each (at most 32 of these). A font is packed when the graphic drew or
+other than its default and the other value of each `boolean` property, one
+at a time, over up to 30 frames each (at most 32 of these). A font is packed when the graphic drew or
 measured text with it, or fell back to it for a character its own font
 lacks; a picture when an `asset(name)` drew it. The app's own fonts are
 never packed, since every copy of Frame Job has them. Text and pictures a
@@ -195,7 +196,7 @@ and how many failed. The assistant asks before it runs.
 
 **Importing a graphic.** Double-click a `.fjgraphic` in Finder (or open it
 with Open With, drop it on Frame Job's Dock icon, or open it from a browser's
-downloads), or choose one with the Graphic dialog's **From File…**. The
+downloads), or choose one with the Insert Graphic dialog's **From File…**. The
 package goes into the front project — the one whose window is in front;
 with none open, a new untitled project — or, for From File…, the dialog's
 own project. If Frame Job was not running it opens first, and the package
@@ -216,7 +217,7 @@ picture stops the import, because the module asks for its pictures by name:
 rename or remove the project's file and import again.
 
 **Import** copies the files into the project's `graphics/` and opens the
-Graphic dialog on This Project with the graphic chosen and a line saying
+Insert Graphic dialog on This Project with the graphic chosen and a line saying
 what was added and what was already there. **Cancel** copies nothing.
 Importing is not an undo step and does not mark the project as edited; an
 untitled project keeps the files when it is first saved. If a copy fails
@@ -235,7 +236,8 @@ selected clip is a graphic clip.
 - **Picture** has Transform (position, scale, rotation, opacity), Shadow,
   Filters, Reflection, Spotlight and Obscure, as for any layer (see
   [Canvas and layers](canvas-and-layers.md)). It has no Crop, Corner Radius
-  or Chroma Key, which are for clips drawn from media.
+  or Chroma Key section, though crop mode still works on the canvas (see
+  [Crop](canvas-and-layers.md#crop)).
 - There is no **Color** sub-tab. To grade a graphic, put an adjustment clip
   above it (see [Color grading](color-grading.md)).
 - **Clip** has the clip's timing and Motion, but no Speed section: speed is
@@ -243,7 +245,7 @@ selected clip is a graphic clip.
 
 The Graphic sub-tab has four sections: Source, Properties, Size and Timeline.
 Properties opens expanded. Source, Size and Timeline open collapsed, and
-their collapsed summaries show, in turn, the error or warning count (or the
+their summaries show, in turn, the error or warning count (or the
 module's name), `W × H`, and the length.
 
 ### Source
@@ -279,13 +281,14 @@ Under the buttons, grouped by heading:
 - **No errors or warnings at the clip's first frame**, or **Checked at the
   clip's first frame** followed by what drawing that frame reported, such as
   a missing font or a picture that isn't in the project.
-- **In the graphics folder**: files the folder scan skipped (a bad module or
-  picture name, an empty file, a font that loads no face) or could not watch,
-  each with a **Reveal** button.
+- **In the graphics folder**: modules, fonts and pictures the folder scan
+  skipped (a bad module or picture name, an empty picture, a font that doesn't
+  load), and anything it could not watch, each with a **Reveal** button.
 
-Each diagnostic reads "line L, column C — message". Click it, or its
-**Open** button, to open the module in your editor. The section's summary,
-when collapsed, is the error or warning count, or the module's name when all
+A diagnostic reads "line L, column C — message", "line L — message" when it
+has no column, or just the message when it has no line. Click it, or its
+**Open** button, to open the module in your editor. The section's summary
+is the error or warning count, or the module's name when all
 is well.
 
 When the selected clips are drawn by different modules, Source names them
@@ -313,9 +316,11 @@ module's default for every property (see
 [Animating a graphic's properties](#animating-a-graphics-properties)).
 
 A value the clip holds for a property the module no longer declares stays,
-dimmed, below the rows, with **⌫** to remove it. If the module doesn't
-compile, the section says so and lists the stored values. A module that
-declares no properties says "The module declares no properties."
+dimmed, below the rows, with **⌫** to remove it. If the module is missing
+or doesn't compile, the section reads "The module did not compile — see
+Source. Stored values are listed below." and lists the stored values; Source
+says which it is. A module that declares no properties says "The module
+declares no properties."
 
 Properties appear only when all the selected clips share one module. With
 several clips selected, a change applies to all of them.
@@ -347,10 +352,10 @@ this:
   actions move it to, shrink and stretch with the two sides; its scale stays
   as it was. Any other graphic, including one with the same area but another
   shape, is kept as placed, rescaled from the old canvas like a title.
-- **The bundled Lower third, Title card, Callout, Bar chart, Counter and
-  Kinetic type templates** measure themselves by the canvas's short side, so
-  they fit a tall frame and draw exactly as before on a landscape or square
-  one.
+- **Every bundled template** measures itself by the short side of the size it
+  draws at, so it fits a tall frame. Lower third, Title card, Callout, Bar
+  chart, Counter and Kinetic type once measured by the height, and draw exactly
+  as before on a landscape or square one.
 - **Older copies of those six in the project**, inserted before they measured
   by the short side, are recognised by their text (not their name) and, in the
   copy Make a copy opens, rewritten with the current template. Your earlier
@@ -358,7 +363,7 @@ this:
   Version… brings it back), and the project you started from never changes.
   Applied in place, without Make a copy, nothing is rewritten and the summary
   lists each one instead.
-- **A module of your own that sizes itself by the canvas's height**
+- **A module of your own that sizes itself by its height**
   (`ctx.height / 1080`) is listed in the summary, since it may not fit the
   narrow frame. It is never rewritten.
 
@@ -513,8 +518,8 @@ selected. Delete always opens on the first module in the list.
 - **Rename** is one undo step when a clip uses the module, and Undo renames
   the file back too. A module no clip uses is renamed back by renaming it
   again. Rename is refused if the new name isn't a module name, if a module
-  of that name already exists, or if clips left behind by a deleted module of
-  that name still use it. Rename is greyed while a nest is open.
+  of that name already exists, or if clips already name it though the
+  folder holds no such module. Rename is greyed while a nest is open.
 - **Delete** is refused while any clip is drawn by the module, and the sheet
   names those clips: delete them or switch them to another module first.
   Fonts and pictures are left alone. Deleting is not an undo step.
@@ -570,8 +575,8 @@ example module.
 - **A graphic that fails** (its module is missing, doesn't compile, throws,
   or runs too long) draws a dark red error card with the error's text in
   place of the graphic, in the preview and in stills.
-- **Time budget**: each frame has 250 ms to draw in the preview and 2 s in an
-  export.
+- **Time budget**: a module's code has 250 ms to draw each frame in the
+  preview and 2 s in an export.
 - **HDR projects**: in an HDR (HLG) project, graphics are drawn at HDR
   reference white (203 cd/m²), like titles and shapes, so a white graphic
   matches SDR white rather than reaching into the highlights. See
@@ -579,7 +584,8 @@ example module.
 
 ## Exporting
 
-An export draws each graphic as its module stood when the export was queued.
+An export draws each graphic as its module stood when the export started, or
+when it was added to the queue.
 Editing a module while an export runs doesn't change that file. See
 [Export](export.md).
 
@@ -603,8 +609,8 @@ An agent connected over MCP (see [MCP](mcp.md)) can do the whole job:
 3. `render_graphic {name, frames}`: look at up to 16 frames on a contact sheet
    (a PNG with each frame's number under it) without placing a clip; `frame`
    draws one frame instead (not with `frames`; with neither, frame 0). A frame
-   that fails is drawn as its error card, with a sentence giving the engine's
-   location. `format: "svg"` answers one frame's SVG text, its diagnostics and
+   that fails is drawn as its error card, with a sentence giving the error and,
+   when it has one, the engine's location. `format: "svg"` answers one frame's SVG text, its diagnostics and
    the `ctx` it was drawn with. It takes `props`, `width`,
    `height`, `max_width` (default 2048), `background` (`transparent`, the
    default, `checker`, or a hex colour) and `path`. A sheet draws at most

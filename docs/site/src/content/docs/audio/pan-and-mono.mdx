@@ -1,0 +1,68 @@
+---
+title: "Pan and Mix to mono"
+description: "Move a stereo clip's balance left or right, fold its channels into one, and place a sound anywhere between the speakers."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The **Mix** section places a clip's sound between the speakers. **Pan** moves a stereo clip's balance, and **Mix to mono** folds its channels into one.
+
+<AtAGlance
+  where="Clip tab ▸ Sound ▸ Mix"
+  tools="set_audio"
+/>
+
+The section's header summarises it: "centre", "mono", or the pan position. **Detach Audio** and **Attach Audio** are on the same section, and have [their own page](/audio/detach-and-attach/).
+
+## Pan a clip
+
+Drag **Pan**, type a number from −100 to 100, or use a quick pick: −100, −50, 0, 50 or 100. Negative numbers go left, positive numbers go right, and the default is 0.
+
+**Position**, under it, reads the result in words: "centre", "left 30" or "right 100". It's a readout, so there's nothing to set there.
+
+On a stereo clip, **Pan** is a balance control. It doesn't move the left channel's sound across to the right:
+
+- At the centre, nothing changes.
+- Moving it one way turns that side up and the other side down, keeping the total power steady.
+- At −100 or 100, the side it went to is about 3 dB louder than at the centre, and the other side is silent.
+
+Pan has no effect on a mono file. See [Good to know](#good-to-know).
+
+## Mix to mono
+
+**Mix to mono** averages all of the clip's channels into one and sends that to every channel. It's off by default.
+
+On a one-channel file it does nothing, because there's nothing to fold.
+
+If only one channel of a stereo file has anything on it, use [Channels](/audio/channels/) instead. Averaging a voice with a silent channel halves its level.
+
+## Place a stereo clip's sound anywhere
+
+To hear a true pan, tick **Mix to mono** as well as setting **Pan**. The fold happens before the pan, so both channels carry the same sound, and **Pan** places that one sound anywhere from left to right.
+
+## Animate them
+
+With an [action](/motion/edit-an-action/) selected, both controls write what the action changes to. **Pan** glides there across the action. **Mix to mono** is a switch, so it changes at the action's end, and its row says "at end". See [Animate sound with actions](/audio/animate-sound/).
+
+## Reset the section
+
+**Reset** on the section's header sets the pan back to centre and turns mono off. It appears while the section differs from its default and no action is selected. See [Reset a section](/getting-started/inspector-fields/#reset-a-section).
+
+## Good to know
+
+- Pan has no effect on a mono file, with or without **Mix to mono**, because the file still has only one channel when Pan acts on it. A [track's pan](/audio/track-volume-and-pan/) can't move it either.
+- On a nest clip, **Pan** has no effect. Set it on the clips inside.
+- **Mix to mono** on a nest clip does work: it folds everything inside the nest, and that flattens any panning on the clips and tracks in it.
+- The Volume section's **Loudness** readout counts Pan and Mix to mono on a stereo clip, and so does [Normalize](/audio/normalize/) in Loudness mode.
+- In the clip's chain of sound processing, this section comes after the [compressor](/audio/compressor/) and before the [limiter](/audio/limiter/).
+
+## With an agent
+
+`set_audio` sets these with `pan`, from −1 for hard left to 1 for hard right (the inspector's −100 to 100), and `mono`, true or false. See [Tools: clip sound](/mcp/tools-set-audio/#mono-keep-pitch-pan-and-channels).
+
+## Related
+
+- [Channels](/audio/channels/)
+- [Track volume and pan](/audio/track-volume-and-pan/)
+- [Detach and Attach Audio](/audio/detach-and-attach/)
+- [The Sound tab](/audio/sound-tab/)

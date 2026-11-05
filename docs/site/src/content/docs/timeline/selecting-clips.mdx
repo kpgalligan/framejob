@@ -1,0 +1,95 @@
+---
+title: "Select clips"
+description: "Pick the clips you want to work on by clicking, dragging a marquee, or choosing a whole track or everything after the playhead."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The selection tells Frame Job which clips you mean. The inspector, the handles on the canvas and the commands in the menus all work on it. Selecting a clip changes nothing in the project.
+
+<AtAGlance
+  menu={['Edit ▸ Select All', 'Edit ▸ Select After Playhead', 'Edit ▸ Select All on Track']}
+  keys={['⌘A', '⌥⌘A']}
+  where={['Click, ⇧-click or drag on the timeline', '⌥-click a track header']}
+  tools="set_selection"
+/>
+
+## Click a clip
+
+Click a clip to select it alone. It gets an outline, and the timeline bar names it.
+
+Clicking a clip that's already part of a larger selection keeps the whole selection, so you can drag the clips together. To get down to one clip, click empty space first, then click the clip.
+
+You can click a clip on a [locked track](/timeline/hide-and-lock-tracks/) to select it and read it in the inspector, but you can't drag or trim it.
+
+A double-click goes further: it [renames the clip](/timeline/names-and-labels/), or goes inside a [nest](/editing/nests/).
+
+## Add or remove a clip
+
+<kbd>⇧</kbd>-click a clip to add it to the selection. <kbd>⇧</kbd>-click a selected clip to take it out.
+
+## Drag a marquee
+
+Drag from any empty part of the timeline: a gap in a lane, the strip under the ruler, or the space below the last lane. A band follows the pointer and selects every clip it touches, however little of the clip it covers.
+
+- A plain drag replaces the selection.
+- <kbd>⇧</kbd>-drag adds to the selection. Clips already selected stay selected.
+- Clips on locked tracks are skipped.
+
+## Clear the selection
+
+Click an empty part of a lane, or the space above or below the lanes.
+
+:::caution
+A double-click in an empty part of a lane [closes that gap](/editing/close-gaps/). That's an edit, not a deselect. Press <kbd>⌘Z</kbd> if you did it by accident.
+:::
+
+## Select all the clips
+
+**Edit ▸ Select All** (<kbd>⌘A</kbd>) selects every clip in the timeline you're editing, on locked tracks too. With a nest open, it selects the clips inside the nest.
+
+While you're typing in a field, <kbd>⌘A</kbd> selects the field's text instead. With the [Transcript tab](/captions/transcript-keys/)'s text in focus, it selects the words.
+
+## Select everything after the playhead
+
+**Edit ▸ Select After Playhead** (<kbd>⌥⌘A</kbd>) selects every clip whose start is at or after the playhead, on every track, including locked ones. A clip the playhead is partway through isn't included.
+
+Use it to push the rest of a project along: select everything after the playhead, then [drag it to make room](/editing/close-gaps/#open-room-by-hand).
+
+## Select all the clips on a track
+
+<kbd>⌥</kbd>-click a track's header to select every clip on that track, locked or not. On an empty track, this leaves nothing selected.
+
+**Edit ▸ Select All on Track** does the same for the current track, which is the track of the first selected clip, or the [front track](/timeline/tracks/) (the top lane) when nothing is selected. It's dimmed when the timeline has no clips, and it beeps when the current track is empty.
+
+## See what's selected
+
+The left end of the timeline bar names the selection.
+
+| Selected | The bar shows |
+| --- | --- |
+| One clip | A chip in the colour of the clip's kind (video, audio, text and so on), the clip's name, and its track and kind under it, such as `Track 2 · video` |
+| Several clips | A count such as `3 clips`, over the track (or `2 tracks`) and the kind (or `mixed`) |
+| Nothing | `No selection` |
+
+This block is a fixed width, so a long name is cut short and the tools beside it never move.
+
+## How a selection behaves
+
+A selection isn't an edit. It's never an undo step, it doesn't mark the project as changed, and it isn't saved, so a project always opens with nothing selected.
+
+- Selecting clips, on the timeline or with the Edit menu's commands, switches the inspector from the **Media** or **Document** tab to its **Clip** tab. The **Transcript** tab stays where it is.
+- The timeline and the canvas share one selection. See [Select on the canvas](/canvas/select-on-canvas/).
+- A clip that's deleted drops out of the selection.
+- Going into a nest or coming back out changes the selection, because the clips on show are different.
+
+## With an agent
+
+[`set_selection`](/mcp/tools-view-state/#set_selection) sets the selection, and with no clips it clears it. An agent doesn't need it to edit, because its tools name their own clips. It matters for what depends on the selection, such as the canvas handles and the inspector. With a nest open, it selects inside the nest. See [Tools: playhead, range and selection](/mcp/tools-view-state/).
+
+## Related
+
+- [Select on the canvas](/canvas/select-on-canvas/)
+- [Select an action](/motion/select-an-action/)
+- [Move clips](/editing/move-clips/)
+- [Hide and lock tracks](/timeline/hide-and-lock-tracks/)

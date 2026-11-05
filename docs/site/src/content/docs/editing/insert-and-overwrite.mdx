@@ -1,0 +1,87 @@
+---
+title: "Insert and overwrite"
+description: Bring a file into a cut that's already timed, either by making room for it or by replacing what's there.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Insert and Overwrite bring a file into a cut that's already timed. Insert makes room for it and pushes everything later along. Overwrite replaces what's there and moves nothing.
+
+<AtAGlance
+  menu={['Edit ▸ Insert at Playhead', 'Edit ▸ Overwrite at Playhead']}
+  keys={['⌥-drop', '⇧⌥-drop']}
+  where="Right-click a row in the Media tab"
+  tools={['insert_clip', 'overwrite_clip']}
+/>
+
+## Place a file at the playhead
+
+<Steps>
+
+1. Click the file's row in the Media tab.
+
+2. Move the playhead to where the file should start.
+
+3. To choose the track, select a clip on it. With nothing selected, the file goes on the front track.
+
+4. Choose **Edit ▸ Insert at Playhead** or **Edit ▸ Overwrite at Playhead**.
+
+</Steps>
+
+Neither item has a shortcut. You can also right-click a row and choose either item there, which acts on that row and selects it.
+
+The file lands on the [current track](/editing/how-edits-work/#what-an-edit-acts-on). With a [nest](/editing/inside-a-nest/) open, that's a track inside the nest.
+
+## Drop with a modifier
+
+Drag a row from the Media tab onto a track, and hold a modifier as you let go. Only the keys held at that moment count.
+
+| Hold | What the drop does |
+| --- | --- |
+| Nothing, or <kbd>⇧</kbd> alone | [Adds the clip](/editing/add-clips/#drag-media-onto-a-track) without moving anything |
+| <kbd>⌥</kbd> | Inserts at the drop point |
+| <kbd>⇧⌥</kbd> | Overwrites at the drop point |
+
+The modifiers only work on a track. A drop on the preview canvas always [adds the file on a new track](/editing/add-clips/#drop-media-on-the-canvas).
+
+## Insert a file
+
+Insert keeps everything you've already cut, and the timeline gets longer by the length of the file.
+
+- If the point falls inside a clip on the destination track, that clip is split there.
+- Every unlocked track opens up by the file's length. Clips that start at or after the point move later, and so do markers.
+- The file lands in the room this makes.
+
+Only the destination track is cut. A clip on another track that spans the point stays whole and where it is, so a music bed plays on unbroken under the new file. The exception is a [detached sound](/audio/detach-and-attach/) linked to the clip that was cut. It's cut at the same point, so the pair stays in step.
+
+The whole edit is one undo step, Insert.
+
+## Overwrite with a file
+
+Overwrite moves nothing, and what was there is gone. The timeline only gets longer if the file runs past its end.
+
+- The destination track is cut at both ends of the file's length.
+- Whatever lies between the cuts is removed.
+- The file lands in the space.
+
+Nothing shifts and no other track is touched. The exception is again a detached sound linked to a clip that was cut. It's cut at the same points, and its piece under the new file stays, no longer linked.
+
+The whole edit is one undo step, Overwrite.
+
+## Good to know
+
+- **Locked tracks.** Insert won't work on a locked destination track, because the track can't open up, and the reason appears at the foot of the inspector. Insert elsewhere leaves locked tracks where they are, so their clips can fall out of step with the rest. Overwrite still clears a locked track, because you chose that track and nothing has to move.
+- **When the menu items are dimmed.** They need a selected row in the Media tab, and that row can't be a `.cube` LUT. A LUT is [applied as a look](/color/luts/), so its right-click **Insert at Playhead** and **Overwrite at Playhead** are dimmed too. A filter that hides the selected row clears the selection.
+- **The length is the whole file.** Both edits place the file from its first frame to its last. To use part of it, [trim the clip](/editing/trimming/) afterwards. After an Insert, trimming leaves a gap, which [Close Gap](/editing/close-gaps/) removes.
+
+## With an agent
+
+[`insert_clip`](/mcp/tools-adding-clips/#insert_clip) and [`overwrite_clip`](/mcp/tools-adding-clips/#overwrite_clip) make the same edits. Each takes a track, a file and a time, so an agent doesn't need the playhead or a selected row, and it can place a file inside a nest without opening it. See [Tools: adding clips](/mcp/tools-adding-clips/) and [Editing inside a nest](/mcp/nests/).
+
+## Related
+
+- [Add clips to the timeline](/editing/add-clips/)
+- [Trim clips](/editing/trimming/)
+- [Close gaps and insert time](/editing/close-gaps/)
+- [How edits work](/editing/how-edits-work/)

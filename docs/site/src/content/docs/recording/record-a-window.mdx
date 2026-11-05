@@ -1,0 +1,77 @@
+---
+title: Record a window
+description: Pick one window with macOS's picker and record it alone, at its own size.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Record a window when only one app matters. The movie is that window alone, at its own size, with nothing else on your screen in it.
+
+<AtAGlance
+  menu="File ▸ New Recording…"
+  keys="⌥⌘N"
+  where="New Recording panel ▸ Source ▸ Window…"
+  tools="record_screen"
+  needs="The Screen Recording permission."
+/>
+
+## Record a window
+
+<Steps>
+
+1. Open the [recorder panel](/recording/recorder-panel/) with <kbd>⌥⌘N</kbd>.
+
+2. Choose **Window…** in **Source**. macOS's window picker opens.
+
+3. Click the window you want. **Source** now reads **Window (picked)**, and the note under **Size** reads "the picked window's own size".
+
+4. Press **Record**. After a 3, 2, 1 countdown recording starts and the panel leaves the screen. The first time, macOS asks for the Screen Recording permission instead, and you relaunch Frame Job after turning it on. See [Recording permissions](/recording/permissions/#screen-recording).
+
+5. Stop with the [menu-bar item](/recording/menu-bar-item/) or <kbd>⌥⌘N</kbd>.
+
+</Steps>
+
+[**Size**](/recording/record-a-display/#choose-a-size) and [**Rate**](/recording/record-a-display/#choose-a-frame-rate) work as they do for a display: **Nominal (points)** records the window at its point size, and **Best (pixels)** at every pixel.
+
+If the window closes while you're recording, see [When a recording stops on its own](/recording/when-a-recording-stops/).
+
+## Pick a different window
+
+Choose **Window (picked)** again to open the picker and pick another window.
+
+Choosing any other row in **Source** drops the pick. A pick lasts until you quit: close and reopen the panel and it's still there, but it's never remembered between launches.
+
+## If you cancel the picker
+
+Cancel the picker and **Source** goes back to the display you used last, or the main display. That's also true when you've already picked a window and choose the row again, so the earlier pick is gone.
+
+If the picker can't open at all, **Source** goes back the same way and the panel reads "The window picker could not open: …" with the reason.
+
+## Which windows the picker lists
+
+The picker lists other apps' windows. Frame Job's own windows depend on **Include Frame Job windows**:
+
+| Box | The picker lists |
+| --- | --- |
+| Off | None of Frame Job's windows |
+| On | Frame Job's windows, but never the recorder panel |
+
+The box only changes the next time the picker opens. A window you've already picked stays picked.
+
+## Record needs a picked window
+
+If you press **Record** while the row still reads **Window…**, with nothing picked, the panel says "Choose a window with Window… first, or pick a display." No countdown starts, so nothing wrong gets recorded.
+
+## With an agent
+
+An agent doesn't use the picker. It names a window by its system window id, and if Frame Job can't record that window the call stops with an error. It can't name a window and a display at once, and `include_framejob_windows` changes nothing for a window. See [Record with `record_screen`](/mcp/record-screen/).
+
+## Related
+
+- [The recorder panel](/recording/recorder-panel/)
+- [Record a display](/recording/record-a-display/)
+- [Start, pause and stop](/recording/pause-and-stop/)
+- [When a recording stops on its own](/recording/when-a-recording-stops/)
+- [Record a camera beside the screen](/recording/camera-beside-the-screen/)
+- [The cursor in a recording](/recording/cursor/)

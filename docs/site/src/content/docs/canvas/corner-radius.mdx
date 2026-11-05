@@ -1,0 +1,55 @@
+---
+title: Corner radius
+description: Round the corners of a video clip, image clip or freeze frame, from a soft edge to a pill or a circle.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Corner radius rounds the corners of a picture, which is handy for a picture-in-picture or a screen recording sitting on a background.
+
+<AtAGlance where="Clip tab ▸ Picture ▸ Corner Radius ▸ Radius" tools="set_video" />
+
+## Round the corners
+
+<Steps>
+
+1. Select a video clip, image clip or freeze frame and open the [Picture tab](/canvas/picture-tab/).
+
+2. Open the **Corner Radius** section.
+
+3. Drag **Radius**, type a value, or click the chevron for a [quick pick](/getting-started/inspector-fields/#use-a-quick-pick).
+
+</Steps>
+
+| Row | What it does | Default | Range | Quick picks |
+| --- | --- | --- | --- | --- |
+| **Radius** | How round the corners are, in source pixels | 0 px | 0 to 500 px | 0, 4, 8, 16, 32, 64 |
+
+Each change is one undo step. Closed, the section's summary reads the radius, such as `32 px`. **Reset** appears in its header while the radius isn't 0.
+
+## How the radius is measured
+
+The radius is in the source's own pixels, so it scales with the clip. A radius of 32 px on a clip at 50 % looks like 16 px on the canvas.
+
+It rounds the [cropped](/canvas/crop/) picture, so the curve follows the crop rather than the original frame. A [shadow](/effects/shadow/) follows the rounded shape.
+
+A radius can't be more than half the picture's shorter side, and anything above that draws as that half. So a big enough radius turns a wide picture into a pill and a square picture into a circle. **Radius** stops at 500 px, so it gets there only when the picture's shorter side, after any crop, is 1,000 px or less.
+
+## Animate the radius
+
+With an [action](/motion/actions/) selected, **Radius** sets the action's end state, and the corners ramp there along the action's curve. See [Set what an action animates to](/motion/edit-an-action/).
+
+## Good to know
+
+Only video clips, image clips and freeze frames have this section. A rectangle shape has its own radius: see [Shape fill, stroke and size](/text-and-shapes/shape-settings/).
+
+## With an agent
+
+`set_video` sets this with `corner_radius`, in source pixels. It takes any value of 0 or more, without the inspector's 500 px stop. See [Tools: picture and grade](/mcp/tools-set-video/#crop-and-corners).
+
+## Related
+
+- [Crop](/canvas/crop/)
+- [Shadow](/effects/shadow/)
+- [The Picture tab](/canvas/picture-tab/)

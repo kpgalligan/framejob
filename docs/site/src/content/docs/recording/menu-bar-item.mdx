@@ -1,0 +1,52 @@
+---
+title: "The menu-bar item"
+description: "See the elapsed time of a running recording in the menu bar, and pause, resume or stop it from there while another app is in front."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+While a recording runs, Frame Job puts an item in the menu bar. For a display or a window the panel is off screen, so this item is the recording's control, wherever you're working.
+
+<AtAGlance
+  where="The menu bar, while a recording runs"
+  tools="record_screen"
+/>
+
+## What it shows
+
+The item appears when the recording starts, and shows the elapsed time as `m:ss`, then `h:mm:ss` past an hour. Hover over it and its tooltip says which state it's in.
+
+| State | The menu bar shows | Tooltip | Its menu |
+| --- | --- | --- | --- |
+| Recording | A coral ● and the running time | "Frame Job is recording" | **Pause Recording**, **Stop Recording** |
+| Paused | ❚❚ and the time, held still | "Frame Job's recording is paused" | **Resume Recording**, **Stop Recording** |
+
+It needs no permission. It appears for an agent's recording too, so you can [pause or stop one](/recording/pause-and-stop/#stop-an-agents-recording). It comes down the moment the recording ends, before the recording has landed.
+
+## Pause, resume and stop
+
+Click the item for its menu.
+
+- **Pause Recording** pauses. The row then reads **Resume Recording**.
+- **Stop Recording** stops the recording, running or paused, and adds it to your project.
+
+The time keeps ticking while the menu is open, so you can read it before you decide. [Start, pause and stop](/recording/pause-and-stop/) has the other places to do this. If you choose **Quit Frame Job** while the panel is hidden for a screen recording, Frame Job opens this menu instead of quitting.
+
+## The keyboard mark
+
+While a recording [records shortcuts](/recording/record-shortcuts/), a ⌨︎ mark follows the ● or ❚❚, and the menu starts with a greyed-out **Recording keyboard shortcuts** row. Both show whether the recording is running or paused, and they hold for a recording an agent started with shortcuts on.
+
+## A fixed width
+
+The item is sized once, so the other items in your menu bar don't shift as the seconds tick, when the hours appear, or at a pause. It's sized for times up to 9:59:59, and a little wider when it shows the keyboard mark. Past 9:59:59 the label is wider than that.
+
+## If macOS hides the item
+
+macOS can drop the item from a crowded menu bar or behind the notch. **File ▸ Stop Recording** and **File ▸ Pause Recording** still work once you switch to Frame Job.
+
+## Related
+
+- [Start, pause and stop](/recording/pause-and-stop/)
+- [Where a recording lands](/recording/where-it-lands/)
+- [Record shortcuts](/recording/record-shortcuts/)
+- [Buttons and context menus](/reference/context-menus/)

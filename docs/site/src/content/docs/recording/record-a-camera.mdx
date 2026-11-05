@@ -1,0 +1,123 @@
+---
+title: Record a camera
+description: Record a webcam or another connected camera on its own, with no screen, and choose its format, check its picture and see where the movie lands.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Record a camera on its own when you want a piece to camera with no screen in it. Frame Job records the chosen camera at the chosen format's highest frame rate.
+
+<AtAGlance
+  menu="File ▸ New Recording…"
+  keys="⌥⌘N"
+  where="New Recording panel ▸ Source ▸ Camera"
+  tools="record_screen"
+  needs="The Camera permission, and the Microphone permission when you choose a microphone. Screen Recording isn't needed."
+/>
+
+## Record a camera on its own
+
+<Steps>
+
+1. Open the [recorder panel](/recording/recorder-panel/) with <kbd>⌥⌘N</kbd> and choose **Camera** in **Source**.
+
+2. Choose the camera in [**Camera**](#choose-a-camera) and its size and frame rate in [**Format**](#choose-a-format).
+
+3. Check the live picture in the [preview](#check-the-picture) under **Format**.
+
+4. Choose a microphone in **Microphone**, or leave it **Off** to record the camera alone. The microphone can be the camera's own, if macOS lists it, and it's recorded to its own file beside the movie.
+
+5. Choose where it goes in **Record Into**.
+
+6. Press **Record**. After a 3, 2, 1 countdown recording starts, and the panel [stays up](#stop-and-pause-from-the-panel). The first time, macOS asks for the Camera permission, and for Microphone if you chose one. See [Recording permissions](/recording/permissions/).
+
+7. Press **Stop** in the panel when you're done.
+
+</Steps>
+
+With no camera connected, pressing **Record** says "No camera is connected."
+
+**System Audio**, **Show Clicks**, **Size**, **Include Frame Job windows**, **Rate** and the other rows for the screen grey out, and keep their values for next time. **Microphone** and **Record Into** stay live.
+
+To record a camera and the screen at once, see [Record a camera beside the screen](/recording/camera-beside-the-screen/).
+
+## Choose a camera
+
+**Camera** lists each connected camera by name, or a single row, **None connected**, when there isn't one. An iPhone used as a Continuity Camera has "(Continuity Camera)" after its name.
+
+It starts on the camera you used last, then the Mac's preferred camera, then the first built-in camera, then the first one connected.
+
+The row is live when **Source** is **Camera**, or a display or window has **Record the camera too** ticked, and greyed out otherwise.
+
+## Choose a format
+
+**Format** sets the size and frame rate the camera records at.
+
+**Best** comes first and names what it will pick, for example **Best (1760×1328 at 30 fps)**. The camera's other formats follow, written like **1920×1080 at 30 fps**. Sizes wider than tall come first, then square, then taller than wide, each largest first.
+
+Each format records at its highest frame rate, so you can't choose a lower rate within a format's range.
+
+It starts on the format you used last when the chosen camera has it, otherwise **Best**. The row is live and greyed out at the same times as **Camera**.
+
+## What Best picks
+
+**Best** is the largest format wider than tall that reaches 30 fps or more, at that format's highest rate. If two formats have the same area, the higher rate wins, and then the one the camera lists first.
+
+If no format wider than tall reaches 30 fps, Frame Job looks at every shape the same way. If none of those does either, it uses the format the camera is already set to.
+
+## Check the picture
+
+The preview under **Format** shows the chosen camera live at the chosen format, as the movie will record it. It isn't mirrored, so you see what's being filmed, and the whole picture is fitted inside it.
+
+It appears only when **Source** is **Camera**, or a display or window has **Record the camera too** ticked, and it stays live through the countdown and the recording.
+
+Sometimes it shows words instead of a picture.
+
+| The preview reads | What it means |
+| --- | --- |
+| "No camera is connected." | There's no camera to show. |
+| "The preview shows once Frame Job may use the camera." | Frame Job doesn't have the Camera permission yet. Showing the panel never asks for it. Pressing **Record** does. |
+| "The camera is recording." | An agent is recording the camera. The picture comes back when it's done. |
+| Another sentence | The reason the camera couldn't start. To try again, choose another source and then **Camera**, or close and reopen the panel. |
+
+## How the camera warms up
+
+Once Frame Job has the Camera permission, the camera starts as soon as the panel shows it, so it's ready before you record, and its light stays on while the panel shows **Camera**. Choosing another source turns it off, unless it's a display or window with **Record the camera too** ticked, and so does closing the panel.
+
+A camera that's starting cold can take a moment to run at its full rate. Frame Job gives it up to a second before recording begins, so the recording starts steady, and then holds the camera to the chosen format and rate for the whole recording.
+
+If it never settles, the recording begins anyway, and the note when it lands names the rate it ran at, for example "The camera ran at 24.3 fps, not its 30, in the 1 s it was given to settle; the recording began anyway." If no steady frames came at all, it says that instead.
+
+## Stop and pause from the panel
+
+The panel stays on screen while a camera records, because nothing on screen is being filmed.
+
+- The controls lock and the microphone's level meter stays live.
+- The [footnote](/recording/recorder-panel/#the-footnote) shows **●** or **❚❚** with the time.
+- **Record** reads **Stop**, with a **Pause** or **Resume** button beside it.
+
+Choose **Close** and the panel goes away, but the recording carries on under the [menu-bar item](/recording/menu-bar-item/). See [Start, pause and stop](/recording/pause-and-stop/) for the other ways to stop.
+
+## Where a camera recording lands
+
+The movie is saved as `Camera Recording 2026-10-26 at 17.14.33.mov` in `~/Movies/Frame Job Recordings`, with any microphone in its own `.m4a` file beside it.
+
+In an open project, the movie lands at the playhead on the front track if it fits, otherwise on a new track in front. The microphone lands on a new back track named **Microphone**.
+
+As a new project, the canvas takes the movie's size and the format's frame rate, rounded to a whole number.
+
+See [Where a recording lands](/recording/where-it-lands/) for the full rules, and [When a recording stops on its own](/recording/when-a-recording-stops/) for a camera that's unplugged mid-take.
+
+## With an agent
+
+An agent picks a camera by its name or id, and a format as `1920x1080@30`, `1920x1080` for that size's highest rate, or `best`. If the camera or format isn't there, the call stops with a list of what is. `rate` and the other screen settings can't be used with a camera. Its recording starts once the camera has settled, and its time counts from the camera's first frame. See [Record with `record_screen`](/mcp/record-screen/).
+
+## Related
+
+- [Record a camera beside the screen](/recording/camera-beside-the-screen/)
+- [System audio and the microphone](/recording/system-audio-and-microphone/)
+- [Start, pause and stop](/recording/pause-and-stop/)
+- [Where a recording lands](/recording/where-it-lands/)
+- [Recording permissions](/recording/permissions/)
+- [Recording files and formats](/recording/files-and-formats/)

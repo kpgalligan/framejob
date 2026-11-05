@@ -1,0 +1,236 @@
+---
+title: "Tools: cutting and deleting"
+description: "The agent tools that split clips, remove clips or stretches of time, and open or close gaps, with their arguments, answers and limits."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These tools cut the timeline: they split clips, remove clips or stretches of time, and open or close gaps.
+
+<AtAGlance
+  tools={['split', 'split_at_shots', 'delete', 'ripple_delete', 'ripple_delete_range', 'ripple_delete_ranges', 'lift_range', 'insert_time', 'close_gap']}
+/>
+
+## Pick a tool
+
+| You want to | Use |
+| --- | --- |
+| Cut clips in two at one time | [`split`](#split) |
+| Cut clips at every shot change inside them | [`split_at_shots`](#split_at_shots) |
+| Remove clips and leave the gaps | [`delete`](#delete) |
+| Remove clips and close the gaps | [`ripple_delete`](#ripple_delete) |
+| Remove a stretch of time and close it | [`ripple_delete_range`](#ripple_delete_range) |
+| Remove many stretches as one undo step | [`ripple_delete_ranges`](#ripple_delete_ranges) |
+| Remove a stretch of time and leave the hole | [`lift_range`](#lift_range) |
+| Open empty time | [`insert_time`](#insert_time) |
+| Close one gap on a track | [`close_gap`](#close_gap) |
+
+## What these tools share
+
+- **Times** are in ticks, 600,000 to the second, and are rounded to the project's frame grid before anything happens. See [Units and ids](/mcp/units-and-ids/).
+- **One call is one undo step**, however many clips it touches.
+- **The answer** is `ok: true`, the ids of anything created, such as `new_clips`, and a `project` summary. A call that changes nothing says so and leaves no undo step. See [What a call answers](/mcp/what-a-call-answers/).
+- **Locked tracks** never move, and a stretch of time removed from the timeline leaves them alone. Lock a track to keep it out of a timeline-wide edit.
+- **Markers** stay at their times under every ripple. Of the tools on this page, only `insert_time` moves them.
+- **Linked clips.** A clip and its [detached sound](/audio/detach-and-attach/) stay together, as each tool below says. A partner on a locked track is never pulled in.
+
+## `split`
+
+Cuts clips in two at one time. The second piece plays on from where the first stopped, so the join can't be seen.
+
+It mirrors **Clip ▸ Split** (<kbd>⌘T</kbd>). See [Split clips](/editing/splitting/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `at` | integer, ticks | No | Where to cut. Left out, the playhead. |
+| `clips` | array of integers | No | The clips to cut, at least one. Left out, every clip on an unlocked track that `at` falls inside, as the menu item does with nothing selected. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+Each piece keeps the actions on its side, and an action that crosses the cut becomes two. The first piece keeps the clip's id and any transition into it. A clip you name on a locked track is still cut. Its linked partner is cut too when the partner is on an unlocked track and `at` falls inside it, and the new halves are linked to each other.
+
+**Answers** `new_clips`, the second pieces.
+
+**Changes nothing** for a named clip `at` isn't strictly inside, which is skipped. If no clip can be cut, the answer is "Split made no change". An unknown clip id is an error.
+
+## `split_at_shots`
+
+Cuts clips of a video file at every hard cut inside the part of the file they play, as one undo step named Split at Shot Changes. It shows no sheet.
+
+It mirrors **Clip ▸ Split at Shot Changes**. See [Split at Shot Changes](/editing/split-at-shot-changes/), which says what counts as a hard cut.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | No | The clips to split. An empty list is an error. Left out, every clip of a video file on an unlocked track in what's open. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+
+It has no `scope` argument. It works in the nest [`set_scope`](/mcp/tools-view-state/) has open, or on the timeline.
+
+A clip it can cut is a clip of a video file with its picture on. Any other clip you name is reported under `skipped`. A clip you name on a locked track is still cut, and its linked partner is cut too when the partner is on an unlocked track.
+
+The cuts are found on your Mac, with no key and no upload, and they're kept in the project's cache, so a second call doesn't have to look for them again. Each cut is worked out through the clip's speed, ramp and reversal, and lands on the frame grid. A cut within one frame of either end of the clip isn't made. To read the cuts without splitting, use [`get_media_analysis`](/mcp/tools-analysis/).
+
+**Answers:**
+
+| Key | What it holds |
+| --- | --- |
+| `cuts` | One `{clip, at}` for each clip that was cut, `at` being a list of timeline ticks. |
+| `added` | How many clips the splits made, linked partners included. |
+| `skipped` | The ids of named clips it couldn't cut. |
+| `cached` | True when nothing had to be read first. |
+| `new_clips` | The new clips' ids. The original id keeps the first piece. |
+
+With no cut inside any clip, `added` is 0, a `note` says so, and there's no undo step.
+
+**Won't run** in these cases, and nothing is split:
+
+- No clip qualifies. The message says none of the clips shows a moving picture.
+- The splits would pass 4,096 clips. The message gives how many it would add, counting linked partners, and how many fit.
+- The analysis takes longer than 60 s. What was covered is kept, so call again to carry on.
+- The analysis failed, was stopped, or the file can't be read.
+- The project or the open nest changed during the wait. Call again.
+
+## `delete`
+
+Removes clips and leaves the gaps. Nothing else moves.
+
+It mirrors <kbd>⌫</kbd> and **Edit ▸ Delete** with clips selected. See [Delete, Ripple Delete and Lift](/editing/delete-clips/#delete-clips-and-leave-a-gap).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | Yes | The clips to remove, at least one. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+A clip you name on a locked track is still removed. A picture takes its linked sound with it, unless the sound's track is locked. A linked sound named alone goes alone, and the picture stays, silent.
+
+**Answers** the usual `ok` and `project`. An unknown clip id or an empty list is an error.
+
+## `ripple_delete`
+
+Removes clips and closes each hole: everything that starts at or after the end of a removed clip's span, on every unlocked track, slides left by that span's length.
+
+It mirrors <kbd>⌘⌫</kbd> and **Edit ▸ Ripple Delete** with clips selected. See [Ripple delete clips](/editing/delete-clips/#ripple-delete-clips).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | Yes | The clips to remove, at least one. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+A clip you name on a locked track is still removed, but clips on locked tracks don't move. Each clip's linked partner on an unlocked track goes too, whichever half you name. A clip on another track that crosses a removed span stays where it is, and two removed clips that touch leave one hole. A clip that slides onto a neighbour gets a Cross Dissolve over the overlap. See [How a ripple closes holes](/editing/delete-clips/#how-a-ripple-closes-holes).
+
+**Won't run** when the shift would push a linked clip before the start of the timeline, as a sound leading its picture in a [J-cut](/audio/j-and-l-cuts/) can. The message names both clips, and nothing moves. An unknown clip id or an empty list is an error.
+
+## `ripple_delete_range`
+
+Cuts one stretch of time out of the timeline and closes it. Every clip on an unlocked track is cut at both ends of the range, what's between is removed, and the rest slides left by the range's length.
+
+It mirrors <kbd>⌘⌫</kbd> with an [in/out range](/timeline/in-out-range/) set and nothing selected. See [Ripple delete a range](/editing/delete-clips/#ripple-delete-a-range).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `from` | integer, ticks | Yes | Where the range starts. |
+| `to` | integer, ticks | Yes | Where the range ends. It must be after `from` once both are on the frame grid. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+Clips on locked tracks are neither cut, removed nor moved, even inside the range. A clip that slides onto a neighbour gets a Cross Dissolve.
+
+**Answers** `new_clips`, the piece left after the range of any clip cut at `to`. That piece has a new id.
+
+**Won't run** when `to` isn't after `from`, which is an error, or when the shift would push a linked clip before the start of the timeline. The undo step is named Ripple Delete.
+
+## `ripple_delete_ranges`
+
+Cuts several stretches of time out of the timeline as one edit and one undo step, named Ripple Delete, however many ranges there are.
+
+[Remove Silences](/cleanup/remove-silences/) and [Remove Filler Words](/cleanup/remove-filler-words/) make this cut from their sheets. See [Ripple delete several ranges](/editing/delete-clips/#ripple-delete-several-ranges).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `ranges` | array of `[from, to]` pairs of ticks | Yes | The stretches to cut, at least one. A single pair may be written flat, as `[from, to]`. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+`detect_silence` and `detect_fillers` return ranges in this shape. A `cut_start` and `cut_end` from `get_timeline_transcript` make a pair too, so a run of words is one range from its first word's `cut_start` to its last word's `cut_end`. See [Tools: clean-up](/mcp/tools-clean-up/).
+
+Each pair is rounded to the frame grid and put in order, so a reversed pair is the same range. Pairs that touch or overlap then merge, and what's left is cut from right to left, each cut as `ripple_delete_range` makes it. So every time you send is a time in the project as you read it, and this isn't the same as calling `ripple_delete_range` once per pair: two ranges that meet make one shift, not two.
+
+**Answers** `new_clips`, the pieces left after each range of any clip cut at a range's end.
+
+**Won't run** when `ranges` is empty, which is an error, or when a shift would push a linked clip before the start of the timeline. A list whose pairs are all empty changes nothing. Each cut can add a clip, so a list that would pass 4,096 clips is an error and nothing is cut.
+
+## `lift_range`
+
+Cuts a stretch of time out and leaves the hole. Every clip on an unlocked track is cut at both ends of the range and what's between is removed, and nothing moves. Use it when a mix or a caption track is already timed.
+
+It mirrors <kbd>⌫</kbd> with an [in/out range](/timeline/in-out-range/) set and nothing selected. See [Lift a range](/editing/delete-clips/#lift-a-range).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `from` | integer, ticks | Yes | Where the range starts. |
+| `to` | integer, ticks | Yes | Where the range ends. It must be after `from` once both are on the frame grid. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+Clips on locked tracks are neither cut nor removed. To close the hole as well, use [`ripple_delete_range`](#ripple_delete_range).
+
+**Answers** `new_clips`, the piece left after the range of any clip cut at `to`. The undo step is named Lift.
+
+**Won't run** when `to` isn't after `from`, which is an error. A range with nothing an unlocked track can give up changes nothing.
+
+## `insert_time`
+
+Opens empty time: every clip on an unlocked track that starts at or after a point moves later, and so does every marker at or after that point.
+
+It has no menu item or gesture of its own. See [Insert time](/editing/close-gaps/#insert-time).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `at` | integer, ticks | Yes | Where the gap opens. |
+| `length` | integer, ticks | Yes | How much room to open. It must come to at least one frame. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+Clips that cross `at` stay in place, so nothing is cut. To open a gap inside a clip, call [`split`](#split) first. A moved clip's linked partner on an unlocked track moves with it. No marker can land on another, because they all move by the same length.
+
+**Answers** the usual `ok` and `project`. The undo step is named Insert Time.
+
+**Won't run** when `length` is zero or negative once it's on the frame grid, which is an error.
+
+## `close_gap`
+
+Closes the empty stretch on a track that contains a time. Everything from the far side of the gap, on every unlocked track, slides left by the gap's length.
+
+It mirrors double-clicking a gap in a lane, and **Clip ▸ Close Gap**. See [Close gaps and insert time](/editing/close-gaps/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `track` | integer | Yes | The track the gap is on. |
+| `at` | integer, ticks | Yes | A time inside the gap. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+The gap runs between the nearest clip edges on that track, or from the start of the timeline when no clip comes before it. A gap closes fully or not at all, so a smaller gap never means it stopped part-way.
+
+**Answers** the usual `ok` and `project`. A clip that slides onto a neighbour by an amount the [overlap rule](/getting-started/refused-edits/) allows gets a Cross Dissolve.
+
+**Won't run** in these cases. Each message names what's in the way, and nothing moves:
+
+- `at` is on a clip, so it isn't in a gap.
+- No clip on the track starts after `at`.
+- The track is locked. Its own clips are the ones that would stay behind.
+- The shift would break the overlap rule on a track it moves.
+- The shift would push a linked clip before the start of the timeline.
+
+An unknown track is an error.
+
+## Related
+
+- [Tools: moving and trimming](/mcp/tools-move-and-trim/)
+- [Tools: clean-up](/mcp/tools-clean-up/)
+- [Tools: speed and time](/mcp/tools-speed/)
+- [Units and ids](/mcp/units-and-ids/)
+- [Delete, Ripple Delete and Lift](/editing/delete-clips/)
+- [How a clean-up cut works](/cleanup/how-cleanup-cuts-work/)

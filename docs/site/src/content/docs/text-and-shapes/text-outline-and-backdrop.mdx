@@ -1,0 +1,64 @@
+---
+title: Text outline and backdrop
+description: Draw a stroke around a text clip's letters, or put a rounded plate behind them, so the words stay readable over any picture.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+White words get lost over a bright shot. An outline draws a stroke around each letter, and a backdrop puts a rounded plate behind the whole text. You can use either or both.
+
+<AtAGlance
+  where={['Clip tab ▸ Text ▸ Outline', 'Clip tab ▸ Text ▸ Backdrop']}
+  tools="set_text"
+/>
+
+## Add an outline
+
+Select a text clip, click the **Outline** header in the **Text** sub-tab to open the section, and tick **Outline**. You get a 2 px black stroke.
+
+| Control | What it does | Default | Range |
+| --- | --- | --- | --- |
+| **Width** | The stroke's thickness. Quick picks: 1, 2, 4 and 8. | 2 px | 0 to 40 px |
+| **Color** | The stroke's colour | Black | |
+
+Both are greyed while the outline is off. The section's header shows the width, or "off".
+
+The stroke sits on the edge of each letter, half inside and half outside, so a wide outline thins the letters.
+
+**Reset** in the section's header turns the outline off.
+
+## Add a backdrop
+
+Click the **Backdrop** header to open the section, and tick **Backdrop**. You get a black plate at 60 % opacity.
+
+| Control | What it does | Default | Range |
+| --- | --- | --- | --- |
+| **Fill** | The plate's colour and opacity | Black at 60 % | |
+| **Padding** | The space between the text and the plate's edge. Quick picks: 0, 8, 12, 24 and 48. | 12 px | 0 to 200 px |
+| **Radius** | How round the corners are. Quick picks: 0, 4, 8, 16 and 32. | 8 px | 0 to 200 px |
+
+All three are greyed while the backdrop is off. The section's header shows the padding, or "off".
+
+A radius can't go past half the plate's shorter side, so a large radius makes a pill shape and goes no further.
+
+**Reset** in the section's header turns the backdrop off.
+
+## Change them during a clip
+
+With an [action](/motion/actions/) selected, these controls set the look at that action's end. **Width**, **Padding**, **Radius** and the colours ease towards the new value, and colours [blend in OKLab](/motion/what-can-animate/#colours-blend-in-oklab). Turning an outline or a backdrop on or off switches when the action ends.
+
+## With an agent
+
+`set_text` sets both. `outline` takes `width` and `color`, and `backdrop` takes `color`, `padding` and `radius`. Send `null` for either to turn it off. An agent isn't held to the ranges above: a width, padding or radius only has to be 0 or more. See [Tools: text, shapes and clip names](/mcp/tools-clip-properties/#set_text).
+
+## Good to know
+
+- Turning an outline or a backdrop off forgets its settings. Turn it on again and it's back to the defaults.
+- Both make the clip's box bigger. The margin around the words is whichever is larger, the outline's width or the backdrop's padding, not the two added together. The plate fills that whole box.
+- During a [reveal](/text-and-shapes/text-reveal/), the backdrop is there at full strength from the first frame, and the words arrive on it. An outline comes and goes with its letters.
+
+## Related
+
+- [Font and text style](/text-and-shapes/text-style/)
+- [Text presets](/text-and-shapes/text-presets/)
+- [Text box and wrapping](/text-and-shapes/text-box/)

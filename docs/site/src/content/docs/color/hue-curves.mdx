@@ -1,0 +1,101 @@
+---
+title: Hue vs Hue and Hue vs Sat curves
+description: Turn one colour toward another, or saturate or mute it, without touching the rest of the picture.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+The hue curves work on one colour at a time. **Hue** turns a chosen hue toward another, such as making the greens more teal. **Sat** saturates or mutes a chosen hue, such as calming a loud red. Both leave the other colours alone.
+
+<AtAGlance
+  where="Clip tab ▸ Color ▸ Curves ▸ the Hue and Sat cells"
+  tools={['set_video', 'set_action_end']}
+/>
+
+## The two hue channels
+
+The **Hue** and **Sat** cells in the channel picker put the plot into degrees. Each channel lays the colours out across the plot, and its height says what happens to the colour at that position.
+
+| Cell | Curve | Across | Up | The centre line |
+| --- | --- | --- | --- | --- |
+| **Hue** | Hue vs Hue | Hue, 0° to 360° | A shift, −180° to +180° | 0°, no shift |
+| **Sat** | Hue vs Sat | Hue, 0° to 360° | A gain, 0× to 2× | 1×, unchanged |
+
+So a straight hue channel is a flat line across the middle, not a diagonal. It starts with two points on that line, at 0° and 180°.
+
+Points work as they do on any curve: click to add one, drag, nudge, type, delete and reset. See [Master and RGB curves](/color/curves/#edit-points). A channel holds 2 to 16 points.
+
+The hue curves run after **Master**, **Red**, **Green** and **Blue** and before the [look](/color/looks/), so they read each colour as those curves left it. Both hue curves read that colour once, before either changes it. A **Sat** point on the greens still acts on greens you've turned teal with **Hue**.
+
+## The spectrum strip
+
+A strip under the plot shows which colour each position stands for, from 0° at the left to 360° at the right. Thin lines mark every 60°, with lines across at the quarters and a stronger line at the centre.
+
+| Hue | Colour |
+| --- | --- |
+| 0° | Red |
+| 60° | Yellow |
+| 120° | Green |
+| 180° | Cyan |
+| 240° | Blue |
+| 300° | Magenta |
+
+## Hue vs Hue
+
+A positive shift moves a colour to the right along the strip, from red toward yellow and green. A negative shift moves it to the left. Brightness stays as it was.
+
+To make the greens more teal:
+
+<Steps>
+
+1. Select the clip, open the [Color tab](/color/color-tab/), open **Curves** and click the **Hue** cell.
+
+2. Click the plot at about 90° and again at about 150°, without dragging. These two points hold the colours either side still.
+
+3. Press the centre line at about 120° and drag up. The label beside the pointer shows the shift, such as `Hue 120° → +30°`.
+
+</Steps>
+
+The outer points are saved with the first point you move. Without them, the shift spreads as far as the points at 0° and 180°.
+
+## Hue vs Sat
+
+Above the centre line a hue gets more saturated, and below it less. At the bottom of the plot, 0×, that hue goes grey. At the top, 2×, its saturation doubles. Saturation scales around the colour's own brightness.
+
+To mute the reds:
+
+<Steps>
+
+1. With **Curves** open on the clip, click the **Sat** cell.
+
+2. Click the plot at about 330° and again at about 30°, without dragging. These two points hold the colours either side still.
+
+3. Drag the point at 0°, at the left end of the centre line, down. The label beside the pointer shows the gain, such as `Hue 0° → ×0.60`.
+
+</Steps>
+
+## Hue curve safeguards
+
+- **A grey stays grey.** A grey has no real hue to read, so a hue curve never tints it. When a colour's strongest and weakest channels are within 2% of each other it's left alone, and the effect fades in to full strength at 6%.
+- **Points never cross the wrap.** A point stops at 0° and 359.9°, so it can't slide round to the other end. The curve itself does wrap: its right end runs on smoothly into its left end, so a shift around red covers both ends of the plot.
+- **Colours stay in range.** When a turned colour can't keep its brightness, it gives up some saturation rather than clip.
+
+## Good to know
+
+- These are the only two colour curves. There's no Hue vs Luma, Luma vs Sat or Sat vs Sat curve.
+- The closest a point gets to a neighbour across the plot is 0.1°.
+- **Reset Hue** and **Reset Sat** straighten one channel from the cell's right-click menu. The section's **Reset** straightens all six, the tone curves included. See [Reset curves](/color/curves/#reset-curves).
+- The **Hue** slider in the [Color section](/color/color-section/) turns every colour at once. Hue vs Hue turns only the colours you choose.
+- Hue curves animate inside an action as tone curves do. See [Animate a grade](/color/animate-a-grade/).
+
+## With an agent
+
+An agent writes `hue_hue` and `hue_sat` whole, each as a list of 2 to 16 hue and value pairs, and that list replaces the channel. It can place a point anywhere from 0 up to, but not including, 360. A value outside the limits gets an error and the curve stays as it was. An action's end is the exception: the value is kept, and it's moved to the nearest limit as the action plays. See [Tools: picture and grade](/mcp/tools-set-video/#curves).
+
+## Related
+
+- [Master and RGB curves](/color/curves/)
+- [Vectorscope](/color/vectorscope/)
+- [Qualifiers](/color/qualifiers/)
+- [Brightness, contrast, saturation and hue](/color/color-section/)

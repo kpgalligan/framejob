@@ -1,0 +1,56 @@
+---
+title: "Fonts"
+description: "Which fonts a text clip can use, the faces Frame Job ships with, and what happens when a project's font isn't on this Mac."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A text clip can use any font installed on your Mac, or one of the faces that come with Frame Job. Both appear in the same list, so there's nothing to set up.
+
+<AtAGlance where="Clip tab ▸ Text ▸ Font ▸ Family" />
+
+To choose a font, see [Font and text style](/text-and-shapes/text-style/).
+
+## Fonts the app ships with
+
+These faces are always in the **Family** list. They need no installing, so a project that uses them draws the same on any Mac.
+
+| Family | Weights |
+| --- | --- |
+| Anton | Regular |
+| Bebas Neue | Regular |
+| Darker Grotesque | Light to Black |
+| IBM Plex Mono | Regular, Medium |
+| Montserrat | ExtraBold, Black |
+| Source Sans 3 | ExtraLight to Black |
+| Source Serif 4 | ExtraLight to Black |
+
+All seven are under the SIL Open Font License.
+
+## Installed fonts
+
+The **Family** list holds every font family on your Mac, in alphabetical order. Frame Job reads it once each time it launches, so a font you install while it's running appears after you quit and reopen it.
+
+## When a project's font is missing
+
+A project remembers a font by name and doesn't hold the font file. If you open it on a Mac without that font, the project still opens and the **Text** sub-tab still works.
+
+- macOS draws the text in a stand-in font.
+- **Family** shows the first family in the list, which isn't the font the project asked for.
+- Picking a **Family** or **Style** replaces the missing font on that clip.
+
+Until you pick something, the clip keeps the name of its font, so it draws correctly again once the font is installed.
+
+:::tip
+For a project you'll open on more than one Mac, use a font Frame Job ships with, or install the same font on each Mac.
+:::
+
+## Fonts in graphics
+
+Graphics work differently. A graphic draws only with the fonts Frame Job ships with and fonts you add to the project, never with the fonts installed on your Mac. A font Frame Job ships with is never packed into a `.fjgraphic` package, because every copy of the app already has it. See [Fonts and pictures in graphics](/graphics/fonts-and-pictures/).
+
+## Related
+
+- [Font and text style](/text-and-shapes/text-style/)
+- [Text clips](/text-and-shapes/text-clips/)
+- [Fonts and pictures in graphics](/graphics/fonts-and-pictures/)

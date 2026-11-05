@@ -1,0 +1,165 @@
+---
+title: "Synchronize Audio"
+description: Line up a camera and a separate recorder, or any clips of the same moment, by matching their sound. No clap, slate or timecode needed.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Synchronize Audio lines up two or more clips by their sound. The usual case is a camera clip and a separate audio recorder that captured the same moment. It finds where the sound matches, moves the clips into place and corrects any clock drift, all as one undo step.
+
+You don't need a clap, a slate or matching timecode. It works from the waveforms and never reads timecode, so any stretch of sound both recordings heard will do.
+
+<AtAGlance
+  menu="Clip ▸ Synchronize Audio"
+  tools="sync_audio"
+  needs="Nothing. The matching and the speech detection run on your Mac, with no key and no upload."
+/>
+
+## Line up clips
+
+<Steps>
+
+1. Put each clip on its own track. They don't need to be close to each other.
+
+2. If the recorder holds several similar stretches, trim it roughly around the camera's sound, so it [matches the right one](#matching-by-sound).
+
+3. [Select the clips](/timeline/selecting-clips/).
+
+4. Choose **Clip ▸ Synchronize Audio**. It has no keyboard shortcut.
+
+5. Wait for the [Synchronizing Audio sheet](#the-synchronizing-audio-sheet) to finish.
+
+</Steps>
+
+One clip, the [anchor](#the-anchor), stays where it is. Every other clip slides along its own track until its sound plays at the same moment as the anchor's. The whole command is one undo step, named **Synchronize Audio**.
+
+If Frame Job is sure of the match, it's applied straight away. If it isn't, Frame Job [asks you first](/audio/weak-sync-matches/).
+
+It's all or nothing. If any clip can't be matched, nothing moves, and [the reasons are listed](#when-it-wont-run).
+
+If the clips are already in sync, nothing changes and Frame Job beeps. Choosing the command a second time on the same clips does this.
+
+## After the clips line up
+
+The clips stay separate. Synchronize Audio doesn't merge the recorder's sound into the camera clip, and it doesn't link the two.
+
+- **You hear both recordings** until you silence one. To use the recorder's sound, [mute the camera's track](/audio/mute-and-solo/#mute-a-track), or use [**Mute**](/audio/volume/#mute-a-clip) on the camera clip.
+- **A drag moves only the clip you drag.** To keep them in sync, [select them and drag them together](/editing/move-clips/#move-several-clips-together). A cut across every track keeps them in step too. See [Edit without losing sync](/multicam/set-up/#edit-without-losing-sync).
+
+## Line up before you cut
+
+Run Synchronize Audio on the whole recordings, before you start splitting them. It takes one clip per track, so the pieces of a split clip can't go in together.
+
+## A camera in several files
+
+A camera can split a long take into several files, and you may have stopped and started it. Synchronize Audio can't take a camera's files together, because it wants one clip per track and every clip has to share sound with [the anchor](#the-anchor).
+
+- Files from one unbroken take can sit end to end on the camera's track. Line up the first and the rest are already in place, as long as that file is the anchor.
+- Otherwise work through the show a group at a time, selecting the files from each camera that ran at the same time. Only the selected clips move.
+- Leave the recorder out once it's in place. A clip with a picture is always chosen as the anchor, so a recorder selected with a camera file moves to that file.
+
+A recorder that runs on through several camera files can't be held still from the menu. An agent can do it by naming the recorder as the anchor. See [`sync_audio`](/mcp/tools-audio/#sync_audio).
+
+## Which clips it takes
+
+**Clip ▸ Synchronize Audio** is available when at least two selected clips can play sound and aren't [nests](/editing/nests/).
+
+Anything else in the selection is left out without a message: a nest, a still, a title, a file with no audio track, a clip with its audio switched off. To line up clips inside a nest, open it with <kbd>⌘↓</kbd> and select them there.
+
+## The anchor
+
+Frame Job picks the anchor this way:
+
+1. Among the selected clips that have a picture, the one that starts earliest. If none has a picture, all of them are considered.
+2. If two start at the same time, the one on the rearmost track.
+3. If they're still tied, the one created first.
+
+So a camera clip stays put and the recorder moves to it. The anchor is never moved or trimmed, and its speed doesn't change.
+
+## Matching by sound
+
+Each file's sound is analysed once, after it's imported, into a form that isn't thrown off by differences in gain, microphone or room. Frame Job compares the files, not the clips, so a clip's volume and effects make no difference.
+
+- **Speech comes first.** When both clips hold at least 2 seconds of speech, as judged by speech detection on your Mac, only the speech is compared. Otherwise all the sound is.
+- **The trimmed parts come first.** Frame Job looks within the parts each clip is trimmed to, when both are at least 2 seconds long. It searches the whole files only if that finds no usable match and at least one clip is trimmed.
+
+:::tip
+A recording with two similar stretches can match the wrong one. Trimming the recorder roughly around the camera's sound tells Frame Job which one you mean.
+:::
+
+## The waveform check
+
+Sounding alike isn't enough, because two takes of the same words can look like a match. So a match is used only if the two waveforms also line up there, as a clear peak within 48 ms. Frame Job checks up to 30 seconds of the overlap, where the sound agrees most, in the speech band of 300 to 3,400 Hz.
+
+The same check fine-tunes the offset to less than a frame.
+
+## Moves land on whole frames
+
+Clips move by a whole number of frames at the project's frame rate, so up to half a frame of constant offset can remain. At 30 fps that's about 17 ms.
+
+## The head trim
+
+If a clip would have to start before 0:00 to line up, it loses that much from its start instead, and starts at 0:00 in sync. Frame Job trims only what it has to. It won't do this if less than a frame of the clip would be left.
+
+## Drift correction
+
+Two devices' clocks never run at quite the same rate, so a recorder slowly falls out of sync over a long take. When the clips overlap for at least 60 seconds, Frame Job measures that drift in 20-second windows along the overlap and corrects it by playing the moved clip at a slightly different speed, at most 0.2 % from ×1.
+
+The correction is part of the same undo step. There's no drift figure to read. What changes is the clip's speed, and **Keep pitch** is turned off. The [Speed section](/speed/speed-section/) shows the rate to two decimal places, so a correction such as ×1.0004 still reads 1.00× there. The clip gets very slightly longer or shorter to match.
+
+Drift is left alone when:
+
+- it's under 5 ms across the overlap
+- it's too small to tell from no drift, meaning under three times its own uncertainty
+- correcting it would take more than 0.2 % from ×1
+- too little of the overlap matches to measure it
+
+:::note
+The correction plays the sound slightly faster or slower, as tape would, so the pitch moves very slightly with the speed. Like any clip with Keep pitch off at a speed other than ×1, the clip's sound is [rendered in the background](/speed/keep-pitch/#tape-pitch-is-rendered-in-the-background). It's briefly silent in the preview after the correction, and again after each trim, split or speed change. An export waits for it.
+:::
+
+## The Synchronizing Audio sheet
+
+Matching runs in the background behind a **Synchronizing Audio** sheet, with a progress bar and the line "Matching the sound of N clips…". Nothing moves until a match is found.
+
+**Cancel** or <kbd>Esc</kbd> closes the sheet and leaves everything as it was.
+
+If the project changes while the matching runs, for example because an agent edits it or moves in or out of a nest, nothing is applied. Frame Job beeps and the inspector says to choose Synchronize Audio again.
+
+## When it won't run
+
+Frame Job beeps and lists every reason in [the strip at the foot of the inspector](/getting-started/refused-edits/#the-refusal-strip), naming each clip by its number. The strip shows three lines, so hover over it to read a long one.
+
+It checks each clip first, and won't start matching until they all pass. A clip can't be lined up when it:
+
+- plays no sound in the timeline
+- is still being analysed. Its sound or speech analysis hasn't finished, so try again in a moment.
+- comes from a file with under 2 seconds of sound
+- plays more than 0.2 % away from ×1. Set it back to ×1 first.
+- plays at a different rate from the ×1 its speed shows, because its source is stretched
+- plays [reversed](/speed/reverse/)
+- [ramps its speed](/speed/speed-ramps/), because a speed action changes its rate over its length
+
+The rest come up during the matching:
+
+- Two of the clips are on one track. Each needs its own.
+- A clip has no sound to line up by, because its analysis found no sound at all.
+- Nothing matches. See [When nothing matches](/audio/weak-sync-matches/#when-nothing-matches).
+- A clip matches the anchor's sound but the waveforms don't line up there, for example two takes of the same words. They aren't one recording.
+- A clip matches the anchor's sound but the two share under 2 seconds of waveform there, too little to confirm it's one recording.
+- A clip would lose so much of its head that less than a frame is left.
+- A clip would never play at the same time as the anchor once lined up. Extend its trim, or the anchor's.
+- A clip would overlap another clip on its own track after the move. Move that clip out of the way, or put this one on a free track.
+
+## With an agent
+
+`sync_audio` does the same thing. An agent can name the anchor, and it's told by name when it passes a nest or a clip that plays no sound, where the menu leaves those out. Its answer also gives each clip's offset, confidence, trim and drift, and clips already in sync are reported as such. See [Tools: audio](/mcp/tools-audio/#sync_audio).
+
+## Related
+
+- [Confident and weak matches](/audio/weak-sync-matches/)
+- [The Speed section](/speed/speed-section/)
+- [Keep pitch](/speed/keep-pitch/)
+- [When an edit is refused](/getting-started/refused-edits/)
+- [Nests](/editing/nests/)

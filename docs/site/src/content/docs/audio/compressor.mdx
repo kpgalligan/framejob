@@ -1,0 +1,83 @@
+---
+title: Compressor
+description: Even out a clip's loud and quiet passages by turning down whatever goes above a threshold.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+The compressor evens out a clip's loud and quiet passages by turning down whatever goes above a threshold. It reacts moment by moment and acts only on what's over the threshold. For a voice that drifts on and off the microphone, the [Leveller](/audio/leveller/) is the better fit. This page covers a clip's compressor. A track has one of its own, on [Track compressor and limiter](/audio/track-dynamics/).
+
+<AtAGlance where="Clip tab ▸ Sound ▸ Compressor" tools="set_audio" />
+
+## Smooth volume levels
+
+<Steps>
+
+1. Select the clip and open the **Sound** sub-tab of the Clip tab. The **Compressor** section starts closed, so open it.
+
+2. Tick **Smooth volume levels**. It turns on at a gentle setting for speech: −18 dB, 3:1, a 10 ms attack and a 200 ms release, with no makeup.
+
+3. Play the clip. Lower [**Threshold**](#threshold) until the loud passages come down, and raise [**Ratio**](#ratio) if you want it to act harder.
+
+4. Add [**Makeup**](#makeup) to win back the level it took.
+
+</Steps>
+
+The section's header shows the ratio, such as "3.0:1", or "off". **Reset** appears there once the compressor has settings, and turns it off. Unticking **Smooth volume levels** also throws away its settings, so ticking it again starts from the defaults.
+
+## The controls
+
+| Control | What it does | Range | Default | Quick picks |
+| --- | --- | --- | --- | --- |
+| **Threshold** | The level above which it starts turning the sound down. | −60 to 0 dB | −18 dB | −30, −24, −18, −12, −6 |
+| **Ratio** | How strongly it turns down sound above the threshold. | 1 to 20 :1 | 3:1 | 1.5, 2, 3, 4, 8, 20 |
+| **Attack** | How quickly it reacts when the level rises. | 0 to 200 ms | 10 ms | 1, 5, 10, 30, 100 ms |
+| **Release** | How quickly it lets go when the level falls. | 10 to 2000 ms | 200 ms | 50, 100, 200, 500, 1000 ms |
+| **Makeup** | Gain added afterwards to make up what the compressor took away. | 0 to 24 dB | 0 dB | 0, 3, 6, 12 |
+
+A number typed outside the range goes to the nearest end of it.
+
+### Threshold
+
+The threshold is a fixed level, not a distance from the clip's loudness as the [Gate](/audio/gate/)'s is. A quiet recording may never reach the default of −18 dB, and then the compressor does nothing until you lower it.
+
+### Ratio
+
+At 3:1, sound 3 dB over the threshold comes out 1 dB over it. 1:1 turns nothing down, and 20:1 acts like a limiter.
+
+### Attack
+
+A short attack catches the start of a word or a sudden peak. A longer one lets those through before the compressor closes in. The time is in milliseconds and isn't rounded to frames.
+
+### Release
+
+A short release recovers quickly after a loud moment. A longer one lets go more gradually. Like Attack, it isn't rounded to frames.
+
+### Makeup
+
+Makeup adds a fixed gain after the compressor, so it applies even at 1:1.
+
+## Change the compressor over time
+
+With an [action](/audio/animate-sound/) selected, the controls write the action's end, and each number moves smoothly across the action. Turning the compressor on or off changes at the action's end, with no glide.
+
+## Good to know
+
+- The compressor acts before the clip's volume, fades and ducking, so moving the Volume slider doesn't change how hard it compresses.
+- It runs after [Noise Reduction](/audio/noise-reduction/), the [Gate](/audio/gate/), the [Leveller](/audio/leveller/) and the [De-esser](/audio/de-esser/), so the threshold is compared with sound they've already worked on.
+- [Normalize](/audio/normalize/) in Loudness mode measures through it.
+- [Enhance Voice](/audio/enhance-voice/) sets a compressor for you, with its threshold at the speech's typical peak and makeup that gives back the loudness it takes.
+- On a nest clip the compressor has no effect. Open the nest with <kbd>⌘↓</kbd> and set it on the clips inside.
+
+## With an agent
+
+`set_audio` sets the same controls through its `compressor` argument. `{}` turns the compressor on at its defaults, and `null` turns it off. An agent isn't held to the inspector's Attack and Release ranges, and gives both times in [its own units](/mcp/units-and-ids/). See [Tools: clip sound](/mcp/tools-set-audio/#compressor-and-limiter).
+
+## Related
+
+- [Limiter](/audio/limiter/)
+- [Leveller](/audio/leveller/)
+- [Track compressor and limiter](/audio/track-dynamics/)
+- [Enhance Voice](/audio/enhance-voice/)
+- [Animate sound with actions](/audio/animate-sound/)

@@ -30031,3 +30031,25 @@ python3 tools/proof/vr6b_proof.py --mutant <name>
 
 The recorded runs are in `designs/creator-jobs.md`'s VR6b record; JOB-37 is what only a person
 judges.
+
+## The documentation site (`docs_site_proof.py`)
+
+The site in `docs/site/` against the tree, with no app, no build, no network and no node, so it
+runs in `make test`. `pnpm build` in `docs/site/` is what proves the site renders and its links
+land; this is what notices a menu item or an agent tool the site has never heard of. D1 every page
+has a title and a description, D2 the sidebar and the pages are one-to-one, D3 every feature in
+`src/data/features.json` names a page and an anchor it has, D4 every product tool has a heading on
+an `mcp/` page and no dev tool is named, D5 every menu item is on a reference page, D6 no page
+names something internal, D7 no page or data file holds a local path, D8 every `<Shot>` has both
+captures, D9 no page uses a banned word, D10 every tool in an `AtAGlance` and every step of a menu
+path is real.
+
+```sh
+python3 tools/proof/docs_site_proof.py                       # the tree (make test)
+python3 tools/proof/docs_site_proof.py --pages a.mdx b.mdx   # those pages: D1, D6–D9
+python3 tools/proof/docs_site_proof.py --selftest            # CONTROL + M1..M11
+```
+
+A new menu file is picked up by its name (`AppDelegate+*Menu*.swift`); a new tool by its catalog
+file (`AgentCatalog*.swift`). The screenshots' own rule is `docs/site/scripts/import-screens.mjs`,
+which refuses a capture that shows a local path.

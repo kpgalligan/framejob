@@ -1,0 +1,119 @@
+---
+title: "How a clean-up cut works"
+description: "What Remove Silences and Remove Filler Words share: the preview, the single undo step, how far a cut reaches, and what it won't touch."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Frame Job's two clean-up commands cut the same way. Each shows you what it would take out, makes the whole cut as one edit, closes the timeline over it, and stays out of nests and transitions. This page covers what they share.
+
+<AtAGlance
+  menu={['Clip ▸ Remove Silences…', 'Clip ▸ Remove Filler Words…']}
+  tools={['detect_silence', 'detect_fillers', 'ripple_delete_ranges']}
+/>
+
+## Two commands for a spoken recording
+
+Both commands are for a screencast, a tutorial, a podcast or a talking-head take.
+
+- [Remove Silences](/cleanup/remove-silences/) cuts the dead air.
+- [Remove Filler Words](/cleanup/remove-filler-words/) cuts the ums and uhs, using the timing of each word in a transcript.
+
+They're in the **Clip** menu, below **Close Gap** and **Retime Range…**, with **Remove Silences…** first. Neither has a keyboard shortcut.
+
+Remove Silences measures the mix as you hear it, so [volume](/audio/volume/), [fades](/audio/fades/), [ducking](/audio/ducking/), [mute and solo](/audio/mute-and-solo/) all change what it finds. See [What counts as silent](/cleanup/voice-or-level/).
+
+An agent can use both, and can also read a clip's transcript to [cut false starts](/cleanup/false-starts/).
+
+## See the cut before you make it
+
+Nothing changes until you choose **Remove**. While a sheet is open, it and the timeline show you exactly what would go.
+
+### Preview shading on the timeline
+
+Every span the command would remove is shaded on the timeline ruler and lanes.
+
+The shading is coral, about twice as strong as the wash of the [in/out range](/timeline/in-out-range/), so you can tell the two apart where they overlap. In the lanes it sits under the clips. On the ruler it sits under the ticks and marker flags, which stay readable.
+
+The shading goes away when the sheet closes, however it closes: **Remove**, **Cancel**, <kbd>⎋</kbd> or the window closing.
+
+### The cut count
+
+The sheet reads how many cuts it would make and how much time they remove, for example "23 cuts · removes 00:00:04:12". A single cut reads "1 cut". With nothing to cut it reads "No cuts", and **Remove** is dimmed.
+
+**Remove** makes exactly the cuts the count describes.
+
+### The rest of the editor waits
+
+Playback pauses when a sheet opens, because a moving playhead would repaint over the shading. Other editing commands in that window are off until you close the sheet.
+
+## One undo step
+
+**Remove** cuts every span and closes the timeline over each one as a single undo step, however many spans there are. One <kbd>⌘Z</kbd> restores everything. The step is named **Undo Remove Silences** or **Undo Remove Filler Words**.
+
+Spans that touch or overlap become one cut.
+
+[Deleting selected words](/captions/delete-words/) in the Transcript tab with <kbd>⌫</kbd> makes the same kind of cut, as its own step named Delete Words.
+
+## A ripple across every unlocked track
+
+A clean-up cut is a [ripple delete](/editing/delete-clips/#how-a-ripple-closes-holes) across every unlocked track, not only the clips that were analysed. The picture above a voice-over is cut with it, so the two stay in step.
+
+- **Working on selected clips doesn't limit the cut.** It changes what's listened to or read. The cut still reaches every unlocked track.
+- **A conversation is cut as one.** Everyone's microphone is cut at the same moment, so a cut takes whatever anyone else said there. In Remove Silences, measure every microphone, so a stretch counts as silent only when everyone is. In Remove Filler Words, check the shading for a filler said over someone else's words.
+- **Locked tracks are neither cut nor moved.** Everything else closes up, so a [locked track](/timeline/hide-and-lock-tracks/) falls out of step with the rest.
+- **Linked clips move together.** If a clip that moves has a linked partner, the partner moves too. When that would take a clip before the start of the timeline, Frame Job makes no cut at all. It beeps, and the foot of the inspector names both clips.
+
+### Markers keep their place
+
+[Markers](/timeline/markers/) stay at their times when the timeline closes, as they do under every ripple delete. The footnote of both sheets says so: "markers keep their place". A marker after a cut therefore sits over later material than it did, so check any you placed on a particular moment.
+
+## Frame-accurate edges
+
+Each cut's start rounds up to the next frame and its end rounds down. Both edges move inward, so each edge of a cut can leave up to a frame of room tone, or of a filler, behind. Rounding outward would clip the start of the next word, so a cut never does.
+
+## Nests are protected
+
+A clean-up cut never reaches into a nest clip. A [nest](/editing/nests/) always plays from its first frame, so cutting into one would strand the rest of it. The whole nest can still slide left with everything else when the timeline closes up.
+
+In Remove Silences a nest's sound still counts when **In:** is **All audible clips**. A loud nest keeps a moment from being quiet, even though no cut may touch the nest.
+
+To clean up the audio inside a nest, do one of these:
+
+- Open it with **Clip ▸ Open Nest** (<kbd>⌘↓</kbd>) and run the command there. With a nest open, both commands work on the nest's own timeline, and a nest inside that nest is still protected. See [Work inside a nest](/editing/inside-a-nest/).
+- Un-nest it with **Clip ▸ Un-nest** (<kbd>⇧⌘G</kbd>).
+
+Each sheet tells you when a nest got in the way. [Remove Silences](/cleanup/remove-silences/#what-the-sheet-tells-you) adds a note telling you to open it, and Remove Filler Words counts the filler as left in.
+
+A nest on a locked track needs no protection, because the cut neither splits nor moves it.
+
+## Transitions are protected
+
+A clean-up cut never reaches into a [transition](/motion/transitions/)'s overlap or the area around it, so quiet or fillers there stay. The protected area is the overlap widened by its own length on each side: a 1 s overlap protects 3 s.
+
+This holds on every unlocked track, whichever clips you chose to work on, and for [any two clips that overlap](/motion/transitions/#an-overlap-with-no-stored-transition) on a track.
+
+Remove Silences says nothing about a transition it stayed out of. Remove Filler Words leaves the filler in whole and counts it as left in.
+
+## Good to know
+
+- Remove Silences measures a reversed clip as it plays. In **Voice** mode a cut edge in one can be off by up to 32 ms, because speech is measured in 32 ms steps along the file as it runs forwards.
+- Remove Filler Words doesn't read reversed clips at all.
+- Remove Silences still listens to locked tracks, so sound on one can keep a moment from being quiet. Remove Filler Words doesn't read clips on locked tracks, and its sheet says how many there are.
+
+## Make the cut from an agent
+
+[`detect_silence`](/mcp/tools-clean-up/#detect_silence) and [`detect_fillers`](/mcp/tools-clean-up/#detect_fillers) report the ranges a sheet would cut, and change nothing. Passing them to [`ripple_delete_ranges`](/mcp/tools-cut-and-delete/#ripple_delete_ranges) makes the same cut as **Remove**, under the same rules. It takes a list of `[from, to]` pairs in ticks, at least one, and a pair written backwards is the same range.
+
+There's one difference you'll see. Any cut an agent makes this way, whether silences, fillers or [false starts](/cleanup/false-starts/), is one undo step named **Undo Ripple Delete**, not the sheet's name.
+
+To find ranges inside a nest, an agent opens it with `set_scope` first, and the ranges are then in the nest's own time. See [Tools: clean-up](/mcp/tools-clean-up/) and [Editing inside a nest](/mcp/nests/).
+
+## Related
+
+- [Remove Silences](/cleanup/remove-silences/)
+- [Remove Filler Words](/cleanup/remove-filler-words/)
+- [Cut false starts](/cleanup/false-starts/)
+- [Delete, Ripple Delete and Lift](/editing/delete-clips/)
+- [Hide and lock tracks](/timeline/hide-and-lock-tracks/)
+- [Work inside a nest](/editing/inside-a-nest/)

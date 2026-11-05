@@ -1,0 +1,85 @@
+---
+title: "Graphics in a vertical version"
+description: How Make Vertical Version re-sizes and re-lays your graphics for a tall or square canvas, which older template copies it updates, and which modules it names for you to check.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+[Make Vertical Version](/framing/make-vertical-version/) has to turn a wide layout into a tall or square one, and graphics can lay themselves out again where footage can't. This page says what happens to each graphic, and which ones you might want to look at afterwards.
+
+<AtAGlance
+  menu="File ▸ Make Vertical Version…"
+  tools="make_vertical_version"
+/>
+
+## Canvas-sized graphics
+
+A graphic exactly the old canvas's size, each side, is re-sized to the new canvas, so its [module](/graphics/what-is-a-graphic/), the code that draws it, lays it out again on the new frame. This is usually a full-frame lower third or title card. A 1920 × 1080 graphic on a 1920 × 1080 canvas becomes 1080 × 1920 for 9:16.
+
+Its position shrinks and stretches with the two sides of the canvas, and so do the positions its [actions](/graphics/animate-properties/) move it to. Its scale stays as it was, because the graphic is the canvas's size again.
+
+This is the one change of canvas that changes a graphic's size. Everywhere else, [Width and Height](/graphics/size-and-timing/#width-and-height) stay as you set them.
+
+## Graphics of any other size
+
+Any other graphic is kept as placed and rescaled from the old canvas, like a title. That includes a graphic with the same area as the canvas but another shape, such as 1080 × 1920 on a 1920 × 1080 canvas.
+
+## Templates measured by the short side
+
+Every [bundled template](/graphics/templates/) measures itself by the short side of the size it draws at, so it fits a tall frame. Older copies of these six measured by the height instead:
+
+- Lower third
+- Title card
+- Callout
+- Bar chart
+- Counter
+- Kinetic type
+
+The current six draw exactly as those older copies did on a landscape or square canvas.
+
+## Older template copies
+
+A project can hold an older copy of one of those six, inserted before they measured by the short side. Frame Job looks at every module a clip draws, on the timeline and inside nests, and recognises these by their text, never their name. A copy you renamed `intro` is still found.
+
+What happens next depends on **Make a copy** in the Make Vertical Version sheet:
+
+| **Make a copy** | What happens |
+| --- | --- |
+| Ticked | The copy that opens has each older module rewritten with the current template. Your earlier text is kept as the module's previous version, so [File ▸ Restore Graphic Version…](/graphics/manage-graphics/) brings it back. The project you started from never changes. |
+| Unticked | Nothing is rewritten, and the summary names each module. |
+
+## Your own modules
+
+A module of your own that sizes itself by the canvas's height, with `ctx.height / 1080` in its text, is named in the summary, because it may not fit the narrow frame. This applies with or without **Make a copy**, and the module is never rewritten.
+
+A template you've edited counts as your own, since its text no longer matches any template Frame Job shipped.
+
+To fix one of these, measure by the short side instead:
+
+```js
+const u = Math.min(ctx.width, ctx.height) / 1080;
+```
+
+On a landscape canvas that's the same number as `ctx.height / 1080`, and it stops a tall canvas drawing the graphic 1.78 times too big. See [The module API](/graphics/module-api/).
+
+## What the summary says
+
+The sheet's summary reports all of this before you choose **Make**, and it stays accurate as you change the sheet. The exception is while it says it will find faces, people and shot changes first: that summary lists none of this.
+
+| The summary says | What it means |
+| --- | --- |
+| "Re-sizes 2 graphics to the new canvas." | That many canvas-sized graphics are being re-sized. |
+| "Updates 1 graphic module to the current template." | That many older template copies are rewritten in the copy. |
+| "Graphic module "intro" is left as it is: it is an older copy of the bundled template "lower-third"; Make Vertical updates it only in a copy." | You've unticked **Make a copy**. Tick it to update the module. |
+| "Graphic module "intro" is left as it is: it sizes itself by the canvas's height, so it may not fit the narrow frame." | Check this graphic on the new canvas. |
+
+## With an agent
+
+[`make_vertical_version`](/mcp/tools-framing/#make_vertical_version) reports the same things in `graphics` when it finishes: how many graphics it re-sized, the modules it updated, and each module it left as it is, with the reason. See [Tools: framing and vertical](/mcp/tools-framing/).
+
+## Related
+
+- [Make Vertical Version](/framing/make-vertical-version/)
+- [What Make Vertical changes](/framing/vertical-what-changes/)
+- [Graphic size and timing](/graphics/size-and-timing/)
+- [Rename, delete and restore graphics](/graphics/manage-graphics/)

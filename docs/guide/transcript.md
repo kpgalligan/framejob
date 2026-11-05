@@ -54,12 +54,16 @@ could not read:
   transcribed, with a **Stop** button beside it.
 - **Stopped. 2 files not read on this Mac.** after you press Stop, with a
   **Read** button that carries on.
-- When two tracks carry the same speech, a note names the two clips, so you
-  can mute one.
+- When two tracks carry the same speech, a note gives the two clips' ids,
+  "Clips 3 and 7 carry the same speech.", and asks you to mute one.
 - A clip with no words is listed with the reason, such as "clip 12 — its audio
   is switched off" or a clip that plays in reverse. The first three are
   listed; "…and 4 more clips with no words." stands for the rest, and holding
   the pointer over it lists them.
+
+The numbers in these notes are the clips' ids in the project. The timeline and
+the inspector show a clip's name, not its id, so a note doesn't say where the
+clip sits. The Assistant can select a clip by its id.
 
 ## Where the words come from
 
@@ -91,9 +95,11 @@ you put it for three seconds before it follows again.
 - **Click a word** to move the playhead to it. If the video is playing, it
   keeps playing from there.
 - **Click a timecode** to move the playhead to the start of that paragraph.
-- **Click a clip** on the timeline or the canvas while the Transcript shows:
-  the tab stays, and the clip's first word scrolls to the top. The playhead
-  does not move.
+- **Click a selected clip** on the timeline or the canvas while the Transcript
+  shows: the tab stays, and the clip's first word scrolls to the top. The
+  playhead does not move. The click that selects a clip doesn't do this, so
+  click it again; that first click scrolls to the clip selected before it, if
+  there was one.
 
 Editing the timeline updates the text right away, and the words you were
 reading stay where they were.
@@ -120,14 +126,15 @@ track and the gap closes, as one undo step, **Delete Words**. On the timeline
   often well inside the pause before it. So the tab moves each start to where
   its sound begins: where the voice model (the one Remove Silences uses) first
   hears speech after it, then to the first hundredth of a second loud enough
-  to be the word (louder than −40 dBFS, or clearly above the pause's own
+  to be the word (at least −40 dBFS, and at least 12 dB above the pause's own
   background noise). A word after a pause therefore starts on its sound, and
-  deleting the word before it ends there instead of keeping a slice of the
-  pause or taking the start of the word you keep. Both are worked out when the
-  project opens a file; until the voice model has heard it, the starts are the
-  recogniser's own, and the tab moves them as soon as it has, keeping your
-  selection. Words from an AssemblyAI transcript, and where any word ends,
-  are left as transcribed.
+  deleting the word before it ends there, if that is within the one second
+  above, instead of keeping a slice of the pause or taking the start of the
+  word you keep. Both steps read what the project measures when it opens a
+  file; until the voice model has heard it, the starts are the recogniser's
+  own, and the tab moves them as soon as it has, keeping your selection. Words
+  from an AssemblyAI transcript, and where any word ends, are left as
+  transcribed.
 - **Other tracks.** If a word on another track starts before your selection
   and runs into it (two people talking at once), the tab adds it to the
   selection first, so you see everything the cut takes before you press ⌫. A

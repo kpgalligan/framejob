@@ -1,0 +1,97 @@
+---
+title: "WebM and Matroska files"
+description: "How Frame Job brings in .webm and .mkv files by copying their streams into a movie, what the copy can carry, and where the copies live."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+macOS won't open a WebM or MKV file directly, so Frame Job copies its video and sound into a QuickTime movie the first time you bring one in. Nothing is re-encoded, so no quality is lost, and your original stays where it is.
+
+<AtAGlance
+  menu={['File ▸ Add Media…', 'File ▸ Open…']}
+  keys={['⇧⌘I', '⌘O']}
+  where="Drag to the Media tab"
+  tools={['import_media', 'open_project', 'relink_media']}
+/>
+
+## How a file is rewrapped
+
+Rewrapping means moving a file's video and sound streams into a different container without changing them. Add, open or relink the file as you would any other. There's no question to answer: the copy starts by itself, and the clip then plays from the copy.
+
+Frame Job recognises these files by what's inside them, not by their name, so a Matroska file with the wrong extension still imports when you drop it on the Media tab, unless that extension is a picture's or `.cube`.
+
+| Stream | What the copy carries |
+| --- | --- |
+| Video | VP9, AV1, H.264 or HEVC |
+| Sound | Opus, Vorbis or AAC |
+
+Only the first video track and the first audio track are copied. Any other track, such as a second language or subtitles, stays behind in the original.
+
+If the end of the file is damaged or cut short, the copy holds everything up to that point.
+
+Some video can't come in because this Mac can't decode it: VP8, AV1 on a Mac without a hardware decoder, and VP9 Profile 1 or 3. Nothing is copied, and the alert says why. See [Codecs this Mac can't decode](/projects/import-media/#codecs-this-mac-cant-decode).
+
+## The name in the Media tab
+
+The media keeps the original's name. Hover over its row in the [Media tab](/projects/media-tab/) and the tooltip gives the original's path and says the file was copied into Frame Job's Rewrapped folder.
+
+## The Copying Movie window
+
+A copy that takes more than a second shows a small **Copying Movie** window, with a progress bar and how much has been copied, such as "412 MB of 1.2 GB". It reads "Reading the file…" until the copy starts.
+
+Choose **Cancel** to stop. The copy stops, nothing is added, no alert appears and no partial file is left behind. If you were opening the file with **File ▸ Open…**, no project opens. If you were adding several files, the others carry on.
+
+The window never takes the keyboard from a Frame Job window, so you can keep editing while it runs. Copies happen one at a time.
+
+## Free space
+
+Before copying, Frame Job checks that the disk has room. If it doesn't, nothing is copied and the alert says what's needed:
+
+> Not enough free space to open *file*: its video and sound need about *size* on “*volume*”, which has *size* free. Nothing was copied.
+
+If Frame Job can't read how much space the volume has, the copy goes ahead.
+
+## The Rewrapped folder
+
+Copies live in `~/Library/Application Support/Frame Job/Rewrapped/`, which all your projects share. Importing the same file again uses its copy instead of making another, even in a different project. If the original has changed, Frame Job makes a new copy.
+
+Frame Job doesn't clear this folder, so copies pile up. You can clear it yourself:
+
+- WebM and MKV copies are made again the next time a project that uses them opens, as long as the original is still there.
+- [ffmpeg conversions](/projects/ffmpeg-conversion/#a-lost-conversion-stays-missing) live here too, and they aren't made again. Their media stays missing until you relink it.
+
+[Consolidate Media](/projects/consolidate-media/) copies the movie, not the WebM, into the package. The row's tooltip then says it was copied into this project's package.
+
+## Streams the copy can't carry
+
+If a stream is in a codec the copy can't carry, the file isn't added, and an alert names the stream, for example:
+
+> *file* has FLAC audio, which Frame Job cannot copy out of a WebM or Matroska file.
+
+This applies to FLAC, MP3, MP2, AC-3, E-AC-3, DTS, TrueHD and PCM sound, Vorbis whose headers can't be read, and MPEG-2, MPEG-4 Part 2, Theora and ProRes video. A codec without a familiar name appears under its Matroska codec ID. A compressed or encrypted track stops the import the same way: "*file* has a compressed or encrypted video track, which Frame Job cannot copy out of a WebM or Matroska file."
+
+If you have ffmpeg installed, Frame Job then offers to help. See [Convert files with ffmpeg](/projects/ffmpeg-conversion/). Without it, the file isn't added.
+
+## Colour is kept
+
+The copy keeps the colour the file states: HLG, HDR10 (PQ), or a BT.709, BT.601 or BT.2020 SDR picture. Frame Job reads it from the file's colour information or, for VP9, from the video itself. HDR10 metadata carries over.
+
+A file that states no colour is shown as macOS reads it.
+
+## If a copy goes missing
+
+If a copy is deleted or moved to the Trash, the project makes it again from the original the next time it opens. The **Copying Movie** window shows as usual.
+
+This needs the original to be in place and still be a WebM or Matroska file. If that copy is cancelled or fails, a deleted copy shows as missing, with a slate, the **missing** badge and **Relink…**, and a copy in the Trash goes on playing from the Trash. The next open tries again.
+
+## With an agent
+
+An agent's import shows no window and waits for the copy to finish. [`import_media`](/mcp/tools-media/#import_media) gives the copy as `path` and the file you asked for as `original`. If the copy can't carry a stream, an agent doesn't get the ffmpeg question: see [Convert files with ffmpeg](/projects/ffmpeg-conversion/#with-an-agent).
+
+## Related
+
+- [Import media](/projects/import-media/)
+- [Convert files with ffmpeg](/projects/ffmpeg-conversion/)
+- [Supported file formats](/reference/file-formats/)
+- [Relink missing media](/projects/relink-media/)
+- [Where Frame Job keeps its files](/reference/file-locations/)

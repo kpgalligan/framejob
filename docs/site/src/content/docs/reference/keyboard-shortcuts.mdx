@@ -1,0 +1,262 @@
+---
+title: "Keyboard shortcuts"
+description: Every key in Frame Job by job, with and without a menu item, for playback, editing, text and fields, and the modes Esc leaves.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+This page lists every key in Frame Job, grouped by what you're doing. [Keys and typing](/getting-started/keys-and-typing/) explains how the keys share the keyboard with text fields, and [Menus](/reference/menus/) lists every menu item in menu order.
+
+<AtAGlance
+  where={['The editor window', 'The Preview Window']}
+  tools={['set_playhead', 'set_range', 'move_clip', 'trim_start', 'trim_end', 'add_text_clip', 'add_zoom_action', 'add_marker', 'set_marker', 'set_clip', 'set_track', 'set_text']}
+/>
+
+The symbols are <kbd>⌘</kbd> Command, <kbd>⌥</kbd> Option, <kbd>⇧</kbd> Shift, <kbd>⌃</kbd> Control, <kbd>⌫</kbd> Delete, <kbd>⌦</kbd> Forward Delete, <kbd>↩</kbd> Return and <kbd>⎋</kbd> Esc.
+
+## How the keys are shared
+
+- **Keys with no modifier belong to the editor window.** That's <kbd>Space</kbd>, the letters and punctuation on this page and the arrow keys. They don't work while you're typing in a field or while a sheet is open. <kbd>⇧</kbd> and Caps Lock still count as no modifier, apart from [<kbd>Space</kbd> on a canvas you've clicked](/canvas/zoom-and-pan/#space-on-the-canvas). <kbd>⌘</kbd>, <kbd>⌥</kbd> and <kbd>⌃</kbd> never do.
+- **Shortcuts with a modifier are menu shortcuts.** A shortcut does nothing while its menu item is greyed out.
+- **<kbd>⌫</kbd>, <kbd>⌘⌫</kbd>, <kbd>⌘↓</kbd> and <kbd>⌘↑</kbd> switch off while you type in a text field,** where they keep their usual text meaning.
+- **In a sheet,** <kbd>↩</kbd> presses the default button and <kbd>⎋</kbd> cancels.
+- **The Preview Window takes the same keys.** Keys with no modifier do nothing there while a field in the editor window is being typed in, or while a sheet is open on it. Keys with a modifier go through the editor's menus.
+
+A field takes the keys only when you click in it, or choose a command that opens one for typing, such as **Clip ▸ Rename…** or **View ▸ Assistant**. <kbd>↩</kbd>, keypad Enter, <kbd>Tab</kbd> or a click anywhere outside the field applies what you typed and gives the keys back, so <kbd>Space</kbd> plays straight away. With macOS Full Keyboard Access on, <kbd>Tab</kbd> moves to the next control instead. In a multi-line field, such as the Text tab's **Content**, <kbd>↩</kbd> applies and <kbd>⇧↩</kbd> starts a new line. The Assistant's message field [sends on <kbd>↩</kbd>](#assistant-message-field).
+
+## Playback and moving the playhead
+
+None of these has a menu item.
+
+| Key | What it does |
+| --- | --- |
+| <kbd>Space</kbd> | Play or pause, wherever the focus is in the window. <kbd>⇧Space</kbd> does the same. |
+| <kbd>L</kbd> | Play forward. Press it again for ×2 and again for ×4. While playing in reverse, it goes straight to ×1 forward. |
+| <kbd>J</kbd> | Play in reverse. Press it again for ×2 and again for ×4. While playing forward, it goes straight to ×1 in reverse. |
+| <kbd>K</kbd> | Pause. |
+| <kbd>←</kbd> <kbd>→</kbd> | Pause and step back or forward one frame. |
+| <kbd>⇧←</kbd> <kbd>⇧→</kbd> | Pause and step back or forward ten frames. |
+| <kbd>↑</kbd> | Go to the previous edit point, or to the start when there isn't one. |
+| <kbd>↓</kbd> | Go to the next edit point. On the last point it stays there. |
+| <kbd>Home</kbd> <kbd>End</kbd> | Pause and go to the start or end of the project. The keypad and fn versions of these keys work too. |
+
+An edit point is the start or end of a clip, or either end of the project. <kbd>J</kbd> and <kbd>L</kbd> beep when there's nothing loaded to play.
+
+<kbd>Space</kbd> does something else in three places:
+
+- In a text field, <kbd>Space</kbd> types a space.
+- With macOS Full Keyboard Access on, a focused button, pop-up or segmented control keeps <kbd>Space</kbd> to press itself.
+- With the preview canvas focused, a tap of <kbd>Space</kbd> plays or pauses when you release it, because holding it down is how you [pan](/canvas/zoom-and-pan/). A <kbd>Space</kbd> held to pan doesn't change playback.
+
+The arrow keys move by word in the [Transcript tab](#transcript-text), and move a selected [curve point](/reference/gestures/#color-tab-controls) in the Color tab.
+
+## Editing
+
+| Key | What it does |
+| --- | --- |
+| <kbd>,</kbd> <kbd>.</kbd> | [Nudge](/editing/nudge-clips/) the selected clips one frame earlier or later. |
+| <kbd>⇧,</kbd> <kbd>⇧.</kbd> | Nudge them ten frames. |
+| <kbd>I</kbd> <kbd>O</kbd> | **Mark ▸ Set In** and **Mark ▸ Set Out**. |
+| <kbd>W</kbd> <kbd>E</kbd> | **Clip ▸ Trim Start to Playhead** and **Clip ▸ Trim End to Playhead**. |
+| <kbd>M</kbd> | **Mark ▸ Add Marker**. |
+| <kbd>N</kbd> | **View ▸ Snapping**, on or off. |
+| <kbd>T</kbd> | Add a [text clip](/text-and-shapes/text-clips/) at the playhead. |
+| <kbd>C</kbd> | Turn [crop mode](/canvas/crop/) on or off for the selected clip on the canvas. |
+| <kbd>Z</kbd> | Region mode: drag a rectangle over the selected clip to [zoom to it](/motion/zoom-to-region/). Hold <kbd>⇧</kbd> while you drag to fill the canvas instead of fitting it. <kbd>⎋</kbd> or <kbd>Z</kbd> again cancels. |
+| <kbd>⇧Z</kbd> | **View ▸ Fit Timeline**. |
+| <kbd>⎋</kbd> | Deselect the selected action, so the Clip tab shows the clip's own values again. |
+
+Where one of these keys has a menu item, the menu doesn't show the letter.
+
+These keys beep instead of acting when:
+
+- <kbd>,</kbd> or <kbd>.</kbd>: nothing is selected. A nudge also has to keep to the [overlap rule](/editing/how-edits-work/#the-overlap-rule), as a drag does.
+- <kbd>W</kbd> or <kbd>E</kbd>: no selected clip is under the playhead.
+- <kbd>M</kbd>: a [nest](/editing/nests/) is open.
+- <kbd>C</kbd>: nothing selected is on the canvas at the playhead.
+- <kbd>Z</kbd>: anything other than exactly one clip is selected, or that clip isn't visible at the playhead, or its track is locked.
+
+## Shortcuts on menu items
+
+### App and windows
+
+| Key | Menu item |
+| --- | --- |
+| <kbd>⌘,</kbd> | **Frame Job ▸ Settings…** |
+| <kbd>⌘H</kbd> | **Frame Job ▸ Hide Frame Job** |
+| <kbd>⌥⌘H</kbd> | **Frame Job ▸ Hide Others** |
+| <kbd>⌘Q</kbd> | **Frame Job ▸ Quit Frame Job** |
+| <kbd>⌘M</kbd> | **Window ▸ Minimize** |
+| <kbd>⌘W</kbd> | **File ▸ Close** |
+| <kbd>⌥⌘W</kbd> | **File ▸ Close All** |
+
+### Projects
+
+| Key | Menu item |
+| --- | --- |
+| <kbd>⌘N</kbd> | **File ▸ New Project** |
+| <kbd>⌥⌘N</kbd> | **File ▸ New Recording…**, which reads **Stop Recording** while a recording runs |
+| <kbd>⌘O</kbd> | **File ▸ Open…** |
+| <kbd>⌘S</kbd> | **File ▸ Save** |
+| <kbd>⇧⌘S</kbd> | **File ▸ Duplicate** |
+| <kbd>⌥⇧⌘S</kbd> | **File ▸ Save As…** |
+| <kbd>⇧⌘I</kbd> | **File ▸ Add Media…** |
+| <kbd>⌘E</kbd> | **File ▸ Export…** |
+| <kbd>⌥⌘E</kbd> | **File ▸ Save Frame…** |
+
+### Clipboard and undo
+
+| Key | Menu item |
+| --- | --- |
+| <kbd>⌘Z</kbd> | **Edit ▸ Undo** |
+| <kbd>⇧⌘Z</kbd> | **Edit ▸ Redo** |
+| <kbd>⌘X</kbd> | **Edit ▸ Cut** |
+| <kbd>⌘C</kbd> | **Edit ▸ Copy** |
+| <kbd>⌘V</kbd> | **Edit ▸ Paste** |
+| <kbd>⌥⌘V</kbd> | **Edit ▸ Paste Attributes** |
+| <kbd>⌘D</kbd> | **Edit ▸ Duplicate** |
+
+### Removing and selecting
+
+| Key | Menu item |
+| --- | --- |
+| <kbd>⌫</kbd> | **Edit ▸ Delete**. It leaves a gap. With an action selected it removes the action, and with nothing selected it lifts the in/out range. |
+| <kbd>⌘⌫</kbd> | **Edit ▸ Ripple Delete**. It closes the gap, and with nothing selected it acts on the in/out range. |
+| <kbd>⌘A</kbd> | **Edit ▸ Select All** |
+| <kbd>⌥⌘A</kbd> | **Edit ▸ Select After Playhead** |
+
+### Clips and nests
+
+| Key | Menu item |
+| --- | --- |
+| <kbd>⌘T</kbd> | **Clip ▸ Split** |
+| <kbd>⇧⌘F</kbd> | **Clip ▸ Freeze Frame** |
+| <kbd>⌥⌘D</kbd> | **Clip ▸ Detach Audio** |
+| <kbd>⇧⌥⌘D</kbd> | **Clip ▸ Attach Audio** |
+| <kbd>⌥⌘K</kbd> | **Clip ▸ Add Action** |
+| <kbd>⇧⌘R</kbd> | **Clip ▸ Rename…** |
+| <kbd>⌘G</kbd> | **Clip ▸ Nest** |
+| <kbd>⇧⌘G</kbd> | **Clip ▸ Un-nest** |
+| <kbd>⌘↓</kbd> | **Clip ▸ Open Nest** |
+| <kbd>⌘↑</kbd> | **Clip ▸ Close Nest** |
+
+### Tracks and range
+
+| Key | Menu item |
+| --- | --- |
+| <kbd>⇧⌘N</kbd> | **Track ▸ New Track** |
+| <kbd>⌥X</kbd> | **Mark ▸ Clear Range** |
+
+### View
+
+| Key | Menu item |
+| --- | --- |
+| <kbd>⌘+</kbd> or <kbd>⌘=</kbd> | **View ▸ Zoom In** |
+| <kbd>⌘-</kbd> | **View ▸ Zoom Out** |
+| <kbd>⌘0</kbd> | **View ▸ Zoom to Fit** |
+| <kbd>⌥⌘I</kbd> | **View ▸ Hide Inspector** |
+| <kbd>⌃⌘T</kbd> | **View ▸ Transcript** |
+| <kbd>⌃⌘A</kbd> | **View ▸ Assistant** |
+| <kbd>⇧⌘P</kbd> | **View ▸ Preview Window** |
+| <kbd>⌃⌘U</kbd> | **View ▸ Show Ungraded** |
+| <kbd>⌃⌘W</kbd> | **View ▸ Scopes** |
+| <kbd>⌃⌘L</kbd> | **View ▸ Loudness Meter** |
+
+The three zoom items zoom the preview canvas, not the timeline. The timeline's zoom has no shortcut except <kbd>⇧Z</kbd>. See [Zoom and scroll](/reference/gestures/#zoom-and-scroll).
+
+## Keys in text and fields
+
+### Text on the canvas
+
+These work while you [edit a text clip in place](/text-and-shapes/edit-text-on-canvas/) on the preview.
+
+| Key | What it does |
+| --- | --- |
+| <kbd>↩</kbd> or keypad Enter | Applies the text and stops editing. Clicking away applies it too. |
+| <kbd>⇧↩</kbd>, <kbd>⌘↩</kbd>, <kbd>⌥↩</kbd> or <kbd>⌃↩</kbd> | Starts a new line. |
+| <kbd>⎋</kbd> | Stops editing. If the text changed, a sheet asks "Apply your changes to this text?" |
+
+In that sheet, **Apply** is the default, on <kbd>↩</kbd>. **Revert** throws the changes away, and **Cancel** goes back to editing. While an input method is composing, <kbd>↩</kbd> and <kbd>⎋</kbd> belong to it.
+
+### Rename fields
+
+The name field that opens on the timeline for a clip, a track or a marker.
+
+| Key | What it does |
+| --- | --- |
+| <kbd>↩</kbd> or <kbd>Tab</kbd> | Saves the new name. A click elsewhere does too. |
+| <kbd>⎋</kbd> | Closes the field and keeps the old name. |
+
+Saving an unchanged or empty field does nothing. To clear a clip's name, use the name field at the top of the Clip tab.
+
+### Transcript text
+
+These work while the [Transcript tab](/captions/transcript-tab/)'s text has the keyboard. [Transcript keys](/captions/transcript-keys/) has the detail.
+
+| Key | What it does |
+| --- | --- |
+| <kbd>←</kbd> <kbd>→</kbd> | Selects the previous or next word and moves the playhead to it. |
+| <kbd>↑</kbd> <kbd>↓</kbd> | Selects the word on the line above or below and moves the playhead to it. Beeps at the first and last line. |
+| <kbd>⇧</kbd> with an arrow | Extends the selection without moving the playhead. |
+| <kbd>⌘A</kbd> | Selects every word. |
+| <kbd>⎋</kbd> | Clears the selection. |
+| <kbd>⌫</kbd>, <kbd>⌦</kbd> or <kbd>⌘⌫</kbd> | Deletes the selected words and closes the gap, one undo step called Delete Words. With a pause selected, it shortens the pause to 0.2 s each end, one undo step called Delete Pause. |
+
+Every other key, <kbd>Space</kbd> and <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> included, works as it does on the timeline.
+
+### Assistant message field
+
+| Key | What it does |
+| --- | --- |
+| <kbd>↩</kbd> or keypad Enter | Sends the message. |
+| <kbd>⇧↩</kbd>, or <kbd>↩</kbd> with any modifier | Starts a new line. |
+| <kbd>Tab</kbd> <kbd>⇧Tab</kbd> | Leaves the field and gives the keys back. With macOS Full Keyboard Access on, they move to the next or previous control. Neither types a tab. |
+| <kbd>⌘Z</kbd> <kbd>⇧⌘Z</kbd> | Undo and redo your typing in the field, not project edits. |
+
+See [Chat with the Assistant](/assistant/chat/).
+
+### Timecode field
+
+Click the timecode in the toolbar, type a time and press <kbd>↩</kbd>, or click away. Playback pauses and the playhead moves there.
+
+| Type | Means |
+| --- | --- |
+| `1:23:04:12` | Hours, minutes, seconds and frames |
+| `1:23:04.5` | Hours, minutes and seconds with a fraction |
+| `1:23:04` | Hours, minutes and seconds |
+| `1:23` | Minutes and seconds |
+| `83.5` or `83` | Seconds |
+
+The time lands on the nearest frame. A time with a leading minus goes to the start of the project. A time Frame Job can't read beeps, and the field goes back to the current time. See [Jump around the timeline](/timeline/move-the-playhead/).
+
+### Inspector fields
+
+| Key | What it does |
+| --- | --- |
+| <kbd>↩</kbd> | Applies the value and leaves the field. |
+| <kbd>Tab</kbd> | Applies the value. A click elsewhere does too. |
+| <kbd>⎋</kbd> | Throws the typing away and keeps the old value. |
+
+In the Media tab's search field, <kbd>⎋</kbd> empties the field. See [Inspector fields](/getting-started/inspector-fields/).
+
+## Modes that Esc leaves
+
+| What's under way | How to leave it |
+| --- | --- |
+| A canvas drag: move, scale, rotate, crop, a line's endpoint or an obscure region | <kbd>⎋</kbd> puts everything back as it was before the drag, and adds no undo step. Caps Lock has to be off. |
+| [Crop mode](/canvas/crop/) | <kbd>⎋</kbd> or <kbd>↩</kbd> while the canvas has the focus and Caps Lock is off, or <kbd>C</kbd>. A click on empty canvas leaves it too. |
+| Region mode, from <kbd>Z</kbd> or the Obscure section's **Place on Canvas** | <kbd>⎋</kbd>. If you started it with <kbd>Z</kbd>, <kbd>Z</kbd> again leaves it too. |
+| The key-colour or qualifier eyedropper | <kbd>⎋</kbd>. The hint on screen reads "Click to pick … · Esc to cancel". |
+| A selected curve point in the Color tab | <kbd>⎋</kbd> deselects it. |
+
+Timeline drags have no such cancel. To take one back, use **Edit ▸ Undo** after you let go.
+
+Region mode also ends by itself when the selection stops being the clip it started for, or the playhead leaves that clip. Only one of these canvas tools can be on at a time, so starting one ends the others.
+
+## Related
+
+- [Keys and typing](/getting-started/keys-and-typing/)
+- [Menus](/reference/menus/)
+- [The Clip menu](/reference/clip-menu/)
+- [Gestures with no menu item](/reference/gestures/)
+- [Troubleshooting](/reference/troubleshooting/)

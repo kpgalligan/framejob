@@ -1,0 +1,131 @@
+---
+title: "The Export Queue"
+description: "Write exports behind the editor, one at a time, while you keep working, and follow, cancel or reveal each one from a single window."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+The Export Queue writes the same file as **Export…** without making you wait for it. Jobs run one at a time behind the editor while you keep working.
+
+<AtAGlance
+  menu="Window ▸ Export Queue"
+  where="Export sheet ▸ Add to Queue"
+  tools={['export', 'export_status', 'cancel_export']}
+/>
+
+## Add to Queue
+
+<Steps>
+
+1. Set up the file in the [export sheet](/export/export-sheet/).
+
+2. Choose **Add to Queue**. It's available whenever **Export…** is.
+
+3. Name the file in the save panel and choose **Save**. This is the same panel **Export…** opens.
+
+</Steps>
+
+The **Export Queue** window then opens on its own, with the job in it. Your settings are remembered as the last choice, as they are for **Export…**.
+
+Opening the export sheet pauses playback whichever button you use, but after **Add to Queue** no progress sheet is in the way. You can start playback again and go on editing while the job runs.
+
+## The Export Queue window
+
+Choose **Window ▸ Export Queue** to open it at any time. It has no keyboard shortcut.
+
+The window lists every queued, running and finished export. Jobs run one at a time, in the order they were added, unless a job has to [wait for memory](#the-encoder-memory-wait). Closing the window stops nothing. Open it again and the jobs are where they'd got to.
+
+The line at the bottom counts the jobs, for example "1 exporting · 2 waiting · 3 finished". With nothing in the list, the window reads "Nothing queued. The Export card's Add to Queue button puts a confirmed export here instead of waiting for it, and they run one at a time while you keep editing."
+
+The list isn't saved. It starts empty each time you open Frame Job.
+
+## Rows and their states
+
+Each row shows the file's name and where the job has got to.
+
+| The row says | What it means | Button |
+| --- | --- | --- |
+| `Waiting` | Queued behind the running job. | **Cancel** |
+| `Waiting for memory: …` | An AV1 or VP9 job [waiting for memory](#the-encoder-memory-wait). | **Cancel** |
+| `Writing · 42 %` | The job is running, with a progress bar beside it. It can stay at `Writing · 0 %` while the job [waits for what it needs](/export/what-an-export-includes/#waiting-for-what-it-needs). | **Cancel** |
+| `Measuring loudness… · 12 %` | The job is measuring the mix before it writes. | **Cancel** |
+| `Stopping…` | You cancelled the job and it hasn't stopped yet. | **Cancel** |
+| `Exported “Board.mp4”.` | The file was written. Any stems, graphic warnings and cursor warnings are counted after the name, then come the [loudness figures](/export/progress-and-report/). | **Show**, **Remove** |
+| `Overwritten by a later export to the same file.` | The job finished, but a later job has since started writing to the same path. | **Remove** |
+| `Cancelled.` | You stopped it while it ran. | **Remove** |
+| `Cancelled before it started.` | You stopped it while it waited. | **Remove** |
+| The reason it failed | The job stopped with an error. | **Remove** |
+
+Hold the pointer over a row for its tooltip: the full path, the container, the size and the frame rate, then the whole memory sentence while a job waits for memory, then each graphic and cursor warning.
+
+| Button | What it does |
+| --- | --- |
+| **Cancel** | Stops that job and removes its partly written file. A waiting job is cancelled before it starts. |
+| **Remove** | Takes a finished row out of the list. The file stays where it is. |
+| **Show** | Reveals the finished file in the Finder. If the file has since been moved or deleted, Frame Job beeps. |
+
+## Clear Finished and Cancel All
+
+**Clear Finished** removes every finished, cancelled and failed row and leaves the queue running. It's dimmed when there's nothing to clear, and it deletes no files.
+
+**Cancel All** stops the running job and every waiting one. It's dimmed when nothing is running or waiting.
+
+A cancelled job's partly written file is removed. A failed job can leave one where you saved it. See [Failures](/export/progress-and-report/#failures).
+
+## A queued job's snapshot
+
+A job holds the timeline as it was when you chose **Save** in the save panel, including its media files, reversed clips, graphics, chapters and any timecode burn-in.
+
+Edits, undos and relinks made afterwards don't change what it writes, and neither does closing the document. You can queue one version, go on cutting, and queue another.
+
+## Quit with jobs in the queue
+
+Quitting while a queued job runs or waits asks first, after Frame Job has asked about any unsaved documents.
+
+The alert reads "An export is still being written." and names the running file, for example "“Board.mp4” is not finished, and 2 more are waiting. Quitting now stops it and deletes the partly written file."
+
+- **Quit Anyway** cancels the queue, deletes the partly written file and quits.
+- **Cancel** keeps Frame Job open and the queue running.
+
+:::caution
+Only the queue is guarded this way. An **Export…** progress sheet on screen stops Frame Job quitting, but one out of sight doesn't: with its window minimised or Frame Job hidden, quitting doesn't ask and leaves the partly written file behind. [Quitting during an export](/export/progress-and-report/#quitting-during-an-export) has the detail.
+:::
+
+## The encoder memory wait
+
+AV1 and VP9 are encoded in software, and they use a lot of memory.
+
+| Format | At 1080p | At 4K |
+| --- | --- | --- |
+| AV1 (MP4) and AV1 (WebM), depending on [Speed](/export/encoder-speed/) | About 1.2–2.4 GB | About 4.4–8.1 GB |
+| VP9 (WebM) | About 0.4–0.5 GB | About 1.1–1.6 GB |
+| VP9 with Alpha (WebM) | About 0.7 GB | About 2.2 GB |
+
+All the AV1 and VP9 exports running in Frame Job, from the queue and from **Export…** progress sheets, may hold up to a quarter of the Mac's memory together. On a 16 GB Mac that's 4.0 GB.
+
+A queued AV1 or VP9 job starts only if it fits in that quarter with what's already running. The queue itself runs one job at a time, so what holds a job back is an AV1 or VP9 export running behind an **Export…** progress sheet.
+
+- When nothing else is running, a job always starts, however large.
+- While a job waits, a later job that fits runs first, and so does any job in a format the Mac encodes itself, such as H.264 or ProRes.
+- An **Export…** sheet never waits. It's counted and starts straight away, so several sheets at once can go past the quarter.
+
+The row's status is one line, so the sentence usually ends in "…" before its figures. The tooltip ends with all of it: "Waiting for memory: AV1 and VP9 exports running now hold about 2.3 GB of the 4.0 GB this Mac allows them, and this one needs about 2.2 GB."
+
+The figures are measured, not a guarantee: a heavier timeline can use more.
+
+## Good to know
+
+- **Export…** doesn't join the queue. It writes straight away behind its [own progress sheet](/export/progress-and-report/), and it can run while a queued job runs.
+- Two jobs can name the same file. The save panel asks about replacing a file only if it's already on disk, so two quick **Add to Queue** choices with one name may not ask at all. The later job replaces the file as it starts writing, whether or not it goes on to finish, and the earlier row stops offering **Show**.
+
+## With an agent
+
+An agent's `export` always goes through the queue, never a progress sheet. Its job is a row like any other, but the window doesn't open on its own. `export_status` reads that row, including the memory sentence while the job waits, and `cancel_export` is its **Cancel**, though a running job can still read `running` until writing has stopped. An agent can follow and stop only the jobs it started. See [Export: start, then poll](/mcp/export/).
+
+## Related
+
+- [The export sheet](/export/export-sheet/)
+- [Export progress and the report](/export/progress-and-report/)
+- [AV1 and VP9](/export/av1-and-vp9/)
+- [What an export includes](/export/what-an-export-includes/)

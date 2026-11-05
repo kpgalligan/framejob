@@ -1,0 +1,58 @@
+---
+title: Encoder speed
+description: Choose how long the AV1 encoder works on each frame, trading export time against file size.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The **Speed** row sets how long the AV1 encoder works on each frame. A longer time gives a smaller file, so it's a choice between waiting less and sending less.
+
+<AtAGlance
+  menu="File ▸ Export…"
+  keys="⌘E"
+  where="Export sheet ▸ Speed"
+  tools="export"
+/>
+
+## Choose a speed
+
+In the export sheet, choose **AV1 (MP4)** or **AV1 (WebM)** in **Format**, then pick a row in **Speed**. The row sits under **Format**, or under **Dynamic Range** in an HDR project.
+
+| Speed | What it does | SVT-AV1 preset |
+| --- | --- | --- |
+| **Faster** | The quickest export and the largest file. | 8 |
+| **Balanced** | The default. | 6 |
+| **Smaller file** | The slowest export and the smallest file. | 4 |
+
+The footnote names your choice, for example `AV1 · MP4 · Balanced`, and the estimate in the readout follows it, for example `Estimated time: about 25 s`. The estimate is only a guide. Its figures come from an idle Apple M2 Max, so a slower or busy Mac, or a heavy timeline, takes longer.
+
+The rate from [Quality](/export/quality/) is the cap at every speed, and each speed is tuned to match HEVC's picture at that rate. So Speed moves the time and the file size, not the quality you asked for.
+
+## What each speed costs
+
+Measured on 10 seconds of 4K camera footage on an Apple M2 Max, exported as AV1 (MP4):
+
+| Speed | Time at 4K | File at 4K | Time at 1080p | File at 1080p |
+| --- | --- | --- | --- | --- |
+| **Faster** | 7.1 s | 27 % larger | 2.4 s | 4 % larger |
+| **Balanced** | 14.0 s | The baseline | 4.2 s | The baseline |
+| **Smaller file** | 19.9 s | 12 % smaller | 5.8 s | 5 % smaller |
+
+The file size **Faster** adds is much greater at 4K than at 1080p, where it costs little.
+
+Speed changes the memory an export uses too. **Faster** measured about 1.3 GB at 1080p and 4.6 GB at 4K, **Balanced** about 2.2 GB and 7.5 GB, and **Smaller file** about 2.4 GB and 8.1 GB. AV1 and VP9 exports share a quarter of the Mac's memory, and a job that would go over it [waits for memory](/export/export-queue/#the-encoder-memory-wait) in the Export Queue.
+
+## Good to know
+
+- On every other format **Speed** is greyed out and keeps your last choice. That includes VP9 (WebM) and VP9 with Alpha (WebM), because VP9 has one speed.
+- The choice is remembered with the rest of the sheet and stored in [presets](/export/presets/).
+
+## With an agent
+
+An agent passes `encoder_speed` to `export`, as `faster`, `balanced` or `smaller`. `balanced` is the default. It works on `av1` and `av1_webm` only, and any other format returns an error. The finished export's result names the speed used. See [Export: start, then poll](/mcp/export/#encoder-speed).
+
+## Related
+
+- [AV1 and VP9](/export/av1-and-vp9/)
+- [Export quality](/export/quality/)
+- [The Export Queue](/export/export-queue/)

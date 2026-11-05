@@ -1,0 +1,99 @@
+---
+title: Transitions
+description: How a transition works in Frame Job, as the overlap between two clips on a track, and the rules that decide where one can go.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A transition carries the picture and sound from one clip into the next. In Frame Job it isn't a separate object you drop on a cut. It's what plays wherever two clips on the same track overlap.
+
+<AtAGlance
+  menu="Clip ▸ Transition ▸"
+  where="Clip tab ▸ Clip sub-tab ▸ Transition"
+  tools={['add_transition', 'set_transition', 'set_transition_style', 'set_transition_duration']}
+/>
+
+## What a transition is
+
+A transition plays across the overlap between two clips on the same track, and the overlap's length is the transition's duration. To make a transition longer, you make the overlap longer, by dragging or trimming a clip or by typing a [Duration](/motion/transition-settings/#duration).
+
+The later clip carries the transition: it's the transition into that clip, and it's stored with that clip. To change one, select the clip that comes second.
+
+There are thirteen [styles](/motion/transition-styles/), from Cross Dissolve to pushes, wipes and a zoom. [Add or remove a transition](/motion/add-a-transition/) has the ways to make one, and [The Transition section](/motion/transition-settings/) has its settings.
+
+Two clips on different tracks don't transition, however they line up. They're layers, and the front one draws over the back one.
+
+## Overlap two clips
+
+The quickest transition is an overlap. When an edit leaves a clip overlapping the clip before it on the same track, and the later clip has no transition stored, Frame Job adds a Cross Dissolve. It's eased (**Ease In Out**) and crossfades the sound (**Crossfade Audio** on).
+
+That holds however the overlap came about:
+
+- Dragging a clip onto its neighbour, or trimming an edge past it.
+- A duplicate, a paste or an insert.
+- A ripple delete, a [Close Gap](/editing/close-gaps/) or [Shift Clips Left](/motion/add-a-transition/#shift-clips-left).
+- A nest or an un-nest.
+
+A clip that already has a transition stored keeps it.
+
+## The overlap rules
+
+Two clips on a track may overlap only as a transition, and two rules limit how:
+
+- A clip can overlap at most one neighbour on each side.
+- An overlap can be at most half as long as the shorter of the two clips. A 4 s clip and a 10 s clip can overlap by up to 2 s.
+
+Clips never push each other out of the way, so Frame Job won't make a move, trim, nudge, duplicate, gap close or nest that breaks either rule. A drag stops at the last place that fits, and anything else beeps and gives the reason at the foot of the inspector.
+
+Two edits work differently:
+
+- **Paste and Un-nest** put a clip that would break the rule on a new track at the front.
+- **A ripple delete** is never stopped by these rules. A clip it slides onto a neighbour gets a Cross Dissolve.
+
+See [How edits work](/editing/how-edits-work/#the-overlap-rule).
+
+## On the timeline
+
+The overlap draws as a hatched zone across the cut, with a solid edge down each side. The transition's name sits in the zone when the whole word fits. On a short transition the name is left out, and the [Transition section](/motion/transition-settings/) still shows it.
+
+See [Reading a clip on the timeline](/timeline/reading-a-clip/#the-transition-zone).
+
+## An overlap with no stored transition
+
+Choosing **None** removes a stored transition but not the overlap. While the two clips overlap they keep blending, as a linear cross dissolve with no sound crossfade: both clips play at their own level across the overlap. The timeline draws no hatched zone for it.
+
+The Transition section says what's there. Its summary reads "none", and it shows **Linear** and **Crossfade Audio** off. Setting either one stores a Cross Dissolve with exactly the values shown, plus your change.
+
+This lasts until the next move, trim or other edit that repositions clips on that track, which gives the overlap the usual eased Cross Dissolve. To get a hard cut back, move or trim the clips so they no longer overlap.
+
+## A transition needs an overlap
+
+A transition stored on a clip that overlaps nothing does nothing until there's an overlap. Drag two clips apart and the later one keeps its transition, with no zone on the timeline. Overlap them again and the same style comes back.
+
+The Transition section only appears for a single selected clip that overlaps the clip before it. To clear a stored transition with no overlap, select the clip and choose **Clip ▸ Transition ▸ None**, which is available for any selection.
+
+## Clips that can't take a transition
+
+[Adjustment clips](/color/adjustment-clips/) can't take a transition, so Frame Job won't make a move, trim or other edit that overlaps an adjustment clip with another clip. Fade one with opacity instead.
+
+The first clip on a track and a clip after a gap have nothing to overlap, so [the Transition menu skips them](/motion/add-a-transition/#clips-that-are-skipped).
+
+## Good to know
+
+- Two overlapping clips with no picture get a transition too. Only their sound changes, so the [crossfade settings](/motion/transition-settings/) matter and the style doesn't show.
+- After [Detach Audio](/audio/detach-and-attach/), **Crossfade Audio** on the video clips' transition has no effect, because their own sound is off. To crossfade the sound, overlap the detached audio clips and give them a transition of their own.
+- [Remove Silences](/cleanup/remove-silences/) and [Remove Filler Words](/cleanup/remove-filler-words/) never cut into a transition's overlap.
+- A clip always blends normally while it's in a transition, whatever [blend mode](/canvas/blend-modes/) it has.
+- A clip draws without [motion blur](/motion/motion-blur/) for the frames of a transition.
+
+## With an agent
+
+`add_transition` makes an overlap at a hard cut. `set_transition` sets or clears the style, `set_transition_style` sets its curve and crossfade, and `set_transition_duration` changes the length of an overlap. A `move_clip` that makes an overlap gets the same Cross Dissolve as a drag. See [Tools: transitions](/mcp/tools-transitions/).
+
+## Related
+
+- [Add or remove a transition](/motion/add-a-transition/)
+- [Transition styles](/motion/transition-styles/)
+- [The Transition section](/motion/transition-settings/)
+- [How edits work](/editing/how-edits-work/)
+- [Tools: transitions](/mcp/tools-transitions/)

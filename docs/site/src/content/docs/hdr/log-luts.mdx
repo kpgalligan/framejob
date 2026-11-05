@@ -1,0 +1,94 @@
+---
+title: "Camera log from your own LUT"
+description: "Convert a log file with a .cube LUT instead of a built-in curve, share that LUT between files, and remove it without surprises."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Log footage looks flat until it's converted. When [Camera Log](/hdr/camera-log/) has no built-in curve for your footage, such as ARRI LogC or RED Log3G10, a `.cube` LUT, a file that maps one set of colours to another, can do the conversion instead. You pick the LUT once, and every clip of that file comes out as normal-looking video.
+
+<AtAGlance
+  where={['Media tab ▸ Camera Log ▸ Log ▸ Use LUT…', 'Media tab ▸ Camera Log ▸ Log ▸ LUT: name']}
+  tools={['import_media', 'set_media_color', 'remove_media']}
+/>
+
+## Use LUT…
+
+<Steps>
+
+1. Open the **Media** tab and click the video file in the list.
+
+2. In the **Camera Log** section, choose **Use LUT…** from the **Log** popup.
+
+3. Pick the `.cube` file. The panel asks you to "Choose a .cube LUT that converts this file's log footage to Rec. 709."
+
+</Steps>
+
+The LUT joins the project's media list and becomes this file's conversion, all as one undo step called **Camera Log**. The line under the popup and the section's header then read **LUT: name**.
+
+Frame Job takes the LUT's output as Rec. 709, so use a LUT made for that job. Like every Camera Log setting, it belongs to the file: every clip of the file follows it, reversed clips included, and it's applied before the chroma key and every grade.
+
+A file takes a curve or a LUT, not both, so choosing one replaces the other. A PQ file keeps its [peak override](/hdr/hdr10-peak/#undo-and-camera-log).
+
+If the file you pick is already in the Media list, Frame Job uses that entry and doesn't add a second one.
+
+The LUT has to be a 3D `.cube` of size 2 to 65 with the default 0 to 1 domain, and no larger than 32 MiB. Anything else shows an error naming the file and what's wrong with it, and nothing changes. For example: "“Film.cube” is not a LUT Frame Job reads: line 2: LUT_3D_SIZE 200 is outside 2–65." [.cube LUTs](/color/luts/) has the format in full.
+
+## A LUT already in the project
+
+Every `.cube` LUT in the project is listed in the **Log** popup as **LUT: name**, between the built-in curves and **Use LUT…**. The name is the file's name without `.cube`.
+
+To use the same LUT on another file, click that file in the list and choose its row. One LUT can convert any number of files.
+
+The popup and the [Look section](/color/looks/) read the same media list. A LUT you imported as a look is offered here, and a LUT you added with **Use LUT…** appears in the Look section's Imported group.
+
+To take a LUT off one file, choose **None** or a curve in the **Log** popup. The LUT stays in the Media list.
+
+## A LUT in use
+
+A LUT that is some file's Camera Log counts as used, even when no clip has it as a look. **Unused only** hides it from the [Media list](/projects/media-tab/#unused-only), and **Remove** asks before it takes the LUT away.
+
+## Remove the LUT
+
+Right-click the LUT's row on the Media tab and choose **Remove**. The alert says what depends on it, for example:
+
+- "It is the Camera Log of 2 files, which lose it."
+- "It is the look of 1 clip, which keeps its place and loses the look. …and the Camera Log of 2 files, which lose it."
+
+**Remove and Clear Looks** removes the LUT as one undo step, **Remove Media**. Those files go back to no conversion, so they show the log picture as recorded. Clips that had it as a look stay where they are and lose the look. A PQ file keeps its peak. **Cancel** changes nothing.
+
+The `.cube` file on your disk is never touched. See [Remove media](/projects/remove-media/).
+
+## Camera Log and looks
+
+Camera Log is applied before any look, so a look works on the picture the conversion made.
+
+If a clip's look is a `.cube` LUT and its file has a Camera Log, the Look section warns: "This clip's file is converted by Camera Log; a camera LUT here converts it twice."
+
+It's only a warning, and Frame Job changes nothing, because a creative LUT on top of a conversion is fine. If the look really is a camera LUT, keep it in one place: either in the **Log** popup or as the clip's look, not both.
+
+The eight built-in looks never show this warning. A `.cube` look on a PQ (HDR10) file does show it, even with **Log** set to **None**.
+
+## Good to know
+
+- In an HDR (HLG) project, a LUT's output is treated as SDR and [lifted to reference white](/hdr/dynamic-range/#sdr-material-in-an-hdr-project), so the file gains no HDR highlights. A built-in curve does become real HDR there.
+- If the LUT can't be found or drawn, the footage shows unconverted, as flat log, until you [relink](/projects/relink-media/) the LUT. A LUT relinks like any other file in the Media list.
+- Relinking the video file keeps its Camera Log.
+- Camera Log is for video files. With an audio file, an image or a LUT selected, the popup is disabled and the line reads "Select a video in the list".
+- **View ▸ Show Ungraded** turns looks and grades off and leaves the conversion on, because the conversion is how the file is read.
+
+## With an agent
+
+An agent takes two steps where a person takes one: `import_media` brings the `.cube` into the project, then [`set_media_color`](/mcp/tools-media/#set_media_color) names it as the file's conversion, with `color` set to `{lut: <media id>}`. The call can't set a curve and a LUT together.
+
+`remove_media` won't take a LUT that's in use unless the call passes `with_clips: true`, which clears the conversions and looks that name it. See [Tools: media](/mcp/tools-media/#remove_media).
+
+## Related
+
+- [Camera Log](/hdr/camera-log/)
+- [.cube LUTs](/color/luts/)
+- [HDR10 peak](/hdr/hdr10-peak/)
+- [Looks](/color/looks/)
+- [The Media tab](/projects/media-tab/)
+- [Remove media](/projects/remove-media/)

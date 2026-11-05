@@ -1,0 +1,111 @@
+---
+title: "Export presets"
+description: Save the export sheet's choices under a name, and set the whole sheet with one pick in any project.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A preset is a set of export choices you've saved under a name. Pick it and the whole sheet is set, in any project. It's the quick way back to the export you make every week.
+
+<AtAGlance
+  menu="File ▸ Export…"
+  keys="⌘E"
+  where={['Export sheet ▸ Preset', 'Export sheet ▸ the gear beside Preset']}
+/>
+
+## Apply a preset
+
+Pick the preset in **Preset:**. Every control is set exactly as if you had clicked it.
+
+The first row is **Custom**, then your presets. Picking **Custom** leaves the sheet as it is. The gear beside the popup saves and deletes presets.
+
+## Save a preset
+
+<Steps>
+
+1. Set the sheet the way you want it.
+
+2. Click the gear beside **Preset:** and choose **Save…**.
+
+3. Type a name and click **Save**, or **Cancel** to save nothing. The name field starts with the name of the preset now chosen.
+
+</Steps>
+
+Saving under a name that already exists, ignoring case, replaces that preset in its place in the list. New presets go at the end.
+
+Frame Job beeps and saves nothing when:
+
+- The name is empty.
+- The name is **Custom**, in any case. It's reserved for the popup's first row.
+- The sheet has an error, for example an empty custom field.
+- The presets file can't be written.
+
+## Change a preset
+
+Apply it, adjust the controls, and save again under the same name. There's no separate rename: to rename a preset, save it under the new name and delete the old one.
+
+## Delete a preset
+
+Choose the preset in **Preset:**, then choose **Delete** from the gear. **Delete** is available only while a saved preset is chosen, and it doesn't ask you to confirm.
+
+The controls keep the preset's values, so **Save…** under the same name puts it back. It returns at the end of the list.
+
+## What a preset stores
+
+A preset stores the choices on the sheet, not the numbers they resolve to, so it means the same on a project of another size. A preset saved on a 1080p project that says "4K, High" exports at the right 4K size and bit rate on any other project.
+
+It stores:
+
+- Format
+- Size row, or the custom size
+- Frame rate
+- Quality tier
+- Loudness
+- Range
+- Burn in timecode
+- Speed
+- Bit depth
+- Stems
+
+**Dynamic Range** isn't stored.
+
+The format decides what a preset can hold. Size, frame rate, quality, loudness and burn-in aren't stored when the format can't use them, so a preset saved on an audio-only format has no size, and one saved on Animated GIF has no loudness. Applying it puts those controls back on their defaults. Speed, Bit depth and Stems are stored whichever format is chosen.
+
+When a preset meets a different project:
+
+- A range falls back to **Whole project** if the project has no range.
+- A size row hidden on this project, because an earlier row has the same numbers, lands on that earlier row. A size row the format doesn't offer falls back to the format's default.
+- A custom size stays those exact numbers.
+
+## Back to Custom
+
+Changing **Format:**, **Size:**, **Frame rate:**, **Quality:**, **Loudness:**, **Range:**, **Burn in timecode** or a custom field puts the popup back on **Custom**. Changing the value back doesn't select the preset again.
+
+**Speed:**, **Bit depth:** and **Stems:** don't do this. After you change one of those three, the popup still shows the preset's name, even though the sheet no longer matches it.
+
+The popup opens on **Custom** each time, even when your remembered choices happen to match a preset.
+
+## The presets file
+
+Presets are kept for your macOS user account, so every project and window shares them. They live in `~/Library/Application Support/Frame Job/ExportPresets.json`.
+
+You can open the file in a text editor. A damaged file reads as no presets, and the export sheet works as usual.
+
+Saving or deleting reads the file first, so two open sheets can't lose each other's presets. A sheet that's already open keeps listing a preset you've deleted elsewhere until it saves or deletes a preset itself, or you open it again.
+
+## Transparent presets
+
+A preset on a transparent format, such as **ProRes 4444 (MOV)** or **HEVC with Alpha (MOV)**, stores the format and nothing about the canvas. The file is transparent only when the project's canvas background is. A custom size also has to match the canvas's shape on these formats, so a preset with a custom size can fail on a canvas of another shape. Use a size row instead, because the rows fit each project's shape. See [Transparent exports](/export/transparency/).
+
+## With an agent
+
+Presets belong to the sheet, and `export` doesn't read them. Its `preset` argument is something else: it names the format, and the call sets each other choice itself. See [Export: start, then poll](/mcp/export/).
+
+## Related
+
+- [The export sheet](/export/export-sheet/)
+- [Choose a format](/export/formats/)
+- [Export size](/export/size/)
+- [Export quality](/export/quality/)
+- [Transparent exports](/export/transparency/)

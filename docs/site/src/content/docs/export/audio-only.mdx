@@ -1,0 +1,96 @@
+---
+title: Audio-only exports
+description: Export the timeline's sound with no picture, as a compressed M4A or an uncompressed WAV or AIFF. There's no MP3 export.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Frame Job can write the timeline's sound with no picture: an M4A to send to someone, or a WAV or AIFF to hand to a mastering engineer, a DAW or a podcast editor.
+
+<AtAGlance
+  menu="File ▸ Export…"
+  keys="⌘E"
+  where="Export sheet ▸ Format"
+  tools="export"
+/>
+
+## Export the sound
+
+<Steps>
+
+1. Choose **File ▸ Export…** or press <kbd>⌘E</kbd>.
+
+2. In **Format**, choose **Audio only (M4A)**, **Audio only (WAV)** or **Audio only (AIFF)**.
+
+3. Set the [controls that apply](#which-controls-apply). The [readout](/export/export-sheet/#the-readout-line) under the controls shows the length in milliseconds rather than frames, for example `Audio only · 00:01:12.200`.
+
+4. Choose **Export…**, or **Add to Queue** to keep editing while it's written, then name the file.
+
+</Steps>
+
+## Audio only (M4A)
+
+An `.m4a` file holding AAC sound, 48 kHz stereo. This is the one to send to someone, because it's by far the smallest.
+
+The sound is 192 kbps unless you pick a tier in [Quality](/export/quality/): **Low** is 128 kbps, **Medium** 192, **High** 256 and **Maximum** 320. The footnote reads `AAC · M4A`, with the rate added when you pick a tier.
+
+Chapter markers are written into the file as [chapters](/export/chapters/), and the file is written with fast start, so a player can begin before all of it has arrived.
+
+## Audio only (WAV)
+
+A `.wav` file of uncompressed sound, 48 kHz stereo. Choose it when the mix is going into someone else's tool, where a second round of lossy compression is the one thing you can't take back.
+
+It's 16-bit by default, or 24-bit through [Bit depth](/export/bit-depth/). That's about 11.5 MB a minute at 16 bits and 17.3 MB a minute at 24. The footnote reads `LPCM · WAV`, with `24-bit` added at that depth.
+
+A WAV holds no chapters, so chapter markers are left out.
+
+## Audio only (AIFF)
+
+The same samples as a WAV, in an `.aiff` file. WAV stores each sample little-endian and AIFF big-endian, which matters only to the software reading the file, so choose whichever your tool asks for.
+
+Everything else is as for WAV: 48 kHz stereo, 16 or 24 bits, the same file size and no chapters. The footnote reads `LPCM · AIFF`.
+
+## Which controls apply
+
+A control an audio format can't use is greyed out. It keeps what it shows, and nothing from it reaches the file.
+
+| Control | M4A | WAV and AIFF |
+| --- | --- | --- |
+| **Quality** | Sets the AAC rate | Greyed out |
+| **Bit depth** | Greyed out | 16-bit or 24-bit |
+| [**Stems**](/export/stems/) | Available | Available |
+| [**Loudness**](/export/loudness/) | Available | Available |
+| [**Range**](/export/range/) | Available | Available |
+| **Size**, **Frame rate**, **Speed**, **Burn in timecode** | Greyed out | Greyed out |
+
+**Size** has nothing to set because there's no picture. A preset saved from an audio format stores no size, so it can't carry one over to a movie.
+
+## The 48 kHz stereo master
+
+Every export with sound, movies included, reads the mix once as 48 kHz stereo at 32-bit float, and rounds it once at the very end. In between, the loudness gain and the limiter both work on the float mix, so nothing has been clipped before they act.
+
+The limiter holds the file's true peak at or under −1 dBTP. See [Export loudness](/export/loudness/). Sound under that ceiling passes through unchanged.
+
+The final rounding goes to the nearest value at the file's bit depth, with no dither at 16 or 24 bits.
+
+There's no control for the sample rate or the channel count. Whatever your sources are, the file is 48 kHz stereo.
+
+## Good to know
+
+- There's no MP3 export. If your podcast host wants an MP3, export a WAV and convert it with your own tool.
+- A timeline with no sound at all can't be exported as audio. The export stops with "There is nothing on the timeline to export — add a clip first."
+- [Stems](/export/stems/) skip the master's limiter, so a stem can peak higher than the mix.
+- When the export finishes, the sheet reports what the sound measured. See [Export progress and the report](/export/progress-and-report/).
+
+## With an agent
+
+An agent passes `audio_m4a`, `audio_wav` or `audio_aiff` as the `preset` of `export`. It sets the M4A's rate with `audio_bitrate` and a WAV or AIFF's depth with `audio_bits`. See [Export: start, then poll](/mcp/export/).
+
+## Related
+
+- [The export sheet](/export/export-sheet/)
+- [Export bit depth](/export/bit-depth/)
+- [Audio stems](/export/stems/)
+- [Export loudness](/export/loudness/)
+- [Choose a format](/export/formats/)

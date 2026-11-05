@@ -77,7 +77,7 @@ the rate, for example `2.00×`.
 
 | Row | What it does |
 |---|---|
-| **Rate** | The rate, from ×0.1 to ×1000, to two decimal places. A typed value outside that range is clamped to it. Its quick-pick menu offers 0.5, 1, 2 and 4. |
+| **Rate** | The rate, from ×0.1 to ×1000, to two decimal places. A typed value outside that range is clamped to it. Its quick-pick menu offers 0.50×, 1.00×, 2.00× and 4.00×. |
 | **Keep pitch** | The same setting as the Speed sheet's Preserve pitch. |
 | **Fit to** | Type a length as timecode, and the rate changes so the clip plays in exactly that time. With several clips selected, each is fitted to that length. |
 | Note | `Audio is silent above ×12` appears when a selected clip with sound is past the audio limit. |
@@ -105,6 +105,8 @@ turn snapping off), shows the result as you drag, and lands as one undo step,
   Clip**).
 - A stretch that needs a rate outside ×0.1 – ×1000 does nothing.
 - On a locked track the edge does not move.
+- On a clip linked to its detached sound the edge does not move either, with
+  no beep and no message. [Attach Audio](audio.md#attach-audio) first.
 - On a clip with a speed ramp, the whole ramp stretches with the clip. A
   stretch that would push any of its rates past the limits does nothing.
 
@@ -199,8 +201,9 @@ beyond the clip's current end.
 
 1. Select the clip, put the playhead where the ramp should start, and choose
    **Clip ▸ Add Action** (⌥⌘K). The new action is 1 s long and is selected.
-2. Drag the band on the action lane to move or resize it. Set its **Curve**
-   in the lane's detail row.
+2. Drag the band on the action lane to move or resize it. Set its curve with
+   the pop-up in the lane's detail row: **Linear**, **In**, **Out** or
+   **In Out**.
 3. In the **Speed** section, set **Rate** to the rate this action should end
    on.
 
@@ -220,12 +223,13 @@ While an action is selected, the Speed section edits that action:
   Typing a rate, or choosing one from the quick-pick menu, sets the action's
   end rate. This turns any action into a Speed action.
 - The section header shows no **Reset** while an action is selected. To end
-  the action at ×1, type 1 or choose 1 from Rate's quick-pick menu.
+  the action at ×1, type 1 or choose 1.00× from Rate's quick-pick menu.
 - The section header's **Clear** button (shown when the action sets a rate), the row's × on hover, and the row's
-  right-click **Remove from action** take the rate out of the action.
+  right-click **Remove from action N** (N is the action's number) take the
+  rate out of the action.
 - **Keep pitch** still sets the clip's own setting, at the clip's own rate.
-- **Fit to** is the clip's alone and cannot be set inside an action. Its row
-  is marked ⊘.
+  Its row is marked ⊘.
+- **Fit to** still fits the clip, never the action. Its row is marked ⊘ too.
 
 ### Changing the speed of a ramped clip
 
@@ -270,8 +274,8 @@ captions back too. A drag moves them when you let go of the mouse.
 - **Speech the clip no longer plays.** A caption whose speech the clip no
   longer reaches is removed. A word caption page that is only partly reached
   keeps the words that still play, and its text is cut to match.
-- **Newly revealed speech.** When a speed-up or a ramp makes the clip play
-  further into its file, the new part gets no captions. Generate Captions
+- **Newly revealed speech.** When a ramp makes the clip play further into
+  its file, the new part gets no captions. Generate Captions
   again to caption it ([Captions](captions.md)).
 - **Neighbours.** A moved caption is cut back where it would run into a
   caption that did not move. One that would start inside such a caption, or
@@ -290,7 +294,8 @@ would do so is refused, and the reason names what would fit:
 
 Speed Ramp… is also refused when:
 
-- the span runs past the clip's end
+- the span runs past the clip's end (only an agent's `from` and `to` can ask
+  for that)
 - the span overlaps an action already on the clip, including one inside a
   Dip's or Burst's hold
 - a Dip or Burst span is shorter than two frames
@@ -307,21 +312,22 @@ background, saved in the project package: a clip with a speed ramp, and a
 clip at a constant speed other than ×1 with Keep pitch off. Renders run one
 at a time, and a new one starts after each edit that changes the clip's
 timing: a ramp, its rate, a trim or a split. Each render covers the whole
-clip's sound. Undo and redo render again too, because the file from before
-the edit is not kept, so the clip is briefly silent after an undo as well.
-How long the silence lasts grows with the clip's length and rate: well under
-a second for a 10 s clip, and a few seconds for a minute of ×4.
+clip's sound. Undo and redo can render again too: the file from before the
+edit is deleted once the next render lands or fails, so the clip can be
+briefly silent after an undo as well. How long the silence lasts grows with
+the clip's length and, above ×1, with its rate.
 
 - **Keep pitch off:** the sound glides smoothly up and down in pitch with the
   rate, like tape, and stays in step with the picture. At a constant speed it
-  plays at that speed's tape pitch, sample-exact.
+  plays at that speed's tape pitch.
 - **Keep pitch on:** the sound keeps its own pitch as the speed changes.
   After a steep slow-down (for example ×2 → ×0.5) it can run up to about
-  22 ms behind the picture.
+  24 ms behind the picture.
 
 While a clip's sound is still rendering, that clip plays silent in the
-preview. An export waits for every render it needs (its progress reads
-"Preparing…" during the wait) and never writes that sound silent. If a render
+preview. An export waits for every render it needs (the Exporting sheet reads
+"Preparing “*name*”…" during the wait, and a queued export's row reads
+"Writing · 0 %") and never writes that sound silent. If a render
 fails, the export fails with "Clip N's retimed audio could not be
 rendered: …". A failed render is not tried again while Frame Job stays open:
 the clip stays silent and exports that need it keep failing until you change
@@ -435,7 +441,7 @@ backwards copy of the file once. The copy is kept in the project package and
 shared by every reversed clip of that file. When you tick Reverse on a file
 with no copy yet, the **Reversing** sheet appears with a progress bar and the
 line "Rendering a reversed copy of “name”…" (or "Rendering reversed copies of
-N files…"). The status reads "Preparing…" until the render starts.
+N files…").
 
 - When it finishes, the sheet closes and the clip plays backwards.
 - **Cancel** stops the render; the sheet reads "Stopping…" until it has. It
@@ -451,8 +457,6 @@ Reverse**. Each press renders one file, shared by every reversed clip of
 that file, so press it once for each file whose clips still show `Not
 rendered`. A reversed copy of a 10-bit source keeps
 its 10-bit depth and its colour labels.
-
-A still image needs no rendering, since it looks the same backwards.
 
 *Agents:* `set_reversed` (`clip`, `reversed` true or false; it is required,
 not a toggle).
@@ -477,9 +481,14 @@ To hold a different frame, ⌥⇧-drag the still's body (a slip, undo step
 of the source.
 
 The command works on a **selected** clip under the playhead and is available
-only when there is one. It needs a clip with a picture: an audio-only clip,
-text, a shape or another still cannot be frozen. If the still would break the
-overlap rule, the freeze is refused and nothing changes. Undo step: **Freeze
+only when there is one. It needs a clip of a video file: on a clip of an
+audio-only file, a still image, a freeze frame, text, a shape, a graphic, an
+adjustment clip or a nest, the item stays available but shows an error (such as
+`clip 7 is not a media clip`) and nothing changes. A clip of a video file
+freezes even with its picture switched off, or as the sound half of a detached
+clip, and the still shows the picture. If the still would break the overlap
+rule, as it does on a locked track and nearly always inside a
+transition, the freeze is refused and nothing changes. Undo step: **Freeze
 Frame**.
 
 *Agents:* `freeze_frame` (`clip`, optional `at`, which defaults to the
@@ -503,10 +512,10 @@ moves the frame it holds.
   action curve and any hold from 0 to 0.9.
 - A ramp's sound, and a constant speed's other than ×1 with Keep pitch off,
   is silent in the preview until its render finishes, and every edit of its
-  timing, undo and redo renders the whole clip's sound again. A failed render
-  stays failed until the clip's timing changes or Frame Job is reopened.
+  timing renders the whole clip's sound again, as undo and redo can. A failed
+  render stays failed until the clip's timing changes or Frame Job is reopened.
 - With Keep pitch on, a ramp's sound can lag the picture by up to about
-  22 ms after a steep slow-down.
+  24 ms after a steep slow-down.
 - A reversed clip shows a slate until its backwards copy has been rendered.
 - **Clip ▸ Synchronize Audio** does not take clips that are reversed,
   ramped, or more than 0.2% away from ×1 (see [Audio](audio.md)).

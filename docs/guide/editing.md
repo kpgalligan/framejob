@@ -13,7 +13,7 @@ Most commands act on the **selection**, the clips outlined in coral on the timel
 - **The in/out range.** I sets the in point, O sets the out point and ⌥X clears both (**Mark ▸ Set In / Set Out / Clear Range**). With nothing selected, Delete and Ripple Delete act on the range instead.
 - **The current track** is the track of the first selected clip, or the front-most track when nothing is selected. Close Gap, Select All on Track, and Insert / Overwrite at Playhead use it.
 
-Clips on a **locked** track can't be dragged, trimmed, slipped or rolled. A marquee skips them, and the edits that shift everything later in time leave them where they are. See [Limits](#limits).
+Dragging can't move, trim, slip or roll clips on a **locked** track. A marquee skips them, and the edits that shift everything later in time leave them where they are. See [Limits](#limits).
 
 *Agents:* `set_selection`, `set_playhead` and `set_range` set the same view state. They are not edits and make no undo step.
 
@@ -40,8 +40,8 @@ A new clip covers the whole file, rounded down to whole frames so it never runs 
 Drag a clip's body to move it in time. Drag it up or down to move it to another track. If several clips are selected, dragging any one of them moves them all and keeps their timing and track offsets. Starts stop at zero.
 
 - **Onto a new track:** drop above the top lane to make a new front track, or below the bottom lane to make a new back track.
-- **Duplicate while dragging:** hold ⌥ when you press. Copies are dragged and the originals stay put (undo name "Duplicate Clips").
-- **Refused drops spring back.** If the drop breaks the overlap rule (see [Limits](#limits)), the clip animates back to where it was and nothing changes. While you drag, positions the project refuses are skipped, and the clip stays at the last allowed position.
+- **Duplicate while dragging:** hold ⌥ when you press. Copies are dragged and the originals stay put (undo name "Duplicate Clips"). The drag duplicates first, so it needs the room Edit ▸ Duplicate would need (see [Duplicating](#duplicating)). When the next clip on the track is too close for that, the drag moves the originals instead, with no beep or message, wherever you drop them (undo name "Move Clips").
+- **Refused drops spring back.** While you drag, positions the project refuses are skipped, and the clip stays at the last allowed position. If the drop breaks the overlap rule (see [Limits](#limits)), the clip animates back to that position and lands there. If the drag never reached an allowed position, it animates back to where it was and nothing changes. A duplicate drag lands the same way, without the animation.
 - **Overlaps make transitions.** A clip dropped so it overlaps the clip before it on the same track gets a Cross Dissolve over the overlap, unless it already has a transition. Clips never push each other out of the way. Other edits do the same; see [Overlaps make transitions](#overlaps-make-transitions).
 
 The whole drag is one undo step, "Move Clips".
@@ -99,7 +99,7 @@ The second piece carries on playing the footage from where the first stopped. An
 
 **Clip ▸ Split at Shot Changes** cuts each selected clip of a video file at every hard cut inside the part of the file it plays: a finished edit, a downloaded clip or a stream recording comes apart into one clip per shot, as one undo step ("Split at Shot Changes"). It is on when a selected clip shows a video file's picture; any other clip in the selection is left alone.
 
-Frame Job finds the cuts on this Mac, with nothing sent anywhere and no key needed, and keeps them in the project's cache, so a second split of the same footage starts at once. While they are being found the **Analyzing** sheet shows each file with a bar: "Waiting" until its first frame is read, then the share done, then "Done". **Stop** closes the sheet and changes nothing; what was already found stays in the cache. If you change the project while the sheet is up, nothing is split and the inspector says to choose the command again.
+Frame Job finds the cuts on this Mac, with nothing sent anywhere and no key needed, and keeps them in the project's cache, so a second split of the same footage starts at once. While they are being found the **Analyzing** sheet shows each file with a bar: "Waiting" until its first frame is read, then the share done, then "Done". **Stop** closes the sheet and changes nothing. The cache keeps what was already saved, which happens every 30 seconds and at the end of each part of the file it reads; anything read since the last save is lost. If you change the project while the sheet is up, nothing is split and the inspector says to choose the command again.
 
 - Each cut lands on the timeline's frame grid, through the clip's speed, ramp and reversal. A cut within one frame of either end of a clip is not made.
 - A clip on a locked track is still cut, and its linked sound is cut with it when the sound is on an unlocked track, as **Split** does.
@@ -123,7 +123,7 @@ The two delete keys pair up. Each acts on the selection, or on the in/out range 
 - Both items are greyed out while you are typing in a text field, so ⌫ and ⌘⌫ still edit text there. They are also greyed out when nothing is selected and no range is set.
 - **Clip ▸ Remove Silences…** and **Clip ▸ Remove Filler Words…** each make many ripple cuts as a single undo step. See [Remove Silences and Remove Filler Words](cleanup-tools.md).
 
-*Agents:* `delete` and `ripple_delete` take `clips`. `lift_range` and `ripple_delete_range` take `from` and `to`; a reversed pair means the same range. `ripple_delete_ranges` takes a list of `[from, to]` pairs. It merges pairs that touch or overlap, then cuts them all as one edit.
+*Agents:* `delete` and `ripple_delete` take `clips`. `lift_range` and `ripple_delete_range` take `from` and `to`, and `to` must be after `from`. `ripple_delete_ranges` takes a list of `[from, to]` pairs, where a reversed pair means the same range. It merges pairs that touch or overlap, then cuts them all as one edit.
 
 ## Closing gaps and inserting time
 
@@ -179,11 +179,11 @@ The target keeps its place, length, speed, animation actions, transition, name, 
 
 **Clip ▸ Detach Audio** (⌥⌘D) switches off each selected clip's sound and adds an audio-only copy of it on the track below, at the same time, with the same footage and speed. If the clip is on the back track, a new track is added behind it. Undo name: "Detach Audio".
 
-The two clips stay linked: moving, splitting, rippling, nesting or copying either one takes the other, and trimming the sound's edge alone makes a J-cut or an L-cut ([Audio](audio.md#j-cuts-and-l-cuts)). **Clip ▸ Attach Audio** (⇧⌥⌘D) merges each pair back into one clip. Undo name: "Attach Audio".
+The two clips stay linked: moving, splitting, rippling, nesting or duplicating either one takes the other, copying the picture brings the sound along, and trimming the sound's edge alone makes a J-cut or an L-cut ([Audio](audio.md#j-cuts-and-l-cuts)). **Clip ▸ Attach Audio** (⇧⌥⌘D) merges each pair back into one clip. Undo name: "Attach Audio".
 
 Each clip that can't be detached is refused with a reason: "clip … has no audio to detach: it is not a media clip", "…: media … has no audio track", or "…: its audio is switched off".
 
-A clip's picture and sound can each be switched on or off. The app's only control for this is Detach Audio. Agents can set either half directly.
+A clip's picture and sound can each be switched on or off. The app has no switch of its own for this: Detach Audio turns the sound off and Attach Audio turns it back on, and Switch by Speaker can switch off the clips it replaces. Agents can set either half directly.
 
 *Agents:* `detach_audio` takes `clip`, and `attach_audio` takes either half's `clip`. `set_enabled` takes `clip` and `video` and/or `audio` (true or false). Leave one out to keep its value.
 
@@ -205,7 +205,7 @@ A nest collapses several clips into one clip that stands for the group. From the
 
 - The clips return to the timeline at the nest clip's start plus their own times, on tracks counted back from the nest clip's track. Missing tracks are added.
 - A clip that would break the overlap rule goes on a new front track instead of being lost.
-- A nest clip trimmed shorter than its contents still gives everything back. Trimming a nest hides content but doesn't cut it.
+- A nest clip trimmed shorter than its contents still gives everything back. A nest always plays from its own first frame, so a trim hides the end of its contents but doesn't cut them, and trimming the start also moves them later.
 - Un-nesting discards the nest clip's own transform, opacity, fades and volume. To change the contents and keep those, open the nest and edit inside it (below).
 
 ### Editing inside a nest
@@ -222,7 +222,7 @@ Open Nest needs exactly one nest clip selected, and Close Nest is greyed out at 
 
 ### Shared and independent copies
 
-Split, Duplicate (⌘D) and ⌥-drag copies of a nest clip share one nest. Editing inside any of them changes them all, and the nest is only removed once no clip shows it. Copy and Paste make an independent copy, so editing a pasted nest leaves the original alone.
+Split, Duplicate (⌘D) and ⌥-drag copies of a nest clip share one nest. Editing inside any of them changes them all, and the nest is only removed once no clip shows it. Copy and Cut don't carry the nest, so pasting a copied nest clip shows an error alert and pastes nothing, even the clips copied with it. Cut still deletes the clip, and Undo brings it back. An agent's `paste` whose `payload` also carries the nest under `nests` makes an independent copy, so editing that nest leaves the original alone.
 
 Inside, the timeline shows the nest's own tracks and clips from the nest's own zero. The canvas shows the nest at its fixed size, without the nest clip's position or scale, so you edit the group on its own terms. The playhead is mapped in and out, so the frame under it doesn't change.
 
@@ -236,7 +236,7 @@ Every clip edit on this page works inside a nest, and each one is still one undo
 
 Some limits count the whole project even while you edit inside a nest: up to 4,096 clips and 64 tracks, and the eight-level nesting depth. An edit that is fine inside the nest can still be refused when the whole project would go over one of them.
 
-*Agents:* `nest` takes `clips` and an optional `name`. `unnest` takes `clip`. Every edit tool takes an optional `scope`, a nest id, which applies the edit inside that nest using the nest's own ids and times. Nine edits are an error with a scope: the three marker edits, `set_canvas`, `add_media`, `relink_media`, `remove_media`, `set_media_color` and `add_adjustment_clip`. `set_scope` opens a nest in the window itself, so that `get_project` and `render_frame` show its contents. It is view state, not an undo step.
+*Agents:* `nest` takes `clips` and an optional `name`. `unnest` takes `clip`. Every edit tool takes an optional `scope`, a nest id, which applies the edit inside that nest using the nest's own ids and times. Eleven edits are an error with a scope: the three marker edits, `set_canvas`, `add_media`, `relink_media`, `remove_media`, `set_media_color`, `set_media_speech`, `set_media_cursor` and `add_adjustment_clip`. So is a `set_track` that names a `compressor` or `limiter`. `set_scope` opens a nest in the window itself, so that `get_project` and `render_frame` show its contents. It is view state, not an undo step.
 
 ## Removing empty tracks
 
@@ -276,9 +276,9 @@ A new edit clears the redo history.
 
 When the project's rules won't allow an edit, the app **beeps** and nothing changes. The rule's own sentence appears at the **foot of the inspector** after "Refused: ", for example "Refused: clips 4 and 7 would overlap by 120000 ticks, more than half of the shorter clip (100000 ticks)". The message stays until the project changes (an edit, an undo or redo, or going into or out of a nest) or until you click it. Moving the playhead or changing the selection doesn't clear it.
 
-An edit that would change nothing, such as a slip already at the end of the footage or a paste of a look the clips already have, beeps too, but shows no message: no rule was broken. A request the project can't use at all, such as a pasted value outside its allowed range, shows an error alert instead.
+An edit that would change nothing, such as a paste of a look the clips already have, beeps too, but shows no message: no rule was broken. A request the project can't use at all, such as pasting a copied nest clip, shows an error alert instead.
 
-During a drag, positions the project refuses are skipped and the clip waits at the last allowed position. Only the drop counts.
+During a drag, positions the project refuses are skipped and the clip waits at the last allowed position. A drop on a refused position lands there, with no beep and no message.
 
 *Agents:* an applied edit answers `ok` with a project summary and the ids of anything it created. An edit that changed nothing fails with "… made no change: the project is already in that state." A refused edit fails with "… was refused at <op>: <the rule's sentence>". Neither makes an undo step.
 
@@ -286,7 +286,7 @@ During a drag, positions the project refuses are skipped and the clip waits at t
 
 - **The overlap rule.** On one track, a clip may overlap at most one neighbour on each side, and each overlap may be at most half the length of the shorter clip. Moves, trims, nudges, duplicates, gap closes and nests that would break it are refused. Paste and Un-nest put such clips on a new front track instead. Ripple deletes are never refused by it: a clip a ripple slides onto a neighbour gets a Cross Dissolve (below).
 - <a id="overlaps-make-transitions"></a>**Overlaps make transitions.** Any edit that leaves a clip overlapping the clip before it on its track gives it a Cross Dissolve over the overlap, unless it already has a transition: moves, trims, duplicates, pastes, ripple deletes, Close Gap, Nest and Un-nest. See [Motion and transitions](motion-and-transitions.md).
-- **Locked tracks.** Their clips can't be dragged, trimmed, slipped or rolled, and a marquee doesn't select them. Split with nothing selected, Lift, and the range form of Ripple Delete leave them uncut. Ripples, gap closes and inserted time don't shift them. Insert onto a locked track and Close Gap on a locked track are refused. A clip on a locked track that you select by clicking is still removed by Delete or Ripple Delete, and Overwrite still clears a locked track.
+- **Locked tracks.** Dragging can't move, trim, slip or roll their clips, and a marquee doesn't select them. Split with nothing selected, Lift, and the range form of Ripple Delete leave them uncut. Ripples, gap closes and inserted time don't shift them. Insert onto a locked track and Close Gap on a locked track are refused. A clip on a locked track that you select by clicking is still removed by Delete or Ripple Delete, trimmed by W and E, and moved by `,` and `.`, and Overwrite still clears a locked track.
 - **One frame minimum.** Trims and rolls always leave a clip at least one frame long.
 - **Footage bounds.** A media clip can't be trimmed, rolled or slipped past either end of its file.
 - **Project size.** Up to 4,096 clips, 64 tracks and eight levels of nesting.

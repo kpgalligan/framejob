@@ -1,0 +1,95 @@
+---
+title: "Voice Isolation"
+description: "Keep the voice in a clip and remove background noise and room echo, using Apple's voice model on your Mac."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Voice Isolation keeps the voice in a clip and removes what's around it: background noise and the echo of the room. It uses Apple's on-device voice model, so nothing leaves your Mac.
+
+<AtAGlance
+  where="Clip tab ▸ Sound ▸ Voice Isolation"
+  tools="set_audio"
+  needs="Nothing. The voice model runs on your Mac, with no key and no upload."
+/>
+
+## Isolate a voice
+
+<Steps>
+
+1. Select a clip with sound, and open the **Voice Isolation** section of the [Sound tab](/audio/sound-tab/).
+
+2. Tick **Isolate voice**. The Amount goes to 80 % and **Status** reads "Rendering…".
+
+3. Keep working. The clip plays without isolation until **Status** reads "Ready", then the editor switches over by itself.
+
+4. Listen, and change **Amount** if you need to.
+
+</Steps>
+
+Isolation also reduces room echo, so there's no separate control for reverb. The section reminds you with the line "Also reduces room echo" under **Status**.
+
+## The controls
+
+| Control | What it does | Range | Default |
+| --- | --- | --- | --- |
+| **Isolate voice** | Turns isolation on at 80 %, or off. | On or off | Off |
+| **Amount** | How much of the isolated voice replaces the clip's own sound. Quick picks: 50, 80 and 100 %. | 0 to 100 % | 0 % (off) |
+| **Status** | What the isolated voice is doing. See [What Status says](#what-status-says). | | Off |
+
+Setting **Amount** above 0 also turns isolation on, and 0 turns it off. **Reset** in the section's header does the same as unticking the box.
+
+## Choose an amount
+
+Amount blends the isolated voice with the clip's own sound.
+
+- **At 80 %**, the pauses between words drop by about 14 dB and keep a little of the room, so the voice doesn't sit in dead silence. This is what the box turns on.
+- **At 100 %**, the pauses are silent.
+- **Below that**, more of the original sound comes through.
+
+Changing Amount takes effect at once. It doesn't need the isolated voice to be worked out again.
+
+## While it renders
+
+The isolated voice is worked out once for each clip, in the background, when you turn it on. Until it's ready the clip plays without it, and the editor switches over by itself.
+
+Trimming or slipping the clip works it out again, because the clip then plays a different part of its file.
+
+An export waits for every isolated clip to be ready, and its sheet reads "Preparing" and the file's name while it does, so a file is never written without isolation. If a clip's isolated voice can't be made, the export stops with "Clip 12's isolated voice could not be rendered:" and the reason.
+
+## What Status says
+
+| Status | What it means |
+| --- | --- |
+| Off | Isolation is off for this clip. |
+| Rendering… | The isolated voice is being worked out. The clip plays without it for now. |
+| Ready | The clip plays with isolation. |
+| Plays without it at this speed | The clip has a speed change, a ramp or a freeze frame. See below. |
+| Waits for the reversed copy | The clip is reversed, and its reversed copy isn't ready yet. |
+| Not rendered: and a reason | It failed. "Not rendered: its media cannot be found" means the clip's file has gone missing, so [relink it](/projects/relink-media/). |
+| — | Several clips are selected. |
+
+## Speed, ramps and freeze frames
+
+Isolation plays only at normal speed. A clip with a [speed change](/speed/change-speed/), a [speed ramp](/speed/speed-ramps/) or a [freeze frame](/speed/freeze-frame/) plays without it, and **Status** says so.
+
+A [reversed](/speed/reverse/) clip is isolated once its reversed copy is ready.
+
+## Good to know
+
+- Isolation comes first in the clip's sound, before the channel choice, the EQ, noise reduction and the compressor. You can use it with [Noise Reduction](/audio/noise-reduction/), which then works on the isolated sound. A [voice effect](/audio/voice-effects/) is made from the isolated voice too. See [How audio works](/audio/how-audio-works/).
+- Two clips cut from one take are isolated separately, so the sound at the join may differ slightly.
+- Isolation does nothing on a [nest](/editing/nests/) clip, and its **Status** reads "Off". Open the nest with <kbd>⌘↓</kbd> and set it on the clips inside.
+- With an [action](/audio/animate-sound/) selected, **Isolate voice** and **Amount** set where the action ends, and the Amount glides across the action, from 0 when the clip's own Amount is 0. The isolated voice is still made for a clip whose own isolation is off.
+
+## With an agent
+
+`set_audio` sets the amount as `isolation`, from 0 to 1: 0 is off, 0.8 is what the box turns on, and 1 leaves silence between words. An agent can't read **Status**, because the render's state isn't in `get_project`, but an export still waits for it. See [Tools: clip sound](/mcp/tools-set-audio/#noise-reduction-and-voice-isolation).
+
+## Related
+
+- [Noise Reduction](/audio/noise-reduction/)
+- [Enhance Voice](/audio/enhance-voice/)
+- [Voice effects](/audio/voice-effects/)
+- [The Sound tab](/audio/sound-tab/)

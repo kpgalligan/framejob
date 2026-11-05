@@ -33,8 +33,8 @@ From top to bottom:
 
 Under the controls, a readout line describes the file and a footnote names the codec, the container and the rates the file will use. Every number they show is the size, rate and duration the file will actually have.
 
-- **Readout:** `1920 × 1080 · 30 fps · 00:01:12:05` (size, frame rate, duration). For the audio-only formats it reads `Audio only · 00:01:12.200`. For GIF and APNG it adds the frame count: `· 360 frames, no audio`. For **AV1 (MP4)**, **AV1 (WebM)**, **VP9 (WebM)** and **VP9 with Alpha (WebM)** a second line estimates how long the export will take: `Estimated time: about 25 s` (in 5-second steps under a minute, then minutes, then hours and minutes). It follows the format, Speed, size and range, and it is only an estimate: the figures behind it are the median of three measured exports per format at 1080p and 4K, of real 4K camera footage on an idle Apple M2 Max, so a slower or busy Mac, or a heavy timeline, takes longer. The other formats show no estimate.
-- **Footnote:** the codec, the container (left out when it is the same word, as in `GIF`), the AV1 speed (`AV1 · MP4 · Balanced`, `AV1 · WEBM · Balanced`; VP9 has none: `VP9 · WEBM`, `VP9 · WEBM · alpha`), the video rate, the audio rate (`192 kbps audio`), `24-bit` for a 24-bit WAV or AIFF, the loudness target (`−14 LUFS`) and `alpha` when the format keeps transparency. When you pick a Quality tier and the format sets its own rate, it reads `format's own rate` instead of a number.
+- **Readout:** `1920 × 1080 · 30 fps · 00:01:12:05` (size, frame rate, duration). For the audio-only formats it reads `Audio only · 00:01:12.200`. For GIF and APNG it adds the frame count: `· 360 frames, no audio`. For **AV1 (MP4)**, **AV1 (WebM)**, **VP9 (WebM)** and **VP9 with Alpha (WebM)** a second line estimates how long the export will take: `Estimated time: about 25 s` (in 5-second steps under a minute, then minutes, then hours and minutes). It follows the format, Speed, size and range, and it is only an estimate: the figures behind it are the median of three measured exports at 1080p and 4K, of real 4K camera footage on an idle Apple M2 Max (AV1 (WebM) uses AV1 (MP4)'s figures), so a slower or busy Mac, or a heavy timeline, takes longer. The other formats show no estimate.
+- **Footnote:** the codec, the container (left out when it is the same word, as in `GIF`), the AV1 speed (`AV1 · MP4 · Balanced`, `AV1 · WEBM · Balanced`; VP9 has none: `VP9 · WEBM`, `VP9 · WEBM · alpha`), `24-bit` for a 24-bit WAV or AIFF, the stem count (`3 stems`), the video rate, the audio rate (`192 kbps audio`), the loudness target (`−14 LUFS`) and `alpha` when the format keeps transparency. When you pick a Quality tier and the format sets its own rate, it reads `format's own rate` instead of a number.
 
 A control the chosen format cannot use is greyed out rather than hidden. Its value is not sent.
 
@@ -46,9 +46,9 @@ A control the chosen format cannot use is greyed out rather than hidden. Its val
 | HEVC (MP4) | `.mp4` | A smaller file at the same picture. 8-bit (Main profile). |
 | HEVC with Alpha (MOV) | `.mov` | A small delivery file that keeps a transparent canvas, for laying over another background. 8-bit. |
 | HEVC 10-bit (MP4) | `.mp4` | Keeps a 10-bit source's gradients (Main 10). |
-| AV1 (MP4) | `.mp4` | The smallest delivery file, encoded by the AV1 encoder built into Frame Job. 10-bit, and it can carry HDR. Slower to export than HEVC. See [Speed](#speed). |
+| AV1 (MP4) | `.mp4` | A delivery file that matches or beats HEVC's picture at the same rate, encoded by the AV1 encoder built into Frame Job. 10-bit, and it can carry HDR. Slower to export than HEVC. See [Speed](#speed). |
 | AV1 (WebM) | `.webm` | The same AV1 picture in a WebM file, with Opus sound, for the web. Frame Job writes the WebM itself. |
-| VP9 (WebM) | `.webm` | VP9 in a WebM file, with Opus sound: the web format every browser plays, encoded by the VP9 encoder built into Frame Job. 8-bit, or 10-bit when it carries HDR. Slower to export than HEVC and larger than AV1 for the same picture. |
+| VP9 (WebM) | `.webm` | VP9 in a WebM file, with Opus sound, for web playback, encoded by the VP9 encoder built into Frame Job. 8-bit, or 10-bit when it carries HDR. Slower to export than HEVC and larger than AV1 for the same picture. |
 | VP9 with Alpha (WebM) | `.webm` | VP9 (WebM) that keeps a transparent canvas, for a title or a lower third a web page plays over its own background in Chrome or Firefox. 8-bit, always the SDR picture. Safari's transparent movie is HEVC with Alpha. |
 | ProRes 422 (MOV) | `.mov` | An editing master for another application. 10-bit. |
 | ProRes 4444 (MOV) | `.mov` | A master that keeps the alpha channel. 12-bit. |
@@ -77,7 +77,7 @@ How the picture fits the frame:
 
 - **Even dimensions.** H.264, HEVC, HEVC with Alpha, HEVC 10-bit, both AV1 formats, both VP9 formats and ProRes 422 need them, so an odd width or height is written one pixel smaller. ProRes 4444, GIF and APNG keep an odd edge.
 - **Movies** are written at exactly the size you choose. When that size is within a pixel of the canvas's shape, the picture fills the frame edge to edge. Any other shape is letterboxed with black.
-- **ProRes 4444, HEVC with Alpha and VP9 with Alpha (WebM)** refuse a size of a different shape instead of letterboxing it, because the padding would destroy the alpha channel. Every row in the Size popup has the canvas's shape, so this only happens with a Custom size.
+- **ProRes 4444, HEVC with Alpha and VP9 with Alpha (WebM)** won't write a size of a different shape, because the padding would destroy the alpha channel. The sheet accepts the size; the export then stops after the save panel, with a message naming both sizes. Every row in the Size popup has the canvas's shape, so this only happens with a Custom size.
 - **GIF and APNG** fit the picture inside the size you choose, keeping its shape and never enlarging it. The readout shows the size the file will have: a 1080 × 1920 project's GIF default is 152 × 270.
 
 The Size control is greyed out for the audio-only formats.
@@ -100,7 +100,7 @@ AV1 and VP9 are encoded in software, so they take longer than the HEVC formats, 
 
 ### Quality
 
-**Format default** lets the encoder choose the video rate. The sound uses 192 kbps AAC, or 192 kbps Opus in the two WebM formats.
+**Format default** asks the encoder for a video rate worked out from the frame: 0.14 bits per pixel per frame for H.264 and 0.07 for HEVC, AV1 and VP9, held between 1 and 200 Mbps. The sound uses 192 kbps AAC, or 192 kbps Opus in the three WebM formats.
 
 The four tiers set a video rate from the frame's size, so a tier means the same picture quality at every size. Each tier's title shows the rate it would ask for at the size and frame rate now chosen.
 
@@ -112,7 +112,7 @@ The four tiers set a video rate from the frame's size, so a tier means the same 
 | **Maximum** | 12.0 Mbps | 320 kbps |
 
 - The video rate scales with the frame's area. High is about 3.6 Mbps at 720p and 32 Mbps at 4K.
-- Above 30 fps, the video rate is 1.5 times higher.
+- Above 30.5 fps, the video rate is 1.5 times higher.
 - HEVC formats, AV1 and VP9 ask for 60 % of the H.264 rate. AV1's and VP9's **Format default** is the HEVC rate too.
 - For **AV1** the rate is a soft cap. AV1 encodes at a constant quality chosen to match or beat HEVC at that rate, so it usually stays under the rate and simple footage comes out much smaller. Very detailed footage can go over: up to about 1.25 times the rate was measured. Its tier titles and footnote read `usually ≤ …`.
 - For **VP9 (WebM)** the rate is a soft cap the same way: VP9 encodes at a constant quality chosen to match or beat HEVC at that rate (HEVC 10-bit's in an HDR export), and the file usually stays under it. Up to about 1.15 times the rate was measured. Its tier titles and footnote read `usually ≤ …` too. On **VP9 with Alpha (WebM)** the rate is the picture's alone: the transparency is a second stream at a fixed quality that comes on top of it, so the file is larger than the rate says. In the measured exports of a moving soft-edged shape the transparency was about 6–15 % of the video at 1080p, about 9–21 % at 720p and about 21–39 % at 640 × 360 (the higher figure at the Low tier); a smaller picture keeps its edges clean with a larger share.
@@ -133,7 +133,7 @@ The **Stems** row sits under Bit depth. It is live only on **Audio only (M4A)**,
 - A muted track has no stem, and while any track is soloed only the soloed tracks have one. A track with no sound on it (only pictures, or nothing) has none. If no track can be heard, the export is refused: "stems: no track is heard, so there is no stem to write".
 - A stem is named after the mix and its track: exporting `Mix.wav` writes `Mix - Dialogue.wav` and `Mix - Music.wav`. A track with no name is called by its header's label, `Track 3`. A `/` or `:` in a track name is written as `-`, and a second stem whose name an earlier one already has, ignoring case, gets its track's label after it: `vo (Track 2)`. If an earlier stem already has that name too, a count follows the label, `vo (Track 2, 2)`, so no two stems share a file.
 - **An existing file at a stem's name is replaced without asking.** The save panel asks only about the mix. The one exception: if a stem's file would be one of the project's own media files, the export stops before writing any stem, with "The stem “Mix - Dialogue.wav” would replace media this project uses; export under another name."
-- Each stem holds its tracks' sound exactly as the mix plays it, with the clips' and tracks' volume, pan, fades, ducking and effects, and a track's own compressor and limiter, but **before the master**: no loudness target is applied to it and the master limiter does not touch it. So the stems added together are the mix, to within the last bit, wherever the master neither raised the level nor limited a peak. A stem can therefore peak higher than the mix; it is clipped only at full scale.
+- Each stem holds its tracks' sound exactly as the mix plays it, with the clips' and tracks' volume, pan, fades, ducking and effects, and a track's own compressor and limiter, but **before the master**: no loudness target is applied to it and the master limiter does not touch it. So the stems added together are the mix, to within rounding, wherever the master neither raised the level nor limited a peak. A stem can therefore peak higher than the mix; it is clipped only at full scale.
 - The stems are written one after another after the mix, and the progress bar counts them. The finish line reads "Exported “Mix.wav” and 3 stems.", and the footnote under the sheet says "3 stems". The loudness figures are the mix's. Cancelling, or a failure part-way, removes the mix and every stem already written.
 
 ### Loudness
@@ -154,7 +154,7 @@ How normalisation works:
 - It then applies **one gain** to everything. Levels inside the timeline keep their relationship to each other.
 - The gain is worked out through the export's master limiter (below), so the file lands on the target even when its loudest peaks would pass the ceiling: those peaks are turned down instead of the whole mix. Only a target more than 40 dB above the mix falls short.
 
-**Every export with sound goes through a master limiter**, normalised or not. It keeps the file's true peak under **−1 dBTP**: a mix that would pass that, from loud clips, a crossfade between two loud clips, a nest turned up or an action that raises a clip's volume, is limited instead of clipped. Sound under the ceiling passes through untouched, sample for sample. The limiter looks 3.3 ms ahead, and the export takes that back, so the sound stays exactly in sync with the picture. The preview has no master limiter: what you hear while editing is the mix before it.
+**Every export with sound goes through a master limiter**, normalised or not. It keeps the file's true peak at or under **−1 dBTP**: a mix that would pass that, from loud clips, a crossfade between two loud clips, a nest turned up or an action that raises a clip's volume, is limited instead of clipped. Sound under the ceiling passes through untouched, sample for sample. The limiter looks 3.3 ms ahead, and the export takes that back, so the sound stays exactly in sync with the picture. The preview has no master limiter: what you hear while editing is the mix before it.
 
 A track's own compressor and limiter ([Audio](audio.md#track-compressor-and-limiter)) run before the master, on that track's sound alone, exactly as set: the export plays each such track on its own through them and mixes the tracks afterwards. The measurement for a loudness target hears them too, so the file still lands on the target. The master is only the loudness gain and this limiter; there is no master compressor or EQ. To compress the whole mix, nest everything onto one track and give that track a compressor.
 
@@ -186,7 +186,7 @@ A preset stores the **choices** on the card: the format, size row or custom size
 - **Delete a preset:** choose it in the popup, then choose **Delete** from the gear. Delete is available only while a saved preset is chosen, and it asks no confirmation. The controls keep the preset's values, so **Save…** under the same name puts it back.
 - **Change a preset:** apply it, adjust the controls, and save again under the same name. There is no separate rename.
 
-Changing any control by hand puts the popup back on **Custom**. The popup also opens on Custom each time, even when the remembered choices happen to match a preset.
+Changing the format, size, frame rate, quality, loudness, range, burn-in or a custom field by hand puts the popup back on **Custom**. Changing **Speed**, **Bit depth** or **Stems** doesn't: the popup keeps the preset's name, although a preset stores those three too. The popup also opens on Custom each time, even when the remembered choices happen to match a preset.
 
 Presets are kept for your whole account in `~/Library/Application Support/Frame Job/ExportPresets.json`, so every project and window shares them. The **Dynamic Range** choice is not stored in a preset or in the remembered choices.
 
@@ -206,7 +206,7 @@ The save panel suggests the project's name with the format's extension (`Board v
 
 **Exporting** shows a progress bar and a percentage. The status line reads "Preparing “*name*”…", then "Measuring loudness…" while the sound is measured, then "Writing “*name*”…".
 
-- **Cancel** stops the export ("Stopping…") and removes the half-written file.
+- **Cancel** stops the export and removes the half-written file. A file you chose to replace in the save panel is gone too.
 - When it finishes, the line reads "Exported “*name*”." followed by what the sound measured, for example `Peak −1.0 dBTP · −14.0 LUFS`. **Show in Finder** reveals the file, and **Close** dismisses the sheet.
 - If a graphic warned while the file was drawn, the line adds a count ("1 graphic warning"), and the tooltip lists each warning with its frame.
 - If a clip's cursor file could not be drawn, the clip is written without its pointer, the line adds a count after the graphic one ("1 cursor warning"), and the tooltip lists each one ("The cursor of media 3 is not drawn: …").
@@ -239,7 +239,7 @@ Closing the window stops nothing. Opening the export sheet pauses playback which
 
 Quitting while a queued job runs or waits asks first: "An export is still being written." The message names the running file and counts the jobs still waiting ("“*name*” is not finished, and 2 more are waiting."). **Quit Anyway** cancels the queue and deletes the partly written file. This question comes after Frame Job has asked about unsaved documents.
 
-Only queued exports are protected this way. Quitting while an **Export…** progress sheet is writing does not ask, and the half-written file is left behind. Cancel that export first.
+Only queued exports are protected this way. While an **Export…** progress sheet is on screen, Frame Job does not quit. If the sheet is out of sight, because its window is minimised or Frame Job is hidden, quitting does not ask: the export stops and the partly written file stays behind. A partly written MOV or MP4 won't open. Cancel that export first.
 
 ## Saving a single frame
 
@@ -258,7 +258,7 @@ Only queued exports are protected this way. Quitting while an **Export…** prog
 
 - The frame is drawn the way an export draws it, at the canvas's full size. Preview Quality, Show Ungraded and Show SDR Version never change it. There is no timecode burn-in.
 - Inside a nest, the frame is the nest's own picture at the nest's time.
-- A frame showing a deep still or a 10-bit VP9 clip is saved as a 16-bit PNG or 10-bit HEIC. JPEG is always 8-bit.
+- A frame showing a deep still or a 10-bit VP9 clip is saved as a 16-bit PNG or 10-bit HEIC. So is a frame of a timeline whose lowest track with video on it holds a 10-bit HEVC or ProRes clip; such a clip on a higher track, above an 8-bit clip, is saved at 8 bits. JPEG is always 8-bit.
 - In an HDR (HLG) project, PNG and HEIC keep the HLG picture and a JPEG is the SDR version (see [HDR and colour](hdr-and-color.md)).
 - A clip with Remove Background waits up to 30 seconds for the person masks of that frame. When they are not ready by then, the frame is saved with the clip whole, and a sheet says so: "Saved without Remove Background", naming the clip's file.
 - When there is no frame at the playhead, an alert says so.
@@ -278,7 +278,7 @@ In an HDR (HLG) project the sheet has a **Dynamic Range** row under Format:
 | **HDR10 (PQ)** | An HDR10 file with fixed mastering metadata. |
 | **SDR version** | The project converted to SDR. |
 
-Only HEVC 10-bit, both AV1 formats, VP9 (WebM), ProRes 422 and ProRes 4444 can carry HDR (VP9 with Alpha (WebM) is always 8-bit and writes the SDR version). VP9 (WebM) is 10-bit (VP9 Profile 2) for HLG and HDR10, and 8-bit (Profile 0, which every player decodes) for the SDR version. On every other video format the row is greyed out on **SDR version**, which is what those formats write. What each choice contains, and how the SDR version is made, is in [HDR and colour](hdr-and-color.md#exporting-hdr).
+Only HEVC 10-bit, both AV1 formats, VP9 (WebM), ProRes 422 and ProRes 4444 can carry HDR (VP9 with Alpha (WebM) is always 8-bit and writes the SDR version). VP9 (WebM) is 10-bit (VP9 Profile 2) for HLG and HDR10, and 8-bit (Profile 0, which more players decode) for the SDR version. On every other video format the row is greyed out on **SDR version**, which is what those formats write. What each choice contains, and how the SDR version is made, is in [HDR and colour](hdr-and-color.md#exporting-hdr).
 
 ## Transparency
 
@@ -303,9 +303,9 @@ MP4 and M4A files are written with their index at the front, so a player can sta
 ## What an export includes
 
 - **The same picture and sound as the preview.** The export uses the same composition and the same compositor. View-only settings never reach it: Preview Quality, Show Ungraded, Show SDR Version, Show Selection, safe areas and the scopes.
-- **Speed ramps and Keep pitch off.** An export waits for the rendered audio of every speed ramp, and of every clip at a constant speed other than ×1 with Keep pitch off, to finish before it writes, and shows "Preparing…" meanwhile. That sound is never exported silent (see [Speed](speed.md)). If it cannot be rendered, the export fails with "Clip *n*'s retimed audio could not be rendered: …".
-- **Remove Background.** A clip with Remove Background is drawn as the person alone in every frame of the file. Its person masks are made on this Mac as soon as the cutout is set, and an export waits, showing "Preparing…", until every mask it draws is made — GIF and APNG too. If they cannot be made, the export fails with "Clip *n*'s person masks could not be made: …" and writes no file.
-- **The gate, the leveller and the de-esser.** Their thresholds follow each clip's measured loudness, and the leveller works from the clip's speech too, so an export waits, showing "Preparing…", until every gated, levelled or de-essed clip in it has been measured. If a measurement has not landed after five minutes, the export fails with "Clip *n*'s loudness or speech has not been measured yet, so its gate, leveller and de-esser cannot be set. Wait for their Status rows to show the clip's loudness, then export again." (see [Audio](audio.md#gate)).
+- **Speed ramps and Keep pitch off.** An export waits for the rendered audio of every speed ramp, and of every clip at a constant speed other than ×1 with Keep pitch off, to finish before it writes, and its progress sheet shows "Preparing “*name*”…" meanwhile. That sound is never exported silent (see [Speed](speed.md)). If it cannot be rendered, the export fails with "Clip *n*'s retimed audio could not be rendered: …".
+- **Remove Background.** A clip with Remove Background is drawn as its subject alone in every frame of the file, or whole while its **Background** row is on **Keep**. Its masks are made on this Mac as soon as the cutout is set, and an export waits, with its progress sheet showing "Preparing “*name*”…", until every mask it draws is made — GIF and APNG too. If they cannot be made, the export fails with "Clip *n*'s person masks could not be made: …" and writes no file.
+- **The gate, the leveller and the de-esser.** Their thresholds follow each clip's measured loudness, and the leveller works from the clip's speech too, so an export waits, with its progress sheet showing "Preparing “*name*”…", until every gated, levelled or de-essed clip in it has been measured. If a measurement has not landed after five minutes, the export fails with "Clip *n*'s loudness or speech has not been measured yet, so its gate, leveller and de-esser cannot be set. Wait for their Status rows to show the clip's loudness, then export again." (see [Audio](audio.md#gate)).
 - **Missing media.** A clip whose file is missing still exports, showing its slate and with no sound. An audio track none of whose clips can be read is written as silence instead of failing the export.
 - **Graphics.** An export draws the graphics as they were when it was asked for, even if a module is saved again mid-export. If a graphic in the range, or in a nest the range reaches, does not compile or has no module, the export does not start and names the graphic. If a graphic fails while the file is being written, the export stops at that frame, names the graphic, and leaves no file. See [Graphics](graphics.md).
 - **Captions** are ordinary text clips, so they are always burned into the picture. To write a separate subtitle file, use **File ▸ Export Captions…** (see [Captions](captions.md)).
@@ -317,7 +317,7 @@ MP4 and M4A files are written with their index at the front, so a player can sta
 | Argument | The sheet's control | Notes |
 |---|---|---|
 | `preset` (required) | Format | `h264`, `hevc`, `hevc_alpha`, `hevc_10bit`, `av1`, `av1_webm`, `vp9_webm`, `vp9_alpha_webm`, `prores_422`, `prores_4444`, `audio_m4a`, `audio_wav`, `audio_aiff`, `gif`, `apng`. |
-| `path` (required) | Save panel | The folder must exist. An existing file is replaced. The format's extension is added when the path has none, and a different known media extension is replaced: `cut.mov` with `h264` writes `cut.mp4`. Any other suffix stays part of the name. |
+| `path` (required) | Save panel | The folder must exist. An existing file is replaced. The format's extension is added when the path has none, and a different known media extension is replaced: `cut.mov` with `h264` writes `cut.mp4`. Any other suffix stays part of the name, and that includes `.webm`: `cut.webm` with `h264` writes `cut.webm.mp4`. |
 | `size` | Size | `document`, `2160p`, `1440p`, `1080p`, `720p`, `preset` (GIF and APNG only), or `[width, height]`. |
 | `range` | Range | `project` (default) or `in_out`. Refused when there is no in/out range. |
 | `video_bitrate`, `audio_bitrate` | Quality | Bits per second. On `av1`, `av1_webm` and `vp9_webm`, `video_bitrate` is a soft cap the file usually stays under. On `vp9_alpha_webm` it is the same soft cap on the picture's stream alone, and the transparency's stream comes on top of it (about 6–15 % of the video at 1080p, up to about 39 % at 640 × 360, measured). `audio_bitrate` is the AAC or Opus rate. |
@@ -331,7 +331,7 @@ MP4 and M4A files are written with their index at the front, so a player can sta
 
 There is no frame-rate argument. An agent's export uses the document's rate, or GIF's and APNG's own.
 
-Every refusal comes back from `export` itself, before anything is queued: a bad argument, a missing folder, an empty timeline, or a graphic that does not compile.
+Every refusal comes back from `export` itself, before anything is queued: a bad argument, a missing folder, an empty timeline, or a graphic that does not compile. A size of another shape on `prores_4444`, `hevc_alpha` or `vp9_alpha_webm` is not one of these: `export` queues the job, and `export_status` then reads `failed` with a reason naming both sizes.
 
 - `export_status {export_id}` answers the job's row without waiting: `queued`, `running` (with `progress` from 0 to 1 and `phase`), `done`, `failed` or `cancelled`. Call it again after a pause until the job finishes.
   - Every answer has `path` and `elapsed` (seconds).
@@ -347,10 +347,11 @@ The full reference is [MCP](mcp.md).
 
 ## Limits
 
-- An animated GIF or APNG holds at most **600 frames**: 48 seconds at GIF's 12.5 fps, or 24 seconds at APNG's 25 fps. A longer range is refused. Shorten the range or lower the frame rate.
+- An animated GIF or APNG holds at most **600 frames**: 48 seconds at GIF's 12.5 fps, or 24 seconds at APNG's 25 fps. A longer range is refused, so shorten it. Every fixed rate in the sheet is above GIF's 12.5 fps, so a lower rate helps a GIF only when a fixed rate is chosen, and **Project rate** takes it back to 12.5 fps. An APNG can go down to 24 or 23.976 fps, which gains about a second. An agent has no frame-rate argument.
+- A file being replaced is removed as writing starts and does not come back. An export that stops from then on, such as one over the 600-frame limit or a transparent export of the wrong shape, leaves neither the old file nor a new one.
 - A loudness target more than 40 dB above the mix lands quieter than asked, and the report's `capped_by_gain` says so.
 - The master limiter cannot be turned off; 0 dBTP is its loosest ceiling. The preview has no master limiter, so a mix that passes −1 dBTP sounds louder while editing than in the file.
-- ProRes 4444, HEVC with Alpha and VP9 with Alpha (WebM) refuse a custom size of a different shape from the canvas.
+- ProRes 4444, HEVC with Alpha and VP9 with Alpha (WebM) won't write a custom size of a different shape from the canvas. The export stops once it starts, not in the sheet.
 - VP9 with Alpha (WebM) is 8-bit SDR only: an HDR project writes its SDR version, and HDR is refused on it.
 - A VP9 with Alpha (WebM) file re-imported into Frame Job keeps its picture and loses its transparency: it shows opaque, with black where it was transparent. Export ProRes 4444 or HEVC with Alpha for a transparent clip to bring back in.
 - Whether Safari shows VP9 with Alpha (WebM)'s transparency has not been confirmed; use HEVC with Alpha for Safari.
@@ -361,5 +362,5 @@ The full reference is [MCP](mcp.md).
 - Captions are burned in, never a switchable subtitle track.
 - Queued jobs run one at a time. **Export…** does not join the queue: it writes straight away, behind its own progress sheet.
 - A queued AV1 or VP9 job waits while the AV1 and VP9 exports already running would use more than a quarter of the Mac's memory with it. The memory each needs is a measured figure, not a guarantee: a heavier timeline can use more. An **Export…** sheet is never held, so starting several AV1 or VP9 sheets at once can go past that quarter.
-- The estimated time is the median of three measured exports per format and size, of real 4K camera footage on one idle Mac (an Apple M2 Max). On exports it was not fitted on, 30 seconds at 2560 × 1440, it came within 14 % of the real time; a slower Mac, a busy one or a heavier timeline takes longer.
-- Quitting during an **Export…** progress-sheet export does not ask and leaves a half-written file. Only the Export Queue is guarded at quit.
+- The estimated time is the median of three measured exports at each size, of real 4K camera footage on one idle Mac (an Apple M2 Max); AV1 (WebM) uses AV1 (MP4)'s figures. On exports it was not fitted on, 30 seconds at 2560 × 1440, it came within 14 % of the real time; a slower Mac, a busy one or a heavier timeline takes longer.
+- Frame Job does not quit while an **Export…** progress sheet is on screen. With the sheet out of sight, its window minimised or Frame Job hidden, quitting does not ask and leaves a partly written file. Only the Export Queue is guarded at quit.

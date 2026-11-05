@@ -1,0 +1,186 @@
+---
+title: "Transcribe with AssemblyAI"
+description: Send the audio of your files to AssemblyAI on your own key for captions with speakers, a vocabulary and language detection, see the price first, and reuse each transcript for free.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+**AssemblyAI** is the cloud engine for captions. It adds speaker labels, a vocabulary of names and jargon, and language detection, and its word timing shows real pauses. You pay AssemblyAI directly on your own key, and each file's transcript is kept so you only pay for it once.
+
+<AtAGlance
+  menu="File ▸ Generate Captions…"
+  where="Generate Captions sheet ▸ Engine: ▸ AssemblyAI"
+  tools="transcribe"
+  needs="Your own AssemblyAI key, unless every file is already transcribed, and a network connection for anything new."
+/>
+
+## Transcribe with AssemblyAI
+
+<Steps>
+
+1. [Save your AssemblyAI key](/captions/assemblyai-key/) in Settings, if you haven't.
+
+2. Choose **File ▸ Generate Captions…**.
+
+3. Set **Engine:** to **AssemblyAI**. The **Speakers:**, **Vocabulary:** and **Transcribe again:** rows appear.
+
+4. Set [**Language:**](#choose-a-language), and turn on [**Speakers:**](#split-the-words-by-speaker) or fill in [**Vocabulary:**](#add-names-and-jargon) if you want them.
+
+5. Read the [price](#the-price-before-you-press-generate) in the summary line.
+
+6. Choose **Generate**. Nothing is uploaded until you do.
+
+</Steps>
+
+The paragraph at the top of the sheet reads "The audio of these files is uploaded to AssemblyAI (United States), transcribed with Universal-3.5 Pro, and deleted from AssemblyAI once the words have been read back. Nothing is uploaded until Generate is pressed." It names your [region](/captions/assemblyai-key/#choose-a-region), which is United States or European Union.
+
+Each media file goes up once, and every clip on it takes its words from that one transcript. Frame Job asks for Universal-3.5 Pro and allows Universal-2 as a fallback. This engine doesn't use your Mac's speech models, so it works on a Mac that has none.
+
+[What goes to AssemblyAI](/captions/assemblyai-privacy/) says exactly what leaves your Mac and how it's deleted. [Generate Captions](/captions/generate-captions/) covers the rest of the sheet.
+
+## Split the words by speaker
+
+Tick **Speakers:** ("split by speaker, coloured in Subtitles") to have AssemblyAI label who says what. It's off by default and adds $0.02 an hour to the price.
+
+A change of speaker then always starts a new caption: a new cue in [Subtitles](/captions/subtitles/), or a new page in a [word style](/captions/word-caption-styles/). In the Subtitles style, each speaker's cues also take their own colour.
+
+Speakers are counted separately for each media file. A speaker is a label within one file, so the same person in two files can come back as two different speakers.
+
+## Add names and jargon
+
+Type the words you expect into **Vocabulary:**, separated by commas: product names, people, identifiers. They go to AssemblyAI with the request. The field starts empty, and its placeholder reads "names and jargon, separated by commas".
+
+Blank entries and exact repeats are dropped. The list stops at 1,000 terms, which is AssemblyAI's limit, and it's cut from the end, so put the terms that matter most first. When the limit cuts your list, the note reads "Vocabulary was capped at 1000 terms (AssemblyAI's limit); N were given."
+
+## Choose a language
+
+**Language:** opens on **Detect automatically**, which leaves the language to AssemblyAI. The [result](#what-the-result-says) then tells you what it found.
+
+You can also name one: English, English (Australia), English (United Kingdom), English (United States), Spanish, French, German, Italian, Portuguese, Arabic, Danish, Dutch, Finnish, Hebrew, Hindi, Japanese, Chinese, Norwegian, Swedish, Turkish or Vietnamese. That list is what AssemblyAI published on 2026-09-17, so it can fall behind.
+
+## The price before you press Generate
+
+The summary line prices the run at AssemblyAI's published rate, and updates as you change a control:
+
+`2 files to upload · 01:12:30.000 of audio · about $0.25 at AssemblyAI's published rate · 1 file already transcribed`
+
+The rate is $0.21 an hour of audio, plus $0.02 an hour with **Speakers:** on. Those are the figures AssemblyAI published on 2026-09-17. They're built into Frame Job and aren't fetched, so AssemblyAI's own bill is the real figure. Each file is priced at its whole length, because AssemblyAI [bills for the whole file](/captions/assemblyai-privacy/#what-is-uploaded-and-billed).
+
+A very short run reads "under $0.01". When every file is already transcribed the line starts "Nothing to upload", as in `Nothing to upload · 2 files already transcribed`.
+
+Two more counts can appear, and neither is in the price:
+
+| The line says | What it means |
+| --- | --- |
+| "1 file waiting on an earlier delete" | The file [isn't uploaded](/captions/assemblyai-privacy/#a-pending-delete-holds-a-file-back) until AssemblyAI confirms an earlier delete. |
+| "1 file could not be read" | Frame Job couldn't read the media file, so it can't be transcribed. With nothing else to do, **Generate** is greyed. |
+
+## Why each file uploads
+
+Rest the pointer on the summary line. You get one line for each file that isn't already transcribed, saying why, and then the rate as a dated sentence.
+
+| The line says | What changed |
+| --- | --- |
+| "has not been transcribed yet" | This file has no transcript in the project. |
+| "has changed since it was transcribed" | The file on disk isn't the one that was transcribed. |
+| "was transcribed with a different language" | The named setting differs from the transcript's. It can also name **model**, **speakers** or **vocabulary**, or several of them. |
+| "was transcribed for a different request" | Something else about the request differs. |
+| "is already transcribed, and Transcribe again was asked for" | You ticked [Transcribe again](#transcribe-again). |
+| "could not be read, so it cannot be transcribed" | The media file couldn't be read. |
+
+## Reuse a transcript
+
+Each media file's transcript is kept in the project package, every word as AssemblyAI sent it. A later run that wants the same transcript uses it, with no upload, no request and no cost.
+
+A transcript is reused when all of these match:
+
+- **The file:** its size, modified time and duration, and whether it has audio. Change the file, or relink to a different one, and it's transcribed again.
+- **The model** Frame Job asks for.
+- **The language:** **Detect automatically** and a named language count as different, as do two named languages.
+- **Speakers:** on or off.
+- **Vocabulary:** the same terms in the same order.
+
+The caption style and the looks don't count, so [restyling](/captions/restyle-captions/) never uploads. Your region doesn't count either, so changing it uploads nothing again.
+
+A transcript made for [Remove Filler Words](/cleanup/filler-transcripts/) serves captions too, as long as those settings match.
+
+The transcript belongs to the media entry, not the file on disk. Two media entries over the same file are uploaded and billed separately.
+
+## Transcribe again
+
+Tick **Transcribe again:** ("ignore any cached transcript") to ignore what's kept and ask AssemblyAI again. It's off by default. Each file goes up in full and is billed again, and the summary line shows that price.
+
+Frame Job won't do this for a file with a [pending delete](/captions/assemblyai-privacy/#a-pending-delete-holds-a-file-back) until the delete goes through.
+
+## Generate with no key
+
+With no key set, the note reads "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription.", **Generate** is greyed, and resting the pointer on it shows the same sentence. Saving a key in Settings turns **Generate** on with the sheet still open.
+
+The exception is work you've already paid for. When every file in the run has a current transcript, **Generate** works with no key, and the paragraph at the top changes to "Current cached transcripts will be used without an API key or network request." Ticking **Transcribe again:** ends that, because it needs a new upload.
+
+With a key set the paragraph stays as it is, and the summary line says there's nothing to upload.
+
+## Transcribe an untitled project
+
+You don't have to save first. An untitled project's transcripts stay in a temporary folder and move into the project package on its first save. Close the project without saving and they're gone, so the same files would be paid for again in a new project. The record of any [delete still pending](/captions/assemblyai-privacy/#what-the-result-warns-about) goes with them.
+
+In the rare case that a project has no folder to keep transcripts in at all, the note reads "This project has nowhere to keep its transcript cache, so it cannot be transcribed with AssemblyAI. Save it first." Save the project and carry on.
+
+## What the result says
+
+While a run goes, the detail line on the sheet's progress card shows the stage for each file: "Extracting", "Uploading" with the megabytes sent, "Submitting", "Waiting for AssemblyAI" with the seconds so far, and "Saving".
+
+A run with nothing to report closes the sheet by itself. If there is something, the card stays open with **Close**, and these lines can join the usual count of captions added:
+
+| The card says | What it means |
+| --- | --- |
+| "“interview.mov”: detected Spanish (97% confidence)." | With **Detect automatically**, the language AssemblyAI found in each file it just transcribed, and how sure it was. The figure is left out if AssemblyAI gave none. |
+| "“interview.mov” was transcribed with universal-2, not universal-3-5-pro." | AssemblyAI used the fallback model. |
+| "The transcript of “interview.mov” could not be kept in the project for reuse." | The captions are fine, but a later run may upload and bill this file again. |
+| "AssemblyAI has not confirmed deleting the transcript of…" | See [What goes to AssemblyAI](/captions/assemblyai-privacy/#what-the-result-warns-about). |
+
+## When a file fails
+
+One file's failure doesn't end a run. Its clips are listed with the reason, and captions from the other files are still placed. If every file fails, nothing is placed and the card shows why.
+
+Two things end a run early, and neither places anything: choosing **Cancel**, and a key AssemblyAI turns down, because every later upload would fail the same way. Files that had already finished stay in the project, so a later run doesn't pay for them again.
+
+| The reason reads | What happened |
+| --- | --- |
+| "No network connection" | Frame Job couldn't reach AssemblyAI. |
+| "AssemblyAI refused the API key — check it in Frame Job ▸ Settings" | AssemblyAI turned the key down, and the run stops there. Try **Verify** in [Settings](/captions/assemblyai-key/#check-the-key). |
+| "AssemblyAI answered 500" | AssemblyAI had a problem of its own. The number varies. |
+| "AssemblyAI did not finish the transcript in the time allowed." | Frame Job waits at least 5 minutes for a transcript, and longer for audio over about 4 hours. |
+| "“name” is longer than AssemblyAI's 10-hour limit for one file." | Nothing was sent for this file. |
+| "AssemblyAI may have created a transcript, but Frame Job could not recover its ID…" | AssemblyAI's reply never reached Frame Job. Check your AssemblyAI dashboard before you try again, because the transcript may still be there. |
+| AssemblyAI's own sentence | AssemblyAI turned the request down or couldn't transcribe the file, perhaps over a problem with your account, and Frame Job passes on its words. |
+
+A failed upload is tried once more, unless AssemblyAI turned it down outright. While waiting, Frame Job checks on the transcript every 3 seconds and rides out up to 3 failed checks in a row. It never follows a redirect, so your key can't reach another host, and the run reports that instead.
+
+## Filler words stay out of captions
+
+AssemblyAI's words include fillers, and captions leave them out, so a caption reads the same whether or not its transcript has them. The sheet's preview leaves them out too.
+
+The words left out are um, uh, hmm, mhm, uh-huh, ah, huh, hm, m, er and erm, in any case and with any punctuation at their edges. The kept transcript still has them, which is what lets [Remove Filler Words](/cleanup/remove-filler-words/) find them later.
+
+## With an agent
+
+`transcribe` never picks this engine by itself: an agent has to pass `engine: "assemblyai"` on each call, whatever the sheet last chose. It can pass any language code, and one AssemblyAI doesn't support comes back as AssemblyAI's own sentence after the upload.
+
+`speakers`, `vocabulary` and `refresh` are the sheet's **Speakers:**, **Vocabulary:** and **Transcribe again:**. They work only with this engine, and the call stops if an agent passes one with `engine: "apple"`.
+
+Beside the usual result, a run reports `uploaded`, `cached`, `audio_seconds`, `speech_model_used`, `language_detected`, `endpoint` and, when there's something to say, `note`. A second run over the same files lists them under `cached`.
+
+The built-in [Assistant](/assistant/privacy/) can't use this engine at all. Use **File ▸ Generate Captions…**, which shows what's uploaded and what it costs.
+
+See [`transcribe`](/mcp/tools-captions/#transcribe).
+
+## Related
+
+- [What goes to AssemblyAI](/captions/assemblyai-privacy/)
+- [Your AssemblyAI key](/captions/assemblyai-key/)
+- [Generate Captions](/captions/generate-captions/)
+- [Transcribe on this Mac](/captions/on-device-transcription/)
+- [Restyle a caption track](/captions/restyle-captions/)
+- [Transcripts for filler words](/cleanup/filler-transcripts/)

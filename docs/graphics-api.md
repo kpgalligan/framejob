@@ -87,7 +87,7 @@ series a ramp would break.
 | `boolean` | `true` / `false` | |
 | `color` | a CSS colour string: `"#ff5a36"`, `"rgb(255, 90, 54)"`, `"hsl(11, 100%, 61%)"`, `"tomato"` | |
 | `enum` | one of `options` | `options`: 1–32 strings |
-| `asset` | a file name in `graphics/assets/`, `null` or `""` (no image); `render` gets `null` for either of the last two | `kind: "image"` |
+| `asset` | a file name in `graphics/assets/`, `null` or `""` (no image); a stored `""` reaches `render` as `null`, a schema `default` of `""` as `""` | `kind: "image"` |
 
 A schema that breaks a rule does not compile, and the error says which rule.
 A `color` entry's `default` must be a colour in the grammar
@@ -186,7 +186,8 @@ const wobble = noise3D(7, 0.5, 0.5, ctx.time) * 20;
 
 `d` is SVG path data: every command (`M L H V C S Q T A Z`) and its
 relative form. `getLength` answers the path's length, curves and arcs
-measured to within about 0.01 %. `getPointAtLength` answers `{x, y, angle}`:
+measured to within about 0.01 %, a tightly bent curve to about 0.05 %.
+`getPointAtLength` answers `{x, y, angle}`:
 the point that far along the path (`length` is clamped to the path) and the
 way the path is heading there, in degrees, ready for `rotate()`.
 `evolvePath` answers `{strokeDasharray, strokeDashoffset}` for a `progress`
@@ -343,9 +344,9 @@ A graphic is a pure function of `frame`, `props`, `ctx` and its fonts and
 assets. These refuse, with these sentences:
 
 ```text
-Math.random()        → Math.random is not available; use random(seed)
-import x from "x"    → imports are not available in a graphic; the standard library is global
-new Function("…")    → Function is not available in a graphic; the module is the one source of code
+Math.random()        → Error: Math.random is not available; use random(seed)
+import x from "x"    → ReferenceError: Error resolving module 'x' from '<name>': imports are not available in a graphic; the standard library is global
+new Function("…")    → Error: Function is not available in a graphic; the module is the one source of code
 eval("…")            → ReferenceError: eval is not defined
 ```
 
@@ -360,7 +361,7 @@ eval("…")            → ReferenceError: eval is not defined
   export. The module's top level has one too. Over it, the answer is an
   error such as `over the 250 ms budget at frame 12 (InternalError:
   interrupted)`.
-- **Memory**: 64 MB of heap and 1 MB of stack per engine. Past either is an
+- **Memory**: 64 MiB of heap and 1 MiB of stack per engine. Past either is an
   error with a line and column.
 - **Size**: a graphic draws at most 8192 pixels on a side.
 - **The answer**: `render` must return an SVG string. `undefined` is
@@ -376,8 +377,8 @@ Every problem comes back as `{level, message, line, column, frame}`.
 `line` and `column` are the module's own, when known; for a timeout they
 are where the function begins, not the statement that ran long. `frame` is
 set for a problem found while drawing. A warning from the module's top level
-(such as `asset("x")` outside `render`) has no frame, and comes back with the
-module's compile: `ok` is still `true`.
+(such as `asset("x")` outside `render` when `x` is not in `graphics/assets/`)
+has no frame, and comes back with the module's compile: `ok` is still `true`.
 
 ## Working over MCP
 
@@ -453,8 +454,8 @@ export function render(frame, props, ctx) {
 A colour blends in OKLab with straight alpha, exactly as `interpolateColors` blends it: `#ff0000`
 to `#0000ff` is `#8c53a2` halfway, not the muddy `#800080` of a channel-by-channel blend, and
 `#ffffff` to `#00000000` is `#63636380`, grey and half transparent. While a prop
-moves, every frame is drawn anew, so a graphic that had settled costs a full draw per frame for the
-length of the action.
+moves, every frame whose SVG changes is drawn anew, so a graphic that had settled costs a full draw
+per frame for the length of the action.
 
 ## Video inside a graphic: the matte
 

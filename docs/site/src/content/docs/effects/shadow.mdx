@@ -1,0 +1,72 @@
+---
+title: Shadow
+description: Add a drop shadow cast by a clip's own shape, and set its colour, strength, softness, direction and distance.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A drop shadow lifts a clip off what's behind it. It's cast by the clip's own shape: the picture, a text clip's letters, or a shape's outline and fill.
+
+<AtAGlance where="Clip tab ▸ Picture ▸ Shadow" tools="set_video" />
+
+## Drop shadow
+
+Select a clip, open the **Shadow** section in the Clip tab's **Picture** sub-tab, and tick **Drop shadow**. It's off by default, and every clip that draws has it, text, shapes and graphics included. A [nest](/editing/nests/) clip shows the section too, but a shadow set there isn't drawn. Set it on the clips inside.
+
+Turning it on gives a soft shadow, down and to the right: black at 50 % with a 12 px blur, at 315° and 8 px away. The other rows stay greyed until it's on.
+
+The section's header reads "off", or the blur in pixels. **Reset** takes the shadow off.
+
+The shadow follows what the clip actually draws. A clip with a [key](/effects/chroma-key/) or [Remove Background](/effects/remove-background/) casts the shadow of what's left, and the shadow fades with the clip's [opacity](/canvas/transform/).
+
+## Shape the shadow
+
+### Color
+
+Any colour, black by default. A colour you can see through multiplies with **Opacity**, so the shadow gets fainter than **Opacity** alone says.
+
+In an HLG project, shadow colours are lifted with the other drawn colours. See [A project's dynamic range](/hdr/dynamic-range/).
+
+### Opacity
+
+The shadow's strength. The range is 0 to 100 %, the default is 50 %, and the quick picks are 0, 25, 50, 75 and 100.
+
+### Blur
+
+How soft the shadow is. The range is 0 to 200 px, the default is 12 px, and the quick picks are 0, 4, 8, 12, 24 and 48.
+
+The pixels are the clip's own, so the blur grows when you scale the clip up.
+
+### Angle
+
+Which way the shadow falls. The range is 0 to 360°, the default is 315°, and the quick picks run every 45°.
+
+0° is to the right, and the angle increases anticlockwise, so 90° is up, 180° is left, 270° is down and 315° is down and to the right.
+
+The direction belongs to the canvas, not the clip. Rotating a clip doesn't turn its shadow, so every shadow at the same angle falls the same way.
+
+### Distance
+
+How far the shadow falls from the clip. The range is 0 to 200 px, the default is 8 px, and the quick picks are 0, 4, 8, 16 and 32.
+
+Like **Blur**, it's in the clip's own pixels, so it grows when you scale the clip up.
+
+## Animate a shadow
+
+With an [action](/motion/edit-an-action/) selected, **Color**, **Opacity**, **Blur**, **Angle** and **Distance** set the value at the action's end and animate toward it. The colour blends through the OKLab colour space. Unticking **Drop shadow** with an action selected turns the shadow off at the action's end.
+
+## Good to know
+
+- A shadow has no effect on a clip on a [matte track](/canvas/matte-tracks/). The settings are kept and apply again when the track stops being a matte.
+- A clip with [Behind subject](/effects/text-behind-subject/) on has its shadow cut with it.
+- A clip with a drop shadow gets no [motion blur](/motion/motion-blur/). It draws sharp.
+
+## With an agent
+
+An agent sets the shadow with `set_video`, and changing one setting keeps the others. See [Tools: picture and grade](/mcp/tools-set-video/#shadow).
+
+## Related
+
+- [Reflection](/effects/reflection/)
+- [Position, scale, rotation and opacity](/canvas/transform/)
+- [Text outline and backdrop](/text-and-shapes/text-outline-and-backdrop/)

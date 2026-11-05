@@ -1,0 +1,135 @@
+---
+title: Matte tracks
+description: Make one track cut the track behind it, so text, a shape or a movie becomes a window onto your footage.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+A matte track cuts the track directly behind it. Its own clips are never drawn. Instead, what they show decides where the track behind can be seen, which turns a title or a shape into a window onto your footage.
+
+<AtAGlance
+  menu="Track ▸ Matte"
+  where="Right-click a track's header or the empty part of its lane ▸ Matte"
+  tools={['set_track', 'add_adjustment_clip']}
+/>
+
+<Shot
+  name="10c-matte-track.window"
+  alt="The editor with three tracks. The Window track carries a Matte · Alpha tag and its rectangle clip is drawn pale with a bracket joining it to the Video track below, so the preview shows the video only inside the rectangle, on a black canvas. The Stray track in front reads Matte · nothing behind. The inspector's Picture sub-tab opens with the note: Matte for the track below (Alpha). Not drawn: its blend mode, drop shadow and reflection have no effect."
+/>
+
+## What a matte does
+
+Any clip that draws can be a matte: text, a shape, a graphic, an image, a movie or a nest.
+
+A matte belongs to the track, not the clip. Move a clip off the track and it's an ordinary clip again, and move one on and it becomes part of the matte.
+
+Only the track directly behind is cut, so tracks further back and the canvas show through the hole. Adding, moving or removing a track can change which track that is.
+
+The cut applies to everything the clip behind draws. Its drop shadow follows the shape that's left, and its reflection is cut where it lands. It all works in the preview, in rendered frames, at every [Preview Quality](/timeline/preview-quality/) and in every export.
+
+## Setting a matte
+
+<Steps>
+
+1. Put the clips that will do the cutting, such as a text clip, on the track directly in front of the track you want to cut. On the timeline, that's the track directly above it.
+
+2. Select one of those clips, or right-click that track's header.
+
+3. Choose a mode from **Track ▸ Matte**, or from the **Matte** submenu of the track's context menu.
+
+</Steps>
+
+**Track ▸ Matte** works on the track holding the first selected clip, or the front-most track when nothing is selected. The context menu works on the track you clicked. Right-click or <kbd>⌃</kbd>-click its header or the empty part of its lane to open it.
+
+A checkmark shows the track's mode. Choosing the mode it already has beeps and makes no undo step. There's no key for a matte, and the undo step is called **Track Matte**.
+
+## The modes
+
+| Mode | The track behind shows where the matte clip is |
+| --- | --- |
+| **Off** | Not a matte. This is an ordinary track, and every track's default. |
+| **Alpha** | Opaque |
+| **Inverted Alpha** | Transparent |
+| **Luma** | Bright |
+| **Inverted Luma** | Dark |
+
+Brightness is Rec. 709 luma, and transparent counts as black, so a half-transparent white counts as half bright.
+
+Everything outside a matte clip's box is transparent. So at any moment a matte clip is playing, **Alpha** and **Luma** hide the track behind outside the clip, and **Inverted Alpha** and **Inverted Luma** show it there.
+
+For text, a shape or anything else with see-through parts, start with **Alpha**. A movie or a photo usually fills its box, so **Alpha** would only give you a rectangle. Use **Luma** for those, so their light and dark areas do the cutting.
+
+## Gaps
+
+Where the matte track has no clip, the track behind shows uncut, whatever the mode.
+
+A matte is read moment by moment and no clip is tied to another, so splitting, moving, deleting or pasting can't break a link between them.
+
+## Turning a matte off
+
+To turn a cut off for a while, use [**Hide Video**](/timeline/hide-and-lock-tracks/) on the matte track, or [turn off a matte clip's picture](/editing/enable-picture-and-sound/). Either way the track behind shows whole, as it does in a gap. To end the matte for good, choose **Off**.
+
+## Nothing to cut
+
+A matte with no target cuts nothing, and its clips still draw nothing. That happens on the back-most track, and on a track directly in front of another matte track. So two matte tracks in a row don't combine: only the one nearest the track behind cuts anything.
+
+## Matte properties
+
+A matte clip is drawn like any other clip, into the matte instead of onto the canvas, so most of its settings shape the cut:
+
+- position, scale, rotation and crop
+- corner radius and opacity
+- colour, chroma key and filters
+- spotlight and obscured regions
+- motion presets and actions
+- transitions between two matte clips
+
+Animate the clip and the cut moves with it, so a moving title can wipe footage on.
+
+A matte clip's blend mode, drop shadow and reflection have no effect. They're kept, and apply again when the track stops being a matte.
+
+**Motion Blur** has no effect either, on a matte clip or on a clip a matte is cutting. Both draw sharp.
+
+A matte clip isn't drawn, but it's still there on the canvas. Click inside its box to select it, and drag it like any clip.
+
+## Sound
+
+A matte clip's sound still plays. A matte only changes the picture, so **Mute Audio** silences the track as it would any other, and **Hide Video** doesn't.
+
+## Adjustment clips
+
+An [adjustment clip](/color/adjustment-clips/) on a track cut by a matte grades only inside the matte. This is how you confine a grade to one area: put the adjustment clip on a track, and make the track directly in front of it a matte.
+
+An adjustment clip on a matte track does nothing, and the Clip tab says so. Its settings are kept.
+
+## The note on the Clip tab
+
+When every selected clip is on a matte track and those tracks share one mode, every sub-tab of the **Clip** tab shows a note under its strip. Every control stays live, and its value comes back into play when the track stops being a matte.
+
+| Selection | Note |
+| --- | --- |
+| Clips on a matte track that has a track to cut | "Matte for the track below (Alpha). Not drawn: its blend mode, drop shadow and reflection have no effect." The note names the track's mode. |
+| Clips on a matte track with nothing to cut | "Nothing is behind this matte track, so it cuts nothing." |
+| Only adjustment clips, on matte tracks of any mode | "An adjustment clip on a matte track has no effect." |
+
+## On the timeline
+
+A matte track's header carries a tag such as "Matte · Alpha", under the track name. With nothing to cut, the tag is dimmed and reads "Matte · nothing behind".
+
+On a short row the tag shares the name's line, and it shortens to "Matte" when the name would lose its room.
+
+The track's clips are drawn at half opacity with dashed outlines, and a bracket joins the track to the track it cuts. A matte that cuts nothing keeps its dashed outlines and has no bracket.
+
+## With an agent
+
+`set_track` sets a track's `matte` to `none`, `alpha`, `alpha_inverted`, `luma` or `luma_inverted`. See [Tools: tracks, markers and canvas](/mcp/tools-tracks-and-markers/#track-mattes). `add_adjustment_clip` adds the adjustment clip, as in [Tools: adding clips](/mcp/tools-adding-clips/#add_adjustment_clip).
+
+## Related
+
+- [Mattes inside nests](/canvas/mattes-in-nests/)
+- [Hide and lock tracks](/timeline/hide-and-lock-tracks/)
+- [Adjustment clips](/color/adjustment-clips/)
+- [Blend modes](/canvas/blend-modes/)

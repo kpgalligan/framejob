@@ -1,0 +1,90 @@
+---
+title: Text Behind Subject
+description: Put a title, shape, picture or graphic behind the person in a clip, so they stand in front of it and the room stays behind it.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Text Behind Subject puts a title behind the person in a camera clip or photo. The person stands in front of the title, and the room stays behind it. A shape, picture or graphic can go behind a person the same way.
+
+<AtAGlance
+  menu="Insert ▸ Text Behind Subject"
+  where="Clip tab ▸ Picture ▸ Behind Subject"
+  tools={['text_behind_subject', 'set_video']}
+  needs="Nothing. The masks are made on your Mac, with no key and no upload."
+/>
+
+## Text behind subject in one step
+
+<Steps>
+
+1. Move the playhead to where the title should start, over the camera clip or photo.
+
+2. If several clips play there, select the one with the person.
+
+3. Choose **Insert ▸ Text Behind Subject**. It has no keyboard shortcut.
+
+4. The new title is selected, so type your text in the Clip tab's [**Text** sub-tab](/text-and-shapes/text-clips/).
+
+</Steps>
+
+One **Undo** takes it all back. The step is named **Text Behind Subject**.
+
+Here's what the command does:
+
+- It adds a track named "Behind Subject" directly above the clip's track, and above any [matte tracks](/canvas/matte-tracks/) in front of it.
+- It puts a title on that track, in the [look a new text clip starts with](/text-and-shapes/text-clips/#add-a-text-clip), running from the playhead for 4 seconds, or to the clip's end if that's sooner.
+- It puts the title behind the subject.
+- If the clip had no [Remove Background](/effects/remove-background/), it turns that on with **Background** set to **Keep** and **Subject** set to **Person**, so the picture stays whole and the person still hides the title. A clip that already has a cutout keeps it.
+
+It works with a clip of a video file or a picture that's playing at the playhead, with its picture on, on a shown track that isn't a matte track. Of those, it takes the front-most selected clip, else the front-most with Remove Background on, else the front-most.
+
+The item is greyed while a [nest](/editing/nests/) is open, and when no such clip plays at the playhead.
+
+## Behind subject by hand
+
+Any clip that draws can go behind a subject, except an adjustment clip or a nest clip.
+
+<Steps>
+
+1. Turn on [Remove Background](/effects/remove-background/) for the camera clip. Set **Background** to **Keep** if you want the room to stay.
+
+2. Put the clip you want behind the person on a track in front of the camera clip, and select it.
+
+3. In the Clip tab's **Picture** sub-tab, open the **Behind Subject** section and tick **Behind subject**.
+
+</Steps>
+
+The section comes right after **Transform** and is closed by default, and its header reads "on" or "off". The box is off by default and shows as mixed over a selection that disagrees. Changing it is one undo step, **Behind Subject**, and **Reset** turns it off.
+
+With one clip selected and the box on, the section says "No cut-out clip is behind it at the playhead." when nothing cuts the clip there.
+
+With an [action](/motion/edit-an-action/) selected, the box sets the action's end, and the clip switches at the action's end. The row shows "at end".
+
+The section isn't offered while a nest is open.
+
+## What cuts the clip
+
+A clip with **Behind subject** on is cut, at every moment, by the subject of every cutout clip on a track behind it. Any clip with Remove Background on counts, with **Background** set to **Remove** or **Keep**.
+
+Track order decides it. A cutout clip on a track in front of the clip doesn't cut it.
+
+Where no mask is drawn yet, or no subject is found, the clip draws whole. See [How the masks are made](/effects/remove-background/#how-the-masks-are-made).
+
+## Good to know
+
+- A subject inside a nest cuts a top-level title when the nest clip is behind the title. A top-level camera never cuts a title inside a nest, because a nest is one picture to the timeline.
+- The clip's [shadow](/effects/shadow/) is cut with it.
+- A clip cut this way gets no [motion blur](/motion/motion-blur/). It draws sharp, and so does the outline that cuts it.
+
+## With an agent
+
+`text_behind_subject` does what the menu item does, and it can also take the title's text, its start time and the clip to go behind. It works on the top-level timeline only, and it leaves the selection as it was. An agent can also turn `behind_subject` on inside a nest with `set_video`, where the section isn't offered, and it works among the clips of that nest. See [Tools: text, shapes and clip names](/mcp/tools-clip-properties/#text_behind_subject) and [Tools: picture and grade](/mcp/tools-set-video/#behind_subject).
+
+## Related
+
+- [Remove Background](/effects/remove-background/)
+- [Text clips](/text-and-shapes/text-clips/)
+- [Tracks](/timeline/tracks/)
+- [Matte tracks](/canvas/matte-tracks/)

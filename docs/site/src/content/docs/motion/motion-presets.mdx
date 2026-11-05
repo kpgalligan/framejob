@@ -1,0 +1,185 @@
+---
+title: Motion presets
+description: Give a clip a ready-made entrance, exit or continuous movement that's tied to its two ends and stays with it through a trim.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A motion preset says what a clip does rather than where it is: how it arrives, how it leaves and what it does in between. It's tied to the clip's two ends, so it goes with the clip through a trim and there's nothing to reposition afterwards.
+
+Each clip has three slots, and all three can run on the same clip:
+
+- **In** is an entrance at the clip's start: Fade, Zoom In, Zoom Out, Slide Left, Slide Right, Slide Up, Slide Down, Spin or Pop. See [Entrance and exit presets](/motion/entrances-and-exits/).
+- **Out** is an exit at the clip's end, from the same nine kinds.
+- **During** is a movement for the clip's whole length: Pulse, Shake, Spin, Bounce or Drift. See [During presets](/motion/during-presets/).
+
+Presets work on any clip that draws a picture: video, still images, text, shapes, graphics and nests.
+
+<AtAGlance
+  menu={['Clip ▸ Motion ▸ In', 'Clip ▸ Motion ▸ Out', 'Clip ▸ Motion ▸ During', 'Clip ▸ Motion ▸ Preview']}
+  where="Clip tab ▸ Clip sub-tab ▸ Motion presets"
+  tools="set_video"
+/>
+
+## Give a clip a preset
+
+<Steps>
+
+1. Select the clip.
+
+2. In the Clip tab, pick the **Clip** sub-tab and open **Motion presets**, the last section. It's closed by default.
+
+3. Choose a kind from **In**, **Out** or **During**.
+
+4. Set **In Duration** or **Out Duration**, or for a During movement, **Amount** and **Period**.
+
+5. Choose **Preview** to watch it loop.
+
+</Steps>
+
+If the defaults suit you, [the Motion menu](#use-the-motion-menu) is quicker.
+
+## The Motion presets section
+
+| Row | What it does | Range | Default |
+| --- | --- | --- | --- |
+| **In** | How the clip enters. | None and nine kinds | None |
+| **In Duration** | How long the entrance takes. Dimmed while **In** is None. | 0.1 to 10 s, with quick picks of 0.25, 0.5 and 1 | 0.5 s |
+| **Out** | How the clip leaves. | None and nine kinds | None |
+| **Out Duration** | How long the exit takes. Dimmed while **Out** is None. | 0.1 to 10 s, with quick picks of 0.25, 0.5 and 1 | 0.5 s |
+| **During** | What the clip does for its whole length. | None and five kinds | None |
+| **Amount** | How strong the During movement is. Dimmed while **During** is None. | 0 to 100%, with quick picks of 25, 50, 75 and 100 | 50% |
+| **Period** | How long one cycle of the During movement takes. Dimmed while **During** is None, and for Drift, which has no cycle. | 0.1 to 10 s, with quick picks of 0.25, 0.5, 1 and 2 | 1 s |
+| **Preview** | Loops the clip so you can [watch its motion](#preview-a-preset). | | |
+
+The two durations and **Period** snap to the project's frame grid. The In is measured from the clip's first frame and the Out back from its last.
+
+The section's header sums up the first selected clip's presets, for example "in fade · out slide left · pulse". With no presets it reads "off".
+
+## Use the Motion menu
+
+**Clip ▸ Motion** has three submenus, **In**, **Out** and **During**, then [**Preview**](#preview-a-preset). Each submenu lists its kinds, then **None** to clear the slot. They work on every selected clip that has a picture, and they're dimmed when no selected clip has one. None of them has a keyboard shortcut.
+
+A checkmark shows the kind every selected clip shares. If the clips disagree, nothing is checked. If none of them has a preset in that slot, **None** is checked. A kind can also carry an [(inactive)](#inactive-presets) label.
+
+## Change or clear a preset
+
+Choosing a different kind keeps the settings the slot already had: an In or Out keeps its duration, and a During keeps its amount and period. A slot that's empty, including one you've set to **None**, starts at the defaults: 0.5 s for an In or Out, and 50% with a 1 s period for a During.
+
+To clear one slot, choose **None**. To clear all three, choose **Reset** in the section's header. **Reset** shows only when the first selected clip has a preset, and it clears every selected clip.
+
+Each change is one undo step, however many clips are selected.
+
+## Set presets on several clips
+
+With several clips selected, a change to one slot leaves each clip's other slots as they were. Choosing a new In kind doesn't touch anyone's Out, and each clip keeps its own In duration.
+
+The section shows the first selected clip's values, with **mixed** beside a row where the clips differ. That has two effects to watch for:
+
+- **In Duration**, **Out Duration**, **Amount** and **Period** only change the clips that have a preset in that slot. The others are left alone.
+- Those rows are dimmed by the first clip alone. If the first selected clip has no In, **In Duration** is dimmed even when other selected clips have one.
+
+## Preview a preset
+
+Choose **Preview** in the section, or **Clip ▸ Motion ▸ Preview**. Frame Job sets the [in/out range](/timeline/in-out-range/) to the clip, turns [Loop](/timeline/loop/) on, moves the playhead to the clip's start and plays.
+
+A clip that ends at the very end of the timeline, such as the only clip on it, plays once, then goes back to its start and stops. Press <kbd>Space</kbd> to watch it again. Any other clip goes round until you stop it.
+
+With several clips selected, it previews the first selected clip that has a picture.
+
+The range and Loop stay until you clear them. Choose **Mark ▸ Clear Range** (<kbd>⌥X</kbd>) and click the **Loop** button in the toolbar. A range you'd already set is replaced.
+
+## Read presets on the timeline
+
+Small marks on a clip's name strip show its presets:
+
+- **A wedge at each end** along the bottom of the strip stands for an In or an Out. It's as long as the preset's duration at the current zoom, at least 2 points wide so a short preset still shows, and never wider than the clip. The Clip tab's [action lane](/motion/action-lane/) shows the same two wedges, hanging from its top.
+- **A wave symbol** at the right end of the strip stands for a During movement. On a clip too narrow to fit it, the symbol is left out.
+
+See [Reading a clip on the timeline](/timeline/reading-a-clip/) for everything else a clip draws.
+
+## Motion sits on top of placement
+
+A preset works relative to the clip. Frame Job takes the clip's own placement and any [actions](/motion/actions/) first, then applies the preset on top:
+
+- Its scale and opacity multiply the clip's own. A clip at 50% opacity fades in to 50%, not 100%.
+- Its rotation and offset add to the clip's own.
+- Anything that changes the clip's size or turns it does so about the clip's visible centre, after any crop.
+- The drawn size stays within the 1% to 1,000% that **Scale** allows.
+
+The three slots add up the same way, so a clip can slide in while it pulses.
+
+### The inspector shows un-moved values
+
+The fields in the Clip tab show the clip's own numbers, even while the preview and the export show it moving. Halfway through a Zoom In, **Scale** still reads what you typed. That's why editing a clip's position or size works the same with a preset on it.
+
+### Dragging during motion
+
+A drag on the canvas changes the clip's own position, starting from where it sits without the preset. If you drag partway through a preset, the distance you drag is added to that un-moved position, and the preset keeps playing on top of it. To place a clip by eye, park the playhead where its In has finished and its Out hasn't started.
+
+## Overlong presets shorten
+
+An In and an Out can together last longer than the clip. Frame Job keeps both and shortens them in proportion to their lengths, so the entrance ends on the frame where the exit begins. A 2 s In and a 1 s Out on a 1.5 s clip play as 1 s and 0.5 s. An In or Out alone that's longer than the clip plays over the clip's whole length.
+
+On the timeline the wedges aren't shortened, so they overlap. That's how to spot it. **In Duration** and **Out Duration** keep what you set too, so if you lengthen the clip later, the presets get their full time back.
+
+## Inactive presets
+
+An In or Out with a zero duration can come from an agent. Frame Job keeps it but it does nothing, and it draws no wedge. It's marked so you can fix it:
+
+- The section's summary reads, for example, "in fade (inactive)".
+- The **Clip ▸ Motion** submenus read **Fade (inactive)**, or **Fade (some inactive)** when only some of the selected clips with that kind have a zero duration.
+- A note at the top of the section reads "Selection includes inactive In motion (zero duration). Increase Duration to reactivate; choose None to clear." It names **In**, **Out** or **In and Out**, and it counts every selected clip.
+
+Changing the kind doesn't fix it, because a new kind keeps the old duration. Raise **In Duration** or **Out Duration**, or choose **None**.
+
+## Presets and actions
+
+An [action](/motion/actions/) animates a property to a value you set, over a span you place on the clip. A preset is anchored to the clip's ends and says what the clip does. Use a preset for an entrance, an exit or a repeating movement, and an action when a value has to reach a particular number at a particular moment.
+
+A preset is never part of an action, and no action can animate one. While an action is selected, the section's rows are marked ⊘ and the section reads "Actions don't animate this. Edits here change the clip." Your edits there write the clip, as they do with no action selected, and **Reset** is still available.
+
+## How edits treat a preset
+
+| Edit | What happens to the presets |
+| --- | --- |
+| Trim | Each preset moves with its edge and keeps its length. |
+| [Split](/editing/splitting/) | The first half keeps the In and gives up the Out, and the second half keeps the Out and gives up the In, so the cut doesn't play an exit and an entrance. Both halves keep the During. |
+| [Change the speed](/speed/change-speed/) | The presets aren't rescaled. A 0.5 s In stays 0.5 s, and a clip that gets much shorter can make its presets [shorten](#overlong-presets-shorten). |
+| [Freeze frame](/speed/freeze-frame/) | The still has no preset, and it sits at the clip's un-moved position, so a freeze taken mid-motion can jump. |
+| [Add Blurred Background](/canvas/backgrounds/#blurred-background) | The backdrop copy doesn't move. The clip in front keeps its presets. |
+| [Duplicate](/editing/duplicate-clips/), [Detach Audio](/audio/detach-and-attach/) and [Paste](/editing/copy-and-paste/) | The presets are kept. |
+| [Paste Attributes](/editing/paste-attributes/) | Presets are copied with the rest of the picture settings. |
+
+A During movement restarts at each cut, because each piece is a clip of its own. [Remove Silences](/cleanup/remove-silences/) on a clip with Pulse or Drift can make it jump at the cuts.
+
+## Good to know
+
+- A preset moves the picture only. A Fade leaves the sound as it is, so use [audio fades](/audio/fades/) for that.
+- A preset on a [nest](/editing/nests/) moves everything inside the nest together.
+- [Adjustment clips](/color/adjustment-clips/) have the section and draw the marks, but there's no picture to move. Only a preset's fade has an effect, and it fades the clip's strength.
+- [Motion blur](/motion/motion-blur/) blurs a preset's movement like any other.
+- [Zoom to Region](/motion/zoom-to-region/) works out its zoom without a During movement, and tells you so with "This clip has During motion — the zoom is solved without it".
+- [Follow Subject](/framing/follow-subject/) works on an upright picture, so it won't take a clip with Spin in any slot.
+- Changing the project's frame rate moves the durations and the period onto the new frame grid.
+
+## With an agent
+
+An agent sets and clears presets with the `motion` key of `set_video`, which is `null` or `{in, out, during}`. `in` and `out` each take a `kind` and a `duration`. `during` takes a `kind`, an `amount` from 0 to 1 and a `period`, and Drift ignores its period. Durations and periods are written in [an agent's time units](/mcp/units-and-ids/#times-in-ticks).
+
+A slot left out keeps what it had, a slot set to `null` is cleared, and `{motion: null}` clears all three.
+
+An agent isn't held to the section's ranges. Any duration of zero or more is accepted, which is how an [inactive preset](#inactive-presets) comes about, and a period can be outside 0.1 to 10 s as long as it's above zero. Frame Job won't accept an amount outside 0 to 1, which is 0 to 100%. Durations and periods snap to the frame grid, so the value read back can differ a little from the one sent.
+
+`get_project` reports the clip's un-moved values, so use `render_frame` to see a preset's effect. `set_action_end` won't take a preset, not even to clear one. See [Tools: picture and grade](/mcp/tools-set-video/#motion) for the full list of keys, and [Entrance and exit presets](/motion/entrances-and-exits/#with-an-agent) for the values of `kind`.
+
+## Related
+
+- [Entrance and exit presets](/motion/entrances-and-exits/)
+- [During presets](/motion/during-presets/)
+- [Actions](/motion/actions/)
+- [Transitions](/motion/transitions/)
+- [Motion blur](/motion/motion-blur/)
+- [Audio fades](/audio/fades/)
+- [The Clip menu](/reference/clip-menu/)

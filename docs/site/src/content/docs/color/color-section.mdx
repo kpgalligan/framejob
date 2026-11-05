@@ -1,0 +1,87 @@
+---
+title: Brightness, contrast, saturation and hue
+description: Make overall changes to a clip's picture with the Color section's Brightness, Contrast, Saturation and Hue controls.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+The Color section makes broad changes to the whole picture: brighter, punchier, more or less colourful, or every colour turned around the wheel.
+
+<AtAGlance
+  where="Clip tab ▸ Color ▸ Color"
+  tools={['set_video', 'set_action_end']}
+/>
+
+## The Color section
+
+<Steps>
+
+1. Select the clip and open the [**Color**](/color/color-tab/) sub-tab.
+
+2. Open the **Color** section by clicking its header. It starts closed.
+
+3. Drag a slider, or type in the number field beside it.
+
+</Steps>
+
+All four controls start at 0.
+
+| Control | Range | Shows | What it does |
+| --- | --- | --- | --- |
+| **Brightness** | −1 to +1 | Two decimals | Raises or lowers every level |
+| **Contrast** | −1 to +1 | Two decimals | Spreads the tones apart or pulls them together |
+| **Saturation** | −1 to +1 | Two decimals | More or less colour overall |
+| **Hue** | −180° to +180° | Whole degrees | Turns every colour around the colour wheel |
+
+**Reset** in the header clears these four as one undo step, **Undo Color**, and leaves [Light](/color/light/) alone. The header reads "neutral" or "adjusted".
+
+With an [action](/color/animate-a-grade/) selected, every control here sets the value the action animates to, rather than the clip's own value.
+
+## Brightness
+
+**Brightness** adds the same amount to every level, so the blacks rise or fall with everything else. Use it for an overall lift of the whole picture. Frame Job has no Offset wheel, so this is the control for that job.
+
+To brighten the way a camera would, with black staying black, use [Exposure](/color/light/#set-the-exposure).
+
+## Contrast
+
+**Contrast** spreads the tones away from the middle or pulls them toward it. At +1 the spread doubles. At −1 every tone meets at mid-grey.
+
+For finer control over which tones move, use [the curves](/color/curves/).
+
+## Saturation
+
+**Saturation** gives more or less colour across the whole picture. −1 is greyscale and +1 is twice the colour.
+
+It moves every colour alike. To favour the muted colours and spare the strong ones, use [Vibrance](/color/light/#add-colour-with-vibrance).
+
+## Hue
+
+**Hue** turns every colour around the colour wheel by the same angle, from −180° to +180°. Its field shows whole degrees. Positive turns red toward yellow and then green.
+
+Each pixel's brightness is kept, and greys stay grey.
+
+To turn one colour and leave the others alone, use [Hue vs Hue](/color/hue-curves/).
+
+## With an agent
+
+An agent sets these four in `set_video`'s `color` object, as `brightness`, `contrast`, `saturation` and `hue`, and `set_action_end` takes the same keys for an action. Any it doesn't name keep their values, and 0 means no change.
+
+An agent isn't held to the sliders' ranges for these four controls. `set_video` takes any finite number for them, with `hue` in degrees. [Light's controls](/color/light/#with-an-agent) are different: `set_video` won't take a value outside their ranges. See [Tools: picture and grade](/mcp/tools-set-video/#color).
+
+## Good to know
+
+- A number you type outside a control's range is pulled back to the nearest limit.
+- These four act first in the grade, before Light, even though the tab lists Light above them. See [The fixed grade order](/color/color-tab/#the-fixed-grade-order).
+- A [chroma key](/effects/chroma-key/) reads the picture before these controls, so changing them doesn't move the key.
+- Blur and Sharpen act after these four. See [Filters around the grade](/color/color-tab/#filters-around-the-grade).
+- On an [adjustment clip](/color/adjustment-clips/), these controls grade everything behind the clip.
+
+## Related
+
+- [The Color tab](/color/color-tab/)
+- [Light](/color/light/)
+- [Master and RGB curves](/color/curves/)
+- [Hue vs Hue and Hue vs Sat curves](/color/hue-curves/)
+- [Animate a grade](/color/animate-a-grade/)

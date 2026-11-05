@@ -1,0 +1,126 @@
+---
+title: Follow the speaker in a vertical
+description: Make a vertical version of a wide interview that cuts to whoever is talking, using a microphone per person.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A wide shot of two to four people doesn't fit a tall frame. Follow Speaker solves that: in [Make Vertical Version](/framing/make-vertical-version/), it reads each person's microphone and cuts the frame to whoever is talking.
+
+<AtAGlance
+  menu="File ▸ Make Vertical Version…"
+  where="Follow ▸ Speaker in the sheet"
+  tools={['make_vertical_version', 'reframe_clip']}
+  needs="A microphone for each person, on its own track. Faces are found on your Mac, with no key and no upload."
+/>
+
+## What you need
+
+- A wide shot: a full-frame movie clip with the people in it.
+- A sound file for each person, from a recorder or a lavalier rather than a camera, each on its own track and recorded with the shot.
+- Those sound files lined up with the shot. Use [**Clip ▸ Synchronize Audio**](/audio/synchronize-audio/) first.
+
+:::tip
+With a camera on each person you don't need Follow Speaker. [Switch by Speaker](/multicam/switch-by-speaker/) cuts a Program track of whoever is talking, and **Follow** on **Subject** then keeps each shot's face in the tall frame.
+:::
+
+## Follow the speaker
+
+<Steps>
+
+1. Choose **File ▸ Make Vertical Version…** and set **Follow** to **Speaker**. The **Microphones** and **Faces** rows appear.
+
+2. Under [**Microphones**](#microphones), tick the tracks that belong to the people in the shot, two to four.
+
+3. Under [**Faces**](#faces), check that each row names that microphone's person. If the movies haven't been analysed yet the pop-ups have no faces for now.
+
+4. Choose **Make**. If an analysis has to run first, [the sheet comes back](#the-sheet-comes-back-after-analysis) when it's done, so you can do step 3 and choose **Make** there.
+
+</Steps>
+
+The other controls work as they do in [Make Vertical Version](/framing/make-vertical-version/#the-controls).
+
+## Microphones
+
+A checkbox for each track holding a sound file, named by the track and listed front to back. Sound from a movie file doesn't count, so a camera's track isn't offered, and neither is a track whose clips all have their sound off. The first four are ticked.
+
+Tick the ones that belong to the people in the shot. **Make** needs two to four, so with more than four tracks listed, check which four are ticked.
+
+When no full-frame movie plays beside two ticked microphones, the sheet says "No full-frame movie clip plays beside two of the ticked microphones, so nobody can be framed by who is talking." and **Make** stays dimmed. Check that the shot and the microphones overlap on the timeline.
+
+## Faces
+
+One row per ticked microphone, with a pop-up of the faces Frame Job found in the longest shot it can frame this way. Faces are numbered left to right, with where each sits across the picture: **Face 1 (42 % across)**.
+
+Ticking or unticking a microphone rebuilds the rows and offers the match again for the new set. Otherwise your own choice stands.
+
+### The automatic match
+
+Frame Job matches each microphone to the face whose mouth moves while it talks. When the match is clear the pop-ups are already set, and the note under them reads "Each microphone is matched to the face that talks with it; change one if it is wrong." Check that each row names that microphone's person.
+
+A match is clear when every microphone agrees with its face to at least 0.2, on a scale where 1 is perfect agreement and 0 is none. A face is counted when it's in at least a quarter of the shot, and four faces at most are considered.
+
+### Choose a face
+
+When the match isn't clear, each pop-up says **Choose a face** and the note reads "The faces do not show clearly who is on each microphone: choose each microphone's face." Pick each microphone's face yourself.
+
+If the shot shows fewer faces than the ticked microphones under it, the pop-ups have no faces to offer. Untick the microphones of people who aren't in it.
+
+## When Make is offered
+
+**Make** is available when all of these are true:
+
+- Two to four microphones are ticked.
+- A full-frame movie plays at the same time as at least two of them.
+- Every ticked microphone has a face of its own. Two microphones can't share a face.
+
+While an analysis is still to be made there are no faces to choose yet, so the last rule waits: **Make** is available with the first two, and choosing it runs the analysis.
+
+A microphone imported moments ago may still be being measured. The sheet says so in the words [Switch by Speaker](/multicam/switch-by-speaker/) uses, such as "The microphone on track 3 is still being analysed — its loudness has not been measured yet. Try again in a moment." Choose the command again in a moment. A microphone with no speech under the shot stops **Make** in the same way, with "The microphone on track 3 has no speech between …". Untick it.
+
+## The sheet comes back after analysis
+
+The summary warns you first: "Finds the faces, people and shot changes in 3 files on this Mac first, then asks you to confirm who is on each microphone, then makes a 1080 × 1920 version."
+
+When you choose **Make**, the Analyzing sheet runs. Then the sheet comes back on the same shape, **Follow**, **Zoom**, **Where Empty**, **Make a copy** and ticked microphones, this time with faces to confirm. Nothing is made until you choose **Make** there. **Stop** on the Analyzing sheet makes nothing.
+
+## How the shot is cut
+
+A shot is framed this way when it's a full-frame movie, its file is present, it has no cursor file, it isn't on a microphone track, and it overlaps a clip from a file with sound on at least two ticked microphones, with that clip's sound on or off. On each microphone the shot uses the one clip that overlaps it most. Frame Job doesn't count the people in it. The summary counts these shots: "Follows whoever is talking in 1 clip."
+
+Who talks when is read the way Switch by Speaker reads the microphones, with its default settings, so the two agree.
+
+- Each change of speaker is a cut, not a move.
+- Each framing holds at least 2 s, so a short reply doesn't cut away and back.
+- Two people talking at once are framed together when they fit. When they don't, the frame stays on one of them, the one already in it if that person is talking.
+- While nobody talks, the last speaker stays.
+
+Every other movie clip follows its faces, and screen recordings and everything else are treated as usual. See [What Make Vertical changes](/framing/vertical-what-changes/).
+
+## Shots that follow their faces instead
+
+A shot that can't be framed by who is talking follows its faces instead, and the summary says why: "Clip 3 is followed, but it follows its faces, not who is talking, because …". The reasons include:
+
+- It changes shot. Follow Speaker frames one wide shot, so split the clip first with **Clip ▸ Split at Shot Changes**.
+- It shows fewer faces than the microphones under it.
+- Nobody talks inside it on those microphones.
+- The clip that overlaps it most on one of its microphones has its sound off, even when another clip on that track plays under the shot. Turn that clip's sound on, or untick the microphone.
+
+## Good to know
+
+- The faces you confirm come from the longest shot and apply to every shot by number, counting left to right. If people sit in a different order in another shot, that shot frames the wrong person.
+- A shot uses only the ticked microphones with a clip under it, so a microphone used elsewhere in the timeline doesn't count against it.
+- [Follow Subject](/framing/follow-subject/) doesn't offer **Speaker**. Only Make Vertical Version and an agent do.
+
+## With an agent
+
+An agent makes the same version with [`make_vertical_version`](/mcp/tools-framing/#make_vertical_version), naming two to four microphone clips, each standing for its track, and the faces if it wants to set them. Nobody confirms a match, so a shot whose faces don't show who is whose follows its faces unless the call names them, and the agent is told why. It's also told which microphones and faces each shot used. [`reframe_clip`](/mcp/tools-framing/#reframe_clip) frames one clip on whoever is talking, on the canvas it's already on. See [Reframe a clip (agents)](/framing/reframe-clip/) and [Tools: framing and vertical](/mcp/tools-framing/).
+
+## Related
+
+- [Make Vertical Version](/framing/make-vertical-version/)
+- [What Make Vertical changes](/framing/vertical-what-changes/)
+- [Follow Subject](/framing/follow-subject/)
+- [Synchronize Audio](/audio/synchronize-audio/)
+- [Switch by Speaker](/multicam/switch-by-speaker/)

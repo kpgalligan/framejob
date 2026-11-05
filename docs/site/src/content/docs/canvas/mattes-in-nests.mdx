@@ -1,0 +1,69 @@
+---
+title: Mattes inside nests
+description: See what happens to a matte when you nest or un-nest its tracks, and when a transition crosses them.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A [matte track](/canvas/matte-tracks/) works inside a [nest](/editing/nests/) the same way it does on the timeline. This page covers what happens where the two meet: a clip inside a nest, nesting and un-nesting matted tracks, and transitions across them.
+
+<AtAGlance
+  menu={['Clip ▸ Nest', 'Clip ▸ Un-nest']}
+  keys={['⌘G', '⇧⌘G']}
+  tools={['nest', 'unnest']}
+/>
+
+## Inside a nest
+
+With a nest open, **Track ▸ Matte** works on the nest's own tracks, and a matte cuts the track directly behind it among them.
+
+A nest clip, the one clip that stands for a nest on the timeline, can also sit on a matte track or on a track a matte cuts:
+
+| Where the nest clip sits | What happens |
+| --- | --- |
+| On a matte track | Its whole picture is the matte, including any matte inside it. |
+| On a track cut by a matte | Every layer it draws is cut. At a soft edge, overlapping layers inside the nest show through each other. |
+
+A clip inside a nest can come under more than one matte. Frame Job starts at the clip's own track and works outward through each nest around it, out to the timeline:
+
+- A matte that cuts a track on the way cuts the clip. With several, the clip shows only where all of them let it through, and at soft edges their strengths multiply.
+- The first matte track it reaches, whether the clip sits on it or a nest clip around it does, makes the clip part of that matte. Nothing further out applies to it.
+
+Two clips showing the same nest at the same moment each have their own matte.
+
+Mattes inside nests work with shadows and reflections, at every [Preview Quality](/timeline/preview-quality/) and in every export.
+
+## Nest
+
+**Clip ▸ Nest** keeps a track's matte only when the track it cuts is nested with it. Select clips on both tracks and the pair carries into the nest, so the picture stays the same.
+
+A matte nested without its target becomes an ordinary track inside the nest. Its clips draw there, so the picture changes unless the nest clip itself lands on a matte track. Undo restores it.
+
+The nest clip goes on the front-most of the nested clips' tracks that isn't a matte track, which is where a matte pair's picture was drawn. If every nested clip came from a matte track, it goes on the front-most of them, and the whole nest becomes a matte.
+
+## Un-nest
+
+**Clip ▸ Un-nest** lines the nest's front-most non-matte track up with the nest clip's track, so the picture comes back as it was. Matte tracks carried in the nest land on the tracks in front of it.
+
+Un-nest never makes a track a matte. A carried matte clip is a matte again only if the track it lands on is one, as it is when you un-nest straight after nesting. With no track in front, or no room on it, the clip goes on a new ordinary track in front and draws as an ordinary clip.
+
+## Transitions
+
+Mattes work through transitions. A dissolve between two clips on a track a matte cuts stays correct under a soft matte, because the same matte cuts both clips.
+
+A **Cross Dissolve** or **Zoom** works differently when one of its two clips is a nest clip, or when both clips are inside a nest. Frame Job draws each side whole, with its shadows, reflections and mattes, and then mixes the two pictures, matte or not. That means:
+
+- Layers inside one side don't show through each other part-way through.
+- A matte inside a nest clip is drawn whole, and fades once with its side.
+- A **Zoom** treats a nest clip as one picture, zooming about the nest clip's centre.
+- Clips inside the transition draw without [motion blur](/motion/motion-blur/).
+
+Push, slide, wipe and fade transitions aren't mixed this way. They apply to each layer on its own.
+
+## Related
+
+- [Matte tracks](/canvas/matte-tracks/)
+- [Nests](/editing/nests/)
+- [Work inside a nest](/editing/inside-a-nest/)
+- [Transition styles](/motion/transition-styles/)
+- [Show video inside a graphic](/graphics/video-inside-a-graphic/)

@@ -1,0 +1,95 @@
+---
+title: "AV1 and VP9"
+description: "Export delivery files and web movies with Frame Job's built-in AV1 and VP9 encoders, and know how their rates, time and memory behave."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+AV1 and VP9 aim to match or beat HEVC's picture at the same rate, and their WebM formats are for the web. Frame Job has their encoders built in, SVT-AV1 4.2.0 and libvpx 1.17.0. They run in software, so an export takes longer than HEVC's.
+
+<AtAGlance
+  where={['Export sheet ▸ Format', 'Export sheet ▸ Speed (AV1 only)']}
+  tools="export"
+/>
+
+| Format | File | Sound | Picture | Keeps transparency | Can carry HDR | **Speed:** |
+| --- | --- | --- | --- | --- | --- | --- |
+| [AV1 (MP4)](#av1-mp4) | `.mp4` | AAC | 10-bit | No | Yes | Yes |
+| [AV1 (WebM)](#av1-webm) | `.webm` | Opus | 10-bit | No | Yes | Yes |
+| [VP9 (WebM)](#vp9-webm) | `.webm` | Opus | 8-bit, or 10-bit with HDR | No | Yes | Greyed out |
+| [VP9 with Alpha (WebM)](#vp9-with-alpha-webm) | `.webm` | Opus | 8-bit | Yes | No | Greyed out |
+
+All four write a keyframe at least every 2 seconds and need even dimensions, so an odd width or height is written one pixel smaller. All four write [chapters](/export/chapters/). The sheet [estimates the time](/export/export-sheet/#estimated-time) before you start.
+
+## AV1 (MP4)
+
+This is AV1 video and AAC sound in an MP4, for delivery. It's always 10-bit.
+
+**Speed:** offers **Faster**, **Balanced** and **Smaller file**, with **Balanced** the default. See [Encoder speed](/export/encoder-speed/). Slower settings take longer and write a smaller file.
+
+It encodes at a constant quality matched to HEVC, with the rate as a [soft cap](#the-rate-as-a-soft-cap). It's one of the six formats that can carry HDR. See [Export HDR](/hdr/export-hdr/).
+
+An M1 or M2 Mac can't [play the file back](#playback-on-m1-and-m2-macs).
+
+## AV1 (WebM)
+
+The same AV1 picture in a WebM file, for the web. It has the same encoder, speeds, soft cap and HDR as AV1 (MP4). Only the container and the sound differ.
+
+The sound is Opus, 48 kHz stereo, at 192 kbps unless a [Quality tier](/export/quality/) says otherwise, and it snaps to the nearest rate the encoder offers. A project with no sound exports a WebM with no sound track.
+
+## VP9 (WebM)
+
+VP9 in a WebM file with Opus sound, for the web. It has one speed, so **Speed:** is greyed out. For the same picture the file is larger than AV1's. Its rate is a [soft cap](#the-rate-as-a-soft-cap) too.
+
+An SDR picture is 8-bit, in VP9's Profile 0. HDR is 10-bit, in Profile 2. VP9 can't name HLG or PQ itself, so the WebM file tells the player which one it is. See [Export HDR](/hdr/export-hdr/).
+
+## VP9 with Alpha (WebM)
+
+VP9 (WebM) that keeps a transparent canvas, for a title or lower third a web page plays over its own background in Chrome or Firefox. Safari's transparent movie is [HEVC with Alpha (MOV)](/export/h264-and-hevc/#hevc-with-alpha-mov).
+
+- The picture is 8-bit, with the transparency as a second stream beside it. The [footnote](/export/export-sheet/#the-footnote) ends in `alpha`.
+- It's SDR only, so an HDR project writes its SDR version, and **Dynamic Range:** stays greyed out on **SDR version**.
+- The sound is Opus, as in VP9 (WebM).
+- A **Custom…** size of a different shape from the canvas won't export, because padding would lose the alpha. After the save panel the export stops with a message naming the canvas's size. Every row in the **Size:** popup is fine.
+- Imported back into Frame Job it shows opaque, because the transparency isn't read. For a transparent clip to bring back in, export ProRes 4444 or HEVC with Alpha.
+
+## The rate as a soft cap
+
+On AV1 and VP9 the video rate isn't a target. They encode at a constant quality chosen to match or beat HEVC at that rate, and the file usually stays under it. That's why the Quality tiers and the footnote read `usually ≤ …`.
+
+With **Format default** the cap is HEVC's rate. With a tier it's 60 % of the H.264 rate, as for HEVC. See [Export quality](/export/quality/). An AV1 rate is held at 100 Mbps at most. In an HDR export, VP9 matches HEVC 10-bit at that rate.
+
+You can't know the file size in advance. Simple footage comes out much smaller than the rate. Very detailed footage can go over it, by up to about 1.25 times the rate as measured on AV1 and about 1.15 times on VP9.
+
+On VP9 with Alpha the rate is the picture's alone. The transparency is a second stream at a fixed quality on top of it, so the file is larger than the rate says. Measured on a moving soft-edged shape, the transparency added this much to the video's size:
+
+| Size | Added to the video |
+| --- | --- |
+| 1080p | About 6–15 % |
+| 720p | About 9–21 % |
+| 640 × 360 | About 21–39 % |
+
+The higher figure in each row is at the **Low** tier.
+
+## Memory and the queue
+
+AV1 and VP9 need a lot of memory. A job in the [Export Queue](/export/export-queue/) waits if starting it would take the AV1 and VP9 exports running at that moment past a quarter of the Mac's memory. Its row says why, for example "Waiting for memory: AV1 and VP9 exports running now hold about 6.0 GB of the 8.0 GB this Mac allows them, and this one needs about 3.0 GB." A later job may run first meanwhile.
+
+A job always starts when no other AV1 or VP9 export is running. **Export…** never waits, so starting several at once behind their progress sheets can go past that quarter. The memory each job needs is a measured figure, not a guarantee.
+
+## Playback on M1 and M2 Macs
+
+M1 and M2 Macs have no AV1 decoder, so neither Frame Job nor QuickTime can play an AV1 file there, MP4 or WebM, and Frame Job can't re-import one. An import stops with a message saying the file needs an M3 or later Mac. The Mac can still export one.
+
+A VP9 (WebM) file re-imports on any Apple silicon Mac.
+
+## With an agent
+
+`export` names these formats `av1`, `av1_webm`, `vp9_webm` and `vp9_alpha_webm`. `video_bitrate` is the same soft cap, on the picture's stream alone for `vp9_alpha_webm`, and `encoder_speed` sets AV1's speed. `export_status` gives the time estimate as `estimated_seconds`. See [Export: start, then poll](/mcp/export/#exact-bitrates).
+
+## Related
+
+- [Encoder speed](/export/encoder-speed/)
+- [Export quality](/export/quality/)
+- [Transparent exports](/export/transparency/)
+- [The Export Queue](/export/export-queue/)

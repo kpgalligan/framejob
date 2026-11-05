@@ -1,0 +1,105 @@
+---
+title: "How edits move actions"
+description: "See what trimming, splitting, slipping, retiming, copying or freezing a clip does to its actions and its motion presets."
+---
+
+An action's times are measured from the clip's own start, not from the start of the timeline. So moving a clip takes its actions with it, but an edit that changes where the clip starts, how long it is or what it plays can change what an action lands on. This page goes through those edits one at a time, so you know what to expect, and where to look when a zoom no longer lands where you put it.
+
+## Trim
+
+**Trimming the start** keeps each action's time on the clip. An action 2 s into the clip is still 2 s into the clip afterwards, so it stays put relative to the new start and now plays over different footage.
+
+**Trimming the end** leaves actions where they are, so one can end up running past the clip's new end. A start trim shortens the clip too, so it can do the same.
+
+Only the part of an action inside the clip plays, so a zoom cut off halfway stops partway in. You can still move that action earlier, shorten it or change its curve, but you can't make it end any later.
+
+See [Trim clips](/editing/trimming/).
+
+## Slip and roll
+
+**Slip** and **Roll** leave actions at the same times on the clip. A slip slides the footage under them. A roll moves the cut between two clips, and the actions on both stay put, as they do for a trim.
+
+See [Slip and roll](/editing/slip-and-roll/).
+
+## Speed changes
+
+Changing the speed with **Clip ▸ Speed…**, or rate-stretching with an <kbd>⌥</kbd>-drag of the end edge, keeps each action at its place as a fraction of the clip. An action a quarter of the way through a clip is still a quarter of the way through, and it gets longer or shorter with the clip. **Clip ▸ Retime Range…** does the same in each clip it changes.
+
+The times snap to whole frames, and an action is kept at least one frame long and inside the clip.
+
+See [Change a clip's speed](/speed/change-speed/), [Rate stretch](/speed/rate-stretch/) and [Retime Range](/speed/retime-range/). A clip with a speed ramp has its own rules, in [Edit a ramped clip](/speed/edit-a-ramped-clip/).
+
+## Split
+
+**Clip ▸ Split** (<kbd>⌘T</kbd>) shares the actions out between the two halves:
+
+- An action that ends at or before the cut stays on the first half.
+- An action that starts at or after the cut goes to the second half, with its times now counted from that half's start.
+- An action that spans the cut is divided in two. The first piece ends at the values the action had reached at the cut, and the second carries on to the original end state.
+
+Both pieces of a divided action keep its curve. The values match at the join, but an eased action can change pace there.
+
+## Adding a transition
+
+Adding a transition at a hard cut can give the incoming clip a new, earlier first frame, when it has spare footage before the cut. Its actions move with that frame, so a zoom stays on the frame it was drawn over.
+
+When there's no spare footage and the incoming clip slides left to make the overlap instead, the clip moves whole and its actions go with it. See [Add or remove a transition](/motion/add-a-transition/).
+
+## Duplicate, copy and paste
+
+**Edit ▸ Duplicate** (<kbd>⌘D</kbd>), an <kbd>⌥</kbd>-drag, and **Edit ▸ Copy** then **Paste** all give copies that keep their actions, and the clip's name travels with them. Each copy's actions are its own, so changing one doesn't touch the other.
+
+Pasting into a project with a different frame rate snaps the actions' times to that project's frames.
+
+See [Duplicate clips](/editing/duplicate-clips/) and [Copy, cut and paste](/editing/copy-and-paste/).
+
+## Nest
+
+Clips you [nest](/editing/nests/) keep their actions inside the nest. Open the nest to see and edit them.
+
+## Detach Audio
+
+**Clip ▸ Detach Audio** (<kbd>⌥⌘D</kbd>) gives the new sound clip a copy of every action, so volume actions keep working. An action that only changes the picture does nothing on the sound clip.
+
+## Freeze Frame
+
+The still that **Clip ▸ Freeze Frame** (<kbd>⇧⌘F</kbd>) makes has no actions. Instead, the look at the frozen frame is baked into the still's own properties: its position, scale, crop and any other picture setting an action had changed by that moment. So it lines up with the frame it froze, and holds there. See [Freeze frame](/speed/freeze-frame/).
+
+## Add Blurred Background
+
+The backdrop copy that **Clip ▸ Add Blurred Background** makes has no actions, so a zoom on the foreground doesn't zoom the backdrop.
+
+## Paste Attributes
+
+**Edit ▸ Paste Attributes** (<kbd>⌥⌘V</kbd>) doesn't copy actions. The clips you paste onto keep the actions they had. See [Paste Attributes](/editing/paste-attributes/).
+
+## What keeps or drops motion
+
+[Motion presets](/motion/motion-presets/) aren't actions, and they follow their own rules.
+
+| Edit | What happens to the presets |
+| --- | --- |
+| Duplicate, Paste, Detach Audio | Kept. |
+| Paste Attributes | Copied, with the rest of the clip's picture settings. |
+| Freeze Frame | The still has none. It sits where the clip sits with no preset applied, so a freeze taken during an entrance can jump. |
+| Add Blurred Background | The backdrop has none. The foreground keeps its own. |
+| Split | The first half gives up its Out and the second half its In, so the cut doesn't play an exit and an entrance. During stays on both halves and restarts at the cut. |
+| Change the speed | Kept, and not rescaled. |
+
+Because During restarts at each cut, [Remove Silences](/cleanup/remove-silences/) on a clip with Pulse or Drift can make it jump at the cuts.
+
+## When a graphic's module changes
+
+Editing a graphic's [module](/graphics/what-is-a-graphic/#modules) can leave an action animating a property the module no longer has, or no longer lets you animate. With that action selected, the property shows as a dimmed row at the end of **Clip tab ▸ Graphic ▸ Properties**, with its value and a **⌫** button. The tooltip says which of the two happened.
+
+Click **⌫** to take the property out of the action. It's one undo step, Remove from Action. An agent does this with `set_action_end`: `graphic.props.<key>: null` takes out one property, and `graphic: null` all of them. See [`set_action_end`](/mcp/tools-animation/#set_action_end).
+
+See [Animate graphic properties](/graphics/animate-properties/).
+
+## Related
+
+- [Actions](/motion/actions/)
+- [Action bands and the action lane](/motion/action-lane/)
+- [Move, resize or remove an action](/motion/change-an-action/)
+- [Motion presets](/motion/motion-presets/)
+- [Edit a ramped clip](/speed/edit-a-ramped-clip/)

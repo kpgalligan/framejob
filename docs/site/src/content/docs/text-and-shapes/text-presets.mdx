@@ -1,0 +1,69 @@
+---
+title: Text presets
+description: Give a text clip a ready-made Title, Subtitle, Lower Third or Caption look, sized to your canvas.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A preset gives a text clip a finished look with one click: its font, size, alignment, backdrop and position, sized to fit your canvas.
+
+<AtAGlance
+  where="Clip tab ▸ Text ▸ Presets"
+  tools={['set_text', 'set_video']}
+/>
+
+## Apply a preset
+
+<Steps>
+
+1. Select one or more text clips.
+
+2. Open the **Presets** section at the bottom of the **Text** sub-tab. It starts closed.
+
+3. Click **Title**, **Subtitle**, **Lower Third** or **Caption**.
+
+</Steps>
+
+It's one undo step, named after the preset.
+
+## The four presets
+
+| Preset | Font | Size | At 1920 × 1080 | Align | Position | Backdrop |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Title** | Source Sans 3 Bold | 9 % | 97 px | Centre | Centre of the canvas | None |
+| **Subtitle** | Source Sans 3 SemiBold | 5 % | 54 px | Centre | 18 % of the height below centre | None |
+| **Lower Third** | Source Sans 3 SemiBold | 4.5 % | 49 px | Left | 20 % of the width left of centre, 28 % of the height below it | Black at 55 %, padding 18 px, radius 6 px |
+| **Caption** | Source Sans 3 Regular | 3.5 % | 38 px | Centre | 38 % of the height below centre | Black at 60 %, padding 12 px, radius 8 px |
+
+The position is where the centre of the text's box sits, so a longer name on a **Lower Third** grows both ways from that point.
+
+**Title** isn't the look a new text clip starts with. That has the same font at a fixed 72 px, where **Title** works its size out from the canvas.
+
+On a canvas taller than wide, **Caption** sits higher, a quarter of the height below centre, clear of a phone's on-screen controls.
+
+[Subtitles](/captions/subtitles/) from **File ▸ Generate Captions…** and **File ▸ Import Captions…** use the **Caption** look, and they also wrap at 80 % of the canvas width. The **Caption** button itself leaves the [box](/text-and-shapes/text-box/) as it is.
+
+## How a preset fits the canvas
+
+Sizes are a share of the canvas's shorter side, and positions a share of its width and height. So a preset fits any canvas, and a vertical 1080 × 1920 canvas gets the same text height as a 1920 × 1080 one. A backdrop's padding and radius stay at the pixel values in the table.
+
+The size is worked out once, from the canvas at the moment you click. Changing the canvas afterwards doesn't apply the preset again.
+
+## What a preset changes
+
+As well as the settings in the table, a preset sets **Vertical** to middle and **Opacity** back to 100 %. **Title** and **Subtitle** take away any backdrop.
+
+It leaves everything else alone, including the words, the colour, the outline, tracking, line spacing, **UPPERCASE**, the box, the reveal, scale and rotation.
+
+With an [action](/motion/actions/) selected, a preset sets that action's end, like any other field.
+
+## With an agent
+
+There's no preset tool. An agent sends the same values through `set_text` and `set_video`. See [Tools: text, shapes and clip names](/mcp/tools-clip-properties/#set_text).
+
+## Related
+
+- [Font and text style](/text-and-shapes/text-style/)
+- [Text outline and backdrop](/text-and-shapes/text-outline-and-backdrop/)
+- [Subtitles](/captions/subtitles/)

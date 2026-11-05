@@ -1,0 +1,135 @@
+---
+title: "Convert files with ffmpeg"
+description: "Use your own ffmpeg to bring in a file macOS can't open: what Frame Job asks, what it copies or re-encodes, and how to change your answer."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+When macOS can't open a file and you have ffmpeg installed, Frame Job can use it to repackage or convert the file on import. Frame Job doesn't include ffmpeg, and without your own copy this step never appears.
+
+<AtAGlance
+  where={['The alert that appears on import ▸ Repackage or Convert']}
+  tools={['import_media', 'relink_media']}
+  needs="Your own ffmpeg and ffprobe, both installed on this Mac."
+/>
+
+## Repackage or convert a file
+
+<Steps>
+
+1. Add, open or relink the file as usual. If macOS can't open it, an alert appears: "Frame Job cannot open “*file*”."
+
+2. Read what it would cost. The alert names the codecs and gives the size and the time.
+
+3. Choose **Repackage** or **Convert** to go ahead, or **Cancel** to leave the file out.
+
+</Steps>
+
+The first button reads **Repackage** or **Convert** depending on the work to be done:
+
+| The button | What the alert tells you |
+| --- | --- |
+| **Repackage** | Every stream can be copied as it is. No re-encoding, no loss of quality, and a few seconds' work. |
+| **Convert** | The video can be copied, but the sound has to be re-encoded to AAC. That also takes a few seconds. |
+| **Convert** | This Mac can't decode the video, so the whole file has to be re-encoded to H.264. The alert gives its picture size and length, and says it takes at least as long as the clip runs, usually longer. |
+
+If you choose **Cancel**, Frame Job then shows the reason it couldn't read the file.
+
+A conversion shows no progress window. The file appears when it's finished. If you add several files that need this step, Frame Job asks about them one at a time.
+
+## What's copied and what's re-encoded
+
+Each stream is copied when it can be, and re-encoded when it can't.
+
+| Stream | Copied unchanged | Otherwise |
+| --- | --- | --- |
+| Video | H.264, HEVC, ProRes, MJPEG, MPEG-4, QuickTime Animation and DV | Re-encoded to H.264 |
+| Sound | AAC, ALAC and the usual 16-, 24- and 32-bit PCM | Re-encoded to 256 kbps AAC |
+
+The H.264 encode uses x264 at CRF 18 when your ffmpeg has it. Without x264 it uses Apple's VideoToolbox encoder, at a bitrate worked out from the picture size and frame rate, from 2 to 60 Mbps. Either way the result is 8-bit 4:2:0, so a 10-bit source comes in as 8-bit.
+
+VP9 Profile 0 or 2 with a known frame rate is copied too, with AAC or ALAC sound beside it, and any other sound is re-encoded to AAC. Frame Job then checks that every frame of the copy sits exactly on the frame rate. If the copy fails that check, or won't open, it's re-encoded to H.264 once. Unless you've told Frame Job to do this automatically, it asks you again first.
+
+Only the first video stream and the first audio stream are carried over. Subtitles and data streams are dropped.
+
+## Where the converted file goes
+
+The converted file goes into `~/Library/Application Support/Frame Job/Rewrapped/`, the same folder as [WebM and MKV copies](/projects/webm-and-matroska/#the-rewrapped-folder). It keeps its own name in the Media tab, and your original is untouched.
+
+Importing the same file again uses the finished conversion with no question, even if you've since removed ffmpeg or chosen never to convert. If the original's path, size or modification date has changed, it counts as a new file.
+
+## Remember your answer
+
+Tick **Do this automatically from now on** in the alert to keep the answer you give:
+
+- Ticked with **Repackage** or **Convert**, such files are converted from then on without asking.
+- Ticked with **Cancel**, they're never converted, and the import fails with its usual message.
+
+There's no button to forget the answer. To be asked again, run this in Terminal while Frame Job is closed:
+
+```sh
+defaults delete com.kgalligan.FrameJob RCFFmpegImport
+```
+
+That setting holds `ask`, `always` or `never`, and `ask` is the default.
+
+## Finding ffmpeg
+
+Frame Job needs both `ffmpeg` and `ffprobe`. With only one of them, this step doesn't appear.
+
+It looks on your `PATH` first, then in `/opt/homebrew/bin`, `/usr/local/bin`, `/opt/local/bin`, `/usr/bin` and `/bin`. It looks once per launch, so quit and reopen Frame Job after installing ffmpeg.
+
+To use one particular build, name it in Terminal:
+
+```sh
+defaults write com.kgalligan.FrameJob RCFFmpegPath /path/to/ffmpeg
+```
+
+`ffprobe` is then taken from beside it, or else found by the same search. If nothing runnable is at that path, Frame Job doesn't look anywhere else for `ffmpeg`, and this step doesn't appear.
+
+## When a conversion fails
+
+| The alert says | What it means |
+| --- | --- |
+| "Could not convert *file* with ffmpeg: *reason*" | ffmpeg stopped with an error. The reason is its own last line, and without one the sentence ends at "ffmpeg." |
+| "ffmpeg gave up converting *file*." | It ran out of time. |
+
+A **Repackage** gets five minutes or twice the file's length, whichever is longer. A **Convert** gets 30 minutes or 30 times the file's length, whichever is longer. Neither gets more than 4 hours.
+
+No partial file is left behind. If a conversion finishes but macOS still can't open the result, Frame Job throws it away and shows the original error, so the next import starts afresh.
+
+## A lost conversion stays missing
+
+Unlike a [WebM copy](/projects/webm-and-matroska/#if-a-copy-goes-missing), a conversion that's deleted isn't made again when the project opens. The media stays missing until you [relink it](/projects/relink-media/). Relinking to the original file goes through this step again.
+
+A conversion you've only moved is treated like any other file: its [bookmark](/projects/import-media/#referenced-not-copied) often finds it again. One moved to the Trash goes on playing from the Trash.
+
+## Files ffmpeg isn't offered for
+
+Frame Job doesn't offer ffmpeg for:
+
+- A `.cube` file it can't read, or a picture it can't read in one of the [formats it imports as stills](/reference/file-formats/#pictures).
+- A file that timed out, because ffmpeg would stall on the same volume.
+- A codec this Mac can't decode inside a file macOS can open, or inside a WebM or MKV file. See [Codecs this Mac can't decode](/projects/import-media/#codecs-this-mac-cant-decode).
+- A WebM or MKV file stopped by the [free-space check](/projects/webm-and-matroska/#free-space).
+- A file in which ffprobe finds no video or audio.
+
+## With an agent
+
+An agent's import never shows this question. Unless you've chosen to convert automatically, the offer counts as declined, and the import fails and gives the reason. While the answer is still `ask` and ffmpeg is installed, the error also says how to get past it: import the file from the app's window, or set the answer to `always`.
+
+To set it, tick [**Do this automatically from now on**](#remember-your-answer) with **Repackage** or **Convert**, or run this in Terminal while Frame Job is closed:
+
+```sh
+defaults write com.kgalligan.FrameJob RCFFmpegImport always
+```
+
+With `always` set, [`import_media`](/mcp/tools-media/#import_media) and [`relink_media`](/mcp/tools-media/#relink_media) convert without asking, and the import can take as long as the conversion does. `import_media` then gives the converted file as `path` and the file you named as `original`, as it does for a WebM copy. See [How tool calls behave](/mcp/tool-calls/).
+
+## Related
+
+- [Import media](/projects/import-media/)
+- [WebM and Matroska files](/projects/webm-and-matroska/)
+- [Relink missing media](/projects/relink-media/)
+- [Supported file formats](/reference/file-formats/)

@@ -1,0 +1,216 @@
+---
+title: "Tools: reading analysis"
+description: Read what Frame Job finds in a file or clip, from hard cuts and faces to people, sounds and person masks, and check on Remove Background.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These two tools hand an agent what Frame Job finds in your media, so it can locate a cut, a face or a burst of laughter without watching the footage. `get_media_analysis` reads shots, faces, people, sounds and person masks for a file or a clip. `analyze_cutout` makes a cutout clip's masks and says where they stand.
+
+<AtAGlance
+  menu={['Clip ▸ Remove Background', 'View ▸ Show Subjects']}
+  where="Clip tab ▸ Picture ▸ Background"
+  tools={['get_media_analysis', 'analyze_cutout']}
+  needs="Nothing. Both run on your Mac, with no key and no upload."
+/>
+
+Neither tool edits anything or makes an undo step. Results are kept for each media file in the project's cache, so a part that's been analysed answers at once. Times are in ticks, 600,000 to a second. See [Units and ids](/mcp/units-and-ids/). [On-device media analysis](/projects/media-analysis/) explains the analysis itself.
+
+## `get_media_analysis`
+
+Reads an analysis of one media file, or of the part of it one clip plays. No menu item shows these results as numbers. **View ▸ Show Subjects** [draws](/framing/show-subjects/) the selected clip's faces and subjects at the playhead, from what's already been found, and never starts an analysis itself.
+
+| `kind` | What it finds |
+| --- | --- |
+| [`shots`](#kind-shots) | The hard cuts. |
+| [`masks`](#kind-masks) | Where a person is, as runs of frames. |
+| [`faces`](#kind-faces) | Every face, 10 times a second, with its tilt and how open the mouth is. |
+| [`subjects`](#kind-subjects) | People and the regions the eye is drawn to, 10 times a second. |
+| [`sound_events`](#kind-sound_events) | How likely laughter, applause, cheering, a crowd, music and speech are, every 0.75 s. |
+
+**Arguments**
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `kind` | string | Yes | What to find: `shots`, `masks`, `faces`, `sound_events` or `subjects`. |
+| `media` | integer | One of `media` and `clip` | The media file to analyse. |
+| `clip` | integer | One of `media` and `clip` | A media clip. Its file is analysed over the part the clip plays. |
+| `from` | integer | No | Where to start, in the file's own time played forwards, in ticks, not snapped. The file's start, or the start of the part the clip plays, by default. |
+| `to` | integer | No | Where to stop, not included, in the file's own time. The file's end, or the end of the part the clip plays, by default. Must be after `from`. |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. The frontmost project when left out. |
+
+`from` and `to` are file times, not timeline times. They're held inside the file, and with `clip` they're held inside the part the clip plays.
+
+**What it answers**
+
+Every kind answers these, as well as its own keys below:
+
+| Key | What it holds |
+| --- | --- |
+| `kind`, `media` | What was asked for and the file it was read from. |
+| `clip` | The clip, when you named one. |
+| `from`, `to` | The window that was read. |
+| `size` | The media's upright picture size, as width and height. |
+| `cached` | True when the answer came from the cache alone. |
+| `stamp` | What the cache was made with. |
+| `run` | Present only when this call ran the analysis: `queued_at`, `started_at` and `ended_at`, in seconds of the app's uptime. |
+| `project` | The project summary. |
+
+With `clip`, each cut, sample or window also has `clip_time`, in ticks from the clip's start in its playing direction, through its speed, ramp and reversal, and `timeline`, the clip's start plus `clip_time`.
+
+**When it refuses**
+
+- You named both `media` and `clip`, or neither.
+- `kind` isn't one of the five. The answer lists them.
+- A media or clip id names nothing, or the clip isn't a media clip, so it has no media to analyse.
+- A picture kind is asked of a file with no moving picture, which includes a still image: "Media 4 has no moving picture, so it has no shots to find."
+- `sound_events` is asked of a file with no sound, or of a clip that plays in reverse, whose sound runs backwards.
+- The file is missing. `relink_media` points it at the file.
+- `to` isn't after `from` once both are held inside the file or the clip.
+- The analysis fails, or the Assistant's **Stop** ends it.
+- The kept results can't be read. The answer says which cache files to remove so they're made again.
+
+### Long analyses and big answers
+
+A call waits at most 60 s. After that it stops and says how much of the window was covered, for example "The faces analysis of media 2 covered 41.0 s of the window's 120.0 s in the 60 s a call waits; what it covered is kept — call again to continue." What was covered is kept, so another call carries on from there.
+
+An answer over 512 KiB of cuts, runs, samples or windows is refused, and the sentence names the largest `to` that fits. So read a long file in `from` and `to` windows. Here's how much fits in one answer:
+
+| Kind | One row | One answer holds |
+| --- | --- | --- |
+| `faces` | About 176 bytes with one face, 221 with `clip` | About 296 s of samples, 236 s with `clip`, and less with more faces in frame. Read about 2 minutes at a time. |
+| `subjects` | About 177 bytes with one person and one salient box, 222 with `clip` | About 294 s of samples, 235 s with `clip` |
+| `sound_events` | About 130 bytes | About an hour of windows |
+
+### `kind: shots`
+
+Finds the hard cuts. It answers `count` and `cuts`, sorted by time. Each cut has `frame`, the file's frame index, and `source`, its time in the file.
+
+- A cut inside a gradual dissolve isn't reported.
+- A single flash frame isn't a cut.
+- A dissolve between flat-coloured pictures, such as slides or title cards, can show as one cut.
+
+[`split_at_shots`](/mcp/tools-cut-and-delete/#split_at_shots) cuts clips at these moments. See [Split at Shot Changes](/editing/split-at-shot-changes/).
+
+### `kind: masks`
+
+Finds a person's outline in every frame and answers where a person is, never the masks themselves.
+
+| Key | What it holds |
+| --- | --- |
+| `mask_size` | The masks' own width and height. |
+| `frames` | How many frames in the window have been analysed. |
+| `subject_found` | Whether any frame holds a person. |
+| `count` | How many runs there are. |
+| `runs` | Each run of consecutive frames that agree, with `from`, `to`, `subject_found` and `frames`, in the file's own time. |
+
+A frame holds a person when at least 0.5 % of its mask is above half strength. `runs` have no `clip_time` or `timeline`, even with `clip`.
+
+[Remove Background](/effects/remove-background/) draws these masks. A still picture's masks aren't this tool's. Use [`analyze_cutout`](#analyze_cutout) for those.
+
+### `kind: faces`
+
+Finds every face at 10 samples a second of the file's own time. It answers `rate`, `count` and `samples`.
+
+| Sample key | What it holds |
+| --- | --- |
+| `source` | The sample's instant in the file. |
+| `frame` | The time of the frame it read, the first at or after `source` within one sample, or null. |
+| `faces` | Each face in the sample. |
+
+| Face key | What it holds |
+| --- | --- |
+| `box` | `[x, y, w, h]`, from 0 to 1 of the upright picture, measured from its top-left corner. |
+| `confidence` | How sure the detection is. |
+| `roll`, `yaw` | How far the face is tilted and turned, in radians. |
+| `mouth_gap` | The inner lips' height, over the face box's height. |
+| `mouth_width` | The outer lips' width, over the face box's height. |
+
+`mouth_gap` over `mouth_width` is how open the mouth is. Values are rounded to 4 decimals, and are null where no value was found.
+
+Faces are ordered from left to right and carry no identity or name. To follow one, follow its box from sample to sample.
+
+### `kind: subjects`
+
+Finds people and the regions the eye is drawn to, at 10 samples a second. Every sample instant is also a `faces` sample. It answers `rate`, `count` and `samples`.
+
+Each sample has `source` and `frame`, as `faces` does, then `people` and `salient`. Both are lists of `box` and `confidence`, with boxes measured as faces' are and ordered from left to right, with no identity. A person box covers the head and shoulders. See [Subjects in the picture](/framing/what-is-found/).
+
+### `kind: sound_events`
+
+Listens to the file's first sound track with Apple's Sound Analysis, in windows of 1.5 s that start every 0.75 s, and says how sure it is of six kinds of sound: laughter, applause, cheering, crowd, music and speech. It needs a file with sound, and an audio file works.
+
+| Key | What it holds |
+| --- | --- |
+| `window`, `hop` | The window's length and the step between windows, in ticks: 900,000 and 450,000. |
+| `groups` | Each kind of sound, with `name`, `labels`, `first_class` and `threshold`. `labels` are the classifier's own labels behind that kind, and its confidence is the highest of theirs. |
+| `count` | How many windows came back. |
+| `windows` | Each window, with `source`, its start in the file, and a confidence from 0 to 1 for each of the six kinds. |
+
+Confidences are rounded to 4 decimals, and are null where a window runs past the end of the sound.
+
+:::note
+Treat these as hints, never as a finding on their own. None of the six has been checked against labelled recordings, so `first_class` is false and `threshold` is null for all of them.
+:::
+
+## `analyze_cutout`
+
+Reports where Remove Background stands for cutout clips and makes their masks now. It's the agent's version of **Status** and [**Analyze Now**](/effects/remove-background/#analyze-now) in the Clip tab's **Picture ▸ Background** section.
+
+A cutout clip is one with Remove Background on, through **Clip ▸ Remove Background**, the section's checkbox, or `cutout` in [`set_video`](/mcp/tools-set-video/). A clip's masks are made as soon as that's set, so an agent needs this tool only to wait for them or to read how they went. A still picture counts, and its one frame is made from the picture itself.
+
+A call asks for every frame the clips play and runs again an analysis that failed or was stopped. Frames already analysed are never analysed again. It then waits up to `wait` seconds for every clip to settle, which means reaching any state but `analyzing`. Running out of time isn't an error. The answer gives the state so far, and you call again to keep waiting. The Assistant's **Stop** ends the wait.
+
+**Arguments**
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | No | The cutout clips to answer for. Left out, every cutout clip in the timeline or nest that's open, in timeline order. |
+| `wait` | number | No | How many seconds to wait for every clip to settle, from 0 to 60. Left out, it's 0, which answers now. |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. The frontmost project when left out. |
+
+**What it answers**
+
+`clips`, a row for each clip, and the `project` summary. Each row has these keys:
+
+| Key | What it holds |
+| --- | --- |
+| `clip`, `media` | The clip and its media file. |
+| `state` | Where it stands. See the next table. |
+| `progress` | From 0 to 1. |
+| `quality` | The clip's cutout quality. |
+| `frames` | How many frames of the file the clip plays, which is 1 for a picture. |
+| `covered` | How many of those are analysed. |
+| `ready` | Whether `covered` equals `frames`. |
+| `subject_found` | Whether a subject was found. |
+| `centroid` | `x` and `y`, the subject's mean centre over those frames, in the media's upright pixels from the top left with y going down. Null unless the state is `ready`. The app doesn't show this figure. |
+| `error` | With `failed`, the sentence saying why. |
+
+| `state` | What it means | The app's **Status** |
+| --- | --- | --- |
+| `analyzing` | The masks are being made. | **Analyzing N %** |
+| `ready` | Every frame is analysed, and a person, or a picture's foreground subject, was found. | **Ready** |
+| `no_person` | Every frame is analysed and no person is in the clip, so it draws whole. | **No person found** |
+| `no_subject` | A picture with subject `foreground` has no subject, so it draws whole. | **No subject found** |
+| `failed` | The masks couldn't be made. | **Failed:** and the reason |
+| `no_picture` | The clip plays no frame of its file. | **No picture to analyze** |
+
+**When it refuses**
+
+Nothing is done when:
+
+- `wait` is outside 0 to 60: "wait must be from 0 to 60 seconds."
+- A clip id names nothing, or `clips` is empty.
+- A clip you named has no Remove Background: "Clip 3 has no Remove Background; set_video `{cutout: {}}` turns it on."
+- With `clips` left out, no clip in the open timeline or nest has it on.
+
+## Related
+
+- [On-device media analysis](/projects/media-analysis/)
+- [Remove Background](/effects/remove-background/)
+- [Show Subjects](/framing/show-subjects/)
+- [Subjects in the picture](/framing/what-is-found/)
+- [Split at Shot Changes](/editing/split-at-shot-changes/)
+- [Tools: framing and vertical](/mcp/tools-framing/)
+- [Tools: picture and grade (set_video)](/mcp/tools-set-video/)
+- [Units and ids](/mcp/units-and-ids/)

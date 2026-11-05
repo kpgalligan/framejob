@@ -1,0 +1,108 @@
+---
+title: "Record shortcuts"
+description: Note the keyboard shortcuts you press during a screen recording, and when you type, without ever recording what you type.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+Record shortcuts notes each keyboard shortcut you press during a screen recording, and when you type, so Frame Job can show those shortcuts on screen and speed up the typing afterwards. It never records what you type.
+
+<AtAGlance
+  menu="File ▸ New Recording…"
+  where="New Recording panel ▸ Record shortcuts"
+  tools={['record_screen', 'get_cursor_events']}
+  needs="macOS's Input Monitoring permission, and a display or a window as the source."
+/>
+
+<Shot
+  name="16-recorder-panel.panel"
+  alt="The New Recording panel with Source set to a display. Below Show Clicks is the unticked Record shortcuts box, with a note saying it records each shortcut and when you type, never what you type. Under it, the When it lands rows show Zoom in on clicks ticked, and Show shortcuts and Speed up typing greyed out."
+/>
+
+## Turn it on
+
+<Steps>
+
+1. Choose **File ▸ New Recording…**.
+
+2. Set **Source:** to a display or a window.
+
+3. Tick **Record shortcuts**. It's off to begin with, and the panel remembers your choice for the next recording.
+
+4. Press **Record**. The first time, you'll need to [grant Input Monitoring](#grant-input-monitoring).
+
+</Steps>
+
+A note under the box says what it records. The box is greyed out for **Camera** and **Microphone Only**, which have no screen to go with the keys. It keeps its tick for when you go back to a screen source.
+
+While keys are being recorded, the [menu-bar item](/recording/menu-bar-item/) shows a keyboard mark before the time, and its menu opens with a dimmed "Recording keyboard shortcuts" row. Everything lands in the recording's [cursor files](/recording/cursor-files/).
+
+## Grant Input Monitoring
+
+Recording keys needs macOS's **Input Monitoring** permission. macOS shows no prompt for it, and Frame Job isn't in that pane's list until you add it, so pressing **Record** without the permission stops the recording from starting and opens System Settings for you.
+
+<Steps>
+
+1. Press **Record**. System Settings opens at **Privacy & Security ▸ Input Monitoring**, and the panel's note says what to do.
+
+2. Turn Frame Job on. If it isn't in the list, add it with **+**.
+
+3. Back in the panel, press **Record** again. You don't need to relaunch.
+
+</Steps>
+
+Frame Job asks for this after Screen Recording, and before the camera and the microphone. See [Recording permissions](/recording/permissions/) for all of them, and for what changes if you started Frame Job from a terminal.
+
+## What counts as a shortcut
+
+A key press is a shortcut when you hold:
+
+- <kbd>⌘</kbd> or <kbd>⌃</kbd> with any key.
+- <kbd>⌥</kbd> with an arrow, Delete, Forward Delete, Return, Enter, Tab or Esc.
+
+<kbd>⇧</kbd> on its own never makes a shortcut, and neither does <kbd>⌥</kbd> with any other key, because that types a character: <kbd>⌥E</kbd> starts an é.
+
+A shortcut is stored with its keys spelled out, such as `cmd+shift+4`. The modifiers come first, in the order `cmd`, `ctrl`, `opt`, `shift`. The key comes last: a named key such as `return`, `tab`, `space`, `left` or `f5`, or otherwise the character the key types with no modifier, in lower case. `+` itself is spelled `plus`.
+
+## What happens to everything else
+
+Every other key press is stored as a typing mark, which is a moment in time and nothing more. It doesn't say which key it was. Frame Job doesn't read the character of a typed key at all, and there's no mode that records what you type.
+
+A key held down until it repeats gives typing marks too, even if it began as a shortcut. Holding <kbd>⌘Z</kbd> is one shortcut and then a run of typing marks.
+
+## When nothing is recorded
+
+Nothing at all is recorded while any app holds secure input, as a password field does: no shortcut, and not even a typing mark.
+
+A password field that doesn't turn on secure input is different. Its keys are recorded as typing marks only, with no characters.
+
+Keys you press while the recording is [paused](/recording/pause-and-stop/) aren't recorded.
+
+:::caution
+The keys stay out of the file, but the movie is still a picture of your screen. A password that shows on screen as you type it is in the recording.
+:::
+
+## What you can do with the keys
+
+| Feature | What it uses | Where |
+| --- | --- | --- |
+| [Shortcut overlays](/recording/shortcut-overlays/) | The shortcuts, shown on screen as you pressed them. | **Clip ▸ Add Shortcut Overlays**, or **Show shortcuts** in the panel |
+| [Speed Up Typing](/recording/speed-up-typing/) | The typing marks, to find the stretches to speed up. | **Clip ▸ Speed Up Typing…**, or **Speed up typing** in the panel |
+| [Auto Zoom](/recording/auto-zoom/) | The typing marks, to zoom in where you typed. | **Zoom on typing** in **Clip ▸ Auto Zoom…** |
+
+**Show shortcuts** and **Speed up typing** are in the panel's **When it lands:** rows, and they're greyed out unless **Record shortcuts** is ticked, because the cursor file would have no keys for them to use.
+
+## With an agent
+
+`record_screen` records keys when it's given `keys: "shortcuts"`. The default is `off`. It never asks macOS for the permission. Without Input Monitoring it won't start, and it names the System Settings pane, so someone has to grant it in the panel first. It won't record keys from a voice-over or a camera on its own. [`get_cursor_events`](/mcp/tools-recording/#get_cursor_events) reads the shortcuts and stretches of typing back. See [Record with record_screen](/mcp/record-screen/#pointer-and-keys).
+
+## Related
+
+- [The recorder panel](/recording/recorder-panel/)
+- [Recording permissions](/recording/permissions/)
+- [Cursor files](/recording/cursor-files/)
+- [Shortcut overlays](/recording/shortcut-overlays/)
+- [Speed Up Typing](/recording/speed-up-typing/)
+- [Auto Zoom](/recording/auto-zoom/)

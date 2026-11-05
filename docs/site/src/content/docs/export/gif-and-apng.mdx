@@ -1,0 +1,80 @@
+---
+title: "Animated GIF and PNG"
+description: "Export a short silent loop as an Animated GIF or Animated PNG, and keep it inside the size and the 600-frame limit."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+GIF and APNG are for short silent loops you can send or drop into a page. Each stores every frame as a whole picture, so a long or large one quickly becomes a file nobody can send. That's why both start small and hold at most 600 frames.
+
+<AtAGlance
+  where="Export sheet ▸ Format"
+  tools="export"
+/>
+
+## Export a loop
+
+<Steps>
+
+1. Set an [in/out range](/timeline/in-out-range/) around the moment you want.
+
+2. Press <kbd>⌘E</kbd>, and choose **Animated GIF** or **Animated PNG** from **Format:**.
+
+3. Set **Range:** to **In/out range**.
+
+4. Check the readout, which shows the size and the frame count, such as `· 360 frames, no audio`.
+
+5. Choose **Export…**.
+
+</Steps>
+
+## Animated GIF
+
+A GIF is a short, silent `.gif` that loops forever. It starts at 480 × 270 and 12.5 fps, and you can still change the size and the rate.
+
+The 12.5 is deliberate. A GIF stores each frame's delay in hundredths of a second, so only rates that divide 100 play back exactly. 25 and 50 fps from the **Frame rate:** popup do too, and any other rate lands wherever the format's rounding puts it.
+
+A GIF has a palette of 256 colours. It can show a pixel as fully transparent but has no partial transparency, so soft edges go hard, and it isn't one of the [formats that keep transparency](/export/transparency/).
+
+## Animated PNG
+
+An APNG is a lossless, silent, true-colour `.png` that loops forever. It starts at 960 × 540 and 25 fps, and you can still change the size and the rate.
+
+It keeps real transparency, so a pixel can be any fraction of opaque, and the [footnote](/export/export-sheet/#the-footnote) ends in `alpha`. It's written at 8 bits a component and labelled BT.709.
+
+A viewer that knows nothing of APNG shows the first frame.
+
+## The 600-frame limit
+
+An animated GIF or APNG holds at most 600 frames. That's 48 seconds at GIF's 12.5 fps, or 24 seconds at APNG's 25 fps. The readout shows the count while you're choosing, but the sheet doesn't stop you. Once you've picked where to save, a longer export stops with no new file, and a file you chose to replace in the save panel has already been removed:
+
+> An animated GIF is limited to 600 frames and this range is 720. Shorten the range, or lower the export frame rate.
+
+For GIF the way out is a shorter range, because every fixed rate in the **Frame rate:** popup is higher than 12.5 fps. If the popup is on a fixed rate, **Project rate** takes the GIF back to 12.5 fps. An APNG can go down to 24 or 23.976 fps, which gains you about a second.
+
+## Fitting inside the size
+
+The **Size:** popup lists **GIF default** or **APNG default** first, and it's the default for those two formats and no others. **GIF default** is 480 × 270 and **APNG default** is 960 × 540, each fitted to the canvas's shape.
+
+Every row, and a **Custom…** size, is a box the picture fits inside. It keeps its shape and is never enlarged, and nothing is letterboxed. The rows show the size the file will have. A 1080 × 1920 project's GIF default is 152 × 270.
+
+Because the picture is never enlarged, rows bigger than the canvas come out as the canvas's own size, and the popup hides rows that repeat an earlier row's numbers. An odd width or height is kept.
+
+## Good to know
+
+- **Quality:** and **Loudness:** are greyed out, and so are **Bit depth:** and **Stems:**. Neither format has a bit rate or any sound.
+- **Burn in timecode** still works.
+- Neither format has [chapters](/export/chapters/).
+- Both write the SDR version in an HDR project.
+
+## With an agent
+
+`export` names these formats `gif` and `apng`. Their default rows are `size: "preset"`, which no other format takes. There's no frame-rate argument, so an agent's GIF is always 12.5 fps and its APNG 25 fps. See [Export: start, then poll](/mcp/export/#size).
+
+## Related
+
+- [Choose a format](/export/formats/)
+- [Export a range](/export/range/)
+- [Export size](/export/size/)
+- [Export frame rate](/export/frame-rate/)

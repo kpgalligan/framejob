@@ -1,0 +1,53 @@
+---
+title: Updates
+description: Check for a newer Frame Job, choose whether it checks by itself, and see which copies update themselves.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The copy of Frame Job you download keeps itself up to date. It tells you when a new version is ready and installs it when you say so.
+
+<AtAGlance
+  menu="Frame Job ▸ Check for Updates…"
+  needs="The copy downloaded from the project's GitHub Releases page."
+/>
+
+## Which copy updates itself
+
+The copy you download from the project's GitHub Releases page updates itself, with [Sparkle](https://sparkle-project.org). A copy built from source has no updater: it has no menu item and it never checks.
+
+An update is always the whole app. Release notes are on the release's page on GitHub.
+
+## Check for updates
+
+Choose **Frame Job ▸ Check for Updates…**, directly under **About Frame Job**. It has no shortcut.
+
+If a newer Frame Job has been published, a window shows its version. Choose **Install Update** to download it, then **Install and Relaunch** to replace the app and relaunch it. If there's nothing newer, it says you're up to date, and its **Version History** button opens the release's page.
+
+The item is greyed while a check is already running. No agent tool checks for updates or installs them.
+
+## Automatic checks
+
+The second time you open Frame Job, it asks whether to check for updates automatically. If you agree, it checks about once a day while it's open and tells you when an update is ready. It installs one only when you say so, unless you tick **Automatically download and install updates** in that prompt, or the matching box in the update window.
+
+Frame Job [remembers](/reference/remembered-choices/) your answer and when it last checked.
+
+## Turn automatic checks off
+
+There's no Settings control for this. With Frame Job closed, run this in Terminal:
+
+```sh
+defaults write com.kgalligan.FrameJob SUEnableAutomaticChecks -bool NO
+```
+
+**Check for Updates…** still works afterwards.
+
+## Signed updates
+
+Every update carries an EdDSA signature, and Frame Job won't install one whose signature doesn't match the key built into the app. Only a release published from the project itself can be installed.
+
+## Related
+
+- [Requirements and install](/getting-started/requirements-and-install/)
+- [What stays on this Mac](/getting-started/ai-and-your-keys/#what-stays-on-this-mac)
+- [What Frame Job remembers](/reference/remembered-choices/)

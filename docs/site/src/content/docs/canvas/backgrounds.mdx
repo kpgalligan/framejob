@@ -1,0 +1,113 @@
+---
+title: Backgrounds
+description: Fill the space around your footage with a colour, a picture or a blurred copy of the clip, on a new track behind everything.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A screen recording that doesn't fill the frame, a phone clip on a landscape canvas or a title standing on nothing all leave the canvas showing. A background fills that space with a colour, a picture or a blurred copy of the clip itself.
+
+To change the colour of the canvas itself, see [Canvas background and timecode](/projects/background-and-timecode/).
+
+<AtAGlance
+  menu={[
+    'Clip ▸ Add Background ▸ Solid Color',
+    'Clip ▸ Add Background ▸ Image…',
+    'Clip ▸ Add Blurred Background',
+  ]}
+  tools={['add_background', 'add_blurred_background']}
+/>
+
+## Solid Color
+
+Choose **Clip ▸ Add Background ▸ Solid Color**. You don't need a selection, and there's no key for it.
+
+Frame Job adds a canvas-sized white rectangle named "Background", starting at 0 and as long as the timeline. It's white because the canvas is black by default, and a black background would seem to do nothing.
+
+Recolour it in the **Fill** row of the **Shape** sub-tab, or turn on **Gradient** there for a full-canvas ramp. See [Shape fill, stroke and size](/text-and-shapes/shape-settings/) and [Gradient fills](/text-and-shapes/gradients/).
+
+## Image
+
+<Steps>
+
+1. Choose **Clip ▸ Add Background ▸ Image…**. You don't need a selection, and there's no key for it.
+
+2. Pick a picture. The panel offers any image type macOS can read, and only image files. That includes AVIF, which [doesn't import as a still](/reference/file-formats/#pictures).
+
+</Steps>
+
+The picture goes behind everything, scaled to fill the canvas and as long as the timeline. It's named "Background". Fill means it covers the whole canvas and any overflow is cut off at the edges, whatever [**Fit new clips to canvas**](/projects/background-and-timecode/#fit-new-clips-to-canvas) says. To see the whole picture instead, scale it down afterwards.
+
+The picture joins the [Media tab](/projects/media-tab/) in the same undo step. If it's already there, the existing entry is reused.
+
+If the file can't be read, an alert says so and nothing is added. "Could Not Add the Picture" means it couldn't join the project's media list.
+
+## Blurred background
+
+This is the usual backdrop for a screen recording or a vertical video: the clip's own picture, blown up past the frame and blurred, so the colours always match.
+
+<Steps>
+
+1. Select one clip.
+
+2. Choose **Clip ▸ Add Blurred Background**. There's no key for it.
+
+</Steps>
+
+Frame Job puts a copy behind everything, named "Blurred Background", and selects the copy rather than the original, so you can adjust its blur or its scale straight away. The copy is:
+
+- at the same start and length, with the same speed and the same part of the source, so both play the same frames
+- scaled to fill the canvas, centred and uncropped
+- blended **Normal**, whatever the original uses
+- blurred by one full-strength Blur [filter](/effects/filters/), which replaces any filters on the original
+- muted, so the sound doesn't play twice
+
+The command works on video, image, freeze frame, shape and graphic clips. It's greyed for a text clip, an adjustment clip and a clip of an audio-only file, which have no picture size to scale to the canvas. It's also greyed for a nest clip, because a blurred copy of a nest would come out sharp, and when you've selected no clips or more than one.
+
+## What a blurred background follows
+
+The copy matches the clip at the moment you add it. After that it's a separate clip: moving or trimming the original doesn't move or trim the copy.
+
+| The copy leaves behind | So |
+| --- | --- |
+| Transition | It's alone on its track, with nothing to transition from. |
+| Actions | A zoom on the foreground doesn't zoom the backdrop. A speed ramp is an action too, so a copy of a ramped clip plays at the clip's steady speed and doesn't stay in step with it. |
+| Motion presets and Motion Blur | The backdrop doesn't slide, spin or pulse with the clip in front. |
+| Remove Background and Behind Subject | The backdrop stays whole. |
+| Label and ducking | The label isn't copied, and the copy doesn't lower the rest of the mix. |
+
+Every other picture setting carries over, including opacity, rotation, corner radius, the colour controls, the drop shadow and the reflection. A rotated clip gives a rotated backdrop, and the fill is worked out as if the picture were square to the canvas, so a large rotation can leave the corners showing.
+
+The copy's picture is always on, even if the original's is [turned off](/editing/enable-picture-and-sound/).
+
+## A new back-most track
+
+Each of the three commands puts one clip on a new track behind every other track, and selects it. A new track is the only place that's sure to be behind everything, with no overlap to check.
+
+The track gets the next numbered name, such as "Track 4". One undo step takes the clip and the track away again. The steps are called **Add Background** and **Add Blurred Background**.
+
+## Good to know
+
+- A colour or picture background is as long as the timeline when you add it, and it doesn't grow with the timeline. Drag its end to [trim](/editing/trimming/) it longer.
+- On an empty timeline, a colour or picture background is one frame long.
+- Fill stops at a scale of 1000%, so a picture less than a tenth of the canvas's width or height can't reach the edges.
+- With a nest open, a background goes on the nest's own tracks, behind everything inside the nest.
+- A project holds up to 64 tracks, counting the tracks inside nests, and Frame Job won't add a background past that.
+
+## With an agent
+
+`add_background` with no arguments adds the white background, and `add_blurred_background` takes the `clip` to copy.
+
+An agent can do two things the menu can't. It can give the background a `color` and a `duration` of its own, at least one frame long, and it can pass the `media` of a movie that's already in the project instead of a picture. It can't pass `media` and `color` together, and a file with no picture, such as a LUT, can't be a background.
+
+A movie background keeps its sound and stops where its file ends, so only a picture or a colour runs the whole timeline. See [Tools: adding clips](/mcp/tools-adding-clips/#add_background).
+
+## Related
+
+- [Canvas background and timecode](/projects/background-and-timecode/)
+- [Shape fill, stroke and size](/text-and-shapes/shape-settings/)
+- [Gradient fills](/text-and-shapes/gradients/)
+- [Filters](/effects/filters/)
+- [Remove Background](/effects/remove-background/)
+- [Make Vertical Version](/framing/make-vertical-version/)

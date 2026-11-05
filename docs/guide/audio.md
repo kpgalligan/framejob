@@ -1,10 +1,10 @@
 # Audio
 
-Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, a voice effect, channel choice, EQ, hum removal, noise reduction, gate, leveller, de-esser, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed and has its own volume, pan, compressor and limiter. Four commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), Enhance Voice sets a voice recording up for speech from its own measurements, Match Audio gives clips another clip's loudness and tone, and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written, except that every export also holds its peaks under −1 dBTP with a master limiter the preview doesn't have, and a track's compressor and limiter are exact in an export but approximate in the preview (see [Track compressor and limiter](#track-compressor-and-limiter)).
+Frame Job mixes sound from every clip that has it: a camera clip, an audio-only file, a microphone recording or a nest. Each clip has its own level, fades, ducking, voice isolation, a voice effect, channel choice, EQ, hum removal, noise reduction, gate, leveller, de-esser, compressor, pan and mono fold, and a true-peak limiter, and each track can be muted or soloed and has its own volume, pan, compressor and limiter. Four commands do the measuring for you. Normalize sets a clip's level from its loudness (or its loudest moment), Enhance Voice sets a voice recording up for speech from its own measurements, Match Audio gives clips another clip's loudness and tone, and Synchronize Audio lines up a camera and a separate recorder by their sound. The preview and the export use the same mix, so what you hear while editing is what gets written, except that an export also holds its mix's peaks at or under −1 dBTP (or a ceiling an agent sets) with a master limiter the preview doesn't have, and a track's compressor and limiter are exact in an export but approximate in the preview (see [Track compressor and limiter](#track-compressor-and-limiter)).
 
 ## Where audio lives
 
-There is only one kind of track. Any track can hold a clip with sound, whether it is a video file, an audio-only file (a voice-over, music, a recorder's take) or a clip you split off with Detach Audio. A clip with sound shows its waveform in the timeline.
+There is only one kind of track. Any track can hold a clip with sound, whether it is a video file, an audio-only file (a voice-over, music, a recorder's take) or a clip you split off with Detach Audio. A clip with sound shows its waveform in the timeline. A nest clip draws no waveform, because it has no file of its own.
 
 The waveform shows the level of the file itself, so moving the Volume slider doesn't redraw it. It's drawn faded when the clip is muted, when its track is muted, or when another track's solo silences it. A track that holds only sound clips is drawn as a shorter lane than a track with pictures.
 
@@ -57,9 +57,9 @@ A nest clip has the same Sound sub-tab, but not every control reaches the clips 
 - **Volume, Mute and the fades** on a nest clip scale everything inside it. Turning a nest down turns all of it down, and muting it silences all of it.
 - **Mix to mono** on a nest clip folds the nest's whole mix.
 - **Ducking** on a nest clip lowers the rest of the project for the nest's whole length.
-- **Pan, the compressor, noise reduction and the limiter** set on a nest clip have no effect. Open the nest (⌘↓) and set them on the clips inside.
+- **Pan, the channel choice, the EQ, hum removal, the gate, the leveller, the de-esser, the compressor, voice isolation, the voice effect, noise reduction and the limiter** set on a nest clip have no effect. Open the nest (⌘↓) and set them on the clips inside.
 
-*Agents:* `set_audio` (`clips`, `patch`) changes any of these properties on one or more clips. Its patch keys are `volume`, `muted`, `fade_in`, `fade_out`, `fade_in_shape`, `fade_out_shape`, `duck`, `mono`, `keep_pitch`, `pan`, `compressor`, `noise_reduction` and `limiter`. Setting `duck`, `compressor` or `limiter` to null turns it off. `get_project` reads them back.
+*Agents:* `set_audio` (`clips`, `patch`) changes any of these properties on one or more clips. Its patch keys are `volume`, `muted`, `fade_in`, `fade_out`, `fade_in_shape`, `fade_out_shape`, `duck`, `mono`, `keep_pitch`, `pan`, `compressor`, `noise_reduction`, `limiter`, `isolation`, `voice`, `channels`, `eq`, `hum`, `gate`, `leveller` and `de_esser`. Setting `duck`, `compressor`, `limiter`, `voice`, `eq`, `hum`, `gate`, `leveller` or `de_esser` to null turns it off. `get_project` reads them back.
 
 ## Volume
 
@@ -68,7 +68,7 @@ A nest clip has the same Sound sub-tab, but not every control reaches the clips 
 | Volume | The clip's level as a percentage. The slider covers 0–400 %; type a higher value in the field, up to 3200 %. Above 400 % the slider's knob stays at the right end. Quick picks: 0, 50, 100, 150, 200, 400. | 0–3200 % | 100 % |
 | Gain | Read-only: the volume in dB (for example "+6.0 dB"), or "silent" at 0 %. | — | +0.0 dB |
 | Loudness | Read-only: the clip's integrated loudness and true peak over the part that plays, at volume 100 % (for example "−41.7 LUFS · −18.5 dBTP"). "measuring…" until the clip's loudness analysis has run; "—" with several clips selected or none that can be measured. | — | — |
-| At volume | Read-only: the same with the clip's volume applied, and with its limiter when the Limiter is on (the true peak then reads no higher than the ceiling). On a clip with an EQ, hum removal, voice isolation, noise reduction, a gate, a de-esser, a compressor or a voice effect, it reads the clip as the last Normalize or Enhance Voice measured it through that processing. Until one has measured the clip as it is now, the figure is the one before the processing and starts with "≈" (its tooltip says so). It follows a Volume drag; the Loudness row itself updates when the drag ends. | — | — |
+| At volume | Read-only: the same with the clip's volume applied, and with its limiter when the Limiter is on (the true peak then reads no higher than the ceiling). On a clip with an EQ, hum removal, voice isolation, noise reduction, a gate, a leveller, a de-esser, a compressor or a voice effect, it reads the clip as the last Normalize or Enhance Voice measured it through that processing. Until one has measured the clip as it is now, the figure is the one before the processing and starts with "≈" (its tooltip says so). It follows a Volume drag; the Loudness row itself updates when the drag ends. | — | — |
 | Mute | Silences the clip without changing its volume. | on / off | off |
 | Normalize (row) | The mode, Peak or Loudness, and the Loudness target in LUFS (quick picks −14, −16, −23; used in Loudness mode only). The choice is the app's, not the project's, and is kept between launches. | Peak / Loudness; −50 to −5 LUFS | Loudness; −16 LUFS |
 | Normalize (button) | Sets the volume from the clip's own loudest moment, or from its loudness, by the mode (see below). | — | — |
@@ -78,9 +78,9 @@ The section's summary reads "muted", "silent" or the gain in dB. Reset puts the 
 
 ### Animating the sound
 
-You can animate a clip's sound with actions. While an action is selected, the Volume row, Mute and the fade lengths write that action's end state, and so do Pan, Mix to mono, Channels, the EQ, Hum, Voice Isolation's Amount, Noise Reduction, the Gate, the Leveller, the De-esser, the Compressor and the Limiter. Numbers move smoothly across the action's span: a pan sweeps from one side to the other, an EQ band's gain rises, a compressor's threshold drifts, the isolated voice fades in. Switches change at the action's end, with no glide: Mix to mono, Channels, EQ Bypass, a pass filter's slope, Hum's mains and harmonics, the Leveller's Response, and turning a section or an EQ slot on or off. Unticking a section or an EQ slot with an action selected turns it off at the action's end. What you hear in the preview is what an export writes.
+You can animate a clip's sound with actions. While an action is selected, the Volume row, Mute and the fade lengths write that action's end state, and so do Pan, Mix to mono, Channels, the EQ, Hum, Voice Isolation's Amount, Noise Reduction, the Gate, the Leveller, the De-esser, the Compressor and the Limiter. Numbers move smoothly across the action's span: a pan sweeps from one side to the other, an EQ band's gain rises, a compressor's threshold drifts, the isolated voice fades in. Switches change at the action's end, with no glide: Mix to mono, Channels, EQ Bypass, a pass filter's slope, Hum's mains and harmonics, the Leveller's Response, and turning a section or an EQ slot on or off (Voice Isolation and Noise Reduction are amounts, so they glide to and from 0). Unticking a section or an EQ slot with an action selected turns it off at the action's end. What you hear in the preview is what an export writes.
 
-A clip whose own Voice Isolation is off still gets its isolated voice made when an action turns the Amount up, and the gate, the leveller and the de-esser measure the clip's loudness when an action turns them on. A limiter or noise reduction turned on by an action runs for the clip's whole track from the start, as one set on the clip itself does.
+A clip whose own Voice Isolation is off still gets its isolated voice made when an action turns the Amount up, and the gate, the leveller and the de-esser measure the clip's loudness when an action turns them on. A limiter or noise reduction turned on by an action puts its small delay on the clip's whole track from the start, as one set on the clip itself does (see [Limiter](#limiter)), but it limits or cleans the sound only where the action has it on.
 
 Ducking, Keep pitch, the fade shapes and the voice effect can't be animated, and neither can a nest clip's Mix to mono. They always change the clip's own settings, even with an action selected.
 
@@ -89,7 +89,7 @@ Ducking, Keep pitch, the fade shapes and the voice effect can't be animated, and
 Every clip with sound, except a nest clip, draws a thin white line over its waveform: the level you hear from that clip over time. It is the clip's volume and its volume actions, with the fades, crossfades, ducking and the track's volume folded in. The top of the clip's audio part is +30 dB (3200 %) and the bottom is −60 dB or quieter. A clip you can't hear, because it's muted, its track is muted, another track is soloed or its sound is switched off, has its line along the bottom. The line starts below the action lane and is drawn only where the audio part is at least 12 pt tall, so at the Small track height it may not show. A small square in the action colour marks each action end that sets the volume.
 
 - **Drag the line** up or down to change the level in force at that point. Inside an action that sets the volume, the drag changes that action's end level. After such an action, it changes the end level of the last one before the point. Otherwise it changes the clip's own Volume. The drag is relative and in dB, and the new value is shown beside the pointer ("+2.5 dB", or "−∞ dB" at silence). Drag below where you pressed, all the way to the bottom of the line, to go to silence. The level stops at 3200 %. One drag is one undo step, "Set Volume".
-- **⌥-click the line** to add a point there. A point is an action, not a keyframe: Frame Job adds an action that runs from the end of the previous action (or the clip's start) to where you clicked, ending at the level the line already has there, so the click on its own changes nothing you hear. Keep the mouse down and drag to move the new point's level. Inside an action that changes only the volume, the click splits that action in two at the point instead. Both halves keep its curve, so a linear action sounds the same until you drag, while an eased one is eased again on each side of the point. The click beeps, and adds nothing, inside an action that also changes something else or that runs past the clip's end (as one can after a trim), or within one frame of the start of the action it is in or of the previous action's end. Adding a point is one undo step, "Add Volume Point".
+- **⌥-click the line** to add a point there. A point is an action, not a keyframe: Frame Job adds an action that runs from the end of the previous action (or the clip's start) to where you clicked, ending at the volume the clip already has there (which can differ from the line inside a fade or under a duck), so the click on its own changes nothing you hear. Keep the mouse down and drag to move the new point's level. Inside an action that changes only the volume, the click splits that action in two at the point instead. Both halves keep its curve, so a linear action sounds the same until you drag, while an eased one is eased again on each side of the point. The click beeps, and adds nothing, inside an action that also changes something else or that runs past the clip's end (as one can after a trim), or within one frame of the start of the action it is in or of the previous action's end. Adding a point is one undo step, "Add Volume Point".
 - To move a point in time, drag its action band. ⇧-click and double-click on the line act on the clip, as they do anywhere on it. The fade handles, the action lane and the clip's edges take a press before the line does.
 - The line shows what this clip contributes, so it moves with the clip's track volume and ducking, but a drag changes only the clip's own level. On a silenced clip the line stays on the floor while the readout changes. Inside an open nest, the line is the nest's own mix: it doesn't include the volume, fades, mute or solo of the nest clip and the tracks outside it.
 
@@ -103,7 +103,7 @@ Every clip with sound, except a nest clip, draws a thin white line over its wave
 - **Peak** sets each clip's volume so its loudest moment reaches **−1 dBFS**.
 
 - **It measures the clip, not the mix.** The level is read from the clip's cached waveform (Peak) or loudness analysis (Loudness) over the part of the file that actually plays. The clip's volume, fades, ducking, mute and solo, and its track's volume and pan, don't affect the reading. Mix to mono and pan on a stereo clip do count in Loudness mode.
-- **In Loudness mode it measures through the clip's processing.** A clip with an EQ, hum removal, voice isolation, noise reduction, a gate, a de-esser, a compressor or a voice effect is rendered through them as the export plays it, and its volume is set from what comes out: cleaning up the pauses changes the measured loudness, so the analysis alone would miss the target. With the limiter on, Normalize renders again at the volume it chose and adjusts until the result is within 0.1 LU of the target, at most three times. This takes a moment per clip (0.7 s for a 30-second voice recording), longer on a long one, and a **Measuring Sound** sheet shows "Clip 1 of 2…" and a Cancel button meanwhile. Cancel changes nothing, and if the project changes while it measures, nothing changes and the inspector says so. A clip with none of that processing is measured from the analysis at once, as before.
+- **In Loudness mode it measures through the clip's processing.** A clip with an EQ, hum removal, voice isolation, noise reduction, a gate, a leveller, a de-esser, a compressor or a voice effect is rendered through them as the export plays it, and its volume is set from what comes out: cleaning up the pauses changes the measured loudness, so the analysis alone would miss the target. With the limiter on, Normalize renders again at the volume it chose and adjusts until the result is within 0.1 LU of the target, at most three times. This takes a moment per clip (0.7 s for a 30-second voice recording), longer on a long one, and a **Measuring Sound** sheet shows "Clip 1 of 2…" and a Cancel button meanwhile. Cancel changes nothing, and if the project changes while it measures, nothing changes and the inspector says so. A clip with none of that processing is measured from the analysis at once, as before.
 - **It replaces the volume** rather than multiplying it, so pressing it a second time changes nothing (the second press beeps). A measured volume within 0.05 dB of the clip's own is left as it is, so a clip measured through its processing doesn't move by a rounding either.
 - **Each clip gets its own gain.** In Peak mode that doesn't match levels across a selection; in Loudness mode it does. However many clips are selected, it is one undo step, named "Normalize", which takes back the limiter it turned on along with the volume.
 - **It writes the clip's base level**, even when the playhead is inside an action. With an action selected, the button carries a small boxed "clip" tag to show this.
@@ -118,7 +118,7 @@ Some clips in a selection are skipped and the rest are still normalized: nests (
 
 **Enhance Voice** sets each selected clip up for speech from the clip's own measurements, in one undo step named "Enhance Voice". It's the button under Normalize in the Volume section, and **Clip ▸ Enhance Voice**. It is offered where Normalize is.
 
-It measures the clip before any of its settings: its loudness and true peak, and, every 10 ms, whether the clip is speaking (the speech the clip's sound analysis found, or the spans saved for Duck by Speech) or pausing. Then it writes ordinary settings, each of which you can see and change in its own section:
+It measures the clip before any of its settings: its loudness and true peak, and, every 10 ms, whether the clip is speaking (the spans saved for Duck by Speech, or else the speech found when its file was imported) or pausing. Then it writes ordinary settings, each of which you can see and change in its own section:
 
 - **High-pass, always:** the EQ's Rumble Cut (80 Hz, 24 dB/oct), keeping the EQ's other parts.
 - **When the pauses are noisy** (their median loudness less than 45 dB under the voice): **voice isolation** at 80 % with noise reduction off, or, on a clip isolation can't serve (a speed change, a ramp or a freeze frame), **noise reduction** at 50 %. And the **gate**, opening 10 dB above the pauses' median peak, held between −40 and −6 dB from the clip's loudness. With quiet pauses, isolation, noise reduction and the gate are turned off. With under half a second of pause there is nothing to measure, so they're left as they are.
@@ -147,7 +147,7 @@ Match then puts up the Measuring Sound sheet while the clips are measured:
 
 - **The reference** is played offline once, as it sounds in the timeline: through its own settings, its limiter and its volume, without fades, ducking or Mute. Its loudness is the target.
 - **Loudness** is Loudness Normalize to that target: each other clip's volume, and its limiter when the peaks need it, measured through its new settings the way Normalize measures a processed clip.
-- **EQ** compares the average spectrum of each clip's speech with the reference's, in 23 third-octave bands from 79 Hz to 12.7 kHz. The speech is what the clip's sound analysis found, or the spans saved for Duck by Speech; it needs about a second of it. Each clip is measured with its EQ's shelves and bands off, and the difference (less its overall level, which is Loudness's job) is fitted with the EQ's low shelf, three bands and high shelf, each gain within ±12 dB. Those five replace the clip's own; its high-pass, low-pass and hum removal are kept, and Bypass is turned off.
+- **EQ** compares the average spectrum of each clip's speech with the reference's, in 23 third-octave bands from 79 Hz to 12.7 kHz. The speech is the spans saved for Duck by Speech, or else what was found when the file was imported; it needs about a second of it. Each clip is measured with its EQ's shelves and bands off, and the difference (less its overall level, which is Loudness's job) is fitted with the EQ's low shelf, three bands and high shelf, each gain within ±12 dB. Those five replace the clip's own; its high-pass, low-pass and hum removal are kept, and Bypass is turned off.
 
 Everything else (the other sections, fades, ducking, pan, Mute) is left alone. Like Normalize, it writes base settings even inside an action. Pressing it again with the same choice changes nothing. A clip that can't be matched (one Normalize would skip, one whose speech hasn't been detected yet or that has under a second of it) is skipped and the others are still matched. If the reference can't be used, or nothing can be matched, Match beeps and the reason appears at the foot of the inspector. If the project changes while the sheet is up, nothing changes and the foot of the inspector says to choose Match Audio again.
 
@@ -168,10 +168,10 @@ A fade is measured from the clip's own edges. Its shape says how the level moves
 
 - **Linear**: a straight-line ramp in level, the same amount every moment. The default.
 - **S-Curve**: starts and ends gently and moves fastest in the middle.
-- **+3 dB**: rises quickly at first and levels off; halfway through it is 3 dB under full. Good for a fade in that should be heard straight away.
-- **−3 dB**: starts slowly and gathers speed; halfway through it is far quieter. Good for a fade out that should feel long.
+- **+3 dB**: on a fade in, rises quickly at first and levels off; on a fade out, holds up and then falls quickly at the end. Halfway through it is 3 dB under full. Good for a fade in that should be heard straight away.
+- **−3 dB**: on a fade in, starts slowly and gathers speed; on a fade out, falls quickly and then trails away. Halfway through it is far quieter. Good for a fade out that should feel long.
 
-The shapes are always the clip's own setting, even with an action selected. It travels with the clip when you move it, and it stays at the edge when you trim. Where a fade in and a fade out overlap, or a fade is longer than the clip, the two multiply, which gives a dip in the middle rather than a jump.
+The shapes are always the clip's own setting, even with an action selected. It travels with the clip when you move it, and it stays at the edge when you trim. Where a fade in and a fade out overlap, the two multiply, which gives a dip in the middle rather than a jump. A fade longer than the clip is cut off partway along its curve.
 
 ### Fade handles on the timeline
 
@@ -211,20 +211,21 @@ With **Clip Length**, ducking follows the clip's length on the timeline, not whe
 With **Speech**, the others go down only while this clip's speech plays: the attack starts Pre-roll before each stretch of speech, the level holds until Hold after it ends, and the release follows. Stretches close enough that their pre-roll and hold meet count as one, and a breath under 0.2 s between words doesn't lift the music.
 
 - **Where the speech is comes from the clip's file.** Frame Job detects speech in every file with sound when it's imported, on your Mac, the same detection Remove Silences uses. Choosing Speech saves where that file's speech is in the project, in the same undo step, so the preview, every export and an agent all hear the same thing. A file keeps the speech it was given; it isn't detected again.
-- **Speech can't be chosen yet** while a selected file's speech is still being detected, or for a clip that isn't a file with sound (a nest, a title). Try again in a moment.
+- **Speech can't be chosen yet** while a selected file's speech is still being detected, or for a clip that isn't a file with sound (a nest). Try again in a moment.
 - **The timeline shows it.** A clip that ducks by speech has a thin yellow line across its waveform: high where the others play at full level, low where they're ducked. It follows the clip's speed, reverse and speed ramps.
 - **Where one stretch's release meets the next one's attack**, the others follow whichever is lower, so the level never dips below Level.
 - **Relinking** the clip's file to a shorter one keeps the speech that still fits, and relinking it to a file with no sound forgets it.
 
 - **Overlapping duckers multiply.** Where two ducking clips overlap, their levels multiply: two at 50 % give 25 %.
-- **A silent ducking clip still ducks.** Ducking is read from the clip's place on the timeline, so a ducking clip that is muted, silenced by a solo, or has its audio switched off still lowers the others. Turn ducking off to stop it.
+- **A silent ducking clip still ducks.** Ducking is read from the clip's place on the timeline, so a ducking clip that is muted, silenced by a solo, or has its audio switched off still lowers the others. Turn ducking off to stop it. A clip with its audio switched off has no Sound tab, so for the picture half of a linked pair, attach the pair first.
+- **A detached clip ducks from both halves.** Detach Audio leaves ducking on the picture as well as the sound. The picture lowers its own sound along with everything else, and the music is lowered by both halves: at 20 %, the voice plays at 20 % and the music at 4 %. Turning ducking off on the sound half leaves the picture ducking. To duck from a detached clip, turn ducking off before you detach, then turn it on for the sound half.
 - **Inside a nest**, a ducking clip lowers the rest of the project over the part of it that plays. Ducking on the nest clip itself lowers it over the nest's whole length.
 
 *Agents:* `set_audio` with `duck: {level, attack, release, mode, pre_roll, hold}`, or `duck: null` to turn it off. `mode: "speech"` is Duck by Speech and saves the file's speech in the same step; `set_media_speech` (`media`, `spans`) sets a file's speech spans directly, and `get_project` shows them as `media[].speech`.
 
 ## Voice Isolation
 
-Voice Isolation keeps the voice and removes what is around it: background noise, music, and the echo of the room. It uses Apple's on-device voice model, so nothing leaves your Mac.
+Voice Isolation keeps the voice and removes what is around it: background noise and the echo of the room. It uses Apple's on-device voice model, so nothing leaves your Mac.
 
 | Control | What it does | Range | Default |
 |---|---|---|---|
@@ -234,7 +235,7 @@ Voice Isolation keeps the voice and removes what is around it: background noise,
 
 At 80 % the pauses between words drop by about 14 dB and keep a little of the room, so the voice doesn't sit in dead silence. At 100 % the pauses are silent. Isolation also reduces room echo, so there is no separate de-reverb control.
 
-The isolated voice is worked out once for each clip, in the background, when you turn it on. Until it is ready the clip plays without it, and the editor switches over by itself when it is. Changing Amount takes effect at once and doesn't work it out again; trimming or slipping the clip does, because the clip then plays a different part of its file. An export waits for every isolated clip to be ready ("Preparing…"), so a file is never written without it.
+The isolated voice is worked out once for each clip, in the background, when you turn it on. Until it is ready the clip plays without it, and the editor switches over by itself when it is. Changing Amount takes effect at once and doesn't work it out again; trimming or slipping the clip does, because the clip then plays a different part of its file. An export waits for every isolated clip to be ready ("Preparing “*name*”…"), so a file is never written without it.
 
 Isolation comes first, before the channel choice, the EQ, noise reduction and the compressor. You can use it together with Noise Reduction, which then works on the isolated sound.
 
@@ -251,7 +252,7 @@ Voice Effect puts one of sixteen effects on the clip's sound, built from Apple's
 | Voice | **Pitch** shifts the voice up or down without changing its speed; **High** and **Deep** shift it up 5 or down 5 semitones and brighten or warm it; **Robot** makes it metallic and buzzing. |
 | Tone | **Bass** and **Treble** boost the lows or the highs by up to 10 dB; **Bright** lifts the presence; **Telephone** and **Radio** squeeze it into a narrow band, the radio with some crackle. |
 | Character | **Lo-Fi** makes it gritty and dull; **Distorted** overdrives it. |
-| Space | **Echo** repeats it every quarter of a second; **Room**, **Hall**, **Plate** and **Cathedral** put it in a space, from a small room to a long cathedral tail. |
+| Space | **Echo** repeats it every quarter of a second; **Room**, **Hall**, **Plate** and **Cathedral** put it in a space, from a room to a long cathedral tail. |
 
 | Control | What it does | Range | Default |
 |---|---|---|---|
@@ -262,7 +263,7 @@ Voice Effect puts one of sixteen effects on the clip's sound, built from Apple's
 
 Each effect keeps the clip at about the loudness it had, so switching between them doesn't jump in level.
 
-Like Voice Isolation, the effect is worked out once for each clip in the background, and until it is ready the clip plays without it. Changing the effect, Amount, Pitch, the Isolation amount, or trimming the clip works it out again. An export waits for every clip's effect to be ready ("Preparing…").
+Like Voice Isolation, the effect is worked out once for each clip in the background, and until it is ready the clip plays without it. Changing the effect, Amount, Pitch, the Isolation amount, or trimming the clip works it out again. An export waits for every clip's effect to be ready ("Preparing “*name*”…").
 
 The effect comes right after Voice Isolation: an isolated clip's effect is made from its isolated voice, so it waits for that first. Everything after it in the list (the channel choice, the EQ, noise reduction and the rest) works on the effected sound.
 
@@ -276,7 +277,7 @@ The effect plays only on a clip at normal speed, as Voice Isolation does. A reve
 |---|---|---|
 | Play | Both plays the file as it is. Left Only plays the left channel from both sides, Right Only the right channel, and Swap Left and Right exchanges them. | Both |
 
-Use Left Only or Right Only for a microphone recorded onto one channel of a stereo file: the voice then plays from both speakers at its own level, and the Volume section's Loudness read-out counts it that way. The choice comes right after voice isolation, before the EQ and the mono fold. A mono file has only one channel, so the choice has no effect on it.
+Use Left Only or Right Only for a microphone recorded onto one channel of a stereo file: the voice then plays from both speakers at its own level, and the Volume section's Loudness read-out counts it that way. The choice comes after voice isolation and the voice effect, before the EQ and the mono fold. A mono file has only one channel, so the choice has no effect on it.
 
 *Agents:* `set_audio` with `channels`: `"both"`, `"left"`, `"right"` or `"swapped"`.
 
@@ -307,7 +308,7 @@ The EQ runs after the channel choice and before hum removal and noise reduction.
 | Control | What it does | Range | Default |
 |---|---|---|---|
 | Remove hum | Turns hum removal on. | on / off | off |
-| Mains | The mains frequency where the recording was made: 50 Hz in most of the world, 60 Hz in the Americas and parts of Asia. | 50 or 60 Hz | 60 Hz |
+| Mains | The mains frequency where the recording was made: 50 Hz in most of the world, 60 Hz in North America and parts of South America and Asia. | 50 or 60 Hz | 60 Hz |
 | Depth | How far each notch turns the hum down. Quick picks: 12, 24, 30, 48. | 6–60 dB | 30 dB |
 | Harmonics | How many notches: the mains frequency and its multiples. Quick picks: 1, 2, 4, 8. | 1–8 | 4 |
 
@@ -364,7 +365,7 @@ The leveller evens out a voice that moves on and off the microphone. It works ah
 | Status | Read-only: where it aims, for example "Aims at −41.7 LUFS"; "Waits for its loudness" or "Waits for its speech" until the clip's analysis has run; or "Not levelling:" and why. | — | — |
 | Loudness | Read-only: the clip's loudness the target is measured from. | — | — |
 
-It measures each phrase the way a loudness meter does (the BS.1770 weighting), over about three seconds of its speech at a time, never reaching across a pause into the next phrase. A phrase shorter than a second takes the level of the phrase before it (or, at the start, the one after it), so a short "yes" or a cough doesn't get a level of its own. Like the gate's threshold, its target follows the clip's loudness. It needs the clip's speech as well as its loudness: the speech the clip's sound analysis found, or the spans saved for Duck by Speech. Until both are measured it waits, and so does an export. Where speech detection isn't available and the media has no saved speech, it doesn't level the clip and its Status says why. It works the same in the preview and in an export, from wherever playback starts. It runs after the gate, so pauses the gate has turned down stay down, and before the de-esser and the compressor, which then see the levelled voice. With an action selected, Target, Max Boost and Max Cut move smoothly across the action; Response changes at its end.
+It measures each phrase the way a loudness meter does (the BS.1770 weighting), over about three seconds of its speech at a time, never reaching across a pause into the next phrase. A phrase shorter than a second takes the level of the phrase before it (or, at the start, the one after it), so a short "yes" or a cough doesn't get a level of its own. Like the gate's threshold, its target follows the clip's loudness. It needs the clip's speech as well as its loudness: the spans saved for Duck by Speech, or else the speech found when its file was imported. Until both are measured it waits, and so does an export. Where speech detection isn't available and the media has no saved speech, it doesn't level the clip and its Status says why. It works the same in the preview and in an export, from wherever playback starts. It runs after the gate, so pauses the gate has turned down stay down, and before the de-esser and the compressor, which then see the levelled voice. With an action selected, Target, Max Boost and Max Cut move smoothly across the action; Response changes at its end.
 
 *Agents:* `set_audio` with `leveller: {target_db, max_up_db, max_down_db, response}` (the response in ticks), `leveller: {}` to turn it on at the defaults, or `leveller: null` to turn it off.
 
@@ -381,7 +382,7 @@ The de-esser tames sibilance — the hard "s", "sh" and "t" sounds a close micro
 | Status | Read-only: "Acts above" and the threshold in dBFS, "Waits for its loudness", or "Not de-essing:" and why. | — | — |
 | Loudness | Read-only: the clip's loudness the threshold is measured from. | — | — |
 
-It never makes any frequency louder. Right at the Frequency it takes about half the range; the full range is reached about an octave above. Its threshold follows the clip's loudness the way the gate's does, and it runs after the gate and the leveller and before the compressor.
+It never makes any frequency louder. Right at the Frequency it takes less than half the range, about 2.5 dB of the default 6 dB. An octave above it takes about 5.5 dB, and a larger range falls further short of its full depth there. Its threshold follows the clip's loudness the way the gate's does, and it runs after the gate and the leveller and before the compressor.
 
 *Agents:* `set_audio` with `de_esser: {frequency, threshold_db, range_db}`, `de_esser: {}` to turn it on at the defaults, or `de_esser: null` to turn it off.
 
@@ -416,7 +417,7 @@ The limiter holds the clip's peaks under a ceiling, so a quiet recording can be 
 
 The limiter is last in the clip's chain, after the Mix section, and it knows the clip's volume: the ceiling is where the clip's peaks land *after* the Volume slider, so turning the volume up makes the limiter work harder rather than pushing the clip past the ceiling. Fades and ducking only turn a clip down, so they never take it over the ceiling either. Normalize in Loudness mode turns it on for you when a clip needs it.
 
-Each clip's limiter holds that clip alone. Every export also runs a **master limiter** over the whole mix, the same kind of limiter at −1 dBTP (or the export's own ceiling), so two limited clips crossfading, a nest turned up or an action raising a clip's volume still can't take the file past it. The preview has no master limiter. See [Exporting](export.md#loudness).
+Each clip's limiter holds that clip alone. Every export also runs a **master limiter** over the whole mix, the same kind of limiter at −1 dBTP (or the export's own ceiling), so two limited clips crossfading, a nest turned up or an action raising a clip's volume still can't take the file past it. A stem is written without it, and the preview has no master limiter. See [Exporting](export.md#loudness).
 
 A track that has a limited clip on it plays every clip on it 3.3 ms later inside Frame Job and places them 3.3 ms earlier to match, so everything still lands on its frame. As with noise reduction, a clip that starts within the first 3.3 ms of the timeline loses that much of its start, and the last 3.3 ms of the track are not heard.
 
@@ -445,11 +446,11 @@ The section summary reads "centre", "mono" or the pan position. Reset sets the p
 
 **Clip ▸ Detach Audio** (⌥⌘D), or the **Detach Audio** button in the Mix section, splits each selected clip's sound onto a clip of its own on the track below. If the clip is already on the bottom track, Frame Job adds a new track underneath for it.
 
-- The original clip keeps its picture, and its audio is switched off.
+- The original clip keeps its picture, and its audio is switched off. It keeps any ducking it had, and it lowers its own sound too, so turn ducking off before you detach a clip ([Ducking](#ducking)).
 - The new clip plays only sound. It has the same file, in point, length and speed as the original, and it keeps the original's audio settings and actions.
 - The two clips stay **linked**. Each shows a link symbol after its kind icon, and selecting one draws a dashed ring around the other.
 
-Detach Audio is refused, with the reason given, for a clip that isn't a media clip, a clip whose file has no audio track, and a clip whose audio is already switched off. It's also refused when the track below already has a clip where the new audio clip would go. A new track is added only when the clip is on the bottom track.
+Detach Audio is refused, with the reason given, for a clip that isn't a media clip, a clip whose file has no audio track, and a clip whose audio is already switched off. It's also refused when the new audio clip would break the overlap rule on the track below: when it would overlap a clip there by more than half of the shorter clip, overlap more than one clip on one side, or overlap an adjustment clip at all. A smaller overlap is allowed and [makes a transition](editing.md#overlaps-make-transitions). A new track is added only when the clip is on the bottom track.
 
 A clip whose audio is off shows no waveform and no fade handles, and a clip with both its picture and its sound switched off is drawn dimmed.
 
@@ -464,7 +465,7 @@ A linked picture and sound stay in step in time through every edit:
 - **Ripple edits, Close Gap and Insert Time** move the other half too. One that would push a sound that starts before its picture past the start of the timeline is refused: "clip … would start before 0: it leads its linked clip … by … ticks".
 - **Slip** slips both, as far as the one with less room allows.
 - **Delete** on the picture deletes its sound too. Deleting the sound alone keeps the picture, silent. Detach Audio and then deleting the sound is how you remove a clip's sound.
-- **Speed** and **Reverse** are refused on a linked clip: "clip … is linked to clip …: Attach Audio before changing its speed or direction". Attach Audio first, change the speed, then detach again.
+- **Speed** and **Reverse** are refused on a linked clip, and so are Retime Range and adding, moving, changing or removing a Speed action: "clip … is linked to clip …: Attach Audio before changing its speed or direction". A rate stretch drag on one does nothing, with no message. Attach Audio first, change the speed, then detach again.
 - A clip on a locked track isn't moved, cut, copied or deleted with its partner.
 
 ### J-cuts and L-cuts
@@ -496,7 +497,7 @@ When a clip plays faster or slower, its sound either keeps its pitch or changes 
 
 ## Crossfading audio across a transition
 
-When two clips on one track overlap with a transition, the transition can also crossfade their sound. Turn on **Crossfade Audio** in the clip's Transition section. The crossfade keeps the combined loudness steady across the overlap. See [Motion and transitions](motion-and-transitions.md).
+When two clips on one track overlap with a transition, the transition can also crossfade their sound. **Crossfade Audio** in the clip's Transition section turns this on or off, and a transition Frame Job makes already has it on. At the default **Crossfade Shape**, +3 dB, the crossfade keeps the combined loudness steady across the overlap. See [Motion and transitions](motion-and-transitions.md).
 
 ## Muting and soloing tracks
 
@@ -577,12 +578,12 @@ How they work:
 
 ## Hearing a scrub
 
-When you click or drag along the ruler, you hear the sound under the playhead. Each time the playhead reaches a new frame, Frame Job plays about 80 ms of the mix forward from it, with a 5 ms fade at each end so the pieces don't click. Hold the mouse still and the sound stops within about a tenth of a second; let go and it stops.
+When you click or drag along the ruler, you hear the sound under the playhead. As the playhead reaches new frames, Frame Job plays about 80 ms of the mix forward from where it is, with a 5 ms fade at each end so the pieces don't click. A new piece is asked for only when no more than 40 ms of sound is left to play, so a fast drag skips frames. Hold the mouse still and the sound stops within about a tenth of a second; let go and it stops.
 
 - **It's the mix you'd hear playing:** each clip's volume, fades, ducking, pan, mono, mute and solo, and the compressor and noise reduction.
 - **Dragging left plays each piece forwards** from the playhead, not backwards, so a word stays recognisable.
 - **It's always on.** To silence it, mute or solo tracks, or turn down the Mac's volume.
-- **Only a scrub on the ruler is heard.** Stepping with ← and →, clicking a marker in the Document tab's Markers list and an agent's `set_playhead` move the playhead silently.
+- **Only a scrub on the ruler is heard.** Stepping with ← and →, **Go** in the Document tab's Markers list and an agent's `set_playhead` move the playhead silently.
 
 *Agents:* there is no tool; `set_playhead` is a silent seek.
 
@@ -619,7 +620,7 @@ The figures are the mix as the preview plays it, before the export's loudness se
 
 ## Loudness on export
 
-The level meter in the timeline bar shows peaks, not loudness; the Loudness Meter column shows the preview's loudness. To make an export hit a loudness target, such as integrated LUFS with a true-peak ceiling, use the export sheet's loudness option: the export reaches it through its master limiter, which holds every export's peaks under −1 dBTP. A WAV or AIFF can be written at 24 bits. Every export reports what its sound measured, whether or not you normalized it. See [Export](export.md).
+The level meter in the timeline bar shows peaks, not loudness; the Loudness Meter column shows the preview's loudness. To make an export hit a loudness target, such as integrated LUFS with a true-peak ceiling, use the export sheet's loudness option: the export reaches it through its master limiter, which holds the mix's peaks at or under −1 dBTP unless an agent sets another ceiling. A WAV or AIFF can be written at 24 bits. Every export reports what its sound measured, whether or not you normalized it. See [Export](export.md).
 
 An audio export can also write **stems**: each track's sound, or each track name's, as its own file beside the mix, for mixing or mastering in another editor. A stem is its tracks' sound before the master, with no loudness target and no master limiter, so the stems add up to the mix. Choose them in the export sheet's **Stems** row. See [Stems](export.md#stems).
 
@@ -640,7 +641,7 @@ In other words, a camera clip stays put and the recorder moves to it.
 - **It matches the sound itself.** Each file's sound is analysed once when it's imported, so differences in gain, microphone and room don't stop a match. When both clips contain enough speech, at least 2 seconds as judged by the on-device voice model, only the speech is compared.
 - **It searches the trimmed parts first.** Frame Job first looks for a match within the parts of each clip you have trimmed it to. It searches the whole files only if that finds nothing and one of the clips is trimmed. If a recording contains more than one similar stretch, trim the recorder roughly around the camera's sound so it matches the right one.
 - **It checks the waveforms.** A match is used only if the two waveforms also line up there, as a clear peak within 48 ms. This keeps two takes of the same words from being treated as one recording. The check also fine-tunes the offset to less than a frame.
-- **It corrects drift.** If two clocks run at slightly different rates, the recorder slowly falls out of sync over a long take. When the clips overlap for at least 60 seconds, Frame Job measures that drift and corrects it by playing the clip at a slightly different speed, at most 0.2 % from ×1. The correction is a plain resample, so the pitch moves very slightly with it. Drift is left alone when it is under 5 ms over the overlap, when it is too small to tell from no drift (under three times its own uncertainty), or when the speed it needs is more than 0.2 % from ×1. The corrected speed appears in the clip's Speed section (for example ×1.0004), with Keep pitch turned off. The command shows no drift figure of its own; that speed is where the correction shows. Like any clip at a speed other than ×1 with Keep pitch off, the corrected clip's sound is rendered in the background, so it is briefly silent in the preview after the correction, and again after each trim, split or speed change of it (see [Speed](speed.md)); an export waits for it.
+- **It corrects drift.** If two clocks run at slightly different rates, the recorder slowly falls out of sync over a long take. When the clips overlap for at least 60 seconds, Frame Job measures that drift and corrects it by playing the clip at a slightly different speed, at most 0.2 % from ×1. The correction is a plain resample, so the pitch moves very slightly with it. Drift is left alone when it is under 5 ms over the overlap, when it is too small to tell from no drift (under three times its own uncertainty), or when the speed it needs is more than 0.2 % from ×1. The corrected speed becomes the clip's Speed, with Keep pitch turned off, but the Speed section shows two decimals, so ×1.0004 reads 1.00×. The command shows no drift figure of its own; Keep pitch turned off and the section's Reset button are what show the correction. Like any clip at a speed other than ×1 with Keep pitch off, the corrected clip's sound is rendered in the background, so it is briefly silent in the preview after the correction, and again after each trim, split or speed change of it (see [Speed](speed.md)); an export waits for it.
 - **It trims the head if needed.** If a clip would have to start before 0:00 to line up, it loses just that much from its start instead, and starts at 0:00 in sync. The anchor is never moved or trimmed.
 - **Moves land on whole frames.** Clips move by a whole number of frames. A whole command is one undo step, named "Synchronize Audio".
 
@@ -710,11 +711,11 @@ The screen recorder can record a microphone with the screen, or record the micro
 - Ducking follows a clip's length on the timeline, not voice activity.
 - Noise reduction removes steady noise only. It doesn't remove sudden sounds and doesn't gate.
 - Voice isolation plays only at normal speed: a clip with a speed change, a ramp or a freeze frame plays without it. Two clips cut from one take are isolated separately, and the join between them may differ very slightly.
-- A voice effect also plays only at normal speed. A clip has one effect at a time. A reverb or echo tail ends with the clip, and a clip split from a take starts its effect fresh at the cut. The waveform, the Loudness read-out and Remove Silences hear the clip without its effect; Normalize in Loudness mode measures through it. On a stereo file a reverb or an echo mixes the two channels, so the channel choice picks from the effected pair.
-- Ducking, Keep pitch, the fade shapes and the voice effect can't be animated with an action; they always apply to the whole clip. A switch an action changes (a section turned on or off, the channel choice, an EQ slope, the mains) changes at the action's end without a glide, as at a cut between two clips. A voice effect is made from the clip's own Voice Isolation Amount, not an animated one.
+- A voice effect also plays only at normal speed. A clip has one effect at a time. A reverb or echo tail ends with the clip, and a clip split from a take starts its effect fresh at the cut. The waveform, the Loudness read-out and Remove Silences hear the clip without its effect; Normalize in Loudness mode measures through it. On a stereo file the channel choice comes after the effect, so it picks from the effected pair.
+- Ducking, Keep pitch, the fade shapes and the voice effect can't be animated with an action; they always apply to the whole clip. A switch an action changes (a section other than Voice Isolation or Noise Reduction turned on or off, the channel choice, an EQ slope, the mains) changes at the action's end without a glide, as at a cut between two clips. A voice effect is made from the clip's own Voice Isolation Amount, not an animated one.
 - On a nest clip, pan, the channel choice, the EQ, hum removal, the gate, the leveller, the de-esser, the compressor, voice isolation, the voice effect, noise reduction and the limiter have no effect. Set them on the clips inside.
 - The gate, the leveller and the de-esser act only once the clip's loudness has been measured, and the leveller once its speech has too; a clip shorter than 0.4 s, or too quiet to measure, plays and exports without them. An export waits up to five minutes for a measurement still running, then stops naming the clip. The leveller also does nothing on a clip with no phrase of at least a second of speech, or with no speech found where speech detection isn't available.
-- The gate has no lookahead, so a sound that starts loud after a long pause can lose its first millisecond while the gate opens. Neither stage has a listen or solo control for what it removes.
+- The gate has no lookahead, so a sound that starts loud after a long pause can lose its first moments while the gate opens: about a millisecond at the default Attack, longer at a slower one. Neither stage has a listen or solo control for what it removes.
 - The EQ's settings switch at a cut between two clips without a glide; the curve has no handles to drag.
 - The channel choice counts in the Loudness read-out; the EQ and hum removal don't.
 - Attach Audio needs the picture and its sound to cover exactly the same time. Undo a J-cut or L-cut, or trim the two to match, before attaching.
@@ -724,9 +725,9 @@ The screen recorder can record a microphone with the screen, or record the micro
 - Normalize, the Loudness read-out and Synchronize Audio need the clip's sound analysis, which runs after import. Until it finishes, those clips are skipped or refused as "still being analysed", and the read-out says "measuring…".
 - The loudness read-out and Loudness mode read a clip played at a speed other than ×1, or ramped, to within about 0.5 LU of what plays. A file with more than two channels is measured from a two-channel mix of it.
 - The limiter holds each clip on its own. Two limited clips that overlap (in a transition, or on two tracks) can add up past the ceiling, and so can a clip whose volume an action raises above its own Volume setting, a clip inside a nest whose volume is above 100 %, and the first moments after a hard cut from a louder clip on the same track, while the level settles. In an export the master limiter catches all of these; the preview has no master limiter, so they can sound louder while editing.
-- Loudness mode's result for a limited clip with no other processing is a model of the limiter, read from the loudness analysis; the export lands within a few tenths of a LU of it (−15.9 LUFS for the −16 example above). A clip measured through its processing is checked by rendering, so its result is the render's.
+- Loudness mode's result for a limited clip with no other processing is a model of the limiter, read from the loudness analysis; the export lands close to it (−15.9 LUFS for the −16 example above). A clip measured through its processing is checked by rendering, so its result is the render's.
 - Measuring through a clip's processing takes time in proportion to the clip's length, and the first press waits for the clip's voice isolation or voice effect to render. The At volume read-out doesn't measure on its own: it shows "≈" until Normalize or Enhance Voice has.
 - Enhance Voice sets the gate from the pauses it measured; on a voice with very soft word starts, check the gate's threshold by ear.
 - Match Audio matches the average tone of the speech, not the room, its reverb, its noise or its dynamics, and only with the EQ's five shelves and bands. It matches clips to a clip, not to a track or a mix, and the sheet doesn't remember its last choice.
 - The Loudness Meter measures only at normal speed, and only the first two channels of a track with more. It doesn't follow the export's loudness setting or its master limiter.
-- Scrubbing plays each piece forwards, even when you drag left, and the level meter stays still while you scrub. The compressor and noise reduction start fresh in each piece, so a scrub through a compressed clip can sound slightly different from playing it.
+- Scrubbing plays each piece forwards, even when you drag left, and the level meter stays still while you scrub. Each clip's effects, the compressor and noise reduction among them, start fresh in each piece, so a scrub through a compressed clip can sound slightly different from playing it.

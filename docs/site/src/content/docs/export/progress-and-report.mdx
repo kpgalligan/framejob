@@ -1,0 +1,127 @@
+---
+title: "Export progress and the report"
+description: Follow an export as it writes, cancel it, read its finish report, and find out why one failed.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+After you choose **Export…** on the export sheet, Frame Job asks where to save, then writes the file behind a progress sheet. When it's done, the sheet tells you what the sound measured and what went wrong, if anything did.
+
+<AtAGlance
+  menu="File ▸ Export…"
+  keys="⌘E"
+  where="The Exporting sheet"
+  tools={['export', 'export_status', 'cancel_export']}
+/>
+
+**Add to Queue** opens the same save panel, then writes the file behind the editor so you can keep working. See [The Export Queue](/export/export-queue/).
+
+## The save panel
+
+The save panel suggests the project's name with the format's extension, such as `Board v1.2.mp4`. Its message says what's being written:
+
+| Format | Message |
+| --- | --- |
+| A movie | "Export the timeline as a movie." |
+| Animated GIF | "Export the timeline as an animated GIF." |
+| Animated PNG | "Export the timeline as an animated APNG." |
+| Audio only | "Export the timeline's audio." |
+
+Cancelling the save panel writes nothing. The export sheet has already closed by then, and it keeps the choices you made for next time.
+
+## The Exporting sheet
+
+**Exporting** shows a progress bar, a percentage and a status line. The status line moves through these:
+
+| Status line | What's happening |
+| --- | --- |
+| "Preparing “*name*”…" | Frame Job is getting everything ready, and may be waiting for something the file needs. |
+| "Measuring loudness…" | The sound is being [measured](/export/loudness/#how-normalisation-works). Every export with sound does this, whether or not you chose a target. |
+| "Writing “*name*”…" | The file is being written. |
+
+The file is written from the timeline as it was when you confirmed it.
+
+### While it says Preparing
+
+Some of what a file holds has to be made first, so the export waits for it:
+
+- The masks of every [Remove Background](/effects/remove-background/#exports) clip in the range, with no time limit.
+- Each clip's cursor, from its [cursor file](/recording/cursor-files/).
+- The measured loudness of every clip with a gate, leveller or de-esser, for up to five minutes.
+- The rendered sound of speed changes, Voice Isolation and voice effects.
+
+GIF and APNG files have no sound, so they don't wait for the last two. You can cancel during any of these waits. [Waiting for what it needs](/export/what-an-export-includes/#waiting-for-what-it-needs) lists which clips each wait covers, and what happens if something can't be made.
+
+## Cancel a running export
+
+Choose **Cancel**. The button greys out while the export stops, then the sheet closes and the partly written file is removed.
+
+:::caution
+If you chose to replace an existing file in the save panel, that file is gone once you cancel. Cancelling doesn't bring it back.
+:::
+
+## The finish report
+
+When an export finishes, the status line names the file and says what the sound measured:
+
+> Exported “name.mp4”. Peak −1.0 dBTP · −14.0 LUFS.
+
+[What the loudness line means](/export/loudness/#what-the-loudness-line-means) explains those figures. A file with no sound has no figures. An export with [stems](/export/stems/) counts them after the name: "Exported “Mix.wav” and 3 stems."
+
+**Show in Finder** reveals the file and closes the sheet. **Close** closes the sheet.
+
+## Graphic and cursor warnings
+
+A warning doesn't stop an export. The finish line adds a count, and its tooltip lists each warning.
+
+| Warning | What happened | What the tooltip lists |
+| --- | --- | --- |
+| "1 graphic warning (hover for details)." | A [graphic](/graphics/what-is-a-graphic/) warned while the file was drawn. | Each warning, with the graphic's name and its frame. |
+| "1 cursor warning (hover for details)." | A clip's cursor file couldn't be drawn, so that clip is written without its cursor. | Each one, for example "The cursor of media 3 is not drawn: …" |
+
+The cursor count comes after the graphic count. A finished row in the Export Queue shows the same counts, and its tooltip lists the same warnings.
+
+## Failures
+
+**File ▸ Export…** is greyed out while the timeline is empty. Any other export that can't run says why in a sentence, on the sheet or on its queue row. On the sheet, **Close** dismisses it.
+
+| The sheet says | What to do |
+| --- | --- |
+| "The export was not started: the graphic …" | A graphic in the range doesn't compile or has no module. Fix it and export again. |
+| "The export was stopped at frame … of the graphic …" | A graphic failed at that frame. No file is left. |
+| "Clip …'s loudness or speech has not been measured yet…" | A clip's gate, leveller or de-esser needs that measurement. Wait for the **Status** rows in those sections to show the clip's loudness, then export again. |
+| "Clip …'s retimed audio could not be rendered: …" | The sound of a speed change couldn't be made. |
+| "Clip …'s isolated voice could not be rendered: …" | Voice Isolation couldn't be rendered for that clip. |
+| "Clip …'s voice effect could not be rendered: …" | The voice effect couldn't be rendered for that clip. |
+| "Clip …'s person masks could not be made: …" or "Clip …'s foreground masks could not be made: …" | A Remove Background clip's masks failed. No frame is written without them. |
+| "This Mac cannot export with the “…” preset." | This Mac has no encoder for that format. Choose another format. No file is left. |
+| "An export that keeps transparency has to have the canvas's own shape…" | A custom size has a different shape from the canvas. See [Transparent exports](/export/transparency/). |
+
+Other messages come from macOS or the file being written, and appear as they are.
+
+A failure is different from a cancel. A failed Animated GIF, Animated PNG or WebM export removes its partly written file, and so does a failed export with stems, a graphic that fails and a Mac with no encoder. Any other failure while writing can leave a partly written file at the path you chose. It isn't a finished export, so delete it.
+
+A file you chose to replace in the save panel is removed as writing starts, and it doesn't come back. If the export stops from that point on, for example at the [600-frame limit](/export/gif-and-apng/#the-600-frame-limit) or the [same-shape rule](/export/transparency/#the-same-shape-rule), you're left without the old file as well as the new one.
+
+## Quitting during an export
+
+While the Exporting sheet is on screen, Frame Job doesn't quit. Cancel the export, or let it finish and close the sheet, then quit.
+
+If the sheet is out of sight, because its window is minimised or Frame Job is hidden, quitting doesn't ask. The export stops and the partly written file stays where you saved it. A partly written MOV or MP4 won't open.
+
+Only the [Export Queue](/export/export-queue/) is guarded at quit, so jobs there ask before they stop.
+
+## With an agent
+
+An agent's `export` puts a job on the Export Queue and returns at once, with no progress sheet. A bad argument, a missing folder, an empty timeline or a graphic that doesn't compile comes back from `export` before anything is queued. Failures while writing and the loudness figures come back from `export_status`, and `cancel_export` stops the job.
+
+Warnings arrive in the finished `export_status` as `graphic_warnings` and `cursor_warnings`, and are left out when there are none. The list of graphic warnings stops after 64 distinct ones. See [Export: start, then poll](/mcp/export/).
+
+## Related
+
+- [The export sheet](/export/export-sheet/)
+- [The Export Queue](/export/export-queue/)
+- [What an export includes](/export/what-an-export-includes/)
+- [Export loudness](/export/loudness/)
+- [Graphics in exports](/graphics/graphics-in-exports/)
+- [Export: start, then poll](/mcp/export/)

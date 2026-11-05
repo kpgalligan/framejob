@@ -1,0 +1,94 @@
+---
+title: Duck by Speech
+description: Lower the other clips only while this clip's speech plays, so the music comes back up in the pauses.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Duck by Speech lowers the other clips only around this clip's stretches of speech, so the music rises again when the voice stops. It's [Ducking](/audio/ducking/) with **Duck by** set to **Speech**.
+
+<AtAGlance
+  where="Clip tab ▸ Sound ▸ Ducking ▸ Duck by"
+  tools={['set_audio', 'set_media_speech']}
+  needs="Nothing. Speech is detected on your Mac, with no key and no upload."
+/>
+
+## Duck only while someone speaks
+
+<Steps>
+
+1. Select the voice clip and open the **Sound** sub-tab of the Clip tab.
+
+2. In the **Ducking** section, tick **Duck other audio**.
+
+3. Set **Duck by** to **Speech**.
+
+4. Adjust [Pre-roll and Hold](#set-pre-roll-and-hold) if the music moves too early or too late.
+
+</Steps>
+
+Level, Attack and Release work as they do for [ducking by clip length](/audio/ducking/#the-controls), but apply to each stretch of speech rather than to the whole clip.
+
+## How it follows the speech
+
+For each stretch of speech, the attack starts Pre-roll before the first word, the others hold at Level until Hold after the last word, and the release follows.
+
+The pauses decide how often the music moves:
+
+- A breath under 0.2 s between words doesn't count as a pause.
+- Stretches whose Pre-roll and Hold meet count as one. At the defaults, that keeps the music down through any pause of 1 s or less.
+- Where one stretch's release meets the next one's attack, the others follow whichever is lower, so the level never dips below Level.
+
+Only the speech in the part of the file the clip plays counts. The stretches follow the clip's speed, reverse and speed ramps.
+
+## Set Pre-roll and Hold
+
+| Control | What it does | Default | Range |
+| --- | --- | --- | --- |
+| **Pre-roll** | How long before each stretch of speech the others start going down. Quick picks: 0, 0.25, 0.5 and 1 s. | 0.5 s | 0–5 s |
+| **Hold** | How long after each stretch of speech the others stay down before the release. Quick picks: 0, 0.25, 0.5 and 1 s. | 0.5 s | 0–5 s |
+
+Both are greyed out until **Duck by** is **Speech**, and both keep the length you type, not rounded to whole frames.
+
+They can reach past the clip's ends. If the speech starts on the clip's first frame, the others start going down Pre-roll before the clip does. As with [the release](/audio/ducking/#good-to-know), a clip that ends right before this one starts may stay at full level.
+
+## Where the speech comes from
+
+Frame Job detects speech in every file with sound when it's imported, on your Mac, with the same detection [Remove Silences](/cleanup/remove-silences/) uses.
+
+Choosing **Speech** saves where that file's speech is in the project, in the same undo step. The preview, every export and an agent then all follow the same stretches. A file keeps the speech it was given and isn't detected again, so another clip of the same file uses the same stretches.
+
+**Duck by** is greyed out, so you can't choose **Speech**, in two cases:
+
+- A selected file's speech is still being detected. Try again in a moment.
+- A selected clip isn't a clip of a file with sound, such as a nest.
+
+Relinking the clip's file to a shorter one keeps the speech that still fits. Relinking it to a file with no sound forgets the speech, and the clip no longer ducks anything.
+
+A file with no speech in it ducks nothing.
+
+## The line on the timeline
+
+A clip that ducks by speech has a thin yellow line across its waveform, so you can see what it's doing to the others. The line is high where they play at full level and low where they're ducked, and it follows the clip's speed, reverse and speed ramps.
+
+On a file with no speech the line stays flat along the top. There's no room for it on a very short waveform, and a clip ducking by Clip Length has no line at all. See [Reading a clip on the timeline](/timeline/reading-a-clip/).
+
+## Good to know
+
+Everything on [Ducking](/audio/ducking/#good-to-know) applies here too. Overlapping ducking clips multiply, a muted clip still ducks, and ducking can't be animated.
+
+## With an agent
+
+An agent turns on Duck by Speech with `set_audio`'s `duck`, setting `mode` to `speech` with `pre_roll` and `hold` if it wants them, and the file's speech is saved in the same step. It can't do so before the speech is detected, or on a clip that isn't a file with sound. See [Tools: clip sound](/mcp/tools-set-audio/#ducking).
+
+An agent can also do something the inspector can't: give a file stretches of speech of its own with `set_media_speech`, in place of the detected ones, and read them back from `get_project` as `media[].speech`. The times are positions in the file played forward, so they don't change with a clip's speed or direction.
+
+It takes up to 100,000 stretches, in order, inside the file's length and not overlapping, though two may touch. Frame Job won't save them for a file with no sound. An empty list says the file has no speech. See [Tools: media](/mcp/tools-media/#set_media_speech).
+
+## Related
+
+- [Ducking](/audio/ducking/)
+- [The volume line](/audio/volume-line/)
+- [Reading a clip on the timeline](/timeline/reading-a-clip/)
+- [What counts as silent](/cleanup/voice-or-level/)

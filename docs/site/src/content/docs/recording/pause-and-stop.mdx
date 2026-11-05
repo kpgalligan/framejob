@@ -1,0 +1,132 @@
+---
+title: "Start, pause and stop"
+description: "Start a recording with its three-second countdown, pause and resume it, stop it from wherever you are, and see what happens if you close the panel or quit."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Press **Record**, count down from 3, pause when you need a break, and stop from wherever you're working. Frame Job then adds the recording to your project, which it calls landing. This page also says what happens if you close the panel or quit along the way.
+
+<AtAGlance
+  menu={['File ▸ New Recording…', 'File ▸ Pause Recording', 'File ▸ Stop Recording']}
+  keys="⌥⌘N"
+  where={['New Recording panel ▸ Record', 'The menu-bar item while recording']}
+  tools="record_screen"
+/>
+
+## Start a recording
+
+<Steps>
+
+1. Set up the [recorder panel](/recording/recorder-panel/) and press **Record**.
+
+2. Frame Job checks the [permissions](/recording/permissions/) it needs.
+
+3. The panel counts 3, 2, 1, a second each. **Record** reads **Cancel** meanwhile, and the [microphone meter](/recording/system-audio-and-microphone/#check-your-level) already moves. Press **Cancel** or close the panel to stop, and nothing is recorded.
+
+4. The recording starts. For a display or a window, the panel leaves the screen and the [menu-bar item](/recording/menu-bar-item/) takes over. With **Source** set to **Camera** or **Microphone Only**, nothing on screen is filmed, so the panel stays up.
+
+</Steps>
+
+## What the button says
+
+The panel's main button tells you where the recording has got to.
+
+| The button reads | What's happening | Pressing it |
+| --- | --- | --- |
+| **Record** | Nothing yet. | Starts the permission checks and the countdown. |
+| **Cancel** | The countdown is running. | Ends it with nothing recorded. |
+| **Starting…** | The recording is starting. | It's dimmed. |
+| **Stop** | A recording runs or is paused. | Stops it and adds it to the project. |
+| **Stopping…** | The files are being written. | It's dimmed. |
+| **Adding…** | The files are being added to the project. | It's dimmed. |
+
+## If a recording doesn't start
+
+A recording that hasn't started within 20 seconds fails rather than hanging. The panel says "The recording did not start within 20 s." and goes back to **Record**. Any other failed start puts its reason in the same note.
+
+While the button reads **Starting…**, you can still stop with <kbd>⌥⌘N</kbd>, or by closing the panel. The **File** item may still read **New Recording…** at that moment. If Frame Job hadn't begun yet, the note reads "Stopped before the recording began; nothing was recorded." A moment later, it's too late to abandon: the recording ends as soon as it begins, and whatever it caught lands as usual.
+
+## One recording at a time
+
+Only one recording runs at a time. If you press **Record** while another runs or is paused, including one an agent started, the countdown runs and the panel then says "A recording is already in progress."
+
+## Pause and resume
+
+You can pause from any of these:
+
+- the [menu-bar item](/recording/menu-bar-item/)'s **Pause Recording**
+- **File ▸ Pause Recording**, directly under **New Recording…**
+- the panel's **Pause** button, for a [camera on its own](/recording/record-a-camera/) or a [voice-over](/recording/voice-overs/)
+
+While paused, each of these reads **Resume Recording** or **Resume**. The **File** item is available only while a recording runs or is paused. Pausing has no keyboard shortcut.
+
+If Frame Job can't pause a recording you started, it beeps and the recording carries on. A resume that fails leaves it paused, with the reason in the panel's note: at once if the panel is up, otherwise when it comes back after you stop. Try again, or stop and land what you have.
+
+## Paused recordings are stretches
+
+A pause ends the current file and a resume starts a new one, so a paused recording is several stretches. Each stretch has its own movie, and its own microphone, camera and [cursor files](/recording/cursor-files/) when the recording has them.
+
+- Each file is named by the moment its stretch began.
+- Each stretch keeps its own width, height and frame rate.
+- The paused time is in no file, and the elapsed time counts only what was recorded.
+
+When the recording lands, the stretches sit end to end on one track, touching, with no transition between them. Each stretch's microphone goes on the **Microphone** track, lined up with its own picture.
+
+## Stop a recording
+
+You can stop a running or paused recording from any of these:
+
+- the menu-bar item's **Stop Recording**
+- **File ▸ Stop Recording** (<kbd>⌥⌘N</kbd>). While any recording runs, **File ▸ New Recording…** reads **Stop Recording**, paused included.
+- the panel's **Stop** button, for a camera on its own or a voice-over
+
+Frame Job writes the files and [adds the recording to your project](/recording/where-it-lands/). If it lands with nothing to report, a hidden panel [stays hidden](/recording/where-it-lands/#when-the-panel-comes-back). Press <kbd>⌥⌘N</kbd> when you want it again.
+
+:::caution
+There's no global shortcut to stop. <kbd>⌥⌘N</kbd> works in Frame Job's own menus, so it does nothing while another app is in front. Use the menu-bar item.
+:::
+
+## Stop from macOS's indicator
+
+macOS shows its own indicator in the menu bar during a screen recording, and it can end the recording too. Frame Job keeps what was captured and adds it. The panel's note reads "Stopped from the system's screen-recording indicator; the recording was added." An agent's result says it was stopped this way.
+
+## The Welcome window during a recording
+
+The **New Recording…** button on the [Welcome window](/projects/welcome-window/) never stops a recording.
+
+- During a screen recording you started in the panel, it only beeps. Use **File ▸ Stop Recording** or the menu-bar item.
+- During a camera recording, a voice-over or an agent's recording, it shows the panel.
+
+## If the panel closes
+
+A recording carries on if the panel closes, under the menu-bar item and **File ▸ Stop Recording**. You can only do this with a camera on its own or a voice-over, because the panel is off screen for anything else.
+
+Closing it at other moments is different:
+
+- During the countdown, it cancels the countdown and nothing is recorded.
+- While the button reads **Starting…**, it counts as a Stop.
+- Closing also lets go of a microphone or camera that was warming up for a recording.
+
+## Quit during a recording
+
+Choosing **Quit Frame Job** (<kbd>⌘Q</kbd>) during a recording doesn't quit. It puts the recording's controls in front of you, so you can stop or resume first:
+
+- With the panel hidden for a screen recording, it opens the menu-bar item's menu.
+- For a camera recording, a voice-over or an agent's recording, it shows the panel.
+
+Frame Job reviews your unsaved projects before this. If that review closes the project you were recording into, the recording opens as a new project when it lands, and the note says so.
+
+## Stop an agent's recording
+
+A recording an agent starts shows the same menu-bar item, so you can pause, resume or stop it from there or from the **File** menu.
+
+Your Stop ends the agent's recording early, and what was recorded still lands. The agent's result shows the shorter length, and lists each stretch with the number of pauses. An agent asks for a length of real time, so a pause shortens what gets recorded rather than extending it. An agent has no way to pause or resume, and it has no countdown. See [Record with record_screen](/mcp/record-screen/#a-person-can-pause-or-stop-it).
+
+## Related
+
+- [The recorder panel](/recording/recorder-panel/)
+- [The menu-bar item](/recording/menu-bar-item/)
+- [Where a recording lands](/recording/where-it-lands/)
+- [When a recording stops on its own](/recording/when-a-recording-stops/)

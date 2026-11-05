@@ -1,0 +1,80 @@
+---
+title: "What an export includes"
+description: "The rules every export shares: what it matches, what it waits for, how it treats missing media, graphics and captions, and what it labels."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Whichever format you pick, every export follows the same rules. This page says what ends up in the file, what an export stops to wait for, and what makes it fail.
+
+<AtAGlance menu="File ▸ Export…" keys="⌘E" tools="export" />
+
+## The same picture and sound
+
+An export draws the picture the same way the preview does, so what you see while editing is what the file holds. It always writes the whole timeline, or the [range](/export/range/) you pick, even with a [nest](/editing/nests/) open.
+
+Every frame is drawn and encoded again, even a clip with no edits. There's no smart rendering or pass-through of a source's compressed frames, so ProRes in and ProRes out is a new generation.
+
+View-only settings never reach the file: [Preview Quality](/timeline/preview-quality/), [Show Ungraded](/color/show-ungraded/), [Show SDR Version](/hdr/show-sdr-version/), [Show Selection](/color/show-selection/), [safe areas](/canvas/safe-areas/) and the [scopes](/color/scopes/).
+
+The sound goes through a master limiter the preview doesn't have, so a mix that passes its ceiling sounds louder while editing than in the file. See [Export loudness](/export/loudness/). A [track compressor or limiter](/audio/track-dynamics/) is exact in the file and only approximate in the preview.
+
+## Waiting for what it needs
+
+Some of what a file holds has to be made first. An export waits for all of it, and never writes that sound silent or that clip uncut. If it can't be made, the export fails and names the clip, except for a cursor track.
+
+| It waits for | Which clips | If it can't be made |
+| --- | --- | --- |
+| Masks, made on this Mac | Every clip with [Remove Background](/effects/remove-background/) that the export draws, in Animated GIF and Animated PNG too | "Clip 4's person masks could not be made: …" (or "foreground masks", for a picture set to Foreground) and no file is written |
+| [Rendered sound](/speed/ramp-audio/) | Every speed ramp, and every clip at a constant speed other than ×1 with Keep pitch off | "Clip 4's retimed audio could not be rendered: …" |
+| The isolated voice | Every clip with [Voice Isolation](/audio/voice-isolation/) | "Clip 4's isolated voice could not be rendered: …" |
+| The voice effect | Every clip with a [voice effect](/audio/voice-effects/) | "Clip 4's voice effect could not be rendered: …" |
+| The clip's measured loudness and speech | Every clip with the [gate](/audio/gate/), [leveller](/audio/leveller/) or [de-esser](/audio/de-esser/) on, because their thresholds follow it | See below |
+| Cursor tracks | Every clip with a [recorded cursor](/recording/cursor/) | The clip draws without its cursor, the export goes on, and the finished line counts a cursor warning |
+
+Only the loudness wait has a limit. If a measurement hasn't finished after five minutes, the export fails with "Clip 4's loudness or speech has not been measured yet, so its gate, leveller and de-esser cannot be set. Wait for their Status rows to show the clip's loudness, then export again." A clip that will never be measured, because it's silent or under 0.4 seconds, doesn't hold the export up and exports as the preview plays it.
+
+While it waits, the [progress sheet](/export/progress-and-report/) reads "Preparing “Board.mp4”…", and a row in the [Export Queue](/export/export-queue/#rows-and-their-states) stays at `Writing · 0 %`. You can cancel at any point. An Animated GIF or Animated PNG has no sound, so it waits only for masks and cursor tracks.
+
+[Save Frame](/export/save-frame/#waiting-for-masks) works differently: it waits up to 30 seconds for masks, then saves the clip whole.
+
+## Missing media
+
+A clip whose file is missing still exports, showing its slate and with no sound. So does a [reversed clip](/speed/reverse/) whose backwards copy isn't rendered yet.
+
+An audio track none of whose clips can be read is written as silence, rather than failing the export. To put the real footage back first, [relink the media](/projects/relink-media/).
+
+## Graphics
+
+An export draws the [graphics](/graphics/graphics-in-exports/) as they were when you asked for it, even if a graphic's module, the code that draws it, is saved again while it runs. That also keeps a [queued job](/export/export-queue/#a-queued-jobs-snapshot) stable.
+
+If a graphic in the range doesn't compile or has no module, the export doesn't start: "The export was not started: the graphic "lower-third" … Fix the module and export again." This counts every graphic in a nest the range reaches, even one outside the part that plays. An audio-only export skips the check.
+
+That check is only a compile, so a graphic can still fail part-way through. The export then stops at that frame, names the graphic and leaves no file: "The export was stopped at frame 120 of the graphic "lower-third": … No file was written."
+
+## Captions
+
+Captions are ordinary text clips, so they're always burned into the picture. They're never a subtitle track a viewer can switch off. To write a separate subtitle file, use [**File ▸ Export Captions…**](/captions/export-captions/).
+
+## Colour labels
+
+An exported file carries colour labels, so players read it correctly. A GIF carries no label.
+
+| File | Primaries | Transfer | Matrix | Often written |
+| --- | --- | --- | --- | --- |
+| SDR | BT.709 | BT.709 | BT.709 | 1-1-1 |
+| [HDR (HLG)](/hdr/export-hdr/#hdr-hlg) | BT.2020 | HLG | BT.2020 | 9-18-9 |
+| [HDR10 (PQ)](/hdr/export-hdr/#hdr10-pq) | BT.2020 | PQ | BT.2020 | 9-16-9 |
+
+Movies are written in video range, the legal levels, and there's no full-range export.
+
+There's no choice of display gamma, such as 2.2 or 2.4, because a BT.709 label doesn't name one. Players and displays can read the same label differently, so a file can look lighter or darker in another app than in Frame Job's [preview](/timeline/preview/#colour-on-your-display). The pixels haven't changed.
+
+## Related
+
+- [The export sheet](/export/export-sheet/)
+- [Export progress and the report](/export/progress-and-report/)
+- [The Export Queue](/export/export-queue/)
+- [Export loudness](/export/loudness/)
+- [Export HDR](/hdr/export-hdr/)
+- [Transparent exports](/export/transparency/)

@@ -1,0 +1,94 @@
+---
+title: Freeze frame
+description: Hold the frame under the playhead for 2 seconds, keep the rest of the cut in sync, and choose which frame the still holds.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Freeze Frame holds one moment of a clip on screen for 2 s, then lets the clip carry on. Use it to pause on a reaction, or to give a title or a voice-over time to land.
+
+<AtAGlance
+  menu="Clip ▸ Freeze Frame"
+  keys="⇧⌘F"
+  tools={['freeze_frame', 'slip']}
+/>
+
+## Freeze a frame
+
+<Steps>
+
+1. Select the clip.
+
+2. Move the playhead to the frame you want to hold.
+
+3. Choose **Clip ▸ Freeze Frame**, or press <kbd>⇧⌘F</kbd>.
+
+</Steps>
+
+Frame Job splits the clip at the playhead, opens 2 s of empty time there, and fills the gap on the clip's track with a still of that source frame. The rest of the clip picks up after the still. All of this is one undo step, called **Freeze Frame**.
+
+The still has no sound, so the clip's own sound stops for the hold.
+
+If the playhead sits on the clip's first frame, there's nothing to cut. The still goes in and the whole clip moves after it.
+
+## When it is available
+
+Freeze Frame works on a selected clip under the playhead. With nothing selected there, it's dimmed. A playhead exactly at a clip's end isn't on that clip. With several selected clips under the playhead, it acts on the first.
+
+It needs a clip of a video file. A clip of an audio-only file, text, a shape, a picture, a graphic, an adjustment clip, a nest or another still can't be frozen. The command stays available on those, and Frame Job shows an error saying the clip "is not a media clip" or "has no video properties". Nothing changes.
+
+A clip of a video file freezes even with its picture switched off, or as the sound half of a [detached](/audio/detach-and-attach/) clip. The still shows the picture either way.
+
+## Everything stays in sync
+
+The 2 s opens across every unlocked track, so the cut stays together:
+
+- Clips that start at or after the playhead move 2 s later, on every unlocked track.
+- Markers at or after the playhead move with them.
+- A clip on another track that crosses the playhead is neither cut nor moved. It plays on through the hold, as a music bed would.
+- Sound [linked](/audio/detach-and-attach/) to the frozen clip is cut at the playhead too, and its second half moves with the picture.
+- Clips on locked tracks stay where they are.
+
+## The still keeps the clip's look
+
+The still keeps the clip's position, scale, crop and other picture settings as they were at that moment, including any action that was moving it. It lines up with the frame it froze, so the hold doesn't jump.
+
+The still has no actions of its own: its look at that moment is written into its own properties. See [How edits move actions](/motion/how-edits-move-actions/).
+
+A [motion preset](/motion/motion-presets/) isn't carried over, so the still doesn't arrive or depart again. Freeze partway through an arrival and the still sits where the clip belongs, without the preset's movement, so the picture jumps there.
+
+## Change the frozen frame
+
+Hold <kbd>⌥⇧</kbd> and drag the still's body. The still stays where it is and holds an earlier frame of the source as you drag left, or a later one as you drag right. It stops at the first and last frames of the file. This is a [slip](/editing/slip-and-roll/), one undo step called **Slip**.
+
+## Change how long it holds
+
+The hold is always 2 s from the menu. [Trim](/editing/trimming/) the still's end to change it. A trim moves only that edge, so shortening the still leaves a gap after it, which [Close Gap](/editing/close-gaps/) removes.
+
+A still has no file end to stop it, so it can hold as long as you like, but the rest of the clip sits right behind it. To hold for longer, [open room](/editing/close-gaps/#open-room-by-hand) after the still first, then drag its end out. Pulled over the next clip instead, it makes an [overlap](/editing/how-edits-work/#the-overlap-rule) with a Cross Dissolve.
+
+## On a ramped clip
+
+On a clip with a [speed ramp](/speed/speed-ramps/) or a changed speed, the still holds the frame actually playing at the playhead.
+
+A [reversed](/speed/reverse/) clip is different. The still counts forwards through the file, so it usually holds another frame from the one on screen. [Drag it](#change-the-frozen-frame) to the frame you want.
+
+## Good to know
+
+Frame Job won't freeze where the still would break the [overlap rule](/editing/how-edits-work/#the-overlap-rule). It beeps, the foot of the inspector says why, and nothing changes. Two places do this:
+
+- Inside a [transition](/motion/transitions/), where the two clips already overlap.
+- On a [locked track](/timeline/hide-and-lock-tracks/), because the rest of that track can't move out of the still's way.
+
+## With an agent
+
+`freeze_frame` takes the clip, an optional `at` (the playhead if left out) and an optional `duration` (2 s if left out), so it can hold any moment of a clip without moving the playhead, for any length of at least one frame. An `at` outside the clip or a shorter `duration` is an error. `slip` on a freeze frame moves the frame it holds. See [`freeze_frame`](/mcp/tools-speed/#freeze_frame).
+
+## Related
+
+- [Trim clips](/editing/trimming/)
+- [Slip and roll](/editing/slip-and-roll/)
+- [Split clips](/editing/splitting/)
+- [Close gaps and insert time](/editing/close-gaps/)
+- [Reverse a clip](/speed/reverse/)

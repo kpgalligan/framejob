@@ -1,0 +1,88 @@
+---
+title: "Trim clips"
+description: Shorten or lengthen a clip by dragging an edge, trimming to the playhead or typing a time.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Trimming changes where a clip starts or ends without moving the footage inside it. Use it to take the slack off a shot, or to pull back in what you cut too tightly.
+
+<AtAGlance
+  menu={['Clip ▸ Trim Start to Playhead', 'Clip ▸ Trim End to Playhead']}
+  keys={['W', 'E']}
+  where={[
+    'Timeline ▸ drag a clip edge',
+    'The Trim Start to Playhead and Trim End to Playhead buttons in the timeline bar',
+    'Clip tab ▸ Clip ▸ Timing ▸ In and Out',
+  ]}
+  tools={['trim_start', 'trim_end']}
+/>
+
+## Drag an edge
+
+Drag either edge of a clip. The edge is the outer 7 points of the clip. The pointer becomes a left-right resize cursor there, and a selected clip shows trim grips.
+
+- **A clip 21 points wide or less** on screen is all body, so [zoom in](/timeline/zoom-and-scroll/) to trim it.
+- **Clips on locked tracks** have no edges to grab and show no resize cursor. <kbd>W</kbd>, <kbd>E</kbd> and the **In** and **Out** fields still trim one, if you've selected it by clicking.
+- **A fade handle or an action band** under the pointer takes the press before the edge does.
+
+The drag [snaps](/timeline/snapping/) when snapping is on, and holding <kbd>⌘</kbd> turns snapping off for that moment. The whole drag is one undo step, Trim Clip.
+
+Hold <kbd>⌥</kbd> as you press a media clip's end edge to [rate stretch](/speed/rate-stretch/) it instead, which changes its speed to fill the new length. <kbd>⌥</kbd> on the start edge is an ordinary trim. <kbd>⌥⇧</kbd> on either edge is a [roll](/editing/slip-and-roll/).
+
+## What each edge does
+
+**A start trim** moves the clip's start and its place in the footage together. The frame under the edge stays put, and the rest of the clip stays where it is on the timeline.
+
+**An end trim** moves the clip's end. Nothing else about the clip changes.
+
+Neither trim moves the clips around it, so a trim leaves a gap or fills one. If you pull a clip over its neighbour, the overlap has to keep to the [overlap rule](/editing/how-edits-work/#the-overlap-rule). Where it does, the later clip gets a Cross Dissolve over the overlap, unless it already has a transition. Where it doesn't, a dragged edge waits at the last position that was allowed, and <kbd>W</kbd>, <kbd>E</kbd> or a typed time beeps and changes nothing.
+
+## Trim to the playhead
+
+Select the clips, move the playhead inside them, then press <kbd>W</kbd> to trim their starts to the playhead or <kbd>E</kbd> to trim their ends. **Clip ▸ Trim Start to Playhead**, **Clip ▸ Trim End to Playhead** and the matching buttons in the timeline bar do the same.
+
+Each selected clip the playhead is inside is trimmed, as one undo step: Trim Start for <kbd>W</kbd> and Trim End for <kbd>E</kbd>.
+
+When no selected clip crosses the playhead, the menu items are greyed out and the keys beep. The menu doesn't show <kbd>W</kbd> and <kbd>E</kbd> beside its items, but the buttons' tooltips name them.
+
+## Type a time
+
+Select one clip and open the **Timing** section of the Clip tab's **Clip** sub-tab. **In** is where the clip starts on the timeline and **Out** is where it ends. Typing a new time is the same trim as dragging that edge.
+
+A time past what the clip can reach lands at the limit, and the field shows where it went. See [Type a clip's timing](/editing/timing-section/).
+
+## How far a trim goes
+
+A clip always keeps at least one frame.
+
+A media clip's trim stops at the start and end of its file. The end stops on the last whole frame the file still holds. A [slip or a roll](/editing/slip-and-roll/) can't pass either end of the file either.
+
+Pictures, freeze frames, text, shapes, graphics, adjustment clips and nests have no file length, so they trim to any length. A trimmed [nest](/editing/nests/) cuts nothing inside it. Trimming its end hides the tail. A nest always plays from its own first frame, so trimming its start moves what's inside along with the new start, rather than cutting into it.
+
+## What a trim keeps
+
+- **Linked sound.** Trim a picture and its [detached sound](/audio/detach-and-attach/) follows, if the two edges matched and the sound's track isn't locked. Trim the sound half and it goes alone, which is how you make a [J-cut or an L-cut](/audio/j-and-l-cuts/). <kbd>W</kbd> and <kbd>E</kbd> work the same way. The **In** and **Out** fields always take a matching partner along, whichever half you selected.
+- **Actions.** They keep their time from the clip's start, so they stay put relative to the new start. An action past a new end is kept, and only the part inside the clip plays. See [How edits move actions](/motion/how-edits-move-actions/).
+- **Caption words.** Timed words stay on their speech.
+- **Speed ramps.** On a [ramped clip](/speed/edit-a-ramped-clip/), the ramp stays where it is in the clip, so what plays after a new start can change. The start stops where the clip still fits its media.
+
+## Trim a graphic
+
+Trimming the front of a graphic clip cuts into its animation. The **In** row of the **Timeline** section in the **Graphic** sub-tab moves forward, and the outro keeps its timing. That **In** counts the graphic's own frames, so it isn't the **In** field under **Timing**.
+
+A graphic has no file to run out of, so you can also drag its start back earlier. The graphic's **In** stops at 0, and the clip keeps growing.
+
+Trimming the end leaves a pinned **Length** alone. With **Follow Clip** on, the graphic's own timeline ends at the clip's new end. A clip longer than a pinned **Length** keeps drawing frames past it, with its progress held at the end. See [Graphic size and timing](/graphics/size-and-timing/).
+
+## With an agent
+
+[`trim_start`](/mcp/tools-move-and-trim/#trim_start) and [`trim_end`](/mcp/tools-move-and-trim/#trim_end) move an edge to a time you give them. With `alone`, they trim either half of a linked pair on its own. On the timeline, only the sound half trims alone. See [Tools: moving and trimming](/mcp/tools-move-and-trim/).
+
+## Related
+
+- [Slip and roll](/editing/slip-and-roll/)
+- [Rate stretch](/speed/rate-stretch/)
+- [Split clips](/editing/splitting/)
+- [Type a clip's timing](/editing/timing-section/)
+- [J-cuts and L-cuts](/audio/j-and-l-cuts/)

@@ -1,0 +1,89 @@
+---
+title: "Copy a grade"
+description: "Give other clips the grade you built on one clip, what comes with it, how LUTs and qualifiers travel, and what stops a paste."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+When one clip looks right, Paste Attributes gives its grade to any number of other clips in one undo step. This page covers what that means for a grade. [Paste Attributes](/editing/paste-attributes/) covers the command in full.
+
+<AtAGlance
+  menu="Edit ▸ Paste Attributes"
+  keys={['⌘C', '⌥⌘V']}
+  tools={['paste_attributes', 'paste']}
+/>
+
+## Copy a grade with Paste Attributes
+
+<Steps>
+
+1. Select the graded clip and press <kbd>⌘C</kbd>.
+
+2. Select the clips that should take the grade.
+
+3. Press <kbd>⌥⌘V</kbd>, or choose **Edit ▸ Paste Attributes**.
+
+</Steps>
+
+The copied clip's video settings replace each selected clip's, as one undo step called Paste Attributes. If nothing would change, Frame Job beeps.
+
+## What comes with the grade
+
+There's no way to paste the grade alone, because it travels with the rest of the clip's picture settings:
+
+- Light, Color, Wheels, Curves, and the look with its **Amount**
+- filters
+- everything else about the picture, including position and scale
+- the audio settings too, where the copied clip has sound and the target can take them
+
+A clip's place, speed, actions, transitions, name and label never come across.
+
+:::caution
+Position and scale come with the grade. Pasting onto a clip you've already placed moves it to where the copied clip sits. To share a grade without touching placement, put an [adjustment clip](/color/adjustment-clips/) above the clips instead.
+:::
+
+The paste replaces, it doesn't merge, so anything the target had that the copied clip didn't is gone. A grade that lives in an [action](/color/animate-a-grade/) doesn't travel either, because actions stay behind. The target takes the copied clip's own values, not its animation.
+
+## LUTs travel with a paste
+
+A look that uses an imported [`.cube` LUT](/color/luts/) keeps working when you paste it into another project, with Paste Attributes or with **Edit ▸ Paste**. The LUT arrives in that project's media along with the clip, and if the project already has the same file, the paste uses that one.
+
+A pasted look never lands on the wrong file. If what's being pasted doesn't carry the LUT, the clip gets no look.
+
+## Keep a grade for later
+
+A clip holds one grade. There are no grade versions, no gallery of stills and no way to save a grade or a look of your own, and Frame Job can't export a grade as a `.cube` LUT.
+
+A grade can still move between projects, because [Paste Attributes](/editing/paste-attributes/) works across them. Copy the graded clip in one project and paste onto clips in another. A project of graded clips you keep for this works as a library.
+
+## A qualifier between clips
+
+A [qualifier](/color/qualifiers/) belongs to an adjustment clip, so what happens to it depends on the clips at both ends of the paste.
+
+| Pasting | The qualifier |
+| --- | --- |
+| Onto a picture clip | Is dropped |
+| From a picture clip onto an adjustment clip | Stays as the adjustment clip had it |
+| From one adjustment clip onto another | Is copied |
+
+## When a paste stops
+
+An adjustment clip has no picture of its own, so some settings can't land on it. If the copied clip has a blur, sharpen or pixelate filter, or a blend mode, pasting onto an adjustment clip shows an error naming the clip and the setting, and nothing changes on any selected clip.
+
+Sepia, noir, vignette and invert filters paste onto an adjustment clip without trouble.
+
+To get past it, take the setting off the copied clip and copy it again, or leave the adjustment clip out of the selection. [When a paste stops](/editing/paste-attributes/#when-a-paste-stops) has the full list, for every kind of clip.
+
+## With an agent
+
+The menu item always copies each of the picture, sound, text and shape groups both clips have. An agent can list the ones it wants in `paste_attributes`'s `groups`, out of `video`, `audio`, `text`, `shape` and `graphic`, so `["video"]` brings the picture settings and leaves the sound alone. The grade is still part of `video`, so to set a grade and nothing else, an agent uses `set_video`. See [Tools: copying and nesting](/mcp/tools-copy-and-nest/#paste_attributes).
+
+## Related
+
+- [Paste Attributes](/editing/paste-attributes/)
+- [Copy, cut and paste](/editing/copy-and-paste/)
+- [Animate a grade](/color/animate-a-grade/)
+- [Adjustment clips](/color/adjustment-clips/)
+- [.cube LUTs](/color/luts/)
+- [Qualifiers](/color/qualifiers/)

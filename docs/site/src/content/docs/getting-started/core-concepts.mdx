@@ -1,0 +1,73 @@
+---
+title: "Core concepts"
+description: "The ideas the rest of these docs lean on: projects, media and clips, tracks, the canvas, actions, nests and the frame grid."
+---
+
+A few ideas run through everything in Frame Job. This page says what each one is and links to where it's covered. For a quick definition of a single word, see the [Glossary](/reference/glossary/).
+
+## Project
+
+A project is one `.framejob` package: a single file in the Finder that holds the edit and its caches. The edit is the canvas, the media list, the tracks, the clips and the markers. Frame Job can rebuild the caches, but not the edit, and the edit is all a package needs in order to open. Each open project has its own window.
+
+A project holds one timeline. There's no list of sequences. A [nest](#nests) is the nearest thing, and a second edit of the same footage is a second project, made with [**File ▸ Duplicate**](/projects/save-and-revert/), [New Project from Range](/projects/new-project-from-range/) or [Make Vertical Version](/framing/make-vertical-version/).
+
+Your footage stays where it is, and the project remembers where to find it. If you want copies inside the package, ask for them with [Consolidate Media…](/projects/consolidate-media/). See [The .framejob package](/reference/framejob-package/).
+
+## Media and clips
+
+**Media** is a file the project knows about. A **clip** is one placement of something on the timeline. A new clip from the [Media tab](/projects/media-tab/) covers the whole file, and you can place the same file as many times as you like.
+
+| Clip kind | What it plays |
+| --- | --- |
+| video | A movie file's picture, with its sound if it has any |
+| audio | A sound with no picture |
+| still | One frozen frame of a movie |
+| image | A picture file, such as a PNG, JPEG or HEIC |
+| text | [Words you type](/text-and-shapes/text-clips/) |
+| shape | [A drawn shape](/text-and-shapes/shape-clips/) |
+| graphic | [A motion graphic](/graphics/what-is-a-graphic/) |
+| nest | [A group of clips](#nests) standing as one |
+| adjustment | [A grade](/color/adjustment-clips/) applied to everything behind it. It draws nothing of its own. |
+
+Every clip that draws (video, image, still, text, shape, graphic and nest) is placed and edited the same way, with the same gestures and a **Picture** sub-tab. Crop and a few other Picture sections are only for movies, stills and pictures. Where a kind differs, its page says so.
+
+## Tracks and stacking
+
+There is one kind of track, and it holds any clip, so one track can mix kinds.
+
+Tracks stack back to front. The top lane is the front-most and the bottom lane is the back, so a track higher in the timeline draws in front. See [Tracks](/timeline/tracks/).
+
+## The canvas
+
+The canvas is the fixed frame every clip is drawn into, at the project's size and frame rate. You set its size, rate and background colour on the [Document tab](/projects/document-tab/).
+
+A clip is placed on the canvas. Moving or scaling a clip never changes the canvas. See [The canvas](/canvas/the-canvas/).
+
+## Actions
+
+An action is a span of time on one clip over which its properties ease to an end state. When the span is over, the clip holds that state until a later action changes it.
+
+An action's times are measured from the clip's own start, so it moves with the clip. Actions on one clip can't overlap, and a clip can have as many as fit end to end. See [Actions](/motion/actions/).
+
+## Nests
+
+A nest collapses several clips into one clip that stands for the group. The group then moves, trims, fades and transforms as one thing.
+
+You can open a nest and edit inside it, and nests can contain nests, up to eight levels deep. A nest's canvas is fixed at the project's size at the moment you nest. See [Nests](/editing/nests/).
+
+## The frame grid
+
+A clip's times always land on a whole frame of the project's frame rate, so you can't place a clip between two frames. Typed times, drags and agent calls all round to this grid of frames. A clip is always at least one frame long. See [How edits work](/editing/how-edits-work/).
+
+## Why clips never push each other
+
+Dragging a clip never shoves its neighbours. Two clips on a track may overlap a little, and the [overlap rule](/editing/how-edits-work/#the-overlap-rule) sets how much. A drop the rule won't allow springs back to the last place that was allowed, and moves nothing else. A clip dropped to overlap the clip before it gets a Cross Dissolve over the overlap.
+
+Other clips move only when a command says so, such as Ripple Delete, Close Gap, Insert, Freeze Frame and, for an agent, Insert Time. Locked tracks stay put through all of them.
+
+## Related
+
+- [Your first edit](/getting-started/first-edit/)
+- [A tour of the editor window](/getting-started/editor-window/)
+- [How edits work](/editing/how-edits-work/)
+- [Glossary](/reference/glossary/)

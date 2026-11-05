@@ -1,0 +1,208 @@
+---
+title: The helper and the socket
+description: How framejob-mcp reaches Frame Job, what it launches and how long it waits, the local socket and its permissions, and what each error means.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+This page is the detail behind the connection: what the helper will and won't launch, how the socket is guarded, and what to read when a client can't get through. To set up a client, see [Connect a client](/mcp/connect-a-client/).
+
+<AtAGlance
+  where={['Helper: Frame Job.app/Contents/Helpers/framejob-mcp', 'Socket: ~/Library/Application Support/Frame Job/Agent/agent.sock']}
+/>
+
+## The helper stays in the bundle
+
+The helper launches only the Frame Job it belongs to, so each copy of the app opens itself and never another copy. Always register it at its path inside the app.
+
+A helper moved out of the app can neither read the stored tool list nor launch Frame Job. A client can still start a session with it, but asking for the tool list returns an error when no Frame Job is running, and a tool call that finds no Frame Job fails with a message naming the executable:
+
+```
+framejob-mcp is not inside a Frame Job bundle: <path> is not <X>.app/Contents/Helpers/<name>, so there is no Frame Job to launch
+```
+
+The helper doesn't check which copy answers on the socket. If you have two copies of Frame Job and one is already running, the other's helper talks to the running one.
+
+## The local agent socket
+
+Frame Job opens a local Unix socket every time it launches, at:
+
+```
+~/Library/Application Support/Frame Job/Agent/agent.sock
+```
+
+There's no switch to turn it on or off, and no network port. See [Where Frame Job keeps its files](/reference/file-locations/) for the folders around it.
+
+### The socket's folder and permissions
+
+The socket sits in the `Agent` folder, and those permissions are its only protection. The folder is `0700` and the socket is `0600`, so only programs running as you can open it. Frame Job makes the folder that way when it's missing.
+
+The folder has to be a real folder, not a symlink. It has to be owned by you, with no permissions for group or others. If it isn't, Frame Job reports the problem in the [log](#socket-status-in-the-log) and doesn't open the socket. It never loosens or repairs the folder itself, so wrong permissions are yours to fix.
+
+### Streamable HTTP over the socket
+
+The socket serves MCP as streamable HTTP, so a client that can speak HTTP over a Unix socket can connect directly, without the helper.
+
+Each request is one JSON-RPC `POST /mcp`, and the reply is a single JSON response. There's no event stream (SSE) and no session id.
+
+| The client sends | The reply |
+| --- | --- |
+| Any HTTP method but `POST` | HTTP 405 |
+| A request body over 8 MiB | HTTP 413 |
+| A message that isn't JSON | HTTP 400 with error `-32700` |
+| A notification | HTTP 202 with no body |
+| A batch | A JSON array with a reply for each request in it. Notifications get no entry, and a batch of only notifications gets HTTP 202. The helper, by contrast, doesn't take batches. |
+
+A direct client gets none of the helper's help. It has no stored tool list, and nothing launches Frame Job for it.
+
+### Call a tool from a script
+
+With no session to open, a script can send `tools/call` straight away, without `initialize` first. Frame Job has to be running already.
+
+```sh
+curl --unix-socket "$HOME/Library/Application Support/Frame Job/Agent/agent.sock" \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_project","arguments":{}}}' \
+  http://localhost/mcp
+```
+
+The reply's `result` holds `isError` and `content`, a list of text and image blocks. See [What a call answers](/mcp/what-a-call-answers/). A call takes as long as its tool needs, so don't give a long one a short timeout.
+
+### One copy holds the socket
+
+With several copies of Frame Job open, the first owns the socket. A later copy finds another one already listening, leaves the socket alone and doesn't open its own. The later copy works normally in its window, but no agent can reach it.
+
+If the file at the path isn't a socket at all, Frame Job leaves that alone too, and opens nothing.
+
+### Stale socket cleanup
+
+A socket file left behind by a copy that crashed is removed and replaced automatically. Only a socket that responds counts as another copy, so a leftover never stops the next launch.
+
+### The socket released at quit
+
+Quitting removes the socket file if it's still this copy's. A tool call in flight can't hold up the quit.
+
+### Socket status in the log
+
+A launch that can't open the socket logs why and carries on, with no dialog. Frame Job works as usual, and no agent can reach that copy. Look in the Console app for a line starting "Frame Job agent socket".
+
+| The log says | What it means |
+| --- | --- |
+| `Frame Job agent socket listening at <path>` | The socket is open. |
+| `… not bound: another instance answers at <path>; this one binds none` | [Another copy](#one-copy-holds-the-socket) holds the socket. |
+| `… not bound: <folder> is mode 0755; the socket's folder must be its owner's alone (0700)` | The folder lets someone else in. The mode shown is the one it has. |
+| `… not bound: <folder> is not a folder (a symlink is refused)` | The folder is a symlink. |
+| `… not bound: could not make the folder <folder>: <reason>` | The folder is missing and can't be made, or a file is in its place. |
+| `… not bound: <folder> is owned by uid 501, not this user (502)` | Someone else owns the folder. |
+| `… not bound: <path> exists and is not a socket; it is left alone` | Something else is at the socket's path. Frame Job won't delete it. |
+| `… not bound: socket path is 110 bytes; macOS allows 103: <path>` | A [custom path](#a-custom-socket-path) is too long. |
+| `… not bound: socket path must be absolute: <path>` | A custom path doesn't start at the root. |
+
+### A custom socket path
+
+The environment variable `RC_AGENT_SOCKET` moves the socket, for both the app and the helper. It's for [testing a second copy](/mcp/connect-a-client/#testing-a-second-copy).
+
+- The path must be absolute, and at most 103 bytes. That's a macOS limit.
+- An empty value means the default path.
+- The path's folder follows the same [rules](#the-sockets-folder-and-permissions) as the default one. A folder that already exists with mode `0755` won't do. A missing folder is made with the right mode.
+- Only the socket moves. The test copy still shares your everyday copy's preferences.
+
+When the helper launches Frame Job for a custom socket, it passes the path on, tells macOS not to restore the app's windows from last time, and writes the app's error output to `framejob-launch.log` beside the socket. A launch for your own socket does none of this, so your Frame Job opens as yours.
+
+## When the helper launches Frame Job
+
+The helper launches Frame Job when a [tool call finds nothing listening](/mcp/overview/#opening-on-the-first-tool-call). It runs `open -n -g` on its own app, so the app stays in the background. Nothing else launches it: not a client starting up, not `ping`, not a request for the tool list.
+
+### One launch between several clients
+
+Two clients that both find no Frame Job launch one copy between them, not two. A lock file, `agent.launch.lock`, sits beside the socket, and the helper holds it until the launched copy responds or the wait ends. Another helper waiting on that lock looks again once it gets it, and finds the copy already running.
+
+Calls made at the same moment in one client session also launch at most once.
+
+### The launch wait
+
+The helper waits up to 60 seconds for a launched Frame Job to start listening. To change that, set the environment variable `RC_MCP_LAUNCH_WAIT` for the helper to a positive whole number of seconds. Any other value means 60.
+
+### Failed launches
+
+If a launched Frame Job never starts listening, the call fails with:
+
+```
+Frame Job did not answer at <socket> within 60 s of launching <bundle>
+```
+
+That client session then stops launching. While nothing responds on the socket, its later calls fail with the same message with this added, and start no more copies:
+
+```
+that instance may still be running, so this session will not launch another — quit it and check <folder>
+```
+
+One cause is the socket's folder: a copy that can't open the socket keeps running in the background and [logs why](#socket-status-in-the-log). To recover:
+
+<Steps>
+
+1. Quit the stray copy of Frame Job.
+
+2. Check the folder the message names, and the log.
+
+3. Open Frame Job yourself, or start a new client session. The session that failed won't launch again, but it does use a Frame Job that's already listening.
+
+</Steps>
+
+## While a client is connected
+
+Once a session is running, the helper passes calls to Frame Job and reports what goes wrong.
+
+### Long calls are never timed out
+
+A forwarded tool call can take as long as it needs, so a long recording or analysis is never cut off by the helper. Only the helper's own request for the tool list has a limit, the [5 seconds](/mcp/overview/#the-tool-list-with-frame-job-closed) before it falls back to the stored list.
+
+A `ping` gets a reply even while a long call holds the app, because the helper handles it itself.
+
+If the client closes, the helper exits at once, without waiting for a call in flight.
+
+### Errors from the helper
+
+A call the helper couldn't deliver comes back as an ordinary tool result with `isError: true` and a plain sentence, so a model can read it.
+
+| The result says | What it means |
+| --- | --- |
+| `could not connect to Frame Job at <path>: <reason>` | The socket is there but can't be reached, for example because of its permissions. |
+| `/usr/bin/open <bundle> failed (<status>): <reason>` | macOS couldn't launch the app. |
+| `Frame Job did not answer at <socket> within …` | See [Failed launches](#failed-launches). |
+| `could not read Frame Job's answer at <path>: the answer is over 8 MiB` | The helper won't read a reply larger than 8 MiB. |
+| `HOME is not set, so the agent socket's path is unknown` | The helper started with no home folder in its environment, and no custom path. |
+
+Other failures are JSON-RPC errors:
+
+| Code | When |
+| --- | --- |
+| `-32700` | The line isn't JSON. The reply has a null id. |
+| `-32600` | The message is a batch or isn't a JSON object, and the reply has a null id. A method that isn't a string gets this too. |
+| `-32601` | Frame Job isn't responding and the method is one the helper can't handle itself, or Frame Job doesn't know the method. |
+| `-32603` | The tool list couldn't be read from the app or from the stored copy, `Contents/Resources/agent-catalog.json`, and the message names both reasons. A forwarded method whose reply couldn't be read gets this too. |
+
+The helper passes any method but `initialize`, `ping`, `tools/list` and `tools/call` to the app when it responds. Notifications and responses from a client are dropped and never forwarded.
+
+The helper's standard output carries protocol only. Everything else it says goes to standard error, each line starting `framejob-mcp: `, so that's where to look in a client's logs.
+
+### Protocol versions
+
+Frame Job speaks three MCP protocol revisions: `2024-11-05`, `2025-03-26` and `2025-06-18`. It uses the revision a client asks for, or `2025-06-18` if it asks for any other. The app and the helper work from the same list.
+
+The helper's reply to `initialize` names the server `framejob`, gives the version of the Frame Job it belongs to, and declares tools with `listChanged`. A direct connection to the socket declares tools without it, because only the helper sends that notice.
+
+### Tool list changes
+
+A list from the stored copy can differ from the running app's, for example when another copy of Frame Job holds the socket. So after a client gets the stored list, or after a launch, the helper asks the app for its list following the next forwarded call. If it differs from what the client was last given, the helper sends `notifications/tools/list_changed` and the client can read it again.
+
+The lists are compared by their content, so a difference in key order doesn't count.
+
+## Related
+
+- [How an agent reaches Frame Job](/mcp/overview/)
+- [Connect a client](/mcp/connect-a-client/)
+- [How tool calls behave](/mcp/tool-calls/)
+- [What a call answers](/mcp/what-a-call-answers/)
+- [Troubleshooting](/reference/troubleshooting/)

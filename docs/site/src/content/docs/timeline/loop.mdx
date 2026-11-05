@@ -1,0 +1,48 @@
+---
+title: "Loop playback"
+description: "Repeat a passage of the timeline while you watch and adjust."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Loop keeps playback going round, so you can watch a passage over and over while you adjust it.
+
+<AtAGlance where="The Loop button in the toolbar" />
+
+## Turn Loop on
+
+Click **Loop**, the repeat button at the end of the transport in the toolbar. The button is dimmed while Loop is off and at full strength while it's on. Click it again to turn Loop off.
+
+Loop has no menu item and no key. It's off when a window opens, each window has its own setting, and it isn't saved with the project.
+
+## What it repeats
+
+| What's set | What Loop repeats |
+| --- | --- |
+| An [in/out range](/timeline/in-out-range/) | The range |
+| No range, or a range of no length | The whole timeline, going back to its start and stopping there |
+
+With a [nest](/editing/nests/) open, the whole timeline means the whole nest. Entering or leaving a nest clears the range.
+
+The loop follows as things change. Set a new in or out point, clear the range or change the timeline's length while Loop is on, and the next pass uses the new span.
+
+## How playback goes round
+
+When playback reaches the end of the loop, it jumps back to the loop's start and carries on, at [×2 and ×4](/timeline/playback/#j-k-and-l) as well.
+
+A loop that ends at the very end of the timeline is different, and that includes the whole timeline. Playback jumps back to the loop's start and stops there, so press play to go round again. To keep going round, set the out point before the end of the timeline.
+
+- Press play at or past the end of the loop and it starts again from the loop's start.
+- Press play before the start of the loop and it plays from where the playhead is. It only jumps back once it reaches the loop's end.
+- Loop only works forwards. Playing backwards with <kbd>J</kbd> doesn't go round, and carries on past the start of the loop.
+
+## Good to know
+
+- The **Preview** button in the [**Motion presets**](/motion/motion-presets/) section, and **Clip ▸ Motion ▸ Preview**, set the in/out range to the clip and turn Loop on. Both stay that way until you clear the range and turn Loop off.
+- Selecting words in the Transcript tab sets the range, so Loop plays those words. See [Follow along and jump](/captions/follow-the-transcript/).
+
+## Related
+
+- [The in/out range](/timeline/in-out-range/)
+- [Play, pause and shuttle](/timeline/playback/)
+- [Follow along and jump](/captions/follow-the-transcript/)

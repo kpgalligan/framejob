@@ -1,0 +1,90 @@
+---
+title: "Clip names and labels"
+description: Give a clip its own name, clear it again, and mark clips with a colour label so a busy timeline is easier to read.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A name says what a clip is, and a colour label sorts it. Both help you find your way around a busy timeline.
+
+<AtAGlance
+  menu={['Clip ▸ Rename…', 'Clip ▸ Label']}
+  keys="⇧⌘R"
+  where={['Double-click a clip on the timeline', 'The name field at the top of the Clip tab']}
+  tools="set_clip"
+/>
+
+## Rename a clip
+
+<Steps>
+
+1. Double-click the clip on the timeline, or select it and press <kbd>⇧⌘R</kbd> (**Clip ▸ Rename…**). A field opens over its name strip, showing the name the strip shows. With **Clip ▸ Rename…**, the timeline scrolls the clip into view first if it needs to.
+
+2. Type the name.
+
+3. Press Return or Tab, or click elsewhere.
+
+</Steps>
+
+The new name is its own undo step, **Rename Clip**, even when the click that ended it also made an edit.
+
+<kbd>Esc</kbd> closes the field and keeps the old name, with no undo step. Saving an empty field or an unchanged name does nothing, so a field you opened by accident is harmless.
+
+**Clip ▸ Rename…** is available when something is selected. With several clips selected, it opens the field on the first of them in timeline order. Spaces at either end of a name are trimmed.
+
+Double-clicking a nest clip opens the nest instead of renaming it. To rename a nest clip, select it and press <kbd>⇧⌘R</kbd>, or use the name field in the [Clip tab](#clear-a-name).
+
+## What a clip shows with no name
+
+A clip with no name of its own shows what it holds:
+
+| Clip | Shows |
+| --- | --- |
+| A nest | The nest's name |
+| A clip from a file | The file's name |
+| Text | Its words, or `Text` when it has none |
+| A shape | The kind of shape |
+| A graphic | `Graphic` |
+| An adjustment clip | `Adjustment` |
+
+## Clear a name
+
+The name field at the top of the [Clip tab](/getting-started/inspector/) names one clip. Empty it to clear the clip's name and go back to what the clip holds. This is the only place you can clear a name, because the field on the timeline ignores an empty name.
+
+The field also renames the clip when you type in it, and either way it's one undo step, **Rename Clip**. It appears only with a single clip selected. With several selected, the header reads how many, for example "3 clips selected".
+
+## Colour labels
+
+<Steps>
+
+1. Select the clips.
+
+2. Choose a colour from **Clip ▸ Label**: **Red**, **Orange**, **Yellow**, **Green**, **Blue** or **Purple**. Choose **None** to remove a label.
+
+</Steps>
+
+A label applies to every selected clip as one undo step, **Label Clip**. Labels are for your own sorting, and they don't change how a clip plays or exports.
+
+A labelled clip has a small dot in its colour at the right end of its name strip. On a clip too narrow to fit both, the strip keeps its kind symbol and drops the dot. See [Reading a clip](/timeline/reading-a-clip/).
+
+The menu is available when something is selected. It checks a colour when every selected clip has that label, and **None** when none has a label. Choosing a label every selected clip already has beeps and changes nothing.
+
+The [Clip tab](/getting-started/inspector/)'s header shows the dot at the end of the name line when every selected clip has the same label. There's no dot when they differ or none has one.
+
+## Good to know
+
+- A clip on a locked track can still be renamed, because a lock protects a clip's place on the timeline, and a name isn't placement.
+- Split, duplicate, detach and paste carry a clip's name and label to the new clip. [Paste Attributes](/editing/paste-attributes/) never does.
+- The field stays open through a zoom or a change an agent makes. If the clip is deleted while the field is open, the field closes and what you typed is dropped.
+- The same field renames [tracks](/timeline/manage-tracks/) and [markers](/timeline/markers/).
+
+## With an agent
+
+`set_clip` names or labels several clips in one step, where a person names one at a time. A name or label you leave out stays as it is, and null or an empty string clears it. It stores any label it's given, and one outside the six colours draws in the neutral text colour, so keep to the six. See [Tools: text, shapes and clip names](/mcp/tools-clip-properties/#set_clip).
+
+## Related
+
+- [Reading a clip on the timeline](/timeline/reading-a-clip/)
+- [Select clips](/timeline/selecting-clips/)
+- [Markers](/timeline/markers/)

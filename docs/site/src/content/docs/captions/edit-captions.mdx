@@ -1,0 +1,81 @@
+---
+title: "Edit captions"
+description: "Change a caption's words, case, look, position and timing, and see which edits keep a word caption's word-by-word timing."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A caption is an ordinary text clip, so you edit it the way you edit any text clip. The one thing to watch is word captions. Each of their clips is a **page** of words, with every word timed to the speech. Most edits keep that timing, and a few drop it.
+
+<AtAGlance
+  where={['Clip tab ▸ Text sections', 'Double-click a page on the canvas', 'The timeline']}
+  tools="set_text"
+/>
+
+## Edit captions in the Text sections
+
+Select a caption and open the **Clip** tab. The **Text** sections are **Content**, **Font**, **Style**, **Outline**, **Backdrop**, **Box**, **Reveal** and **Presets**, and they work as they do for any [text clip](/text-and-shapes/text-clips/).
+
+Select several captions to change them together. That's the quick way to set a font or a colour across a whole run. Take care with **Content**, though: what you type there replaces the text of every selected caption.
+
+To move a caption on the screen, drag it on the canvas or use the **Transform** section. To change when it shows, use the timeline, as [below](#trimming-splitting-and-moving-a-page). The **Presets** buttons set position as well as look.
+
+## Change the words on a page
+
+Type in the **Content** box, or double-click the page on the canvas and [type there](/text-and-shapes/edit-text-on-canvas/). The same rule holds in both places:
+
+| You change | What happens to the timing |
+| --- | --- |
+| The text, keeping the same number of words | Every word keeps its timing. Fixing a misheard word is safe. |
+| The number of words | The page loses its timing and shows plainly, with no word-by-word effect. |
+
+Words are counted by the spaces between them, so turning "gonna" into "going to" changes the count.
+
+A page that has lost its timing says **Not timed — regenerate to time it again** in the **Content** section. To time it again, [generate the captions again](/captions/restyle-captions/#restyle-by-generating-again). The new pages come from the speech, not from the old track, so your corrections, splits, trims and hand styling on that track go too.
+
+## Case on a word page
+
+The capitals on a word caption come from its style, through the **UPPERCASE** box in the **Style** section. Untick it to show a page as written.
+
+Case is applied when the page is drawn, so the **Content** box always shows the words as written, however the page looks. Changing case never drops the word timing.
+
+## Trimming, splitting and moving a page
+
+Trim, split and drag a page on the timeline with the usual tools. All three are safe for word timing:
+
+- **Trim** changes when the page is on screen. Each word stays on the speech it times, and the page's text doesn't change.
+- **Split** gives you two clips that play as the one page did. Both keep the page's words, each word still on its speech.
+- **Dragging** a page moves its words with it, so they stay in step with the page, not with the speech under it.
+
+## Reveals do not apply to a timed page
+
+The text reveals (**Typewriter**, **Word Fade** and **Line Rise**) don't work on a word caption page. The rows in the **Reveal** section are greyed, and the section says **Word style wins; the reveal does not apply.**
+
+That's true of any page with a word style, including one that has lost its timing.
+
+## Change a page's word style
+
+No inspector section sets a word style's highlight colour, pop scale or pill colour. To change them, [generate the captions again](/captions/restyle-captions/#restyle-by-generating-again) with a different style, or ask an agent.
+
+## Newly revealed speech stays uncaptioned
+
+When a speed-up or a ramp makes a clip play further into its file, the new part gets no captions until you choose **File ▸ Generate Captions…** again. [Captions follow a speed change](/speed/captions-and-speed/) explains how the captions you already have move.
+
+## Word timings for agents
+
+An agent can do two things here that the inspector can't: rewrite a page's word timings, and change its word style, both with `set_text`. Frame Job won't take a set of timings that doesn't have exactly one timing for each word of the page, so a change to the number of words has to clear the timings in the same call. Word timings can't be animated with an action. See [Word timings and word style](/mcp/tools-clip-properties/#word-timings-and-word-style).
+
+## Good to know
+
+- With an [action](/motion/actions/) selected on a page, a **Content** edit goes to that action and the page keeps its timing. Where the action's text has a different number of words from the page, the page shows plainly.
+- A split page is two text clips, so an [exported caption file](/captions/export-captions/) has two cues with the same words.
+- Frame Job won't run [Retime Range](/speed/retime-range/) over a caption page with timed words. Move the range off the page first.
+
+## Related
+
+- [Captions are text clips](/captions/how-captions-work/)
+- [Word caption styles](/captions/word-caption-styles/)
+- [Restyle a caption track](/captions/restyle-captions/)
+- [Re-lay captions for a canvas](/captions/re-lay-captions/)
+- [Captions follow a speed change](/speed/captions-and-speed/)
+- [Export captions](/captions/export-captions/)

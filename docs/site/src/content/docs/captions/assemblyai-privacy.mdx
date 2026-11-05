@@ -1,0 +1,82 @@
+---
+title: "What goes to AssemblyAI"
+description: What leaves your Mac when you transcribe with AssemblyAI, what you're billed for, how the transcript is deleted afterwards, and what happens when a delete doesn't land.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+When you transcribe with AssemblyAI, the sound of your files leaves your Mac. It leaves only when you press **Generate** in the Generate Captions sheet or **Transcribe** in the Remove Filler Words sheet, or when an agent calls `transcribe` with the AssemblyAI engine or `transcribe_for_fillers`. Frame Job then asks AssemblyAI to delete its transcript as soon as it has the words. Captions made [on this Mac](/captions/on-device-transcription/) never leave it.
+
+<AtAGlance
+  menu={['File ▸ Generate Captions…', 'Clip ▸ Remove Filler Words…']}
+  where="Frame Job ▸ Settings… ▸ Transcription ▸ ⓘ"
+  tools={['transcribe', 'transcribe_for_fillers']}
+  needs="Your own AssemblyAI key."
+/>
+
+## What is uploaded and billed
+
+| Goes to AssemblyAI | Stays on your Mac |
+| --- | --- |
+| The whole audio of each media file behind the chosen clips | The video |
+| Your **Vocabulary:** terms, and the language and **Speakers:** settings | The project and the rest of its media |
+
+The audio goes up as 16 kHz mono FLAC, about half the size of a WAV with the same samples. If the FLAC can't be written, a WAV goes up instead. Frame Job removes its temporary copy from your Mac when the upload ends, whether or not it worked.
+
+It's the whole file, not only the parts your clips use, and AssemblyAI bills for the whole file. A two-hour recording you use 30 seconds of costs two hours, about $0.42 at the rate [Frame Job shows](/captions/assemblyai-transcription/#the-price-before-you-press-generate). A file over 10 hours is turned down before anything is sent.
+
+The audio goes to the [region](/captions/assemblyai-key/#choose-a-region) set in Settings, and the sheet names that region before you press **Generate**. **Transcribe** in [Remove Filler Words](/cleanup/filler-transcripts/) sends audio in the same way.
+
+:::caution
+A recording of someone else goes to a third party here. Get their say-so first, or use **On this Mac**. The `transcribe` tool gives an agent the same warning.
+:::
+
+## The transcript is deleted after reading
+
+Each file's round trip runs in this order: upload, transcribe, read the words back, save them in the project package, then ask AssemblyAI to delete its transcript. You don't have to do anything. Each delete request has 5 seconds to answer.
+
+Frame Job also asks for the delete when a transcript fails, runs out of time or can't be used, and when you choose **Cancel** while AssemblyAI is working.
+
+A copy of the words stays in your [project package](/captions/assemblyai-transcription/#reuse-a-transcript). That copy is what makes later runs free.
+
+If AssemblyAI doesn't confirm the delete, [the result says so](#what-the-result-warns-about).
+
+## Unconfirmed deletes are retried
+
+An unconfirmed delete is retried at the start of the next AssemblyAI run in the same project that has a key. Every delete still waiting in the project is retried then, whichever files the run is about.
+
+The retry uses the key and region set at that later run, so it can only work with a key for the account and region that made the upload. The two regions don't share transcripts. If you've changed either since, set it back for a run.
+
+With no key set when that next run starts, nothing is sent, and the delete waits for a run that has one.
+
+## A pending delete holds a file back
+
+While a delete is pending, Frame Job won't upload that file again, because the kept transcript is its only record of the delete still to be made. If that file's kept transcript still matches the run, it's used as normal. If the file needs a new upload, or you ticked [Transcribe again](/captions/assemblyai-transcription/#transcribe-again), it waits:
+
+- The summary line counts it apart, as "1 file waiting on an earlier delete", and leaves it out of the price.
+- Resting the pointer on the summary gives its price: "It is waiting on an earlier delete and will not be uploaded in this run — about $0.42 more if it does."
+
+The hover line says "if it does" because the retry happens first. If the delete goes through at the start of the run, the file uploads in that same run. If it doesn't, the file isn't uploaded, and its clips are listed with the reason "AssemblyAI has not confirmed deleting its earlier transcript, so it was not uploaded again; the next run with an API key retries the delete".
+
+## What the result warns about
+
+These lines appear on the sheet's result card, with the file's name in place of "name".
+
+| The card says | What to do |
+| --- | --- |
+| "AssemblyAI has not confirmed deleting the transcript of “name”; it will be retried at the next run with an API key." | Nothing. Run AssemblyAI again in this project when you next need it, with the same account and region. |
+| "…It was not uploaded again in this run." | Added to the line above when the delete held the file back. |
+| "AssemblyAI has not confirmed deleting the transcript of “name”; cleanup was deferred because no API key is set. Its deletion ID is retained in the project; a later run with a key for the originating account and region will retry deletion only if that ID is safe to send." | Set the key for that account and region, then run again in this project. |
+| "AssemblyAI has not confirmed deleting the transcript of “name”. Its transcript could not be saved in the project, so Frame Job cannot retry deleting it automatically. Delete it in your AssemblyAI dashboard." | Frame Job has no record to retry from. Choose [Account Page](/captions/assemblyai-key/#open-your-assemblyai-account) in Settings and delete it there. |
+
+:::caution
+In an [untitled project](/captions/assemblyai-transcription/#transcribe-an-untitled-project), the record of a pending delete lives in a temporary folder. If you never save the project, that record is lost and Frame Job can't retry. Save the project, or delete the transcript in your AssemblyAI dashboard.
+:::
+
+## Related
+
+- [Transcribe with AssemblyAI](/captions/assemblyai-transcription/)
+- [Your AssemblyAI key](/captions/assemblyai-key/)
+- [Transcribe on this Mac](/captions/on-device-transcription/)
+- [AI features and your own keys](/getting-started/ai-and-your-keys/)
+- [Transcripts for filler words](/cleanup/filler-transcripts/)

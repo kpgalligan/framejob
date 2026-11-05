@@ -1,0 +1,102 @@
+---
+title: Retime Range
+description: Play the stretch between In and Out faster or slower on every unlocked track at once, and keep everything after it in step.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Retime Range plays the stretch between In and Out faster or slower on every unlocked track at once, and moves everything after Out up or back to stay in step. Use it to speed up a slow part of a screen recording with its microphone and camera together.
+
+<AtAGlance
+  menu="Clip ▸ Retime Range…"
+  tools="retime_range"
+  needs="An in/out range."
+/>
+
+## Retime a range
+
+<Steps>
+
+1. Set [In and Out](/timeline/in-out-range/) around the stretch. The menu item is dimmed without them, and while another sheet is open.
+
+2. Choose **Clip ▸ Retime Range…**, right after **Close Gap**. It has no keyboard shortcut.
+
+3. Set the **Rate**, and tick or untick **Preserve pitch**.
+
+4. Choose **Apply**.
+
+</Steps>
+
+The whole edit is one undo step, **Retime Range**.
+
+## The sheet
+
+| Control | What it does | Default | Range |
+| --- | --- | --- | --- |
+| **Rate:** | How much faster the range plays. ×2 makes it half as long, and ×0.5 twice as long. The **Presets** pull-down offers 0.25×, 0.50×, 1×, 1.5×, 2×, 4×, 10× and 100×. | ×2 | ×0.1 to ×1000 |
+| **Preserve pitch** | Sets the pitch setting on every video or audio clip in the range, as [Keep pitch](/speed/keep-pitch/) does on one clip. | As the first video or audio clip on an unlocked track in the range has it, or on when there is none | |
+
+**Apply** at ×1 closes the sheet and changes nothing. At any other rate it retimes the range.
+
+If the rate takes a clip with sound past ×12, Frame Job [asks first](/speed/sound-at-high-speed/), because above ×12 a clip's audio is left out. **Set Speed** closes the sheet and applies the edit. **Cancel** leaves the sheet open with nothing changed.
+
+## What happens in the range
+
+The range gets shorter or longer by the rate, and everything after Out moves to match. A 10 s range at ×2 lasts 5 s, and what follows it starts 5 s earlier.
+
+### Clips across an edge
+
+A clip that crosses In or Out is cut there first, as [Split](/editing/splitting/) cuts it. Only the piece inside the range changes speed.
+
+### Rates multiply
+
+Each video or audio clip inside plays at its own rate times the **Rate**, so a ×2 clip retimed by ×2 plays at ×4. A [speed ramp](/speed/edit-a-ramped-clip/#scale-a-whole-ramp) keeps its shape, and every rate in it scales.
+
+### Titles, shapes and stills
+
+Titles, shapes, stills, images, graphics and adjustment clips inside are stretched or squeezed by the same amount. A graphic with a length of its own keeps it.
+
+### Actions
+
+Actions keep their place in each clip, at the same fraction of its length. See [How edits move actions](/motion/how-edits-move-actions/).
+
+### Markers and detached sound
+
+Markers inside the range move with the picture, and markers after it move with everything else. A detached sound linked to a moved clip moves with it.
+
+## Inside a nest
+
+Retime Range works inside a [nest](/editing/nests/), where it retimes the nest's own tracks and uses the nest's own In and Out. A nest has no markers of its own, so none moves.
+
+## When a range can't be retimed
+
+Nothing changes, and the reason appears at the foot of the inspector. Frame Job stops at the first problem it finds, working roughly in this order, so fixing one can show the next:
+
+| What stops it | What to do |
+| --- | --- |
+| The rate is outside ×0.1 to ×1000. | This only comes up with an agent, because the sheet's field stays inside this range. |
+| The range is under two frames. | Widen the range. |
+| A locked track has a clip that ends after In. It would fall out of step. | [Unlock the track](/timeline/hide-and-lock-tracks/), or move In past that clip. |
+| The range touches a nest clip. | Move the range off it, or retime inside the nest. |
+| The range touches a caption page with timed words. | Move the range off it. |
+| The range touches half of a linked pair. | Use [Attach Audio](/audio/detach-and-attach/) first. |
+| A transition touches the range. | Move the range off it, or remove the transition. |
+| Two markers would land on the same time. | Move one of them first. |
+| A clip would play faster than ×1000 or slower than ×0.1. The message names the clip and the rate. | Pick a gentler rate, or set the clip's own speed first. |
+| A clip would be squeezed under one frame. The message names it. | Pick a gentler rate. |
+
+A clip only has to overlap the range to count, so a nest or a linked clip that crosses In or Out stops the edit too.
+
+## With an agent
+
+`retime_range` makes the same edit, but it takes the range as times, `from` and `to`, so it needs no In and Out. It also needs a `rate`, and a rate of 1 changes nothing. `keep_pitch` is optional, and without it each clip keeps the setting it has.
+
+The result lists the pieces the cuts made in `new_clips`. It never asks about ×12: the clip's audio is left out, and the result carries `audio_left_out` and `audio_note`. See [Tools: speed and time](/mcp/tools-speed/#retime_range).
+
+## Related
+
+- [Change a clip's speed](/speed/change-speed/)
+- [Speed Up Typing](/recording/speed-up-typing/)
+- [The in/out range](/timeline/in-out-range/)
+- [Sound at high speed](/speed/sound-at-high-speed/)

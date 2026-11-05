@@ -1,0 +1,98 @@
+---
+title: "Save, revert and close"
+description: "Save a project as a .framejob package, let it autosave, make a copy, go back to an earlier version, and close it without losing work."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A project lives in a `.framejob` package. Save it once and Frame Job keeps the package up to date as you work, so most of these commands are about where the project lives and how to go back.
+
+<AtAGlance
+  menu={['File ▸ Save', 'File ▸ Duplicate', 'File ▸ Save As…', 'File ▸ Revert To ▸', 'File ▸ Rename…', 'File ▸ Move To…', 'File ▸ Share', 'File ▸ Close']}
+  keys={['⌘S', '⇧⌘S', '⌥⇧⌘S', '⌘W']}
+  tools={['save_project', 'close_project']}
+/>
+
+## Save a project
+
+Press <kbd>⌘S</kbd> or choose **File ▸ Save**. An untitled project asks for a name and a place first. After that, a save writes straight to the package.
+
+A project built around an opened movie, sound file or picture is untitled too. Its save panel opens in that file's folder with the file's name filled in, and the save writes a new package beside the file. It never writes over the file itself.
+
+The window's subtitle tells you where you stand. It reads, for example, `1920 × 1080 · 30 fps · edited` while there are changes that haven't been written, and the word `edited` goes when they have. The close button shows no dot.
+
+## Autosave
+
+Once a project has been saved, it autosaves in place, the macOS way: your changes are written to the package as you work, and you don't need to press <kbd>⌘S</kbd>. A project that has never been saved has no package to write to, so save it first.
+
+Because projects autosave, macOS adds its standard document commands to the **File** menu: **Duplicate**, **Rename…**, **Move To…**, **Revert To ▸** and **Share**.
+
+## Crash-safe writes
+
+Every save, autosaves included, writes the new package beside the old one and then swaps it in. A crash part-way through a save can't leave you with half a package.
+
+## Make a copy
+
+| Command | Key | What it does |
+| --- | --- | --- |
+| **File ▸ Duplicate** | <kbd>⇧⌘S</kbd> | Opens a copy of the project as a new untitled project. The original stays open as it was. |
+| **File ▸ Save As…** | <kbd>⌥⇧⌘S</kbd> | Writes the project to a new package, and the window carries on in it. Hold <kbd>⌥</kbd> with the **File** menu open and **Duplicate** becomes **Save As…**. |
+
+## Revert to an earlier version
+
+**File ▸ Revert To ▸** goes back to the last saved version, or lets you browse earlier versions of the package. It has no key.
+
+Going back throws away the changes made since that version. The playhead returns to the start, and the selection and the in/out range are cleared.
+
+## Rename or move a project
+
+| Command | What it does |
+| --- | --- |
+| **File ▸ Rename…** | Renames the project's package. |
+| **File ▸ Move To…** | Moves the project's package to another folder. |
+
+Click the window's title for the same two controls.
+
+Both act on the package alone. Footage the project points at stays where it is, unless you've copied it in with [Consolidate Media](/projects/consolidate-media/).
+
+## Share a project
+
+**File ▸ Share** opens the macOS Share menu for the project.
+
+:::note
+A package doesn't hold your footage until you've run [Consolidate Media](/projects/consolidate-media/). Without that, whoever receives it sees a project with missing media.
+:::
+
+## Close a project
+
+Press <kbd>⌘W</kbd> or choose **File ▸ Close**. What happens depends on the project.
+
+| The project is | What Close does |
+| --- | --- |
+| Saved | Writes any changes and closes without asking. |
+| Untitled, with changes | Asks whether to save first. |
+| Built around an opened movie, sound file or picture | Asks whether to save first, even if you've changed nothing. It always counts as an untitled project with changes. |
+| Untitled, with no changes | Closes without asking. |
+
+Hold <kbd>⌥</kbd> with the **File** menu open and **Close** becomes **Close All** (<kbd>⌥⌘W</kbd>).
+
+## A project saves only as a package
+
+A project only ever saves as a `.framejob` package. **File ▸ Save** can't make a movie or a still. Those are separate steps: see [the export sheet](/export/export-sheet/). What a package holds is on [The .framejob package](/reference/framejob-package/).
+
+## With an agent
+
+- [`save_project`](/mcp/tools-projects/#save_project) finishes only once the package is on disk. It needs a path the first time, and passing a path later writes there, as **Save As…** does. There's no tool for **Duplicate**.
+- `save_project` won't write to a path another open project holds, so close that project first. It won't write to a path a window is still opening either: call it again once the window has opened, or pass another path.
+- [`get_project`](/mcp/tools-projects/#get_project) reports `unsaved_changes`, so an agent can see whether anything is still unwritten.
+- [`close_project`](/mcp/tools-projects/#close_project) writes nothing. Where **Close** would save a project's changes, the tool leaves the project open unless you pass `discard`, which loses them. It also leaves a window open while a sheet is up. Once a project is closed, a call naming its path fails until the project is opened again.
+- The [Assistant](/assistant/what-it-can-do/) asks you before it saves, and it can't close a project, because that would close the window its conversation lives in.
+
+See [Tools: projects and history](/mcp/tools-projects/).
+
+## Related
+
+- [Undo and saving](/getting-started/undo-and-saving/)
+- [Open a project](/projects/open-a-project/)
+- [Consolidate Media](/projects/consolidate-media/)
+- [The .framejob package](/reference/framejob-package/)

@@ -1,0 +1,66 @@
+---
+title: "Zoom and scroll the timeline"
+description: "Zoom the timeline out to see a whole project or in to single frames, and scroll along it."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Zoom the timeline out to see a whole project at once, or in to place a cut on a single frame. Everything on this page changes the timeline only. To zoom the picture, see [Zoom and pan the preview](/canvas/zoom-and-pan/).
+
+<AtAGlance
+  menu="View ▸ Fit Timeline"
+  keys="⇧Z"
+  where={['The zoom controls at the right of the timeline bar', 'Pinch, or ⌥ or ⌘ and scroll, over the timeline']}
+/>
+
+## Zoom about the pointer
+
+Put the pointer on the part of the timeline you care about, then either:
+
+- pinch on a trackpad, or
+- hold <kbd>⌥</kbd> or <kbd>⌘</kbd> and scroll.
+
+The time under the pointer stays where it is while everything else spreads out or closes in around it, which makes this the best way to get close to one cut.
+
+## Use the zoom slider
+
+Drag the **Timeline Zoom** slider in the timeline bar. It zooms about the middle of the view, and it covers the whole zoom range on a log scale, so the same travel always changes the zoom by the same ratio.
+
+## Step with the zoom buttons
+
+The **Zoom Out** (−) and **Zoom In** (+) buttons sit either side of the slider. Each click moves the zoom by 5 % of the slider's travel, which is about 1.6 times, and keeps the middle of the view in place. Twenty clicks cross the whole range.
+
+## Fit the whole project
+
+Press <kbd>⇧Z</kbd>, click **Fit Timeline** (the double-arrow button after the + button), or choose **View ▸ Fit Timeline**. The whole project fits across the timeline pane and the view scrolls to the start.
+
+The menu item shows no key, because <kbd>⇧Z</kbd> is one of the keys the editor handles itself. This is the only timeline zoom with a menu item or a key.
+
+A project under 1 second long fits as if it were 1 second. With a [nest](/editing/nests/) open, Fit Timeline fits the nest.
+
+:::note
+**View ▸ Zoom In**, **Zoom Out** and **Zoom to Fit** zoom the preview, not the timeline.
+:::
+
+## How far it zooms
+
+A window opens with each second of the timeline 42 points wide on screen, not fitted to the project, so press <kbd>⇧Z</kbd> to see all of a long project. A point is the unit macOS measures the screen in.
+
+The zoom runs from 0.35 points per second, where an hour is 1,260 points wide, to 4,000 points per second, where one frame of a 30 fps project is about 133 points wide. It stops at either limit.
+
+The zoom isn't saved. Every window opens at 42 points per second again, and an agent has no tool to set it.
+
+## Scroll the timeline
+
+Scroll, or swipe with two fingers, over the timeline. The track headers stay at the left and the ruler stays at the top while the lanes move.
+
+The timeline keeps 260 points of empty room past the last clip, so you can reach the end and drag a clip beyond it.
+
+The view also moves by itself to keep the playhead in sight. See [The ruler and playhead](/timeline/ruler-and-playhead/).
+
+## Related
+
+- [The ruler and playhead](/timeline/ruler-and-playhead/)
+- [Jump around the timeline](/timeline/move-the-playhead/)
+- [Track height](/timeline/track-height/)
+- [Zoom and pan the preview](/canvas/zoom-and-pan/)

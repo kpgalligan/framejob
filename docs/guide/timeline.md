@@ -14,17 +14,19 @@ on [Editing](editing.md).
 |---|---|---|
 | Title bar | top | The project name, with canvas size, frame rate and "edited" (while unsaved) as the subtitle, e.g. `1920 × 1080 · 30 fps · edited` |
 | Toolbar | under the title bar | Transport, timecode, preview zoom, safe-area guides, **Export…** |
-| Preview | middle left | The frame under the playhead, at canvas size, letterboxed |
+| Preview | middle left | The frame under the playhead, letterboxed to fit the pane, or at the toolbar's preview zoom |
 | Inspector | middle right | The Clip, Media, Document, Transcript and Assistant tabs |
 | Timeline bar | above the timeline | The selection block, clip buttons, Snap, the level meter, zoom, track size (see [below](#the-timeline-bar)) |
 | Timeline | bottom | The ruler, track headers and lanes |
 
 Drag the dividers to resize the panes. The inspector can be 280–440 pt wide
-(304 pt to start) and the timeline 140 pt up to 60 % of the window (300 pt to
-start). The sizes you drag to are remembered. Dragging the inspector divider
-to the edge stops at its minimum width; the only way to hide the inspector is
-**View ▸ Hide Inspector** (⌥⌘I), which becomes **Show Inspector** while it is
-hidden and is also remembered. The window is at least 900 × 620 pt.
+(304 pt to start) and the timeline 140 pt up to 60 % of the space under the
+toolbar (300 pt to start). The sizes you drag to are remembered. The inspector
+divider stops at the minimum width until you drag about halfway on to the
+window's edge, which hides the inspector; drag the divider back out to show it.
+**View ▸ Hide Inspector** (⌥⌘I) hides it too and, unlike a drag, is remembered.
+It becomes **Show Inspector** while the inspector is hidden. The window is at
+least 900 × 620 pt.
 
 ### The toolbar
 
@@ -61,7 +63,7 @@ From left to right:
   are on [Canvas and layers](canvas-and-layers.md).
 - **Snap**, the snapping checkbox (see [Snapping](#snapping)).
 - **The level meter** (see [The level meter](#the-level-meter)).
-- **The zoom cluster**: −, the zoom slider, + and Fit (⇔) (see
+- **The zoom cluster**: −, the zoom slider, + and Fit (↔) (see
   [Zooming the timeline](#zooming-the-timeline)).
 - **S / M / L**, the track size (see [Row heights](#row-heights)).
 
@@ -106,8 +108,10 @@ for it (see [Editing](editing.md)).
 
 **Remove Track** removes an empty track at once. If the track still holds
 clips it asks first ("The track still holds 3 clips, which will be removed
-with it.") with **Remove** and **Cancel**. The last track can't be removed.
-**Remove Empty Tracks** always keeps at least one track.
+with it.") with **Remove** and **Cancel**. The last track can't be removed:
+the context menu greys the item out, and **Track ▸ Remove Track** beeps and
+says why at the foot of the inspector, after the alert if that track holds
+clips. **Remove Empty Tracks** always keeps at least one track.
 
 The **Track** menu works on the *current track*: the first selected clip's
 track, or the front-most track when nothing is selected. Besides the commands
@@ -156,7 +160,8 @@ Each track's height also depends on what it holds:
 | Only clips with sound and no picture | 40 pt | 60 pt | 82 pt |
 | Anything else (an empty track included) | 54 pt | 84 pt | 116 pt |
 
-At Small a clip shows little more than its name strip.
+At Small a clip on a text and shape track shows little more than its name
+strip.
 
 ## Reading a clip
 
@@ -172,11 +177,17 @@ where one ends and the next begins.
 - **Label dot**: a labelled clip gets a small dot in its label colour at the
   right end of the name strip. The block's colour still shows its kind.
 - **Filmstrip**: thumbnails along the picture part of a video or image clip,
-  under a wash of the clip's colour. Each thumbnail is the source frame at
-  that point, following speed, reverse and speed ramps.
+  under a wash of the clip's colour. Each thumbnail is the one kept for that
+  second of the source, following speed, reverse and speed ramps. A file keeps
+  one a second for its first 600 seconds, and anything later shows only the
+  clip's colour. An image has a single thumbnail, drawn along the clip's first
+  second, with only the clip's colour after it, and zoomed out until a 34 pt
+  tile spans more than 2 seconds it shows only its colour. A freeze frame's
+  strip starts at the moment it froze and runs on through the file's later
+  seconds, so past its first second the thumbnails aren't the frame it holds.
 - **Waveform**: the sound of a clip that has audio, drawn below the
   filmstrip on a clip that has both. Muted, or silenced by another track's
-  solo, it draws faded.
+  solo, it draws faded. A nest clip draws no waveform, even when it has sound.
 - **Fade handles**: small white squares at the top corners of the audio part.
   Drag one inward to fade (see [Audio](audio.md)).
 - **Volume line**: a thin white line over the waveform showing the level you
@@ -193,7 +204,7 @@ where one ends and the next begins.
   is wide enough to trim and its track is unlocked.
 - **Linked**: a picture and the sound Detach Audio split from it each show a
   link symbol after the kind symbol. When one is selected, the other gets a
-  dashed accent ring, because edits to one move both (see
+  dashed accent ring, because most edits to one carry to the other (see
   [Audio](audio.md#what-stays-in-sync)).
 - **Dimmed**: a clip on a hidden track, or one with both its picture and its
   sound switched off.
@@ -278,9 +289,11 @@ play: Play beeps.
 ### Loop
 
 Turn on **Loop** in the toolbar to loop playback. With an in/out range set it
-loops the range; otherwise it loops the whole timeline. Pressing play at or
-past the end of the loop starts again from the loop's start. Loop is set per
-window and isn't saved.
+loops the range; otherwise the loop is the whole timeline. A loop that ends at
+the end of the timeline doesn't repeat by itself: it jumps to its start and
+stops, and you press play to go round again. Pressing play at or past the end
+of the loop starts again from the loop's start. Loop is set per window and
+isn't saved.
 
 ### What you'll notice after an edit
 
@@ -304,12 +317,12 @@ project. `render_frame` writes the frame at a time as a PNG.
 | ⌥-scroll or ⌘-scroll | Zoom about the pointer |
 | Zoom slider | The slider in the timeline bar |
 | − / + buttons | Either side of the slider, in steps about the middle of the view |
-| Fit Timeline | ⇧Z, the ⇔ button, or **View ▸ Fit Timeline**. Fits the whole timeline in the view and scrolls to the start. |
+| Fit Timeline | ⇧Z, the ↔ button, or **View ▸ Fit Timeline**. Fits the whole timeline in the view and scrolls to the start. |
 
 A window opens at a fixed zoom of about 42 pt per second, not fitted to the
 project, so press ⇧Z to see all of a long project. The zoom runs from about a
-third of a point per second (hours on screen) to 4,000 pt per second (single
-frames wide).
+third of a point per second (an hour about 1,260 pt wide) to 4,000 pt per
+second (single frames wide).
 
 A plain scroll moves the view. **View ▸ Zoom In** (⌘+ or ⌘=), **Zoom Out**
 (⌘-) and **Zoom to Fit** (⌘0) zoom the *preview*, not the timeline. They step
@@ -332,7 +345,9 @@ The **selection block** at the left of the timeline bar names what is
 selected: one clip's name over its track and kind (`Track 2 · video`), or a
 count such as `3 clips` over the track (or `2 tracks`) and the kind (or
 `mixed`). With nothing selected it reads "No selection". Selecting clips on
-the timeline switches the inspector to its Clip tab.
+the timeline switches the inspector to its Clip tab, except that the
+Transcript tab stays, and so does the Assistant tab when nothing was selected
+before.
 
 **Edit ▸ Select All on Track** selects every clip on the current track: the
 first selected clip's track, or the front track when nothing is selected. It
@@ -377,10 +392,10 @@ its time, its name, **Chapter**, **Go** and **Delete**. With none it says
 "No markers. Press M to add one."
 
 A new marker is called `Marker N` and is red. Two markers can't share a frame,
-so M on a frame that already has a marker beeps, and a drag onto another
-marker's frame doesn't move it. **Next Marker** and **Previous Marker** pause
-playback and jump; they beep when there is no marker further in that
-direction, and are dimmed when the project has no markers.
+so M on a frame that already has a marker shows an alert and adds nothing,
+and a drag onto another marker's frame doesn't move it. **Next Marker** and
+**Previous Marker** pause playback and jump; they beep when there is no marker
+further in that direction, and are dimmed when the project has no markers.
 
 Markers belong to the whole timeline. While a nest is open the ruler shows no
 markers and drags don't snap to them, the three Mark ▸ marker commands are
@@ -495,7 +510,7 @@ bare keys still work, and so does Undo. It closes with its project window.
 
 | Setting | Remembered between launches |
 |---|---|
-| Timeline height, inspector width, inspector hidden | Yes |
+| Timeline height, inspector width, inspector hidden with ⌥⌘I | Yes |
 | Snapping, track size, Safe Areas, Preview Quality | Yes, for every project |
 | Preview Window position | Yes |
 | Timeline zoom, Loop, playhead, selection, in/out range | No |

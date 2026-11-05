@@ -1,0 +1,91 @@
+---
+title: Select an action
+description: Select an action from its band or by moving the playhead into it, see which one is selected, and leave it to edit the clip again.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+Select an action to change what it animates to. While one is selected, the fields in the Clip tab show and set what the clip reaches at the action's end, not the clip's own values.
+
+<AtAGlance
+  keys="Esc"
+  where={['A band on the timeline', 'Clip tab ▸ action lane']}
+/>
+
+<Shot
+  name="07b-clip-graphic-action.inspector"
+  alt="The Clip tab with an action selected. The action lane reads ACTIONS 1, editing 1, with a solid numbered band from a fifth to three fifths of the clip and the playhead line across it. Below it are a start time of 00:00:01:00, a length of 2.00 s and the curve Linear. The Graphic sub-tab and the Properties section each show a diamond and 3, and the rows accent, size and boxed carry a diamond, with boxed tagged at end."
+/>
+
+## Click a band
+
+Click an action's band on the timeline or in the Clip tab's [action lane](/motion/action-lane/). The action is selected, and the Clip tab then edits its end values.
+
+The playhead moves to the action's end, so the preview shows the state you're editing. When the action ends with the clip, the playhead stops one frame short, because the clip's very end has no picture.
+
+Clicking a band on a clip that's part of a multi-clip selection selects only that clip and its action.
+
+On the timeline the action is selected when you press. In the Clip tab's lane it's selected when you let go, so a drag in the lane selects the band when you drop it. See [Move, resize or remove an action](/motion/change-an-action/).
+
+## Adding selects the action
+
+An action made with [Add Action](/motion/add-an-action/), [Zoom to Region or Zoom Back](/motion/zoom-to-region/) is selected as it's added. The playhead doesn't move for this.
+
+## Play or scrub into a span
+
+While a clip is the only one selected, moving the playhead into one of its actions selects that action. Playing, scrubbing and stepping all count.
+
+Selecting a clip counts too. If the playhead is already inside one of its actions, that action is selected along with the clip.
+
+The playhead has to enter the span. An edit that puts a span under a still playhead selects nothing, and neither does an undo or a redo.
+
+## How a selected action looks
+
+On the timeline:
+
+- The action's band is solid.
+- A wash runs down the clip under the action's span.
+- The span is shaded on the ruler.
+
+In the Clip tab:
+
+- The action lane is tinted, and its header adds "· editing N" after the count.
+- The band is solid, and the **Clip** chip is no longer highlighted.
+- A detail row appears with the action's start, length, curve and trash button.
+
+## The Clip chip
+
+The **Clip** chip sits at the start of the action lane. It's highlighted while no action is selected, which tells you the fields edit the clip. Click it while an action is selected to leave the action.
+
+## Leave an action
+
+Do any of these, and the Clip tab shows the clip's own values again:
+
+- Press <kbd>Esc</kbd>.
+- Click the **Clip** chip.
+- Select a different clip.
+
+Moving the playhead out of the span doesn't leave the action. It stays selected, and the fields keep editing its end state.
+
+After <kbd>Esc</kbd> or the **Clip** chip, the playhead can stay inside the span without selecting the action again. It's selected the next time the playhead leaves and comes back.
+
+With no action selected, <kbd>Esc</kbd> does whatever it would do otherwise.
+
+## Selection is not an edit
+
+Selecting an action isn't an undo step, and it isn't saved with the project. A project always opens with no action selected.
+
+## Good to know
+
+- Only a single selected clip can have a selected action. Select a second clip and the action is deselected. The action lane then reads "Select one clip to edit its actions."
+- Where two bands sit under the pointer, the one painted on top wins, which is the later one.
+- Clicking a band that touches the next action puts the playhead on the first frame of that next action, but the one you clicked stays selected.
+- Removing the selected action deselects it.
+
+## Related
+
+- [Set what an action animates to](/motion/edit-an-action/)
+- [Move, resize or remove an action](/motion/change-an-action/)
+- [Action bands and the action lane](/motion/action-lane/)
+- [Actions](/motion/actions/)

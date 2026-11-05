@@ -1,0 +1,371 @@
+---
+title: "Record with record_screen"
+description: "How an agent records the screen, a camera or a voice-over for a set time and lands it in a project: every argument, what it returns and what can stop it."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+`record_screen` is **File ▸ New Recording…** without the panel. An agent says how many seconds to record, the call runs for that long, and the recording lands in the project the way one made with the panel does. There's no countdown, and the tool never asks for a permission.
+
+<AtAGlance
+  menu="File ▸ New Recording…"
+  tools="record_screen"
+  needs={[
+    'Screen Recording permission, for a screen recording',
+    'Microphone, Camera or Input Monitoring, only when the call uses them',
+    'A person has to give each permission first',
+  ]}
+/>
+
+## Record the screen
+
+The smallest call names only `seconds`:
+
+```json
+{ "seconds": 30 }
+```
+
+That records the main display for 30 seconds with its system sound, leaves Frame Job's own windows out of the picture, and lands the movie at the playhead of the front project. A recording then goes through these stages:
+
+- **It starts at once.** There's no countdown and no panel.
+- **It writes to disk.** The file goes to `~/Movies/Frame Job Recordings`, named for example `Screen Recording 2026-09-10 at 14.03.22.mov`, and it's never stored inside the project. A name that's already taken gets ` (2)`, ` (3)` and so on.
+- **It lands.** The movie becomes ordinary media, and a clip goes at the playhead on the front track of whatever is open, a [nest](/mcp/nests/) included. When that track has no room there, Frame Job adds a new track in front of everything. This is one undo step, **Add Recording**.
+- **It returns.** The call comes back once the recording is finished, imported and placed. See [What it answers](#what-it-answers).
+
+With no project open, the recording opens as a new untitled project instead, and `landed` reads `new_project`. Its canvas takes the movie's size and `rate`. Later calls address that project with `project` set to the recording's path, which is the path `get_project` reports for it. If the target project closes while the recording runs, the same thing happens and the answer's `note` says so.
+
+Only one recording runs at a time, whoever started it. A second call stops with "A recording is already in progress."
+
+A recording that a person pauses is written in stretches, one file for each run between pauses. This page uses that word throughout, and a recording never paused is a single stretch. See [A person can pause or stop it](#a-person-can-pause-or-stop-it).
+
+:::note
+The built-in [Assistant](/assistant/what-it-will-not-do/) can't call `record_screen`. Recording stays with a person at the Record button, or an agent connected from outside.
+:::
+
+[Where a recording lands](/recording/where-it-lands/) has the landing in full, and the two ways an agent's differs.
+
+## Choose a source
+
+`source` says what's recorded.
+
+| `source` | What it records | Files |
+| --- | --- | --- |
+| `screen` | A display or a window. The default. | `Screen Recording <date> at <time>.mov` |
+| `voice_over` | The default microphone alone, with no picture. | `Voice-over <date> at <time>.m4a` |
+| `camera` | A camera alone, with no screen. | `Camera Recording <date> at <time>.mov` |
+
+An argument the source can't use isn't ignored. The call stops with a message naming it, and nothing is recorded. A JSON null counts as not given. This is what each source takes:
+
+| Argument | `screen` | `voice_over` | `camera` |
+| --- | --- | --- | --- |
+| `seconds`, `project`, `path`, `place`, `enhance` | Yes | Yes | Yes |
+| `microphone` | Yes | Implied, and `false` stops the call | Yes |
+| `rate` | Yes | Yes, for a new project's canvas | No |
+| `camera`, `camera_format` | Yes, [beside the screen](#record-a-camera-beside-the-screen) | No | Yes |
+| `camera_layout`, `camera_cutout` | Yes, with `camera` | No | No |
+| `display`, `window`, `size`, `include_framejob_windows` | Yes | No | No |
+| `system_audio`, `show_clicks`, `cursor`, `keys` | Yes | No | No |
+| `auto_zoom`, `shortcut_overlays`, `speed_up_typing` | Yes | No | No |
+
+## The arguments
+
+Only `seconds` is required. The sections further down cover the arguments for [voice-overs](#record-a-voice-over), [cameras](#record-a-camera-alone) and the [steps after landing](#run-steps-after-it-lands).
+
+### Length and source
+
+| Argument | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `seconds` | number | Required | How long to record, from 1 to 600 seconds. It's wall-clock time, so a [pause](#a-person-can-pause-or-stop-it) shortens what's recorded. |
+| `source` | `screen`, `voice_over` or `camera` | `screen` | What's recorded. See [Choose a source](#choose-a-source). |
+
+### Display or window
+
+| Argument | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `display` | whole number, 0 or more | `0` | Which display, as an index into the displays that can be shared, 0 being the main one. Can't be used with `window`. |
+| `window` | whole number | None | The system window id (`CGWindowID`) of one window to record on its own, at that window's own size, instead of a display. Can't be used with `display`. |
+| `include_framejob_windows` | boolean | `false` | Puts Frame Job's own windows, the editor and the preview, in a display recording. By default they're left out. With `window` it changes nothing. Frame Job's own sound stays out either way. |
+| `size` | `nominal` or `best`, in any case | `nominal` | `nominal` records a display's point size, and `best` its pixel size, twice the points on a Retina display. An odd dimension is rounded up to even. |
+| `rate` | `30` or `60` | `60` | The most frames a second the file may hold, and the canvas rate of a new project the recording opens as. A camera alone records at its format's rate instead. |
+
+A screen recording's frame rate is whatever the screen did, because a frame arrives only when something changes. A mostly still screen reports a low, fractional rate. That's the file and not a fault, and the picture holds its last frame to the end of the sound.
+
+### Sound
+
+| Argument | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `system_audio` | boolean | `true` | Records what the Mac plays as the movie's one stereo 48 kHz track. It takes in every app but Frame Job, so the timeline can play meanwhile and stay out of it. `false` writes a movie with no audio track, and `has_audio` reads false. |
+| `microphone` | boolean | `false` | Also records the default microphone, to a second file beside the movie named `<movie name> (Microphone).m4a`. |
+
+The microphone's file lands as its own clip on a new track at the back named **Microphone**, lined up with the picture by the measured `mic_offset`. When the microphone began first and there's no room for it there, the clip's head is trimmed rather than the clip landing late.
+
+A microphone that fails doesn't fail the recording. The picture lands, the stretch it failed in has no `mic_path`, and `mic_problem` and the `note` say why. See [System audio and the microphone](/recording/system-audio-and-microphone/).
+
+### Pointer and keys
+
+| Argument | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `cursor` | `separate` or `in_picture` | `separate` | `separate` keeps the pointer out of the movie, and Frame Job draws it on the clip from the cursor file, where you can restyle it. `in_picture` has macOS draw the pointer into the movie. |
+| `show_clicks` | boolean | `false` | Shows each mouse click. With `in_picture`, a ring is drawn around each click into the movie. With `separate`, the clips land with click ripples on, drawn by Frame Job. |
+| `keys` | `off` or `shortcuts` | `off` | `shortcuts` writes keyboard shortcuts into the cursor files, and needs the Input Monitoring permission. |
+
+Every display or window recording writes a cursor file beside each movie, named `<movie name>.fjcursor`, holding the pointer's path, its clicks and scrolls. A problem with it never fails the recording. `segments` reports it as `cursor_problem`, and the note repeats it. A `separate` stretch with no cursor file has no pointer at all, and the note ends "The pointer is not in the movie either: it was recorded Separate."
+
+With `keys: "shortcuts"`, the file records each shortcut pressed with ⌘ or ⌃, or with ⌥ and an arrow, Delete, Forward Delete, Return, Enter, Tab or Esc, spelled like `cmd+shift+4`. Every other key is a mark of the time alone, never which key was typed. Nothing is written while an app holds secure input. See [Record shortcuts](/recording/record-shortcuts/) and [The cursor in a recording](/recording/cursor/).
+
+### Where it goes
+
+| Argument | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `path` | string | `~/Movies/Frame Job Recordings` | A folder to record into, created if it doesn't exist. It names the folder and never the file, and the answer's `path` is the file that was written. A leading `~` means your home folder, and a blank string means the default folder. |
+| `project` | string | The front project | The open project to land in, as `get_project` reports its path. One that names nothing open stops the call. It never turns into a new project. |
+| `place` | boolean | `true` | Puts clips on the timeline, in one undo step with the media. `false` adds the recording to the media list only, and the note says to place it with `add_clip`. |
+
+In a new project `place: false` has no effect, because the project is made from the recording's picture. Its clips are on the timeline, one for each stretch and the first at 0, and the `note` says so.
+
+## Record a voice-over
+
+`source: "voice_over"` records the default microphone alone, as the panel's **Microphone Only** does. `microphone: true` is implied. The only permission it reads is the Microphone one, and it looks nothing up.
+
+Each stretch between pauses is its own `.m4a` file. The files land touching, from the playhead, on one new track at the back named **Microphone**, in one undo step, **Add Recording**. In a new project the first file starts the project, on a 1920 × 1080 canvas at `rate`, and later files touch it on its one track.
+
+The answer's `path` is the first `.m4a`, its `width` and `height` are 0, and it has no `mic_path`. A microphone that stops on its own ends the voice-over, what it wrote lands, and `mic_problem` and the `note` say so.
+
+See [Record a voice-over](/recording/voice-overs/).
+
+## Record a camera alone
+
+`source: "camera"` records one camera, with no screen, and lands it as a screen recording's picture lands. It reads the Camera permission and never the Screen Recording one. `microphone: true` adds the default microphone as a second file, as for a screen.
+
+Recording starts once the camera has settled at its frame rate, which takes up to a second, and `seconds` counts from its first frame. While it runs, a recorder panel left open with a camera chosen reads "The camera is recording." in its preview. The movie holds no sound, so `has_audio` is false. In a new project the canvas is the file's size at the format's frame rate, rounded.
+
+### Choose the camera and its format
+
+| Argument | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `camera` | string | The default camera with `source: "camera"`, none with `source: "screen"` | A camera's unique id, or its name in any case. Blank counts as not given. |
+| `camera_format` | string | `best` | The format to record at, in any case: `1920x1080@30`, or `1920x1080` for that size's highest frame rate, or `best`. Blank or null means `best`. |
+
+The default camera is the Mac's preferred camera, then the first built-in one, then the first connected. `best` is the largest size wider than tall that runs at 30 fps or more, at its highest frame rate.
+
+An unknown camera stops the call with a list of every camera connected, by name and id. With none connected the message is "No camera is connected." A format the camera doesn't have stops the call with a list of its formats. With `source: "screen"`, `camera_format` needs `camera`: "With source screen, camera_format needs camera — name the camera to record beside the screen."
+
+The answer carries `camera`, with the camera's `name`, `id` and `format`, spelled like `1920x1080@30`. It adds `problem` when the camera stopped on its own, which ends the recording with `stopped_by: "system_stopped"` and lands what it wrote, and `note` when the camera hadn't settled by the time recording began. The top-level `note` repeats both.
+
+See [Record a camera](/recording/record-a-camera/).
+
+## Record a camera beside the screen
+
+`source: "screen"` with `camera` records that camera at the same time as the screen, for a talking head over a screencast. It's the panel's **Record the camera too** box, and `camera_format` works as it does for a camera alone.
+
+Each stretch gets a camera movie named after its screen movie, like `Screen Recording 2026-10-26 at 17.14.33 (Camera).mov`. The camera files land in the same undo step as the screen, on one new track named **Camera** in front of the screen's. Each camera clip starts where its screen clip starts, moved by that stretch's measured `camera_offset`. A camera usually starts a little before the screen, and then the clip's first frames are trimmed rather than the clip starting early. A camera clip never starts before its screen clip, and never overlaps the camera clip before it.
+
+With `place: false` the camera files are added to the media list only, with no clip and no **Camera** track. In a new project the first movie starts the project, and its camera is one undo step: **Add Camera**, or **Add Camera and Microphone** with a microphone, for a recording that wasn't paused.
+
+The Camera permission is checked before the Screen Recording one. See [Record a camera beside the screen](/recording/camera-beside-the-screen/).
+
+### Lay the camera out
+
+| Argument | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `camera_layout` | see below | `corner_square` | How each camera clip lands, laid out from its first frame with its stretch's screen clip, as the panel's **Layout** does. |
+| `camera_cutout` | boolean | `false` | Runs [Remove Background](/effects/remove-background/) on the camera clips right after the landing, as the panel's **Remove the camera's background when it lands** box does. |
+
+| `camera_layout` | Panel's name | What you get |
+| --- | --- | --- |
+| `corner_square` | Corner | The bottom-right corner, scaled to fit a box a quarter of the canvas wide and a third of it tall, inside the 90 % safe area. |
+| `corner_rounded` | Rounded Corner | The same corner with rounded edges. |
+| `corner_circle` | Circle | The same corner as a circle. |
+| `side_by_side` | Side by Side | The screen and the camera next to each other. |
+| `camera_full` | Camera Full | The camera fills the canvas. |
+
+The layout reaches no further than the later end of the two clips. When a stretch's screen clip is missing, or isn't playing where its camera starts, that camera goes in the bottom-right corner instead. Either way it stays an ordinary clip you can move. [Camera layouts](/framing/camera-layouts/) has the rest.
+
+Both arguments need `camera`, and neither works with `source: "voice_over"` or `"camera"`. `camera_layout` and `camera_cutout: true` also need `place: true`. Frame Job checks all of this before it reads any permission, and the message says what's missing. For example: "With source screen, camera_layout needs camera — name the camera to record beside the screen."
+
+## Run steps after it lands
+
+These arguments run a command over the recording once it has landed. Each is its own undo step, so undoing one keeps the recording, and they run in the order of this table. The landing itself is the same with or without them.
+
+| Argument | What it runs | On which clips | Undo step | Needs |
+| --- | --- | --- | --- | --- |
+| `camera_cutout` | Remove Background | The camera clips | **Remove Background** | `camera`, `place: true` |
+| `enhance` | `enhance_voice` at −16 LUFS | The microphone's clips, or a voice-over's | **Enhance Voice** | `microphone: true` or `source: "voice_over"`, `place: true` |
+| `auto_zoom` | `auto_zoom` | The screen clips | **Auto Zoom** | `place: true` |
+| `shortcut_overlays` | `add_shortcut_overlays` | The screen clips | **Add Shortcut Overlays** | `place: true`, `keys: "shortcuts"` |
+| `speed_up_typing` | `speed_up_typing` | The screen clips | **Speed Up Typing** | `place: true`, `keys: "shortcuts"` |
+
+All default to `false`. The last three are the panel's **When it lands:** boxes, **Zoom in on clicks**, **Show shortcuts** and **Speed up typing**. `enhance` is its **Enhance the microphone when it lands** box. See [Polish when a recording lands](/recording/when-it-lands/).
+
+The screen clips are the clips of the recording's movies that have a cursor file. `enhance` never touches the picture, a camera or the system audio.
+
+### What they wait for
+
+The call stays open while these run, and `project` in the answer is read after them.
+
+- `enhance` waits for the microphone's loudness and speech to be analysed, up to 5 minutes.
+- `speed_up_typing` waits for the clips' speech to be detected, up to 5 minutes.
+- `enhance`, `auto_zoom`, `shortcut_overlays` and `speed_up_typing` also wait while the project is busy, up to 5 minutes: a drag is under way, or a different nest is open from the one the recording landed in.
+- `camera_cutout` waits for nothing, and runs straight after the landing.
+
+### The values they use
+
+They run at the tools' own defaults, never at what the sheets last remembered.
+
+| Step | Values |
+| --- | --- |
+| `enhance` | −16 LUFS. Call [`enhance_voice`](/mcp/tools-audio/#enhance_voice) afterwards for another target. |
+| `auto_zoom` | Zoom 2×, Arrive 0.6 s, Stay 2.5 s, Follow the cursor while zoomed on, Zoom on typing on, Replace existing zooms off, Motion blur 50 %. |
+| `shortcut_overlays` | Bottom, dark, 1.5 s. |
+| `speed_up_typing` | ×4 for stretches of 3 s or more, Keep pitch on. A speed-up that leaves a clip silent above ×12 is applied, and says so in `audio_note`. |
+
+### What each one answers
+
+Each step adds its own answer to the call's answer, under its name, or a sentence under `<name>_error` saying why it didn't run. The recording stays either way.
+
+| Key | Holds |
+| --- | --- |
+| `camera_cutout` | `clips`, the clips that were cut out. |
+| `camera_cutout_error` | "No camera clip landed on the timeline, so Remove Background did not run." |
+| `enhance` | What `enhance_voice` answers. |
+| `enhance_error` | That no microphone clip landed, that it wasn't ready to measure within 5 minutes, that the call was stopped first, or `enhance_voice`'s own reason. |
+| `auto_zoom`, `shortcut_overlays`, `speed_up_typing` | What each tool answers. |
+| `auto_zoom_error`, `shortcut_overlays_error`, `speed_up_typing_error` | That no screen clip with a cursor file landed, that the project was busy or the speech wasn't detected within 5 minutes, that the call was stopped first, or the tool's own reason. |
+
+If `auto_zoom`, `shortcut_overlays` or `speed_up_typing` fails for a reason of its own, the next one still runs. When no screen clip landed, a wait runs out or the call is stopped, none of the remaining ones run, and each gets its own sentence.
+
+## It never asks for a permission
+
+`record_screen` reads each permission and never requests one. It never shows a system prompt, never opens the window picker and never opens System Settings. A person grants them in the panel, usually by pressing **Record** in **File ▸ New Recording…** once. See [Recording permissions](/recording/permissions/).
+
+| Permission | When it's read | What the call says when it's missing |
+| --- | --- | --- |
+| Screen Recording | Any `screen` recording | "Screen Recording is not granted to Frame Job. Turn it on in System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording, then relaunch." |
+| Microphone | `microphone: true` or `source: "voice_over"` | "The microphone is not granted to Frame Job (status: denied)." and the Microphone pane. With status `notDetermined`, it says to press Record in **File ▸ New Recording…** once. The status may also read `restricted`. |
+| Camera | `source: "camera"` or `camera` | "The camera is not granted to Frame Job (status: denied)." and the Camera pane. With status `notDetermined`, it says to press Record with the Camera source once. |
+| Input Monitoring | `keys: "shortcuts"` | "Input Monitoring is not granted to Frame Job. Turn it on in System Settings ▸ Privacy & Security ▸ Input Monitoring." |
+
+A Frame Job launched from a shell runs under the terminal's permissions, not its own. Each of these messages then also names the launching process by its pid, and says the permission that counts is that application's, or to relaunch with `open -a "Frame Job"`.
+
+:::caution
+macOS periodically asks whether to keep letting Frame Job record, and neither Frame Job nor the tool can see that alert. A capture waiting behind it looks like a hang. When a start or a finish times out, the answer says an alert may be waiting on the screen. Answer it and call again.
+:::
+
+## What's checked first
+
+Frame Job checks a call in a fixed order and stops at the first problem. The caller's own mistakes come first, so an agent hears about a mistake even when no permission has been given.
+
+1. `seconds` missing or outside 1 to 600.
+2. `source` unknown, then the arguments that source can't take, including `camera_format`, `camera_layout` or `camera_cutout` on a screen recording without `camera`, then `microphone: false` with a voice-over.
+3. `display` with `window`, or a `display` or `window` that isn't a valid number.
+4. `rate` or `size` outside its values.
+5. `keys` or `cursor` outside its values.
+6. `enhance` without a microphone, then with `place: false`.
+7. `auto_zoom`, `shortcut_overlays` and `speed_up_typing`, in that order, each with `place: false`, and the last two without `keys: "shortcuts"`.
+8. `camera_layout` outside its values, then `camera_layout` and `camera_cutout: true` with `place: false`.
+9. The Microphone permission.
+10. The Input Monitoring permission.
+11. A `project` that names nothing open.
+12. For a camera, the camera lookup, then `camera_format`, then the Camera permission.
+13. For a screen, the Screen Recording permission.
+14. The display or window lookup. A window that can't be shared gets "No window with id 123 is shareable." An index past the last display gets "display must be 0…1 (got 3); 2 displays are shareable."
+
+When the console is locked or every display is asleep, step 14 says "No display is shareable right now — the console is locked or every display is asleep; nothing can be recorded until one is."
+
+After those, a call with a microphone needs a default microphone, or it stops with "No microphone is available." Then the recording starts.
+
+## How long the call takes
+
+| Stage | How long |
+| --- | --- |
+| Starting | Up to 20 seconds, then "The recording did not start within 20 s." |
+| Recording | `seconds`, plus about a second to start and finish. |
+| Finishing | Up to about 75 s more if the files are slow to close, and 60 s more for each further stretch of a paused recording. |
+| Finishing, with a camera beside the screen | Up to about 105 s more, and 90 s more for each further stretch, because each camera file is read too. |
+| Landing | Up to 20 seconds, while a drag in the target project ends. |
+| [Steps after landing](#what-they-wait-for) | Up to 5 minutes for each wait. |
+
+A finish that times out lists every movie it still holds, then the camera files, because they may yet finish on their own. If a drag outlasts its wait, the message names the files too, which are on disk either way:
+
+"The recording was saved at `<path>` but could not be added: …"
+
+Calls run one at a time, so a recording holds up the next call until it returns. See [How tool calls behave](/mcp/tool-calls/).
+
+## A person can pause or stop it
+
+While an agent records, the same [menu-bar item](/recording/menu-bar-item/) appears as for the panel, so a person at the Mac can pause, resume or stop it. **File ▸ Pause Recording** and **File ▸ Stop Recording** (<kbd>⌥⌘N</kbd>) work too. An agent has no tool to pause or resume.
+
+- **Stop** ends the call early and the recording still lands, with `stopped_by: "stopped"` and a `duration` shorter than `seconds`. That's the same value the tool's own stop gives, so the short `duration` is what tells the two apart.
+- **Pause** shortens what the call records, because `seconds` keeps running. The paused time is in no file, and `pauses` counts the presses, including a pause with no resume before the stop.
+
+A paused recording is a sequence of files, one for each stretch between a start or a resume and a pause or the stop. Each is named by its own start time and, with a microphone, carries its own microphone file. Every stretch lands as its own clip on one track, touching the one before, and each microphone file as its own clip on the **Microphone** track at its own offset.
+
+## What it answers
+
+Times are ticks, 600,000 to the second. See [Units and ids](/mcp/units-and-ids/). Most top-level keys describe the first stretch, the recording's own file.
+
+| Key | What it holds |
+| --- | --- |
+| `path` | The first stretch's file, the one a new project is addressed by. |
+| `duration` | The total recorded across every stretch. |
+| `width`, `height`, `fps` | The first stretch's picture size and frame rate, with `fps` as `[num, den]`. |
+| `has_audio`, `audio_tracks` | What that movie holds. `audio_tracks` is 1 with system audio, else 0. The microphone is never a track of the movie. |
+| `mic_offset` | Always present, and 0 with no microphone. The measured lead in ticks, positive when the picture began after the microphone. |
+| `mic_path`, `mic_duration` | The first stretch's microphone file, when it landed. |
+| `mic_problem` | Every stretch's microphone sentence, joined. It can stand beside a `mic_path` when a later stretch failed. |
+| `media`, `clip`, `mic_media`, `mic_clip` | The first stretch's ids. There's no `clip` or `mic_clip` with `place: false`. |
+| `camera` | The camera used, as in [Choose the camera and its format](#choose-the-camera-and-its-format). |
+| `pauses` | How many times Pause was pressed, 0 when never. |
+| `segments` | Always present, one entry for each file, in order. Exactly one for a recording never paused. |
+| `stopped_by` | `stopped` for the tool's own stop and a person's Stop from Frame Job. `user_stopped` for macOS's own screen-recording indicator. `system_stopped` for a display that slept or a camera that stopped on its own. |
+| `landed` | `document` or `new_project`. |
+| `unreadable` | Any stretches left out. See below. |
+| `note` | Present when there's something to say. |
+| `project` | The usual project summary. |
+| `new_media`, `new_clips`, `new_tracks` | The ids made, as every edit reports them, when it landed in an open project. `new_tracks` appears when a track was added. `scope` and `document_ops` appear when it landed inside a nest. See [What a call answers](/mcp/what-a-call-answers/). |
+
+Each entry of `segments` carries these keys. A screen recording's frame rate differs between stretches, so each has its own.
+
+| Key | What it holds |
+| --- | --- |
+| `path`, `duration`, `width`, `height`, `fps` | This stretch's file. |
+| `started_at` | When this stretch began, in UTC to the millisecond, like `2026-09-12T13:04:22.417Z`. |
+| `mic_offset`, `mic_path`, `mic_duration`, `mic_problem` | As at the top level, for this stretch. |
+| `media`, `clip`, `mic_media`, `mic_clip` | This stretch's ids, when known. |
+| `camera_path`, `camera_duration`, `camera_offset` | This stretch's camera file, when it landed. `camera_offset` is in ticks, positive when the camera began after the screen. |
+| `camera_problem`, `camera_note` | What went wrong with this stretch's camera, when anything did. The note repeats them. |
+| `camera_media`, `camera_clip` | The camera's ids, when known. |
+| `cursor_path`, `cursor_image` | This stretch's cursor file, when one was written. `cursor_image` reads `none` because no cursor image is recorded. |
+| `cursor_problem` | Why the file wasn't written, or holds only the geometry the screen had when the stretch began. |
+
+### When a stretch won't read
+
+A stretch whose movie won't read, such as an empty file from a pause straight after a resume, is left out rather than failing the recording. The readable stretches land, and `unreadable` lists each one left out, with its `path`, its `kept_files` still on disk and the `reason`. When its microphone file reads, the entry adds `mic_path` and `mic_duration`, and `mic_media` and `mic_clip` when known, and that microphone lands in the slot the picture would have had. A camera file from such a stretch stays on disk, named in `kept_files`, and doesn't land.
+
+Only a recording with no readable movie at all fails, and it names every file.
+
+## Undo a recording
+
+In an open project, one undo removes every stretch's media and clips and leaves the files on disk, as undoing Add Media… does.
+
+A recording that opened as a new project has no undo step for its first picture, because the project is made from it. Whatever came with it is one undo step, and undoing it leaves that first picture alone in the project:
+
+| What came with it | Undo step |
+| --- | --- |
+| A microphone, on a recording never paused | **Add Microphone** |
+| A camera, on a recording never paused | **Add Camera** |
+| A camera and a microphone, on a recording never paused | **Add Camera and Microphone** |
+| Only click ripples, on a recording never paused | **Cursor Clicks** |
+| Later stretches of a paused recording, with all their files | **Add Recording Segments** |
+
+[Steps after landing](#run-steps-after-it-lands) undo first, one at a time, last first.
+
+## Related
+
+- [Tools: recording and screencasts](/mcp/tools-recording/)
+- [The recorder panel](/recording/recorder-panel/)
+- [Recording permissions](/recording/permissions/)
+- [Where a recording lands](/recording/where-it-lands/)
+- [Polish when a recording lands](/recording/when-it-lands/)
+- [When a recording stops on its own](/recording/when-a-recording-stops/)
+- [Recording files and formats](/recording/files-and-formats/)

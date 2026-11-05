@@ -1,0 +1,68 @@
+---
+title: Sound on a ramp
+description: How Frame Job renders the sound of a ramped clip in the background, why the clip goes silent for a moment, and what an export does about it.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A clip whose speed changes as it plays can't play its sound straight from the file, so Frame Job renders that sound in the background. While it renders, the clip is silent in the preview. An export always waits for it.
+
+<AtAGlance
+  where="Clip tab ▸ Clip ▸ Speed section ▸ Keep pitch"
+  tools={['set_speed', 'export']}
+/>
+
+## Rendered audio
+
+Two kinds of clip have their sound rendered into a separate file:
+
+- a clip with a [speed ramp](/speed/speed-ramps/), with **Keep pitch** on or off
+- a clip at a constant speed other than ×1 with **Keep pitch** off
+
+A clip at a constant speed with **Keep pitch** on isn't rendered, and neither is a clip above ×12, because [it has no sound](/speed/sound-at-high-speed/).
+
+There's nothing to start. A new render begins after each edit that changes the clip's timing, such as a ramp, its rate, a trim or a split, and after you change **Keep pitch**. During a drag, it waits until you let go.
+
+Each render covers the whole clip's sound, so how long it takes grows with the clip's length and rate. Renders run one at a time, in the background, so you can keep editing. An edit that makes a render out of date drops it, so a run of quick edits doesn't queue up work.
+
+The files are saved inside the project package, in `cache/ramp-audio/`, and Frame Job can rebuild them. Until a new project is saved, they're in a temporary folder. [New Project from Range](/projects/new-project-from-range/) doesn't copy them, so the new project renders its own.
+
+## Keep pitch off
+
+The sound glides smoothly up and down in pitch with the rate, like tape, and stays in step with the picture. At a constant speed it plays at that speed's tape pitch.
+
+## Keep pitch on
+
+The sound keeps its own pitch as the speed changes. After a steep slow-down, such as ×2 to ×0.5, it can run up to about 24 ms behind the picture.
+
+See [Keep pitch](/speed/keep-pitch/) for the control itself.
+
+## Silent while it renders
+
+While a clip's sound is rendering, that clip plays silent in the preview. Everything else on the timeline plays as usual, and the clip's sound comes back on its own when the render finishes.
+
+## Undo and redo render again
+
+Undo and redo usually start a render too, because Frame Job drops the file from before the edit once a newer render lands. The clip is briefly silent then as well.
+
+## Exports wait for it
+
+An export waits for every render it needs and never writes that sound silent. The Exporting sheet reads "Preparing “*name*”…" during the wait, and a queued export's row reads `Writing · 0 %`. You can cancel either one there. This covers speed ramps and clips at a constant speed other than ×1 with **Keep pitch** off.
+
+An animated GIF or APNG has no sound, so it doesn't wait. An export an agent starts with `export` waits the same way.
+
+## A failed render
+
+If a render fails, an export that needs it stops with this message, naming the clip:
+
+> Clip N's retimed audio could not be rendered: …
+
+Frame Job doesn't try a failed render again while it stays open. The clip stays silent, and exports that need it keep failing, until you change the clip's timing, which starts a new render, or quit and reopen Frame Job.
+
+## Related
+
+- [Speed ramps](/speed/speed-ramps/)
+- [Keep pitch](/speed/keep-pitch/)
+- [Sound at high speed](/speed/sound-at-high-speed/)
+- [Edit a ramped clip](/speed/edit-a-ramped-clip/)
+- [What an export includes](/export/what-an-export-includes/)

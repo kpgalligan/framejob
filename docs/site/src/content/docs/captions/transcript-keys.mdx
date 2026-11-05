@@ -1,0 +1,71 @@
+---
+title: "Transcript keys"
+description: Every key the Transcript tab's text takes, for moving by word or line, selecting, clearing and deleting, and what the rest of the keyboard does there.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+While the transcript text has the keyboard, the arrows move through the words instead of the frames, and the delete keys cut words. Every other key works as it does on the timeline.
+
+<AtAGlance menu="View ▸ Transcript" keys="⌃⌘T" where="Inspector ▸ Transcript, with the text active" />
+
+To give the text the keyboard, choose **View ▸ Transcript** (<kbd>⌃⌘T</kbd>) or click in the text. Clicking **Transcript** in the inspector's tab strip shows the tab but doesn't give the text the keyboard.
+
+| Key | What it does |
+| --- | --- |
+| <kbd>←</kbd> <kbd>→</kbd> | Select the previous or next word and move the playhead to it |
+| <kbd>↑</kbd> <kbd>↓</kbd> | Select the nearest word on the line above or below and move the playhead to it |
+| <kbd>⇧</kbd> with an arrow | Extend the selection without moving the playhead |
+| <kbd>⌘A</kbd> | Select every word |
+| <kbd>⎋</kbd> | Clear the selected words or pause |
+| <kbd>⌫</kbd> <kbd>⌦</kbd> | Delete the selected words and close the gap, or shorten the selected pause |
+
+## Move word by word
+
+<kbd>←</kbd> and <kbd>→</kbd> select the previous or next word and move the playhead to it. If the video is playing, it keeps playing from there.
+
+They move from the end of the selection you last moved. With a [pause](/captions/shorten-pauses/) selected, they move from the word before it. With nothing selected, they move from the highlighted word, the last one to start at or before the playhead, and if there isn't one, <kbd>→</kbd> selects the first word and <kbd>←</kbd> the last. At the first and last word they stay put.
+
+## Move line by line
+
+<kbd>↑</kbd> and <kbd>↓</kbd> select the nearest word on the line above or below, as the text is laid out, and move the playhead to it. They skip the timecode lines, and beep at the first and last line.
+
+## Extend the selection
+
+<kbd>⇧</kbd> with any arrow moves one end of the selection and leaves the playhead where it is. The other end stays where you started, so going back the other way shrinks the selection. <kbd>⇧</kbd>-click does the same with the mouse.
+
+The tab may [widen the selection](/captions/delete-words/#the-selection-becomes-the-range) further, over any word the cut would cut into.
+
+## Select every word
+
+<kbd>⌘A</kbd> selects every word, and **Edit ▸ Select All** does the same while the text has the keyboard. It selects words only, so a selected pause is dropped.
+
+## Clear the selection
+
+<kbd>⎋</kbd> clears the selected words or pause, along with the range they set. With nothing selected, <kbd>⎋</kbd> does what it does in the rest of the window, which is deselect a selected [action](/motion/actions/).
+
+## Delete
+
+With words selected, <kbd>⌫</kbd> or <kbd>⌦</kbd> [deletes them and closes the gap](/captions/delete-words/). With a pause selected, either one [shortens it](/captions/shorten-pauses/). <kbd>⌘⌫</kbd> does the same.
+
+With nothing selected in the text, <kbd>⌫</kbd> and <kbd>⌘⌫</kbd> do what they do on the timeline, so they act on the [selected clips or the range](/editing/delete-clips/).
+
+## Timeline keys keep working
+
+Any key this page doesn't list works as it does on the timeline, so you can play and mark without leaving the text. These are the common ones:
+
+| Key | What it does |
+| --- | --- |
+| <kbd>Space</kbd> | Play and pause |
+| <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> | Shuttle back, pause, shuttle forward |
+| <kbd>I</kbd> <kbd>O</kbd> | Set the in and out points at the playhead |
+| <kbd>M</kbd> | Add a marker |
+
+[Keyboard shortcuts](/reference/keyboard-shortcuts/) has the rest.
+
+## Related
+
+- [Cut by deleting words](/captions/delete-words/)
+- [Shorten a pause](/captions/shorten-pauses/)
+- [Follow along and jump](/captions/follow-the-transcript/)
+- [The in/out range](/timeline/in-out-range/)

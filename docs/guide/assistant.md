@@ -21,7 +21,7 @@ Under the controls, a status line reports the key's state: "No API key is set." 
 
 A saved key is stored in a file named `anthropic-key` in `~/Library/Application Support/Frame Job/`, which only your user account can read. It goes to the assistant's helper process when a conversation starts and nowhere else. No tool reads or writes the key, the model or the chat settings, so an agent connected over MCP cannot see or change them.
 
-If no key is saved, Frame Job uses the `ANTHROPIC_API_KEY` environment variable instead. In practice that only applies when Frame Job is launched from a shell that sets the variable. A saved key always takes precedence.
+If no key is saved, Frame Job uses the `ANTHROPIC_API_KEY` environment variable instead. Frame Job reads it from its own environment, so a variable set in a shell profile reaches it only when you launch Frame Job from that shell. A saved key always takes precedence.
 
 ## Opening the Assistant
 
@@ -35,9 +35,9 @@ From top to bottom, the tab has:
 4. **The ask-first row**, shown only while the assistant is waiting for your permission.
 5. **The message field and Send.**
 
-Without a key, the message field is replaced by "Add your Anthropic API key in Settings to use the assistant." and an **Open Settings…** button. **View ▸ Assistant** stays enabled with no key, so the tab can say this; saving the key in Settings brings the message field back at once. If a conversation is started without a key anyway (an agent's `assistant_send`), it fails with "No Anthropic API key is set. Set one in Frame Job ▸ Settings… ▸ Assistant."
+Without a key, the message field is replaced by "Add your Anthropic API key in Settings to use the assistant." and an **Open Settings…** button. **View ▸ Assistant** stays enabled with no key, so the tab can say this; saving the key in Settings brings the message field back at once. If the key file is deleted behind the app's back while the field is showing, sending fails with "No Anthropic API key is set. Set one in Frame Job ▸ Settings… ▸ Assistant."
 
-The tab doesn't switch away on its own while you work in it. The assistant's own edits change the selection without moving you to the Clip tab. Clicking a clip in the timeline or on the canvas still shows the Clip tab, as it always does.
+The tab doesn't switch away on its own while you work in it. The assistant's own edits change the selection without moving you to the Clip tab. Clicking a clip in the timeline or on the canvas still shows the Clip tab. With nothing selected, that click only selects the clip and the tab stays; click the clip again to show the Clip tab.
 
 ## Sending a message
 
@@ -50,7 +50,7 @@ Type in the field ("Ask about or edit this project…") and press Return or clic
 | Tab, ⇧Tab | Gives the keys back to the editor. With Full Keyboard Access on, moves focus to the next or previous control |
 | ⌘Z, ⇧⌘Z | Undoes or redoes your typing. Typing never lands on the project's undo stack. |
 
-The field empties once the message is sent. If the conversation cannot start (for example, the key was removed), the reason appears in red in the transcript and your text stays in the field.
+The field empties once the message is sent. If the conversation cannot start (for example, the key file is gone), the reason appears in coral in the transcript and your text stays in the field.
 
 While a turn runs, **Send** reads **Stop**. See [Stopping a turn](#stopping-a-turn).
 
@@ -63,7 +63,7 @@ Each message you send starts with a short block describing your window at the mo
 - the playhead, in ticks and in seconds
 - the selected clip ids
 
-So "split this clip at the playhead" or "make the selected titles bigger" mean what you'd expect. The block isn't updated during the assistant's turn. After its own edits, the assistant reads the project again.
+So "split this clip at the playhead" or "make the selected titles bigger" mean what you'd expect. The block isn't updated during the assistant's turn, so the assistant is told to read the project again after its own edits.
 
 ## The transcript
 
@@ -76,10 +76,10 @@ The transcript is one block of text. You can select across entries and copy it a
 | Its working notes between tool calls | Small, faint |
 | One line per tool call: the tool's name and its arguments, e.g. `split (at: 96000, clips: [12])` (first 70 characters) | Small monospace |
 | `failed: …` for a tool call that was refused, with the reason | Small monospace |
-| `Allowed: …` / `Declined: …` for each permission question, or `Declined (stop): …`, `Declined (close): …` or `Declined (helper): …` when it was declined by Stop, by closing the window or by the helper stopping | Small monospace |
+| `Allowed: …` / `Declined: …` for each permission question, or `Declined (stop): …`, `Declined (close): …` or `Declined (helper): …` when it was declined by Stop, by a key or model change ending the conversation, or by the helper stopping | Small monospace |
 | Compaction and clearing notes, and notes about key, model or spend-ledger problems | Small monospace |
 | `Cost: …` at the end of each turn | Small monospace |
-| Errors | Red |
+| Errors | Coral |
 
 Errors you may see:
 
@@ -114,17 +114,17 @@ The assistant has the same tools an agent has over MCP (see [MCP](mcp.md)), with
 - export, check an export's progress, or cancel it
 - render a frame of the timeline to look at the result, before and after a visual edit
 
-Every edit is one undo step on the project, the same as your own. A turn isn't grouped: each edit is its own step, so a turn that made ten edits takes ten Undos, and **Edit ▸ Undo** names each step after its edit, as it does for an agent's call over MCP. **Edit ▸ Undo** (⌘Z) outside the message field takes back the assistant's last change. You can also ask the assistant to undo.
+Every edit to the project is one undo step, the same as your own. A turn isn't grouped: each edit is its own step, so a turn that made ten edits takes ten Undos, and **Edit ▸ Undo** names each step after its edit, as it does for an agent's call over MCP. **Edit ▸ Undo** (⌘Z) outside the message field takes back the assistant's last change. You can also ask the assistant to undo. Graphics files are the exception: `write_graphic`, `delete_graphic`, `restore_graphic`, `import_graphic_font`, `import_graphic_asset` and `import_graphic` make no undo step (see [Motion graphics](graphics.md)).
 
 **How it behaves.** Its replies are short, a sentence or two, and don't repeat what the tool lines already show. It writes or restyles captions only when you ask. It renders a frame to look before and after a visual edit. The model runs at medium effort with thinking on, and the faint working notes between tool calls are its thinking updates.
 
 The assistant works only on its own window's project. A tool call that names another project is refused.
 
-**Cutting words.** Ask it to take out filler words and it finds them and cuts them in one step, but only in media that already have a cloud transcript made with filler words (by **Clip ▸ Remove Filler Words…**). The assistant can't upload audio to make one, so in other media it cuts nothing (the search reports which media have no such transcript). Ask it to remove a false start and it reads the clip's words and their times (from the media's cached transcript, or from this Mac's own speech recogniser, never the network), says which words it will cut, then cuts them as one undo step. It removes a false start only when you ask, because deciding what was a false start is a judgement call. See [Clean-up tools](cleanup-tools.md).
+**Cutting words.** Ask it to take out filler words and it finds them and cuts them in one step, but only in media that already have a cloud transcript made with filler words (by **Clip ▸ Remove Filler Words…**). The assistant can't upload audio to make one, so in other media that search finds nothing and reports which media have no such transcript. The words it reads there still flag any filler they hold, but words not transcribed with filler words can leave fillers out. Ask it to remove a false start and it reads the clip's words and their times (from the media's cached transcript, or from this Mac's own speech recogniser, never the network), says which words it will cut, then cuts them as one undo step. It removes a false start only when you ask, because deciding what was a false start is a judgement call. See [Clean-up tools](cleanup-tools.md).
 
 ### Tools it will not call
 
-`record_screen`, `close_project` and `transcribe_for_fillers` are removed from what the assistant can see. `transcribe` stays available for transcribing on this Mac, and only a call with the cloud engine (AssemblyAI) is refused. All four are refused if the assistant calls them anyway, and the call shows in the transcript as a `failed:` line: "*tool* is not available to the assistant: *reason*" (for the cloud case, `transcribe with engine "assemblyai" is not available to the assistant: …`). The reason names the menu item to use instead.
+`record_screen`, `close_project` and `transcribe_for_fillers` are removed from what the assistant can see, so it has no way to run them. `transcribe` stays available for transcribing on this Mac, and only a call with the cloud engine (AssemblyAI) is refused. That call shows in the transcript as a `failed:` line, `transcribe with engine "assemblyai" is not available to the assistant: …`, and the reason names the menu item to use instead.
 
 | Tool | Why | Do it yourself with |
 |---|---|---|
@@ -143,14 +143,21 @@ Five tools ask first: `export`, `export_captions`, `save_project`, `consolidate_
 | `export_captions` | "export_captions writes *path*" (or REPLACES) |
 | `save_project` | "save_project writes *path*" (or REPLACES); "save_project writes a file" when no path is known |
 | `consolidate_media` | "consolidate_media copies every referenced file into *package*/media", or "… into the project's package" when the project has never been saved |
+| `export_graphic` | "export_graphic writes *path*" (or REPLACES), `.fjgraphic` added when missing |
 | `new_project_from_range` | "new_project_from_range writes *path*", `.framejob` added when missing (only with a `path`) |
 | `make_vertical_version` | "make_vertical_version writes *path*", `.framejob` added when missing (only with a `path`) |
 
 A `~` in the path is expanded before the question is asked, so the sentence shows the full path.
 
-Other tools the assistant can call write files without asking: `render_frame` writes a PNG (to a temporary file, or to a path the model names), and `write_graphic`, `import_graphic_font` and `import_graphic_asset` write graphics modules, fonts and assets into the project's package.
+`new_project_from_range` and `make_vertical_version` never replace anything. With something already at the path the question reads REPLACES, but after **Allow** nothing is written, and the assistant is told to choose a new path.
 
-While a question waits, the **Assistant** tab title shows a small dot, whichever inspector tab you are on. Answer with a click: Return never answers a question. Nothing runs until you click **Allow**. **Deny** tells the assistant you declined, and it won't retry that call in the same turn unless you ask. Stopping the turn, closing the window or the helper stopping each count as a decline. Other windows' assistants and agents over MCP keep working while one window waits for an answer.
+A project that has never been saved needs a path. If `save_project` has none, the question reads "save_project writes a file" and nothing is written after **Allow**.
+
+For `export`, `export_captions` and `save_project`, the sentence shows the path as the assistant wrote it. Frame Job adds or corrects the file extension as it writes, and REPLACES looks only at the path in the sentence, so a question that reads "writes" can still replace a file at the corrected name.
+
+Other tools the assistant can call write files without asking: `render_frame` and `render_graphic` write a picture (to a temporary file, or to a path the model names); `write_graphic`, `import_graphic_font`, `import_graphic_asset` and `import_graphic` write graphics modules, fonts and assets into the project's package; and `new_project` with a `path` saves a blank project there, replacing whatever is at that path unless an open project holds it.
+
+While a question waits, the **Assistant** tab title shows a small dot, whichever inspector tab you are on. Answer with a click: Return never answers a question. Nothing runs until you click **Allow**. **Deny** tells the assistant you declined, and it won't retry that call in the same turn unless you ask. Stopping the turn, ending the conversation (**Clear**, a key or model change, closing the window) or the helper stopping each count as a decline. Other windows' assistants and agents over MCP keep working while one window waits for an answer.
 
 ### While you are dragging
 
@@ -177,11 +184,11 @@ The **Context** meter shows how much of the model's context window the conversat
 - "*N* of *L* tokens · *P*%" once the model's window is known (shortened to "*N* / *L* · *P*%" or "*P*%" when the inspector is narrow; the tooltip always has the full figure)
 - "*N* tokens (window size unknown)" if Anthropic did not report the window size
 
-The bar under the figure fills in the accent colour and turns red past 80%.
+The bar under the figure fills in the accent colour and turns coral past 80%.
 
 **Compaction.** With **Compact when context reaches** on, the conversation is summarised at the end of the first turn that passes the threshold, never in the middle of a turn. The summary keeps what you asked for and your stated preferences, the project and the clips, tracks, markers and media involved, the edits made and undone, and what is still open. The transcript notes "Compacting the conversation (*N* tokens)…" and then "Compacted: *N* → about *M* tokens. Earlier renders are gone; the assistant re-renders when it needs to look.". If no summary comes back, the note says compaction didn't finish and that it will try again after the next turn. The summary request is priced like any other response.
 
-With compaction off, a conversation grows until it fills the model's window, and requests then fail until you click **Clear**.
+With compaction off, nothing summarises a conversation, so it keeps growing toward the model's window. What happens when the window is full is Anthropic's to decide. A reply that reaches the end of the window stops where it got to, with no error line and nothing to say it was cut short, and a refused request shows as an "API error" line. **Clear** starts a new conversation.
 
 **Clearing old tool results.** With **Clear old tool results past 150,000 tokens** on, Anthropic may drop older tool results from what the model sees once the conversation passes 150,000 tokens. It keeps the five most recent, clears at least 50,000 tokens at a time, and can happen mid-turn. Each clearing adds a note, "Cleared *N* old tool results (*M* tokens) from the model's view.", and costs a fresh prompt-cache write. The model may have to fetch something again after a clearing.
 
@@ -207,9 +214,9 @@ The tab's **Spend** row adds up the conversation's turns since the last **Clear*
 
 - "Nothing yet" before the first response
 - "$0.0532 · Frame Job's estimate"
-- "at least $… · Frame Job's estimate" when a response was cut short or could not be priced (shortened to "≥$…" when narrow)
-- "under $0.0001 · Frame Job's estimate" for a tiny positive amount (shortened to "<$0.0001" when narrow)
-- "unknown · Frame Job's estimate" when nothing could be priced
+- "at least $… · Frame Job's estimate" when a response was cut short or could not be priced (shortened to "≥$… · Frame Job's estimate" when narrow)
+- "under $0.0001 · Frame Job's estimate" for a tiny positive amount (shortened to "<$0.0001 · Frame Job's estimate" when narrow)
+- "unknown · Frame Job's estimate" when a response could not be priced and what could be priced comes to less than $0.00005
 
 Hovering the figure shows "What this conversation's responses cost at LiteLLM prices, as Frame Job estimates it. The Anthropic Console shows what your account was billed."
 
@@ -227,7 +234,7 @@ When you use the assistant, these go to Anthropic, under your key:
 - what the tools answer: the project's details as JSON (including media file paths), clip transcripts it reads, refusals and other results
 - the frames it renders to look at the picture
 
-Frame Job doesn't send any of this anywhere else. Audio never goes to the cloud transcriber from the assistant (see [Tools it will not call](#tools-it-will-not-call)). The assistant asks before it exports a movie or captions, saves the project, or consolidates media; other tools can still write files without asking (a rendered frame's PNG, and graphics modules, fonts and assets in the project's package). Once a day at most, the helper downloads LiteLLM's public price table from GitHub. That request carries no key and no project data.
+Frame Job doesn't send any of this anywhere else. Audio never goes to the cloud transcriber from the assistant (see [Tools it will not call](#tools-it-will-not-call)). The assistant asks before it exports a movie, captions or a graphic, saves the project, consolidates media, or writes a project made from a range or a vertical version to a path; other tools can still write files without asking (a rendered picture, graphics modules, fonts and assets in the project's package, and a blank project saved to a path). Once a day at most, the helper downloads LiteLLM's public price table from GitHub. That request carries no key and no project data.
 
 Everything else stays on your Mac: the key file, the spend ledger and the cached price table, `anthropic-prices.json`, all in `~/Library/Application Support/Frame Job/`. The conversation itself is kept in memory only, and goes when you clear it or close the window.
 
@@ -238,7 +245,7 @@ Everything else stays on your Mac: the key file, the spend ledger and the cached
 - It can't record the screen, close its window's project, or send audio to the cloud transcriber.
 - A tool call that arrives during a drag waits until you release the mouse.
 - Stop doesn't cancel an export that has already been queued.
-- With compaction off, a long conversation eventually fails until you **Clear** it.
+- With compaction off, nothing stops a long conversation from filling the model's window.
 - Changing the key or the model ends every window's conversation.
 
 *Agents:* none. The Assistant is the person's own conversation, and its settings are deliberately out of reach of any tool. An agent drives the same tools directly over [MCP](mcp.md), and is never asked first or refused by the assistant's rules above.

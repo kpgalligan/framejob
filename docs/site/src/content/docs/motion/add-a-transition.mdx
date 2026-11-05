@@ -1,0 +1,137 @@
+---
+title: "Add or remove a transition"
+description: "Put a transition on a cut, change the style of one you already have, get past a cut with no spare footage, and take a transition off again."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A transition plays across an overlap between two clips on the same track. **Clip ▸ Transition ▸** makes that overlap for you at a cut, restyles one that's already there, and takes a transition off.
+
+<AtAGlance
+  menu="Clip ▸ Transition ▸"
+  where="Clip tab ▸ Clip sub-tab ▸ Transition ▸ Kind"
+  tools={['add_transition', 'set_transition']}
+/>
+
+## Add a transition
+
+<Steps>
+
+1. Select the clip after the cut. A transition belongs to the clip it leads into. To do several cuts at once, select the clip after each cut.
+
+2. Choose **Clip ▸ Transition ▸** and a [style](/motion/transition-styles/).
+
+</Steps>
+
+The overlap appears on the timeline as a hatched zone, with the style's name in it when the word fits. To change its length or easing, use [the Transition section](/motion/transition-settings/).
+
+## The Transition menu
+
+The menu lists the thirteen styles, then **None**. It has no keyboard shortcuts. It works on every selected clip at once, as one undo step called **Set Transition**, and what each clip gets depends on where it sits.
+
+| Where the clip sits | What happens |
+| --- | --- |
+| It starts exactly where the clip before it ends | A new overlap is made. See [At a hard cut](#at-a-hard-cut). |
+| It already overlaps the clip before it | It gets the new style. See [Restyle an overlap](#restyle-an-overlap). |
+| After a gap, or first on its track | Nothing. See [Clips that are skipped](#clips-that-are-skipped). |
+
+A style is available only when at least one selected clip is at a hard cut or an overlap. **None** is available for any selection.
+
+The checkmark shows the style of the earliest selected clip, or **None** when that clip has no transition.
+
+## At a hard cut
+
+A clip that starts exactly where the clip before it ends gets a new half-second overlap, centred on the cut.
+
+The overlap is made from footage the two clips aren't showing. The first clip plays on past its out point, and the second starts earlier than its in point. Nothing else on the timeline moves, and the outer edges of the pair stay where they were.
+
+If there isn't half a second to spare, the transition comes out shorter. The length is limited by:
+
+- The footage each clip has beyond the cut. When one side runs short, the other side gives more if it can, so the overlap can end up off-centre.
+- The neighbours. The first clip can't grow into the clip after the second, and the second can't grow into the clip before the first.
+- [The overlap rules](/motion/transitions/), which hold an overlap to half the shorter clip.
+
+Text, shape, still, image and graphic clips have no file to run out of, so they can always give their share. A [nest](/editing/nests/) clip gives nothing before its start, and past its end it gives only what's left of the nest.
+
+The incoming clip now starts earlier, and what's timed to its picture stays in step. Its [actions](/motion/actions/) stay on the frames they were drawn over, so a zoom stays on its click, and timed caption words stay on their speech. A fade-in or a text reveal now starts at the clip's new first frame, so it begins under the transition.
+
+If the clip still holds a transition from an earlier overlap, it takes the style you chose and keeps that transition's curve and crossfade. Otherwise the new transition starts with the [default values](/motion/transition-settings/#default-values).
+
+## Restyle an overlap
+
+A clip that already overlaps the clip before it takes the style you choose, and keeps its curve and crossfade. The **Kind** row in [the Transition section](/motion/transition-settings/#kind) does the same for one clip.
+
+## Clips that are skipped
+
+A clip after a gap has nothing to overlap, and neither does the first clip on its track, so the menu skips them. If you select a run of clips that starts after a gap or at the start of its track, the first one is skipped and every cut after it gets the style.
+
+## No extra footage
+
+Two clips that each use their whole file have nothing beyond the cut to overlap with. When none of the cuts you chose can take a transition, Frame Job shows a sheet that says "There’s no extra footage at this cut for a transition.", or "at these cuts" for several.
+
+| Button | What it does |
+| --- | --- |
+| **Shift Clips Left** | Makes the overlap another way. See [Shift Clips Left](#shift-clips-left). |
+| **Cancel** | Changes nothing. |
+
+A cut with footage to spare gets a shorter transition instead of the sheet, unless its clips are so short that the overlap rules leave no room for even one frame. If you chose several cuts and at least one takes a transition, there's no sheet either, and the cuts with no footage stay as they are.
+
+## Shift Clips Left
+
+**Shift Clips Left** makes the overlap by sliding the second clip, and everything after it on unlocked tracks, left by half a second. The second clip's first frames then blend over the first clip's last ones.
+
+- The project gets shorter by the same amount.
+- No clip's footage changes.
+- The shift is capped at half the shorter clip, and at the longest shift that keeps every moved track within [the overlap rules](/motion/transitions/).
+- Markers don't move.
+- A clip on another track that ends up overlapping its neighbour gets a Cross Dissolve.
+- Clips on locked tracks stay where they are, so they fall out of step with what moved.
+- The whole shift is one undo step, **Add Transition**, however many cuts it covers.
+
+Frame Job won't shift a second clip on a locked track. With only that cut chosen it beeps and nothing moves.
+
+## Overlap two clips by hand
+
+You can make a transition without the menu. When an edit makes a clip overlap the clip before it on the same track, and that clip has no stored transition, Frame Job adds a Cross Dissolve. That holds whether you drag, trim an edge, paste, add a clip, close a gap or shift clips.
+
+See [Transitions](/motion/transitions/) for the overlap rules, and [Default values](/motion/transition-settings/#default-values) for how that Cross Dissolve starts out.
+
+## Remove a transition
+
+Select the later clip of the pair and choose **Clip ▸ Transition ▸ None**, or choose **None** in the **Kind** row of [the Transition section](/motion/transition-settings/#kind).
+
+**None** in the menu is available for any selected clip, because a clip can hold a transition the timeline doesn't draw, such as one left behind when an overlap was dragged apart. It clears every selected clip, wherever each one sits.
+
+### None keeps the overlap
+
+**None** removes the transition but not the overlap. While the two clips still overlap they keep blending, as a plain linear dissolve with no hatch and no sound crossfade.
+
+To get a hard cut back, move or trim the clips so they no longer overlap.
+
+:::caution
+An overlap with no transition doesn't stay that way. The next time you move or trim a clip on that track, or change the overlap's **Duration**, Frame Job gives it a Cross Dissolve again.
+:::
+
+A transition you don't clear stays on the clip after you pull the overlap apart. It draws nothing until the clip overlaps something again, then comes back with its style. Choose **None** as well if you don't want that.
+
+## Good to know
+
+- An adjustment clip can't take a transition, on either side of a cut. Fade it with opacity instead. At a hard cut beside one, the no-extra-footage sheet still appears, and **Shift Clips Left** only beeps.
+- With a [nest](/editing/nests/) open, the menu works on the clips inside it.
+
+## With an agent
+
+The menu uses the same two tools: `add_transition` for a clip at a hard cut, and `set_transition` for a clip that already overlaps.
+
+`add_transition` needs a `clip` and a `duration`. The menu always asks for half a second, centred on the cut. An agent can ask for any length of one frame or more, take the footage from [one side of the cut](/motion/transition-settings/#alignment), or shift clips with `ripple: true`, without going through the sheet. A request too long for the footage lands shorter, and a length that rounds to no frames at all is an error. With no `kind`, it uses the style the clip already holds, or Cross Dissolve if it holds none. The tool only works at a hard cut. On any other clip it fails, saying whether the clip is first on its track, follows a gap or already overlaps.
+
+`set_transition` needs a `clip` and a `kind`. Setting `kind: null` removes the transition, and because `kind` is required, leaving it out by mistake can't clear one. The tool can also put a style on a clip with no overlap, where it draws nothing until the clip overlaps something. See [`add_transition`](/mcp/tools-transitions/#add_transition) and [`set_transition`](/mcp/tools-transitions/#set_transition).
+
+## Related
+
+- [Transitions](/motion/transitions/)
+- [Transition styles](/motion/transition-styles/)
+- [The Transition section](/motion/transition-settings/)
+- [Crossfades](/audio/crossfades/)
+- [Hide and lock tracks](/timeline/hide-and-lock-tracks/)

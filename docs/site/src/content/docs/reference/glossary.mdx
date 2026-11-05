@@ -1,0 +1,71 @@
+---
+title: Glossary
+description: Frame Job's own words in plain terms, from action and canvas to nest, ramp, stem and tick, each linked to its page.
+---
+
+The words Frame Job uses, in plain terms, each with a link to the page that explains it.
+
+## Projects and the timeline
+
+- **Action.** An animation on a clip: a span on its action lane with an end state its properties ease to. See [Actions](/motion/actions/).
+- **Adjustment clip.** A clip with no picture of its own that grades every track behind it. See [Adjustment clips](/color/adjustment-clips/).
+- **Canvas.** The fixed frame every clip is drawn into. Every export starts from its size. See [The canvas](/canvas/the-canvas/).
+- **Clip.** One placed piece on a track: a stretch of a media file, or a text, shape, image, graphic, adjustment or nest clip. See [Core concepts](/getting-started/core-concepts/).
+- **Current track.** The track of the first selected clip, or with nothing selected the front-most track. Track commands act on it. See [Menus](/reference/menus/).
+- **Edit point.** A clip's start or end, where <kbd>↑</kbd> and <kbd>↓</kbd> stop. See [Jump around the timeline](/timeline/move-the-playhead/).
+- **Frame grid.** The frames of the project's rate. Every time you set lands on one. See [Core concepts](/getting-started/core-concepts/).
+- **In/out range.** The span set with <kbd>I</kbd> and <kbd>O</kbd>, which many commands act on. See [The in/out range](/timeline/in-out-range/).
+- **Linked pair.** A picture clip and its detached sound, which move, split and ripple together. See [Detach and Attach Audio](/audio/detach-and-attach/).
+- **Media.** A file the project has imported, listed in the Media tab. Clips refer to it. See [The Media tab](/projects/media-tab/).
+- **Nest.** A clip that wraps other clips into a timeline of its own. See [Nests](/editing/nests/).
+- **No-change edit, or identity.** An edit that was understood and had nothing to change. It beeps, makes no undo step and shows no message. See [When an edit is refused](/getting-started/refused-edits/#a-beep-with-no-message).
+- **Package.** A `.framejob` project, a folder the Finder shows as one file. See [The .framejob package](/reference/framejob-package/).
+- **Playhead.** The current time on the timeline. See [The ruler and playhead](/timeline/ruler-and-playhead/).
+- **Refusal.** A rule stopping an edit. Frame Job beeps and shows the rule's sentence after "Refused: " at the foot of the inspector. Nothing changes and no undo step is made. See [When an edit is refused](/getting-started/refused-edits/).
+- **Ripple.** An edit that closes the gap it leaves by moving later clips along. See [Delete, Ripple Delete and Lift](/editing/delete-clips/).
+- **Selected action.** The one action of the single selected clip that the Clip tab is editing. While it's chosen, the fields show and write its end state. See [Select an action](/motion/select-an-action/).
+- **Tick.** Frame Job's unit of time, 600,000 to the second, which divides every common frame duration exactly. The "Refused: " line and agent tools give lengths in ticks. See [Units and ids](/mcp/units-and-ids/).
+- **Track.** A lane of clips. The front track is the top lane, and it's drawn over those behind it. See [Tracks](/timeline/tracks/).
+
+## Picture and sound
+
+- **Camera Log.** A file's setting saying which camera log curve it holds, so it's converted at the start of the picture. See [Camera Log](/hdr/camera-log/).
+- **cd/m².** The unit of brightness, also called nits. See [Scopes in an HDR project](/hdr/hdr-scopes/).
+- **Cue.** One timed caption. See [Captions are text clips](/captions/how-captions-work/).
+- **Cutout.** A clip with Remove Background on. See [Remove Background](/effects/remove-background/).
+- **Deep.** A picture with more than 8 bits for each colour component. See [Precision and bit depth](/hdr/precision/).
+- **Ducking.** Lowering a clip's sound under another's. See [Ducking](/audio/ducking/).
+- **Dynamic range.** Whether the project works in SDR or HDR (HLG). See [A project's dynamic range](/hdr/dynamic-range/).
+- **J-cut and L-cut.** The sound of a linked pair starting before, or ending after, its picture. See [J-cuts and L-cuts](/audio/j-and-l-cuts/).
+- **Look.** A built-in grade or a `.cube` LUT on a clip. See [Looks](/color/looks/).
+- **LUFS.** The unit of loudness. See [Normalize](/audio/normalize/).
+- **LUT.** A colour lookup table in a `.cube` file. See [.cube LUTs](/color/luts/).
+- **Matte.** A track that cuts the track behind it by its alpha or brightness. See [Matte tracks](/canvas/matte-tracks/).
+- **Plate.** A clip that fills the canvas behind everything, such as a solid colour or a picture from **Add Background**. See [Backgrounds](/canvas/backgrounds/).
+- **Qualifier.** An adjustment clip's pick of the pixels it grades, by hue, saturation and brightness. See [Qualifiers](/color/qualifiers/).
+- **Ramp.** A speed change over time, a Speed action on the action lane. See [Speed ramps](/speed/speed-ramps/).
+- **Scopes.** The waveform, parade, vectorscope and histogram beside the preview. See [Scopes](/color/scopes/).
+- **Slate.** What a clip draws in place of a picture it doesn't have, such as missing media. See [Relink missing media](/projects/relink-media/).
+- **Stem.** One track's sound written as its own file beside the mix. See [Audio stems](/export/stems/).
+- **Transition.** The change from one clip to the next across their overlap on one track. See [Transitions](/motion/transitions/).
+
+## Graphics and agents
+
+- **Assistant.** The chat in the inspector that edits the open project on your own Anthropic key. See [Chat with the Assistant](/assistant/chat/).
+- **Category.** The list a module is filed under in the Insert Graphic sheet. See [Bundled templates](/graphics/templates/).
+- **Error card.** What a graphic draws in its own box when it can't draw itself. See [Edit a module](/graphics/edit-a-module/).
+- **Graphic.** A clip whose picture is drawn by code. It's the clip's content, not an effect. See [What a graphic is](/graphics/what-is-a-graphic/).
+- **Graphic package.** A `.fjgraphic` file holding a module and the fonts and pictures it uses. See [Share a graphic](/graphics/share-a-graphic/).
+- **Kept version.** An earlier text of a module the app kept, the last 10 for each module. See [Rename, delete and restore graphics](/graphics/manage-graphics/).
+- **MCP.** The protocol an agent uses to drive Frame Job, through the `framejob-mcp` helper. See [How an agent reaches Frame Job](/mcp/overview/).
+- **Module.** A graphic's source, one JavaScript module returning SVG for each frame. See [Write a graphic module](/graphics/write-a-module/).
+- **Op.** Short for operation: one edit to a project, applied whole. Most agent tools each make one. See [How tool calls behave](/mcp/tool-calls/).
+- **Patch.** An object an agent sends holding only the properties it wants to change. See [Patches](/mcp/patches/).
+- **Props.** The values a graphic is drawn with, stored on its clip. See [Graphic properties](/graphics/properties/).
+- **Template.** A module the app ships, copied into the package when you insert it. See [Bundled templates](/graphics/templates/).
+
+## Related
+
+- [Core concepts](/getting-started/core-concepts/)
+- [A tour of the editor window](/getting-started/editor-window/)
+- [Troubleshooting](/reference/troubleshooting/)

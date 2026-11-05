@@ -1,0 +1,61 @@
+---
+title: "Remove media"
+description: "Take a file out of a project from the Media tab, with or without the clips that use it, and leave it safe on disk."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Removing media takes a file off the project's list. It never touches the file on your disk, and one undo brings it back.
+
+<AtAGlance
+  where="Right-click a row on the Media tab ▸ Remove"
+  tools="remove_media"
+/>
+
+## Remove a file
+
+Right-click the file's row on the [Media tab](/projects/media-tab/) and choose **Remove**.
+
+If no clip uses the file, it goes at once, with no question, as one undo step called **Remove Media**.
+
+To see what you can remove without losing a clip, tick [Unused only](/projects/media-tab/#unused-only) first.
+
+## Remove a file clips use
+
+If clips use the file, Frame Job asks first, because a clip can't stay in a project without its file. The alert reads "Remove “name”? It is used by 3 clips, which will be removed with it."
+
+- **Remove and Delete Clips** removes the file and those clips as one undo step.
+- **Cancel** changes nothing.
+
+The count covers the whole project, including clips inside [nests](/editing/nests/), even while a nest is open. The clips go from wherever they are:
+
+- Clips on the timeline leave their time empty. The clips around them don't move.
+- Clips inside a nest go from the nest. The nest itself stays, with everything else in it.
+
+If you'd rather keep the clips and use another file, [relink](/projects/relink-media/#relink-one-file) instead.
+
+## What stays on disk
+
+Remove never deletes a file:
+
+- Your original stays where it is.
+- A copy in the project's package, from [Consolidate Media](/projects/consolidate-media/), stays in the package's `media` folder.
+- A movie copy Frame Job made of a [WebM or MKV](/projects/webm-and-matroska/) stays in its Rewrapped folder.
+
+## Good to know
+
+- Removing a LUT works differently: its clips stay and lose their look, and the alert's button reads **Remove and Clear Looks**. See [Remove a LUT in use](/color/luts/#remove-a-lut-in-use).
+- If a clip's [Hide While Silent](/effects/hide-while-silent/) follows the file you remove, Hide While Silent turns off on that clip. The clip stays.
+- You can remove a file with a nest open. It still comes out of the whole project.
+
+## With an agent
+
+[`remove_media`](/mcp/tools-media/#remove_media) doesn't ask. It won't remove a file that clips still use unless the call passes `with_clips: true`, which takes those clips too. Without it, the call stops and names the clips in the way. For a LUT, `with_clips` clears the looks and Camera Logs that name it and keeps the clips. See [Tools: media](/mcp/tools-media/).
+
+## Related
+
+- [The Media tab](/projects/media-tab/)
+- [Relink missing media](/projects/relink-media/)
+- [Consolidate Media](/projects/consolidate-media/)
+- [.cube LUTs](/color/luts/)
+- [Delete, Ripple Delete and Lift](/editing/delete-clips/)

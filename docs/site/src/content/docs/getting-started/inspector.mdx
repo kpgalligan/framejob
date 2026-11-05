@@ -1,0 +1,117 @@
+---
+title: "The inspector"
+description: "Find your way around the inspector's five tabs, the Clip tab's sub-tabs and its folding sections."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+The inspector is the panel at the right of the editor window. It's where you read and change the numbers behind what you see: the selected clips, the project's media, the project itself, its words and the Assistant. This page covers how it's laid out. [Inspector fields](/getting-started/inspector-fields/) covers how its controls behave.
+
+<AtAGlance
+  menu={['View ▸ Hide Inspector', 'View ▸ Transcript', 'View ▸ Assistant']}
+  keys={['⌥⌘I', '⌃⌘T', '⌃⌘A']}
+  where="The editor window, middle right"
+  tools="set_clip"
+/>
+
+<Shot
+  name="05-clip-picture.inspector"
+  alt="The inspector on the Clip tab with a video clip selected. At the top is the clip's name, speech.mov, over the line video · 00:00:05:07 · 640×360 · 30 fps. Under it are the action lane, reading no actions, and the sub-tabs Picture, Color, Sound and Clip, with Picture active. Below them the Transform section is open, showing Scale, Position, Rotation, Opacity and Blend."
+/>
+
+## The five tabs
+
+| Tab | What it's for |
+| --- | --- |
+| **Clip** | The selected clips. With nothing selected it reads "Select a clip to edit its properties." |
+| **Media** | Every file in the project. See [The Media tab](/projects/media-tab/). |
+| **Document** | The project as a whole. See [The Document tab](/projects/document-tab/). |
+| **Transcript** | The timeline's words. **View ▸ Transcript** (<kbd>⌃⌘T</kbd>) goes straight there. See [The Transcript tab](/captions/transcript-tab/). |
+| **Assistant** | A conversation that edits this project. **View ▸ Assistant** (<kbd>⌃⌘A</kbd>) goes straight there. See [Chat with the Assistant](/assistant/chat/). |
+
+## The Clip tab's pinned block
+
+With a clip selected, three things stay pinned at the top of the Clip tab while its sections scroll underneath: the selection header, the [action lane](/motion/action-lane/) and the sub-tabs.
+
+The selection header shows:
+
+- **A chip** coloured by the clip's kind. It's neutral when the selected kinds have different colours.
+- **The name.** With one clip selected this is a field. Type to give the clip its own name, which is one undo step, "Rename Clip". Empty the field to go back to what the clip shows by default. This is the only control that clears a clip's name.
+- **A line of facts.** The kind, the duration in the project's timecode, the source's pixel size and the source's own frame rate, for example `video · 00:00:05:07 · 640×360 · 30 fps`. A clip with no source shows only the facts it has.
+- **A colour dot** at the end of the name line, for a clip's [colour label](/timeline/names-and-labels/). With several clips selected it shows only when they all share the label.
+
+With several clips selected, the header reads "3 clips selected" and gives their total duration. Renaming here needs a single clip.
+
+## Sub-tabs
+
+The strip under the action lane splits the Clip tab into **Text**, **Shape**, **Graphic**, **Picture**, **Color**, **Sound** and **Clip**. It shows only what the selection can use, and sections that don't apply are absent, not greyed out.
+
+| Selected | Sub-tabs |
+| --- | --- |
+| A movie | Picture, Color, Sound, Clip |
+| A picture | Picture, Color, Clip |
+| A text clip | Text, Picture, Clip |
+| A shape | Shape, Picture, Clip |
+| A graphic | Graphic, Picture, Clip |
+| A nest | Picture, Clip, with Sound before Clip when something inside can make a sound |
+| An audio-only clip | Sound, Clip |
+| An adjustment clip | Color, Clip |
+
+With a mixed selection, the rules are these:
+
+- **Text**, **Shape** and **Graphic** appear only when every selected clip is that kind.
+- **Picture** appears when a selected clip draws, unless an adjustment clip is in the selection.
+- **Color** appears when a selected clip draws and none of them is text, a shape, a graphic or a nest. An audio-only clip on its own doesn't get it.
+- **Sound** appears when a selected clip has sound.
+- **Clip** is always there, last.
+
+A sub-tab you pick stays active while the selection doesn't change. A new selection starts on the first tab it has, so a text clip starts on **Text** and a shape on **Shape**.
+
+While an action is selected, a sub-tab it changes shows a mark such as `◆2` after its label, counting what the action sets there. See [Action bands and the action lane](/motion/action-lane/).
+
+## Selection follows to the Clip tab
+
+Clicking a clip on the timeline or the canvas moves the inspector to the **Clip** tab, even if the clip was already selected. A selection that changes any other way, such as a paste, <kbd>⌘A</kbd> or an agent, moves it only from **Media** or **Document**.
+
+Two tabs hold their ground:
+
+- **Transcript** stays when you click a clip. Click a clip that's [already selected](/captions/follow-the-transcript/#a-selected-clip-scrolls-to-its-words) and it scrolls to that clip's first word.
+- **Assistant** isn't pulled away when the selection changes without a click, so the Assistant's own edits don't take you off the conversation. With nothing selected it also stays for the click that selects a clip, so click the clip again to move to **Clip**.
+
+Clearing the selection moves no tab.
+
+## Fold a section
+
+Click a section's header to fold it. A folded header keeps a one-line summary of what's inside, such as `100%` for Transform or `2 filters` for Filters, so you can read a value without opening it. The fold is remembered per section, in every window and between launches.
+
+The summary's colour tells you about the section:
+
+| Summary colour | What it means |
+| --- | --- |
+| The action colour | The selected action sets something in this section |
+| Body text | The section differs from its default |
+| Faint | The section is at its default |
+
+On the Clip tab, a section you've never clicked starts closed, except Transform, a text clip's Content, a shape's Shape and a graphic's Properties. Every Media and Document section starts open.
+
+If every section on a Clip sub-tab would be shut, the first one you haven't folded yourself opens by default. A section you closed yourself stays closed.
+
+Inside an action, a section the action sets shows `◆1` or a higher count in its header and opens by itself, without changing what's remembered. A faint ⊘ marks a section where every row is ⊘, because actions don't animate it. See [What an action can animate](/motion/what-can-animate/).
+
+Folding animates, unless **Reduce Motion** is on in macOS.
+
+## Hide or show the inspector
+
+Choose **View ▸ Hide Inspector** (<kbd>⌥⌘I</kbd>) and the preview takes its space. The item then reads **View ▸ Show Inspector**. The inspector is shown by default, and your choice is remembered between launches.
+
+Dragging the divider hides it too. The divider stops at the inspector's smallest width until you drag about halfway on to the window's edge, and then the inspector disappears. Drag the divider back out to show it. Only the menu item's choice is remembered, so a hide or show made by dragging lasts until you close that window.
+
+**View ▸ Transcript** and **View ▸ Assistant** bring it back if it's hidden.
+
+## Related
+
+- [Inspector fields](/getting-started/inspector-fields/)
+- [A tour of the editor window](/getting-started/editor-window/)
+- [Select clips](/timeline/selecting-clips/)
+- [What Frame Job remembers](/reference/remembered-choices/)

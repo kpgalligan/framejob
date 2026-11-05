@@ -1,0 +1,81 @@
+---
+title: "Show Subjects"
+description: "Draw the faces, people and salient regions Frame Job has found for a clip over the preview, so you can see what framing will follow."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Show Subjects outlines what Frame Job has found in the selected clip at the playhead, right on the preview. Use it to check what [Follow Subject](/framing/follow-subject/) has to work with.
+
+<AtAGlance
+  menu="View ▸ Show Subjects"
+  needs="Nothing. It only draws what has already been found."
+/>
+
+## Turn on Show Subjects
+
+<Steps>
+
+1. Select a clip of a movie.
+
+2. Move the playhead to a moment that clip shows.
+
+3. Choose **View ▸ Show Subjects**. A tick appears beside it in the menu.
+
+</Steps>
+
+If a note appears instead of boxes, the clip hasn't been analysed yet. See [Not analyzed](#not-analyzed).
+
+Select another clip to see its boxes, and move the playhead to see another moment. Choose the item again to turn it off.
+
+The item has no shortcut, and it's available whenever the window has no sheet open.
+
+It draws for one clip at a time. With several clips selected, that's the front-most one showing at the playhead. A selected still, picture, nest, text, shape or graphic draws nothing and shows no note, and neither does a clip the playhead isn't on.
+
+## What the outlines mean
+
+| Outline | What it marks |
+| --- | --- |
+| Yellow | A face |
+| Teal | A person's head and shoulders |
+| Purple, dashed | A salient region, a part of the picture the eye goes to first |
+
+Each outline has a dark line behind it, so it stays visible on a bright picture. Faces draw on top of the other two.
+
+[Subjects in the picture](/framing/what-is-found/) explains what each kind of box is.
+
+## The boxes stay on the picture
+
+The boxes sit on the clip's picture wherever you've placed it. If you've moved, scaled or rotated the clip, each box moves and turns with it. If you've cropped the clip, the boxes are clipped to the crop.
+
+They also follow the clip's speed, speed ramps and reversal, so they show what the clip is showing at that moment rather than what's at the same time in the file.
+
+## Not analyzed
+
+When nothing has been found for the clip's picture at the playhead, a note sits at the clip's top-left corner:
+
+> Not analyzed — Clip ▸ Follow Subject… analyzes it
+
+Show Subjects never starts an analysis, so turning it on costs nothing. To make the boxes, run [Follow Subject](/framing/follow-subject/) or [Make Vertical Version](/framing/make-vertical-version/) on the clip. If Show Subjects is on when an analysis lands, the boxes appear by themselves.
+
+Three situations are worth knowing:
+
+- Analysis covers the parts of a file that clips play, plus a second either side. Another part of the same file can still read "Not analyzed".
+- A part that's been analysed and holds nothing shows no outlines and no note.
+- Follow Subject doesn't analyse a screen recording that has its [cursor file](/recording/cursor-files/), so the note stays on such a clip. See [Screen recordings are skipped](/framing/follow-subject/#screen-recordings-are-skipped).
+
+## A view of the window
+
+Show Subjects belongs to the window, not the project. It's off in a new window, each window has its own setting, and it isn't remembered between launches. It edits nothing, so it isn't an undo step, and it never changes an export or a saved frame.
+
+## With an agent
+
+There's no agent tool for the overlay. An agent reads the same boxes with [`get_media_analysis`](/mcp/tools-analysis/#get_media_analysis).
+
+## Related
+
+- [Subjects in the picture](/framing/what-is-found/)
+- [Follow Subject](/framing/follow-subject/)
+- [Make Vertical Version](/framing/make-vertical-version/)
+- [On-device media analysis](/projects/media-analysis/)

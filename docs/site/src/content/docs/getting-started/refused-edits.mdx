@@ -1,0 +1,59 @@
+---
+title: When an edit is refused
+description: How Frame Job tells you it won't make an edit, from the Refused strip in the inspector to a beep with no message, and why nothing changes.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Frame Job has rules that keep a project sound, such as how far two clips may overlap. When an edit would break one, nothing changes and Frame Job says so. How it says so tells you what happened.
+
+<AtAGlance
+  where={['The foot of the inspector', 'The timeline, for a drop']}
+/>
+
+| What you see | What happened |
+| --- | --- |
+| A beep and a **Refused:** line at the foot of the inspector | A rule wouldn't allow the edit |
+| A clip animates back to the last place it was allowed | The rules wouldn't allow the drop |
+| A beep and no message | The edit would have changed nothing |
+| An error alert | Frame Job couldn't use the request at all |
+
+Only a drop can still move the clip, to the last allowed place on its way. None of the others changes the project or makes an undo step.
+
+## The refusal strip
+
+When a rule won't allow an edit, Frame Job beeps and shows the rule's own sentence at the foot of the inspector, after "Refused: ":
+
+> Refused: track 3 is locked, so the gap on it cannot be closed
+
+The strip shows up to three lines. Rest the pointer on it to read the whole sentence.
+
+It stays until you click it or the project changes, which means an edit, an undo or redo, or going into or out of a nest. Moving the playhead or changing the selection doesn't clear it, so you can look around while you work out what to do.
+
+The sentence is exact rather than friendly. It can name clips and tracks by Frame Job's own numbers, which aren't their positions on the timeline, and give lengths in the timeline's smallest units rather than in seconds.
+
+Each feature's page lists what can stop it, and [Troubleshooting](/reference/troubleshooting/) gathers them in one place.
+
+A typed Start, Length or end value on an action shows the strip too. Dragging an action's band never does. See [Move, resize or remove an action](/motion/change-an-action/).
+
+## A drop that springs back
+
+While you drag, positions the rules don't allow are skipped and the clip waits at the last allowed one. A clip dropped on one of those positions animates back to that place and stays there, as one undo step. If the drag never reached an allowed place, it animates back to where it started and nothing changes. See [Move clips](/editing/move-clips/).
+
+## A beep with no message
+
+An edit that would change nothing beeps but shows no message, because no rule was broken. A slip does this when the clip is already at the end of its footage, and **Edit ▸ Paste Attributes** does it on clips that already have the copied look.
+
+## An error alert
+
+Now and then Frame Job can't use a request at all, such as a value outside its allowed range. It shows an error alert naming the offending value. You'll rarely meet one, because the inspector's number fields already [hold what you type to their range](/getting-started/inspector-fields/#type-a-value).
+
+## With an agent
+
+An agent is told the same things in words. An edit a rule won't allow fails with the rule's sentence, and an edit that changes nothing fails saying so. See [What a call answers](/mcp/what-a-call-answers/).
+
+## Related
+
+- [Undo and saving](/getting-started/undo-and-saving/)
+- [Troubleshooting](/reference/troubleshooting/)
+- [How edits work](/editing/how-edits-work/)

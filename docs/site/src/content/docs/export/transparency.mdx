@@ -1,0 +1,85 @@
+---
+title: "Transparent exports"
+description: "Export a title or overlay with a transparent background, and choose the format that keeps it for the place it's going."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A transparent canvas lets you export a title, a lower third or an overlay that sits on top of something else. Only four formats keep the transparency, so the format is the choice that matters.
+
+<AtAGlance
+  where={['Document tab ▸ Appearance ▸ Background', 'Export sheet ▸ Format']}
+  tools={['set_canvas', 'export']}
+/>
+
+## Export with transparency
+
+<Steps>
+
+1. [Make the canvas background transparent](/projects/background-and-timecode/#make-the-background-transparent) in the Document tab.
+
+2. Open the [export sheet](/export/export-sheet/) and pick a format that keeps transparency. The sheet's [footnote](/export/export-sheet/#the-footnote) ends in `alpha`, for example `VP9 · WEBM · alpha`.
+
+3. Choose **Export…** or **Add to Queue**.
+
+</Steps>
+
+## Which formats keep transparency
+
+A transparent canvas stays transparent in four formats:
+
+- **ProRes 4444 (MOV)**
+- **HEVC with Alpha (MOV)**
+- **VP9 with Alpha (WebM)**
+- **Animated PNG**
+
+Every other movie format flattens the picture onto black. **Animated GIF** isn't one of the four either: a GIF can show a pixel as fully transparent, but it has no alpha channel, so nothing partly transparent survives it.
+
+For a single frame, [Save Frame](/export/save-frame/#png-jpeg-or-heic) keeps transparency in PNG and HEIC, and JPEG flattens onto black.
+
+## The Transparency note
+
+While the canvas background isn't fully opaque, the **Appearance** section of the [Document tab](/projects/document-tab/) says how many formats will keep it: "Transparent — kept by 4 export formats."
+
+If only one or two formats could keep it, the note names them instead of counting. A document with no length can read "Transparent — needs an alpha format."
+
+## Which transparent movie to send
+
+| Send | For | Good to know |
+| --- | --- | --- |
+| **VP9 with Alpha (WebM)** | The web, in a page's `<video>` in Chrome and Firefox | Whether Safari shows its transparency hasn't been confirmed, so send Safari HEVC with Alpha. |
+| **HEVC with Alpha (MOV)** | Safari, QuickTime and Apple's apps | The delivery file: lossy, 8-bit and smaller than ProRes 4444. |
+| **ProRes 4444 (MOV)** | Another editor | The master. |
+
+VP9 with Alpha shows its transparency only in a player that decodes VP9 with the libvpx decoder. Others, ffmpeg's default decoder among them, show the picture opaque.
+
+To bring a transparent clip back into Frame Job, export ProRes 4444 or HEVC with Alpha. A VP9 with Alpha file keeps its picture when you import it but loses its transparency, showing black where it was transparent.
+
+## Straight alpha
+
+The colour in all three transparent movies is straight, not multiplied by the transparency, so a re-imported ProRes 4444 or HEVC with Alpha file composites to the right colour. If another app asks how a file's transparency is stored, choose straight.
+
+Frame Job also fills the transparent pixels around the picture, up to 4 pixels out, with the colour of the edge beside them. Without that, a codec that averages colour across pixels would darken the edge. This is automatic, and there's nothing to set.
+
+## The same-shape rule
+
+ProRes 4444, HEVC with Alpha and VP9 with Alpha won't write a frame of a different shape from the canvas. Fitting the picture into another shape would pad it, and the padding destroys the alpha channel.
+
+Every row in the [**Size:** popup](/export/size/) has the canvas's shape, so this only happens with a **Custom…** size. Scaling is fine, larger or smaller, as long as the proportions hold, and a size within a pixel of the canvas's shape is written.
+
+After the save panel, the export stops with a message naming both sizes: "An export that keeps transparency has to have the canvas's own shape. This canvas is 1920 × 1080 and 1000 × 1000 is a different shape, so the picture would be padded and the padding loses the alpha channel. Export at 1920 × 1080, at one of the sizes in the popup, or at any size with the same proportions." No new file is written, and a file you chose to replace in the save panel has already been removed.
+
+## Good to know
+
+HEVC with Alpha, VP9 with Alpha and Animated PNG are 8-bit. In an [HDR project](/hdr/export-hdr/) they write the SDR version, so use ProRes 4444 to keep both HDR and transparency.
+
+## Related
+
+- [Canvas background and timecode](/projects/background-and-timecode/)
+- [Choose a format](/export/formats/)
+- [Save Frame](/export/save-frame/)
+- [ProRes](/export/prores/)
+- [H.264 and HEVC](/export/h264-and-hevc/)
+- [AV1 and VP9](/export/av1-and-vp9/)
+- [Animated GIF and PNG](/export/gif-and-apng/)

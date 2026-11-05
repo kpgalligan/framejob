@@ -1,0 +1,93 @@
+---
+title: "Long conversations"
+description: Watch how much of the model's memory a conversation uses, and keep a long one going with compaction and tool result clearing.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A conversation with the Assistant grows with every message, tool result and rendered frame, and the model can only hold so much of it at once. That limit is its context window, measured in tokens, the small pieces of text a model counts in. The Context meter shows how full it is, and two settings keep a long conversation going.
+
+<AtAGlance
+  menu="Frame Job ▸ Settings… ▸ Assistant"
+  keys="⌘,"
+  where="Inspector ▸ Assistant tab ▸ Context"
+  needs="An Anthropic API key. See Set up the Assistant."
+/>
+
+## The context meter
+
+The **Context** row at the top of the Assistant tab shows how much of the model's context window the conversation is using, as of the last response.
+
+| The row reads | When |
+| --- | --- |
+| "Nothing reported yet" | Before your first message in this window. |
+| "12,000 of 200,000 tokens · 6%" | Once the model's window is known. The percentage shows at most one decimal. It can read "0 of …" for a moment after your first message, before the first response. |
+| "12,000 tokens (window size unknown)" | Anthropic didn't report the window size. |
+
+When the inspector is narrow the figure shortens to "12,000 / 200,000 · 6%" or "6%", or to "12,000 tokens" with no known window. The tooltip always has the full figure.
+
+The bar under the figure fills in the accent colour and turns coral past 80%.
+
+**Clear** (↺), at the end of the row, puts the count back to zero, and so does a change of key or model, because each ends the conversation.
+
+## The settings
+
+Both settings are in **Frame Job ▸ Settings… ▸ Assistant**. A change applies without **Save** and keeps the conversation going. A new threshold counts from the end of the current turn, and a change to clearing applies from your next message.
+
+| Setting | What it does | Default | Range |
+| --- | --- | --- | --- |
+| **Compact when context reaches** … **tokens** | Replaces the conversation with a summary at the end of a turn. | On, 300,000 tokens | 20,000 to 900,000 tokens |
+| **Clear old tool results past 150,000 tokens** | Lets Anthropic drop older tool results from what the model sees. | Off | |
+
+The token field is dimmed while **Compact when context reaches** is off. A number outside the range beeps, and the field goes back to the stored value.
+
+## Compaction
+
+With **Compact when context reaches** on, the conversation is replaced by a summary at the end of the first turn that reaches the threshold. It never happens in the middle of a turn, and a [stopped](/assistant/stop-a-turn/) turn doesn't compact.
+
+The summary is asked to keep:
+
+- what you asked for and every preference you stated
+- the project and any nest open
+- the clips, tracks, markers and media involved
+- the edits made, in order, and which were undone
+- what's still open or was promised
+
+Rendered frames don't survive, so the summary describes in words what each one showed. The Assistant renders again when it needs to look.
+
+The transcript notes each step:
+
+| The transcript says | What it means |
+| --- | --- |
+| "Compacting the conversation (*N* tokens)…" | The summary has been asked for. |
+| "Compacted: *N* → about *M* tokens. Earlier renders are gone; the assistant re-renders when it needs to look." | It worked. The Context meter drops to about *M*. |
+| "Compaction didn't finish (*reason*); it will try again after the next turn." | No summary came back. The conversation is unchanged. |
+
+The summary request is priced like any other response, and it's part of that turn's [`Cost:` line](/assistant/cost/#per-turn).
+
+:::tip
+Compaction only starts once the conversation reaches the threshold, so the threshold has to be lower than the model's window. If the Context meter shows a window smaller than your threshold, lower it.
+:::
+
+## With compaction off
+
+Nothing replaces the conversation, so it keeps growing until it fills the model's window. A reply that reaches the end of the window stops where it got to, with no error, and the Context meter reads full. From then on each message fails, with an [error in the transcript](/assistant/conversation/#errors), until you click **Clear**. **Clear** ends the conversation, and nothing of it carries into the next message.
+
+## Clearing old tool results
+
+A tool result is what comes back from one of the Assistant's tool calls, and a project's details can run long. With **Clear old tool results past 150,000 tokens** on, Anthropic may drop older ones from what the model sees once the conversation passes 150,000 tokens. It's a lighter step than compaction: the conversation stays, and only old tool results go.
+
+- It keeps the results of the five most recent tool uses.
+- It clears at least 50,000 tokens at a time.
+- It can happen in the middle of a turn.
+- It never clears tool search results, which are how the Assistant finds its tools.
+
+Each clearing adds a note to the transcript, "Cleared *N* old tool results (*M* tokens) from the model's view." The model may have to fetch something again afterwards.
+
+Each clearing costs a fresh prompt-cache write: Anthropic can't reuse its stored copy of the conversation, so it stores a new one, and that goes on your bill. That's why it clears in large pieces.
+
+## Related
+
+- [Read the conversation](/assistant/conversation/)
+- [What it costs](/assistant/cost/)
+- [Settings](/reference/settings/)

@@ -2,11 +2,11 @@
 
 Frame Job grades a clip from the inspector's **Color** tab. You can set exposure and white balance, push the shadows, midtones and highlights toward a colour with three wheels, shape tones and hues with curves, and finish with one of eight built-in looks or your own `.cube` LUT. An **adjustment clip** grades everything behind it at once, and its **qualifier** can narrow that grade to one colour or tone range. To check your work, **Show Ungraded** gives a before/after view and **Scopes** shows a waveform, parade, vectorscope and histogram beside the preview.
 
-Every grade setting can be animated in an action. The preview, **Save Frame…** and every export draw a grade the same way. A clip you haven't graded renders exactly as it would without one.
+Most grade settings can be animated in an action. The preview, **Save Frame…** and every export draw a grade the same way. A clip you haven't graded renders exactly as it would without one.
 
 ## The Color tab
 
-Select one or more clips and open the inspector's **Clip** tab. The **Color** sub-tab appears when every selected clip can take a grade:
+Select one or more clips and open the inspector's **Clip** tab. The **Color** sub-tab appears when every selected clip that draws can take a grade:
 
 - a video clip, an image clip or a still (freeze frame), or
 - an adjustment clip.
@@ -25,13 +25,13 @@ The tab's sections, from top to bottom:
 | Curves | Every gradable clip |
 | Look | Every gradable clip |
 
-Each section's header shows a short summary, such as "neutral", "adjusted", "Warm 80%" or "hue · sat · inverted", and has a **Reset** button that returns only that section to neutral. If no section is open, the tab opens the first one you haven't closed yourself.
+Each section's header shows a short summary, such as "neutral", "adjusted", "Warm 80%" or "hue · sat · inverted", and, while the section differs from its default, a **Reset** button that returns only that section to neutral. If no section is open, the tab opens the first one you haven't closed yourself.
 
 **Working on several clips.** A control writes only the setting it governs. Dragging Exposure across three clips changes their exposure and leaves each clip's other values alone. When the selected clips have different values, the row shows a mixed badge.
 
 **Undo.** Dragging a slider is one undo step, and so is a typed value. Each step is named after its control, for example **Undo Exposure**, **Undo Hue** or **Undo Strength**. A section's **Reset** is one step named after the section ("Light", "Color", "Look", "Adjustment", "Qualifier").
 
-The order the grade is applied in is fixed: Color first, then Light, Wheels, Curves (tone curves, then the hue curves) and the Look. The clip's filters from the Picture tab's **Filters** section split around the grade: Pixelate, Blur and Sharpen act on the picture before it, and Sepia, Noir, Vignette and Invert act after the Look, in the order of their slots. That matters when you combine a filter such as Noir or Vignette with a grade. A camera-log conversion set on the media comes before all of them (see [HDR and colour management](hdr-and-color.md)).
+The order the grade is applied in is fixed: Color first, then Light, Wheels, Curves (tone curves, then the hue curves) and the Look. The clip's filters from the Picture tab's **Filters** section each have a fixed place around it: Pixelate acts before Color, Blur and Sharpen between Color and Light, and Sepia, Noir, Vignette and Invert after the Look, in the order of their slots. That matters when you combine a filter such as Noir or Vignette with a grade. A camera-log conversion set on the media comes before all of them (see [HDR and colour management](hdr-and-color.md)).
 
 ## Light
 
@@ -76,7 +76,7 @@ Each column has a colour disc, a strip under it, and a number field.
 
 Hover a disc to see its push as a tooltip, such as "Hue 34° · 0.25" (the hue angle and the strength), or "Neutral" when the puck is centred. There is no number field for the push itself.
 
-**The disc** pushes its tonal range toward a colour. The puck's direction picks the hue and its distance from the centre sets the strength. The disc is turned to match the vectorscope, so dragging toward a colour moves the vectorscope trace toward it.
+**The disc** pushes its tonal range toward a colour. The puck's direction picks the hue and its distance from the centre sets the strength. The disc is turned to nearly match the vectorscope, so dragging toward a colour moves the vectorscope trace toward it.
 
 - Press anywhere on the disc and drag. The puck moves by however far the pointer moves; it doesn't jump to where you clicked. Dragging one disc radius gives the full push.
 - Hold ⌥ to move at a tenth of the speed.
@@ -110,7 +110,7 @@ The picker has six cells:
 | Hue | **Hue vs Hue**: shifts a chosen hue toward another, with brightness kept ("make the greens more teal") | Hue 0–360° across, shift −180° to +180° up |
 | Sat | **Hue vs Sat**: saturates or mutes a chosen hue | Hue 0–360° across, gain 0× to 2× up (1× is unchanged) |
 
-Channels you've changed in the same family appear as faint lines in their own colour behind the curve you're editing: the Master, Red, Green and Blue curves together, and Hue and Sat together.
+Channels you've changed among Master, Red, Green and Blue appear as faint lines in their own colour behind the one you're editing. Hue and Sat show only their own curve.
 
 The Hue and Sat plots have a spectrum strip under them. A hue curve never tints a grey, and its points never cross the 0°/360° wrap. A dot under a cell means that channel has been changed. Right-click a cell and choose **Reset Red** (or the name of whichever cell you clicked) to straighten that channel alone. The section's **Reset** straightens all six.
 
@@ -126,7 +126,7 @@ A curve holds from 2 to 16 points on a smooth curve that never overshoots.
 | Drag a point | Moves it, held just inside its neighbours. You can drag the end points too, which sets the black and white points on a tone curve |
 | ⌥-drag | Moves at a tenth of the speed |
 | ⇧-drag | Locks the point to one axis. After a short movement, whichever direction you moved further wins and holds for the rest of the drag. ⌥ and ⇧ combine |
-| Arrow keys | Nudge the selected point: 0.01 on a tone curve, 1° (or 0.01× on Sat) on a hue curve |
+| Arrow keys | Nudge the selected point: 0.01 on a tone curve, 1° on a hue curve (on Sat, ↑ and ↓ move 0.01× instead) |
 | ⇧-arrow keys | Nudge by ten times as much |
 | ⌫ or ⌦, or double-click a point | Deletes it. A curve can't go below two points |
 | Esc | Deselects the point |
@@ -143,7 +143,7 @@ A point you add to a straight channel isn't saved until you first move it, nudge
 
 ### Built-in looks
 
-**Look** is a gallery of tiles. Each tile is a thumbnail of the first selected clip with that look applied: the frame at the playhead when the playhead is inside that clip, otherwise the clip's first frame. The thumbnails refresh a moment after the playhead stops or an edit lands, never during playback or scrubbing, and only while the Look section is open. **None** comes first, then the eight looks:
+**Look** is a gallery of tiles. Each tile is a thumbnail of the first selected clip with that look applied: the frame at the playhead when the playhead is inside that clip, otherwise the clip's first frame. The thumbnails refresh a moment after the playhead stops or an edit lands, never while the playhead is moving through that clip, and only while the Look section is open. **None** comes first, then the eight looks:
 
 | Look | Character |
 |---|---|
@@ -172,16 +172,16 @@ A `.cube` 3D LUT is media in your project. You can add one three ways:
 
 Each LUT gets a tile in the gallery's **Imported** group, named after its file without `.cube`. It also gets an item in **Clip ▸ Look ▸** between the eight looks and None. A LUT is applied at the same step as a built-in look and uses the same **Amount** row.
 
-Frame Job reads 3D LUTs whose `LUT_3D_SIZE` is from 2 to 65. It refuses any other file in its own words, for example "“Film.cube” is not a LUT Frame Job reads: line 2: LUT_3D_SIZE 200 is outside 2–65." Output values are clamped to 0–1. If you change the file on disk, the new table is read at the next frame drawn. If the file goes missing, the clip draws without its look until you relink it; the rest of the grade still applies.
+Frame Job reads 3D LUTs whose `LUT_3D_SIZE` is from 2 to 65. It refuses any other file in its own words, for example "“Film.cube” is not a LUT Frame Job reads: line 2: LUT_3D_SIZE 200 is outside 2–65." Output values are clamped to 0–1. If you change the file on disk, the new table is read at the next frame drawn. If the file goes missing, the clip draws without its look until the file is back at its path or you relink it; the rest of the grade still applies.
 
 The Look section warns you in two cases:
 
-- "This clip's file is converted by Camera Log; a camera LUT here converts it twice." A creative LUT is fine there; a camera LUT would convert the footage a second time.
+- "This clip's file is converted by Camera Log; a camera LUT here converts it twice." A creative LUT is fine there; a camera LUT would convert the footage a second time. A PQ (HDR10) file with a LUT look shows this warning too, with or without a Camera Log.
 - "This project is HDR (HLG): a .cube LUT reads its values as Rec. 709."
 
 See [HDR and colour management](hdr-and-color.md) for camera log and HLG projects.
 
-**Removing a LUT.** A LUT counts as used by every clip whose look it is, and by every file whose Camera Log it is. Removing it from the Media tab asks first, naming those uses, and its **Remove and Clear Looks** button removes the LUT and clears the look from those clips (they keep their place) and the Camera Log from those files. An action whose end names the removed LUT simply stops changing the look.
+**Removing a LUT.** A LUT counts as used by every clip whose look it is, and by every file whose Camera Log it is. Removing it from the Media tab asks first, naming those uses, and its **Remove and Clear Looks** button removes the LUT and clears the look from those clips (they keep their place) and the Camera Log from those files. An action whose end names the removed LUT keeps that end, which now means no look: once the action ends, the clip draws without one, even if it has a look of its own.
 
 *Agents:* `set_video` with `look: {kind, amount}`. `kind` is one of `warm`, `cool`, `teal_orange`, `vivid`, `faded`, `vintage`, `dramatic`, `black_white` or `lut`, and `look: null` removes the look. For a LUT, call `import_media` with the `.cube` file, then `set_video {look: {kind: "lut", media: <id>}}`.
 
@@ -256,11 +256,11 @@ Press **Pick from Canvas**, then click the picture in the preview. Frame Job sam
 - Luma is re-centred only if it was already on.
 - A range that was already on keeps its width and softness.
 
-The pick is one undo step named "Qualifier". Press Esc or the button again to cancel; changing the selection also cancels. A click outside the canvas beeps and leaves the mode armed. The button works only when every selected clip is an adjustment clip. Arming it cancels any other canvas mode that is armed, such as the chroma key's eyedropper or a Zoom to Region drag. With an action selected, the picked ranges go to the action's end state.
+The pick is one undo step named "Qualifier". Press Esc or the button again to cancel; changing the selection also cancels. A click outside the canvas beeps and leaves the mode armed. The button works only when every selected clip is an adjustment clip. Arming it cancels any other canvas mode that is armed, such as the chroma key's eyedropper or a Zoom to Region drag. With an action selected, the picked ranges go to the action's end state, and a near-grey click only takes Hue out of that end state, so a Hue the clip has on stays on.
 
 ### Show Selection
 
-**Show Selection** (the checkbox in the section, or **View ▸ Show Selection**, which has no shortcut) draws the qualifier's selection in grey. White is fully graded, black is untouched, and grey is in between. The blur and any matte cutting the clip are included, and the Strength is not applied. Layers in front of the clip are left out, and the preview is black where the clip is not on the frame. A "Selection" tag appears in the preview's top-left corner.
+**Show Selection** (the checkbox in the section, or **View ▸ Show Selection**, which has no shortcut) draws the qualifier's selection in grey. White is fully graded, black is untouched, and grey is in between. The blur and any matte cutting the clip are included, and the Strength is not applied. Layers in front of the clip are left out, and the whole preview is black when the clip is not on the frame. A "Selection" tag appears in the preview's top-left corner.
 
 Show Selection follows the first selected adjustment clip. It moves to another adjustment clip when you select that one, and turns off when no adjustment clip is selected. The menu item is disabled while it is off and no adjustment clip is selected. It only affects this window's preview and the Preview Window, never an export or Save Frame….
 
@@ -289,18 +289,18 @@ Some things are not part of the grade, so Show Ungraded leaves them on: a camera
 
 Below the Waveform and the Histogram, two readouts show **Highlights clipped** and **Shadows clipped** as a share of the frame. The slot's caption says what the scope reads: "Rec. 709 · encoded" in an SDR project. In an HDR (HLG) project it reads "HLG · cd/m²" or "Rec. 2100 HLG", with a cd/m² scale (0, 10, 51, 203, 1000), a dashed line at reference white and Rec. 2020 vectorscope targets. See [HDR and colour management](hdr-and-color.md).
 
-The scopes measure every frame the preview composes: they follow the picture live while it plays, and update after each edit while paused. Their readouts show "—" until a frame has been measured. Because they read the preview's frame, they follow Show Ungraded, and with **View ▸ Show SDR Version** on in an HLG project they measure the SDR picture and switch to the Rec. 709 caption and targets. If the preview area is too short for both slots, they shrink together. Below a 360-point pane, only the top slot shows.
+The scopes measure the frames the preview composes, skipping any that arrive while they are still busy and always ending on the latest: they follow the picture live while it plays, and update after each edit while paused. Their readouts show "—" until a frame has been measured. Because they read the preview's frame, they follow Show Ungraded, and with **View ▸ Show SDR Version** on in an HLG project they measure the SDR picture and switch to the Rec. 709 caption and targets. If the preview area is too short for both slots, they shrink together. Below a 360-point pane, only the top slot shows.
 
 *Agents:* `render_frame` with `waveform`, `parade`, `vectorscope` (plus `vectorscope_zoom` 1, 2 or 4) and `histogram`. The text answer gives the clipping percentages, and a JSON file next to the image holds the counts.
 
 ## Grading inside an action
 
-Every grade setting can be animated. Select an action on the clip's action lane, then change a control. The change goes to the action's end state, and the value ramps there from the clip's own value. The row marks (◆) and the Color tab's badge show which settings the selected action animates. See [Motion and transitions](motion-and-transitions.md) for actions.
+Most grade settings can be animated. Select an action on the clip's action lane, then change a control. The change goes to the action's end state, and the value ramps there from the value it has when the action starts. The row marks (◆) and the Color tab's badge show which settings the selected action animates. See [Motion and transitions](motion-and-transitions.md) for actions.
 
 - **Light, Color, wheels, Strength, the look's Amount and the qualifier's numbers** ramp smoothly. An animated hue centre takes the short way round the colour wheel; 350° to 10° passes through 0°.
 - **Curves** animate between any two curves, even with different numbers of points, and from or to a straight line. Inside an action, a channel cell's **Reset Red** (or whichever channel) and the row's **Set end value to default** write a straight curve to the action's end, so the curve animates back to neutral.
-- **Turning a look on or off, or changing it, applies to the clip itself, not to the action**, even with an action selected. A look that differs between start and end switches at the action's end. Amount is what animates.
-- **Turning a qualifier range on or off** switches at the action's end.
+- **Turning a look on or off, or changing it, applies to the clip itself, not to the action**, even with an action selected. A look that differs between start and end switches whole at the action's end, Amount included. Amount animates only while the look stays the same.
+- **Turning a qualifier range on** switches at the action's end. An action can't turn off a range the clip has on: unticking it with an action selected, or choosing **Set end value to default** on its row, only takes the range back out of the action. The box stays ticked, and the Qualifier rows show ◆ until you choose **Clear**.
 
 While an action is selected, a grade section's header shows **Clear** in place of **Reset**, and only when the action animates one of that section's rows: it removes the section's settings from the action. Right-click a grade row for **Remove from action N** or **Set end value to default**.
 
@@ -313,7 +313,7 @@ The grade controls show the action's animation in their own way:
 
 Sliders carry the same marks as everywhere else in the inspector; see [Motion and transitions](motion-and-transitions.md).
 
-*Agents:* `add_action`, then `set_action_end` with a `video` patch carrying `color`, `wheels`, `curves`, `look.amount` or `qualifier`.
+*Agents:* `add_action`, then `set_action_end` with a `video` patch carrying `color`, `wheels`, `curves`, `look.amount` or `qualifier`. A qualifier range set to `null` there only leaves the end state, and `off` can't name `video.qualifier` or a range inside it.
 
 ## Copying a grade: Paste Attributes
 
@@ -331,7 +331,7 @@ Pasting a clip that has blur, sharpen, pixelate or a blend mode onto an adjustme
 
 ## Limits
 
-- The Color tab needs every selected clip to be gradable. Deselect text, shape, graphic and nest clips first.
+- The Color tab needs every selected clip that draws to be gradable. Deselect text, shape, graphic and nest clips first.
 - Qualifiers exist only on adjustment clips. To grade one colour, put an adjustment clip above the picture for the span you want. It grades every track behind it, so a matte track cutting its track is how you confine it to one area (see [Canvas and layers](canvas-and-layers.md)).
 - There is no Offset wheel. Use Color's **Brightness** for an overall lift.
 - Show Ungraded, Show Selection and the scopes affect only the window's preview. Nothing about them is saved or exported.

@@ -1,0 +1,106 @@
+---
+title: "Export HDR"
+description: "Export an HDR (HLG) project as an HLG master, an HDR10 file or an SDR version, and see which formats can carry each."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+An HDR (HLG) project can leave Frame Job as an HLG master, as an HDR10 file, or as an SDR version for everywhere HDR won't play. You choose on the export sheet's **Dynamic Range:** row.
+
+<AtAGlance
+  menu="File ▸ Export…"
+  keys="⌘E"
+  where="Export sheet ▸ Dynamic Range"
+  tools={['export', 'export_status']}
+  needs="An HDR (HLG) project."
+/>
+
+## Export an HDR file
+
+<Steps>
+
+1. Choose **File ▸ Export…** (<kbd>⌘E</kbd>).
+
+2. In **Format:**, choose one of the [six formats that carry HDR](#which-formats-carry-hdr).
+
+3. In **Dynamic Range:**, choose **HDR (HLG)**, **HDR10 (PQ)** or **SDR version**.
+
+4. Finish the rest of the [export sheet](/export/export-sheet/) as usual.
+
+</Steps>
+
+## The Dynamic Range row
+
+The row sits under **Format:**, and it only appears in an HDR (HLG) project. An SDR project's sheet doesn't have it. To make a project HDR, see [A project's dynamic range](/hdr/dynamic-range/).
+
+The choice lasts while the sheet is open. If you switch to a format that can't carry HDR and back, your choice returns. It isn't remembered for the next export, and an [export preset](/export/presets/) doesn't save it.
+
+### HDR (HLG)
+
+The BT.2100 HLG master, tagged with BT.2020 primaries and matrix and the HLG transfer. It's first on the row and the default.
+
+### HDR10 (PQ)
+
+An HDR10 file: BT.2100 PQ, mastered at 1,000 cd/m², with [fixed metadata](#fixed-hdr10-metadata). It's available on the same six formats as HLG.
+
+### SDR version
+
+The project's SDR version, in Rec. 709. It's the same picture as [Show SDR Version](/hdr/show-sdr-version/). White titles stay near white, and highlights above reference white are rolled off.
+
+## Which formats carry HDR
+
+Six formats can carry an HDR picture, each at 10 bits or more:
+
+- **HEVC 10-bit (MP4)**
+- **AV1 (MP4)**
+- **AV1 (WebM)**
+- **VP9 (WebM)**
+- **ProRes 422 (MOV)**
+- **ProRes 4444 (MOV)**
+
+On every other format the **Dynamic Range:** row is disabled and shows **SDR version**. **H.264 (MP4)**, **HEVC (MP4)**, **HEVC with Alpha (MOV)**, **VP9 with Alpha (WebM)**, **Animated GIF** and **Animated PNG** always write the SDR version. The audio-only formats have no picture, so the row does nothing there.
+
+### VP9 and HDR
+
+**VP9 (WebM)** writes HLG and HDR10 as 10-bit VP9 Profile 2, and the SDR version as 8-bit Profile 0. VP9 itself can't say which transfer it uses, so the WebM file's colour information is what tells a player it's HLG or PQ.
+
+## Fixed HDR10 metadata
+
+Every HDR10 file carries the same metadata:
+
+| Field | Value |
+| --- | --- |
+| Mastering display | P3 D65, 0.005–1,000 cd/m² |
+| MaxCLL | 1,000 |
+| MaxFALL | 0 |
+
+The picture never goes above 1,000 cd/m², so this metadata is always accurate. The [HDR10 peak](/hdr/hdr10-peak/) in the Media tab describes a source file and doesn't change it.
+
+## HDR frames
+
+**File ▸ Save Frame…** (<kbd>⌥⌘E</kbd>) in an HDR (HLG) project writes the HLG picture as a 16-bit PNG or a 10-bit HEIC, labelled BT.2100 HLG. A JPEG writes the SDR version, labelled BT.709. See [Save Frame](/export/save-frame/).
+
+## Good to know
+
+- There's no Dolby Vision or HDR10+ output. Neither is added to an HLG or HDR10 file.
+- One export writes one picture, so an HDR master and its SDR version are two exports. The [Export Queue](/export/export-queue/) can run them one after the other.
+- [Show SDR Version](/hdr/show-sdr-version/) changes the preview only. It never reaches an export or a saved frame, so the file is whatever the sheet says.
+
+## With an agent
+
+`export` takes the same three choices as `dynamic_range`: `hlg`, `pq` or `sdr`. Where the sheet disables the row, the tool fails with a message instead. Asking for HLG or HDR10 on a format that can't carry it, `vp9_alpha_webm` included, names the six formats that can. Asking for either in an SDR project says to make the project HDR first. Asking for the SDR version in an SDR project changes nothing, and an audio-only format ignores the choice.
+
+`export` returns an id for the job straight away. Once `export_status` reports a video job done in an HDR (HLG) project, its `dynamic_range` names the picture that was written. See [Export: start, then poll](/mcp/export/) and [Tools: rendering and export](/mcp/tools-render-and-export/#export).
+
+`render_frame` writes the same bytes as Save Frame, and `sdr_version` draws the SDR version in any image format. See [Check the picture: render_frame](/mcp/render-frame/#frames-from-an-hdr-project).
+
+## Related
+
+- [A project's dynamic range](/hdr/dynamic-range/)
+- [Show SDR Version](/hdr/show-sdr-version/)
+- [The export sheet](/export/export-sheet/)
+- [Choose a format](/export/formats/)
+- [AV1 and VP9](/export/av1-and-vp9/)
+- [Save Frame](/export/save-frame/)
+- [Precision and bit depth](/hdr/precision/)

@@ -1,0 +1,115 @@
+---
+title: Units and ids
+description: The units an agent's arguments are written in. Times in ticks, ids, track order, colours, booleans, keys that must be sent, list arguments and speed rates.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Every tool writes its arguments the same way. This page is the reference for what a number, a colour or a list means in an argument, and what happens when one is out of bounds.
+
+<AtAGlance
+  tools={['get_project', 'add_track', 'move_track', 'set_canvas', 'set_transition', 'add_zoom_action', 'ripple_delete_ranges', 'paste_attributes', 'copy_pieces', 'set_speed', 'add_speed_ramp']}
+/>
+
+## Times in ticks
+
+Every time argument is in ticks, 600,000 to the second, not in frames or timecode.
+
+| Length | Ticks |
+| --- | --- |
+| 1 second | 600000 |
+| 1 minute | 36000000 |
+| 1 frame at 23.976 fps | 25025 |
+| 1 frame at 24 fps | 25000 |
+| 1 frame at 25 fps | 24000 |
+| 1 frame at 29.97 fps | 20020 |
+| 1 frame at 30 fps | 20000 |
+| 1 frame at 59.94 fps | 10010 |
+| 1 frame at 60 fps | 10000 |
+
+A time you send is rounded to the project's frame grid. Times in a `set_audio` patch, such as fades and the attack and release of ducking and the compressor, are the exception: they're lengths of sound, so they stay exactly as sent.
+
+What a time is measured from depends on the argument:
+
+- **Most times** are timeline times, from the start of the timeline. With `scope`, they're from the start of the nest.
+- **Action times** are clip time, measured from the clip's own start. `add_action`'s `at`, `add_zoom_action`'s `at`, and `add_speed_ramp`'s `from` and `to` are examples.
+- **Source times** are measured in the media file, played forwards. `get_media_analysis` takes its `from` and `to` this way, not snapped to the grid, and `get_cursor_events` answers in them when you ask with `media`.
+
+A few arguments aren't times on the timeline and take plain seconds, such as `record_screen`'s `seconds` and `analyze_cutout`'s `wait`. Each tool's table says so.
+
+## One id space
+
+Clip, track, marker and media ids share one number space, so an id names one thing on its own. `get_project` lists them, and an edit's answer [names any it creates](/mcp/what-a-call-answers/#a-landed-edit).
+
+An id nothing has is answered with where to look: "No clip has id 17. get_project lists the clips." A number that isn't whole isn't an id.
+
+## Track order
+
+`tracks[0]` is the back of the layer stack and the bottom lane of the timeline. A higher index draws in front.
+
+A `track` argument is a track's id, not its place in the stack. The place is `index`, which `add_track` and `move_track` take: 0 is the back. Left out of `add_track`, the new track goes to the front.
+
+## Colour formats
+
+Colours are spelled differently depending on what they belong to.
+
+| Colour | Spelling | Example |
+| --- | --- | --- |
+| Clips and the canvas: text, shapes, shadows, outlines, `set_canvas`'s `background` | Four numbers `[r, g, b, a]`, each from 0 to 1 | `[1, 0.35, 0.21, 1]` |
+| A chroma key, `video.chroma.key` | Three numbers `[r, g, b]`, each from 0 to 1 | `[0, 1, 0]` |
+| A marker's `color`, a clip's `label` | A colour name: red, orange, yellow, green, blue or purple | `"red"` |
+| A graphic's colour props | A CSS colour string, usually hex | `"#ff5a36"` |
+
+Three numbers where four belong, or a component out of range, is refused. Nothing is filled in or clamped. A number from 0 to 255 is the usual mistake.
+
+A marker's colour and a clip's label aren't checked against the six. Any other name is kept, and draws in the neutral text colour.
+
+A graphic's colour may also be written as `rgb()`, `rgba()`, `hsl()`, `hsla()` or a CSS colour name. Frame Job stores it as lowercase hex.
+
+## Boolean spellings
+
+A tool's boolean argument may be sent as `true` or `false`, or as the strings `"true"`, `"1"`, `"false"` or `"0"`. Any other string, a list or an object is refused: "discard must be true or false."
+
+This covers a tool's own arguments. Inside a [patch](/mcp/patches/), a boolean must be a real `true` or `false`, and so must a graphic's boolean prop.
+
+## Keys that must be sent even when null
+
+Two arguments are required even though null is a valid value, because null means something:
+
+| Tool | Argument | Null means |
+| --- | --- | --- |
+| `set_transition` | `kind` | Remove the transition |
+| `add_zoom_action` | `region` | Zoom back out to the clip's own scale and position |
+
+Leaving either out is refused, so a forgotten value can't remove a transition or zoom back by accident.
+
+## No empty lists
+
+An empty list argument names nothing to act on, so it's refused by name.
+
+| Argument | Tools | The answer |
+| --- | --- | --- |
+| `clips` | Tools that act on clips, such as `set_video`, `detect_silence` and `analyze_cutout` | "clips is empty — name at least one clip." |
+| `ranges` | `ripple_delete_ranges`, `copy_pieces` | "ranges is empty — name at least one [from, to] pair." |
+| `groups` | `paste_attributes` | "groups is empty — name at least one of…", followed by the group names. Leave `groups` out to paste the default set. |
+
+Where a tool takes `clips`, a single id is accepted in place of a list. In `set_selection` an empty list means something: it selects nothing.
+
+A frame-rate term of 0 in `set_canvas`'s `fps` is refused too, as is a fraction: each term is a whole number from 1 to 4294967295, so 29.97 fps is `[30000, 1001]`.
+
+Lists inside a patch are different. `filters: []` is how you clear a filter stack. See [Patches](/mcp/patches/#how-a-patch-merges).
+
+## Speed rates are clamped
+
+Most values out of range are refused. A speed rate is different: `set_speed` and `add_speed_ramp` bring a `rate` outside ×0.1–×1000 into that range. A rate of zero or less is refused.
+
+On a clip with a speed ramp, `set_speed` scales every rate in the ramp, so the ramp keeps its shape, and the scale stops where any of those rates would pass the limits.
+
+Above ×12 a clip's sound is left out of the mix. The answer says so with `audio_left_out` and `audio_note`. See [Tools: speed and time](/mcp/tools-speed/).
+
+## Related
+
+- [Patches](/mcp/patches/)
+- [What a call answers](/mcp/what-a-call-answers/)
+- [Read the project: get_project](/mcp/get-project/)
+- [Editing inside a nest](/mcp/nests/)

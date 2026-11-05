@@ -1,0 +1,110 @@
+---
+title: "Consolidate Media"
+description: "Copy every file a project uses into its package, so you can back it up, move it to another Mac or hand it over without the originals."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A project normally points at your files where they are. Consolidate Media copies them all into the `.framejob` package and points the project at the copies, so the package becomes the whole edit. You can then hand it to someone, move it to another Mac, or back it up and delete the originals.
+
+<AtAGlance
+  menu="File ▸ Consolidate Media…"
+  where="Media tab footer ▸ Consolidate…"
+  tools="consolidate_media"
+  needs="A saved project, and room on the disk for a second copy of the footage."
+/>
+
+## Consolidate a project
+
+<Steps>
+
+1. Choose **File ▸ Consolidate Media…**, or **Consolidate…** at the foot of the [Media tab](/projects/media-tab/). Both are off when the project has no media. If the project has never been saved, you'll [save it first](#save-the-project-first).
+
+2. Watch the **Consolidating Media** sheet as the files copy.
+
+3. Read what the sheet reports, then choose **Close**, or **Show in Finder** to see the copies.
+
+</Steps>
+
+Every file in the media list is copied into a `media` folder inside the package, whether a clip uses it or not. To keep the package smaller, [remove](/projects/remove-media/) what you don't need first. [Unused only](/projects/media-tab/#unused-only) shows you what that is.
+
+## Save the project first
+
+An untitled project has no package to copy into. On one, the command asks "Save this project first?" and offers **Save…** and **Cancel**. After the save it carries on where it left off. Cancelling the Save panel stops the command.
+
+## While it copies
+
+The sheet shows a bar, a line such as "Copying 4 files (2.1 GB) into the package…", and the name of the file being copied. When every file is already inside and only the project's links need correcting, the line reads "Relinking 2…".
+
+**Cancel** stops between files, so the sheet shows "Stopping…" until the file in progress is done. What was copied stays copied and the project points at it, and the rest keep pointing at the originals. The project always opens. Run the command again to copy the rest.
+
+## When it finishes
+
+The sheet says what happened and offers **Show in Finder** and **Close**. **Show in Finder** shows the package's `media` folder and closes the sheet. The changes to the project are one undo step called **Consolidate Media**.
+
+| The sheet says | What it means |
+| --- | --- |
+| "Copied 4 files (2.1 GB) into the package." | How many files it copied, cursor files included. |
+| "No files needed copying." | Nothing was copied. It also appears beside the lines below when no copy succeeded. |
+| "Stopped before the rest." | You chose **Cancel**. |
+| "2 files could not be copied." | Those files keep pointing at their originals, so every clip still plays. The first file's reason shows underneath. |
+| "1 missing file was left alone — relink intro.mov." | See [Missing files](#missing-files). It names up to three. |
+| "1 cursor file was missing and left alone." | See [Cursor files](#cursor-files). |
+
+## What gets copied
+
+### Names and duplicates
+
+- Two different files with the same name are kept apart, as `intro.mov` and `intro-2.mov`. Names are compared without regard to case, and a name already in the `media` folder counts as taken.
+- Two rows in the media list that point at the same file share a single copy.
+- Files already in the package's `media` folder aren't copied again.
+
+### Missing files
+
+A missing file can't be copied, so it's left alone and the sheet names it. [Relink it](/projects/relink-media/) and consolidate again.
+
+With nothing to do, Frame Job doesn't open the sheet. It shows an alert reading "Nothing to consolidate." and why:
+
+- "Every file this project uses is already inside the package."
+- "Every file this project can find is already inside the package. 2 missing files need relinking first."
+
+### LUTs
+
+[LUTs](/color/luts/) are in the media list, so they're copied like footage, used or not. The looks and Camera Logs that use one then read the copy in the package.
+
+### Cursor files
+
+A screen recording's [cursor file](/recording/cursor-files/) is copied too, next to its movie and named after it: `Recording.mov` and `Recording.fjcursor`. It counts as one of the files copied in the final report.
+
+- It's copied only once its movie is, and the project points at the copy only once it's there.
+- One that can't be copied is listed with the other failures, and the recording keeps its original cursor file.
+- One that's missing is left alone: "1 cursor file was missing and left alone."
+
+### WebM, MKV and converted files
+
+For a [WebM or MKV](/projects/webm-and-matroska/), or a file [converted with ffmpeg](/projects/ffmpeg-conversion/), Frame Job copies the movie it plays from, not the file you imported. The row's [tooltip](/projects/media-tab/#the-tooltip) then says it was copied into this project's package.
+
+## Move a consolidated package
+
+Move or rename a consolidated package and it finds its own copies when it opens. Any missing file with a file of the same name in the package's `media` folder is pointed back at it, and a screen recording's cursor file is found again the same way.
+
+This happens with no sheet, adds no undo step, and doesn't mark the project as changed. A file Frame Job can still find is never touched, even if a file of the same name sits in `media`. Anything still missing after this brings up the [Missing media sheet](/projects/relink-media/#relink-from-the-missing-media-sheet).
+
+## Good to know
+
+- Nothing checks for free space first. A copy that runs out of room is reported with the files that couldn't be copied, and those files keep pointing at their originals.
+- Undo points the project back at the originals but leaves the copies in the package. Consolidating again then makes second copies, such as `intro-2.mov`.
+- When two rows share a copy and that copy fails, both keep pointing at the original.
+
+## With an agent
+
+[`consolidate_media`](/mcp/tools-media/#consolidate_media) does the same work with no sheet and no **Cancel**, and Frame Job's own window doesn't respond until the copy is done, which can take a while. On a project that has never been saved it stops and says to save first. The [Assistant](/assistant/what-it-will-not-do/) asks you before it runs it. See [Tools: media](/mcp/tools-media/).
+
+## Related
+
+- [The Media tab](/projects/media-tab/)
+- [Relink missing media](/projects/relink-media/)
+- [Remove media](/projects/remove-media/)
+- [Save, revert and close](/projects/save-and-revert/)
+- [The .framejob package](/reference/framejob-package/)

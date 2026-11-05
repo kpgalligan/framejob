@@ -1,0 +1,94 @@
+---
+title: Hide and lock tracks
+description: Take a track's picture out of your video without touching its clips, and protect a track from being moved or cut by accident.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+**Hide Video** takes a track's picture out of your video and leaves its clips where they are. **Lock Track** protects a track's clips while you edit everything around them.
+
+<AtAGlance
+  menu={['Track ▸ Hide Video', 'Track ▸ Lock Track']}
+  where={['The eye and padlock switches in a track header', 'Right-click a track header or an empty stretch of its lane']}
+  tools={['set_track']}
+/>
+
+## Hide Video
+
+Click the eye in the track's header. It becomes a struck-through eye and the track's clips draw dimmed on the timeline. Click it again to bring the picture back.
+
+**Hide Video** in the [track context menu](/timeline/manage-tracks/#the-track-context-menu) does the same for the track you clicked, and **Track ▸ Hide Video** for the [current track](/timeline/tracks/#the-current-track).
+
+While a track is hidden:
+
+- Its picture is gone from the preview and from every export.
+- Its clips aren't drawn on the canvas, so you can't click them there. You can still select and edit them on the timeline.
+- Its sound keeps playing. To silence it as well, use [Mute Audio](/audio/mute-and-solo/).
+- A hidden [matte track](/canvas/matte-tracks/) cuts nothing, so the track behind it shows whole.
+- If it holds a [nest](/editing/nests/), everything inside the nest is hidden too.
+
+## Lock Track
+
+Click the open padlock in the track's header. It closes and the lane is hatched. Click it again to unlock.
+
+**Lock Track** in the [track context menu](/timeline/manage-tracks/#the-track-context-menu) does the same for the track you clicked, and **Track ▸ Lock Track** for the [current track](/timeline/tracks/#the-current-track).
+
+### What a lock stops
+
+On the timeline, you can't drag, trim, slip or roll a locked track's clips with the mouse. Their trim edges are gone, and their fade handles, volume lines and action bands don't respond. A marquee skips them.
+
+On the preview, you can't select or drag them. A click passes through to the unlocked clip behind.
+
+Edits that reach across the timeline leave a locked track alone:
+
+- [**Split**](/editing/splitting/) with nothing selected doesn't cut its clips.
+- [**Lift** and the range form of **Ripple Delete**](/editing/delete-clips/) leave them uncut.
+- Ripples, [closed gaps](/editing/close-gaps/) and inserted time don't shift them. That includes the cuts from [Remove Silences](/cleanup/remove-silences/).
+- A clip on a locked track isn't moved, cut or deleted along with a linked partner on an unlocked track.
+
+### What Frame Job won't do
+
+A few edits need to shift or cut a locked track to work, so Frame Job stops them.
+
+| Edit | What happens |
+| --- | --- |
+| [Insert](/editing/insert-and-overwrite/) onto a locked track | Beeps and says why at the foot of the inspector. |
+| [Close Gap](/editing/close-gaps/) on a locked track | Beeps and says why at the foot of the inspector. |
+| [Retime Range](/speed/retime-range/) | Won't run while a locked track has a clip that ends after the range's start, because that clip would fall out of step. |
+
+### What a lock doesn't stop
+
+A lock protects where a clip sits, not what it looks like. You can still rename a clip on a locked track and change it in the inspector.
+
+You can also still select one by clicking it on the timeline, with <kbd>⌥</kbd>-click on the header, or with **Edit ▸ Select All on Track**. Once a locked clip is selected, the edits you aim at it still work:
+
+- **Delete** and **Ripple Delete** remove it.
+- **Split** cuts it.
+- **Clip ▸ Trim Start to Playhead** (<kbd>W</kbd>) and **Clip ▸ Trim End to Playhead** (<kbd>E</kbd>) trim it.
+- <kbd>,</kbd> and <kbd>.</kbd> nudge it along the timeline.
+- If you drag an unlocked clip in the same selection, the locked clip moves with it.
+
+A few other things get past a lock too:
+
+- [**Overwrite**](/editing/insert-and-overwrite/) still clears the span it needs on a locked track.
+- You can drop a clip or a file onto a locked track.
+- You can [reorder](/timeline/manage-tracks/#reorder-tracks) or [remove](/timeline/manage-tracks/#remove-track) a locked track.
+- [New Project from Range](/projects/new-project-from-range/) cuts locked tracks like any other, and the new project keeps their locks.
+
+## Good to know
+
+- Each flip is one undo step, named Hide Track or Lock Track.
+- **Track ▸ Hide Video** and **Track ▸ Lock Track** show no checkmark, so read the state from the track's header. The context menu does show one.
+
+## With an agent
+
+`set_track` sets both switches, as `hidden` and `locked`. See [Tools: tracks, markers and canvas](/mcp/tools-tracks-and-markers/#set_track).
+
+A lock holds back gestures in the window and edits that reach across the timeline. As with a clip you've selected, an agent that names a clip on a locked track can still move, trim, cut or delete it. See [Tools: moving and trimming](/mcp/tools-move-and-trim/).
+
+## Related
+
+- [Tracks](/timeline/tracks/)
+- [How edits work](/editing/how-edits-work/)
+- [Mute and solo tracks](/audio/mute-and-solo/)
+- [Matte tracks](/canvas/matte-tracks/)

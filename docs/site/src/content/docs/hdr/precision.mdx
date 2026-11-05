@@ -1,0 +1,56 @@
+---
+title: "Precision and bit depth"
+description: "How Frame Job keeps the depth of your footage through compositing and grading, which exports carry it, and what stays 8-bit."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Frame Job works in 16-bit float, so a gradient from a 10-bit camera file survives grading. There's nothing to turn on. This page says where that depth is kept and where it ends. "Deep" here means more than 8 bits per channel.
+
+<AtAGlance menu="File ▸ Export…" keys="⌘E" tools="export" />
+
+## 16-bit float compositing
+
+Every video source is decoded to 16-bit float, and every frame is composited at 16-bit float. There's no 32-bit float mode. Blends run there too, so a heavy grade keeps its precision. A 10-bit source keeps its detail all the way to a 10-bit or ProRes export.
+
+A 16-bit float frame takes twice the memory of an 8-bit one, so an export needs about twice the memory for its frames.
+
+## 10-bit exports
+
+The format you choose on the [export sheet](/export/export-sheet/) decides how much of that depth reaches the file.
+
+| Format | Depth in the file |
+| --- | --- |
+| **HEVC 10-bit (MP4)** | 10-bit (Main 10) |
+| **AV1 (MP4)**, **AV1 (WebM)** | Always 10-bit |
+| **ProRes 422 (MOV)**, **ProRes 4444 (MOV)** | Deep: they take the composited frames as they are, at 10 bits in ProRes 422 and 12 in ProRes 4444. See [ProRes](/export/prores/). |
+| **VP9 (WebM)** | 8-bit for an SDR picture, 10-bit for HLG and HDR10 |
+| **H.264 (MP4)**, **HEVC (MP4)**, **HEVC with Alpha (MOV)**, **VP9 with Alpha (WebM)** | 8-bit |
+| **Animated GIF**, **Animated PNG** | 8-bit |
+
+The sheet's **Bit depth:** row is about sound, not the picture. See [Export bit depth](/export/bit-depth/).
+
+## Deep stills
+
+A still deeper than 8 bits per channel, such as a 16-bit PNG or TIFF or a 10-bit HEIC, is drawn at 16-bit float. An 8-bit still is drawn at 8 bits. It's automatic and there's no setting: add the file with **File ▸ Add Media…** (<kbd>⇧⌘I</kbd>) as usual.
+
+## Saved frames
+
+**File ▸ Save Frame…** (<kbd>⌥⌘E</kbd>) writes a 16-bit PNG or a 10-bit HEIC when the frame shows a deep still or a 10-bit VP9 clip, and always in an HDR (HLG) project. A 10-bit HEVC or ProRes clip gets the same when it's on the lowest track with video on it. On a higher track, above an 8-bit clip, it's saved at 8 bits. A JPEG is always 8-bit. See [Save Frame](/export/save-frame/).
+
+## Reversed clips
+
+A reversed clip plays from a backwards copy rendered at 10 bits, at the source's exact size and with the source's own colour labels, so an HDR or log clip still reads correctly. See [Reverse a clip](/speed/reverse/).
+
+## What stays 8-bit
+
+Text, shapes, captions, graphics and screen recordings are 8-bit, and so are thumbnails. In an HDR (HLG) project those layers are still [lifted to HDR reference white](/hdr/dynamic-range/), so they sit with the rest of the picture.
+
+## Related
+
+- [Export HDR](/hdr/export-hdr/)
+- [Choose a format](/export/formats/)
+- [Export bit depth](/export/bit-depth/)
+- [How sources are read](/hdr/how-sources-are-read/)
+- [Save Frame](/export/save-frame/)
+- [Reverse a clip](/speed/reverse/)

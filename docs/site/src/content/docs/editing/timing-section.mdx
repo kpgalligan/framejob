@@ -1,0 +1,87 @@
+---
+title: "Type a clip's timing"
+description: "Trim a clip to an exact time by typing its In and Out, and read its length, in the Clip tab's Timing section."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+The Timing section is for when you know the number. Type where a clip starts and ends on the timeline, and read how long it is, without dragging an edge.
+
+<AtAGlance
+  where="Clip tab ▸ Clip ▸ Timing"
+  tools={['trim_start', 'trim_end']}
+/>
+
+## Type In and Out
+
+<Steps>
+
+1. Select one clip.
+
+2. In the [inspector's](/getting-started/inspector/) **Clip** tab, choose the **Clip** sub-tab, the last one. **Timing** is its first section, and it starts shut. Click its header to open it, and it stays open until you shut it. Shut, the header still shows the clip's length.
+
+3. Click **In** or **Out** and type a time. `1:23`, `83.5` and `1:23:04` all work, as they do in the toolbar's time field. See [Inspector fields](/getting-started/inspector-fields/).
+
+4. Press <kbd>Return</kbd> or <kbd>Tab</kbd>.
+
+</Steps>
+
+| Field | What it is | What typing does |
+| --- | --- | --- |
+| **In** | Where the clip starts on the timeline | Trims its front edge. The rest of the clip stays where it is. |
+| **Out** | Where the clip ends on the timeline | Trims its back edge. |
+
+Both are positions on the timeline, not positions in the file. A later **In** hides the start of the footage, and an earlier one brings it back. To move the whole clip without trimming it, [drag it](/editing/move-clips/) instead.
+
+Each change is one undo step, named Trim Start or Trim End. The time lands on the project's frame grid.
+
+## How far an edge can go
+
+A number out of range doesn't beep. The edge goes as far as it can, and the field shows where it landed.
+
+| Field | Earliest | Latest |
+| --- | --- | --- |
+| **In** | The start of the timeline, or as far back as the file has footage | One frame before the clip's end |
+| **Out** | One frame after the clip's start | As far as the file has footage |
+
+Only a clip that plays a video or audio file has a footage limit. Text, shapes, pictures and graphics have no file length to run out of.
+
+Three things leave the clip as it was:
+
+- If you type a new value but it puts the edge where it already is, Frame Job beeps.
+- If the text can't be read as a time, Frame Job beeps and the field goes back to the old value.
+- If the new edge would break the [overlap rule](/getting-started/refused-edits/), Frame Job beeps and gives the reason at the foot of the inspector.
+
+An overlap the rule allows goes through, and the clip that now overlaps the one before it gets a Cross Dissolve.
+
+## Read the duration
+
+**Duration** shows the clip's length, in the project's [timecode style](/projects/background-and-timecode/). You can't type in it: change the length through **In** and **Out**.
+
+## With several clips selected
+
+**In**, **Out** and **Duration** each describe one clip, so they go away when you select more than one.
+
+If every selected clip plays a video or audio file, Timing stays and holds only the [Reverse](/speed/reverse/) rows, which apply to all of them as one undo step. Its header shows the lengths of the selected clips added together, followed by "total".
+
+If the selection also holds anything else, such as text, a shape, a picture or a freeze frame, there's no Timing section.
+
+## Good to know
+
+- With one clip selected, the Reverse rows appear under **Duration** only for a clip that plays a video or audio file.
+- Typing an edge also moves the same edge of a [linked clip](/audio/detach-and-attach/) when the two line up and its track isn't locked. That holds even when you type on the sound half. To move a sound's edge without its picture, [use a drag, <kbd>W</kbd> or <kbd>E</kbd>](/editing/slip-and-roll/#move-a-sound-clips-edge-alone).
+- A locked track stops drags, not these fields. If a clip on a locked track is selected, typing still trims it.
+- Inside a [nest](/editing/nests/), the times count from the nest's own start.
+- [Actions](/motion/how-edits-move-actions/) keep their place measured from the clip's start, so trimming the front edge moves them along the timeline with it.
+
+## With an agent
+
+[`trim_start`](/mcp/tools-move-and-trim/#trim_start) and [`trim_end`](/mcp/tools-move-and-trim/#trim_end) move the same two edges to a time on the timeline, and stop at the same limits. With `alone`, the edge moves without its linked partner's. See [Tools: moving and trimming](/mcp/tools-move-and-trim/).
+
+## Related
+
+- [Trim clips](/editing/trimming/)
+- [Slip and roll](/editing/slip-and-roll/)
+- [Reverse a clip](/speed/reverse/)
+- [Fit a clip to a length](/speed/fit-to-duration/)

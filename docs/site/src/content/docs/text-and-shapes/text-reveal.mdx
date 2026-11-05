@@ -1,0 +1,88 @@
+---
+title: "Text reveals"
+description: "Make a text clip type on, fade in word by word or rise in line by line, and set how long it takes to arrive and leave."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A reveal decides how a text clip's words arrive and leave. It runs from the clip's own first and last frames, so it needs no [action](/motion/actions/) and it moves with the clip.
+
+<AtAGlance where="Clip tab ▸ Text ▸ Reveal" tools="set_text" />
+
+## Add a reveal
+
+<Steps>
+
+1. Select the text clip.
+
+2. In the inspector's **Clip** tab, open the **Reveal** section of the **Text** sub-tab.
+
+3. Choose **Typewriter**, **Word Fade** or **Line Rise** from the **Reveal** popup.
+
+4. Set [**In** and **Out**](#set-how-long-it-takes) if you want something other than one second in and no exit.
+
+</Steps>
+
+Switching from one reveal to another keeps the times you set. Choosing **None**, or the section's **Reset**, turns the reveal off and forgets them, so the next reveal starts at 1 s in and 0 s out.
+
+When the section is closed, its header reads "off", or the reveal and its **In** time, such as "typewriter · 1.00 s".
+
+The preview, a rendered frame and an export all work out each frame the same way, so what you see while scrubbing is what you'll export.
+
+## The three reveals
+
+### Typewriter
+
+The text types on, one character at a time. Spaces and line breaks count as characters, so the typing pauses at them. On the way out it backspaces, and the end of the text goes first.
+
+### Word Fade
+
+The words fade in one after another. Each word's fade overlaps the next by half, so it reads as a wave across the text rather than one word at a time. On the way out they leave in the same order, so the first word in is the first word out.
+
+### Line Rise
+
+Each line fades in as it rises into place, starting 35 % of its own height below where it ends up. The top line goes first and the others follow. On the way out each line sinks and fades, again from the top.
+
+A line on its way up is cut off at the edge of the text box. Over a [backdrop](/text-and-shapes/text-outline-and-backdrop/) that looks like a mask, and without one the line appears to slide out of nothing.
+
+Lines are what the box makes them. In [Auto-size](/text-and-shapes/text-box/) only your own line breaks start a new line, so a single line of text rises all at once.
+
+## Set how long it takes
+
+| Control | What it does | Default | Range | Quick picks |
+| --- | --- | --- | --- | --- |
+| **In** | How long the arrival takes, from the clip's first frame. | 1 s | 0 to 10 s | 0, 0.25, 0.5, 1, 2 |
+| **Out** | How long the departure takes, counted back from the clip's last frame. | 0 s | 0 to 10 s | 0, 0.25, 0.5, 1, 2 |
+
+- A time of 0 means that end of the reveal doesn't happen. With **In** at 0 the text is whole on the first frame, and with **Out** at 0 it stays whole to the last.
+- Both times snap to whole frames.
+- Both rows are greyed while **Reveal** is **None**.
+- If **In** and **Out** add up to more than the clip's length, the two overlap. The text never shows in full, and a short clip gets a partial reveal.
+
+A reveal has no easing control, because the motion is part of the reveal you choose.
+
+## Word styles take over
+
+On a caption page with a [word style](/captions/word-caption-styles/), the word style decides how the words appear. The **Reveal** section is greyed and notes "Word style wins; the reveal does not apply." The page is drawn without any reveal.
+
+## Good to know
+
+- **Backdrop and outline.** A backdrop stays at full strength for the whole clip, so the words type or fade onto it. An outline arrives and leaves with its letters.
+- **Trimming.** **In** and **Out** are measured from the clip's edges, so a trim moves the reveal with the new edge and keeps its length.
+- **Splitting.** After a [split](/editing/splitting/), the first piece keeps the arrival and loses the departure, and the second keeps the departure and loses the arrival. A piece left with neither has its reveal turned off.
+- **Transitions.** A reveal starts on the clip's first frame, so a [transition](/motion/transitions/) into a text clip plays over the start of the reveal.
+- **Nests.** Inside a [nest](/editing/nests/), the text clip's own edges count, not the nest clip's. If the nest clip's edge falls part way through a reveal, the reveal is cut off there.
+- **Actions.** With an [action](/motion/edit-an-action/) selected, these rows set the action's end. A change of reveal switches at the action's end rather than blending. **In** and **Out** ramp like any number, which shifts the reveal's own timing while it plays, so it's usually better to set them on the clip.
+- **Right-to-left text.** Typewriter can show the wrong part of a line when the text is right-to-left or mixes directions.
+
+## With an agent
+
+`set_text` sets a reveal through `animation`: `null` turns it off, and `{kind, in, out}` sets it, with a `kind` of `typewriter`, `word_fade` or `line_rise`. On a page with a `word_style`, the word style is what's drawn and `animation` has no effect. See [Tools: text, shapes and clip names](/mcp/tools-clip-properties/#set_text).
+
+## Related
+
+- [Text clips](/text-and-shapes/text-clips/)
+- [Text box and wrapping](/text-and-shapes/text-box/)
+- [Word caption styles](/captions/word-caption-styles/)
+- [Entrance and exit presets](/motion/entrances-and-exits/)

@@ -1,0 +1,69 @@
+---
+title: "Keep pitch"
+description: "Choose whether a clip's sound keeps its own pitch at a new speed or follows the speed like tape, and know when that sound is silent while it renders."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+When a clip plays faster or slower, its sound can do one of two things. Keep pitch decides which.
+
+<AtAGlance
+  menu={['Clip ▸ Speed… ▸ Preserve pitch', 'Clip ▸ Retime Range… ▸ Preserve pitch']}
+  where="Clip tab ▸ Clip sub-tab ▸ Speed section ▸ Keep pitch"
+  tools={['set_speed', 'retime_range', 'set_audio']}
+/>
+
+## What it does
+
+| Setting | The sound |
+| --- | --- |
+| On | The voice or music keeps its own pitch at the new speed. |
+| Off | The pitch follows the speed, higher when faster and lower when slower, like tape or a record. |
+
+The setting belongs to the clip and is on for a new clip. Above ×12 a clip has no sound either way. See [Sound at high speed](/speed/sound-at-high-speed/).
+
+It also controls how a speed ramp sounds. See [Sound on a ramp](/speed/ramp-audio/).
+
+## Keep pitch in the inspector
+
+Tick or untick **Keep pitch** in the [Speed section](/speed/speed-section/#keep-pitch). It applies to every selected media clip as one undo step, **Keep Pitch**.
+
+## Preserve pitch in the Speed sheet
+
+The [Speed sheet](/speed/change-speed/) calls the same setting **Preserve pitch**. It opens on the first selected clip's setting, and **Apply** sets it on every listed clip. Changing it alone counts as a change for **Apply**.
+
+The [Retime Range](/speed/retime-range/) sheet has a **Preserve pitch** box too, for the clips in the range.
+
+## Tape pitch is rendered in the background
+
+With Keep pitch off, at any rate but ×1 and up to ×12, Frame Job renders the clip's sound in the background before it plays. The clip is silent in the preview until that finishes. When it's ready, the sound plays at that speed's tape pitch.
+
+- Renders run one at a time, and the wait grows with the clip's length and, above ×1, its rate.
+- A change to the clip's timing, such as a new rate, a trim or a split, starts a new render.
+- Undo and redo render again too, because the file from before the edit isn't kept. The clip is briefly silent after an undo as well.
+- In a saved project, the rendered sound is kept in the project package.
+
+An export waits for every render it needs, so that sound is never silent in the file. The **Exporting** sheet reads "Preparing" and the file's name during the wait, for example "Preparing “movie.mp4”…".
+
+If a render fails, the export stops with "Clip N's retimed audio could not be rendered: …". Frame Job doesn't try that render again while it stays open, so the clip stays silent in the preview. Change the clip's timing to start a new render, or quit and reopen Frame Job.
+
+With Keep pitch on, a constant speed needs no render and plays straight away.
+
+## Good to know
+
+- **It always applies to the whole clip**, even with an action selected, and it can't be animated. In an action, its row is marked ⊘.
+- **Across clips at different rates**, the inspector's checkbox also brings them all to the first clip's rate. See [Keep pitch in the Speed section](/speed/speed-section/#keep-pitch).
+- **Linked clips.** Keep pitch isn't a rate, so you can change it on a clip that's linked to its detached sound.
+- **Very small speed changes.** With Keep pitch on, a rate within 0.1% of ×1 plays as plain varispeed, which moves the pitch by under 1.74 cents, too little to hear. From ×0.98 to ×1.02, outside that band, Frame Job uses a stretch suited to small changes.
+- **Synchronize Audio** turns Keep pitch off on a clip it corrects for drift. See [Synchronize Audio](/audio/synchronize-audio/).
+
+## With an agent
+
+`set_speed`, `retime_range` and `set_audio` all take `keep_pitch`. Leave it out and the setting stays as it is. See [`set_speed`](/mcp/tools-speed/#set_speed), [`retime_range`](/mcp/tools-speed/#retime_range) and [`set_audio`](/mcp/tools-set-audio/#mono-keep-pitch-pan-and-channels).
+
+## Related
+
+- [The Speed section](/speed/speed-section/)
+- [Change a clip's speed](/speed/change-speed/)
+- [Sound on a ramp](/speed/ramp-audio/)
+- [Sound at high speed](/speed/sound-at-high-speed/)

@@ -9,8 +9,9 @@ shape clips, image clips, background plates, and matte tracks, which cut the
 track behind them.
 
 Every clip that draws can be edited the same way: video, image, still, text,
-shape, graphic and nest. A track never holds just one kind of clip. Tracks
-stack back to front, and a track higher in the timeline draws in front.
+shape and graphic. A nest clip has no box on the canvas, so you place it with
+the Picture tab's fields instead. A track never holds just one kind of clip.
+Tracks stack back to front, and a track higher in the timeline draws in front.
 
 ## The canvas
 
@@ -30,7 +31,9 @@ rate and background colour on the Document tab (see
 | Pinch on the trackpad, or ⌥-scroll / ⌘-scroll | Step through the stops |
 | Hold Space and drag, or scroll | Pan, when the zoomed canvas is bigger than the pane |
 
-A Space tap that does not pan still plays and pauses as usual.
+A Space tap that does not pan still plays and pauses as usual. With Caps Lock
+on, Space doesn't pan a canvas you've clicked: its press and its release each
+toggle playback, so a tap leaves playback as it was.
 
 **View ▸ Preview Window** (⇧⌘P) opens a second window with the same picture
 and no handles, for a second display.
@@ -48,6 +51,10 @@ and no handles, for a second display.
   [Matte tracks](#matte-tracks)). Because it is topmost inside that box, a
   click there selects the matte clip. To select the clip it cuts, click
   outside the matte clip's box, or use the timeline.
+- A nest clip has no box on the canvas. A click on its picture reaches whatever
+  is behind it, and a selected nest clip gets no outline or handles. Select it
+  on the timeline. Selected with other clips, it moves with them when you drag
+  one of them.
 
 The selected clips get an outline. The front-most selected clip also gets
 handles.
@@ -57,17 +64,19 @@ handles.
 | Gesture | What it does |
 |---|---|
 | Drag inside the box | Move. Every selected clip moves by the same amount |
-| ← → ↑ ↓ (canvas focused) | Nudge the selection 1 canvas pixel |
-| ⇧ + arrow | Nudge 10 pixels |
 | Drag one of the eight square handles | Scale (see below) |
 | ⌥ while scaling | Scale about the centre instead of pinning the opposite handle |
 | Drag the round grip above the top edge | Rotate about the clip's centre |
 | ⇧ while rotating | Snap the angle to 15° steps |
-| Esc during any drag | Cancel the drag and put the clip back where it was, with no undo step |
+| Esc during any drag | Cancel the drag and put the clip back where it was, with no undo step. Caps Lock has to be off |
+
+The arrow keys don't move a clip, even with the canvas focused. ← and → step
+the playhead by a frame (⇧ for 10 frames), and ↑ and ↓ go to the previous and
+next edit point.
 
 How a scale drag behaves depends on the clip:
 
-- **Video, image, still, graphic and nest clips** have one uniform scale. Every
+- **Video, image, still and graphic clips** have one uniform scale. Every
   handle scales the whole picture and keeps its aspect ratio.
 - **Shape clips** change their box size instead. A corner handle keeps the
   aspect ratio and ⇧ frees it. An edge handle changes only the width or only
@@ -76,8 +85,9 @@ How a scale drag behaves depends on the clip:
   width, which makes the box fixed-width. The corners and the top and bottom
   edges scale the text uniformly.
 
-A drag scales between 1 % and 1000 %. Each drag is one undo step, and a click
-that doesn't move anything adds no step.
+A drag scales between 1 % and 1000 %. A shape's box and a text clip's wrap
+width stay within 4–20000 px. Each drag is one undo step, and a click that
+doesn't move anything adds no step.
 
 There is no separate anchor-point control. Rotation, the Picture tab's Scale
 field and a ⌥ scale drag pivot on the centre of the clip's uncropped picture.
@@ -111,9 +121,8 @@ and never appear in an export. The app remembers the setting.
 ### Editing an action's end state on the canvas
 
 With an action selected on the clip's action lane, a move, scale, rotate or
-crop drag, or an arrow-key nudge, edits that action's end state, just as the
-inspector's fields do. The box on screen still shows the frame at the
-playhead. There are two exceptions: a drag on a multi-clip selection, and a
+crop drag edits that action's end state, just as the inspector's fields do.
+The box on screen still shows the frame at the playhead. There are two exceptions: a drag on a multi-clip selection, and a
 shape's box resize, both edit the clip itself. See
 [Motion and transitions](motion-and-transitions.md).
 
@@ -121,16 +130,24 @@ shape's box resize, both edit the clip itself. See
 
 Press **C**, or double-click a clip that is not text, to enter crop mode for
 the selected clip. The eight handles become crop edges, and the part being
-cut away is shown as a dim ghost inside the uncropped frame. Press **Esc** or
-**Return**, or click empty canvas, to leave crop mode.
+cut away is shown as a faint white area inside the uncropped frame's dashed
+outline. Press **Esc** or **Return** with the canvas focused and Caps Lock
+off, or click empty canvas, to leave crop mode. Clicking a clip that isn't
+selected keeps crop mode on and moves the crop handles to that clip. With
+several clips selected, crop mode ends if the clip you click isn't the
+front-most selected clip afterwards. A nest clip has no box on the canvas, so **C** only beeps on one.
 
 A crop removes edges in place: the picture never shifts as you crop. Crop
 amounts are in the source's own pixels, so they stay correct when you scale
 the clip later. The core keeps at least one source pixel in each direction.
 
 The Picture tab's **Crop** section has the same four insets as fields, plus a
-**Crop on Canvas** button that enters crop mode. Crop appears only for clips
-with pixels of their own, which means video, image and still clips.
+**Crop on Canvas** button that enters crop mode. The section appears only for
+clips with pixels of their own, which means video, image and still clips.
+
+**C** also enters crop mode on a text, shape or graphic clip, and a double-click
+does on a shape or graphic. They have no Crop section, so there are no fields
+and no **Reset**. To take that crop off, undo or drag the handles back.
 
 ## Inline text editing
 
@@ -166,12 +183,14 @@ Picture's sections, in order:
 |---|---|
 | Transform | every clip that draws |
 | Behind Subject | every clip that draws but an adjustment or nest clip, at the top level |
+| Layout | one selected clip of a video file ([Camera layouts](#camera-layouts)) |
+| Hide While Silent | every clip that draws but a nest clip ([Hide while silent](#hide-while-silent)) |
 | Crop, Corner Radius, Chroma Key | video, image and still clips |
 | Background | clips of a video file, freeze frames of one, and image clips |
 | Cursor | clips of a movie whose cursor file the picture doesn't already show ([The cursor](screen-recording.md#the-cursor)) |
-| Shadow, Filters, Reflection, Spotlight, Obscure | every clip that draws, text and shapes included |
+| Shadow, Filters, Reflection, Spotlight, Obscure | every clip that draws, text and shapes included. On a nest clip they show but draw nothing, so set them on the clips inside |
 
-Each section folds open and shut and shows a one-line summary while closed.
+Each section folds open and shut and shows a one-line summary in its header.
 Transform starts open. **Reset** appears only while a section differs from its
 default. With several clips selected, a field shows the first clip's value and
 a mixed badge when the others differ. An edit applies to every selected clip.
@@ -228,7 +247,8 @@ gives the same explanation.
 
 Limits:
 
-- A cross dissolve draws as Normal for as long as the clips overlap.
+- Both clips of a transition draw as Normal for as long as they overlap, and a
+  clip on a matte track always does.
 - The Blend popup is greyed on a nest clip, because a nest has no pixels of its
   own to blend. Un-nest it (⇧⌘G) to blend the clips inside.
 - Blend is an ordinary property, so an action can change it. Like any
@@ -264,7 +284,7 @@ too.
 | Row | What it does | Default |
 |---|---|---|
 | Remove background | Turns it on. Turning it on gives each selected clip without it the defaults; turning it off removes it from all of them | off |
-| Subject | Only when every selected clip is a picture: **Person** keeps the person; **Foreground** keeps the photo's foreground subject — a person, a pet, an object — whatever it is (below) | Person |
+| Subject | Only when every selected clip is a picture: **Person** keeps the person; **Foreground** keeps the photo's foreground subject, whatever it is (below) | Person |
 | Background | **Remove** draws the person alone; **Keep** draws the whole picture | Remove |
 | Edge | Pulls the outline in (below 0) or pushes it out (above 0), −1 to 1 | 0 |
 | Feather | How soft the outline is, 0–100 % | 0 % |
@@ -289,7 +309,7 @@ A picture's mask is made from the picture itself, once, as the preview draws
 it: Person uses the same person segmentation as a video, and Foreground uses
 Vision's foreground instance mask, which keeps every foreground subject it
 finds. A picture is one frame, so its Status goes straight from Analyzing to
-Ready.
+Ready, **No person found** or **No subject found**.
 
 The masks are made as soon as Remove Background is on, for the frames the clip
 plays, and kept in the project's cache, so they are never made twice. Until a
@@ -330,11 +350,11 @@ playhead.
 Any clip that draws, but an adjustment or nest clip, can be put behind a
 subject by hand: the Picture tab's **Behind Subject** section, right after
 Transform, has one checkbox, **Behind subject**. A clip with it on is cut, at
-every moment, by the person in every clip with Remove Background on (Remove or
-Keep) that is on a track behind it — inside a nest too, when the nest clip is
-behind it. A cut-out clip on a track in front of it does not cut it. Its shadow
-is cut with it. Where no person mask is drawn yet, or no person is found, the
-clip draws whole. With one clip selected and the box on, the section notes
+every moment, by the person, or a picture's foreground subject, in every clip
+with Remove Background on (Remove or Keep) that is on a track behind it —
+inside a nest too, when the nest clip is behind it. A cut-out clip on a track
+in front of it does not cut it. Its shadow is cut with it. Where no mask is
+drawn yet, or no subject is found, the clip draws whole. With one clip selected and the box on, the section notes
 "No cut-out clip is behind it at the playhead." when nothing cuts it there.
 With an action selected the checkbox writes the action's end, and it switches
 at the action's end.
@@ -353,7 +373,9 @@ it plays. Put the playhead where the switch should happen and choose one from
   box a quarter of the canvas wide and a third tall, 5 % in from the edges, as
   a recording lands it. Corner shows the whole camera picture with square
   corners, Rounded Corner rounds them, and Circle crops the largest square of
-  the picture to a circle. The screen fills the canvas as Add Clip places it.
+  the picture to a circle. The screen goes where a new clip lands: centred, at
+  Fit scale if it is bigger than the canvas and **Fit new clips to canvas** is
+  on, otherwise at 100 %.
 - **Side by Side** — the screen fitted in the left two-thirds, the camera
   cropped to fill the right third, with a margin around and between them and
   slightly rounded corners.
@@ -361,7 +383,7 @@ it plays. Put the playhead where the switch should happen and choose one from
   below it.
 - **Camera Full** — the camera fills the canvas.
 - **Screen Only** — the camera is hidden where it is (its opacity goes to 0),
-  and the screen fills the canvas.
+  and the screen is placed as in Corner.
 
 **Which clips:** with two clips with a picture selected on different tracks,
 the front one is the camera and the other the screen. With one selected, it is
@@ -382,10 +404,23 @@ first where the second begins. One **Undo** takes the whole switch back.
 **How far it reaches:** a layout holds until the next switch. Every later clip
 on the camera's track (and on the screen's) that starts before the next layout
 action on that track takes the layout as its own placement — so a camera cut
-into pieces stays in the corner — and keeps its own actions.
+into pieces stays in the corner — and keeps its own actions. Text and
+adjustment clips are left out.
 
-**The Layout section:** with one video clip selected, the Clip tab's Picture
-sub-tab has a **Layout** section (after Transform and Behind Subject, shut
+**Moving a laid-out camera:** a clip shows a layout action's end state until a
+later action changes it, so a drag with no action selected changes the clip's
+own values, which show only before the switch. From the switch on, the picture
+stays put. A camera that landed with a recording has its switch on its first
+frame, a one-frame layout action, so that one frame moves and the rest don't.
+To change the layout itself, put the playhead on the switch, select the camera
+clip (which selects the action), press → until the playhead is past the
+switch, then drag the camera or type in the Transform rows, and press **Esc**.
+A first-frame switch's first frame still shows the clip's own values and stays
+in the old place. To move it too, put the playhead on the first frame, press
+**Esc**, and type the same values in the Transform rows.
+
+**The Layout section:** with one clip of a video file selected, the Clip tab's
+Picture sub-tab has a **Layout** section (after Transform and Behind Subject, shut
 until you open it): **Layout** (Corner, Side by Side, Stacked, Camera Full,
 Screen Only), **Shape** (Square, Rounded, Circle) and **Corner** (Bottom Right,
 Bottom Left, Top Right, Top Left) — Shape and Corner only for Corner — a
@@ -402,7 +437,8 @@ When the camera clip's person masks are already made for every frame it plays
 centres on the person (the middle of where the masks find them, averaged over
 the clip) instead of on the middle of the picture. A layout never starts that
 analysis itself: with no masks, or masks for only part of the clip, the crop
-centres on the picture.
+centres on the picture. An image clip as the camera always centres on the
+picture.
 
 **Zooms:** a switch never fights a zoom. When a clip it would move holds a zoom
 (or another action that moves it) after the playhead, the switch is refused.
@@ -484,8 +520,9 @@ text clip, or a shape's outline and fill.
 
 ### Filters
 
-A clip can carry up to **four** filters. They are applied in list order, so
-blur-then-sepia looks different from sepia-then-blur.
+A clip can carry up to **four** filters. Pixelate, Blur and Sharpen act on the
+picture first, wherever they sit in the list. Sepia, Noir, Vignette and Invert
+come after them, in list order.
 
 - **Add Filter** appends a Blur at 50 %.
 - Each filter's row starts with a number popup that is its place in the
@@ -514,8 +551,9 @@ reflection.
 
 ### Spotlight
 
-**Spotlight a region** dims the canvas outside a rectangle or ellipse on the
-clip, and can magnify what is inside.
+**Spotlight a region** dims the clip outside a rectangle or ellipse on it, and
+can magnify what is inside. Only the clip's own picture darkens: the clips
+behind it and the canvas around it stay as they are.
 
 | Row | Range | Default |
 |---|---|---|
@@ -560,8 +598,10 @@ where they overlap a region, and a drag inside a region moves the clip. Esc
 cancels the drag.
 
 Regions are stored in the clip's own source pixels, so they follow the layer
-through every move, scale, rotation and crop. Each region's numbers can be
-animated like any other property. **Add Region**, **Place on Canvas** and
+through every move, scale and rotation. A region is measured from the centre
+of the cropped picture, so a crop that takes more off one side than the other
+shifts it across the picture by half the difference. Each region's numbers can
+be animated like any other property. **Add Region**, **Place on Canvas** and
 **Remove** always change the clip itself, not the selected action.
 
 ## Text clips
@@ -572,7 +612,8 @@ track in front of everything if there isn't. The new clip:
 
 - reads "Title" in Source Sans 3 Bold at 72 px, white, centred
 - lasts 5 seconds
-- is selected, so the **Text** sub-tab opens on it
+- is selected, so the **Text** sub-tab opens on it (an inspector showing
+  Transcript or Assistant stays there)
 
 A text clip has no source file, so you can trim it to any length.
 Double-click it on the canvas to type (see
@@ -595,8 +636,8 @@ plain string or a text patch); `set_text` to restyle.
 | **Presets** | One-click looks, described below |
 
 UPPERCASE changes only how the text is drawn: what you typed is kept as typed.
-A text clip also gets the Picture tab's Transform, Shadow, Filters,
-Reflection, Spotlight and Obscure sections.
+A text clip also gets the Picture tab's Transform, Behind Subject, Hide While
+Silent, Shadow, Filters, Reflection, Spotlight and Obscure sections.
 
 Every frame of a reveal is worked out by the same calculation for the
 preview, a rendered frame and an export, so the three always agree. A text
@@ -611,9 +652,9 @@ undo step. It also sets **Vertical** to middle and **Opacity** back to 100 %.
 Sizes are fractions of the canvas's shorter side and positions fractions of
 its width and height, so a preset fits any canvas size and a vertical canvas
 gets the same text height as a horizontal one. On a canvas taller than wide
-the Caption preset sits higher, a quarter of the height below centre, clear of
-a phone's on-screen controls. With an action selected on the action lane, a
-preset sets that action's end state, like any other field.
+the Caption preset sits higher, a quarter of the height below centre. With an
+action selected on the action lane, a preset sets that action's end state,
+like any other field.
 
 | Preset | Face | Size (of the shorter side) | Placement | Backdrop |
 |---|---|---|---|---|
@@ -647,8 +688,8 @@ kind name or a shape patch); `set_shape` for geometry and paint.
 | **Gradient** | Fills the shape with a colour ramp in place of the flat fill (below) |
 | **Arrowheads** | **Arrowhead at start**, **Arrowhead at end** (lines and arrows only) |
 
-A shape also gets the Picture tab's Transform, Shadow, Filters, Reflection,
-Spotlight and Obscure sections.
+A shape also gets the Picture tab's Transform, Behind Subject, Hide While
+Silent, Shadow, Filters, Reflection, Spotlight and Obscure sections.
 
 ### Gradients
 
@@ -685,8 +726,8 @@ selected.
 You import an image the same way as a movie (see
 [Projects and media](projects-and-media.md)), and it lands as a 5-second clip.
 An image has no length of its own, so you can trim it to any duration. Image
-clips have everything on the Picture tab, Crop, Corner Radius and Chroma Key
-included, and a Color tab for grading. Remove Background works on a picture too,
+clips have everything on the Picture tab but Layout and Cursor, Crop, Corner
+Radius and Chroma Key included, and a Color tab for grading. Remove Background works on a picture too,
 keeping its person or its foreground subject (see
 [Remove Background](#remove-background)).
 
@@ -702,14 +743,14 @@ back-most track** and selects it.
 | Command | What it puts there |
 |---|---|
 | **Clip ▸ Add Background ▸ Solid Color** | A canvas-sized white rectangle named "Background", starting at 0 and as long as the timeline. White because the canvas is already black. Recolour it in the Shape tab's Fill row, or turn on Gradient for a full-canvas ramp |
-| **Clip ▸ Add Background ▸ Image…** | A picture you choose (the panel offers only image files), scaled to fill the canvas, as long as the timeline. The picture joins the Media tab in the same undo step, or is reused if it is already there. If it can't be read, an alert says so and nothing is added |
+| **Clip ▸ Add Background ▸ Image…** | A picture you choose (the panel offers only image files, AVIF among them, which does not import as a still; see [What Frame Job reads](projects-and-media.md#what-frame-job-reads)), scaled to fill the canvas, as long as the timeline. The picture joins the Media tab in the same undo step, or is reused if it is already there. If it can't be read, an alert says so and nothing is added |
 | **Clip ▸ Add Blurred Background** | A copy of the one selected clip, playing exactly the same frames, scaled to fill the canvas, centred, uncropped and blurred at full strength. It is muted so the sound doesn't play twice, and is named "Blurred Background". This is the usual backdrop for a screen recording or a vertical video that doesn't fill the frame |
 
 Limits:
 
 - Add Blurred Background needs exactly one selected clip. It is dimmed for a
-  text clip, an adjustment clip, an audio-only clip and a nest clip, none of
-  which has a picture size to scale to the canvas. Video, image, still, shape
+  text clip, an adjustment clip, a clip of an audio-only file and a nest clip,
+  none of which has a picture size to scale to the canvas. Video, image, still, shape
   and graphic clips can all take one.
 - The blurred copy takes no transition, actions, label or ducking from the
   original.
@@ -798,12 +839,14 @@ is copied.
 
 ## Limits
 
-- Scale is uniform for pictures. Only shapes (box width and height) and text
-  (wrap width) can be stretched on one axis.
+- Scale is uniform for pictures. Only shapes (box width and height), text
+  (wrap width) and graphics (the Graphic tab's Width and Height) can change on
+  one axis.
 - At most four filters and four obscure regions per clip. Gradients have 2–8
   stops.
-- Crop, Corner Radius and Chroma Key are only for video, image and still
-  clips.
+- The Crop, Corner Radius and Chroma Key sections are only for video, image and
+  still clips. A text, shape or graphic clip can still be cropped on the canvas
+  ([Crop](#crop)).
 - A nest clip can't take a blend mode, and Add Blurred Background is not
   offered for one.
 - Locked tracks can't be edited on the canvas, and hidden tracks can't be

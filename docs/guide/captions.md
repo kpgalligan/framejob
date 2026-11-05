@@ -31,7 +31,7 @@ A project holds at most 4,096 clips. A caption run that would go over that limit
 
 ## Import a SubRip file
 
-Choose **File ▸ Import Captions…** and pick a `.srt` file. The open panel reads "Choose a SubRip (.srt) caption file." and accepts `.srt` and any plain-text file, so a SubRip file saved as `.txt` imports too. A `.vtt` file is not read as WebVTT. Each cue becomes one text clip in the **Caption** preset, on a new track called **Captions** (or the next free number). The import is a single undo step, **Import Captions**.
+Choose **File ▸ Import Captions…** and pick a `.srt` file. The open panel reads "Choose a SubRip (.srt) caption file." and accepts `.srt` and any text file, so a SubRip file saved as `.txt` imports too. A `.vtt` file goes through the same SubRip reader: its cues import, and its `WEBVTT` header and any `NOTE` or `STYLE` blocks are reported as skipped entries. Each cue becomes one text clip in the **Caption** preset, on a new track called **Captions** (or the next free number). The import is a single undo step, **Import Captions**.
 
 The reader copes with the variations real caption files have:
 
@@ -40,23 +40,23 @@ The reader copes with the variations real caption files have:
 - a comma or a dot before the milliseconds, the `MM:SS` and `SS` shorthands, and any number of fraction digits
 - position settings after the end time, which are ignored
 - `<i>`, `<b>`, `<u>` and `<font>` tags and `{\an8}`-style overrides, which are removed, plus the common HTML entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`, `&#39;`, `&nbsp;`)
-- text in UTF-8, UTF-16, Windows-1252 or Latin-1
+- text in UTF-8, or in UTF-16 with a byte-order mark
 
 The file's own line breaks are kept. Long lines also wrap inside the caption box.
 
-**Malformed entries are reported, not dropped silently.** If a block has no `-->` timing line, has a time that cannot be read, ends at or before its start, or has no text, it is skipped. When the import finishes, an alert lists what was skipped by line number (the first eight, then "…and N more"), along with how many captions were shortened to fit. A clean import shows no alert. A file in which no cue can be read is refused, and the message gives the first few reasons.
+**Malformed entries are reported, not dropped silently.** If a block has no `-->` timing line, has a time that cannot be read, ends at or before its start, or has no text, it is skipped. When the import finishes, an alert lists what was skipped by line number (the first eight, then "…and N more"), along with how many captions were shortened to fit. A clean import shows no alert. A file in which no cue can be read is refused, and the message gives the first few reasons. That is usually what happens to a Windows-1252 or Latin-1 file with accented letters: save it as UTF-8 and import it again.
 
 *Agents:* `import_captions` (`path`, plus an optional existing `track`; reports what landed and, under `skipped`, each malformed entry by line).
 
 ## Generate captions from speech
 
-Choose **File ▸ Generate Captions…**. The item is greyed out when nothing in the project can be transcribed. Playback pauses and the **Generate Captions** sheet opens. It is one card: you set it up, press **Generate**, and the same card becomes the progress bar. The footnote reads "captions go on a new track".
+Choose **File ▸ Generate Captions…**. The item is greyed out when nothing on the open timeline can be transcribed; sound inside a nest counts only with that nest open. Playback pauses and the **Generate Captions** sheet opens. It is one card: you set it up, press **Generate**, and the same card becomes the progress bar. The footnote reads "captions go on a new track".
 
 ### What can be transcribed
 
-A clip can be transcribed only if it plays a movie or sound file that has an audio track, its audio is switched on, and its file is present. Clips that cannot be transcribed are skipped with a reason:
+A clip can be transcribed only if it plays a movie or sound file that has an audio track, its audio is switched on, and its file is present. Mute doesn't switch a clip's audio off here: a clip that is muted, turned down to silence, or on a muted or soloed-out track is still read and captioned, and two clips holding the same speech can give the same words twice. To leave a clip out, use **Selected clips** and leave it unselected. Clips that cannot be transcribed are skipped with a reason:
 
-- its source is not a media file (text, shape, still, image, graphic or nest)
+- its source is not a media file (text, shape, still, image, graphic, adjustment clip or nest)
 - it plays in reverse
 - its media has no audio track
 - its audio is switched off (for example, the picture half of a clip after Detach Audio, whose sound is on the audio-only clip below it)
@@ -70,13 +70,13 @@ Captions follow a clip's speed. On a sped-up, slowed or speed-ramped clip, each 
 
 | Row | What it does | Default |
 |---|---|---|
-| **Language** | The spoken language. With **On this Mac**, every language this Mac's recogniser supports; a language whose model is not installed reads "— not installed". With **AssemblyAI**, **Detect automatically** and then 21 languages. | On this Mac: your Mac's own language. AssemblyAI: Detect automatically. |
+| **Language** | The spoken language. With **On this Mac**, every language this Mac's recogniser supports; a language whose model is not installed reads "— not installed". With **AssemblyAI**, **Detect automatically** and then 18 languages in 21 rows (English has four). | On this Mac: your Mac's own language. AssemblyAI: Detect automatically. |
 | *(Download row)* | Appears when the chosen on-device language is not installed. See below. | — |
 | **Engine** | **On this Mac** or **AssemblyAI**. | The engine you chose last time; On this Mac the first time. |
 | **Speakers** | AssemblyAI only. "split by speaker, coloured in Subtitles". | Off |
 | **Vocabulary** | AssemblyAI only. Names and jargon to expect, separated by commas. | Empty |
 | **Transcribe again** | AssemblyAI only. "ignore any cached transcript" uploads again even when a usable transcript is cached. | Off |
-| **From** | **Selected clips**, **In/out range** or **Whole timeline**. A choice that holds nothing transcribable is greyed. **In/out range** takes every clip that overlaps the range, whole. | Selected clips if the selection holds anything transcribable, else In/out range if one is marked, else Whole timeline. |
+| **From** | **Selected clips**, **In/out range** or **Whole timeline**. A choice that holds nothing transcribable is greyed. **In/out range** takes every clip that overlaps the range, whole. | Selected clips if the selection holds anything transcribable, else In/out range if one is marked and holds anything transcribable, else Whole timeline. |
 | **Style** | **Subtitles** or one of the five word caption styles. See [Caption styles](#caption-styles). | The style you chose last time; Subtitles the first time. |
 | *(looks)* | **Slide the pill**, **Fill words as spoken**, **Dim in pauses**. See [Looks](#looks-for-word-captions). | Each one as you last left it; off the first time. |
 | *(preview)* | A sample page drawn at this canvas's size. | — |
@@ -114,7 +114,7 @@ Hover over the summary to see the reason for each file, such as "has not been tr
 
 **The transcript cache.** Each media file's transcript is kept in the project package and reused by the next run. A file whose cached transcript matches the request (same file, model, language, Speakers and Vocabulary) is not uploaded again and costs nothing. The caption style does not count, so restyling never uploads. A transcript made for Remove Filler Words also serves Generate Captions, so that file is not uploaded or billed again. The cache is kept per media entry, so two media entries over the same file are uploaded and billed separately. When no API key is set and every file in the run already has a current transcript, the hint changes to "Current cached transcripts will be used without an API key or network request." and **Generate** works without a key. With a key set, the usual hint stays, and the summary says there is nothing to upload. To force a fresh upload anyway, tick **Transcribe again**.
 
-**Filler words.** AssemblyAI's words include fillers such as um, uh, hmm, mhm, uh-huh, ah, er and erm. Captions, and the sheet's preview, leave them out, so a caption reads the same whether or not its transcript has them.
+**Filler words.** AssemblyAI's words include fillers: um, uh, hmm, mhm, uh-huh, ah, huh, hm, m, er and erm. Captions, and the sheet's preview, leave them out, so a caption reads the same whether or not its transcript has them.
 
 **Deletion at AssemblyAI.** Once the words have been read back, Frame Job asks AssemblyAI to delete its copy. If AssemblyAI does not confirm the delete, the result says so:
 
@@ -126,7 +126,7 @@ While a delete is pending, that file is not uploaded again. Its current cached t
 
 **Speakers.** With **Speakers** ticked, a change of speaker always starts a new cue or page. In the **Subtitles** style, each speaker's cues take their own colour, in the order the speakers first appear: white, yellow, cyan, green, then round again. Speakers are counted separately for each media file.
 
-**Vocabulary.** Type the words and phrases to expect, such as product names, people and identifiers, separated by commas. Blank entries and repeats are dropped (the first spelling is kept), and the list is capped at 1,000 terms. If the cap cuts your list, the note says "Vocabulary was capped at 1000 terms (AssemblyAI's limit); N were given."
+**Vocabulary.** Type the words and phrases to expect, such as product names, people and identifiers, separated by commas. Blank entries and exact repeats are dropped (a different capitalisation counts as a different term), and the list is capped at 1,000 terms. If the cap cuts your list, the note says "Vocabulary was capped at 1000 terms (AssemblyAI's limit); N were given."
 
 **Languages.** Detect automatically, English, English (Australia), English (United Kingdom), English (United States), Spanish, French, German, Italian, Portuguese, Arabic, Danish, Dutch, Finnish, Hebrew, Hindi, Japanese, Chinese, Norwegian, Swedish, Turkish and Vietnamese.
 
@@ -182,7 +182,7 @@ A page is filled to the width it actually measures in its style on your canvas, 
 - It ends early at a pause of 0.25 s or more, after a word ending in `.` `?` `!` or `…`, after 3 seconds on screen, or at a change of speaker. One Word pages hold one word each.
 - A comma, semicolon or colon just before the width runs out moves the break back to it, if the page is already at least half full.
 - A single word too wide for the frame shrinks, down to 80% of the style's size, before it wraps.
-- A page stays up 0.5 s after its last word, or runs up to the next page when the gap is under 0.25 s, so the row does not blink between pages.
+- A page stays up 0.5 s after its last word, or runs up to the next page if that starts sooner, so the row does not blink between pages.
 - Pages never run past the end of the clip they came from.
 
 ### The preview
@@ -197,9 +197,9 @@ Three checkboxes under the Style popup each add a look to a word style's pages. 
 |---|---|---|
 | **Slide the pill** | The pill slides from the previous word to the one being said, over 0.2 s (or less when the next word comes sooner), instead of jumping. | Pill |
 | **Fill words as spoken** | The word being said fills from left to right as it is spoken, taking at most 0.6 s. The part already said is in the highlight colour; the rest is in the upcoming colour (Karaoke's dimmed white), or not yet drawn in Build. | Highlight, Karaoke, Build |
-| **Dim in pauses** | The page fades to half opacity during a pause of 0.25 s or more, then comes back before the next word. It also dims before the first word when that word starts late, and after the last word until the caption ends. Each fade takes 0.1 s. | All five word styles |
+| **Dim in pauses** | The page fades to half opacity during a pause of 0.25 s or more, then comes back before the next word. It also dims before the first word when that word starts at least 0.25 s late, and after the last word when at least 0.25 s of the caption is left. Each fade takes 0.1 s. | All five word styles |
 
-With **On this Mac** chosen and a word style selected, a note under the boxes reads "On-device words rarely carry a pause; this shows mostly with AssemblyAI." The on-device recogniser stretches each word's time across the silence after it, so few pauses are long enough to dim.
+With **On this Mac** chosen and a word style selected, a note under the boxes reads "On-device words rarely carry a pause; this shows mostly with AssemblyAI." The on-device recogniser's word times run together, so most of a silence falls inside a word and few pauses are long enough to dim.
 
 *Agents:* `transcribe`'s `slide`, `fill` and `dim`. Each is false unless given, never what the sheet last chose. `true` is refused by name with a style it would not show on, or with `place: false`; `false` is always accepted. A placed run given any of the three lists the looks that were on under `looks`.
 
@@ -226,7 +226,7 @@ Word captions are paged for the canvas they were made on. After you change the c
 - A track is **kept as placed** when it is a matte track, holds a page with no word timings (Subtitles, or a page whose word count you changed), holds a page none of whose words starts inside it, holds a page in a style Frame Job does not make, has pages in more than one style, or the new pages would not fit in the project. A sheet after the edit names each kept track and why. Nothing appears when every track was re-laid.
 - It is one undo step, **Re-lay Captions**.
 
-The item is greyed out with no caption track it can re-lay, while a sheet is open, and while a recording runs. Inside a nest it works on the nest's tracks at the nest's size. **File ▸ Make Vertical Version…** does the same for the vertical copy (see [Vertical versions](vertical-and-framing.md)).
+The item is greyed out with no caption track it can re-lay, while a sheet is open, and while a recording runs. When the only tracks left to re-lay would not fit in the project, the item stays live, and choosing it changes nothing and shows the sheet, headed "No caption track was re-laid." Inside a nest it works on the nest's tracks at the nest's size. **File ▸ Make Vertical Version…** does the same for the vertical copy (see [Vertical versions](vertical-and-framing.md)).
 
 *Agents:* `relay_captions` does the same in the container `set_scope` has open. It answers the tracks re-laid (`relaid`: the new track, the track it replaced, its name, style and page count) and the tracks kept with their reasons (`kept`). With nothing it can re-lay it is refused, naming each kept track and its reason.
 
@@ -259,7 +259,7 @@ Nothing marks a track as a caption track, so any track made only of text clips c
 
 **Round trips are exact to the frame.** A track exported and imported again puts every cue back on the frame it came from, at every ordinary frame rate. The file itself may not match byte for byte, because import snaps times to the frame grid: at 30 fps, `00:00:04,120` comes back as `00:00:04,133`.
 
-*Agents:* `export_captions` (`path`, plus optional `track` and `format`). The track is never guessed: with no candidate, or more than one and no `track` given, the call is refused and the candidates are listed. A `.srt` or `.vtt` extension in `path` is replaced by the format's own, and any other extension is kept (`chart.png` becomes `chart.png.srt`).
+*Agents:* `export_captions` (`path`, plus optional `track` and `format`). The track is never guessed: with more than one candidate and no `track` given, the call is refused and the candidates are listed. With no candidate it is refused: "No track holds only text clips, so there are no captions to write." A `.srt` or `.vtt` extension in `path` is replaced by the format's own, and any other extension is kept (`chart.png` becomes `chart.png.srt`).
 
 ## Your AssemblyAI key
 
@@ -280,7 +280,7 @@ No MCP tool can read or change the key or the region. Only a person sets them, h
 
 ## Limits
 
-- **Import reads SubRip only.** WebVTT can be exported but not imported.
+- **Import has only a SubRip reader.** A `.vtt` file's cues come through it, but its `WEBVTT` header and `NOTE` and `STYLE` blocks are reported as skipped, so a `.vtt` import always ends in the alert. Its cue settings and styling are lost, and a time tag inside a cue, such as `<00:00:03.500>`, stays in the text.
 - Captions are burned-in text clips, not a switchable subtitle stream in the exported movie.
 - A clip played in reverse, a clip with its audio switched off, and a clip whose media is missing or silent cannot be transcribed.
 - **On this Mac** needs the language's speech model installed from the sheet's Download row. Speakers, Vocabulary and Transcribe again are AssemblyAI only.

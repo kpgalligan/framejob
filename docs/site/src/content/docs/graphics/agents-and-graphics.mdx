@@ -1,0 +1,211 @@
+---
+title: Graphics with an agent
+description: Let an agent write a graphic module, look at its frames, place it on the timeline and check the result, and see what undo covers.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+An agent is an AI tool that works in Frame Job for you, such as Claude Code connected over MCP, or the [Assistant tab](/assistant/what-it-can-do/). You describe the graphic you want, and it can make it from start to finish: read the API, write the [module](/graphics/what-is-a-graphic/#modules) that draws it, look at it, place it, change it and check the finished frame. This page follows that loop and says what undo covers along the way.
+
+Each tool's arguments are on [Tools: graphics](/mcp/tools-graphics/) and [Tools: graphic fonts, pictures and packages](/mcp/tools-graphic-files/).
+
+<AtAGlance
+  menu={['Help ▸ Graphics Reference', 'Insert ▸ Graphic…']}
+  where={['Inspector ▸ Assistant', 'Clip tab ▸ Graphic']}
+  tools={[
+    'graphic_reference',
+    'write_graphic',
+    'render_graphic',
+    'get_graphic',
+    'list_graphics',
+    'insert_graphic',
+    'add_graphic_clip',
+    'set_graphic',
+    'import_graphic_font',
+    'import_graphic_asset',
+    'add_action',
+    'set_action_end',
+    'render_frame',
+  ]}
+  needs="A client connected over MCP, or the Assistant tab with your Anthropic key."
+/>
+
+## The loop
+
+<Steps>
+
+1. **Read the API.** `graphic_reference` returns it. An agent reads it once, before writing a graphic.
+
+2. **Write the module.** `write_graphic` saves the module, compiles it and says whether that worked. Fix the source and write again until it compiles.
+
+3. **Look at it.** `render_graphic` draws frames on a contact sheet with no clip on the timeline.
+
+4. **Add what it draws with.** `import_graphic_font` adds a font and `import_graphic_asset` adds a picture. The reply to a font import gives the exact family names to write in `font-family`, and the reply to a picture import gives the name to pass to `asset()`. See [Fonts and pictures in graphics](/graphics/fonts-and-pictures/).
+
+5. **Place it and change it.** `add_graphic_clip` places a clip and `set_graphic` changes it. To animate a property, `add_action` adds an action and `set_action_end` says what the property ends at. See [Animate graphic properties](/graphics/animate-properties/).
+
+6. **Check the result.** `render_frame` shows a frame of the finished timeline.
+
+</Steps>
+
+## Read the API
+
+`graphic_reference` returns the whole graphics API as Markdown: the module's shape, `ctx`, the schema's types, the standard library, fonts, the sandbox, limits and idioms. It's the same file **Help ▸ Graphics Reference** opens, and an agent only needs to read it once.
+
+No project needs to be open. If the call names a project, it must be one that's open.
+
+## Write a module
+
+`write_graphic` saves `graphics/<name>.js` in the project, compiles that exact text and reports the result. It creates the `graphics` folder the first time, and the file is written in one go, so nothing ever reads half of it.
+
+A module's name is lowercase letters, digits and `-`. It starts with a letter or a digit and is at most 63 characters.
+
+The reply says whether the module compiled, what its `meta` and `schema` are, which clips it draws, which earlier versions are kept, and each problem with its line and column. A module that doesn't compile is still a normal reply, not a failed call, so the agent reads where it went wrong and writes again. When a module does compile, any problems listed are warnings from its top level, such as an `asset()` call there that names a file the folder doesn't hold.
+
+Clips already drawn by the module redraw at once. The write can't be undone, but the text it replaced is kept: see [Undo rules](#undo-rules).
+
+[Write a graphic module](/graphics/write-a-module/) has the shape of the file itself.
+
+## A contact sheet
+
+`render_graphic` draws a module without placing a clip: up to 16 frames on one PNG, with each frame's number printed under it. It's how an agent looks at a graphic before committing it to the timeline. There's no inspector control for it, because a person watches the preview instead.
+
+| Choice | What it does | Default |
+| --- | --- | --- |
+| Frames | Which frames to draw, 1 to 16 of them in order, or a single frame | Frame 0 |
+| Properties | The values to draw with. A property left out draws with the schema's default. | The schema's defaults |
+| Size | The width and height to draw at, 1 to 8192 pixels | The module's `meta` size, else the canvas |
+| Widest sheet | How wide the PNG may be, 64 to 8192 pixels | 2048 |
+| Background | What the sheet is painted on: transparent, a checker, or a hex colour (`#rgb`, `#rrggbb`, `#rrggbbaa`) | Transparent |
+| Where it's written | A path whose folder already exists | A temporary file |
+
+The frames sit on a near-square grid. Frames are scaled down to fit the sheet's width, never up, and the gaps and frame numbers stay at full size. Raise the widest sheet to see frames larger.
+
+Each frame is drawn as a clip would draw it, at the project's frame rate and with a length from the module's `meta`, else 5 seconds. A frame at or past that length is still drawn, with `ctx.progress` at 1, as a longer clip would draw it.
+
+A frame that fails is drawn as its [error card](/graphics/edit-a-module/#the-error-card), and the reply adds a sentence naming the frame and the problem, with its line and column when the engine has them. A frame that warns gets a sentence too.
+
+A sheet draws at most 134,217,728 pixels of frames in all, which is two frames at 8192 × 8192 or sixteen at 3840 × 2160. Past that the call fails before any frame is drawn, so ask for fewer frames or a smaller size.
+
+:::note
+The sheet gives each frame the 2 seconds an export does, not the preview's 250 ms. A frame that draws here can still run over its [time budget](/graphics/write-a-module/#the-time-budget) in the preview.
+:::
+
+## One frame's SVG
+
+Asked for `svg` instead of the default `png`, `render_graphic` returns one frame's SVG text, its problems and the `ctx` it was drawn with. Use it to read the markup a frame produced.
+
+It takes one frame and writes no file, so naming several frames, a background, a widest sheet or a path is an error. If the frame fails, the reply says so and holds no SVG.
+
+## List and insert
+
+`list_graphics` lists what the Insert Graphic sheet shows, in the sheet's order. **This Project** comes first when the project holds a module, listing every module whatever its own category. The bundled templates follow by category, with **Other** last.
+
+Each entry has its name, title, description and category, says whether it's a template or a project module, and says whether it compiles. The title is the module's `meta.name`, else its file name made into a title. Two project modules with the same title are shown as "title — name".
+
+`insert_graphic` is the sheet's **Insert**. It places a clip at the playhead, on the front track when it fits there and otherwise on a new track above everything, at the module's own length and size. That's one undo step. With a nest open, the clip lands inside it.
+
+- A template is first copied into `graphics/` under a free name, such as `lower-third` then `lower-third-2`. The copy can't be undone, so undoing the insert removes the clip and leaves the file. The reply names the module the clip is drawn by.
+- A project module is placed as it is, with no copy.
+- A module that doesn't compile places nothing, and the call fails with its first error. A template's copy stays in the folder.
+
+See [Insert a graphic](/graphics/insert-a-graphic/).
+
+## Place a clip
+
+`add_graphic_clip` places a clip drawn by a module already in `graphics/`, on the track and at the time the agent chooses. It can also place the clip inside a nest. Use `insert_graphic` when the playhead is the right place.
+
+| Choice | Default | Limit |
+| --- | --- | --- |
+| Length | The module's `meta.durationInFrames` at the project's rate, else 5 seconds | At least one frame |
+| Width and height | The module's `meta` size, else the canvas | 1 to 8192 pixels each |
+| Properties | The schema's defaults | At most 64 |
+
+Each property is checked against the module's schema when the clip is placed. A key the schema lacks, a value of the wrong type, a number out of range or an option that isn't listed stops the call, and the error names the property. Colours are stored as lowercase hex.
+
+Frame Job won't place the clip when:
+
+- The module isn't in the folder. The error says what the folder holds.
+- The module doesn't compile. The error gives its first problem.
+- A `meta` value it would use isn't a whole number in range. The error names the key.
+- The canvas is wider or taller than 8192 pixels and no size was given. The error names the canvas.
+- The clip would overlap another one on the track, as for any clip.
+
+## Change a clip
+
+`set_graphic` changes what one or more graphic clips are drawn from: another module, the size, the graphic's own length or the properties. It's the same as editing **Properties**, **Size** and **Timeline** in the [Graphic sub-tab](/graphics/graphic-tab/).
+
+- **Properties** merge key by key, and a clip stores at most 64. Clearing a property removes it. A property that an action on the clip animates is set to the module's default instead, so the animation keeps its start.
+- **Length** snaps to a frame and is at least one frame. Clearing it is **Follow Clip**. See [Graphic size and timing](/graphics/size-and-timing/).
+- **In** can't be set here. It moves when you trim the clip's front, roll the cut before it or split it.
+
+These are the clip's base values. To animate one, add an action and set its end.
+
+Clips drawn by two different modules can't take a property change together, unless the same call names one module for them all, and a clip that isn't a graphic is an error. A call that changes nothing makes no undo step, and that includes re-sending a colour in another spelling.
+
+## Read a module or the folder
+
+`get_graphic` with a name reads one module: its source, revision, path, whether it compiles, its `meta`, `schema` and problems, the clips it draws, and its kept versions, newest first. The **Source** section shows you the file, revision and problems.
+
+With no name it reads the folder:
+
+- The folder's path, given even before the folder exists. The first write creates it.
+- Every module with its revision, whether it compiles and the clips it draws.
+- The font families and pictures the project's graphics can use.
+- Anything the folder's scan skipped or couldn't watch, in its own sentences.
+- Every name with kept versions, deleted modules included.
+
+## File tools
+
+An agent can also edit the graphics folder with its own file tools, and Frame Job sees the change within a moment.
+
+| What | Where |
+| --- | --- |
+| Modules | `graphics/<name>.js` |
+| Fonts | `graphics/fonts/`, as `.ttf` or `.otf` |
+| Pictures | `graphics/assets/` |
+
+`history/`, `API.md` and `API.d.ts` are Frame Job's own, so leave them alone. `history/` holds the kept versions, and `API.md` and `API.d.ts` are the reference and its types.
+
+A module saved a moment ago can read as not compiling, with one problem saying Frame Job hasn't compiled it yet. Ask again.
+
+In a project that hasn't been saved, the folder is a temporary one. It moves when the project is saved, so ask `get_graphic` for the path again afterwards.
+
+See [Edit a module](/graphics/edit-a-module/) for how changes are picked up and how many files are watched.
+
+## Undo rules
+
+The files in `graphics/` live beside the project, not in its undo history. Changes to the clips on the timeline are ordinary undo steps.
+
+| Action | Undo step? | Marks the project edited? |
+| --- | --- | --- |
+| `write_graphic`, `restore_graphic`, `delete_graphic` | No | No |
+| `import_graphic_font`, `import_graphic_asset` | No | No |
+| `add_graphic_clip`, `insert_graphic`, `set_graphic` | Yes | Yes |
+| `rename_graphic` | Yes, for the clips that follow the new name, as one step | Only through the clips |
+
+Undoing a rename moves the file back along with the clips, and redo moves it forward again. With no clips drawn by the module, a rename makes no undo step. `import_graphic` can't be undone either, and `export_graphic` edits nothing, so it has no undo step.
+
+Because a file write can't be undone, Frame Job keeps the last 10 versions of each module, and `restore_graphic` brings one back. A deleted module's code is kept the same way. See [Rename, delete and restore graphics](/graphics/manage-graphics/).
+
+## Graphics in render frame
+
+`render_frame` shows a frame of the timeline as an export would draw it. When a graphic in that frame failed or warned, the reply has a sentence naming the graphic, its frame and the problem. A graphic that failed draws its error card in the picture. See [Check the picture: render_frame](/mcp/render-frame/).
+
+## The Assistant
+
+The [Assistant tab](/assistant/what-it-can-do/) uses these same tools, so you can ask it in the inspector to write, change, place, render, rename, delete, restore, export and import graphics. It already knows a graphic is a module and where to read what a module can draw, so plain words are enough. It needs your [Anthropic key](/assistant/set-up/).
+
+It asks before `export_graphic`, because that writes a package where the model chose and replaces any file already there. Nothing is written until you choose **Allow**. Importing a package doesn't ask, because it only writes inside the project's `graphics/`.
+
+## Related
+
+- [What a graphic is](/graphics/what-is-a-graphic/)
+- [Write a graphic module](/graphics/write-a-module/)
+- [The module API](/graphics/module-api/)
+- [Rename, delete and restore graphics](/graphics/manage-graphics/)
+- [Tools: graphics](/mcp/tools-graphics/)
+- [Tools: graphic fonts, pictures and packages](/mcp/tools-graphic-files/)
+- [How an agent reaches Frame Job](/mcp/overview/)
+- [What the Assistant can do](/assistant/what-it-can-do/)

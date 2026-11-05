@@ -1,0 +1,123 @@
+---
+title: "Import media"
+description: "Bring movies, sound, pictures and LUTs into a project with Add Media… or a Finder drop, and find out why a file won't come in."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+Importing puts a file in the project's Media tab, ready to place on the timeline. Frame Job reads the file from where it already is, so nothing is copied and the project stays small.
+
+<AtAGlance
+  menu="File ▸ Add Media…"
+  keys="⇧⌘I"
+  where={['Media tab ▸ Add Media…', 'Drag from the Finder onto the Media tab']}
+  tools={['import_media', 'add_media']}
+/>
+
+<Shot
+  name="10b-media-tab.inspector"
+  alt="The Media tab of the inspector, with the Add Media… button and its ⇧⌘I shortcut at the top of the list, and a count of the project's items beside them."
+/>
+
+## Add media
+
+<Steps>
+
+1. Choose **File ▸ Add Media…** (<kbd>⇧⌘I</kbd>), or **Add Media…** at the top of the Media tab.
+
+2. Pick one or more files, and choose **Open**.
+
+</Steps>
+
+Frame Job checks every file, then adds the ones it can read to the [Media tab](/projects/media-tab/) together, as one undo step. The step is called **Add Media**, or **Add 3 Media Files** for three.
+
+The files are in the Media tab, not on the timeline. [Place them](/editing/add-clips/) from there. Thumbnails and waveforms are built in the background, so they fill in a moment later.
+
+Adding a file that's already in the list changes nothing. A file Frame Job can't read shows an alert naming it, and the rest are still added.
+
+## Drop on the Media tab
+
+Drag files from the Finder onto the Media tab to add them to this project. It works like **Add Media…**, with one difference: a drop has no list of allowed types, so Frame Job tries every file you drop. That's how a format the panels don't list gets in.
+
+Frame Job doesn't look inside a folder. A folder takes the drop like a file, then shows the alert **Could not read** with its name, and nothing in it is added. Any files dropped with it are still added. To bring in a shoot's cameras and microphones, open the folder in the Finder, select the files and drop those.
+
+A Finder drop anywhere else on the window, such as the canvas or the timeline, doesn't add to this project. It opens the file as a new project of its own, as a drop on the Dock icon does. See [Open a project](/projects/open-a-project/).
+
+## What each way takes
+
+The **Add Media…** and **File ▸ Open…** panels only let you pick the types they list. To bring in anything else, drop it on the Media tab.
+
+| Files | **Add Media…** | **File ▸ Open…**, or a drop on the window or the Dock | A drop on the Media tab |
+| --- | --- | --- | --- |
+| Movies | Yes | Yes | Yes |
+| M4A, MP3, WAV and AIFF | Yes | Yes | Yes |
+| PNG, JPEG and HEIC | Yes | Yes | Yes |
+| `.cube` LUTs | Yes | No | Yes |
+| TIFF, GIF, BMP, HEIF and WebP | No | No | Yes |
+| CAF, FLAC and other sound macOS plays | No | No | Yes |
+
+An AVIF picture doesn't import as a still, even by a drop. See [Pictures](/reference/file-formats/#pictures).
+
+A `.cube` is imported, never opened. It sits in the Media tab and you apply it to clips as a [look](/color/luts/), or to a file as its [Camera Log](/hdr/log-luts/). It never goes on the timeline.
+
+Caption files aren't media. Bring an `.srt` in with [Import Captions](/captions/import-captions/). Every format and codec Frame Job reads is listed in [Supported file formats](/reference/file-formats/).
+
+## Referenced, not copied
+
+A project remembers each file's path and a Finder bookmark, and reads the file from there. The package stays small, but it depends on your footage staying put. If you move a file, the bookmark often finds it again.
+
+When you want a package that holds everything it needs, use [Consolidate Media](/projects/consolidate-media/).
+
+WebM and Matroska files, and anything converted with ffmpeg, are the exception: Frame Job reads those from a copy it keeps in its own folder. See [WebM and Matroska files](/projects/webm-and-matroska/) and [Convert files with ffmpeg](/projects/ffmpeg-conversion/).
+
+## A project always opens
+
+A project opens even when files it uses have moved or been deleted. Clips whose file is gone keep their place on the timeline and show a slate, and their rows in the Media tab wear the **missing** badge.
+
+Those clips still export, showing the slate and with no sound. To bring them back, see [Relink missing media](/projects/relink-media/).
+
+## Codecs this Mac can't decode
+
+Before it adds a video, Frame Job decodes its first frame. If nothing on this Mac can decode it, the file is left out and an alert names the codec.
+
+| The alert says | What it means |
+| --- | --- |
+| "*file* is VP8 video, which this Mac cannot decode." | VP8 doesn't import. |
+| "*file* is AV1 video, which needs an M3 or later Mac." | AV1 needs a hardware decoder, which this Mac doesn't have. |
+| "*file* is VP9 Profile 1 video, which this Mac cannot decode; VP9 Profiles 0 and 2 import." | VP9 Profiles 1 and 3 don't import. Profiles 0 and 2 do. |
+
+Any other codec gets the same sentence with its four-character code in place of a name. There's no way past these, and [ffmpeg](/projects/ffmpeg-conversion/) isn't offered.
+
+A file in a codec this Mac does decode still imports when some of its data is damaged.
+
+## Import errors
+
+| The alert says | What it means |
+| --- | --- |
+| "Could not read *file*." | The file is damaged, or it isn't a format Frame Job reads. |
+| "*file* has no video or audio the app can open." | The file holds neither. |
+| "Timed out reading *file*." | The check took more than 30 seconds, usually because the file is on a stalled network volume. |
+| "“Film.cube” is not a LUT Frame Job reads: line 2: LUT_3D_SIZE 200 is outside 2–65." | The `.cube` can't be read. The alert names the line and the problem. |
+
+If you have ffmpeg installed, Frame Job may offer to convert a file before it shows the first two of these. See [Convert files with ffmpeg](/projects/ffmpeg-conversion/).
+
+## Good to know
+
+- A project holds at most 1,024 media files.
+- Undoing an import takes the files out of the project and leaves them on disk.
+
+## With an agent
+
+[`import_media`](/mcp/tools-media/#import_media) does what **Add Media…** does, one file at a time, and it never stops to ask a question. It takes the file's path, absolute or starting with `~`, and gives back the new media id with what it found in the file: its kind, length, size, frame rate, and whether it has video, sound or transparency. Place the file with [`add_clip`](/mcp/tools-adding-clips/#add_clip).
+
+[`add_media`](/mcp/tools-media/#add_media) is different: it adds an entry from a description you supply and doesn't look at the file. Only the path is needed, and a path already in the list changes nothing. Use it only to replay a project's own JSON. See [Tools: media](/mcp/tools-media/).
+
+## Related
+
+- [Add clips to the timeline](/editing/add-clips/)
+- [The Media tab](/projects/media-tab/)
+- [Open a project](/projects/open-a-project/)
+- [Supported file formats](/reference/file-formats/)
+- [Relink missing media](/projects/relink-media/)

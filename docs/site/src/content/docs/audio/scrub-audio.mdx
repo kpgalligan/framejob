@@ -1,0 +1,46 @@
+---
+title: Hear a scrub
+description: Hear the sound under the playhead as you click or drag along the timeline ruler, to find a word or a beat.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+When you click or drag along the ruler, you hear the sound under the playhead. Use it to find a word or a beat by ear.
+
+<AtAGlance where="Click or drag along the timeline ruler" />
+
+## Scrub the sound
+
+Drag along the [ruler](/timeline/ruler-and-playhead/). Playback pauses first if it was running. As the playhead reaches new frames, Frame Job plays about 80 ms of the mix forward from it, with a 5 ms fade at each end so the pieces don't click. A fast drag skips frames, because each new piece waits until the last one has almost played.
+
+- A click on the ruler plays one piece.
+- Hold the mouse still and the sound stops within about a tenth of a second.
+- Let go and it stops.
+
+Dragging left plays each piece forwards from the playhead, not backwards, so a word stays recognisable.
+
+## What you hear
+
+A scrub plays the mix you'd hear in playback: each clip's volume, fades, ducking, pan and mono, each track's volume and pan, mute and solo, and each clip's sound processing.
+
+Three things differ from playback:
+
+- A clip's sound processing, such as its compressor or noise reduction, starts fresh in each piece, so it can sound different from a steady play.
+- A track's [compressor and limiter](/audio/track-dynamics/) aren't in a scrub.
+- The [level meter](/audio/level-meter/) stays still.
+
+## Silence a scrub
+
+Scrub audio is always on, with no setting, no key and no agent tool. To silence it, [mute or solo](/audio/mute-and-solo/) tracks, or turn down your Mac's volume.
+
+## Good to know
+
+- Only a scrub on the ruler is heard. Stepping with <kbd>←</kbd> and <kbd>→</kbd>, **Go** in the [Markers list](/timeline/markers/#the-markers-list), and an agent moving the playhead are all silent.
+- A scrub doesn't use the microphone, so it never asks for that permission.
+
+## Related
+
+- [The ruler and playhead](/timeline/ruler-and-playhead/)
+- [Mute and solo tracks](/audio/mute-and-solo/)
+- [The level meter](/audio/level-meter/)
+- [Markers](/timeline/markers/)

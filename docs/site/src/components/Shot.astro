@@ -1,0 +1,35 @@
+---
+// One screen of the app, captured in both looks; the page's theme shows the matching one.
+// `name` is a capture's file name without its look: `05-clip-picture.inspector` reads
+// src/assets/screens/05-clip-picture.inspector.{light,dark}.webp. An unknown name fails the build.
+// A capture is at 2× and never shows larger than its real size, so a sheet looks like a sheet.
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+
+interface Props {
+  name: string;
+  alt: string;
+  caption?: string;
+}
+
+const { name, alt, caption } = Astro.props;
+
+const screens = import.meta.glob<{ default: ImageMetadata }>('../assets/screens/*.webp', {
+  eager: true,
+});
+
+function shot(look: 'light' | 'dark') {
+  const found = screens[`../assets/screens/${name}.${look}.webp`];
+  if (!found) throw new Error(`Shot: no ${look} capture named "${name}" in src/assets/screens/`);
+  return found.default;
+}
+
+const light = shot('light');
+const dark = shot('dark');
+---
+
+<figure class="fj-shot" style={`max-width: ${Math.round(light.width / 2)}px`}>
+  <Image class="fj-light" src={light} alt={alt} />
+  <Image class="fj-dark" src={dark} alt={alt} />
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>

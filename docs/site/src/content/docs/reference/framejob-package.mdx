@@ -1,0 +1,102 @@
+---
+title: "The .framejob package"
+description: "See what a saved project holds, which parts Frame Job can rebuild and which it can't, and what happens when you move or copy a package."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A Frame Job project is one `.framejob` package: a folder the Finder shows as one file. It holds your edit, its caches and, if you ask for them, copies of your footage.
+
+<AtAGlance
+  menu={['File ▸ Save', 'File ▸ Consolidate Media…']}
+  keys="⌘S"
+  tools={['save_project', 'consolidate_media']}
+/>
+
+## What a package is
+
+| Inside | What it is | Can Frame Job rebuild it? |
+| --- | --- | --- |
+| [`project.json`](#projectjson) | The edit itself | No. A package needs it to open. |
+| [`cache/`](#cache) | Thumbnails, waveforms, analyses and renders | Yes, though [cloud transcripts](#transcripts-are-worth-keeping) cost money. |
+| [`media/`](#media) | Copies of your footage, only after **Consolidate Media…** | No. It may be the only copy. |
+| [`graphics/`](#graphics) | Graphic modules, fonts, images and kept versions, only once you add a graphic, font or image | No. |
+
+To look inside, Control-click the package in the Finder and choose **Show Package Contents**.
+
+A project only ever saves as a `.framejob` package. A movie or a still is a separate step: see [Export](/export/formats/) and [Save Frame](/export/save-frame/).
+
+A save writes the new package beside the old one and swaps it in, so a crash part-way through can't leave half a package.
+
+:::caution
+A save keeps only those four things. Any other file you put inside a package is dropped at the next save, autosaves included.
+:::
+
+## `project.json`
+
+This is the edit itself: the canvas, media list, tracks, clips and markers. It's the only thing a package needs in order to open.
+
+A project from any earlier version of Frame Job opens, and the next save writes it in the current format. A project from a newer build won't open, and the message asks you to update Frame Job. See [Open a project from another version](/projects/open-a-project/#open-a-project-from-another-version).
+
+If `project.json` can't be read as text, the message says "*name* does not contain a readable project.json." If it's a folder or a link rather than a file, Frame Job quits unexpectedly as it opens the package. See [When a project won't open](/projects/open-a-project/#when-a-project-wont-open).
+
+## `cache/`
+
+Everything here is something Frame Job can rebuild, so a package with a missing or damaged `cache/` still opens and redraws.
+
+| Folder | What it holds |
+| --- | --- |
+| `thumbs/` | Filmstrip thumbnails |
+| `peaks/` | Waveforms |
+| `loudness/` | Loudness measurements |
+| `speech/` | Voice detection |
+| `sync/` | The analysis for [Synchronize Audio](/audio/synchronize-audio/) |
+| `transcripts/` | [Transcripts from AssemblyAI](#transcripts-are-worth-keeping) |
+| `device-transcripts/` | Words recognised on this Mac |
+| `analysis/` | [On-device analysis](/projects/media-analysis/): shot changes, faces, people and salient regions, sound events, and the masks for **Remove Background** and **Text Behind Subject** |
+| `reversed/` | [Reversed clips](/speed/reverse/) |
+| `ramp-audio/` | Sound for [speed ramps](/speed/speed-ramps/) |
+| `isolated/` | [Voice Isolation](/audio/voice-isolation/) renders |
+| `voiced/` | [Voice effect](/audio/voice-effects/) renders |
+
+The per-file caches build in the background after an open, an import or a relink, and the timeline fills in as they finish. At most two files' sound caches build at a time. A cache that already matches its file is never rebuilt. Analyses and renders are made when something asks for them.
+
+Masks can make a package much larger, because they're kept for every frame: a minute of 1080p video's masks take about 62 MB.
+
+### Transcripts are worth keeping
+
+A transcript from AssemblyAI costs money to make again, so treat `cache/transcripts/` as worth keeping. Everything else in `cache/` rebuilds for nothing but time.
+
+## `media/`
+
+This folder exists only after [Consolidate Media…](/projects/consolidate-media/), and it holds copies of your footage. Unlike `cache/`, it may be the only copy, so don't delete it.
+
+By default a project doesn't copy your footage. It remembers each file's path and a Finder bookmark, and reads the file from there. The package stays small but depends on the footage staying put. Consolidate Media is how a package comes to hold everything it needs.
+
+## `graphics/`
+
+This folder exists once you add a [graphic](/graphics/what-is-a-graphic/), or a font or image for one. It holds the graphic modules, the small programs that draw each graphic, and these folders:
+
+| Folder | What it holds |
+| --- | --- |
+| `fonts/` | [Fonts](/graphics/fonts-and-pictures/) the graphics use |
+| `assets/` | [Images](/graphics/fonts-and-pictures/) the graphics use |
+| `history/` | The last 10 [kept versions](/graphics/edit-a-module/#kept-versions) of each module, one folder per module |
+
+## How a package travels
+
+Moving, copying or consolidating a package keeps its caches. Until an untitled project is first saved, its caches live in a temporary folder, and the first save copies them in.
+
+When you open a package, any media missing from its stored path is looked for in the package's own `media/` folder under the same name. That's what lets you move a consolidated package. A working link is never replaced this way.
+
+A referenced file that has moved is often found again through its bookmark. If it isn't, see [Relink missing media](/projects/relink-media/).
+
+To take a project to another Mac, run Consolidate Media first, so the footage goes with it.
+
+## Related
+
+- [Save, revert and close](/projects/save-and-revert/)
+- [Open a project](/projects/open-a-project/)
+- [Consolidate Media](/projects/consolidate-media/)
+- [Relink missing media](/projects/relink-media/)
+- [Where Frame Job keeps its files](/reference/file-locations/)

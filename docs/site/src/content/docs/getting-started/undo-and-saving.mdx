@@ -1,0 +1,72 @@
+---
+title: Undo and saving
+description: What one undo step is, how the Edit menu names it, what makes no step, and how Autosave keeps your work.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Every change to a project is a step you can take back. Once a project has been saved, Frame Job also writes your work to disk as you go, so you can try things without worrying about losing it.
+
+<AtAGlance
+  menu={['Edit ▸ Undo', 'Edit ▸ Redo']}
+  keys={['⌘Z', '⇧⌘Z']}
+  tools={['undo', 'redo']}
+/>
+
+## Undo and redo
+
+**Edit ▸ Undo** (<kbd>⌘Z</kbd>) and **Edit ▸ Redo** (<kbd>⇧⌘Z</kbd>) walk back and forward one step at a time.
+
+A new edit clears the redo history, so anything you undid and didn't redo is gone. Each project keeps its last 32 steps.
+
+## What counts as one step
+
+One step is one thing you did, however many clips it touched.
+
+| What you did | How much it counts for |
+| --- | --- |
+| A menu command or key | One step, even when it changes many clips. Ripple Delete over a range, Un-nest of several nests, Detach Audio on a selection and a Remove Silences pass are each one. |
+| A gesture | One step from mouse-down to mouse-up, however long the drag lasts: a move, trim, rate stretch, slip, roll or duplicate-drag. |
+| An inspector edit | One step for a typed value or a slider press, even with several clips selected. See [Inspector fields](/getting-started/inspector-fields/). |
+| A flip of a track's switch, a track rename or a track reorder | Each one is its own step. |
+
+## How steps are named
+
+The Edit menu names the step it will take back, such as **Undo Move Clips**, and Redo is named the same way. Check the name before you press if you're not sure what you're about to undo.
+
+| For | The names you'll see include |
+| --- | --- |
+| Clips | Move Clips, Rename Clip, Label Clip |
+| Tracks | Hide Track, Mute Track, Lock Track, Solo Track, Track Matte, Track Volume, Track Pan, Reset Track Mix, Rename Track, Reorder Track, New Track, Remove Track, Remove Empty Tracks |
+| Markers | Add Marker, Move Marker, Rename Marker, Chapter Marker, Remove Marker |
+
+## What makes no step
+
+Anything that doesn't change the project makes no step, so <kbd>⌘Z</kbd> walks straight past it:
+
+- Selecting, including a click on a clip that doesn't move it.
+- Moving the playhead.
+- Setting the in/out range.
+- Going into or out of a nest.
+- An edit Frame Job [wouldn't make](/getting-started/refused-edits/).
+- An edit that would leave everything as it was.
+
+<kbd>⌘Z</kbd> in the Assistant's message field undoes your typing there and never touches the project's steps. Sending the message drops that typing history.
+
+## How Autosave keeps your work
+
+Once a project has been saved, it autosaves in place as you work, the macOS way. An untitled project has no place of its own on disk until its first Save, so save early. See [Save, revert and close](/projects/save-and-revert/) for saving, reverting and browsing earlier versions.
+
+The word "edited" in the title bar means changes haven't reached the disk yet. It clears after every silent autosave, and the window's close button never shows a dot.
+
+Each save writes the new project beside the old one and swaps it in, so a crash part-way through can't leave you with half a project. See [Crash-safe writes](/projects/save-and-revert/#crash-safe-writes).
+
+## With an agent
+
+Each agent tool call that edits the project is exactly one step, so one [`undo`](/mcp/tools-projects/#undo) takes back one call. `undo` and [`redo`](/mcp/tools-projects/#redo) take nothing but the optional `project` every tool has. `undo` reports the name of the step it took back, and it's an error when there's nothing to undo. A change to a graphic's files makes no step: see [Undo rules](/graphics/agents-and-graphics/#undo-rules). See [Tools: projects and history](/mcp/tools-projects/).
+
+## Related
+
+- [When an edit is refused](/getting-started/refused-edits/)
+- [Save, revert and close](/projects/save-and-revert/)
+- [How edits work](/editing/how-edits-work/)

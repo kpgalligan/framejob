@@ -1,0 +1,104 @@
+---
+title: Export size
+description: Export at the document's size, a standard size or one you type, and see how Frame Job fits the picture to it.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+The **Size** popup sets the width and height of the exported file, whatever the size of your canvas. The [readout](/export/export-sheet/#the-readout-line) under the controls shows the numbers the file will have.
+
+<AtAGlance
+  menu="File ▸ Export…"
+  keys="⌘E"
+  where="Export sheet ▸ Size"
+  tools="export"
+/>
+
+## Choose a size
+
+Open the export sheet and pick a row in **Size**. Each row prints its numbers, for example `1080p · 1920 × 1080`.
+
+| Row | What it writes |
+| --- | --- |
+| **GIF default** or **APNG default** | The format's cap, 480 × 270 or 960 × 540. Only on those two formats, where it's the default. |
+| **Document size** | The canvas as it is. The default for every movie format. |
+| **Document (even)** | Takes the place of **Document size** when the format needs [even dimensions](#odd-widths-and-heights) and the canvas has an odd edge. It's one pixel smaller on that edge. |
+| **4K** | A short edge of 2160 pixels. |
+| **1440p** | A short edge of 1440 pixels. |
+| **1080p** | A short edge of 1080 pixels. |
+| **720p** | A short edge of 720 pixels. |
+| **Custom…** | The [width and height you type](#type-a-custom-size). |
+
+The number in a row's name is the short edge. The long edge follows your canvas's shape, rounded to the nearest even number:
+
+| Canvas | **1080p** | **4K** |
+| --- | --- | --- |
+| 1920 × 1080 | 1920 × 1080 | 3840 × 2160 |
+| 1080 × 1920 (vertical) | 1080 × 1920 | 2160 × 3840 |
+| 1080 × 1080 (square) | 1080 × 1080 | 2160 × 2160 |
+| 3024 × 1964 | 1662 × 1080 | 3326 × 2160 |
+
+Changing **Format** rebuilds the list and puts it back on that format's first row, so a size picked for a movie doesn't follow you into a GIF.
+
+## Type a custom size
+
+<Steps>
+
+1. Choose **Custom…** in **Size**. The two fields on the row below become editable, holding the size that was chosen a moment before.
+
+2. Type a width and a height, from 16 to 8192 pixels each.
+
+3. Press <kbd>Tab</kbd>, or click the other field. The readout updates then, not on each keystroke. Choosing **Export…** does the same.
+
+</Steps>
+
+A number outside the range stays in the field, and **Export…** beeps until you fix it. With a field empty, **Export…** and **Add to Queue** are greyed out and the readout says "Type a width and a height, or pick a size from the list."
+
+## Sizes that repeat
+
+A row with the same numbers as an earlier row is hidden, so one size shows once, under the name that says more. A 1920 × 1080 document shows **Document size** and no separate **1080p**.
+
+A saved preset that names a hidden row still works. It lands on the row showing the same numbers.
+
+## Export larger than the document
+
+The list offers sizes larger than the document, so a 720p recording can go out at 4K for a platform that picks its bit rate by resolution.
+
+A movie is scaled up to the size you choose. The picture is drawn at the canvas size first, so a larger frame holds more pixels but no more detail.
+
+GIF and APNG are never enlarged. They fit the picture inside the size you choose, as [Good to know](#good-to-know) explains.
+
+## Odd widths and heights
+
+H.264, HEVC, HEVC with Alpha, HEVC 10-bit, both AV1 formats, both VP9 formats and ProRes 422 need even dimensions. On these formats an odd width or height is written one pixel smaller, and the readout shows the size the file will really have. This applies to a custom size as well as to the canvas.
+
+ProRes 4444, GIF and APNG keep an odd edge.
+
+## A different shape from the canvas
+
+A movie is written at exactly the size you choose. What happens to the picture depends on how close that size is to the canvas's shape:
+
+- **Within a pixel of the canvas's shape**, the picture fills the frame edge to edge, with no black line along an edge.
+- **Any other shape** is letterboxed with black.
+
+Only **Custom…** can give you a different shape, because every row in the list has the canvas's shape.
+
+ProRes 4444, HEVC with Alpha and VP9 with Alpha (WebM) don't letterbox, because the padding would destroy the alpha channel. The sheet lets you choose the size, but Frame Job won't write the file: the export stops with a message naming the canvas and the size you asked for. Use a size with the canvas's proportions instead. An odd size typed in those proportions is fine. See [Transparent exports](/export/transparency/).
+
+## Good to know
+
+- GIF and APNG fit the picture inside the size you choose, keeping its shape and never enlarging it, so they have no letterbox. Their rows show the fitted numbers: a 1080 × 1920 project's **GIF default** is 152 × 270. See [Animated GIF and PNG](/export/gif-and-apng/).
+- **Size** is greyed out for the [audio-only formats](/export/audio-only/).
+- A preset stores the row you chose rather than its numbers, so "4K" comes out at the right 4K size for each document. See [Export presets](/export/presets/).
+
+## With an agent
+
+An agent passes `size` to `export`: `document`, the default, then `2160p`, `1440p`, `1080p`, `720p`, `preset` for the GIF and APNG default, or `[width, height]` for a custom size. A custom size outside 16 to 8192 pixels is an error. Every named size works on every document, including one the sheet hides as a repeat. See [Export: start, then poll](/mcp/export/#size).
+
+## Related
+
+- [Canvas size](/projects/canvas-size/)
+- [Export quality](/export/quality/)
+- [Export frame rate](/export/frame-rate/)
+- [Transparent exports](/export/transparency/)

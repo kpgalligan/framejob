@@ -1,0 +1,241 @@
+---
+title: Troubleshooting
+description: Find out why a command is greyed, an edit is refused, a file won't open, a clip is silent, sound is out of sync, the picture looks wrong or an export stops, and what to do next.
+---
+
+Frame Job says why it won't do something, in a sentence or a tooltip. This page starts from what you see and tells you what it means and what to do. For the numbers behind these answers, see [Limits](/reference/limits/).
+
+## A command is greyed out
+
+Every menu item has a rule for when it's on. [Menus](/reference/menus/) and [The Clip menu](/reference/clip-menu/) give each item's rule. A ⌘ shortcut does nothing while its item is greyed.
+
+If the item should be on, check these first:
+
+| Check | Why it matters |
+| --- | --- |
+| The selection | Many commands need a clip selected, or a certain kind of clip. |
+| A sheet | While a sheet is open, every editor command is off. Close the sheet first. |
+| A nest | With a [nest](/editing/nests/) open, these are off: **New Project from Range…**, **Make Vertical Version…**, **Rename Graphic…**, **Add Marker**, **Next Marker**, **Previous Marker**, **Insert ▸ Adjustment Clip** and **Text Behind Subject**. Leave the nest with <kbd>⌘↑</kbd>. |
+| A text field | **Open Nest**, **Close Nest**, **Delete** and **Ripple Delete** are off while you type, because their keys edit the text. |
+| A key | A command that needs your own key stays in the menu, greyed, and its title ends "(needs your AssemblyAI key)". Rest the pointer on it to see which key and where to set it. Saving the key turns it on at once. See [A feature asks for a key](#a-feature-asks-for-a-key). |
+
+## A key does nothing
+
+Single-letter keys and the arrow keys belong to the editor window, and they stand down in two cases.
+
+- **You're typing in a field.** Press <kbd>↩</kbd> or <kbd>Tab</kbd>, or click outside the field, to give the keys back to the editor.
+- **A sheet is open.** Close it first. In a sheet, <kbd>↩</kbd> presses the main button and <kbd>⎋</kbd> cancels.
+
+One more thing can catch you out: with a point selected on a [curve](/color/curves/), <kbd>⌫</kbd> deletes the point, not the clip.
+
+See [Keys and typing](/getting-started/keys-and-typing/) and [Keyboard shortcuts](/reference/keyboard-shortcuts/).
+
+## An edit is refused
+
+When the project's rules won't allow an edit, Frame Job beeps, nothing changes, and the rule's own sentence appears at the foot of the inspector after "Refused: ":
+
+> Refused: clips 4 and 7 would overlap by 120000 ticks, more than half of the shorter clip (100000 ticks)
+
+The sentence stays until the project changes or you click it. It's exact rather than friendly. The clip numbers are Frame Job's own, not positions on the timeline, and a [tick](/reference/glossary/#projects-and-the-timeline) is 1/600,000 of a second. So this one says the overlap would be 0.2 s, and half of the shorter clip is 0.17 s.
+
+The rules you'll meet most:
+
+| Rule | What it means |
+| --- | --- |
+| The overlap rule | On one track, a clip may overlap at most one neighbour on each side, and each overlap may be at most half the length of the shorter clip. |
+| A locked track | Its clips can't be dragged, trimmed, slipped or rolled, and you can't insert onto it or close a gap on it. Unlock it with its [lock button](/timeline/hide-and-lock-tracks/). |
+| The one-frame minimum | Trims and rolls leave a clip at least one frame long. |
+| The ends of the file | A media clip can't be trimmed, rolled or slipped past either end of its file. |
+
+Two other results look similar:
+
+- **A beep with no message** means the edit would have changed nothing, such as a slip already at the end of the footage. No rule was broken.
+- **An error alert** means Frame Job couldn't use the request at all, such as a value outside its allowed range.
+
+During a drag, positions the rules won't allow are skipped, and the clip waits at the last allowed place. Only the drop counts.
+
+See [When an edit is refused](/getting-started/refused-edits/).
+
+## A clip won't move on the canvas
+
+A clip shows an [action's](/motion/actions/) end state once the action has ended. With no action selected, a drag changes the clip's own values, so past a zoom or a [camera layout](/framing/camera-layouts/#resize-or-move-a-laid-out-camera) the picture stays put. Select the action, then drag.
+
+A clip on a [locked track](/canvas/the-canvas/#hidden-and-locked-tracks) can't be selected or moved on the canvas either.
+
+## A project won't open
+
+A project that can't be read fails with a message naming the problem, and Frame Job doesn't rewrite the package.
+
+| Message | What to do |
+| --- | --- |
+| "*name* does not contain a readable project.json." | The project file inside the package is damaged. Open a backup copy if you have one. |
+| "project format version *N* is newer than this build understands (version *M*); update Frame Job to open it" | A newer Frame Job saved it. [Update Frame Job](/getting-started/updates/). |
+| "too many clips: 5000 (max 4096)", or the same for tracks, markers or media | The file is past one of the [project limits](/reference/limits/#project-size). |
+
+If Frame Job quits unexpectedly as it opens a package, check that `project.json` inside it is a file. A folder or a link in its place gives no message. Open a backup copy if you have one.
+
+Files that have moved don't stop a project opening, and neither does a damaged `cache/` folder. For moved files, see [Clips show a slate](#clips-show-a-slate). Also see [Open a project](/projects/open-a-project/).
+
+## A file won't import
+
+Frame Job tells you which file it couldn't add and why.
+
+| Message | What it means |
+| --- | --- |
+| "*file* is AV1 video, which needs an M3 or later Mac." | This Mac has no AV1 decoder. |
+| "*file* is VP9 Profile 1 video, which this Mac cannot decode; VP9 Profiles 0 and 2 import." | Only those two VP9 profiles import. |
+| "*file* is VP8 video, which this Mac cannot decode." | This Mac has no decoder for that codec. Other codecs it can't decode get the same sentence with their own name. |
+| "Could not read *file*." | The file is damaged, or it isn't a format Frame Job reads. |
+| "*file* has no video or audio the app can open." | The file holds neither. |
+| "Timed out reading *file*." | The check took longer than 30 seconds, usually because of a stalled network volume. |
+| "“Film.cube” is not a LUT Frame Job reads: line 2: LUT_3D_SIZE 200 is outside 2–65." | The message names the line of the file and what's wrong with it. See [.cube LUTs](/color/luts/). |
+| "Not enough free space to open *file*…" | A WebM or Matroska file needs room for its copy. The sentence says how much. See [WebM and Matroska files](/projects/webm-and-matroska/). |
+
+A file in a codec this Mac decodes still imports even when some of its data is damaged.
+
+If macOS can't open a file, you can repackage or convert it with your own ffmpeg. See [Convert files with ffmpeg](/projects/ffmpeg-conversion/).
+
+If the **File ▸ Add Media…** panel won't let you choose a file, drop it on the Media tab instead. The panel lists only the common types. See [Supported file formats](/reference/file-formats/).
+
+An agent's `import_media` reports these reasons too.
+
+## Clips show a slate
+
+A project always opens, even when files it uses have moved or been deleted. Clips whose file is gone keep their place and show a slate, and their rows in the [Media tab](/projects/media-tab/) wear the **missing** badge.
+
+When a project opens with files missing, Frame Job offers the **Missing media** sheet once. Choose **Locate…** for a file, then **Relink**. Frame Job also looks in that file's folder for the other missing files by name, so a shoot moved as one folder is usually found in one go. To relink a file later, use **Relink…** on its row in the Media tab. An agent uses `relink_media`.
+
+Two other cases show a slate or leave media missing:
+
+- A reversed clip shows a slate until its backwards copy has been rendered. See [Reverse a clip](/speed/reverse/).
+- A [conversion made with ffmpeg](/projects/ffmpeg-conversion/#a-lost-conversion-stays-missing) that's gone from Frame Job's [Rewrapped folder](/projects/webm-and-matroska/#the-rewrapped-folder) stays missing until you relink it. A WebM or MKV copy that's gone is [made again](/projects/webm-and-matroska/#if-a-copy-goes-missing) when the project opens, as long as the original is still there.
+
+See [Relink missing media](/projects/relink-media/).
+
+## The preview stutters or lags
+
+Frame Job always plays your original files. There are no proxy files or optimised media to make, so playback of a heavy project can look choppy. Neither of these changes an export.
+
+| Try | What it does |
+| --- | --- |
+| [**View ▸ Preview Quality ▸ Half** or **Quarter**](/timeline/preview-quality/) | Draws the picture smaller. It saves the work of drawing each pixel, but not of decoding your footage, drawing shadows or playing the sound. |
+| [Leaving Frame Job alone for a few seconds](/graphics/playback-and-memory/#background-render) | Over a graphic, Background render draws ahead of the paused playhead, so the next play is smooth from the start. It only helps graphics. |
+
+## Phone footage looks wrong
+
+**Washed out, or less bright than in Photos.** HDR video, such as an iPhone's, holds highlights brighter than ordinary video can show. A new project is SDR, so Frame Job converts the clip and eases those highlights down. That's expected, and the export matches the preview. To keep the highlights, set the project to [HDR (HLG)](/hdr/dynamic-range/) and [export HDR](/hdr/export-hdr/). See [How sources are read](/hdr/how-sources-are-read/#hlg-video).
+
+**Sideways.** Frame Job follows the file's own rotation, so a portrait clip comes in upright. A file that's still sideways was saved that way, so turn it with [**Rotation**](/canvas/transform/#rotation).
+
+## A clip is silent
+
+Check these in order. A muted clip, a muted track and a track silenced by a solo all draw the waveform faded.
+
+| Check | What to do |
+| --- | --- |
+| The clip's own sound | The clip may be muted in the [Sound tab](/audio/sound-tab/), or its [sound turned off](/editing/enable-picture-and-sound/). |
+| The track's **Mute** | A muted track is silent. Mute wins over Solo, so a track that's muted and soloed stays silent. |
+| **Solo** on another track | While any track is soloed, the others are silent, even if the soloed track has nothing on it. See [Mute and solo tracks](/audio/mute-and-solo/). |
+| The clip's rate | Above ×12 a clip has no sound, and the Speed section says "Audio is silent above ×12". On a ramped clip, one rate above ×12 anywhere silences the whole clip. See [Sound at high speed](/speed/sound-at-high-speed/). |
+| Whether its sound has rendered | A ramp's sound, and a constant speed other than ×1 with Keep pitch off, is silent in the preview until its render finishes. A failed render stays failed until the clip's timing changes or you reopen Frame Job. |
+| **Detach Audio** | After a detach, the picture clip's own sound is off, and the sound is on its linked clip. See [Detach and Attach Audio](/audio/detach-and-attach/). |
+
+If the clip plays but [Voice Isolation](/audio/voice-isolation/) or a [voice effect](/audio/voice-effects/) has gone, check its speed. Both play only at normal speed, so a clip with a speed change, a ramp or a freeze frame plays without them.
+
+## Sound is out of sync
+
+| What you see | What to do |
+| --- | --- |
+| A camera and a separate recorder don't line up | Run [Synchronize Audio](/audio/synchronize-audio/). It matches their sound, so you don't need a clap or a slate. |
+| Clips that were in sync have slipped apart | Lined-up clips aren't linked, so a drag moves only one. Undo it, or [move them together](/editing/move-clips/#move-several-clips-together). |
+| They slipped after a cut | [Ripple-deleting a selected clip](/editing/delete-clips/#how-a-ripple-closes-holes) leaves clips running under it uncut, and a locked track doesn't move. Undo it and [cut a range](/editing/delete-clips/#ripple-delete-a-range) instead. |
+| The sound slides further out over a long take | The two devices' clocks run at different rates. Synchronize Audio [corrects that drift](/audio/synchronize-audio/#drift-correction) when the clips overlap for at least 60 seconds, by up to 0.2 % of speed. |
+| Synchronize Audio won't run | The foot of the inspector gives the reason. See [When it won't run](/audio/synchronize-audio/#when-it-wont-run). |
+
+## The picture looks wrong
+
+| What you see | What to check |
+| --- | --- |
+| A clip looks flat, grey and washed out | It's log footage with no conversion. Set its [Camera Log](/hdr/camera-log/), or a [LUT](/hdr/log-luts/) for a log with no built-in curve. A file whose conversion LUT has gone missing shows flat too. |
+| A log clip looks too contrasty | A camera LUT may be converting it twice. Check the [Look section's warning](/color/luts/#warnings-in-the-look-section). For a Canon file, see [Full-range files](/hdr/how-sources-are-read/#full-range-files). |
+| An HDR clip's highlights look flat or clipped | In an SDR project, HDR footage is [converted to Rec. 709](/hdr/how-sources-are-read/#one-conversion-at-the-start) and its highlights are rolled off. To keep them, make the project [HDR (HLG)](/hdr/dynamic-range/). For a PQ file, check its [peak](/hdr/hdr10-peak/). |
+| White titles look dimmer than HDR highlights | That's correct. Titles sit at [HDR reference white](/hdr/dynamic-range/#drawn-layers), and highlights rise above it. |
+| The grade has gone from the preview | Look for the **Ungraded** tag, and turn off [Show Ungraded](/color/show-ungraded/). |
+| A clip's look has gone | Its `.cube` file may be [missing or broken](/color/luts/#a-missing-or-broken-file). |
+| The preview has turned grey | Look for the **Selection** tag, and turn off [Show Selection](/color/show-selection/). |
+| A file looks different in another app | See [Colour labels](/export/what-an-export-includes/#colour-labels) and [Colour on your display](/timeline/preview/#colour-on-your-display). |
+
+## An export won't start or stops
+
+An export that fails says why and leaves no finished file. An agent reads the same reason from `export_status`.
+
+While the timeline is empty, **File ▸ Export…** is greyed out. Add a clip first.
+
+"Preparing…" is a wait, not a stall. An export waits for what it has to draw and play first, such as speed-ramp audio, [Remove Background](/effects/remove-background/) masks, and sound measurements.
+
+| What you see | What to do |
+| --- | --- |
+| "Clip *N*'s loudness or speech has not been measured yet…" | An export waits up to five minutes for a measurement still running, then stops. Wait for the clip's Status rows to show its loudness, then export again. |
+| "Clip *N*'s retimed audio could not be rendered: …" | A failed render keeps failing exports until you change the clip's timing or reopen Frame Job. |
+| "The export was not started: the graphic…" or "The export was stopped at frame *N* of the graphic…" | Frame Job won't export a graphic that can't draw itself. Fix its [module](/graphics/edit-a-module/) and export again. |
+| "This Mac cannot export with the “*preset*” preset." | This Mac has no encoder for that format. Choose [another format](/export/formats/). |
+| "An animated GIF is limited to 600 frames and this range is *N*." | Shorten the range. If **Frame rate:** is on a fixed rate, **Project rate** takes a GIF down to 12.5 fps, and no fixed rate goes lower. An APNG has the same limit. See [Animated GIF and PNG](/export/gif-and-apng/#the-600-frame-limit). |
+| "An export that keeps transparency has to have the canvas's own shape…" | ProRes 4444, HEVC with Alpha and VP9 with Alpha (WebM) won't take a size of a different shape. Use a size from the popup, or one with the same proportions. See [Transparent exports](/export/transparency/). |
+
+A queued AV1 or VP9 job can sit waiting for memory, so it hasn't stalled. See [The Export Queue](/export/export-queue/).
+
+:::caution
+Quitting during an **Export…** progress sheet doesn't ask first, and it leaves a half-written file. Only the Export Queue is guarded at quit.
+:::
+
+See [Export progress and the report](/export/progress-and-report/).
+
+## A feature asks for a key
+
+Anything that sends your words or your audio to a language or cloud model needs your own key. Everything that runs on your Mac needs none.
+
+| Message | What to do |
+| --- | --- |
+| "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription." | Paste a key under **Transcription** in [Settings](/reference/settings/). |
+| "No Anthropic API key is set. Set one in Frame Job ▸ Settings… ▸ Assistant." | Paste a key under **Assistant** in Settings. |
+| "AssemblyAI refused the API key — check it in Frame Job ▸ Settings" | The key failed. Check it, and press **Verify** to test it. |
+
+A transcript made in one AssemblyAI region can't be seen from the other, so check **Region** too.
+
+An agent can't set a key, so a person has to. See [AI features and your own keys](/getting-started/ai-and-your-keys/).
+
+## Recording won't start
+
+A recording needs macOS's permissions, and Frame Job asks for each one only when you press Record.
+
+- **Screen Recording** is at **System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording**. Once it's on, relaunch Frame Job, then press Record again. Later presses without it open that pane.
+- **Microphone**, **Camera** and **Input Monitoring** are asked for only when the recording needs them.
+- If you started Frame Job from a terminal or another app, macOS applies that app's permissions. The panel's note names the launching process and how to relaunch.
+- If the screen is locked or every display is asleep, nothing can be recorded until one wakes.
+
+Each permission is checked before the countdown, so a missing Screen Recording permission stops the recording rather than leaving you with a black movie.
+
+An agent's `record_screen` never asks for a permission, so a person has to grant it first. See [Recording permissions](/recording/permissions/).
+
+## An agent can't reach Frame Job
+
+Only programs running as you can connect, through the `framejob-mcp` helper inside the app.
+
+| What you see | What to do |
+| --- | --- |
+| The client can't start the helper, or shows a failed server and no tools, after you moved Frame Job | In the **MCP** section of [Settings](/reference/settings/#mcp), press **Copy MCP Command** and register the new path. The path is the one you opened Settings from, and it doesn't follow the app. |
+| "framejob-mcp is missing from this copy of Frame Job." | The helper isn't in this copy. Use a complete copy of the app. |
+| "Frame Job did not answer at…" | Frame Job launched but wasn't ready within 60 seconds. Later calls in that client session don't launch another copy, so quit the stray copy and try again. |
+| "No project is open. Call open_project or new_project first." | The connection works, and nothing is open yet. Have the agent call `open_project` or `new_project`. |
+| A call seems stuck | [Calls run one at a time](/mcp/tool-calls/#one-call-at-a-time), so it may be behind a long one such as `record_screen`. It also waits while you hold a drag in any project. |
+| The agent works on a different copy of Frame Job, or can't reach the one you have open | The first copy to open holds the socket, and no agent can reach a later one. Quit the copy you don't want and open the other first. See [One copy holds the socket](/mcp/helper-and-socket/#one-copy-holds-the-socket). |
+
+See [Connect a client](/mcp/connect-a-client/), and [The helper and the socket](/mcp/helper-and-socket/#errors-from-the-helper) for what each error means.
+
+## Related
+
+- [Limits](/reference/limits/)
+- [When an edit is refused](/getting-started/refused-edits/)
+- [Menus](/reference/menus/)
+- [Keyboard shortcuts](/reference/keyboard-shortcuts/)
+- [Glossary](/reference/glossary/)

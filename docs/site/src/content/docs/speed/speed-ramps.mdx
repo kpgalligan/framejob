@@ -1,0 +1,87 @@
+---
+title: "Speed ramps"
+description: "What a speed ramp is, how Speed actions build one, how to read it on the timeline, and why a ramp can't play past the end of its file."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A speed ramp changes a clip's rate over time. It can play at ×1, speed up to ×4 over half a second, hold there, and slow back down, all inside one clip. Use one to hurry through a slow stretch or linger on a moment, without cutting the clip or moving anything after it.
+
+<AtAGlance
+  menu={['Clip ▸ Speed Ramp…', 'Clip ▸ Add Action']}
+  keys="⌥⌘K"
+  where={['The action lane', 'Clip tab ▸ Clip ▸ Speed section']}
+  tools={['add_speed_ramp', 'add_action', 'set_action_end', 'set_action', 'remove_action']}
+/>
+
+There are two ways to make one:
+
+- [Make a speed ramp](/speed/make-a-ramp/) with **Clip ▸ Speed Ramp…**, which builds a whole ramp in one step.
+- [Build a ramp by hand](/speed/build-a-ramp/), one change of speed at a time.
+
+Both give you the same thing, so you can start from the sheet and adjust the result by hand.
+
+## Speed actions
+
+A ramp is made of Speed actions. A Speed action is an ordinary [action](/motion/actions/) on the clip's action lane whose end sets a rate. Each one:
+
+- starts from the rate the clip is playing at when the action begins, which is the clip's own rate or the rate an earlier Speed action ended on
+- moves to its own end rate along its curve
+- keeps that end rate after it finishes, until the next Speed action
+
+So a ramp up and back down is two actions. The first ends at ×4, the clip stays at ×4 after it, and the second ends at ×1.
+
+An end rate can be anything from ×0.1 to ×1000. Only a video or audio clip can have one, because only those have a file to read at a rate.
+
+## A ramped clip keeps its place
+
+A ramp changes how much of the file plays, not where the clip sits. The clip's start, its end and every clip around it stay put.
+
+Speeding part of a clip up makes it play further into its file. Slowing part of it down makes it play less of the file.
+
+For example, take a 10-second clip at ×1 with a Linear ramp up to ×4 from 2 s to 2.5 s, and back to ×1 from 4 s to 4.5 s. It still takes 10 seconds on the timeline, but it now plays 16 seconds of its file.
+
+This is the difference from [Change a clip's speed](/speed/change-speed/), where the clip gets longer or shorter.
+
+## Never past the end of the file
+
+Because a ramp can play further into the file, it can run out of file. A ramp may never play past the end of the clip's media, so an edit that would do that isn't made, and the reason says what would fit.
+
+| What you tried | What the reason tells you |
+| --- | --- |
+| Setting an end rate too high | The largest end rate that fits, to 0.001. If no rate down to ×0.1 fits, it names the latest clip end that would fit at ×0.1. |
+| Moving, resizing or removing a Speed action, or clearing its rate | The latest clip end that fits |
+| Applying **Clip ▸ Speed Ramp…** | The largest rate that fits, or that no rate fits |
+
+Nothing changes when this happens. Frame Job beeps and shows the reason at the foot of the inspector, starting "Refused:". It stays there until you click it or the project changes. In the Speed Ramp sheet the reason appears in the [readout](/speed/make-a-ramp/#the-readout) and **Apply** is unavailable. Dragging a band doesn't show a reason. The band stays at the last place that fits.
+
+A clip end in a reason is a position on the timeline, given in ticks, Frame Job's own unit of time. Divide by 600,000 to get seconds. Trim the clip's end to that time and the ramp has enough file to play.
+
+## The rate line
+
+A white line across the action lane draws the clip's rate over its length, higher where it plays faster and lower where it plays slower.
+
+The line is scaled from the clip's own slowest rate to its fastest, so a gentle ramp draws as tall as a steep one. Use it to see the ramp's shape. For the figures, see the [Speed section](/speed/speed-section/).
+
+The line shows at the **Medium** and **Large** track heights and in the Clip tab's lane. A clip whose rate never changes draws no line. While the line is drawn, a selected Speed band leaves out the curve it would otherwise show.
+
+The clip's filmstrip and waveform follow the ramp too.
+
+## The band label
+
+At the **Large** track height, a Speed action's band on the timeline is labelled `speed`. A band's label lists everything its action changes, so one that also changes the clip's scale reads `scale, speed`. At **Medium** it shows only its number, and at **Small** it's a plain bar.
+
+## Good to know
+
+- A clip linked to its detached sound can't change its speed. See [Detach and Attach Audio](/audio/detach-and-attach/).
+- Going above ×12 anywhere in a ramp silences the whole clip. See [Sound at high speed](/speed/sound-at-high-speed/#ramps-and-the-12-rule).
+- Sound on a ramped clip is rendered in the background, so a clip can be briefly silent after you edit it. See [Sound on a ramp](/speed/ramp-audio/).
+- Captions over a ramped clip follow the ramp. See [Captions follow a speed change](/speed/captions-and-speed/).
+
+## Related
+
+- [Make a speed ramp](/speed/make-a-ramp/)
+- [Build a ramp by hand](/speed/build-a-ramp/)
+- [Edit a ramped clip](/speed/edit-a-ramped-clip/)
+- [Action bands and the action lane](/motion/action-lane/)
+- [Reading a clip on the timeline](/timeline/reading-a-clip/)

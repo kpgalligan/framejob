@@ -1,0 +1,91 @@
+---
+title: "Split clips"
+description: "Cut clips in two at the playhead, and see what each piece keeps of the footage, actions, word timings and graphics."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Split cuts a clip in two at the playhead, so you can trim, move or remove one piece without touching the other. There's no separate blade or razor tool. Split does that job.
+
+<AtAGlance
+  menu="Clip ▸ Split"
+  keys="⌘T"
+  where="The scissors button in the timeline bar"
+  tools="split"
+/>
+
+## Split at the playhead
+
+<Steps>
+
+1. Move the playhead to the frame you want to cut on.
+
+2. Select the clips to cut, or select nothing to cut everything under the playhead.
+
+3. Press <kbd>⌘T</kbd>, choose **Clip ▸ Split**, or click the scissors button in the timeline bar.
+
+</Steps>
+
+| What's selected | What gets cut |
+| --- | --- |
+| One or more clips | Each selected clip the playhead is inside |
+| Nothing | Every clip under the playhead on every unlocked track |
+
+It's one undo step, named Split, however many clips it cuts. The command is available whenever the timeline has clips.
+
+The playhead has to be strictly inside a clip. A playhead sitting exactly on a clip's edge is at a cut already, so that clip is left alone. If nothing can be cut, Frame Job beeps and nothing changes.
+
+A clip on a locked track is left alone when nothing is selected, but it's still cut if you selected it.
+
+## Footage stays continuous
+
+The second piece carries on playing the footage from where the first stopped, at the same speed, so the split doesn't show when you play it back. If an action is animating the clip, the second piece starts from where that animation had got to at the cut, such as its position or volume. It keeps the clip's name, label and settings, its grade included.
+
+On a clip with a [speed ramp](/speed/edit-a-ramped-clip/), the two pieces meet at exactly the same point in the footage, and the second starts at the rate in force at the cut.
+
+## Linked sound
+
+A [linked clip](/audio/detach-and-attach/) on an unlocked track is cut too, when the playhead is inside it, and the two second halves are linked to each other.
+
+If the linked clip isn't cut, because its track is locked or the playhead isn't inside it, it stays linked to whichever piece shares more of its time. The other piece isn't linked to anything.
+
+## Actions and word timings
+
+[Actions](/motion/how-edits-move-actions/) stay with the piece they fall in:
+
+- An action that ends at or before the cut stays on the first piece.
+- An action that starts at or after the cut moves to the second piece.
+- An action that spans the cut becomes two. The first half ends at the value it had reached at the cut, and the second carries on to the original target, so the join doesn't show. Both keep the action's curve.
+
+An [entrance and exit preset](/motion/entrances-and-exits/) is tied to the clip's ends, so the first piece keeps the entrance and the second keeps the exit. A [text reveal](/text-and-shapes/text-reveal/) divides the same way. Otherwise the clip would leave at the cut and arrive again on the far side of it.
+
+Caption word timings stay on their words. Both pieces keep the full text, the first with its timings as they were and the second with its timings moved to match its new start.
+
+The one exception is a text clip whose wording an action changes. If the second piece's text at the cut no longer has the same number of words as its timings, the second piece loses its word timings and shows its text all at once.
+
+## Split a graphic
+
+A [graphic](/graphics/size-and-timing/) carries on across the cut rather than starting again, and plays its outro once, at the true end.
+
+The graphic's **In** on the second piece starts at the cut, so it picks up where the first piece left off. Both pieces keep the original's **Length**, so an outro still plays at the same moment. That pins the length, so **Follow Clip** is off on both pieces afterwards.
+
+Trimming the start of a graphic, or [rolling the cut](/editing/slip-and-roll/#roll-a-cut) before it, moves **In** in the same way. Trimming the end leaves a pinned **Length** alone. With **Follow Clip** on, the graphic's own timeline ends at the new end.
+
+## Good to know
+
+- The cut lands on the project's frame grid.
+- A [transition](/motion/transitions/) into the clip stays on the first piece. The second piece starts with a hard cut.
+- [Sound fades](/audio/fades/) are copied to both pieces. A clip with a fade-in fades in again at the cut, and one with a fade-out dips at the cut, so set them again on the side of the cut where you don't want them.
+- A project holds up to 4,096 clips. A split that would pass that shows an error alert, and nothing changes.
+
+## With an agent
+
+`split` cuts at a time you give it, or at the playhead if you leave the time out. Give it a list of clips to cut those, or leave the list out to cut every clip on an unlocked track at that time, as the menu item does with nothing selected. See [Tools: cutting and deleting](/mcp/tools-cut-and-delete/#split).
+
+## Related
+
+- [Split at Shot Changes](/editing/split-at-shot-changes/)
+- [Delete, Ripple Delete and Lift](/editing/delete-clips/)
+- [Trim clips](/editing/trimming/)
+- [How edits move actions](/motion/how-edits-move-actions/)

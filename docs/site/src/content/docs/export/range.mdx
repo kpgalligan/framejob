@@ -1,0 +1,73 @@
+---
+title: "Export a range"
+description: Write only the part of the timeline between your in and out points, instead of the whole project.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+An export writes the whole timeline unless you tell it otherwise. Use **Range:** on the export sheet to write only the passage between your in and out points, such as one section of a long project or a clip for review.
+
+<AtAGlance
+  menu="File ▸ Export…"
+  keys="⌘E"
+  where="Export sheet ▸ Range"
+  tools="export"
+/>
+
+## Export only the range
+
+<Steps>
+
+1. On the timeline, set the [in/out range](/timeline/in-out-range/) with <kbd>I</kbd> and <kbd>O</kbd>.
+
+2. Choose **File ▸ Export…**.
+
+3. In **Range:**, choose **In/out range**.
+
+4. Check the length in the readout under the controls, then choose **Export…** or **Add to Queue**.
+
+</Steps>
+
+## The Range popup
+
+| Choice | What it writes |
+| --- | --- |
+| **Whole project** | The whole timeline. This is the default. |
+| **In/out range** | Only the range set on the timeline. It's listed only when a range is set. |
+
+With no range set, the popup is greyed out on **Whole project**.
+
+The range is rounded to whole frames at the export's rate and kept inside the project. If you change **Frame rate:**, it lands on that rate's frames, so its length can move by less than a frame. The readout always shows the length the file will have.
+
+The sheet remembers **In/out range** with the rest of your last export, and a [preset](/export/presets/) can store it too. On a project with no range, either one falls back to **Whole project**.
+
+## Inside a nest
+
+An export always writes the top-level timeline, even when you're working inside a [nest](/editing/nests/). So it can't use a range that belongs to a nest.
+
+While a nest is open, the popup is greyed out on **Whole project**. If the nest has a range of its own, the popup's tooltip says why that range isn't offered.
+
+To export that passage, leave the nest with <kbd>⌘↑</kbd> and set the range on the timeline. A range stays with the timeline or nest it was set in, so opening or leaving a nest clears it.
+
+## Sound ends with the range
+
+A file's sound is exactly as long as the range it exports, including when a clip in it plays faster or slower. Frame Job cuts the sound at the range's end, and if the sound runs out early it fills the rest with silence.
+
+## Good to know
+
+- If a range turns out to be empty, for example one that lies past the end of the project after an edit, the sheet says the export range is empty and **Export…** and **Add to Queue** stay greyed out. Set the range again, or choose a different one.
+- Animated GIF and Animated PNG files have a limit on their frame count, so a long range may not fit. See [Animated GIF and PNG](/export/gif-and-apng/).
+- [Burn in timecode](/export/burn-in-timecode/) reads project time, so a file from a range shows the timeline's timecode, not a count from zero.
+- [Chapters](/export/chapters/) explains how a range export treats chapter markers.
+
+## With an agent
+
+`export` takes `range`: `project`, the default, or `in_out`, which writes the range set with [`set_range`](/mcp/tools-view-state/#set_range). With no range set, `in_out` gets an error instead of a file. See [Export: start, then poll](/mcp/export/#range).
+
+## Related
+
+- [The in/out range](/timeline/in-out-range/)
+- [The export sheet](/export/export-sheet/)
+- [Burn in timecode](/export/burn-in-timecode/)
+- [Export: start, then poll](/mcp/export/)

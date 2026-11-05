@@ -1,0 +1,151 @@
+---
+title: Frame Job
+description: A native macOS video editor. Cut, grade, caption, animate and export it yourself, or ask the Assistant or any MCP agent to do it.
+template: splash
+editUrl: false
+hero:
+  title: Frame Job
+  tagline: A native macOS video editor. Cut it yourself, ask the Assistant, or let any MCP agent drive. Every edit is an ordinary undo step.
+  actions:
+    - text: Get started
+      link: /getting-started/requirements-and-install/
+      variant: primary
+      icon: right-arrow
+    - text: All features
+      link: /features/
+      variant: secondary
+    - text: Download
+      link: https://github.com/kpgalligan/framejob/releases/latest/download/FrameJob.dmg
+      variant: minimal
+      icon: external
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import Shot from '@components/Shot.astro';
+
+<Shot
+  name="04-editor.window"
+  alt="The Frame Job editor window: a preview above a timeline with music, shape, graphic and title tracks, and an inspector down the right."
+/>
+
+Frame Job runs on Apple Silicon Macs with macOS 26 or later. There's no account to make. Every AI feature runs on your own API key, and everything else works without one.
+
+## Start here
+
+<CardGrid>
+  <LinkCard
+    title="Your first edit"
+    description="Open a movie, cut it, and export it."
+    href="/getting-started/first-edit/"
+  />
+  <LinkCard
+    title="A tour of the editor window"
+    description="What each part of the window is for."
+    href="/getting-started/editor-window/"
+  />
+  <LinkCard
+    title="Core concepts"
+    description="Projects, tracks, clips and the canvas."
+    href="/getting-started/core-concepts/"
+  />
+  <LinkCard
+    title="AI features and your own keys"
+    description="What's optional, and what stays on your Mac."
+    href="/getting-started/ai-and-your-keys/"
+  />
+</CardGrid>
+
+## What you can do
+
+<CardGrid>
+  <Card title="Cut" icon="seti:video">
+    [Trim](/editing/trimming/), [slip and roll](/editing/slip-and-roll/),
+    [split](/editing/splitting/) and [nest](/editing/nests/) clips on tracks that hold anything.
+    Take out dead air with [Remove Silences](/cleanup/remove-silences/) and
+    [Remove Filler Words](/cleanup/remove-filler-words/), or
+    [cut by deleting words](/captions/delete-words/) from the transcript.
+  </Card>
+  <Card title="Compose" icon="seti:image">
+    Place [text](/text-and-shapes/text-clips/), [shapes](/text-and-shapes/shape-clips/) and
+    [pictures](/text-and-shapes/image-clips/) on a fixed canvas, use
+    [matte tracks](/canvas/matte-tracks/), and
+    [Remove Background](/effects/remove-background/) with no green screen.
+  </Card>
+  <Card title="Animate" icon="rocket">
+    Ease any property with [actions](/motion/actions/), use
+    [motion presets](/motion/motion-presets/) and [transitions](/motion/transitions/), build
+    [speed ramps](/speed/speed-ramps/), and drop in [motion graphics](/graphics/what-is-a-graphic/).
+  </Card>
+  <Card title="Grade" icon="seti:favicon">
+    [Wheels](/color/wheels/), [curves](/color/curves/), [looks](/color/looks/),
+    [LUTs](/color/luts/), [qualifiers](/color/qualifiers/) and
+    [scopes](/color/scopes/), with [camera log](/hdr/camera-log/) and
+    [HDR projects](/hdr/dynamic-range/).
+  </Card>
+  <Card title="Mix" icon="seti:audio">
+    [Enhance Voice](/audio/enhance-voice/), [EQ](/audio/eq/),
+    [ducking](/audio/ducking/), [Normalize](/audio/normalize/) to a loudness target, and
+    [Synchronize Audio](/audio/synchronize-audio/) across cameras and recorders.
+  </Card>
+  <Card title="Caption" icon="comment-alt">
+    [Generate captions](/captions/generate-captions/) on your Mac or with AssemblyAI, as
+    [subtitles](/captions/subtitles/) or [word-by-word styles](/captions/word-caption-styles/),
+    and read your project as [a transcript](/captions/transcript-tab/).
+  </Card>
+  <Card title="Record" icon="laptop">
+    Record [a display](/recording/record-a-display/) or
+    [a window](/recording/record-a-window/) with [a camera beside it](/recording/camera-beside-the-screen/),
+    then [Auto Zoom](/recording/auto-zoom/) and
+    [Speed Up Typing](/recording/speed-up-typing/).
+  </Card>
+  <Card title="Reframe" icon="seti:crystal">
+    [Follow Subject](/framing/follow-subject/) keeps a person in frame, and
+    [Make Vertical Version](/framing/make-vertical-version/) turns a whole edit into 9:16, 4:5 or
+    1:1. [Switch by Speaker](/multicam/switch-by-speaker/) cuts between cameras for you.
+  </Card>
+  <Card title="Deliver" icon="seti:config">
+    [H.264 and HEVC](/export/h264-and-hevc/), [ProRes](/export/prores/),
+    [AV1 and VP9](/export/av1-and-vp9/), [transparent exports](/export/transparency/),
+    [stems](/export/stems/) and an [Export Queue](/export/export-queue/) that runs behind the editor.
+  </Card>
+</CardGrid>
+
+## Work with an AI
+
+<CardGrid>
+  <LinkCard
+    title="The Assistant"
+    description="Chat with Claude in the inspector to edit the open project, on your own Anthropic key."
+    href="/assistant/set-up/"
+  />
+  <LinkCard
+    title="Agents and MCP"
+    description="Drive every edit from Claude Code or any other MCP client."
+    href="/mcp/overview/"
+  />
+</CardGrid>
+
+## Look something up
+
+<CardGrid>
+  <LinkCard
+    title="All features"
+    description="Every feature in one list you can filter."
+    href="/features/"
+  />
+  <LinkCard
+    title="Keyboard shortcuts"
+    description="Every key, in one place."
+    href="/reference/keyboard-shortcuts/"
+  />
+  <LinkCard
+    title="Menus"
+    description="Every menu command."
+    href="/reference/menus/"
+  />
+  <LinkCard
+    title="Supported file formats"
+    description="What Frame Job reads and writes."
+    href="/reference/file-formats/"
+  />
+</CardGrid>

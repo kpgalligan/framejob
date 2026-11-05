@@ -1,0 +1,166 @@
+---
+title: "Auto Zoom"
+description: "Zoom a screen recording in where things happen, planned from its cursor file, with every zoom left as an ordinary action you can change."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Auto Zoom moves a screen recording in where things happen. It reads the recording's [cursor file](/recording/cursor-files/), arrives at each click as it happens, stays while you keep working there, and zooms back out once you stop, so a viewer can see what you clicked without you zooming each moment by hand.
+
+<AtAGlance
+  menu="Clip ▸ Auto Zoom…"
+  where="Zoom in on clicks, under When it lands: in the recorder panel"
+  tools="auto_zoom"
+  needs="A recording with a cursor file. Nothing else: it plans from that file on your Mac, with no picture analysis and no key."
+/>
+
+## Zoom a recording
+
+<Steps>
+
+1. Select one or more clips of a screen recording. **Clip ▸ Auto Zoom…** is available when every selected clip is a movie with a cursor file, and no sheet is up. It works inside an open [nest](/editing/nests/) too.
+
+2. Choose **Clip ▸ Auto Zoom…**. The sheet reads "Reading cursor files…" and **Zoom** is dimmed until they're read and there's a plan.
+
+3. Adjust the [controls](#the-controls). The line under them [says what you'd get](#what-the-sheet-tells-you).
+
+4. Choose **Zoom**, or **Cancel** to leave the timeline as it was.
+
+</Steps>
+
+The whole plan is one undo step, **Auto Zoom**.
+
+## The controls
+
+| Control | What it does | Default | Range |
+| --- | --- | --- | --- |
+| **Zoom:** | How far in, as a multiple of the clip's own size. | 2× | 1.25 to 4× |
+| **Arrive:** | How long the zoom takes, in seconds. It starts this long before the click and is fully in on the click. | 0.6 s | 0.2 to 2 s |
+| **Stay:** | How long the zoom holds after the last click or typing before it starts back out. | 2.5 s | 0.5 to 10 s |
+| **Follow the cursor while zoomed** | Pans along when the pointer stays near the edge of the zoomed view. | On | |
+| **Zoom on typing** | Zooms in on stretches of typing as well as clicks. | On when the recording holds typing | |
+| **Replace existing zooms** | Removes the clips' existing zooms first. | Off | |
+| **Motion blur** | Gives each zoomed clip a 50 % motion blur. | On | |
+
+The number fields take up to two decimal places, and each value is held to its range.
+
+### Follow the cursor while zoomed
+
+When the pointer stays outside the middle 70 % of the zoomed view for 0.3 s, the view makes a half-second pan to it. It makes at most one of these pans a second, and none that would run into the zoom back out or a pan to a coming click.
+
+### Zoom on typing
+
+A stretch of typing is at least three typed keys, each less than a second after the last. The zoom arrives at the first key and aims at the last click before the stretch, because the typing marks say when you typed, not where. With no click before it, the zoom aims at where the pointer was.
+
+**Zoom on typing** is greyed out when the recording holds no such stretch. A recording only holds typing if it was made with [Record shortcuts](/recording/record-shortcuts/) on, which needs macOS's **Input Monitoring** permission.
+
+### Replace existing zooms
+
+Off, your own zooms stay, and a planned zoom that would meet one is [left out](#the-zooms-are-ordinary-actions). On, the selected clips' zooms go first. A zoom here is any action that changes only a clip's scale and position, so it takes hand-made zooms from [Zoom to Region](/motion/zoom-to-region/) as well as Auto Zoom's own. A speed change, a fade or any other action stays.
+
+### Motion blur
+
+The zoomed clips get a 180° shutter in the same undo step, so the zooms and pans blur along their movement. Only clips that actually get a zoom are touched. A clip that already has a [Motion blur](/motion/motion-blur/) keeps its own, and unticking the box doesn't take one away.
+
+## What the sheet tells you
+
+The line under the controls says what **Zoom** would do, or why it can't. It updates when you tick a box or leave a number field.
+
+| The sheet says | What it means |
+| --- | --- |
+| "5 zooms in 2 visits." | What **Zoom** would make. A [visit](#how-a-visit-is-planned) is one trip in and back out. Each zoom in, pan and zoom back out counts as one zoom, so a click with nothing after it is two. |
+| "1 dropped where an action is already set." | Follows the line above: that many planned zooms [met an action](#the-zooms-are-ordinary-actions) already on the clip and were left out. |
+| "0 zooms in 0 visits." | Nothing in the clips' played part calls for a zoom. **Zoom** closes the sheet and changes nothing, unless **Replace existing zooms** is on, when it still removes the clips' zooms. |
+| "Clip 12 is placed smaller than the canvas…" | See [A clip placed smaller than the canvas](#a-clip-placed-smaller-than-the-canvas). |
+| "Clip 12 plays reversed; Auto Zoom plans only clips that play forward." | Auto Zoom only works on clips that play forward. Take the clip out of the selection, or untick [Reverse](/speed/reverse/). |
+| "Clip 12 has no picture." | The selection includes a clip with sound only. Select the picture. |
+| "Media 3's cursor file … is missing…" | The file has moved or gone. Use **Locate…** in the Media tab's **Cursor** section to point at it. See [Cursor files](/recording/cursor-files/). |
+| "The cursor file … could not be read…" | Frame Job couldn't read the file, and the sentence gives the reason. |
+
+With any of the last five, **Zoom** stays dimmed.
+
+### A clip placed smaller than the canvas
+
+Auto Zoom won't plan a clip that sits smaller than the canvas, such as a screen beside a camera or a picture in picture, because a zoom would fill the canvas. The sheet says "Clip 12 is placed smaller than the canvas; a zoom would fill the canvas. Nest it (Clip ▸ Nest) and run Auto Zoom inside the nest."
+
+The way round this is to zoom inside a [nest](/editing/nests/), then place the nest:
+
+<Steps>
+
+1. Select the clip and choose **Clip ▸ Nest**.
+
+2. Open the nest. The clip keeps its small placement in there, so Auto Zoom gives the same message until you make the clip fill the nest again. Set its [scale and position](/canvas/transform/) back.
+
+3. Run Auto Zoom inside the nest. The zooms fill the nest.
+
+4. Leave the nest, and place the nest clip where the screen was.
+
+</Steps>
+
+Nest the screen before you shrink it and there's nothing to set back in step 2.
+
+## How a visit is planned
+
+Auto Zoom groups the recording's activity into visits, and each visit becomes a run of moves.
+
+- **A visit starts** at a click with any button, or at a stretch of typing when **Zoom on typing** is on.
+- **The zoom in** ends on that first click or key, and starts **Arrive:** seconds before it.
+- **A later click or stretch of typing** within **Stay:** of the last activity joins the visit. If it falls outside the middle 60 % of the view, the view pans to it, arriving on the click or first key.
+- **The zoom back out** starts **Stay:** seconds after the last click or the last key of a typing stretch, and takes 0.8 s.
+- **Scrolling ends a visit.** Three or more wheel events under a second apart count as scrolling, and the zoom back out starts where they start. A click after that begins a new visit.
+- **Visits close together run on.** When one visit would finish zooming out less than a second before the next starts zooming in, the view pans across instead.
+
+The view keeps the canvas's shape and never shows past the edge of the picture, or of a crop on the clip. Near a corner it stops at the corner, so the click sits off centre.
+
+Only what plays counts. A click in a part you've trimmed away is ignored, and everything is placed through the clip's speed and any speed ramp.
+
+## The zooms are ordinary actions
+
+Each zoom in, pan and zoom back out is a normal [action](/motion/actions/) on the clip's [action lane](/motion/action-lane/), the same kind [Zoom to Region](/motion/zoom-to-region/) makes. Each is snapped to the frame grid and eases in and out. You can [move, resize or remove](/motion/change-an-action/) any of them, or [change what it animates to](/motion/edit-an-action/).
+
+Actions on a clip can't overlap, so a planned zoom that would meet one already there is left out and counted in the sheet. This goes piece by piece, so a visit can lose its zoom in and keep its zoom back out. Check those visits by eye.
+
+To try different settings after you've applied a plan, undo it, or run Auto Zoom again with **Replace existing zooms** on. Run again without it and the new plan meets the old one, and most of it is dropped.
+
+## Across a split
+
+The halves of a split clip are planned as one recording: clips side by side on one track, from the same file, each carrying on where the last stopped.
+
+- Every zoom back out returns to the first half's placement.
+- No zoom crosses a cut. One that would is moved to one side of it.
+- A zoom held across a cut carries into the next half, which starts already zoomed. Frame Job does this by setting that half's own scale and position.
+- If that half wasn't selected, or has an action of its own during the zoom, the zoom goes back out at the cut instead.
+
+With **Replace existing zooms** on, a later selected half left zoomed by an earlier run goes back to the first half's placement, unless an action you've kept moves it.
+
+## What Auto Zoom remembers
+
+Frame Job remembers **Zoom:**, **Arrive:**, **Stay:**, **Follow the cursor while zoomed**, **Replace existing zooms** and **Motion blur** from one use to the next. A value is kept only if you changed it and then chose **Zoom**. **Cancel** keeps nothing.
+
+**Zoom on typing** is never remembered. It's ticked whenever the recording holds typing.
+
+## Zoom when a recording lands
+
+**Zoom in on clicks**, under **When it lands:** in the [recorder panel](/recording/recorder-panel/), runs Auto Zoom by itself on a finished screen recording, with the values the sheet last used and no sheet. See [Polish when a recording lands](/recording/when-it-lands/).
+
+## Good to know
+
+- A click right at the start of a clip has no room before it. The zoom in starts on the clip's first frame and takes its full **Arrive:** time, so it finishes after the click.
+- **Zoom:** multiplies the size the clip is placed at, so a clip already scaled up goes further in than the number suggests.
+- If the menu item is dimmed, check the selection. Recordings of a display or a window made in Frame Job have a cursor file. A camera's clip, a voice-over, a title and a movie from elsewhere don't, and one such clip in the selection is enough to dim it.
+
+## With an agent
+
+`auto_zoom` plans and applies the same zooms, with the sheet's settings as arguments. An agent can also limit the plan to a stretch of the timeline, in which case replacing removes only the zooms in that stretch, and set a motion blur other than 50 %. See [`auto_zoom`](/mcp/tools-recording/#auto_zoom).
+
+## Related
+
+- [Polish when a recording lands](/recording/when-it-lands/)
+- [Zoom to Region](/motion/zoom-to-region/)
+- [Action bands and the action lane](/motion/action-lane/)
+- [Motion blur](/motion/motion-blur/)
+- [Cursor files](/recording/cursor-files/)
+- [Record shortcuts](/recording/record-shortcuts/)
+- [Shortcut overlays](/recording/shortcut-overlays/)
+- [Speed Up Typing](/recording/speed-up-typing/)

@@ -1,0 +1,105 @@
+---
+title: "Tools: rendering and export"
+description: "The agent tools that render one frame of the timeline, start an export, follow it on the Export Queue and stop it."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These tools turn the timeline into pictures and files. `render_frame` is how an agent sees what it has done, and `export`, `export_status` and `cancel_export` write the finished file.
+
+<AtAGlance
+  menu={['File ▸ Save Frame…', 'File ▸ Export…', 'Window ▸ Export Queue']}
+  keys={['⌥⌘E', '⌘E']}
+  tools={['render_frame', 'export', 'export_status', 'cancel_export']}
+  needs="A client connected over MCP, or the Assistant tab."
+/>
+
+This page is the quick reference. [Check the picture: render_frame](/mcp/render-frame/) and [Export: start, then poll](/mcp/export/) have every argument in full, with what the agent gets back and what to do when a call fails.
+
+Every tool here also takes `project`, the path of an open project. Without it the call goes to the frontmost project. See [How tool calls behave](/mcp/tool-calls/). `export_status` and `cancel_export` accept it but don't use it, because an `export_id` belongs to the launch, not to a project. None of the four takes `scope`.
+
+## `render_frame`
+
+Renders one frame of the finished timeline as a picture the model can see and a file on disk. It's drawn the way an export draws it, so it shows what the file will hold at that moment. Use it before and after every edit. It's the same writer as **File ▸ Save Frame…**, so a PNG written here and one saved from the menu are byte-identical. See [Save Frame](/export/save-frame/).
+
+With no arguments, it draws the frame under the playhead at the canvas's size and writes a PNG to a temporary file. Every argument is optional.
+
+| To set | Use |
+| --- | --- |
+| The moment | [`t`](/mcp/render-frame/#t), in ticks. Default: the playhead. |
+| The file | [`path`](/mcp/render-frame/#path), [`format`](/mcp/render-frame/#format) (`png`, `jpeg` or `heic`) and [`max_width`](/mcp/render-frame/#max_width) (16 to 8192 pixels). |
+| What's drawn | [`burn_in_timecode`](/mcp/render-frame/#burn_in_timecode), [`ungraded`](/mcp/render-frame/#ungraded), [`sdr_version`](/mcp/render-frame/#sdr_version) and [`selection`](/mcp/render-frame/#selection). |
+| Scopes | [`waveform`, `parade` and `histogram`](/mcp/render-frame/#waveform-parade-and-histogram), [`vectorscope` and `vectorscope_zoom`](/mcp/render-frame/#vectorscope-and-vectorscope_zoom). Each scope also writes a JSON file beside the image. |
+
+The switches in the **View** menu never reach this tool, so an agent asks for those pictures here, whatever a person has switched on.
+
+It returns an image and a text block. The text gives the moment and the sizes, and its last sentence is "Written to `<path>`." Before that sentence it can add what each scope measured, or a note about:
+
+- A JPEG that flattened a transparent canvas onto black.
+- A [graphic](/mcp/render-frame/#graphic-problems-in-the-answer) that warned or failed.
+- A recorded cursor that couldn't be drawn.
+- A clip with Remove Background [whose masks weren't ready](/mcp/render-frame/#waiting-for-cutout-masks) after 30 seconds, which is drawn uncut.
+
+With a nest open, it renders that nest, at its own canvas and from its own zero. See [Editing inside a nest](/mcp/nests/). An HDR project has its own rules for each format. See [Frames from an HDR project](/mcp/render-frame/#frames-from-an-hdr-project).
+
+## `export`
+
+Puts the timeline on the Export Queue and returns at once, as **File ▸ Export…** (<kbd>⌘E</kbd>) does with its sheet. It takes the sheet's choices but not the frame rate or a saved preset, and it sets quality as exact rates. An export runs at the project's rate, or at 12.5 fps for `gif` and 25 fps for `apng`. An agent's export and a menu export go through the same exporter. See [The export sheet](/export/export-sheet/).
+
+`preset` and `path` are required.
+
+| To set | Use |
+| --- | --- |
+| The encoding | [`preset`](/mcp/export/#presets): `h264`, `hevc`, `hevc_alpha`, `hevc_10bit`, `av1`, `av1_webm`, `vp9_webm`, `vp9_alpha_webm`, `prores_422`, `prores_4444`, `audio_m4a`, `audio_wav`, `audio_aiff`, `gif` or `apng`. |
+| The file | [`path`](/mcp/export/#path-handling). The folder must exist, and an existing file is replaced. |
+| What's written | [`size`](/mcp/export/#size) and [`range`](/mcp/export/#range). |
+| The picture | [`video_bitrate`](/mcp/export/#exact-bitrates), [`dynamic_range`](/mcp/export/#dynamic-range), [`encoder_speed`](/mcp/export/#encoder-speed) and [`burn_in_timecode`](/export/burn-in-timecode/). |
+| The sound | [`audio_bitrate`](/mcp/export/#exact-bitrates), [`loudness_lufs`](/mcp/export/#the-loudness-report), [`peak_dbtp`](/mcp/export/#peak-dbtp), [`audio_bits`](/mcp/export/#audio-bits) and [`stems`](/mcp/export/#stems). |
+
+It returns `{export_id, path, status}` at once, and `status` is `queued` or `running`. Jobs run one at a time, and the queue window isn't opened. The export always writes the whole project, even with a nest open. Follow it with [`export_status`](#export_status) and stop it with [`cancel_export`](#cancel_export). The `export_id` lasts until Frame Job quits.
+
+A problem with the request comes back from this call as an error, before anything is queued. A failure while writing comes back from `export_status`, and so does a size of another shape on a transparent preset. See [What stops an export](/mcp/export/#refusals-and-failures).
+
+In the [Assistant tab](/assistant/what-it-will-not-do/), Frame Job asks you before each `export` runs, naming the file it would write or replace. A client connected over MCP isn't asked.
+
+## `export_status`
+
+Says how an export is going. It's the job's row in **Window ▸ Export Queue**, read now. It never waits, so call it again after a pause until `status` is `done`, `failed` or `cancelled`. See [The Export Queue](/export/export-queue/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `export_id` | integer | Yes | The `export_id` that `export` returned, 1 or more. |
+
+Every result has `export_id`, `status`, `path` and `elapsed`, the seconds since `export` was called, or up to the finish once it has finished. The rest depends on `status`:
+
+| Status | Adds |
+| --- | --- |
+| `queued` | `waiting`, the queue row's text, while the job waits for memory behind other AV1 and VP9 exports. |
+| `queued` or `running` | `estimated_seconds` on `av1`, `av1_webm`, `vp9_webm` and `vp9_alpha_webm`. |
+| `running` | `progress`, 0 to 1, and `phase` while the exporter names one, such as the loudness measurement. |
+| `done` | What the file holds: its size, the settings used, the `loudness` measured, and any `graphic_warnings` and `cursor_warnings`. |
+| `failed`, `cancelled` | `reason`, the queue row's text. |
+
+[Export status](/mcp/export/#export-status) lists every key of a `done` result, and [The loudness report](/mcp/export/#the-loudness-report) explains `loudness`.
+
+Only ids that `export` returned since Frame Job launched are known, so a job a person put on the queue can't be read. Any other id gives an error. A finished job's result outlives its queue row, so it still reads after **Remove** or **Clear Finished**.
+
+## `cancel_export`
+
+Stops an export, as **Cancel** in its Export Queue row does. See [The Export Queue](/export/export-queue/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `export_id` | integer | Yes | The `export_id` that `export` returned, 1 or more. |
+
+A queued export is cancelled before it starts. A running one stops and its partly written file is removed, though the result may still read `running` until the writer has stopped, when `export_status` reads `cancelled`. A finished export is left alone.
+
+It returns what `export_status` returns, and gives an error for an id `export` didn't return since launch.
+
+## Related
+
+- [Check the picture: render_frame](/mcp/render-frame/)
+- [Export: start, then poll](/mcp/export/)
+- [The Export Queue](/export/export-queue/)
+- [What an export includes](/export/what-an-export-includes/)
+- [Transparent exports](/export/transparency/)

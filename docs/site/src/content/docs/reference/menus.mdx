@@ -1,0 +1,263 @@
+---
+title: "Menus"
+description: "Every command in the Frame Job, File, Edit, Insert, Track, Mark, View, Window and Help menus, with its shortcut and when it's available."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+This page lists every command in the menu bar, in menu order, with its shortcut and what has to be true for it to be available. Use it to find a command's key, or to work out why an item is greyed out. Each row says what the command does in a few words, and the page it links to has the full story.
+
+The menu bar reads Frame Job, File, Edit, Insert, Clip, Track, Mark, View, Window, Help. The Clip menu is long enough to have [its own page](/reference/clip-menu/).
+
+## How to read these tables
+
+| Symbol | Key |
+| --- | --- |
+| ⌘ | Command |
+| ⌥ | Option |
+| ⇧ | Shift |
+| ⌃ | Control |
+| ⌫ | Delete |
+| ↩ | Return |
+| ⎋ | Escape |
+| ← → ↑ ↓ | The arrow keys |
+
+- **(key)** after a shortcut means a bare key the menu doesn't draw: <kbd>W</kbd>, <kbd>E</kbd>, <kbd>M</kbd>, <kbd>I</kbd>, <kbd>O</kbd>, <kbd>N</kbd> and <kbd>⇧Z</kbd>. The editor handles these itself rather than the menu, so a text field can never lose the letter to them. They work in the editor window and the [Preview Window](/timeline/preview-window/), and not while you're typing in a field or while a sheet is open.
+- **A ⌘ shortcut does nothing while its item is greyed out.**
+- **Always** in the last column means whenever a project window is in front with no sheet on it. While a sheet is up, every command that acts on the project is greyed out, and so is every such command when no project window is open.
+- **The current track** is the track of the first selected clip. With nothing selected it's the front-most track.
+- <kbd>⌫</kbd>, <kbd>⌘⌫</kbd>, <kbd>⌘↓</kbd> and <kbd>⌘↑</kbd> are switched off while you type in a text field, so they keep their usual text-editing meaning there.
+
+macOS may add items of its own to these menus. Those aren't listed. [Keyboard shortcuts](/reference/keyboard-shortcuts/) has every key, including the ones with no menu item.
+
+## Frame Job menu
+
+| Item | Keys | What it does |
+| --- | --- | --- |
+| **About Frame Job** | | Shows the standard About panel, with the version and the Frame Job mark. |
+| **Check for Updates…** | | Asks whether a newer Frame Job has been published and offers to install it. Greyed while a check is running. It's only in the copy downloaded from GitHub, and a build from source doesn't have it. See [Updates](/getting-started/updates/). |
+| **Settings…** | <kbd>⌘,</kbd> | Opens the [Settings](/reference/settings/) window. It works with no project open. |
+| **Hide Frame Job** | <kbd>⌘H</kbd> | Hides the app. |
+| **Hide Others** | <kbd>⌥⌘H</kbd> | Hides every other app. |
+| **Show All** | | Shows hidden apps again. |
+| **Quit Frame Job** | <kbd>⌘Q</kbd> | Quits. Projects with unsaved work are dealt with first, as on any Mac. |
+
+Two things can stop a quit:
+
+- **A recording is running.** The quit is cancelled and the recording's controls are put in front of you. Stop the recording first. See [Start, pause and stop](/recording/pause-and-stop/#quit-during-a-recording).
+- **The Export Queue is busy.** An alert reads "An export is still being written." It says what's running and how many more are waiting, and **Quit Anyway** stops the export and deletes the partly written file. See [The Export Queue](/export/export-queue/#quit-with-jobs-in-the-queue).
+
+Only the queue is guarded. Quitting while an **Export…** progress sheet is writing doesn't ask, and leaves a half-written file behind.
+
+No agent tool checks for updates or quits the app.
+
+## File menu
+
+<AtAGlance
+  tools={['new_project', 'record_screen', 'new_project_from_range', 'make_vertical_version', 'open_project', 'close_project', 'save_project']}
+/>
+
+The first groups make, open, close and save projects, and start or stop a recording.
+
+| Item | Keys | What it does | Available when |
+| --- | --- | --- | --- |
+| **New Project** | <kbd>⌘N</kbd> | Opens a new, empty project window straight away, 1920×1080 at 30 fps. See [Start a project](/projects/start-a-project/). | With or without a project open |
+| **New Recording…** | <kbd>⌥⌘N</kbd> | Opens the [recorder panel](/recording/recorder-panel/). While a recording runs the item reads **Stop Recording** and stops it, whether the panel or an agent started it. | With or without a project open |
+| **Pause Recording** | | Pauses the running recording. The item reads **Resume Recording** while paused. It beeps if the recording can't pause or resume. | During a recording |
+| **New Project from Range…** | | Opens the in/out range as a new untitled project, with its media's caches and its graphics. See [New Project from Range](/projects/new-project-from-range/). | An in/out range is set and no nest is open |
+| **Make Vertical Version…** | | Makes a 9:16, 4:5 or 1:1 version of the timeline, as a new untitled project or in this one. Each full-frame movie clip follows its subject, and [Follow Speaker](/framing/follow-speaker/) cuts a wide shot of two to four people to whoever is talking. See [Make Vertical Version](/framing/make-vertical-version/). | The project has a clip, no nest is open and no recording is running |
+| **Open…** | <kbd>⌘O</kbd> | Opens a project or a media file. See [Open a project](/projects/open-a-project/). | With or without a project open |
+| **Open Recent ▸** | | Lists recently opened documents, filled in by macOS, then **Clear Menu**. | With or without a project open |
+| **Close** | <kbd>⌘W</kbd> | Closes the window, asking about unsaved work. | macOS decides |
+| **Close All** | <kbd>⌥⌘W</kbd> | Hold <kbd>⌥</kbd> and **Close** becomes this, to close all the windows. | macOS decides |
+| **Save** | <kbd>⌘S</kbd> | Saves the project. | macOS decides |
+| **Duplicate** | <kbd>⇧⌘S</kbd> | Opens a copy of the project as a new, untitled document. | macOS decides |
+| **Save As…** | <kbd>⌥⇧⌘S</kbd> | Hold <kbd>⌥</kbd> and **Duplicate** becomes this. It writes the project to a new package. | macOS decides |
+| **Rename…** | | Renames the project's package. | macOS decides |
+| **Move To…** | | Moves the project's package to another folder. | macOS decides |
+| **Revert To ▸** | | Goes back to the last saved version, or browses earlier versions of the package. | macOS decides |
+| **Share** | | Opens the macOS Share menu for the project. | macOS decides |
+
+Projects autosave, so macOS gives this menu its own document commands: **Duplicate** in place of **Save As…**, and **Revert To ▸** in place of **Revert to Saved**, with **Rename…**, **Move To…** and **Share** beside them. macOS also decides when these and **Close** and **Save** are available. [Save, revert and close](/projects/save-and-revert/) has what each one does.
+
+## File menu: media, captions, graphics
+
+<AtAGlance
+  tools={['import_media', 'import_captions', 'transcribe', 'export_captions', 'relay_captions', 'consolidate_media', 'import_graphic_font', 'import_graphic_asset', 'rename_graphic', 'delete_graphic', 'restore_graphic']}
+/>
+
+The middle group brings in media, captions, fonts and pictures, and looks after the project's graphics. Only **Add Media…** has a key, because a menu key with no modifier would take a letter from the editor.
+
+| Item | Keys | What it does | Available when |
+| --- | --- | --- | --- |
+| **Add Media…** | <kbd>⇧⌘I</kbd> | Imports files into the project's Media list. Several at once are one undo step. See [Import media](/projects/import-media/). | Always |
+| **Import Captions…** | | Reads a SubRip (`.srt`) file onto a new text track. See [Import captions](/captions/import-captions/). | Always |
+| **Generate Captions…** | | Makes captions from speech. See [Generate Captions](/captions/generate-captions/). | A clip plays sound from a media file forwards, with its audio on |
+| **Export Captions…** | | Writes a caption track out as a file. See [Export captions](/captions/export-captions/). | The project has a caption track, meaning a track whose clips are all text clips |
+| **Re-lay Captions for This Canvas** | | Lays the word caption tracks out again for the current canvas, keeping every correction, as one undo step, "Re-lay Captions". See [Re-lay captions for a canvas](/captions/re-lay-captions/). | The timeline, or the open nest, has a word caption track Frame Job can re-lay, and no recording is running |
+| **Consolidate Media…** | | Copies the project's media into the project package. An untitled project asks you to save first. See [Consolidate Media](/projects/consolidate-media/). | The project has media |
+| **Add Font to Graphics…** | | Adds a `.ttf` or `.otf` font that graphics can use. It can't be undone. See [Fonts and pictures in graphics](/graphics/fonts-and-pictures/). | Always |
+| **Add Image to Graphics…** | | Adds a PNG, JPEG, GIF, WebP, SVG or SVGZ picture that graphics can use. It can't be undone. | Always |
+| **Rename Graphic…** | | Renames one of the project's graphics, and every clip using it follows. See [Rename, delete and restore graphics](/graphics/manage-graphics/). | The project has graphics and no nest is open |
+| **Delete Graphic…** | | Deletes a graphic no clip uses. Frame Job won't delete one a clip is using. It isn't an undo step. | The project has graphics |
+| **Restore Graphic Version…** | | Brings back an earlier version of a graphic. It isn't an undo step. | An earlier version of a graphic is kept |
+
+## File menu: export
+
+<AtAGlance tools={['export', 'export_status', 'cancel_export', 'render_frame']} />
+
+| Item | Keys | What it does | Available when |
+| --- | --- | --- | --- |
+| **Export…** | <kbd>⌘E</kbd> | Opens the [export sheet](/export/export-sheet/). It always exports the timeline, even with a nest open. The toolbar's **Export…** button does the same. | The project isn't empty |
+| **Save Frame…** | <kbd>⌥⌘E</kbd> | Saves the frame under the playhead as a PNG, JPEG or HEIC still. Inside a nest it saves the frame the canvas shows. See [Save Frame](/export/save-frame/). | The timeline you're editing has a duration |
+
+## Edit menu
+
+<AtAGlance
+  tools={['undo', 'redo', 'paste', 'paste_attributes', 'duplicate', 'delete', 'lift_range', 'ripple_delete', 'ripple_delete_range', 'insert_clip', 'overwrite_clip', 'set_selection']}
+/>
+
+| Item | Keys | What it does | Available when |
+| --- | --- | --- | --- |
+| **Undo** | <kbd>⌘Z</kbd> | Undoes the last edit. The item names it, for example **Undo Move Clips** or **Undo Ripple Delete**. See [Undo and saving](/getting-started/undo-and-saving/). | There's something to undo |
+| **Redo** | <kbd>⇧⌘Z</kbd> | Redoes it, named the same way. Any new edit clears what could be redone. | There's something to redo |
+| **Cut** | <kbd>⌘X</kbd> | Copies the selected clips and removes them, leaving a gap. If the copy fails, nothing is removed. See [Copy, cut and paste](/editing/copy-and-paste/). | Something is selected |
+| **Copy** | <kbd>⌘C</kbd> | Copies the selected clips. A selection across several tracks pastes back onto as many lanes. Pasted into another app, it's a short text summary. | Something is selected |
+| **Paste** | <kbd>⌘V</kbd> | Pastes clips at the playhead, the earliest there and the others keeping their offsets. Nothing needs to be selected. It works between projects, matching media by path. | The clipboard holds Frame Job clips |
+| **Paste Attributes** | <kbd>⌥⌘V</kbd> | Puts the copied clip's picture and sound settings onto the selected clips. Only the earliest copied clip is read. See [Paste Attributes](/editing/paste-attributes/). | Frame Job clips are copied and something is selected |
+| **Paste Graphic Properties** | | Puts the copied graphic's properties onto the selected clips that use the same graphic. It beeps if the copied clip isn't a graphic. See [Paste Graphic Properties](/graphics/copy-properties/). | Frame Job clips are copied and a graphic clip is selected |
+| **Duplicate** | <kbd>⌘D</kbd> | Copies the selected clips and places the copies after them. See [Duplicate clips](/editing/duplicate-clips/). | Something is selected |
+| **Delete** | <kbd>⌫</kbd> | Removes the selection and leaves a gap. With nothing selected it lifts the in/out range: what's inside is removed and nothing moves. With an action selected it removes that action, not its clip. With words selected in the Transcript tab it cuts them and closes the gap. See [Delete, Ripple Delete and Lift](/editing/delete-clips/). | Something is selected, a range is set, or words are selected. Off while text is being edited, and while the curve plot holds a selected point, where <kbd>⌫</kbd> deletes the point |
+| **Ripple Delete** | <kbd>⌘⌫</kbd> | Removes the selection, or the in/out range when nothing is selected, and closes the gap. Words selected in the Transcript tab take priority over both. | Something is selected, a range is set, or words are selected. Off while text is being edited |
+| **Insert at Playhead** | | Inserts the file selected in the [Media tab](/projects/media-tab/), pushing later clips along. One undo step, "Insert". See [Insert and overwrite](/editing/insert-and-overwrite/). | A file is selected in the Media tab, and it isn't a LUT |
+| **Overwrite at Playhead** | | Places that file over whatever is there. One undo step, "Overwrite". | A file is selected in the Media tab, and it isn't a LUT |
+| **Select All** | <kbd>⌘A</kbd> | Selects every clip in the timeline you're editing. With the Transcript tab's words in focus, it selects every word. | Always |
+| **Select After Playhead** | <kbd>⌥⌘A</kbd> | Selects every clip that starts at or after the playhead. | Always |
+| **Select All on Track** | | Selects every clip on the current track. It beeps when the track is empty. | The timeline has clips |
+
+Selecting adds no undo step. See [Select clips](/timeline/selecting-clips/).
+
+## Insert menu
+
+<AtAGlance
+  tools={['add_adjustment_clip', 'list_graphics', 'insert_graphic', 'write_graphic', 'add_graphic_clip', 'export_graphic', 'import_graphic', 'text_behind_subject']}
+/>
+
+No item in this menu has a key.
+
+| Item | What it does | Available when |
+| --- | --- | --- |
+| **Adjustment Clip** | Adds an [adjustment clip](/color/adjustment-clips/) over the in/out range. Without a range it covers the selected clips' span, and without a selection the whole timeline. It lands on the front track when it fits, and otherwise on a new front track named "Adjustment". One undo step. | No nest is open and the timeline isn't empty |
+| **Graphic…** | Opens the **Insert Graphic** sheet: the bundled templates by category, **This Project**'s own graphics and a looping preview, with **Insert**, **From File…** (a `.js` file, or a `.fjgraphic` to import) and **Export…** (saves the chosen one as a `.fjgraphic`). See [Insert a graphic](/graphics/insert-a-graphic/). | Always |
+| **Text Behind Subject** | Puts a title on a new "Behind Subject" track above the clip at the playhead, behind the person, for 4 s or the rest of the clip. It turns [Remove Background](/effects/remove-background/) on with Keep background when the clip doesn't have it. One undo step. See [Text Behind Subject](/effects/text-behind-subject/). | No nest is open, and a clip of a video file or a picture plays at the playhead with its picture on, on a shown track that isn't a matte track |
+
+## Clip menu
+
+The Clip menu sits between Insert and Track. See [The Clip menu](/reference/clip-menu/).
+
+## Track menu
+
+<AtAGlance tools={['add_track', 'remove_track', 'remove_empty_tracks', 'set_track', 'move_track']} />
+
+Everything here but **New Track** and **Remove Empty Tracks** acts on the [current track](#how-to-read-these-tables). To act on a particular track, use that track's [context menu](/reference/context-menus/). Every item is available whenever a project window is in front with no sheet on it.
+
+| Item | Keys | What it does |
+| --- | --- | --- |
+| **New Track** | <kbd>⇧⌘N</kbd> | Adds a track at the front, the top lane. See [Add, rename and reorder tracks](/timeline/manage-tracks/). |
+| **Remove Track** | | Removes the current track. If it still holds clips you're asked first and told how many go with it, with **Remove** and **Cancel**. The last track can't be removed. |
+| **Remove Empty Tracks** | | Removes every track that has no clips, keeping one if they're all empty. It beeps when there's nothing to remove. |
+| **Hide Video** | | Hides or shows the track's picture. See [Hide and lock tracks](/timeline/hide-and-lock-tracks/). |
+| **Mute Audio** | | Mutes or unmutes the track's sound. Mute wins over Solo. See [Mute and solo tracks](/audio/mute-and-solo/). |
+| **Lock Track** | | Locks or unlocks the track, which protects where its clips sit. See [Hide and lock tracks](/timeline/hide-and-lock-tracks/#lock-track). |
+| **Solo** | | Plays only this track's sound. It's audio only. A checkmark shows when it's on, because a soloed track with nothing on it still silences the rest. |
+| **Mix…** | | Opens the track's mix panel: volume, pan, compressor and limiter. A timeline has one panel at a time, so opening it on another track closes the first. Inside an open nest its dynamics are disabled. See [Track volume and pan](/audio/track-volume-and-pan/). |
+| **Matte ▸** | | **Off**, **Alpha**, **Inverted Alpha**, **Luma** or **Inverted Luma**. Makes the track a matte that cuts the track behind it, and a checkmark shows the mode. One undo step, "Track Matte", and choosing the mode it already has beeps. See [Matte tracks](/canvas/matte-tracks/). |
+
+**Hide Video**, **Mute Audio** and **Lock Track** show no checkmark here. The track's context menu shows one.
+
+## Mark menu
+
+<AtAGlance
+  tools={['add_marker', 'set_marker', 'remove_marker', 'set_range', 'set_playhead']}
+/>
+
+| Item | Keys | What it does | Available when |
+| --- | --- | --- | --- |
+| **Add Marker** | <kbd>M</kbd> (key) | Adds a marker at the playhead, snapped to a frame. A second marker on the same frame adds nothing and shows an alert. See [Markers](/timeline/markers/). | No nest is open |
+| **Set In** | <kbd>I</kbd> (key) | Sets the in point at the playhead. With no Out yet, the range runs to the end of the timeline. See [The in/out range](/timeline/in-out-range/). | Always |
+| **Set Out** | <kbd>O</kbd> (key) | Sets the out point at the playhead. With no In yet, the range starts at 0. | Always |
+| **Clear Range** | <kbd>⌥X</kbd> | Clears the in/out range. | A range is set |
+| **Next Marker** | | Moves the playhead to the next marker and pauses. It beeps past the last one. | The project has markers and no nest is open |
+| **Previous Marker** | | Moves the playhead to the previous marker and pauses. It beeps before the first one. | The project has markers and no nest is open |
+
+Setting In or Out adds no undo step. An agent clears the range by calling `set_range` with no bounds.
+
+## View menu
+
+These items set how the window looks. Zoom always acts on the canvas. To zoom the timeline, use the timeline bar's controls or the [gestures](/reference/gestures/).
+
+| Item | Keys | What it does | Available when |
+| --- | --- | --- | --- |
+| **Zoom In** | <kbd>⌘+</kbd> or <kbd>⌘=</kbd> | Zooms the canvas in one step. The steps are Fit, 50%, 100% and 200%. See [Zoom and pan the preview](/canvas/zoom-and-pan/). | The canvas is below 200% |
+| **Zoom Out** | <kbd>⌘-</kbd> | Zooms the canvas out one step. | The canvas isn't at Fit |
+| **Zoom to Fit** | <kbd>⌘0</kbd> | Fits the canvas to the preview again. | The canvas isn't at Fit |
+| **Fit Timeline** | <kbd>⇧Z</kbd> (key) | Zooms the timeline to show the whole project and scrolls to the start. See [Zoom and scroll the timeline](/timeline/zoom-and-scroll/). | Always |
+| **Snapping** | <kbd>N</kbd> (key) | Turns [snapping](/timeline/snapping/) on or off for the timeline and the canvas. A checkmark shows when it's on. | Always |
+| **Safe Areas** | | Shows or hides the [safe-area guides](/canvas/safe-areas/) on the canvas, with a checkmark. | Always |
+| **Hide Inspector** | <kbd>⌥⌘I</kbd> | Hides the [inspector](/getting-started/inspector/). The item reads **Show Inspector** while it's hidden. | Always |
+| **Transcript** | <kbd>⌃⌘T</kbd> | Shows the [Transcript tab](/captions/transcript-tab/), ready for its keys, showing the inspector first if it's hidden. | Always |
+| **Assistant** | <kbd>⌃⌘A</kbd> | Shows the [Assistant](/assistant/chat/) tab and puts the cursor in its message field, showing the inspector first if it's hidden. | Always |
+| **Timeline Track Height ▸** | | **Small**, **Medium** or **Large**. Sets the height of the timeline rows, and a checkmark marks the current one. A lane's height also depends on what it holds. See [Track height](/timeline/track-height/). | Always |
+
+**Snapping**, **Safe Areas**, **Hide Inspector** and **Timeline Track Height** are [remembered between launches](/reference/remembered-choices/).
+
+## View menu: preview
+
+<AtAGlance tools={['render_frame', 'get_media_analysis']} />
+
+These items change what you see in the preview, and none of them changes an export.
+
+| Item | Keys | What it does | Available when |
+| --- | --- | --- | --- |
+| **Preview Quality ▸** | | **Full**, **Half** or **Quarter**. The size the preview renders at, playing or paused, with a checkmark on the current row. Saved frames aren't affected either. It keeps the canvas's exact aspect ratio, so an awkward canvas size can render larger than the row's fraction. See [Preview Quality](/timeline/preview-quality/). | Always |
+| **Preview Window** | <kbd>⇧⌘P</kbd> | Opens a second window showing the picture with no overlays, handles or guides. Choose it again to close it, and a checkmark says it's on screen. See [The Preview Window](/timeline/preview-window/). | Always |
+| **Show Ungraded** | <kbd>⌃⌘U</kbd> | Shows the preview as if no clip were graded, with a tag on the preview saying so. See [Show Ungraded](/color/show-ungraded/). | Always |
+| **Show Selection** | | Shows which pixels the selected adjustment clip's qualifier picks. It follows another adjustment clip when the selection moves to one, and turns off when none is selected. See [Show Selection](/color/show-selection/). | An adjustment clip is selected, or it's already on |
+| **Show SDR Version** | | Shows an HDR project's SDR version. See [Show SDR Version](/hdr/show-sdr-version/). | Always |
+| **Show Subjects** | | Draws the selected clip's faces, people and salient regions at the playhead, from what's already been analysed. It never starts an analysis, so a clip with none shows "Not analyzed — Clip ▸ Follow Subject… analyzes it". See [Show Subjects](/framing/show-subjects/). | Always |
+| **Scopes** | <kbd>⌃⌘W</kbd> | Shows the scopes panel beside the preview. A new window starts with Waveform over Vectorscope. See [Scopes](/color/scopes/). | Always |
+| **Loudness Meter** | <kbd>⌃⌘L</kbd> | Shows the live loudness column beside the preview: momentary, short-term and integrated LUFS and the true peak of what plays. It has a Reset, and the meter measures whether or not it's showing. See [The Loudness Meter](/audio/loudness-meter/). | Always |
+
+**Preview Quality** is remembered between launches. **Show Ungraded**, **Show Selection**, **Show SDR Version**, **Show Subjects**, **Scopes** and **Loudness Meter** belong to the window and aren't remembered.
+
+## Window menu
+
+<AtAGlance tools={['export_status', 'cancel_export']} />
+
+| Item | Keys | What it does |
+| --- | --- | --- |
+| **Minimize** | <kbd>⌘M</kbd> | Minimizes the front window to the Dock. |
+| **Zoom** | | Makes the window larger or smaller. This is the window's zoom, not the canvas's. |
+| **Export Queue** | | Opens the [Export Queue](/export/export-queue/) window. A running export doesn't stop when the window closes. |
+| **Bring All to Front** | | Brings all Frame Job windows to the front. |
+| Each open window | | Brings that window forward, as in any Mac app. |
+
+The open windows are listed at the end of the menu. Settings is listed there while it's open, so you can bring it back from behind other windows. The Export Queue, the Preview Window and the recorder panel aren't listed.
+
+## Help menu
+
+<AtAGlance tools="graphic_reference" />
+
+| Item | What it does |
+| --- | --- |
+| **Frame Job Help** | The standard macOS help item. The app doesn't ship a help book, so macOS shows its own message. This site is the help. |
+| **Graphics Reference** | Opens the bundled graphics scripting reference in your default Markdown app. It works with no project open, and an agent reads the same file with `graphic_reference`. See [The module API](/graphics/module-api/). |
+
+## Related
+
+- [The Clip menu](/reference/clip-menu/)
+- [Keyboard shortcuts](/reference/keyboard-shortcuts/)
+- [Gestures with no menu item](/reference/gestures/)
+- [Buttons and context menus](/reference/context-menus/)
+- [What Frame Job remembers](/reference/remembered-choices/)
+- [When an edit is refused](/getting-started/refused-edits/)

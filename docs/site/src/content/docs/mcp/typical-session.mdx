@@ -1,0 +1,81 @@
+---
+title: "A typical session"
+description: "The order an agent works in, from opening a project through placing, changing and checking clips to saving and exporting."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+An agent works in Frame Job the way you do: bring the media in, place it, change it, look at the result, then save and export. What's different is that it can't see the window, so it reads the project for the ids it needs and renders a frame to check each step.
+
+<AtAGlance
+  tools={['new_project', 'open_project', 'get_project', 'import_media', 'add_clip', 'render_frame', 'save_project', 'export', 'export_status']}
+/>
+
+## Work through a session
+
+<Steps>
+
+1. **Open.** Call `open_project` with a path, or `new_project` for a blank 1920 × 1080, 30 fps project with one track. See [Tools: projects and history](/mcp/tools-projects/).
+
+2. **Read.** Call `get_project`. It returns the canvas, the playhead and every id. Every other tool names things by those ids.
+
+3. **Import.** Call `import_media` with the file's path. It returns the new `media` id and what the file holds: its kind, duration, size, frame rate, and whether it has video, sound or transparency. The file is in the project now, but not on the timeline.
+
+4. **Place.** Call `add_clip` with `track`, `media` and `at`. The answer lists the new clip's id under `new_clips`.
+
+5. **Change.** Use the edit tools. Each call is one undo step. See [All tools](/mcp/tools/).
+
+6. **Check.** Call `render_frame` at the moment that matters, and look at the picture. Do this before and after an edit.
+
+7. **Save.** Call `save_project`, with a `path` the first time. It returns once the package is on disk.
+
+8. **Export.** Call `export` with a `preset` and a `path`. It returns at once with an `export_id`. Then call `export_status` until `status` is `done`, `failed` or `cancelled`.
+
+</Steps>
+
+Steps 5 and 6 are the loop. An edit that comes back `ok` says the project changed, and only a frame says it looks right. If it doesn't, `undo` takes the last step back.
+
+## See one from start to finish
+
+Here's a short session, each call with its arguments. Times are in ticks, 600,000 to the second, so `1200000` is 2 s.
+
+```text
+new_project   { "path": "~/Movies/Talk.framejob" }
+get_project   { }
+import_media  { "path": "~/Movies/talk.mov" }
+add_clip      { "track": 1, "media": 2, "at": 0 }
+split         { "clips": [3], "at": 1200000 }
+render_frame  { "t": 1200000, "max_width": 960 }
+save_project  { }
+export        { "preset": "h264", "path": "~/Movies/Talk.mp4" }
+export_status { "export_id": 1 }
+```
+
+`media` and `clips` here stand for the ids the earlier answers gave. Read them from each answer rather than guessing, because ids come from one number series that clips, tracks, markers and media all share. See [Units and ids](/mcp/units-and-ids/).
+
+`save_project` needs no `path` here because `new_project` was given one. A project made without one stays an untitled draft until the first `save_project` that names a path.
+
+## Follow the export
+
+`export` puts the job on the [Export Queue](/export/export-queue/) and returns. It doesn't wait for the file.
+
+`export_status` never waits either, so pause between calls. While the job runs, its answer has `progress`, from 0 to 1. When `status` is `done`, the answer says what the file holds, including its size in `bytes`, its settings and its loudness. `failed` and `cancelled` come with a `reason`.
+
+To stop a job, call `cancel_export`. See [Export: start, then poll](/mcp/export/).
+
+## Good to know
+
+- Tools act on the frontmost project. With more than one open, pass `project`, the path `get_project` reports. See [How tool calls behave](/mcp/tool-calls/).
+- A call that can't do what it's asked comes back with the reason, and the project stays as it was. See [What a call answers](/mcp/what-a-call-answers/).
+- `render_frame` and `export` differ inside a [nest](/mcp/nests/). With a nest open, `render_frame` draws the nest, but `export` still writes from the timeline.
+- `export` replaces a file already at the path, and adds the container's extension when the path has none.
+- `unsaved_changes` in `get_project` says whether there's anything still to save.
+
+## Related
+
+- [Read the project: get_project](/mcp/get-project/)
+- [Check the picture: render_frame](/mcp/render-frame/)
+- [Export: start, then poll](/mcp/export/)
+- [All tools](/mcp/tools/)
+- [Patches](/mcp/patches/)

@@ -1,0 +1,101 @@
+---
+title: "Transition styles"
+description: "What each of the thirteen transition styles looks like, and how each one treats small layers and clips of different sizes."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A transition's style decides how one clip gives way to the next across their overlap. Frame Job has thirteen: Cross Dissolve, two fades, four pushes, four wipes, Slide and Zoom.
+
+<AtAGlance
+  menu="Clip ▸ Transition ▸"
+  where="Clip tab ▸ Clip sub-tab ▸ Transition ▸ Kind"
+  tools={['add_transition', 'set_transition']}
+/>
+
+To put a style on a cut, see [Add or remove a transition](/motion/add-a-transition/). To change how it's eased or how long it lasts, see [The Transition section](/motion/transition-settings/).
+
+## Cross Dissolve
+
+The outgoing clip fades out as the incoming clip fades in. The two always add up to a whole picture, so the frame doesn't dip dark in the middle.
+
+Where only one of the two clips covers part of the canvas, that part fades to whatever is behind it.
+
+This is the style Frame Job uses when it adds a transition without being asked, such as when you drag one clip over the end of another.
+
+## Fade Through Black and Fade Through White
+
+**Fade Through Black** takes the outgoing clip down to black over the first half of the transition. At the halfway point the clips swap, and the incoming clip fades up from black over the second half.
+
+**Fade Through White** does the same through white. In an [HLG project](/hdr/dynamic-range/), the white is SDR white as it sits in that project, not the brightest white HLG can show.
+
+The two clips are never on screen together. See [Fades on small layers](#fades-on-small-layers) for what these styles do to a clip that doesn't fill the canvas.
+
+## Push
+
+Both clips move together, as if the incoming clip were shoving the outgoing one off the canvas.
+
+| Style | The outgoing clip leaves | The incoming clip comes in from |
+| --- | --- | --- |
+| **Push Left** | To the left | The right |
+| **Push Right** | To the right | The left |
+| **Push Up** | Upward | The bottom |
+| **Push Down** | Downward | The top |
+
+## Wipe
+
+An edge sweeps across the picture, taking the outgoing clip away and revealing the incoming clip behind it. Neither clip moves. The edge is very slightly soft, so it doesn't crawl.
+
+| Style | The edge sweeps |
+| --- | --- |
+| **Wipe** | Left to right |
+| **Wipe Left** | Right to left |
+| **Wipe Up** | Bottom to top |
+| **Wipe Down** | Top to bottom |
+
+## Slide
+
+The incoming clip slides in from the right over the outgoing clip, which stays where it is. Slide only comes in from the right. For the other directions, use a [Push](#push).
+
+## Zoom
+
+The outgoing clip grows toward you, from 100% to 125% of its size, while the incoming clip grows into place from 75% to 100%. The two dissolve into each other as they go. Each clip grows around its own centre.
+
+## Small layers and clips of different sizes
+
+A transition plays on each clip where that clip sits, not on the canvas as a whole. You won't see any of what follows on two full-frame clips of the same size. It matters for a picture-in-picture, or for a pair that differ in size, position, crop or rotation.
+
+### Wipes on mismatched clips
+
+A wipe's edge is measured in each clip's own frame, so two clips of different sizes don't meet at one line. Halfway through, the edge is halfway across each clip, wherever each one sits. The frame is the clip as it's cropped and placed, so on a rotated clip the edge turns with the clip.
+
+Between the two edges you can see whatever is behind the pair, or both clips at once.
+
+### Fades on small layers
+
+A fade through a colour changes the clip's own pixels toward that colour. On a clip smaller than the canvas, such as a picture-in-picture, you see a black or white box over what's behind it, not a see-through fade.
+
+For a small clip that should melt into the picture behind it, use [Cross Dissolve](#cross-dissolve).
+
+### Push and Slide on small layers
+
+A Push or a Slide always travels one whole canvas width, or one whole canvas height for Push Up and Push Down, whatever the size of the clip. A small incoming clip starts one canvas away from where it lands, so it doesn't begin at the edge of the frame unless it's placed there.
+
+Slide leaves the outgoing clip at full strength until the overlap ends. If the incoming clip is smaller, the outgoing clip stays visible around it for the whole transition, then disappears when the overlap ends.
+
+## Good to know
+
+- The style only changes the picture. Whether the sound crossfades is a separate choice, and it works the same with all thirteen. See [Crossfades](/audio/crossfades/).
+- A clip always draws with the Normal blend mode during a transition, whatever [blend mode](/canvas/blend-modes/) it has.
+- Cross Dissolve and Zoom treat a [nest](/editing/nests/) clip as one picture. The other styles play on each layer inside the nest, so a wipe's edge is measured in each layer's own frame.
+
+## With an agent
+
+An agent names a style by its `kind`, which is the style's name in lower case with underscores: `cross_dissolve`, `push_left`, `wipe_up`, `slide`. The plain **Wipe** is `wipe`, and the two fades are `fade_black` and `fade_white`. See [Tools: transitions](/mcp/tools-transitions/).
+
+## Related
+
+- [Transitions](/motion/transitions/)
+- [Add or remove a transition](/motion/add-a-transition/)
+- [The Transition section](/motion/transition-settings/)
+- [Crossfades](/audio/crossfades/)

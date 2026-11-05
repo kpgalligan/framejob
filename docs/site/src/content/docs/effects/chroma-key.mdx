@@ -1,0 +1,96 @@
+---
+title: Chroma Key
+description: Remove a background colour, such as a green screen, so whatever is on the tracks behind shows through.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Chroma Key removes one colour from a clip, such as a green screen, so whatever is on the tracks behind shows through.
+
+<AtAGlance
+  where="Clip tab ▸ Picture ▸ Chroma Key"
+  tools="set_video"
+/>
+
+## Key out a color
+
+<Steps>
+
+1. Put the clip on a track in front of what should show through, and select it.
+
+2. In the Clip tab's **Picture** sub-tab, open the **Chroma Key** section. It comes after **Corner Radius** and is closed by default.
+
+3. Choose **Pick from Canvas** and click the background in the preview. That sets the colour and turns the key on. Or tick **Key out a color**, which keys pure green.
+
+4. Adjust [**Tolerance**](#tolerance), [**Softness**](#softness) and [**Spill**](#spill) until the edges look right.
+
+</Steps>
+
+Turning the key on gives pure green at 20 % Tolerance, 10 % Softness and 50 % Spill. **Key Color**, **Tolerance**, **Softness** and **Spill** stay greyed until the key is on. **Pick from Canvas** doesn't. The section's header reads "off", or the Tolerance as a percentage. **Reset** takes the key off the clip.
+
+The section is there for clips of a video file, image clips and freeze frames. Text, shape, graphic, adjustment and nest clips don't have it. With several clips selected, an edit keys all of them.
+
+## Key color
+
+The colour to remove. It starts as pure green, and the swatch takes any colour. The opacity in the colour panel has no effect here, because a key colour has none.
+
+## Pick from Canvas
+
+Choose **Pick from Canvas** and the preview reads "Click to pick the key color · Esc to cancel". One click on the picture sets **Key Color**. The button works with the key off, and a pick turns it on.
+
+A pick reads the clip as the key sees it, without the clip's own key, grade and opacity. So picking again reads the same green the first pick did, even though that green is now a hole. A clip in front of it at that point still covers it, and you get what's visible there.
+
+Picking again changes only the colour. It keeps the **Tolerance**, **Softness** and **Spill** you set.
+
+To cancel, press the button again, press <kbd>Esc</kbd> or change the selection.
+
+| If | What happens |
+| --- | --- |
+| You click outside the picture | Frame Job beeps and stays ready for another click |
+| You click where the canvas holds nothing | Frame Job beeps and changes nothing |
+| The selection changes while the frame is being read | Frame Job beeps and changes nothing |
+
+Only one canvas tool is ready at a time. **Pick from Canvas** ends [Obscure](/effects/obscure/)'s **Place on Canvas**, [Zoom to Region](/motion/zoom-to-region/) and the [qualifier's Pick from Canvas](/color/pick-from-canvas/).
+
+## Tune the key
+
+Start with **Tolerance** to clear the background, then **Softness** for the edge, then **Spill** for any fringe of the key colour.
+
+### Tolerance
+
+How far from the key colour still counts as background. Everything that close is removed completely. Raise it if patches of background remain, and lower it if the key eats into your subject.
+
+The range is 0 to 100 %, and the default is 20 %. The quick picks are 0, 10, 20, 40 and 60.
+
+### Softness
+
+How gradual the edge of the key is. Past **Tolerance**, the picture fades back in over this distance, so a low value gives a hard edge.
+
+The range is 0 to 100 %, and the default is 10 %. The quick picks are 0, 5, 10, 25 and 50.
+
+### Spill
+
+How much of the key colour is removed from the edges that remain. Pixels in the soft edge are pulled toward a grey of their own brightness, which takes out a green fringe. It works only in that edge, so with **Softness** at 0 it has almost nothing to act on.
+
+The range is 0 to 100 %, and the default is 50 %. The quick picks are 0, 25, 50, 75 and 100.
+
+## Animate the key
+
+With an [action](/motion/edit-an-action/) selected, **Key Color**, **Tolerance**, **Softness** and **Spill** set the value at the action's end and animate toward it. The colour blends through the OKLab colour space along the action. **Pick from Canvas** also sends its colour to the action's end.
+
+## Good to know
+
+- The key runs before the grade, so [grading a clip](/color/color-tab/) doesn't change what's keyed. A [camera log](/hdr/camera-log/) conversion and the [source conversion](/hdr/how-sources-are-read/) come first, so the key sees the converted picture.
+- [Show Ungraded](/color/show-ungraded/) leaves the key on.
+- How a key behaves when a project switches between SDR and HDR is on [A project's dynamic range](/hdr/dynamic-range/).
+
+## With an agent
+
+An agent sets the key with `set_video`, using the same colour and the same three amounts written as 0 to 1. It has no **Pick from Canvas**, so it passes the colour as numbers. See [Tools: picture and grade](/mcp/tools-set-video/#chroma-key).
+
+## Related
+
+- [Remove Background](/effects/remove-background/)
+- [Matte tracks](/canvas/matte-tracks/)
+- [Transparent exports](/export/transparency/)

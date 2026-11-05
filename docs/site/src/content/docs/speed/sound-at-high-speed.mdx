@@ -1,0 +1,87 @@
+---
+title: "Sound at high speed"
+description: "Why a clip goes silent above ×12, what the alert asks before it happens, and how ramps count towards the limit."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A clip that plays faster than ×12 loses its sound in the preview and in the export, while its picture keeps playing. Frame Job asks before an edit takes a clip there.
+
+<AtAGlance
+  menu={['Clip ▸ Speed…', 'Clip ▸ Speed Ramp…', 'Clip ▸ Retime Range…', 'Clip ▸ Speed Up Typing…']}
+  where={['Clip tab ▸ Clip ▸ Speed section', 'The ⌥ rate stretch on the timeline']}
+  tools={['set_speed', 'rate_stretch', 'add_speed_ramp', 'set_action_end', 'retime_range']}
+/>
+
+## Sound is left out above ×12
+
+The limit is the same with [Keep pitch](/speed/keep-pitch/) on or off. At exactly ×12 the sound still plays, and at anything faster it doesn't. The picture carries on to the top of the speed range, ×1000.
+
+The limit is fixed, and no setting changes it. It sits a margin below the speeds at which an export with sound can stall.
+
+Nothing is deleted. Bring the clip back to ×12 or below and its sound returns.
+
+## The alert
+
+Before an edit takes a clip with sound from ×12 or below to above ×12, an alert asks first. For one clip it reads:
+
+> “Interview” will be silent at ×16.
+>
+> Frame Job leaves a clip’s audio out above ×12. The picture still plays.
+
+For several clips it counts them. It reads “3 clips will be silent at ×16.”, or “3 clips will be silent at their new speeds.” when their rates differ, and then “Frame Job leaves a clip’s audio out above ×12. The pictures still play.”
+
+The alert is a question, not a block. You can always go ahead.
+
+| Button | What it does |
+| --- | --- |
+| **Set Speed** | Makes the edit exactly as you asked. It's the default button, and it keeps this name when the edit is a ramp or a stretch. |
+| **Cancel** | Changes nothing and adds no undo step. |
+
+You're asked once. A clip that's already above ×12 isn't asked about again, even if you make it faster still. A clip whose sound is switched off, or whose file has no sound, isn't asked about at all.
+
+## Where the alert appears
+
+| You're using | If you choose **Cancel** |
+| --- | --- |
+| **Clip ▸ Speed…** | The sheet stays open. |
+| **Clip ▸ Speed Ramp…** | The sheet stays open. |
+| **Clip ▸ Retime Range…** | The sheet stays open. |
+| **Clip ▸ Speed Up Typing…** | The sheet stays open. |
+| The [Speed section](/speed/speed-section/): **Rate**, its quick picks, **Keep pitch**, **Reset** or **Fit to** | The fields go back to what they showed. |
+| The [⌥ rate stretch](/speed/rate-stretch/) | The clip stays as it was before the drag. |
+
+A stretch is put back when you let go, so nothing has changed while the question is up. **Set Speed** then applies it again.
+
+Moving, resizing or removing an action can't raise a clip's fastest rate, so those edits never ask.
+
+## Ramps and the ×12 rule
+
+On a [ramped clip](/speed/speed-ramps/), Frame Job looks at the fastest rate set anywhere on the clip. If any rate in the ramp is above ×12, the whole clip is silent, not only the fast part.
+
+The alert counts the ramp's peak rate in the same way. A clip at ×1 with one Speed action ending at ×16 is asked about at ×16.
+
+An end rate on an action lying past the clip's end still counts, even though that part never plays. If a trimmed clip has gone silent for no clear reason, check the count in the header of its [action lane](/motion/action-lane/) in the Clip tab. An action wholly past the clip's end has no band you can reach, but it's still counted.
+
+## The silent audio note
+
+The Speed section shows **Audio is silent above ×12** while a selected clip is past the limit. It needs a clip whose file has sound and whose sound is on. It appears in either pitch mode, and a ramp counts by its fastest rate.
+
+## Good to know
+
+- A clip that only has sound follows the same rule, and is silent above ×12.
+- Clips inside a [nest](/editing/nests/) count too.
+- Turning a clip's sound back on while it's above ×12 doesn't bring up the alert, because the speed didn't change. The silent audio note shows instead.
+- When Speed Up Typing runs by itself after a [recording lands](/recording/when-it-lands/), Frame Job can't stop to ask. A speed-up that would silence a clip isn't made, and the reason appears at the foot of the inspector.
+
+## With an agent
+
+An agent is never asked. Its edit goes through, and the result lists the ids of the clips that went silent in `audio_left_out`, with a sentence saying so in `audio_note`. Neither appears if no clip crossed the limit. See [Above ×12 the sound is left out](/mcp/tools-speed/#above-12-the-sound-is-left-out).
+
+## Related
+
+- [Change a clip's speed](/speed/change-speed/)
+- [The Speed section](/speed/speed-section/)
+- [Keep pitch](/speed/keep-pitch/)
+- [Speed ramps](/speed/speed-ramps/)
+- [Sound on a ramp](/speed/ramp-audio/)

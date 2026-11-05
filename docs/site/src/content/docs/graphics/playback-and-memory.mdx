@@ -1,0 +1,103 @@
+---
+title: "Graphics playback and memory"
+description: "How Frame Job keeps heavy graphics playing smoothly: drawing ahead, kept frames, Background render, and the memory they're allowed to use."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A graphic is drawn from code, frame by frame, and a heavy one can take longer to draw than a frame lasts. Frame Job works around that by drawing ahead of the playhead and keeping what it has drawn. Nearly all of this is automatic, and the one thing you can set is [Background render](#background-render).
+
+<AtAGlance
+  menu="Frame Job ▸ Settings… ▸ Playback"
+  keys="⌘,"
+/>
+
+## Drawing ahead while playing
+
+While a preview plays forward over a project with a graphic in it, on the timeline or in a nest, Frame Job draws upcoming frames on spare processor cores ahead of the playhead. It uses one fewer core than your Mac has active.
+
+It starts again from the new spot on play, on a seek, and on an edit while playing. It runs to the end of the timeline, or to the end of the in and out range while playback is looping inside it.
+
+It doesn't run while the preview is paused or playing in reverse. Background render covers paused.
+
+## Kept frames
+
+A window keeps the graphic frames it has drawn in memory while it's open, so a stretch you play again comes from memory rather than being drawn again.
+
+A frame is matched by what it draws, so changing a module or a property only redraws the frames that come out different. Frames go when the window closes or newer frames replace them. The least recently used go first, and frames Background render drew ahead give way last.
+
+## Background render
+
+When you leave Frame Job alone, the window you last played or moved the playhead in draws its graphics ahead of the paused playhead, so the next play is smooth from the start.
+
+| Setting | What it does | Default | Range |
+| --- | --- | --- | --- |
+| **Background render** | Turns background drawing on or off. | On | |
+| **Start after … seconds** | How long Frame Job must be left alone first. | 5 | 1 to 60 |
+
+Find them in **Frame Job ▸ Settings… ▸ Playback**. They save the moment you change them, with no **Save** button, and they apply to every project. The ⓘ on the **Playback** heading explains them.
+
+Background render needs a paused window that draws a graphic. It draws from the playhead to the end of the timeline, or to the end of the in and out range while playback would loop inside it, and it ends early if the [memory budget](#the-memory-budget) runs out. After that it waits for your next activity and the same wait before it runs again.
+
+It keeps the processor busy while it runs, and it carries on while Frame Job is hidden or covered. It doesn't stop your Mac going to sleep. It only draws graphic frames, and it changes nothing in your project or your export.
+
+## Set how long it waits
+
+**Start after … seconds** takes a whole number from 1 to 60, typed or with the stepper. You can only change them while **Background render** is on. A typed number outside the range beeps and the stored value comes back.
+
+## What stops Background render
+
+Any activity in Frame Job stops the pass at once, and it starts again after the same wait.
+
+| Stops it | Doesn't stop it |
+| --- | --- |
+| A key, including a modifier key on its own | Moving the pointer |
+| A click, a drag, a scroll or a trackpad gesture | Working in another app |
+| Any edit, in any window | An agent's read-only call, such as `get_project` |
+| Play, pause or a seek, in any window | |
+| An agent's call that edits a project or moves a playhead | |
+
+It never runs while any window is playing.
+
+## The memory budget
+
+The frames drawn ahead and the frames kept share one budget for all of Frame Job. It's sized to your Mac, with no fixed cap in gigabytes.
+
+| Memory on your Mac | Budget |
+| --- | --- |
+| Normal | A quarter of its physical memory, so 8 GB on a 32 GB Mac |
+| Short | An eighth |
+| Critically short | Nothing. No frames are held, and each graphic is drawn when it's needed. |
+
+The frames an [export](/graphics/graphics-in-exports/#parallel-rendering) draws ahead count too. Frames being drawn ahead come first, and kept frames give up whatever room those need.
+
+Each playing window or export also holds at most 1,024 pictures ahead, however much memory is free.
+
+## What Frame Job skips
+
+Frame Job also avoids repeating work it has already done, in two ways.
+
+### Repeat frames
+
+When a frame's SVG is the same as one already drawn, such as during a hold or in a static graphic, Frame Job reuses that picture. Your module still runs for every frame. Only the drawing of its SVG into a picture is skipped.
+
+While an [action](/graphics/animate-properties/) moves a property that changes what the module draws, every frame comes out different, so a graphic that had settled costs a full draw per frame for the length of the action.
+
+### The picture cache
+
+PNG and JPEG pictures a graphic draws are decoded once and cached, so graphics full of pictures draw faster. The result is identical to drawing the original.
+
+The cache is a sixteenth of the graphics budget, so it shrinks when memory is short. The least recently used go first.
+
+## Good to know
+
+Your module's code has 250 ms to run for each frame in the preview. Past that the frame draws the [error card](/graphics/edit-a-module/#the-error-card). An export allows 2 s, so a frame that fails in the preview can still export. See [Graphics in exports](/graphics/graphics-in-exports/).
+
+Background render is a setting for a person. No agent tool reads or writes it.
+
+## Related
+
+- [Graphics in exports](/graphics/graphics-in-exports/)
+- [Edit a module](/graphics/edit-a-module/)
+- [Fonts and pictures in graphics](/graphics/fonts-and-pictures/)
+- [Settings](/reference/settings/)

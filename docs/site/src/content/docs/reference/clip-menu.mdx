@@ -1,0 +1,246 @@
+---
+title: "The Clip menu"
+description: "Every command and submenu in the Clip menu, with its shortcut and what has to be true for it to be available."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The Clip menu holds the commands that act on the selected clips. This page gives every item's exact title and shortcut, and what makes it available, so you can find a key or work out why something is greyed out.
+
+The symbols and the **(key)** mark are explained in [How to read these tables](/reference/menus/#how-to-read-these-tables). Every item here is greyed out while a sheet is on the window.
+
+## The Clip menu
+
+From top to bottom, with lines dividing it into five groups after **Trim End to Playhead**, **Switch Angle ▸**, **Add Blurred Background** and **Label ▸**:
+
+| Item | Keys | Details |
+| --- | --- | --- |
+| **Split** | <kbd>⌘T</kbd> | [Cutting and trimming](#cutting-and-trimming) |
+| **Split at Shot Changes** | | [Cutting and trimming](#cutting-and-trimming) |
+| **Trim Start to Playhead** | <kbd>W</kbd> (key) | [Cutting and trimming](#cutting-and-trimming) |
+| **Trim End to Playhead** | <kbd>E</kbd> (key) | [Cutting and trimming](#cutting-and-trimming) |
+| **Freeze Frame** | <kbd>⇧⌘F</kbd> | [Cutting and trimming](#cutting-and-trimming) |
+| **Detach Audio** | <kbd>⌥⌘D</kbd> | [Sound](#sound) |
+| **Attach Audio** | <kbd>⇧⌥⌘D</kbd> | [Sound](#sound) |
+| **Normalize** | | [Sound](#sound) |
+| **Enhance Voice** | | [Sound](#sound) |
+| **Match Audio…** | | [Sound](#sound) |
+| **Synchronize Audio** | | [Sound](#sound) |
+| **Switch by Speaker…** | | [Sound](#sound) |
+| **Add Action** | <kbd>⌥⌘K</kbd> | [Actions and speed](#actions-and-speed) |
+| **Auto Zoom…** | | [Actions and speed](#actions-and-speed) |
+| **Follow Subject…** | | [Actions and speed](#actions-and-speed) |
+| **Add Shortcut Overlays** | | [Actions and speed](#actions-and-speed) |
+| **Speed Up Typing…** | | [Actions and speed](#actions-and-speed) |
+| **Speed…** | | [Actions and speed](#actions-and-speed) |
+| **Speed Ramp…** | | [Actions and speed](#actions-and-speed) |
+| **Close Gap** | | [Cutting and trimming](#cutting-and-trimming) |
+| **Retime Range…** | | [Actions and speed](#actions-and-speed) |
+| **Remove Silences…** | | [Clean-up](#clean-up) |
+| **Remove Filler Words…** | | [Clean-up](#clean-up) |
+| **Transition ▸** | | [Transition](#transition) |
+| **Motion ▸** | | [Motion](#motion) |
+| **Look ▸** | | [Look](#look) |
+| **Remove Background** | | [Remove Background](#remove-background) |
+| **Camera Layout ▸** | | [Camera Layout](#camera-layout) |
+| **Switch Angle ▸** | | [Switch Angle](#switch-angle) |
+| **Add Background ▸** | | [Backgrounds](#backgrounds) |
+| **Add Blurred Background** | | [Backgrounds](#backgrounds) |
+| **Rename…** | <kbd>⇧⌘R</kbd> | [Rename and label](#rename-and-label) |
+| **Label ▸** | | [Rename and label](#rename-and-label) |
+| **Nest** | <kbd>⌘G</kbd> | [Nests](#nests) |
+| **Un-nest** | <kbd>⇧⌘G</kbd> | [Nests](#nests) |
+| **Open Nest** | <kbd>⌘↓</kbd> | [Nests](#nests) |
+| **Close Nest** | <kbd>⌘↑</kbd> | [Nests](#nests) |
+
+Most items have no key, because every bare letter belongs to the editor and a menu key with no modifier would take it.
+
+## Cutting and trimming
+
+<AtAGlance tools={['split', 'split_at_shots', 'trim_start', 'trim_end', 'freeze_frame', 'close_gap']} />
+
+| Item | Keys | What it does | Available when |
+| --- | --- | --- | --- |
+| **Split** | <kbd>⌘T</kbd> | Cuts the selected clips at the playhead. With nothing selected, it cuts every clip under the playhead on an unlocked track. See [Split clips](/editing/splitting/). | The timeline has any clip |
+| **Split at Shot Changes** | | Cuts each selected clip of a video file at every hard cut in the part it plays, as one undo step. The Analyzing sheet shows while the cuts are found on this Mac. See [Split at Shot Changes](/editing/split-at-shot-changes/). | A selected clip shows a video file's picture |
+| **Trim Start to Playhead** | <kbd>W</kbd> (key) | Trims the selected clips' starts to the playhead. The sound half of a [detached pair](/audio/detach-and-attach/) trims on its own, without its picture. See [Trim clips](/editing/trimming/). | A selected clip is under the playhead |
+| **Trim End to Playhead** | <kbd>E</kbd> (key) | Trims the selected clips' ends to the playhead. The sound half of a detached pair trims on its own, without its picture. | A selected clip is under the playhead |
+| **Freeze Frame** | <kbd>⇧⌘F</kbd> | Holds the frame under the playhead as a still clip, 2 s long, in a gap opened there. It acts on the first selected clip under the playhead, and only on a media clip. See [Freeze frame](/speed/freeze-frame/). | A selected clip is under the playhead |
+| **Close Gap** | | Closes the gap under the playhead on the current track, and everything from the far side slides left across every unlocked track. See [Close gaps and insert time](/editing/close-gaps/). | The timeline has clips |
+
+## Sound
+
+<AtAGlance
+  tools={['detach_audio', 'attach_audio', 'normalize_clip', 'enhance_voice', 'match_audio', 'sync_audio', 'switch_by_speaker']}
+/>
+
+| Item | Keys | What it does | Available when |
+| --- | --- | --- | --- |
+| **Detach Audio** | <kbd>⌥⌘D</kbd> | Moves a clip's sound onto its own clip on the track below, linked to it. See [Detach and Attach Audio](/audio/detach-and-attach/). | Something is selected |
+| **Attach Audio** | <kbd>⇧⌥⌘D</kbd> | Merges a detached sound back into its picture. | A selected clip is linked to its detached sound or picture |
+| **Normalize** | | Sets the selected clips' volume to a loudness (the default, turning a clip's limiter on when its peaks need it) or a peak, by the mode chosen in the Volume section's Normalize row. A clip with processing is measured through it while the Measuring Sound sheet shows. See [Normalize](/audio/normalize/). | A selected clip plays sound and isn't a nest |
+| **Enhance Voice** | | Sets the selected clips up for speech from their own measurements, as one undo step. It sets a rumble cut, a compressor, the limiter and the volume for the Normalize row's target, and adds voice isolation or noise reduction, a gate, the leveller and the de-esser when the recording needs them. See [Enhance Voice](/audio/enhance-voice/). | A selected clip plays sound and isn't a nest |
+| **Match Audio…** | | Gives the selected clips the loudness and speech tone of one of them, chosen in a sheet, by setting their volume, limiter and EQ. They're measured while the Measuring Sound sheet shows. See [Match Audio](/audio/match-audio/). | Two or more selected clips play sound, not counting nests |
+| **Synchronize Audio** | | Lines up the selected clips by their sound. A weak match asks you first. See [Synchronize Audio](/audio/synchronize-audio/). | Two or more selected clips play sound, not counting nests |
+| **Switch by Speaker…** | | Cuts a Program track from the selected cameras, showing whoever talks on each microphone, as one undo step. Run **Synchronize Audio** first. See [Switch by Speaker](/multicam/switch-by-speaker/). | The selected clips with a picture sit on two or more tracks and a selected clip has its sound on. It works inside a nest |
+
+## Actions and speed
+
+<AtAGlance
+  tools={['add_action', 'auto_zoom', 'reframe_clip', 'add_shortcut_overlays', 'speed_up_typing', 'set_speed', 'add_speed_ramp', 'retime_range']}
+/>
+
+| Item | Keys | What it does | Available when |
+| --- | --- | --- | --- |
+| **Add Action** | <kbd>⌥⌘K</kbd> | Adds an action at the playhead, 1 s long, which changes nothing until you set what it animates to. Frame Job won't add one that would overlap another action or run past the clip's end. See [Add an action](/motion/add-an-action/). | A selected clip is under the playhead |
+| **Auto Zoom…** | | Zooms the selected screen recordings in at their clicks and typing and back out after, as ordinary actions, in one undo step, "Auto Zoom". See [Auto Zoom](/recording/auto-zoom/). | Every selected clip plays a movie that has a cursor file. It works inside a nest |
+| **Follow Subject…** | | Frames each selected movie clip on its subject (faces, people or the region the eye goes to, found on this Mac), with eased moves on its action lane and a blurred copy on a Backgrounds track where it shows the whole picture, in one undo step. See [Follow Subject](/framing/follow-subject/). | A selected clip plays a movie. It works inside a nest |
+| **Add Shortcut Overlays** | | Shows each keyboard shortcut recorded in the selected screen recordings as keycaps at the moment it was pressed, on a "Shortcuts" track, in one undo step. See [Shortcut overlays](/recording/shortcut-overlays/). | Every selected clip plays a movie that has a cursor file, and Frame Job isn't already reading the files. It works inside a nest |
+| **Speed Up Typing…** | | Plays the typing in the selected screen recordings faster where nobody speaks and no shortcut shows, in one undo step. See [Speed Up Typing](/recording/speed-up-typing/). | Every selected clip plays a movie that has a cursor file. It works inside a nest |
+| **Speed…** | | Sets the selected clips' playback rate through a sheet, ×0.1 to ×1000. See [Change a clip's speed](/speed/change-speed/). | The selection includes a clip that plays a media file |
+| **Speed Ramp…** | | Puts a speed ramp preset on one selected media clip. See [Make a speed ramp](/speed/make-a-ramp/). | Exactly one clip is selected and it plays a media file |
+| **Retime Range…** | | Plays the in/out range faster or slower on every unlocked track and moves what follows to stay in step, in one undo step, "Retime Range". See [Retime Range](/speed/retime-range/). | An in/out range is set. It works inside a nest |
+
+## Clean-up
+
+<AtAGlance
+  tools={['detect_silence', 'detect_fillers', 'transcribe_for_fillers', 'ripple_delete_ranges']}
+  needs="Remove Filler Words… needs your AssemblyAI key, unless a file it would read already has a transcript made with filler words."
+/>
+
+| Item | What it does | Available when |
+| --- | --- | --- |
+| **Remove Silences…** | Finds silent stretches and removes them, through a sheet. It needs no key. See [Remove Silences](/cleanup/remove-silences/). | A clip plays sound |
+| **Remove Filler Words…** | Finds "um"s and "uh"s and removes them, through a sheet. See [Remove Filler Words](/cleanup/remove-filler-words/). | A clip plays sound from a media file forwards, with its audio on, and either your AssemblyAI key is set or a file it would read has a transcript made with filler words |
+
+When the key is all that's missing, the item is greyed and reads **Remove Filler Words… (needs your AssemblyAI key)**, and its tooltip says where to set the key. See [Your AssemblyAI key](/captions/assemblyai-key/).
+
+## Transition
+
+<AtAGlance tools={['add_transition', 'set_transition']} />
+
+**Transition ▸** sets the transition into the clip. See [Add or remove a transition](/motion/add-a-transition/).
+
+The rows are **Cross Dissolve**, **Fade Through Black**, **Fade Through White**, **Push Left**, **Push Right**, **Push Up**, **Push Down**, **Wipe**, **Slide**, **Zoom**, **Wipe Left**, **Wipe Up** and **Wipe Down**, then **None**. A checkmark shows the selected clip's transition.
+
+| Row | Available when |
+| --- | --- |
+| A transition | A selected clip has room for one, meaning an overlap or a hard cut. Other selected clips are skipped. |
+| **None** | Something is selected, so a transition the timeline doesn't show can always be cleared. |
+
+At a hard cut it aims for a transition 0.5 s long, snapped to frames, and makes a shorter one when the clips have less footage to spare. Where neither side of the cut has a frame to spare, a sheet says so and offers **Shift Clips Left**, which slides the second clip and everything after it on unlocked tracks left by half a second.
+
+## Motion
+
+<AtAGlance tools="set_video" />
+
+**Motion ▸** sets how the clip enters, leaves and moves, and previews the result. Every item is available when a selected clip is anything but sound alone. See [Motion presets](/motion/motion-presets/).
+
+| Item | Rows |
+| --- | --- |
+| **In ▸** | **Fade**, **Zoom In**, **Zoom Out**, **Slide Left**, **Slide Right**, **Slide Up**, **Slide Down**, **Spin**, **Pop**, then **None** |
+| **Out ▸** | The same as **In ▸** |
+| **During ▸** | **Pulse**, **Shake**, **Spin**, **Bounce**, **Drift**, then **None** |
+| **Preview** | Sets the in/out range to the first selected clip with a picture, turns Loop on and plays it. The range and Loop stay set afterwards. |
+
+In each submenu a checkmark shows the kind every selected clip has. An In or Out kind with a length of zero reads "Fade (inactive)", or "Fade (some inactive)" when only some of the selected clips with that kind have zero length.
+
+Every During motion starts from where the clip is placed, so the clip's first frame sits exactly there.
+
+## Look
+
+<AtAGlance tools="set_video" />
+
+**Look ▸** puts a look or a LUT on the clip. See [Looks](/color/looks/) and [.cube LUTs](/color/luts/).
+
+The rows are **Warm**, **Cool**, **Teal & Orange**, **Vivid**, **Faded**, **Vintage**, **Dramatic** and **Black & White**, then the project's `.cube` LUTs in Media list order when it has any, then **None**. The LUT rows are updated each time the menu opens.
+
+A checkmark marks a look every selected clip has, and a dash marks one only some of them have. Each clip keeps its amount, and a clip with no look starts at full strength.
+
+It's available when a selected clip shows a picture from a file, or is an adjustment clip.
+
+## Remove Background
+
+<AtAGlance tools={['set_video', 'analyze_cutout']} />
+
+**Remove Background** keeps the person and removes the rest of the picture, or turns that off. It has no key. See [Remove Background](/effects/remove-background/).
+
+It's checked when every selected clip has it, and shows a dash when some do. With every clip it can act on already cut out, it turns them all off. Otherwise it turns on the ones without, and each clip already cut out keeps its values.
+
+It's available when a selected clip plays a video file, is a freeze frame of one, or is a picture.
+
+## Camera Layout
+
+<AtAGlance tools="switch_layout" />
+
+**Camera Layout ▸** lays out the camera and the screen behind it at the playhead, eased over half a second and held until the next switch. One undo step, "Camera Layout". See [Camera layouts](/framing/camera-layouts/).
+
+| Item | What it does |
+| --- | --- |
+| **Corner ▸** | The whole camera fitted in a box in the corner you pick, with the screen at its full placement. The box is a quarter of the canvas wide, a third tall and 5 % in from the edges. |
+| **Rounded Corner ▸** | The same, with rounded corners. |
+| **Circle ▸** | The camera cropped to a circle as tall or wide as the box's shorter side, in the same corner. |
+| **Side by Side** | The screen fitted in the left two-thirds, and the camera cropped to fill the right third, with margins and a small radius. |
+| **Stacked** | The screen across the top, and the camera filling the rest below. |
+| **Camera Full** | The camera fills the canvas. |
+| **Screen Only** | Hides the camera where it is. |
+
+**Corner ▸**, **Rounded Corner ▸** and **Circle ▸** each hold **Bottom Right**, **Bottom Left**, **Top Right** and **Top Left**.
+
+The camera's crop is centred on the person when Frame Job has already made the camera's person masks. It doesn't start that analysis for you. A zoom in the way brings up a sheet offering **Nest and Switch**.
+
+It's available with two selected clips with a picture on different tracks, one selected clip with a picture, or, with nothing selected, a clip at the playhead on a track named "Camera". The camera has to contain the playhead. It works inside a nest.
+
+## Switch Angle
+
+<AtAGlance tools="switch_angle" />
+
+**Switch Angle ▸** changes which camera track the selected shot comes from, keeping its span, its switches and its dissolves, as one undo step. The new pieces are selected. See [Switch Angle](/multicam/switch-angle/).
+
+It has one row per track covering the shot's whole span, updated each time the menu opens. There are up to nine, front first, named after their tracks, and tracks that share a name add their position, as in "Camera (2)". With no track to offer, the menu shows **No Covering Angle**, which is never available.
+
+A row is available when exactly one clip is selected, its track isn't locked, it isn't linked to a detached sound, and that row's track still covers it with video clips. It works inside a nest.
+
+## Backgrounds
+
+<AtAGlance tools={['add_background', 'add_blurred_background']} />
+
+Both commands put something on a new track behind everything. See [Backgrounds](/canvas/backgrounds/).
+
+| Item | What it does | Available when |
+| --- | --- | --- |
+| **Add Background ▸ Solid Color** | Adds a canvas-sized white rectangle the length of the timeline, selected so you can recolour it in the **Fill** row of the **Shape** sub-tab. There's no dialog. | Always |
+| **Add Background ▸ Image…** | Adds a picture you choose, scaled to fill the canvas, the length of the timeline. It takes images only. Importing and placing are one undo step. | Always |
+| **Add Blurred Background** | Adds a blurred copy of the picture with the same start, duration and speed, playing the same part of its media. The copy is muted, and has none of the clip's transition, actions or label. | Exactly one clip is selected and it's a video, image, freeze frame, shape or graphic clip. Greyed for a nest, text, adjustment or audio-only clip |
+
+**Add Background ▸** needs no selection.
+
+## Rename and label
+
+<AtAGlance tools="set_clip" />
+
+| Item | Keys | What it does | Available when |
+| --- | --- | --- | --- |
+| **Rename…** | <kbd>⇧⌘R</kbd> | Renames the selected clip in place on the timeline. It's also the way to rename a nest clip, because double-clicking one opens it. See [Clip names and labels](/timeline/names-and-labels/). | Something is selected |
+| **Label ▸** | | **Red**, **Orange**, **Yellow**, **Green**, **Blue** and **Purple**, each with its colour dot, then **None**. A checkmark shows the label the selected clips share. One undo step, "Label Clip", and a colour every selected clip already carries beeps. | Something is selected |
+
+## Nests
+
+<AtAGlance tools={['nest', 'unnest', 'set_scope']} />
+
+| Item | Keys | What it does | Available when |
+| --- | --- | --- | --- |
+| **Nest** | <kbd>⌘G</kbd> | Wraps the selected clips into one nest clip, which is selected afterwards. The nest's canvas stays at the project's size at this moment. See [Nests](/editing/nests/). | Something is selected, other than a single nest clip on its own |
+| **Un-nest** | <kbd>⇧⌘G</kbd> | Breaks a nest clip back into its clips. The nest clip's own transform, opacity, fades and volume are lost. | The selection includes a nest clip |
+| **Open Nest** | <kbd>⌘↓</kbd> | Goes inside the selected nest clip. See [Work inside a nest](/editing/inside-a-nest/). | Exactly one clip is selected and it's a nest clip |
+| **Close Nest** | <kbd>⌘↑</kbd> | Comes back out by one level. | A nest is open |
+
+**Open Nest** and **Close Nest** are greyed while you're typing in a text field.
+
+## Related
+
+- [Menus](/reference/menus/)
+- [Keyboard shortcuts](/reference/keyboard-shortcuts/)
+- [Gestures with no menu item](/reference/gestures/)
+- [Buttons and context menus](/reference/context-menus/)
+- [When an edit is refused](/getting-started/refused-edits/)

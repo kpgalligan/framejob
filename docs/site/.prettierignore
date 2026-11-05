@@ -1,0 +1,8 @@
+node_modules
+dist
+.astro
+pnpm-lock.yaml
+public
+src/assets
+src/data
+src/content

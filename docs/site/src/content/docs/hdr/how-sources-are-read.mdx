@@ -1,0 +1,144 @@
+---
+title: How sources are read
+description: How Frame Job reads each kind of video and photo you bring in, iPhone HDR included, and what it converts in an SDR project and in an HDR (HLG) project.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Frame Job reads each source as what it is: ordinary video, HLG video, an HDR10 file, wide-gamut footage or camera log. You don't need to set anything for most footage, because the file's own colour labels say how to read it. The one kind you may have to name yourself is camera log.
+
+This is Frame Job's colour management. The labels, or your Camera Log setting, choose each file's input transform, and the [project's dynamic range](/hdr/dynamic-range/) is the timeline's colour space.
+
+<AtAGlance
+  menu={['File ▸ Add Media…', 'View ▸ Show Ungraded']}
+  keys={['⇧⌘I', '⌃⌘U']}
+  where={['Media tab ▸ Camera Log', 'Media tab ▸ HDR10']}
+  tools={['import_media', 'set_media_color']}
+/>
+
+## One conversion at the start
+
+Each frame of a source is converted once, before anything else happens to it, into the colour the project works in. That's Rec. 709 in an SDR project and Rec. 2100 HLG over BT.2020 in an HDR (HLG) project. See [A project's dynamic range](/hdr/dynamic-range/) for how to choose.
+
+The chroma key and every grade then see the converted picture, so they work the same whatever the file was. The file's labels choose the conversion, and a [Camera Log](/hdr/camera-log/) set on the file chooses before its labels. The conversion is Frame Job's own, for HLG, PQ and wide-gamut sources alike.
+
+An SDR project that holds only Rec. 709 sources isn't converted at all. Its pixels and labels stay exactly as they are, because Frame Job turns the conversion on only when a source needs it.
+
+A few terms come up below. A file's **primaries** say which colours its red, green and blue are, and its **transfer curve** says how its numbers turn into brightness. Brightness is measured in cd/m², also called nits. A highlight that's **rolled off** is eased down to the brightest level the picture can show, rather than cut off flat.
+
+| Source | In an SDR project | In an HDR (HLG) project |
+| --- | --- | --- |
+| [Rec. 709 or untagged](#rec-709-and-untagged-sources) | Drawn as it is | Lifted to HDR reference white, so it looks the same |
+| [HLG video](#hlg-video) | Converted to Rec. 709, highlights rolled off smoothly | Kept as HLG, highlights above white intact |
+| [PQ or HDR10 video](#pq-and-hdr10-video) | Converted to Rec. 709, highlights rolled off at the file's own peak | Real HDR, up to 1,000 cd/m² |
+| [Wide-gamut SDR](#wide-gamut-sdr) | Converted to Rec. 709 | Converted into BT.2020 and lifted |
+| [Camera log](#camera-log) | Converted to a normal-looking Rec. 709 picture | Converted to real HDR, unless [your own LUT](/hdr/log-luts/) does the converting |
+| [HLG or PQ still](#hdr-stills) | Converted as a video of the same kind is | Drawn in its own colour, as HDR |
+| [Gain-map photo](#gain-map-photos) | Its ordinary picture | Its HDR highlights |
+
+## Rec. 709 and untagged sources
+
+Ordinary Rec. 709 video, video with no colour labels, recordings and stills are drawn as they are in an SDR project.
+
+In an HDR (HLG) project they're lifted to HDR reference white, the level ordinary white sits at: 203 cd/m², or 75 % of the HLG signal. They look the same as they do in SDR, and HDR highlights rise above them. Text, captions, shapes, graphics and the background colour are lifted the same way.
+
+## HLG video
+
+HLG video, such as iPhone HDR video, needs no setting. The file's own colour labels choose the conversion.
+
+- **In an SDR project** it's converted to Rec. 709 with its highlights rolled off smoothly. A colour Rec. 709 can't show is eased toward its own brightness instead of being clipped.
+- **In an HDR (HLG) project** it stays HLG, with its highlights above white intact. An HLG file over BT.2020 is used exactly as it is, and one over P3 or BT.709 primaries is converted into BT.2020.
+
+In an SDR project, HLG is converted whatever its primaries. A file whose primaries are absent or unknown is read as BT.2020.
+
+## PQ and HDR10 video
+
+A PQ file, usually called HDR10, is always converted.
+
+- **In an SDR project** its highlights roll off to white at the peak read from the file. Colours outside Rec. 709 are eased toward their brightness, as with HLG. You can override the peak in the Media tab's **HDR10** section. See [HDR10 peak](/hdr/hdr10-peak/).
+- **In an HDR (HLG) project** it becomes real HDR, keeping its brightness up to 1,000 cd/m². If the file's peak is above that, its highlights are rolled off to fit. A peak of 1,000 cd/m² or less doesn't change the picture.
+
+A file whose primaries are absent or unknown is read as BT.2020, as with HLG.
+
+## Wide-gamut SDR
+
+A source with BT.2020 or P3 D65 primaries and an SDR transfer curve, sRGB included, is converted to the project's colours rather than drawn with the wrong ones. This happens by itself, from the file's labels.
+
+- **In an SDR project** it's converted to Rec. 709. Colours Rec. 709 can't show are clipped.
+- **In an HDR (HLG) project** it's converted into BT.2020 and lifted, so those colours survive.
+
+An SDR project always works in Rec. 709. To keep a wide-gamut source's colours, use an HDR (HLG) project.
+
+## sRGB-transfer files
+
+A source labelled with the sRGB transfer curve is read as sRGB rather than as Rec. 709. This is automatic too. Primaries that are absent or unrecognised read as BT.709.
+
+An sRGB file with BT.709 primaries never turns the conversion on by itself. It's read as sRGB when something else in the project needs converting, and it looks the same either way. With BT.2020 or P3 D65 primaries it counts as [wide-gamut SDR](#wide-gamut-sdr).
+
+## Full-range files
+
+A file stores its levels in video range, a narrower band of the available codes, or in full range, all of them. S-Log3 and V-Log files can be stored either way, and the two need reading differently. Frame Job takes the range from the file's full-range flag. If a VP9 video has no flag, it reads the range from the VP9 track's own settings. A file with neither is read as video range.
+
+Apple Log, Apple Log 2, C-Log2 and C-Log3 are read the same way whatever the flag says.
+
+:::caution
+A non-ProRes Canon file flagged as video range that actually stores full-range codes looks too contrasty after C-Log2 or C-Log3 conversion.
+:::
+
+## Camera log
+
+Log footage looks flat and grey until it's converted, and this is the one kind of source you may have to name. Frame Job recognises Apple Log and Apple Log 2 by themselves. For Sony, Panasonic and Canon footage, choose the curve in the Media tab's **Camera Log** section. See [Camera Log](/hdr/camera-log/).
+
+- **In an SDR project** the footage becomes a normal-looking Rec. 709 picture.
+- **In an HDR (HLG) project** it's converted to HLG instead of Rec. 709, with no highlight roll-off, so it's real HDR. Footage converted with [your own LUT](/hdr/log-luts/) is the exception: a LUT's output counts as SDR.
+
+## HDR stills
+
+A still labelled HLG or PQ is treated as HDR, the way a video of the same kind is, rather than being read as SDR. Bring it in with **File ▸ Add Media…** (<kbd>⇧⌘I</kbd>) as you would any picture. This works for PNG and HEIC, which keep their colour space and depth.
+
+- **In an SDR project** the still converts as an HLG or PQ video does.
+- **In an HDR (HLG) project** it's drawn in its own colour, as HDR.
+
+Display P3, BT.709 and BT.2020 primaries are recognised, and any other reads as BT.2020.
+
+A PQ still has an [HDR10 peak](/hdr/hdr10-peak/) like a PQ video. It takes a peak but no Camera Log.
+
+A still deeper than 8 bits per channel that isn't labelled HDR is an ordinary SDR picture, drawn at full depth. See [Precision and bit depth](/hdr/precision/).
+
+## Gain-map photos
+
+An iPhone HDR photo is a HEIC with a gain map: an ordinary picture plus the information to brighten its highlights. Frame Job reads ISO 21496-1 and Apple HDR gain maps.
+
+- **In an HDR (HLG) project** the photo shows its HDR highlights.
+- **In an SDR project, and in every thumbnail,** it shows its ordinary picture.
+
+In the SDR version of an HDR project, the photo is its HDR rendition toned down, not the photo's own SDR image. That covers [Show SDR Version](/hdr/show-sdr-version/), JPEG frames and SDR-version exports.
+
+A chroma key picked on a gain-map photo keys close to, but not exactly, what it keyed before a switch to HDR (HLG). Re-pick the key if an edge changes.
+
+## The same everywhere
+
+The conversion works the same way in the preview, in every export, and in rendered and saved frames.
+
+The timeline's filmstrip and the Media tab's thumbnails follow it too:
+
+- Filmstrips of log, PQ and HLG files show the converted picture, not the raw file. In an SDR project that's the picture in the preview. In an HDR (HLG) project they're drawn as an SDR project would draw them.
+- An HLG or PQ still's thumbnail is drawn the same way. It appears a moment after import, once it's been converted.
+- Changing a PQ file's peak redraws its strip, as changing a file's Camera Log does.
+
+**View ▸ Show Ungraded** (<kbd>⌃⌘U</kbd>) turns off the grades but leaves this conversion on, because the conversion is how the file is read, not part of the grade. See [Show Ungraded](/color/show-ungraded/).
+
+## Good to know
+
+- Camera Log and the HDR10 peak belong to the file, not to a clip, so two clips of one file can't be read differently.
+- HDR reference white is fixed at 203 cd/m². There's no setting for it.
+- There's no ACES mode and no other choice of working colour space beyond SDR and HDR (HLG).
+- A chroma key on HLG footage with P3 or BT.709 primaries, or on PQ highlights above 1,000 cd/m², is close but not exact after a switch to HDR (HLG). [A project's dynamic range](/hdr/dynamic-range/) has the detail.
+
+## Related
+
+- [Camera Log](/hdr/camera-log/)
+- [HDR10 peak](/hdr/hdr10-peak/)
+- [A project's dynamic range](/hdr/dynamic-range/)
+- [Show Ungraded](/color/show-ungraded/)
+- [Import media](/projects/import-media/)

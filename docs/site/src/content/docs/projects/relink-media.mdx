@@ -1,0 +1,104 @@
+---
+title: "Relink missing media"
+description: "Point a project back at files that have moved, one at a time or a whole folder at once, and see what a relink changes and keeps."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A project points at your files where they are, so moving or deleting one leaves its clips with nothing to show. Relinking tells Frame Job where the file is now, or gives it another file to use instead.
+
+<AtAGlance
+  where={['The Missing media sheet, when a project opens', 'Right-click a row on the Media tab ▸ Relink…']}
+  tools={['relink_media', 'get_project']}
+/>
+
+## When a file goes missing
+
+A project always opens, even with files gone or offline, such as on a drive that isn't plugged in. Connect the drive and open the project again, and those files are back. For each missing file:
+
+- Its clips keep their place on the timeline and show a slate, with no sound.
+- Its row on the [Media tab](/projects/media-tab/) wears a coral **missing** badge.
+- An export still runs, and writes the slate and silence for those clips.
+
+Frame Job remembers a file by more than its path, so one you've moved or renamed is often still found and never shows as missing.
+
+## Relink from the Missing media sheet
+
+When a project opens with files missing, the **Missing media** sheet comes up. It reads "The project opened without these files: their clips keep their place on the timeline and show a slate until the files are found." Each file is listed with its old path, and the footnote counts them ("3 files").
+
+<Steps>
+
+1. Choose **Locate…** beside a file.
+
+2. Pick its new location in the panel, which reads "Choose the file for “name”." Its path appears in the row, and the button turns into **Change…**.
+
+3. Check the other rows. Frame Job has [looked in the same folder](#locate-one-file-find-the-rest) for them.
+
+4. Choose **Relink**.
+
+</Steps>
+
+**Relink** stays off until at least one file is located, then applies every choice as one undo step called **Relink Media**. You don't have to locate them all. The ones you skip stay missing, and you can [relink them later](#relink-one-file). **Cancel** changes nothing.
+
+The sheet is offered once, when the project's window opens, and doesn't appear over another sheet. After that, use the Media tab.
+
+### Locate one file, find the rest
+
+Choosing a file also looks in that file's folder for the other missing files, by name. So a shoot moved as one folder is usually found with one **Locate…**.
+
+Only the folder you pointed at is searched. A row is filled only if a file of that name is there, and a row that already has a file keeps it.
+
+## Relink one file
+
+To relink at any time, right-click the file's row on the Media tab, choose **Relink…**, and pick the file in the panel, which reads "Choose the file for “name”."
+
+This works for any file, missing or not, so you can use it to swap one file for another across every clip that shows it. It's one undo step, **Relink Media**. Thumbnails and waveforms are rebuilt if the new file is a different one, and a file that has only moved keeps them.
+
+## What Frame Job checks
+
+Frame Job reads the new file the way it reads an import:
+
+- **It must be the same kind of file.** You can't relink a movie to a sound file, for example. From the Media tab you get a beep and the reason at the foot of the inspector. In the sheet, the other relinks are applied first and then an alert gives the reason. The row stays as it was either way.
+- **It must be readable.** A file Frame Job can't open brings up an alert, and the sheet's other choices still go through.
+- **A WebM or MKV is copied as it is on import.** See [WebM and Matroska files](/projects/webm-and-matroska/). Choosing **Cancel** during the copy leaves that file out of the relink. A file macOS can't open can go through the same [ffmpeg step](/projects/ffmpeg-conversion/) as an import.
+
+## What a relink changes
+
+The row takes on the new file's duration, size, frame rate, and whether it has audio, video and alpha.
+
+A clip that runs past the end of a shorter new file is shortened to end with it, on the timeline and inside [nests](/editing/nests/). A clip that starts past the new end is cut down to a single frame. Nothing else on the timeline moves, and everything else about the clip stays as it was.
+
+A different file is analysed again, so features that use the analysis, such as [Remove Silences](/cleanup/remove-silences/), wait for the new answers.
+
+## What a relink keeps
+
+Some things don't come from the new file, so here's what happens to each:
+
+| What | After a relink |
+| --- | --- |
+| [Camera Log](/hdr/camera-log/) | Kept. It's your reading of the footage, which a new path doesn't change. |
+| A clip's [grade](/color/color-tab/) and look | Kept. They belong to the clip, not the file. |
+| [HDR10 peak](/hdr/hdr10-peak/) | Kept. The peak is read only at import, so set it by hand if the new file differs. |
+| [Cursor file](/recording/cursor-files/) | The one beside the new movie is taken. If there's none, the existing one stays, as long as it's still there and the new movie is the same size. Otherwise the media has no cursor file. |
+| Saved speech, for [Duck by Speech](/audio/duck-by-speech/) | What still fits in the new file is kept. A new file with no sound forgets it. |
+
+## Good to know
+
+- A file in the Trash isn't missing yet. Frame Job follows it there and keeps playing it until you empty the Trash.
+- A project opened from a consolidated package that has moved finds its own copies, with no sheet. See [Move a consolidated package](/projects/consolidate-media/#move-a-consolidated-package).
+- If a WebM or MKV copy has gone but the original is still there, Frame Job makes the copy again when the project opens. See [WebM and Matroska files](/projects/webm-and-matroska/).
+- A relink stores what Frame Job needs to follow the file, so the next move is followed too.
+- You can relink with a nest open. The change still applies to the whole project.
+
+## With an agent
+
+[`get_project`](/mcp/tools-projects/#get_project) lists the files that need relinking under `missing_media`, and [`relink_media`](/mcp/tools-media/#relink_media) points one at a new path, with the same checks. It makes the bookmark that follows the file for you, or takes one you pass. It works on one file at a time and doesn't search a folder. See [Tools: media](/mcp/tools-media/).
+
+## Related
+
+- [The Media tab](/projects/media-tab/)
+- [Consolidate Media](/projects/consolidate-media/)
+- [Import media](/projects/import-media/)
+- [Remove media](/projects/remove-media/)
+- [Troubleshooting](/reference/troubleshooting/)

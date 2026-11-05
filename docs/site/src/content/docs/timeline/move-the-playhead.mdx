@@ -1,0 +1,90 @@
+---
+title: "Jump around the timeline"
+description: "Move the playhead straight to the next cut, either end of the timeline, or a time you type."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+These are the quick ways to put the playhead where you want it: hop from cut to cut, go to either end of the timeline, or type a time. To drag it along the ruler, see [The ruler and playhead](/timeline/ruler-and-playhead/). To step frame by frame, see [Play, pause and shuttle](/timeline/playback/). To hop between flags, see [Markers](/timeline/markers/).
+
+<AtAGlance
+  keys={['↑', '↓', 'Home', 'End']}
+  where={['The transport buttons in the toolbar', 'The timecode field in the toolbar']}
+  tools="set_playhead"
+/>
+
+## Jump between edit points
+
+Press <kbd>↑</kbd> for the previous edit point and <kbd>↓</kbd> for the next. The **Previous Edit Point** and **Next Edit Point** buttons either side of Play in the toolbar do the same.
+
+An edit point is the start or end of any clip, on any track, and the two ends of the timeline.
+
+- <kbd>↑</kbd> with nothing earlier goes to the start of the timeline.
+- <kbd>↓</kbd> on the last edit point stays where it is.
+- Playback keeps going. The playhead jumps and plays on from there.
+- With a [nest](/editing/nests/) open, these step through the nest's clips.
+
+## Go to the start or end
+
+Press <kbd>Home</kbd> for the start of the timeline and <kbd>End</kbd> for the end, or use the **Go to Start** and **Go to End** buttons, on the outer side of the edit point buttons. Both pause playback first.
+
+The keypad's Home and End work too, and so does the <kbd>fn</kbd> key with <kbd>←</kbd> or <kbd>→</kbd> on a keyboard without them. With a nest open, they go to the start and end of the nest.
+
+## Type a time to jump
+
+The toolbar shows the playhead's time in a field. You can type into it.
+
+<Steps>
+
+1. Click the time.
+
+2. Type where you want to go.
+
+3. Press <kbd>Return</kbd> or <kbd>Tab</kbd>, or click somewhere else in the editor.
+
+</Steps>
+
+Playback pauses, the playhead moves to the nearest frame, and the keys go back to the editor, so <kbd>Space</kbd> plays straight away.
+
+The field takes any of these, whichever way the project displays time. You can leave out leading zeros, so `1:05` and `01:05` mean the same.
+
+| You type | Example | It means |
+| --- | --- | --- |
+| Hours, minutes, seconds and frames | `00:01:23:12` | 1 minute 23 seconds and 12 frames |
+| Hours, minutes and seconds with milliseconds | `00:01:23.500` | 1 minute 23.5 seconds |
+| Hours, minutes and seconds | `1:23:04` | 1 hour 23 minutes 4 seconds |
+| Minutes and seconds | `1:23` | 1 minute 23 seconds |
+| Seconds with a decimal | `83.5` | 83.5 seconds |
+| A bare number of seconds | `83` | 83 seconds |
+
+Text that isn't a time beeps, and the field goes back to the playhead's time. Only whole numbers count as frames, so `00:00:01:12.5` isn't a time.
+
+A leading minus sign is accepted, but the playhead can't go before the start, so a negative time lands on the first frame.
+
+The field shows frames by default. The [Document tab's **Timecode** row](/projects/background-and-timecode/) switches it to milliseconds, along with the duration beside it, the ruler and the times in the **Clip** and **Document** tabs. The field stops following the playhead while you type in it.
+
+## Read the duration
+
+After the time, the toolbar shows a slash and the length of what the timeline shows, such as `/ 00:00:05:07`. It's written the same way as the time, in frames or milliseconds.
+
+With a [nest](/editing/nests/) open, both numbers are the nest's: the time counts from the nest's own start, and the duration is the nest's length.
+
+## Good to know
+
+- Moving the playhead is never an edit. It makes no undo step, and it isn't saved with the project.
+- When a jump lands outside the visible part of the timeline, the view scrolls to bring the playhead back.
+- With the text of the [Transcript tab](/captions/transcript-keys/) in focus, the arrow keys move through its words.
+- None of these keys work while you're typing in a field or while a sheet is open. They do work in the [Preview Window](/timeline/preview-window/).
+
+## With an agent
+
+[`set_playhead`](/mcp/tools-view-state/#set_playhead) moves the playhead to a time and seeks the preview. It doesn't pause playback. [`split`](/mcp/tools-cut-and-delete/#split), [`freeze_frame`](/mcp/tools-speed/#freeze_frame) and [`add_marker`](/mcp/tools-tracks-and-markers/#add_marker) use the playhead when they're given no time. See [Tools: playhead, range and selection](/mcp/tools-view-state/).
+
+## Related
+
+- [The ruler and playhead](/timeline/ruler-and-playhead/)
+- [Play, pause and shuttle](/timeline/playback/)
+- [Markers](/timeline/markers/)
+- [The in/out range](/timeline/in-out-range/)
+- [Keyboard shortcuts](/reference/keyboard-shortcuts/)

@@ -1,0 +1,109 @@
+---
+title: "The canvas"
+description: "What the preview's canvas shows, how clips stack on it, and what you can do directly on the picture."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+The canvas is the fixed frame every clip is drawn into. It's where you place a clip's picture, and every export starts from it.
+
+<AtAGlance
+  where={['The preview pane', 'Document tab, for its size, rate and background']}
+  tools={['render_frame', 'set_video', 'set_selection']}
+/>
+
+<Shot
+  name="04-editor.window"
+  alt="The editor with nothing selected. In the preview pane a black 960 × 540 canvas sits in a grey surround, showing a navy video clip smaller than the frame, the words Frame Job inside a white ellipse in front of it, and a lower-third title at the bottom left. The caption under the picture reads 960 × 540 · 30 fps."
+/>
+
+## What the canvas shows
+
+The canvas shows the composition at the playhead, at the project's size, centred in the preview pane with a margin of 24 points round it. A thin line marks its edge, so a black canvas still shows against the area around it. Handles and guides stay on the picture however you zoom or pan.
+
+A clip smaller than the canvas leaves whatever is behind it showing, down to the background colour. A clip larger than the canvas is cut off at its edge.
+
+You don't set the canvas up here. Its size is on [Canvas size](/projects/canvas-size/), and its rate and background colour are on the [Document tab](/projects/document-tab/).
+
+## The caption
+
+The small line under the picture states the canvas size and frame rate, for example `1920 × 1080 · 30 fps`.
+
+## Layers
+
+Tracks stack back to front, so a track higher in the timeline draws in front of the ones below it. A track doesn't hold one kind of clip: video, image, freeze frame, text, shape, graphic and nest clips can share a track, and you place them all with the same Picture sections, apart from the exceptions on their own pages. All of them but the nest take the same gestures on the canvas.
+
+An adjustment clip has no picture of its own, so it has no box on the canvas. Select it on the timeline. See [Adjustment clips](/color/adjustment-clips/).
+
+A nest clip's picture is drawn, but it has no box on the canvas either, so a click passes through it. Select it on the timeline and place it on the [Picture tab](/canvas/picture-tab/), or [open it](/editing/inside-a-nest/) to work on the clips inside.
+
+## Working on the canvas
+
+Drag on the picture and the placement changes. The [Picture tab](/canvas/picture-tab/) shows the same placement as numbers.
+
+| To | Do this | More |
+| --- | --- | --- |
+| Select a clip | Click it. | [Select on the canvas](/canvas/select-on-canvas/) |
+| Move a clip | Drag inside its box. | [Move](/canvas/move-scale-rotate/#move) |
+| Resize a clip | Drag one of the eight square handles. | [Scale](/canvas/move-scale-rotate/#scale) |
+| Rotate a clip | Drag the round grip above the top edge. | [Rotate](/canvas/move-scale-rotate/#rotate) |
+| Crop a clip | Press <kbd>C</kbd>, or double-click a clip that isn't text. | [Crop](/canvas/crop/) |
+| Change a title's words | Double-click a text clip. | [Edit text on the canvas](/text-and-shapes/edit-text-on-canvas/) |
+| Move one end of a line or arrow | Drag its round end handle. | [Lines and arrows](/text-and-shapes/lines-and-arrows/) |
+
+Press <kbd>Esc</kbd> during a drag to [cancel it](/canvas/move-scale-rotate/#cancel-a-drag).
+
+### With an action selected
+
+While an action is selected on the clip, a move, scale, rotate or crop drag changes that action's end state, as the inspector's fields do. The box on screen still shows the frame at the playhead. See [Select an action](/motion/select-an-action/).
+
+Two things always change the clip itself: resizing a shape's box and dragging a line's end. Several clips selected at once have no selected action, so a drag on them changes the clips too.
+
+## Hidden and locked tracks
+
+Clips on a hidden track aren't drawn, so you can't click them. A clip with its [picture turned off](/editing/enable-picture-and-sound/) draws nothing either, and can't be clicked.
+
+Clips on a [locked track](/timeline/hide-and-lock-tracks/) are drawn, but you can't select or move them on the canvas. A click passes through to whatever is behind.
+
+- A locked clip you select on the timeline shows its outline on the canvas, with no handles.
+- If the front-most selected clip is locked, nothing gets handles, even when an unlocked clip is selected behind it.
+- A drag of several clips leaves any on a locked track where they are.
+
+## Canvas modes
+
+Some tools wait for a click or a drag on the picture. While one is on, the pointer is a crosshair, a hint at the top of the preview says what to do, and every click on the picture goes to that tool.
+
+| Mode | Turn it on with | The hint reads |
+| --- | --- | --- |
+| [Zoom to Region](/motion/zoom-to-region/) | <kbd>Z</kbd>, or the Zoom to Region button above the action lane | "Drag a rectangle to zoom to it · ⇧ fills · Esc to cancel" |
+| [Place on Canvas](/effects/obscure/) | **Place on Canvas** in the Obscure section | "Drag a rectangle to obscure · Esc to cancel" |
+| [Pick from Canvas](/effects/chroma-key/), for a chroma key | **Pick from Canvas** in the Chroma Key section | "Click to pick the key color · Esc to cancel" |
+| [Pick from Canvas](/color/pick-from-canvas/), for a qualifier | **Pick from Canvas** in the Qualifier section | "Click to pick the colour to qualify · Esc to cancel" |
+
+Only one mode can be on at a time, and turning one on ends any other. A mode ends when:
+
+- you finish the drag or the pick
+- you press <kbd>Esc</kbd>, which changes nothing
+- you press its key or button a second time
+- the selection changes so that it's no longer aimed at the same clips
+- for Zoom to Region and Place on Canvas, the playhead leaves the clip
+
+Zoom to Region and Place on Canvas need exactly one selected clip that's drawing at the playhead, has a box on the canvas and isn't on a locked track. Otherwise Frame Job beeps and the mode doesn't start. The **Place on Canvas** button is greyed while the clip has four regions. The two pick modes beep the same way when nothing selected can use them.
+
+A pick that lands outside the canvas beeps and the mode stays on. So does a rectangle less than 6 canvas pixels wide or high.
+
+## With an agent
+
+`render_frame` writes the frame at a moment as a picture file, through the same path an export takes, so an agent can look at what it made. See [Check the picture: render_frame](/mcp/render-frame/).
+
+`set_video` changes a clip's placement, as a drag does, and `set_selection` selects clips, as a click does. See [Tools: picture and grade](/mcp/tools-set-video/#set_video) and [Tools: playhead, range and selection](/mcp/tools-view-state/#set_selection).
+
+## Related
+
+- [Select on the canvas](/canvas/select-on-canvas/)
+- [Move, scale and rotate](/canvas/move-scale-rotate/)
+- [Zoom and pan the preview](/canvas/zoom-and-pan/)
+- [Canvas snapping](/canvas/canvas-snapping/)
+- [Safe areas](/canvas/safe-areas/)
+- [Matte tracks](/canvas/matte-tracks/)

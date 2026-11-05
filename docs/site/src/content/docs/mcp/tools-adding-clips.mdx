@@ -1,0 +1,206 @@
+---
+title: "Tools: adding clips"
+description: The agent tools that place media, titles, shapes, adjustment clips and backgrounds on the timeline, with every argument, answer and refusal.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These tools put new clips on the timeline. Three place a media file, three make a clip with no source, and two make a backdrop on a new track of its own.
+
+<AtAGlance
+  tools={['add_clip', 'insert_clip', 'overwrite_clip', 'add_text_clip', 'add_shape_clip', 'add_adjustment_clip', 'add_background', 'add_blurred_background']}
+/>
+
+## What the tools share
+
+Each one is one undo step. It answers `ok: true`, `new_clips` (the ids it made), `new_tracks` when it made a track, and the `project` summary. See [What a call answers](/mcp/what-a-call-answers/).
+
+Times and lengths are ticks, 600,000 per second, rounded to the project's frame grid. A negative `at` is taken as 0. Colours are four numbers, `[r, g, b, a]`, each from 0 to 1. See [Units and ids](/mcp/units-and-ids/).
+
+**`project`** is the path of an open project as `get_project` reports it. Without it the call goes to the frontmost project.
+
+**`scope`** is a nest id. With it, the call's ids and times are looked up inside that nest. Without it, the call goes wherever the app is looking. See [Editing inside a nest](/mcp/nests/).
+
+**The overlap rule** stops a placement that breaks it. A clip may overlap at most one neighbour on each side, and each overlap may be at most half of the shorter clip, because an overlap is a transition. A new clip that overlaps the clip before it and has no transition gets a Cross Dissolve.
+
+**A locked track** doesn't stop these tools, apart from `insert_clip`. Locks hold back gestures in the window and what a timeline-wide shift may touch.
+
+## `add_clip`
+
+Places a whole media file as one clip, as [dragging a Media-tab row onto a track](/editing/add-clips/#drag-media-onto-a-track) does.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `track` | integer | Yes | The track id. `get_project` lists them. |
+| `media` | integer | Yes | The media id. `import_media` returns one. |
+| `at` | integer | Yes | Where the clip starts on the timeline, in ticks. |
+| `scope` | integer | No | The nest to place it in. |
+| `project` | string | No | The project to act on. |
+
+The clip starts at source time 0 and runs the media's whole length, rounded down to whole frames so it never outruns the file. Trim it afterwards with [`trim_start`](/mcp/tools-move-and-trim/#trim_start) and [`trim_end`](/mcp/tools-move-and-trim/#trim_end). A picture with no length of its own runs 5 seconds.
+
+It's given Fit scale when the project's `fit_new_clips` is on, which it is by default, and the source is bigger than the canvas.
+
+It's refused when it would break the overlap rule. A file shorter than a frame or with no duration can't be placed, and neither can a LUT, which is applied as a [look](/mcp/tools-set-video/). The undo step is called "Add Clip".
+
+## `insert_clip`
+
+The insert edit, as [**Edit ▸ Insert at Playhead**](/editing/insert-and-overwrite/#insert-a-file) or <kbd>⌥</kbd>-dropping a Media-tab row does. It makes room for the whole media at `at`, so nothing is covered.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `track` | integer | Yes | The track id. |
+| `media` | integer | Yes | The media id. |
+| `at` | integer | Yes | Where to insert, in ticks. |
+| `scope` | integer | No | The nest to insert in. |
+| `project` | string | No | The project to act on. |
+
+In one step:
+
+1. The clip `at` falls inside on `track` is split.
+2. Every unlocked track opens by the media's length. Clips starting at or after `at` move later, and so do markers at or after it.
+3. The media lands in the hole.
+
+Only the destination track is cut. A clip straddling `at` on another track stays whole, which is what keeps a music bed unbroken. The exception is a cut clip's linked partner on an unlocked track, which is cut at `at` too and paired with it.
+
+It's refused when `track` is locked, because the room can't be made there, and when the split or the placing can't be done, with that step's own reason. A file `add_clip` can't place can't be inserted either. The undo step is called "Insert".
+
+## `overwrite_clip`
+
+The overwrite edit, as [**Edit ▸ Overwrite at Playhead**](/editing/insert-and-overwrite/#overwrite-with-a-file) or <kbd>⇧⌥</kbd>-dropping a Media-tab row does. It takes the room instead of making it.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `track` | integer | Yes | The track id. |
+| `media` | integer | Yes | The media id. |
+| `at` | integer | Yes | Where to overwrite, in ticks. |
+| `scope` | integer | No | The nest to overwrite in. |
+| `project` | string | No | The project to act on. |
+
+The span the media needs is cleared on `track` alone: cut at both ends, and whatever is left inside removed. Nothing shifts, so the clips after the span and every other track stay where they are.
+
+The exception is a cut clip's linked partner on an unlocked track, which is cut at the same bounds and paired. The partner's middle piece stays, unlinked.
+
+The named track is cleared even when it's locked. It's refused when the clip can't be placed once the span is clear, and a file `add_clip` can't place can't be used here either. The undo step is called "Overwrite".
+
+## `add_text_clip`
+
+Adds a text clip, a title, as the [**Add Text**](/text-and-shapes/text-clips/#add-a-text-clip) button does. It has no source, so it can be any length. Style it afterwards with `set_text` and place it with `set_video`.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `track` | integer | Yes | The track id. |
+| `at` | integer | Yes | Where it starts, in ticks. |
+| `duration` | integer | No | Its length, in ticks. Default 5 seconds (`3000000`). |
+| `text` | object or string | No | A plain string is the words. An object is a `set_text` patch merged over a new clip's look. Default: the placeholder "Title". |
+| `scope` | integer | No | The nest to add it in. |
+| `project` | string | No | The project to act on. |
+
+A new clip is 72 px white Source Sans 3 Bold, centred. An object can set anything [`set_text`](/mcp/tools-clip-properties/) can, including `content`, `font`, `size`, `color`, `align`, `valign`, `outline`, `backdrop`, `width`, `animation`, `case`, `words` and `word_style`. See [Patches](/mcp/patches/).
+
+```json
+{ "track": 3, "at": 1800000, "text": "Chapter one" }
+{ "track": 3, "at": 1800000, "duration": 1200000,
+  "text": { "content": "Chapter one", "size": 96, "align": "left" } }
+```
+
+It's refused for a duration under one frame, for an unknown key or a bad value in the patch, by name, and when it would break the overlap rule. The undo step is called "Add Text".
+
+## `add_shape_clip`
+
+Adds a rectangle, ellipse, line or arrow drawn over the video, as [**Add Shape**](/text-and-shapes/shape-clips/#add-a-shape-clip) does. Like text, it has no source and can be any length. [`set_shape`](/mcp/tools-clip-properties/) changes it afterwards and `set_video` places it.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `track` | integer | Yes | The track id. |
+| `at` | integer | Yes | Where it starts, in ticks. |
+| `duration` | integer | No | Its length, in ticks. Default 5 seconds (`3000000`). |
+| `shape` | object or string | No | A plain string is a kind: `rectangle`, `ellipse`, `line` or `arrow`. An object is a `set_shape` patch merged over the default rectangle. |
+| `scope` | integer | No | The nest to add it in. |
+| `project` | string | No | The project to act on. |
+
+Leave out `shape` for the default: a 320×120 rectangle, outlined with no fill. An object can set `kind`, `width`, `height`, `stroke`, `fill`, `radius`, `arrow_start`, `arrow_end`, `from`, `to` and `gradient`.
+
+A rounded rectangle is a rectangle with a `radius`, not a kind of its own. An arrow is created with its head on, so pass `arrow_end: false` for a bare diagonal. A box bigger than the canvas gets Fit scale when `fit_new_clips` is on, as oversized footage does.
+
+It's refused for a duration under one frame, for an unknown kind, key or value, by name, and when it would break the overlap rule. The undo step is called "Add Shape".
+
+## `add_adjustment_clip`
+
+Adds an adjustment clip, as [**Insert ▸ Adjustment Clip**](/color/adjustment-clips/#insert-an-adjustment-clip) does. It has no picture of its own. While it lasts, it grades everything drawn behind it: every lower track and the canvas background, never a track in front.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `track` | integer | Yes | The track id. |
+| `at` | integer | Yes | Where it starts, in ticks. |
+| `duration` | integer | No | Its length, in ticks. Default 5 seconds (`3000000`). |
+| `scope` | integer | No | Leave it out. Passing it is refused, because this edit has no meaning inside a nest. |
+| `project` | string | No | The project to act on. |
+
+Grade it with [`set_video`](/mcp/tools-set-video/): `color`, `wheels`, `curves`, `look`, `qualifier`, and the point filters (sepia, noir, vignette and invert). Its `opacity` is the grade's strength. On a track cut by a [matte](/canvas/matte-tracks/) it grades only inside the matte, and on a matte track it does nothing.
+
+It's refused:
+
+- inside a nest, whether you pass `scope` or a nest is open
+- in any transition or overlap. Fade it with `opacity` instead.
+
+Later, `set_video` gives an error for blur, sharpen, pixelate or a blend mode on it. The undo step is called "Add Adjustment Clip".
+
+## `add_background`
+
+Puts a backdrop on a new back-most track, starting at 0 and running the timeline's length, as [**Clip ▸ Add Background**](/canvas/backgrounds/) does. The clip is named "Background".
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `color` | array of four numbers | No | The plate's colour, as `[r, g, b, a]`, each from 0 to 1. White when left out. |
+| `media` | integer | No | A media id to show instead of a colour. `import_media` adds a file. |
+| `duration` | integer | No | Its length, in ticks. Default: the whole timeline's length, and never less than one frame. |
+| `scope` | integer | No | The nest to add it in. |
+| `project` | string | No | The project to act on. |
+
+With no arguments it's a canvas-sized white rectangle, which is what the menu's **Solid Color** row sends. It's white because the canvas is already black, so a black plate would appear to do nothing. A full-canvas gradient is this clip with [`set_shape`](/mcp/tools-clip-properties/)'s `gradient` after it.
+
+With `media` the picture goes there at Fill scale, where `add_clip` would Fit it, because a plate that leaves the canvas showing down one side has failed. A video plate stops where its file does, whatever `duration` says. A picture runs the timeline, or for `duration` when you give one.
+
+It answers both `new_tracks` and `new_clips`, and the track holds the lower id.
+
+These are errors, and nothing is added:
+
+- `media` and `color` together
+- a `duration` under one frame
+- a file with no picture, such as a sound file
+- a colour that isn't four numbers from 0 to 1
+
+The undo step is called "Add Background".
+
+## `add_blurred_background`
+
+The screencast backdrop, as [**Clip ▸ Add Blurred Background**](/canvas/backgrounds/#blurred-background) does. It copies a clip onto a new back-most track at the same start, duration, speed and source window, so the two play exactly the same frames.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip id. `get_project` lists them. |
+| `scope` | integer | No | The nest the clip is in. |
+| `project` | string | No | The project to act on. |
+
+The copy is named "Blurred Background". It's scaled to fill the canvas, centred, uncropped, blended normally and blurred at full strength.
+
+Its sound is off, or the mix would play one recording twice. It drops the original's ducking, because a copy keeping it would duck the whole mix, and it drops its transition, actions and label too.
+
+It answers both `new_tracks` and `new_clips`, and the track holds the lower id.
+
+These are errors, and nothing is added:
+
+- a nest clip, whose copy would come out sharp
+- a source with no pixel size, such as a text clip or a sound-only clip
+- a clip with no video properties
+
+The undo step is called "Add Blurred Background".
+
+## Related
+
+- [Tools: media](/mcp/tools-media/)
+- [Tools: moving and trimming](/mcp/tools-move-and-trim/)
+- [Tools: text, shapes and clip names](/mcp/tools-clip-properties/)
+- [Tools: picture and grade (set_video)](/mcp/tools-set-video/)
+- [Patches](/mcp/patches/)

@@ -1,0 +1,95 @@
+---
+title: Restyle a caption track
+description: Switch a caption track to another word style or look by generating it again, or change the font and backdrop of a run of captions in the inspector.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+There are two ways to restyle captions, depending on what you want to change. A word style and its looks are set when the captions are generated, so changing those means generating again. Font, outline and backdrop are ordinary text settings, which you can change on a run of captions in the inspector.
+
+<AtAGlance
+  menu="File ▸ Generate Captions…"
+  where={['The Generate Captions sheet ▸ Replace:', 'Clip tab ▸ Text']}
+  tools={['transcribe', 'set_text']}
+/>
+
+## Restyle by generating again
+
+<Steps>
+
+1. Choose **File ▸ Generate Captions…** and set **From:** to the same clips.
+
+2. Set **Style:** to the new word style and tick any [looks](/captions/word-caption-looks/).
+
+3. Tick **Replace: existing captions**. The line under it names each track it will remove, with its caption count, for example "Replaces “Captions” (12 captions)."
+
+4. Choose **Generate**.
+
+</Steps>
+
+The old tracks are removed and the new one takes their place at the front of the stack, all in one undo step, **Generate Captions**. The new track takes the first free name, so a lone **Captions** track is replaced by another called **Captions**.
+
+What it costs depends on the engine:
+
+- **AssemblyAI:** the kept transcript is reused whatever style you ask for, so nothing is uploaded and nothing is billed. That holds while the language, **Speakers:** and **Vocabulary:** match the transcript and **Transcribe again:** stays unticked. See [Transcribe with AssemblyAI](/captions/assemblyai-transcription/).
+- **On this Mac:** the audio is recognised again. It's free, but it takes the time again.
+
+:::caution
+New pages are made from the transcript, not from the old track. Words you corrected, pages you split or trimmed, and anything you restyled by hand go with the old track. To page a track again and keep your corrections, use [Re-lay Captions](/captions/re-lay-captions/) instead.
+:::
+
+## Which tracks Replace may remove
+
+**Replace:** is available only for a word style, and only when there's a track it may replace. It's greyed out with Subtitles chosen. When it isn't available, it's unticked and the line under it is hidden.
+
+A track qualifies when:
+
+- it's named **Captions** or **Captions N**, such as **Captions 2**. A track you renamed doesn't qualify.
+- it holds at least one clip, and only text clips.
+- every one of those clips overlaps a clip being transcribed.
+
+The last rule is about the whole track. If even one caption on it sits outside what **From:** covers, the track is left alone and **Replace:** won't list it. Choosing a wider **From:** can bring it in.
+
+The old track's style doesn't matter, so **Replace:** also swaps out a Subtitles track or an [imported](/captions/import-captions/) one that meets these rules.
+
+## Change a run of captions together
+
+To change the font, outline or backdrop and leave the word style alone, select the captions and use the inspector.
+
+<Steps>
+
+1. [Select the captions](/timeline/selecting-clips/) on the timeline.
+
+2. Open the **Clip** tab and its **Text** sub-tab.
+
+3. Change what you need under [**Font**, **Style**](/text-and-shapes/text-style/), [**Outline**, **Backdrop**](/text-and-shapes/text-outline-and-backdrop/) or [**Box**](/text-and-shapes/text-box/).
+
+</Steps>
+
+Each page keeps its own words and word timing. Its word style stays too: the highlight colour, the pop and the pill only change by generating again, or through an agent. See [Word colours](/captions/word-caption-looks/#word-colours).
+
+:::note
+A change of typeface on a word caption page, which a text preset also makes, means Re-lay Captions no longer recognises its track and [keeps it as placed](/captions/re-lay-captions/#tracks-kept-as-placed).
+:::
+
+## Good to know
+
+- **Replace:** always opens unticked. The sheet doesn't remember it.
+- A hidden or locked caption track is replaced like any other, and the new track is visible and unlocked.
+- If you cancel a run, nothing is placed and the old tracks stay.
+- If one file can't be transcribed, the captions from the other files are still placed and the old tracks still go, so the captions over that file's clips are lost. Undo brings them back.
+- To go from a word style back to Subtitles, generate the Subtitles track, then [remove the old one](/timeline/manage-tracks/). **Replace:** isn't available for that.
+- With a [nest](/editing/nests/) open, the sheet works on that nest's tracks.
+
+## With an agent
+
+[`transcribe`](/mcp/tools-captions/#restyle-captions) restyles the same way with `replace`, as long as it asks for a word style and places the captions. An agent can also change a placed page's word style directly with [`set_text`](/mcp/tools-clip-properties/#word-style), which keeps your corrected words. See [Word colours](/captions/word-caption-looks/#with-an-agent).
+
+## Related
+
+- [Generate Captions](/captions/generate-captions/)
+- [Word caption styles](/captions/word-caption-styles/)
+- [Looks for word captions](/captions/word-caption-looks/)
+- [Edit captions](/captions/edit-captions/)
+- [Re-lay captions for a canvas](/captions/re-lay-captions/)

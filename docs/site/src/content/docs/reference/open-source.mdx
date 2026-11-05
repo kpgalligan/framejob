@@ -1,0 +1,49 @@
+---
+title: Open source and notices
+description: Frame Job's Apache License 2.0, and where to read the third-party notices every copy of the app carries.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Frame Job is open source. This page gives its licence, and says where to find the notices for the third-party software it includes.
+
+<AtAGlance
+  where="Frame Job.app ▸ Contents/Resources/Acknowledgements.txt"
+/>
+
+## Frame Job's licence
+
+Frame Job is released under the Apache License, Version 2.0. The full text is the [LICENSE file](https://github.com/kpgalligan/framejob/blob/main/LICENSE) at the root of the repository.
+
+## Third-party notices
+
+Every copy of the app carries `Acknowledgements.txt`, which lists every third-party notice the app owes, each with its licence text. It's written at each build, from the Rust crates, the Assistant helper's npm packages, Bun, Sparkle, the encoders, the voice-activity model and the fonts.
+
+There's no entry for it in the About panel. To read it:
+
+<Steps>
+
+1. In the Finder, right-click Frame Job and choose **Show Package Contents**.
+
+2. Open `Contents/Resources/Acknowledgements.txt`.
+
+</Steps>
+
+## What carries its own licence
+
+Some of what ships with Frame Job keeps its own licence, beside it in the app or listed in `Acknowledgements.txt`.
+
+| Part | Licence | Where its text is |
+| --- | --- | --- |
+| Fonts: Anton, Bebas Neue, Darker Grotesque, IBM Plex Mono, Montserrat, Source Sans 3 and Source Serif 4 | SIL Open Font License | `Contents/Resources/Fonts/`, one `OFL-` file for each family |
+| The voice-activity model, Silero VAD | MIT | `Contents/Resources/Models/LICENSE` |
+| SVT-AV1 and libvpx, the [AV1 and VP9](/export/av1-and-vp9/) encoders | BSD 3-Clause Clear and BSD 3-Clause | `Contents/Resources/Licenses/svt-av1/` and `Contents/Resources/Licenses/libvpx/`, with their patent texts |
+| A patched copy of tiny-skia, which draws [graphics](/graphics/what-is-a-graphic/) | BSD 3-Clause | `Acknowledgements.txt` |
+
+The published app also includes Sparkle, for [updates](/getting-started/updates/). A copy you build yourself has no updater.
+
+## Related
+
+- [Requirements and install](/getting-started/requirements-and-install/)
+- [Updates](/getting-started/updates/)

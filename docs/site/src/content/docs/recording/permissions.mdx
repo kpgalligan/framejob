@@ -1,0 +1,112 @@
+---
+title: "Recording permissions"
+description: "Which macOS permissions a recording needs, when Frame Job asks for each one, and what to do when one is missing."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A recording can need up to four macOS permissions, depending on what you record. Frame Job asks for them only when you press **Record** in the recorder panel, and never during a countdown.
+
+<AtAGlance
+  where={['New Recording panel ▸ Record', 'System Settings ▸ Privacy & Security']}
+  tools="record_screen"
+  needs="macOS's Screen Recording, Input Monitoring, Camera and Microphone permissions, as the table below says."
+/>
+
+## Which permissions you need
+
+| Permission | Needed when | Where it lives in **System Settings ▸ Privacy & Security** | Relaunch afterwards? |
+| --- | --- | --- | --- |
+| **Screen Recording** | You record a display or a window. | **Screen & System Audio Recording** | Yes |
+| **Input Monitoring** | **Record shortcuts** is ticked and you record a display or a window. | **Input Monitoring** | No |
+| **Camera** | **Source** is **Camera**, or **Record the camera too** is ticked. | **Camera** | Yes, after a denial |
+| **Microphone** | A microphone is chosen, which every voice-over needs. | **Microphone** | Yes, after a denial |
+
+A camera on its own or a voice-over doesn't need Screen Recording.
+
+## When Frame Job asks
+
+A press of **Record** checks every permission it needs before the countdown begins, so a countdown never ends in a prompt. If one is missing, that press stops there, and the panel's note says what to do. The recorder panel is the only place Frame Job asks for these or opens System Settings for them.
+
+The checks run in a fixed order, and stop at the first one missing:
+
+| You're recording | The order |
+| --- | --- |
+| A display or a window | Screen Recording, Input Monitoring, Camera, Microphone |
+| A camera on its own | Camera, Microphone |
+| A voice-over (**Source** is **Microphone Only**) | Microphone |
+
+Frame Job skips any that the recording doesn't need. Before any of them, it checks that you've picked what to record: a window, a camera, or a microphone for a voice-over.
+
+## Screen Recording
+
+The first press of **Record** without the permission shows macOS's prompt. The panel's note reads:
+
+> Screen Recording is not granted to Frame Job. Turn it on in System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording, then relaunch.
+
+Turn it on, relaunch Frame Job, and press **Record** again.
+
+macOS shows that prompt only once, and Frame Job remembers it has asked. Every later press without the permission opens System Settings at the right pane instead, and the note adds "System Settings is open at that pane."
+
+## Input Monitoring
+
+**Record shortcuts** needs Input Monitoring to see key presses. macOS shows no prompt for it, and Frame Job isn't in that pane's list until you add it. So a press of **Record** without it opens System Settings at the pane, and the note reads:
+
+> Input Monitoring is not granted to Frame Job. Turn it on in System Settings ▸ Privacy & Security ▸ Input Monitoring. If Frame Job is not in its list, add it with +. System Settings is open at that pane.
+
+Turn Frame Job on there, adding it with **+** if it isn't listed, and press **Record** again. No relaunch is needed, and **Record shortcuts** doesn't need Accessibility.
+
+## Camera
+
+If you've never answered, macOS's prompt appears. It reads "Frame Job records the camera you choose, into a file of its own. Nothing is sent anywhere."
+
+- Allowing it carries on to the microphone check and the countdown.
+- Denying it leaves the panel idle, with a note saying the camera isn't granted.
+
+If you've denied it before, the press opens System Settings at the Camera pane instead, and the note says so. Turn it on there and relaunch Frame Job.
+
+## Microphone
+
+If you've never answered, macOS's prompt appears. It reads "Frame Job records the microphone you choose alongside a screen recording, into a file of its own beside the movie. Nothing is sent anywhere."
+
+- Allowing it starts the countdown straight away, as long as the panel is still open.
+- Denying it leaves the panel idle, with a note saying the microphone isn't granted.
+
+If you've denied it before, the press opens System Settings at the Microphone pane instead, and the note says so. Turn it on there and relaunch Frame Job.
+
+## If you started Frame Job from a terminal
+
+A Frame Job started from a terminal or another app runs under that app's permissions, not its own. Turning on Frame Job in System Settings then makes no difference.
+
+The panel's note says so, and names the process that launched it by its process number (pid):
+
+> This Frame Job was launched by another process (pid 4182), so the grant that counts is that application's — the terminal's, for a shell launch; or relaunch with open -a "Frame Job".
+
+Either give the permission to that app, or quit Frame Job and start it from the Finder, the Dock or `open -a "Frame Job"`.
+
+In a launch like this, Frame Job doesn't remember having asked. Each press without Screen Recording asks macOS again rather than opening System Settings.
+
+## The panel steps aside
+
+The recorder panel usually floats above other windows. While a macOS prompt or System Settings is up, it stops floating so that it doesn't cover them. It floats again when you allow a camera or microphone prompt, on your next press of **Record**, or when you open the panel again.
+
+## macOS's recurring alert
+
+macOS periodically asks whether to keep letting Frame Job record the screen. Frame Job can't see this alert, and the permission still reads as granted, so a capture waiting behind it looks like a recording that won't start.
+
+If the panel stays on **Starting…** and then says "The recording did not start within 20 s.", look for the alert on the screen. Answer it and press **Record** again.
+
+## With an agent
+
+`record_screen` never asks for a permission and never opens System Settings, because a prompt needs a person in front of it. It checks each permission it needs and, if one is missing, stops with a sentence that names it and says where to turn it on. Grant it once from the panel.
+
+If the recording doesn't start or finish in time, it reports that a macOS alert may be waiting. See [Record with record_screen](/mcp/record-screen/).
+
+## Related
+
+- [The recorder panel](/recording/recorder-panel/)
+- [Record a display](/recording/record-a-display/)
+- [Record shortcuts](/recording/record-shortcuts/)
+- [Record a camera](/recording/record-a-camera/)
+- [Record a voice-over](/recording/voice-overs/)
+- [When a recording stops on its own](/recording/when-a-recording-stops/)

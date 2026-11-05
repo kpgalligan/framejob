@@ -1343,6 +1343,29 @@ on your own account, never the spike's.
 - **Answer:** do the Dock, the About panel (Light and Dark) and the package's document icon all show the new viewfinder mark?
 - **Source:** spec §11 NM-11, rename R2.
 
+## The documentation site
+
+What `docs/site/` states that the code leaves to macOS. Each one is a sentence on a page that a
+person can settle in a moment; correct the page if it reads otherwise.
+
+**DOC-1 — The File menu's Duplicate and Save As… keys**
+- **Do:** 1. Open a saved project. 2. Open the File menu. 3. Hold ⌥ with the menu open.
+- **Expect:** the menu shows Duplicate on ⇧⌘S, and holding ⌥ turns it into Save As… on ⌥⇧⌘S, as `/projects/save-and-revert/` says. The code builds Save As… on ⇧⌘S and macOS supplies the swap.
+- **Answer:** do the two items and their keys match the page?
+- **Source:** `docs/site/src/content/docs/projects/save-and-revert.mdx`.
+
+**DOC-2 — Return in the export sheet's custom size field**
+- **Do:** 1. Open the export sheet and set Size to Custom. 2. Type a width and press Return.
+- **Expect:** you can tell whether Return only applies the size or also starts the export. `/export/size/` names only Tab, a click in the other field and Export…; add Return there if it only applies the size, and warn of it if it starts the export.
+- **Answer:** which of the two does Return do?
+- **Source:** `docs/site/src/content/docs/export/size.mdx`.
+
+**DOC-3 — One drag in the Colors panel on the canvas background**
+- **Do:** 1. In the Document tab, click the background colour. 2. Drag in the Colors panel for a second or two. 3. Choose Edit ▸ Undo.
+- **Expect:** you can tell how many undo steps the drag made. `/projects/background-and-timecode/` doesn't say; add it if it isn't one.
+- **Answer:** did one Undo put the colour back?
+- **Source:** `docs/site/src/content/docs/projects/background-and-timecode.mdx`.
+
 ## Published build
 
 After a push to `publish` has made a release (`docs/developing.md`,

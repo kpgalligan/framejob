@@ -3,7 +3,8 @@
 Frame Job can find who and what is in a clip's picture: faces, people and the
 regions the eye is drawn to. It finds them on this Mac with Apple's Vision
 framework — nothing is uploaded and no key is needed — and keeps what it found
-in the project's cache, so it is found once per file. This page covers what is
+in the project's cache, so it is found once per file, and found again after the
+file or macOS changes. This page covers what is
 found, how to see it, how **Clip ▸ Follow Subject…** frames the selected clips
 on it, how **File ▸ Make Vertical Version…** makes a tall or square version of
 the whole timeline, and how an agent reframes a clip with it.
@@ -16,19 +17,20 @@ keeps:
 - **Faces** — each face's box, how it is turned, and how open the mouth is.
 - **People** — each person's head and shoulders, as a box.
 - **Salient regions** — the parts of the picture the eye goes to first, as
-  boxes. In a talking-head shot this is usually the speaker; on a slide it is
-  often the text.
+  boxes.
 
 Boxes are found in each sample on its own: Frame Job does not follow a person
 from one moment to the next or put names to faces.
 
 Nothing is looked at when you import a file. A file is analysed when something
 asks for it — **Clip ▸ Follow Subject…** and **File ▸ Make Vertical
-Version…** (below), an agent
+Version…** (below), **Clip ▸ Switch by Speaker…** when cameras share one
+microphone (it finds faces, see [Multicam](multicam.md)), an agent
 (`get_media_analysis` with `kind: "faces"` or `"subjects"`, see [MCP](mcp.md)),
 or `reframe_clip` (below); Follow Subject and `reframe_clip` ask for the part of
-the file each clip plays. Analysis runs in the background and
-keeps what it has found if it is stopped; asking again continues it.
+the file each clip plays. Analysis runs in the background and saves what it has
+found about every 30 seconds; if it is stopped it keeps what it last saved, and
+asking again continues from there.
 
 ## Show Subjects
 
@@ -51,7 +53,8 @@ an analysis itself, so turning it on costs nothing.
 
 Show Subjects is a view of the window: it is off in a new window, it is not
 remembered between launches, and it never changes an export or a saved frame.
-Choose it again to turn it off. It has no shortcut and is always available.
+Choose it again to turn it off. It has no shortcut and is available except
+while a sheet is open.
 
 ## Follow Subject
 
@@ -119,9 +122,9 @@ not while a recording runs. The sheet has five controls:
   Empty are the same remembered choice as Follow Subject's (Speaker, which
   Follow Subject does not offer, opens Follow Subject on Subject); Zoom always
   starts at 100 %, the scale at which a picture just covers the new canvas.
-- **Make a copy** — ticked whenever the sheet opens. With it, the vertical
-  version opens as a new untitled project, named after this one with the shape
-  — "Interview (9:16)" — and this project does not change; save the copy when
+- **Make a copy** — ticked each time you choose the command. With it, the
+  vertical version opens as a new untitled project, named after this one with
+  the shape — "Interview (9:16)" — and this project does not change; save the copy when
   you want to keep it. Unticked, this project itself becomes the vertical
   version.
 
@@ -148,12 +151,14 @@ Each clip with a picture on the top-level timeline is treated by what it is:
   not cut away and back; two people talking at once are framed together when
   they fit, and while nobody talks the last speaker stays. Every other movie
   clip follows its faces. A shot whose faces cannot be framed by who is
-  talking (it changes shot, say) follows its faces instead, and the summary
-  says why.
+  talking (it changes shot, say, or the clip that overlaps it most on one of
+  its microphones has its sound off) follows its faces instead, and the
+  summary says why.
 - **A screen recording with its cursor file** follows the pointer instead of
   a face: the frame sits on the pointer and moves only when it strays from
-  the middle of the frame, arrives on each click — the move ends on the
-  click's frame, so the click lands in view — and holds still while you type.
+  the middle of the frame, arrives on each click outside that middle — the
+  move ends on the click's frame, so the click lands in view — and holds still
+  while you type.
   Any zoom and pan of its own (say **Clip ▸ Auto Zoom…**'s) is replaced, since
   the tall frame is already a close-up. When the cursor file cannot be read
   (it was moved or deleted), the recording is shown whole on a blurred copy,
@@ -221,8 +226,8 @@ With **Speaker** chosen the sheet shows two more rows:
   clear the pop-ups are already set, and the note under them says "Each
   microphone is matched to the face that talks with it; change one if it is
   wrong."; check each row names that microphone's person. When the faces do
-  not show who is whose — mouths too still or too small to read — each
-  pop-up says **Choose a face** and the note asks you to choose: pick each
+  not show who is whose — a mouth does not move closely enough with its
+  microphone — each pop-up says **Choose a face** and the note asks you to choose: pick each
   microphone's face yourself.
 
 **Make** is offered once two to four microphones are ticked, a shot plays
@@ -244,8 +249,8 @@ The whole change is one undo step, **Make Vertical**: in the copy, **Edit ▸
 Undo Make Vertical** gives back the landscape edit; in place, it takes the
 command back on this project.
 
-A vertical canvas shows the middle of a landscape picture enlarged: a 1080p
-source framed on 1080 × 1920 is enlarged ×1.78, which can look soft on a
+Filling a vertical canvas shows only part of a landscape picture, enlarged: a
+1080p source framed on 1080 × 1920 is enlarged ×1.78, which can look soft on a
 phone. Shoot 4K for footage you mean to make vertical.
 
 ## Reframing a clip (for agents)
@@ -273,8 +278,8 @@ chooses what to follow with `follow`:
   from left to right). Each change of speaker is a cut, held at least 2 s;
   two people talking at once are framed together when they fit, and while
   nobody talks the last speaker stays. When the faces do not show who is
-  whose — mouths too still or too small to read — the call is refused,
-  naming where each face is across the picture; name each microphone's face
+  whose — a mouth does not move closely enough with its microphone — the
+  call is refused, naming where each face is across the picture; name each microphone's face
   with `mic_faces`, in `mics`' order, and call it again. A clip that changes
   shot is refused: split it at its shot changes first. **File ▸ Make Vertical
   Version…**'s Follow **Speaker** (above) is its menu: it frames each such

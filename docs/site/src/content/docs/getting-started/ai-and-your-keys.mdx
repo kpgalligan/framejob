@@ -1,0 +1,88 @@
+---
+title: AI features and your own keys
+description: Which features need nothing, which use an on-device model, which need your own Anthropic or AssemblyAI key, and what ever leaves your Mac.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Most of Frame Job needs no key and no network. The few features that send your words or audio to a cloud model run on your own API keys, so you decide what's used and you pay the provider directly.
+
+<AtAGlance
+  menu="Frame Job ▸ Settings…"
+  keys="⌘,"
+  where={['Settings ▸ Assistant', 'Settings ▸ Transcription']}
+  tools={['transcribe', 'transcribe_for_fillers']}
+  needs="Your own Anthropic or AssemblyAI key, only for the features that send to them."
+/>
+
+## Your own keys
+
+There's no Frame Job account and no relay in between. There are two keys in all, and each provider bills your account directly.
+
+| Key | Turns on | Saved in |
+| --- | --- | --- |
+| Anthropic | The Assistant | [Settings ▸ Assistant](/assistant/set-up/) |
+| AssemblyAI | Cloud captions and Remove Filler Words | [Settings ▸ Transcription](/captions/assemblyai-key/) |
+
+Frame Job shows its own estimate of what each Assistant turn and each month costs. See [What it costs](/assistant/cost/). The provider's bill is the real figure.
+
+With no key set, Settings says "No API key is set." in its ordinary muted colour. That only means there's no key yet, and it isn't an error.
+
+## What needs what
+
+Anything that sends your words or audio to a language or cloud model needs your own key. Everything that runs on your Mac needs none.
+
+| What it takes | Features |
+| --- | --- |
+| Nothing | Editing, colour, graphics, recording, export, Split at Shot Changes, and connecting an [MCP client](/mcp/overview/#an-mcp-client-or-the-assistant), which brings its own model |
+| An on-device model, with no key and no upload | **Generate Captions** with **On this Mac**, Remove Silences' voice analysis, Enhance Voice and Voice Isolation, Remove Background, Follow Subject, Make Vertical Version and Switch by Speaker |
+| Your AssemblyAI key | The **AssemblyAI** engine of **File ▸ Generate Captions…**, and **Clip ▸ Remove Filler Words…** with its **Transcribe** buttons |
+| Your Anthropic key | The Assistant |
+
+Filler removal works only through AssemblyAI. There's no on-device version.
+
+Without your Anthropic key, **View ▸ Assistant** still opens the tab, which says how to add the key.
+
+Work you've already paid for keeps working with no key:
+
+- **Generate** isn't greyed when every file is already transcribed.
+- **Remove Filler Words…** stays on while a file it would work on has a current transcript made with filler words.
+
+An on-device language that isn't installed yet shows a **Download** row in the [Generate Captions](/captions/generate-captions/) sheet.
+
+## Greyed commands
+
+A command that needs a key you haven't set is greyed rather than hidden, and it says which key and where to set it.
+
+A greyed menu item's title gains the key's name, as in **Remove Filler Words… (needs your AssemblyAI key)**. Rest the pointer on a greyed command or button and it reads:
+
+> No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription.
+
+For the Assistant it's the same sentence with Anthropic and Assistant. The Assistant tab itself reads "Add your Anthropic API key in Settings to use the assistant." with an **Open Settings…** button.
+
+An agent's tool stops with the same sentence, at the point it would send. See [Transcripts for filler words](/cleanup/filler-transcripts/) for what still works without a key.
+
+## Saving a key takes effect at once
+
+Saving or removing a key updates open sheets and menu items straight away. An open Generate Captions sheet turns **Generate** back on with the sheet still up, and there's nothing to reopen or relaunch.
+
+## What stays on this Mac
+
+Editing, analysis, on-device transcription, recording and export all stay on this Mac. Only these reach the network, and each is something you start or can see:
+
+| Goes to | What | When |
+| --- | --- | --- |
+| AssemblyAI | The audio of the files being transcribed | When you press **Generate** or **Transcribe** with that engine. **Verify** in Settings also makes a small request with your key, with no audio. See [What goes to AssemblyAI](/captions/assemblyai-privacy/). |
+| Anthropic | Your Assistant messages, the project's details and the frames it renders | While you use the Assistant. See [Assistant privacy](/assistant/privacy/). |
+| GitHub | A request for LiteLLM's published price table, which the cost estimates use, with no key and no project data | At most once a day, from the Assistant's helper |
+| GitHub | A check of the update feed, and the update itself when you choose to install one | In the [downloaded copy](/getting-started/updates/) only, when you check or if you allowed automatic checks |
+| macOS's own download | An on-device speech model | When you ask for one |
+
+Frame Job has no analytics or telemetry code.
+
+## Related
+
+- [Set up the Assistant](/assistant/set-up/)
+- [Your AssemblyAI key](/captions/assemblyai-key/)
+- [Transcribe on this Mac](/captions/on-device-transcription/)
+- [Troubleshooting](/reference/troubleshooting/)

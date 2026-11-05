@@ -1,0 +1,85 @@
+---
+title: "Canvas size"
+description: "Set the project's frame size and aspect ratio from a preset, a source file or typed numbers, and choose whether your clips scale along with it."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+The canvas is the fixed frame every clip is composited into, and every export starts from its size. Change it when the whole video should be a different shape.
+
+<AtAGlance where="Document tab ▸ Canvas" tools="set_canvas" />
+
+A new project starts at 1920 × 1080. A project opened from a movie or a picture takes that file's size, and one opened from a sound file starts at 1920 × 1080.
+
+## Pick a preset
+
+<Steps>
+
+1. Open the [Document tab](/projects/document-tab/).
+
+2. Tick **Resize clips proportionally** if you want your layout to [follow the new size](#resize-your-clips-with-the-canvas).
+
+3. In the **Canvas** section, choose a size from **Preset**.
+
+</Steps>
+
+The list runs in this order:
+
+- **1080p · 1920 × 1080**
+- **4K · 3840 × 2160**
+- **720p · 1280 × 720**
+- **Vertical · 1080 × 1920**, the 9:16 shape for TikTok, reels and shorts
+- **Square · 1080 × 1080**
+- **1440p · 2560 × 1440**
+- **Source Size**, which [matches a file](#match-a-source-file)
+- **Custom**, which the popup shows when the size matches none of these. Choosing it beeps and changes nothing, so [type the size](#type-a-size) instead.
+
+Each change is one undo step.
+
+## Match a source file
+
+Choose **Source Size** in **Preset** to set the canvas to the size of the first media file that has a picture size. It beeps when no file in the project has one, as in a project of sound files only.
+
+A file with an odd width or height can't be used. Choosing it puts up the same alert as [typing an odd number](#type-a-size), and the size stays as it was.
+
+## Type a size
+
+Type into **Width** and **Height**, in pixels. **Preset** then reads **Custom**, unless the size happens to match a preset or the first media file that has a picture size.
+
+- Both numbers must be even. An odd number puts up an alert such as "canvas width must be even (h.264 encodes in macroblocks), not 1081", and the size stays as it was.
+- The range is 16 to 16,384. A number outside it is pulled to the nearest limit.
+- A number with a fraction is rounded to a whole pixel.
+
+A project opened from an odd-sized movie keeps that size. Once you change either field, though, both sides are checked. If one side is odd, fix that side first. If both are, choose a preset, because a field can only change one side at a time.
+
+## Resize your clips with the canvas
+
+**Resize clips proportionally** decides what happens to your clips at the next size change. It's off by default.
+
+| Setting | What a size change does |
+| --- | --- |
+| Off | Clips keep their scale and their distance in pixels from the centre of the canvas. |
+| On | Every clip's position and scale change by the same ratio as the canvas, so the layout looks the same at the new size. |
+
+When the shape of the canvas changes too, a clip's horizontal position follows the width and its vertical position follows the height. Its scale follows the smaller of the two ratios, so a clip that fitted the old canvas still fits the new one.
+
+The checkbox is a preference on this Mac. It's remembered across launches and it isn't saved in the project, so ticking it is not an undo step. The size change it scales is.
+
+## Good to know
+
+- A resize scales each clip's own placement. An [action](/motion/actions/) that moves a clip keeps its old target, so check any animated moves afterwards.
+- Clips inside a [nest](/editing/nests/) aren't touched. A nest keeps the size it was made at.
+- To turn a landscape timeline into a tall or square one, with each clip reframed, use [Make Vertical Version](/framing/make-vertical-version/).
+- Captions can follow a new canvas too. See [Re-lay captions for a canvas](/captions/re-lay-captions/).
+
+## With an agent
+
+[`set_canvas`](/mcp/tools-tracks-and-markers/#set_canvas) takes the size and, on each call, whether to scale the clips, with `rescale_clips`. It doesn't read the checkbox, so leaving `rescale_clips` out means the clips aren't scaled. A size outside the range isn't pulled to the limit as a typed one is: the call fails and nothing changes. See [Tools: tracks, markers and canvas](/mcp/tools-tracks-and-markers/).
+
+## Related
+
+- [The Document tab](/projects/document-tab/)
+- [Position, scale, rotation and opacity](/canvas/transform/)
+- [Make Vertical Version](/framing/make-vertical-version/)
+- [Export size](/export/size/)

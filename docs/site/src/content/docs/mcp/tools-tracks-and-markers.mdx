@@ -1,0 +1,238 @@
+---
+title: "Tools: tracks, markers and canvas"
+description: "The agent tools that add, reorder and set up tracks, place and change markers, and change the project's canvas."
+---
+
+These tools change the three things a project's clips sit in: the track stack, the markers on the ruler and the canvas. Each call that changes something is one undo step.
+
+Track `index` 0 is the back of the layer stack, the bottom lane of the timeline. A higher index draws in front. Ids come from [`get_project`](/mcp/get-project/), and times are ticks, 600,000 to the second. See [Units and ids](/mcp/units-and-ids/).
+
+## `add_track`
+
+Adds an empty track. It's **Track ▸ New Track** (<kbd>⇧⌘N</kbd>, see [New Track](/timeline/manage-tracks/#new-track)), except that an agent can choose where in the stack the track goes. The menu item always adds at the front.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `index` | integer | No | Where in the stack, from 0 at the back to the track count at the front. Default: the front. |
+| `name` | string | No | The track's name, such as `Titles`. Spaces at either end are dropped. Default: `Track` and the new count, so `Track 4` when there were three. A name of only spaces counts as no name. |
+| `scope` | integer | No | Add the track inside this nest. `index` then counts that nest's own tracks. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+**Answers** with `new_tracks`, holding the new track's id, and the [project summary](/mcp/what-a-call-answers/).
+
+**Refuses** an `index` past the front, naming the range. A project holds at most 64 tracks, and that limit counts the tracks in every nest as well as the timeline's.
+
+## `remove_track`
+
+Removes a track. It's **Track ▸ Remove Track**, see [Remove Track](/timeline/manage-tracks/#remove-track). Where the menu item asks in an alert before it removes clips, the tool never asks: it refuses until you pass `with_clips`.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `track` | integer | Yes | The track's id. |
+| `with_clips` | boolean | No | Remove the track's clips too. Default: false. |
+| `scope` | integer | No | Look the track up inside this nest. |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+**Answers** with the project summary.
+
+**Refuses** two things:
+
+- The only track left. A project always keeps one, and `with_clips` doesn't get past this.
+- A track that still holds clips, unless `with_clips` is true. The message names up to three of the clips, gives a count for the rest, and says to pass `with_clips: true`.
+
+## `move_track`
+
+Moves a track to a new place in the layer stack, sliding the tracks it passes the other way. It's dragging a track header, see [Reorder tracks](/timeline/manage-tracks/#reorder-tracks).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `track` | integer | Yes | The track's id. |
+| `index` | integer | Yes | Its new position, from 0 at the back to one less than the track count. |
+| `scope` | integer | No | Look the track up inside this nest. `index` then counts that nest's own tracks. |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+**Answers** with the project summary. A track that's already at `index` answers "made no change".
+
+**Refuses** an `index` past the last track, naming the range.
+
+## `set_track`
+
+Changes a track's name, its four switches, its matte and its mix. Anything you leave out keeps its value.
+
+The switches are the track header's toggles and **Track ▸ Hide Video**, **Mute Audio**, **Lock Track** and **Solo**, see [Hide and lock tracks](/timeline/hide-and-lock-tracks/) and [Mute and solo tracks](/audio/mute-and-solo/). `volume` and `pan` are **Track ▸ Mix…**, see [Track volume and pan](/audio/track-volume-and-pan/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `track` | integer | Yes | The track's id. |
+| `name` | string | No | The track's new name. Spaces at either end are dropped, and an empty name leaves the track unnamed. |
+| `hidden` | boolean | No | Drops the track's picture from the composition. |
+| `muted` | boolean | No | Silences the track's sound. |
+| `locked` | boolean | No | Keeps every ripple, insert and range edit off the track. |
+| `solo` | boolean | No | Silences every other track in the same container that isn't also soloed. Mute wins on a track that's both, and pictures aren't touched. |
+| `matte` | string | No | `none`, `alpha`, `alpha_inverted`, `luma` or `luma_inverted`. See [Track mattes](#track-mattes). |
+| `volume` | number | No | The track's fader as a linear gain from 0 to 4, multiplying every clip's own volume on it. 1 is unity, 4 is +12.04 dB and 0 is silent. |
+| `pan` | number | No | The track's balance, from −1 (left) to 1 (right). It's a constant-power balance after each clip's own pan, and a mono source isn't panned. |
+| `compressor` | object | No | The track's compressor, or `null` for off. See [A track's compressor and limiter](#a-tracks-compressor-and-limiter). |
+| `limiter` | object | No | The track's limiter, or `null` for off. See [A track's compressor and limiter](#a-tracks-compressor-and-limiter). |
+| `scope` | integer | No | Look the track up inside this nest. |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+A container is the timeline, or one nest's own tracks. `volume` and `pan` play through nests: a nested clip is affected by its own track and by the track of every nest clip around it.
+
+**Answers** with the project summary. A call that sets what's already there answers "made no change".
+
+**Refuses** a call that names none of the optional arguments, and a `volume` or `pan` outside its range. Neither value is clamped.
+
+### Track mattes
+
+`matte` makes a track cut the track directly behind it in its container, as **Track ▸ Matte** does. See [Matte tracks](/canvas/matte-tracks/).
+
+| Value | In **Track ▸ Matte** | What cuts the track behind |
+| --- | --- | --- |
+| `none` | **Off** | Nothing. It's an ordinary track again. |
+| `alpha` | **Alpha** | The matte track's alpha. |
+| `alpha_inverted` | **Inverted Alpha** | Its alpha, inverted. |
+| `luma` | **Luma** | Its brightness. |
+| `luma_inverted` | **Inverted Luma** | Its brightness, inverted. |
+
+The matte track's clips aren't drawn, but they still sound. Where the matte track shows nothing, the track behind shows uncut. A back-most matte track, or one in front of another matte track, cuts nothing.
+
+### A track's compressor and limiter
+
+`compressor` and `limiter` are **Track ▸ Mix…**'s **Compressor** and **Limit peaks**, see [Track compressor and limiter](/audio/track-dynamics/). They run on the track's sub-mix, after every clip, its volume and its pan, compressor first. The limiter's ceiling is on what the track hands the mix.
+
+Each takes an object, and that object **replaces the whole setting**. A key you leave out takes its default, not the value the track had. This is the opposite of [`set_audio`](/mcp/tools-set-audio/#set_audio), where objects merge. `null` clears the setting, and leaving the argument out keeps it.
+
+| `compressor` key | Range | Default |
+| --- | --- | --- |
+| `threshold_db` | −60 to 0 dB | −18 |
+| `ratio` | 1 to 20 | 3 |
+| `attack` | 0 or more ticks | 6,000 (10 ms) |
+| `release` | 0 or more ticks | 120,000 (200 ms) |
+| `makeup_db` | 0 to 24 dB | 0 |
+
+| `limiter` key | Range | Default |
+| --- | --- | --- |
+| `ceiling_db` | −24 to 0 dBTP | −1 |
+| `release` | 600 to 600,000 ticks | 60,000 (100 ms) |
+
+An unknown key, a mistyped value or a value out of range is refused, naming the key.
+
+- **Timeline tracks only.** A nest's tracks have no compressor or limiter, so either argument is refused inside a nest. The track holding a nest clip is that nest's bus.
+- **Exact in every export.** The preview runs them approximately.
+- **Measuring tools don't hear them.** Normalize, the Loudness readout, Enhance Voice and Match Audio all measure without the track's compressor and limiter.
+
+## `remove_empty_tracks`
+
+Removes every track that holds no clips. It's **Track ▸ Remove Empty Tracks**, see [Remove Empty Tracks](/timeline/manage-tracks/#remove-empty-tracks).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `scope` | integer | No | Tidy this nest's tracks instead. |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+When every track is empty, the back-most one stays, because a project always keeps one.
+
+**Answers** with the project summary, or "made no change" when no track can go.
+
+## `add_marker`
+
+Adds a marker to the timeline. It's **Mark ▸ Add Marker** (<kbd>M</kbd>), see [Add a marker](/timeline/markers/#add-a-marker), with a name, a colour and a chapter setting available in the same call.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `at` | integer | No | Where, in ticks. It's rounded to the project's frame grid, and a time before 0 becomes 0. Default: the playhead. |
+| `name` | string | No | The marker's name. Default: `Marker` and the new count, so `Marker 3` when there were two. |
+| `chapter` | boolean | No | Also make it a [chapter](/export/chapters/) of the exported file. Default: false. |
+| `color` | string | No | A colour name such as `red`, not a hex string. See [Marker colours](/timeline/markers/#marker-colours). Default: red. |
+| `scope` | integer | No | The tool lists it, but a nest has no markers, so naming one is refused. |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+**Answers** with `new_markers`, holding the new marker's id, and the project summary.
+
+**Refuses:**
+
+- A frame that already has a marker. The message names that marker. Two markers can't share a frame.
+- A project already at its limit of 1,024 markers.
+- Any call while a nest is open, because a marker sits at project time and the times in that call would be the nest's. Leave the nest with `set_scope` and no arguments first. See [Editing inside a nest](/mcp/nests/).
+
+## `set_marker`
+
+Moves or renames a marker, or changes its colour or chapter setting. Anything you leave out keeps its value. It mirrors dragging a flag on the ruler and the marker's row in the Document tab, see [Move, rename and remove a marker](/timeline/markers/#move-rename-and-remove-a-marker).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `marker` | integer | Yes | The marker's id. |
+| `time` | integer | No | The new time, in ticks. It's rounded to the project's frame grid, and a time before 0 becomes 0. |
+| `name` | string | No | The new name. An empty name leaves the marker unnamed. |
+| `chapter` | boolean | No | Make it a chapter of the exported file, or stop it being one. |
+| `color` | string | No | A colour name. An empty string keeps the colour it has. |
+| `scope` | integer | No | The tool lists it, but a nest has no markers, so naming one is refused. |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+**Answers** with the project summary.
+
+**Refuses** a call that names none of `time`, `name`, `chapter` and `color`, and a `time` on a frame another marker holds.
+
+With a nest open, `time` is refused for the same reason as in [`add_marker`](#add_marker). `name`, `chapter` and `color` still work, and the answer lists the edit under `document_ops`. See [Document edits while a nest is open](/mcp/nests/#document-edits-while-a-nest-is-open).
+
+## `remove_marker`
+
+Removes a marker. It's **Delete** in the marker's row in the Document tab, see [Move, rename and remove a marker](/timeline/markers/#move-rename-and-remove-a-marker).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `marker` | integer | Yes | The marker's id. |
+| `scope` | integer | No | The tool lists it, but a nest has no markers, so naming one is refused. |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+**Answers** with the project summary. With a nest open it still works, and the answer lists the edit under `document_ops`.
+
+## `set_canvas`
+
+Changes the project's canvas, the fixed frame every clip is drawn into. Anything you leave out keeps its value.
+
+It mirrors the **Canvas**, **Frame Rate** and **Appearance** sections of the [Document tab](/projects/document-tab/). See [Canvas size](/projects/canvas-size/), [Project frame rate](/projects/frame-rate/), [Canvas background and timecode](/projects/background-and-timecode/), [A project's dynamic range](/hdr/dynamic-range/) and [Blending](/hdr/blending/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `width` | integer | No | Canvas width in pixels, 16 to 16,384. It must be even. |
+| `height` | integer | No | Canvas height in pixels, 16 to 16,384. It must be even. |
+| `rescale_clips` | boolean | No | Scale every clip's placement with the canvas, so a layout looks the same after a resize. Default: false. |
+| `fps` | array | No | The frame rate as `[numerator, denominator]`, each a whole number of 1 or more: `[30, 1]`, `[30000, 1001]` for 29.97, `[24000, 1001]` for 23.976. A bare whole number such as `30` also works. |
+| `background` | array | No | The colour behind every layer as `[r, g, b, a]`, four numbers from 0 to 1. |
+| `fit_new_clips` | boolean | No | Give a new clip Fit scale when its source is bigger than the canvas. |
+| `timecode_frames` | boolean | No | Show times as `HH:MM:SS:FF` rather than `HH:MM:SS.mmm`. |
+| `output` | string | No | The project's dynamic range: `sdr` (Rec. 709, the default for a project) or `hlg` (HDR, Rec. 2100 HLG). |
+| `blending` | string | No | How layers blend: `encoded` (the default for a project) or `linear` light. |
+| `scope` | integer | No | The tool lists it, but a nest's size is fixed, so naming one is refused. |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+**Answers** with the project summary, or "made no change" when the canvas already says what you sent.
+
+**Refuses:**
+
+- A call with nothing to change.
+- A `width` or `height` that's outside its range or odd.
+- An `fps` term that isn't a whole number from 1 to 4,294,967,295.
+- A fractional bare `fps` such as `29.97`. The message gives the pair to send.
+- A `background` that isn't exactly four numbers, or has a value outside 0 to 1. It isn't filled in or clamped.
+
+With a nest open, the call applies to the whole project instead, and the answer lists it under `document_ops`.
+
+**Resizing.** Without `rescale_clips`, clips keep their pixel positions. With it, each clip's `x` follows the width's ratio, its `y` the height's, and its `scale` the smaller of the two, so a layer that fitted the old canvas still fits the new one. Two things stay as they were: the end of a move or scale in an [action](/mcp/tools-animation/) keeps its old target, and the clips inside a nest don't change, because a nest keeps its own size.
+
+**Changing the frame rate** moves every clip's start and length, every action's span and every marker to the new grid, on the timeline and inside nests. On a coarser grid, two markers can land on one frame. When they do, the first in the project's list stays and the other is dropped. The change goes ahead even if two clips end up overlapping by up to a frame more.
+
+**Changing `output`** keeps every grade's settings, and a chroma key keeps keying the colour it was picked on. A qualifier's ranges read the HLG signal, so re-pick them after switching.
+
+**Changing `blending`** to `linear` makes a dissolve keep its brightness, and soft edges and glows come out brighter. Grades, keys and qualifiers work on the same values as before.
+
+## Related
+
+- [Tracks](/timeline/tracks/)
+- [Add, rename and reorder tracks](/timeline/manage-tracks/)
+- [Markers](/timeline/markers/)
+- [The Document tab](/projects/document-tab/)
+- [Editing inside a nest](/mcp/nests/)
+- [What a call answers](/mcp/what-a-call-answers/)

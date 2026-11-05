@@ -1,0 +1,91 @@
+---
+title: Font and text style
+description: Choose a text clip's font and size, then set its colour, alignment, capitals, line spacing and letter spacing.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The **Font** and **Style** sections of the **Text** sub-tab set how a text clip's words look. Select a text clip to reach them. Both start closed, so click a header to open its section. The **Font** header shows the size and the **Style** header shows the alignment.
+
+<AtAGlance
+  where={['Clip tab ▸ Text ▸ Font', 'Clip tab ▸ Text ▸ Style']}
+  tools="set_text"
+/>
+
+## Choose a font
+
+**Family** lists every font family installed on your Mac, plus the ones Frame Job ships with: Source Sans 3, Source Serif 4, Montserrat, Anton, Bebas Neue, Darker Grotesque and IBM Plex Mono.
+
+**Style** lists the faces of that family, such as Regular or SemiBold.
+
+When you change **Family**, Frame Job keeps the current style if the new family has one of that name. Otherwise it uses Regular, or the family's first style if it has no Regular. Both controls make an undo step called **Font**.
+
+See [Fonts](/text-and-shapes/fonts/) for more on the faces.
+
+## Set the size
+
+**Size** runs from 6 to 800 px, and a new clip starts at 72 px. Type a value or use the quick picks: 24, 36, 48, 72, 96 and 144.
+
+The size is in canvas pixels, so the same number looks smaller on a larger canvas. For a size worked out from the canvas, use a [preset](/text-and-shapes/text-presets/).
+
+## Set the colour
+
+**Color** is white by default. Click its swatch to open the colour panel, and set the colour and its opacity there.
+
+## Align the text
+
+| Control | Choices | Default |
+| --- | --- | --- |
+| **Align** | **L**, **C** or **R** | Centre |
+| **Vertical** | Top, middle or bottom of the box | Middle |
+
+Both make an undo step called **Alignment**.
+
+With the box on **Auto-size**, the box is as wide as the longest line, so **Align** lines up the shorter lines and a single line doesn't move. In a [fixed-width box](/text-and-shapes/text-box/), it places every line in the box. To move the text itself, drag it on the canvas or use [Transform](/canvas/transform/).
+
+A text box is always as tall as its words, so **Vertical** moves the text by a pixel or two at most.
+
+## Show the text in capitals
+
+Tick **UPPERCASE** to draw the text in capitals. What you typed is kept as you typed it, so unticking the box brings it back. It never changes the number of words, so it's safe on captions timed word by word.
+
+The [canvas text editor](/text-and-shapes/edit-text-on-canvas/) shows the text as you typed it, not in capitals.
+
+## Adjust the spacing
+
+| Control | What it does | Default | Range |
+| --- | --- | --- | --- |
+| **Line spacing** | The space between lines, as a multiple of the font's line height | 1× | 0.5 to 4× |
+| **Tracking** | Extra space between letters. Below 0 pulls them together. | 0 px | −20 to 100 px |
+
+## Reset the style
+
+**Reset** in the **Style** section's header puts everything in that section back, in one undo step called **Text Style**:
+
+- **Color** to white
+- **Align** to centre and **Vertical** to middle
+- **UPPERCASE** off
+- **Line spacing** to 1× and **Tracking** to 0 px
+
+It shows while something in the section differs from those values and no action is selected. It doesn't touch the font or the size, and the **Font** section has no **Reset** of its own. To put **Size** back to 72 px, right-click its label and choose **Reset to default**.
+
+## Change the style during a clip
+
+With an [action](/motion/actions/) selected, these controls set the look at that action's end. **Size**, **Color**, **Line spacing** and **Tracking** ease towards the new value, and colours [blend in OKLab](/motion/what-can-animate/#colours-blend-in-oklab). **Family**, **Style**, **Align**, **Vertical** and **UPPERCASE** switch when the action ends.
+
+## With an agent
+
+An agent names a font by its one PostScript name, such as `SourceSans3-Bold`, rather than by family and style. A colour is four numbers from 0 to 1: red, green, blue and opacity. **Align** is `align` (`left`, `center` or `right`), **Vertical** is `valign` (`top`, `middle` or `bottom`), and **UPPERCASE** is `case` (`as_written` or `upper`).
+
+An agent isn't held to the ranges above: a size or line spacing only has to be above 0, and tracking can be any number. See [Tools: text, shapes and clip names](/mcp/tools-clip-properties/#set_text).
+
+## Good to know
+
+A project can name a font this Mac doesn't have. The **Text** sub-tab still opens, showing the first family in the list, and the text draws in a substitute until you install the font or choose another.
+
+## Related
+
+- [Fonts](/text-and-shapes/fonts/)
+- [Text outline and backdrop](/text-and-shapes/text-outline-and-backdrop/)
+- [Text box and wrapping](/text-and-shapes/text-box/)
+- [Text presets](/text-and-shapes/text-presets/)

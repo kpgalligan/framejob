@@ -1,0 +1,123 @@
+---
+title: "What counts as silent"
+description: "How Remove Silences decides a moment is quiet: Voice or Level, what the mix changes, and why a stretch isn't offered for cutting."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Remove Silences cuts a stretch only when it's quiet as you hear it, in the mix, and only where every clip it's measuring is quiet at once. The **In:** menu sets which clips those are. **Judge by:** in the sheet picks how each moment is tested.
+
+<AtAGlance
+  menu="Clip ▸ Remove Silences…"
+  where="Judge by: in the Remove Silences sheet"
+  tools="detect_silence"
+  needs="Nothing. Voice detection runs on your Mac, with no key and no upload."
+/>
+
+## Judge by Voice or Level
+
+| **Judge by:** | A moment is quiet when |
+| --- | --- |
+| **Voice** | Nobody is talking. |
+| **Level** | The sound in the mix is at or below the threshold. |
+
+The sheet opens on **Voice** every time, unless [the voice model can't be used](#when-the-voice-model-cant-be-used).
+
+Voice listens for speech, not for loudness. A low recording level doesn't make speech quiet, and in a clip that holds a voice, a loud sound that isn't speech, such as a hum, still counts as quiet. If a recording has sounds you want to keep, such as the audio of a demo, choose **Level**.
+
+## Voice mode
+
+A voice-activity model that comes with Frame Job (Silero VAD) scores every 32 ms of a file for how likely it is to be speech. A moment counts as speech when its score reaches the voice confidence, a value from 0 to 1 that the sheet always holds at 0.5.
+
+You don't start the analysis. It runs by itself after you import a file or open a project, listens to each file once and keeps the answer with the project. It runs on your Mac, and nothing is uploaded.
+
+In Voice mode the threshold row reads **Level if no voice:**, and it does two jobs:
+
+- It's the level for [clips with no voice in them](#clips-with-no-voice-are-judged-by-level).
+- A clip the mix turns down to that level or lower is quiet whatever it holds. At the default −40 dBFS, that's a clip turned down by 40 dB or more.
+
+The same voice analysis also serves [Duck by Speech](/audio/duck-by-speech/), [Enhance Voice](/audio/enhance-voice/), [Synchronize Audio](/audio/synchronize-audio/), [Speed Up Typing](/recording/speed-up-typing/), [Switch by Speaker](/multicam/switch-by-speaker/) and the [transcript's word timing](/captions/transcript-words/).
+
+## Clips with no voice are judged by level
+
+In Voice mode, a clip with no voice in it at all, such as music or a tone, would read as quiet from start to end. So Frame Job judges that clip by level instead, against **Level if no voice:**, and the sheet names it:
+
+- One clip: "Intro music at 00:00:12:00 holds no voice and is judged by level."
+- Several: "3 clips hold no voice and are judged by level: …", followed by each clip's name and time.
+
+The test covers only the part of the file the clip plays. That's why the sheet names clips and not files: two clips of one file can be judged differently.
+
+## Level mode
+
+In Level mode a moment is quiet when the sound in the mix is at or below **Quieter than:**. That's the file's waveform with the [mix](#silence-is-measured-in-the-mix) applied, measured in 10 ms steps. When a step holds more than one reading, as it does in a clip playing at ×2, the louder reading counts, so a step is quiet only if all of it is.
+
+**Quieter than:** runs from −80 to −10 dBFS and starts at −40 dBFS. See [The controls](/cleanup/remove-silences/#the-controls).
+
+## Silence is measured in the mix
+
+Remove Silences measures what you hear, not the raw file. The mix is the file's sound after everything that changes its volume in the project. These all count:
+
+- The clip's volume, its fades and any volume change in an action
+- Ducking from another clip
+- Muting a clip or a track, and soloing another track
+- The track's volume
+
+In Level mode, a clip you've turned down reads quieter by exactly as much. In Voice mode, turning a clip down makes it quiet only once it reaches the level in **Level if no voice:**. Above that, speech is still speech.
+
+Effects on the clip don't count. Remove Silences hears the file without its [voice effect](/audio/voice-effects/) or [Voice Isolation](/audio/voice-isolation/).
+
+## Every clip being measured has to be quiet
+
+A stretch is silent only where every clip being measured is quiet. A music bed under a voice-over therefore keeps the pauses in the speech from being cut, because the music is still playing through them.
+
+To cut those pauses, select the voice clip and set **In:** to **Selected clips**, so only the voice is measured.
+
+:::caution
+**In:** changes what's measured, not what's cut. The cut still runs across every unlocked track, so the music is cut at the same places. [Lock its track](/timeline/hide-and-lock-tracks/#lock-track) to leave the music where it is. See [How a clean-up cut works](/cleanup/how-cleanup-cuts-work/).
+:::
+
+## Muted clips are left out
+
+A clip the mix silences all the way through is left out of the analysis entirely. That covers a muted clip, a clip silenced by a solo, and a clip turned down or faded to nothing. This holds whichever **In:** choice you make, even for a selected clip.
+
+So a muted music bed is never read as one long silence covering the whole song. It doesn't hold a cut up either. Where it's the only thing playing, there's nothing to measure, and the stretch is left alone like a gap.
+
+## While a file is still being analysed
+
+Nothing inside a file is offered for cutting until its analysis is ready, so a clip can't be cut as silence only because its waveform hasn't arrived yet. This often shows straight after an import.
+
+| Mode | What it waits for | The sheet says |
+| --- | --- | --- |
+| Level | The waveform | "The waveform is still being analysed for …" |
+| Voice | The voice analysis | "Speech is still being analysed for …" |
+| Voice, for a clip with no voice | The voice analysis, then the waveform | "The waveform is still being analysed for …. Anything inside it that holds no voice is left alone until it lands." |
+
+There's one exception in every mode. A part the mix has already turned down far enough to be quiet can still be cut, because no analysis can change that answer, and the sheet names the clip.
+
+You can leave the sheet open. It updates as each file finishes.
+
+If a file's sound can't be read to its end, Frame Job doesn't keep the analysis, and it tries again the next time you open the project. Until then, nothing inside that file is offered for cutting.
+
+## When the voice model can't be used
+
+If the voice model can't be used on this Mac, the sheet opens in **Level** mode with **Voice** greyed out, and it says "The voice model could not be used, so quiet is judged by level." This lasts until you relaunch Frame Job.
+
+## Limits of Voice mode
+
+- A soft word that scores under the voice confidence reads as quiet. Raise **Keep at ends:** if a word gets clipped.
+- A clip that holds any voice is judged by voice for its whole length. So a long music clip with a little speech in it isn't judged by level, and the music around that speech reads as quiet. Use **In:** **Selected clips** to keep it out of the measurement.
+- The model hears each file mixed down to mono, whatever the clip's pan or channel settings. A voice on only one side of a stereo file reaches it quieter.
+
+## With an agent
+
+`detect_silence` takes the same choices as the sheet, and one the sheet doesn't have: the voice confidence, which is how sure the model must be for a moment to count as speech. It runs from 0.1 to 0.9, with a default of 0.5, and it also decides which clips count as holding no voice. It works in Voice mode only, and asking for it in Level mode or outside that range gets an error that says why. The answer lists the clips judged by level, and the files they play.
+
+While the voice model can't be used, an agent that asks for Voice by name gets an error telling it to use Level. One that doesn't name a mode gets Level, with the same note the sheet shows. See [`detect_silence`](/mcp/tools-clean-up/#detect_silence).
+
+## Related
+
+- [Remove Silences](/cleanup/remove-silences/)
+- [How a clean-up cut works](/cleanup/how-cleanup-cuts-work/)
+- [On-device media analysis](/projects/media-analysis/)
+- [Mute and solo tracks](/audio/mute-and-solo/)
+- [Ducking](/audio/ducking/)

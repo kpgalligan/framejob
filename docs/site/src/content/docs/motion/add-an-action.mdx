@@ -1,0 +1,83 @@
+---
+title: Add an action
+description: Add a 1-second action at the playhead, see when Add Action is available, and find out why Frame Job might not place one.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Add Action puts a new [action](/motion/actions/) on the selected clip at the playhead, ready for you to say what it animates to.
+
+<AtAGlance
+  menu="Clip ▸ Add Action"
+  keys="⌥⌘K"
+  where="Clip tab ▸ action lane ▸ + (Add Action)"
+  tools="add_action"
+/>
+
+## Add Action
+
+<Steps>
+
+1. Select a clip and put the playhead over it.
+
+2. Press <kbd>⌥⌘K</kbd>. **Clip ▸ Add Action** and the **+** button in the Clip tab's [action lane](/motion/action-lane/) do the same.
+
+3. In the Clip tab, change what you want the clip to reach by the end of the action. To fade the clip out over that second, for example, set **Opacity** in the **Picture** sub-tab to 0%.
+
+</Steps>
+
+The new action starts at the playhead, lasts 1 second and uses the **Linear** curve. It's one undo step.
+
+## A new action starts empty
+
+A new action's end state is empty, so it changes nothing until you edit it. The band appears, and the clip looks and sounds the same as before.
+
+The action is selected as it's added, so the Clip tab is ready for its end state. See [Set what an action animates to](/motion/edit-an-action/). The playhead stays where it is, at the action's start, so the preview shows the change only once you move through the action or play it.
+
+## When Add Action is available
+
+Add Action needs the playhead over a selected clip. Otherwise **Clip ▸ Add Action** is greyed out, and the action lane's **+** button beeps.
+
+## Several clips selected
+
+With several clips selected, the action goes on the first selected clip under the playhead and isn't selected, because only a single selected clip can have a selected action. Select that clip alone to edit the new action.
+
+## When there's no room for an action
+
+The new action needs a clear second after the playhead. Frame Job beeps and adds nothing when the action would:
+
+- overlap another action on the clip, or
+- run past the clip's end.
+
+The reason appears at the foot of the inspector, after "Refused:". See [When an edit is refused](/getting-started/refused-edits/).
+
+Near the end of a clip, move the playhead back first, or [shorten an existing action](/motion/change-an-action/). A clip shorter than 1 second has no room for an action from Add Action.
+
+## Other commands that make actions
+
+These commands write ordinary actions. They show as bands and edit like any other.
+
+| Command | What it adds |
+| --- | --- |
+| [Zoom to Region](/motion/zoom-to-region/) | One 1-second **Ease In Out** action that zooms to a rectangle you draw |
+| [Zoom Back](/motion/zoom-to-region/#zoom-back) | One 1-second **Ease In Out** action back to the clip's own size and place |
+| [Clip ▸ Speed Ramp…](/speed/make-a-ramp/) | One action for Ramp Up and Ramp Down, two for Speed Dip and Speed Burst |
+| [Clip ▸ Auto Zoom…](/recording/auto-zoom/) | Zoom actions planned from a recording's cursor file |
+| [Clip ▸ Follow Subject…](/framing/follow-subject/) | Moves that keep a subject in frame |
+| [Clip ▸ Camera Layout](/framing/camera-layouts/) | Moves from one layout to the next |
+| [The volume line](/audio/volume-line/) | An action for each point you add with <kbd>⌥</kbd>-click |
+
+Only Add Action, Zoom to Region and Zoom Back select the action they make.
+
+## With an agent
+
+`add_action` takes the clip, a start in clip time and an optional length, 1 second if left out, so an agent can place an action shorter than 1 second where Add Action has no room. The new action's id comes back in `new_actions`. See [`add_action`](/mcp/tools-animation/#add_action).
+
+## Related
+
+- [Set what an action animates to](/motion/edit-an-action/)
+- [Actions](/motion/actions/)
+- [Select an action](/motion/select-an-action/)
+- [What an action can animate](/motion/what-can-animate/)
+- [Move, resize or remove an action](/motion/change-an-action/)

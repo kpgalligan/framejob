@@ -1,0 +1,50 @@
+---
+title: "The level meter"
+description: Read the two-row meter in the timeline bar to see how loud the mix is while it plays, and whether it reaches full scale.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The level meter shows how high the mix you're hearing sits while the timeline plays, and warns you when a sample reaches full scale, the loudest level digital sound can hold.
+
+<AtAGlance where="The timeline bar, left of the zoom controls" />
+
+## What it shows
+
+The meter shows what you hear: each clip's volume, fades, ducking, mute and solo, and the compressor and other effects. Press play and it moves. There's nothing to turn on.
+
+It has two rows, one per channel, with the left channel on top. A mono track shows in both rows, and a track with more than two channels shows only its first two.
+
+At normal speed it measures the mix itself, so two tracks playing the same sound read as one louder sound, and a sound and its inverse read as silence. At any other speed it adds up each track's level instead. That can read a little higher than the mix, and it can light the clip cell when the mix itself wouldn't reach full scale.
+
+## Read the meter
+
+Each row runs from −60 dB on the left to 0 dB on the right. The scale is even in dB, so the middle of a row is −30 dB. It has no tick marks.
+
+| Part | What it tells you |
+| --- | --- |
+| **Solid bar** | The average (RMS) level. It rises at once and falls at 24 dB a second. |
+| **Lighter wash** behind the bar | The instantaneous peak. It rises and falls the same way, and it's never shorter than the bar. |
+| **Peak-hold mark** | The highest recent level. It stays for about 1.2 seconds, then falls at 12 dB a second. |
+| **Clip cell** at the right end of each row | Lights for 2 seconds whenever a sample in that row reaches full scale. |
+
+A level above 0 dB fills the row and goes no further, so the clip cell is what tells you the mix went over.
+
+## When playback stops
+
+The bars fall back to the floor. The peak-hold mark stops waiting and falls with them, and a lit clip cell stays lit for the rest of its 2 seconds. The whole meter is at rest within about 3 seconds.
+
+## Good to know
+
+- The meter shows peaks and average level, not loudness. For LUFS and true peak, use [the Loudness Meter](/audio/loudness-meter/).
+- It shows the preview's mix. An export also goes through a master limiter, so what an export measures can differ. See [Export loudness](/export/loudness/).
+- There's one meter for the whole app. With two projects open, the meter in both windows follows the one that's playing, and stopping one project doesn't blank the meter while the other plays on.
+- In a narrow window the meter gets smaller, and below 40 points wide it isn't drawn at all.
+- The recorder panel has its own meter for the microphone. See [The recorder panel](/recording/recorder-panel/).
+
+## Related
+
+- [The Loudness Meter](/audio/loudness-meter/)
+- [Mute and solo tracks](/audio/mute-and-solo/)
+- [Limiter](/audio/limiter/)
+- [Play, pause and shuttle](/timeline/playback/)

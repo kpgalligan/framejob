@@ -1,0 +1,140 @@
+---
+title: "Record a camera beside the screen"
+description: "Record your webcam or another camera at the same time as a display or a window, for a talking head over a screencast, and choose how it lands."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Tick one box and Frame Job records your camera or webcam at the same time as the screen, for a talking head over a screencast. The camera lands as an ordinary clip on a track of its own, already laid out over the screen.
+
+<AtAGlance
+  menu="File ▸ New Recording…"
+  keys="⌥⌘N"
+  where={['New Recording panel ▸ Record the camera too', 'New Recording panel ▸ Layout', "New Recording panel ▸ Remove the camera's background when it lands"]}
+  tools="record_screen"
+  needs="The Screen Recording and Camera permissions, and the Microphone permission when you choose a microphone."
+/>
+
+## Record the screen and the camera
+
+<Steps>
+
+1. Choose **File ▸ New Recording…**, and set **Source** to a display or **Window…**.
+
+2. Tick **Record the camera too**. **Camera**, **Format**, **Layout** and **Remove the camera's background when it lands** go live, and a live preview of the camera appears under **Format**.
+
+3. Choose the camera in **Camera**, and its size and frame rate in **Format**. [Record a camera](/recording/record-a-camera/) explains both lists.
+
+4. Choose a [layout](#choose-a-layout).
+
+5. Choose a **Microphone** if you want your voice. The camera's movie has no sound of its own.
+
+6. Press **Record**. Frame Job checks its permissions, then counts down from 3.
+
+7. The panel leaves the screen. Pause and stop from the [menu-bar item](/recording/menu-bar-item/) or the **File** menu.
+
+</Steps>
+
+**Record the camera too** is off until you tick it, and Frame Job remembers it between launches. It's live only with a display or **Window…** as the source. **Camera** and **Microphone Only** grey it out, keeping its value.
+
+**System Audio**, **Show Clicks**, **Size**, **Include Frame Job windows** and **Rate** stay live and apply to the screen, and the note under **Size** describes the screen. The camera records at the frame rate of its **Format**.
+
+### What Record checks
+
+Pressing **Record** stops at the first thing missing, in this order:
+
+1. A window, when **Source** reads **Window…** with none picked. The panel says "Choose a window with Window… first, or pick a display."
+2. A camera. With none connected, the panel says "No camera is connected."
+3. The Screen Recording permission.
+4. The Input Monitoring permission, only with [Record shortcuts](/recording/record-shortcuts/) ticked.
+5. The Camera permission.
+6. The Microphone permission, only with a microphone chosen.
+
+[Recording permissions](/recording/permissions/) says what each one asks of you.
+
+### The preview
+
+The camera starts as soon as you tick the box, so it has usually settled at its frame rate by the time recording begins. Unticking the box, choosing **Microphone Only** or closing the panel turns it off.
+
+The preview shows the chosen camera at the chosen format. When it can't, it says why:
+
+| The preview says | What it means |
+| --- | --- |
+| "No camera is connected." | There's no camera to show. |
+| "The preview shows once Frame Job may use the camera." | You haven't allowed the Camera permission yet. Showing the panel never asks for it. Pressing **Record** does, or opens System Settings if you've turned it down. |
+| "The camera is recording." | An agent is recording a camera right now. The picture comes back when it ends. |
+| Another sentence | The reason the camera couldn't start. Untick and tick the box, or reopen the panel, to try again. |
+
+## Choose a layout
+
+**Layout** sets how the camera sits with the screen when the recording lands.
+
+| Layout | What it does |
+| --- | --- |
+| **Corner** | The default. The camera sits in the bottom-right corner, scaled to fit a box a quarter of the canvas wide and a third of it tall, inside the 90 % guide of [**View ▸ Safe Areas**](/canvas/safe-areas/). |
+| **Rounded Corner** | The same corner with rounded edges. |
+| **Circle** | The same corner as a circle. |
+| **Side by Side** | The screen and the camera next to each other. |
+| **Camera Full** | The camera fills the canvas. |
+
+**Layout** is live only with **Record the camera too** ticked. Otherwise, and while a recording is under way, it's greyed out and keeps its value. Frame Job remembers it between launches.
+
+The panel offers no other corner, and no **Stacked** or **Screen Only**. [**Clip ▸ Camera Layout ▸**](/framing/camera-layouts/) has those once the clip has landed. Neither offers a scale or an inset, but you can [resize the camera](/framing/camera-layouts/#resize-or-move-a-laid-out-camera) once it's landed. Any crop the panel's layout makes centres on the camera's picture, not on the person.
+
+## The Camera track
+
+When the recording lands, each stretch's camera movie goes on one new track named **Camera**, in front of everything, lined up with that stretch's screen clip. A recording you never paused has one stretch. A paused one has [several](/recording/pause-and-stop/#paused-recordings-are-stretches).
+
+Frame Job measures how far apart the camera and the screen started, for each stretch. The camera usually starts a moment first, so the clip's first frames are trimmed off rather than the clip starting early. A camera clip never starts before its screen clip, and never overlaps the camera clip before it.
+
+The camera files land in the same undo step as the screen:
+
+| Recording into | The undo step |
+| --- | --- |
+| An open project | **Add Recording**, for the screen, the camera and any microphone |
+| A new project, one stretch | **Add Camera**, or **Add Camera and Microphone** with a microphone. The screen movie is the project itself. |
+| A new project, several stretches | **Add Recording Segments** |
+
+[Where a recording lands](/recording/where-it-lands/) covers the rest of the landing. Each camera file is named after its screen movie with ` (Camera)` added, for example `Screen Recording 2026-10-26 at 17.14.33 (Camera).mov`.
+
+## How far the layout reaches
+
+The layout is one layout switch at the camera clip's first frame, the same kind **Clip ▸ Camera Layout ▸** makes, so the screen keeps its full picture until the camera arrives. It ends with that stretch's screen clip or its camera clip, whichever is later.
+
+That keeps it to this recording. A clip that was already in the project never moves, and another stretch's screen with no camera of its own stays full.
+
+If a stretch's screen clip is missing, or isn't playing where its camera starts, that camera goes in the bottom-right corner instead, whichever layout you chose.
+
+## Remove the camera's background
+
+Tick **Remove the camera's background when it lands** and Frame Job runs [**Clip ▸ Remove Background**](/effects/remove-background/) on the camera's clips as soon as they land. It works on your Mac, with no key.
+
+The box is off until you tick it, and Frame Job remembers it. It's greyed out, keeping its value, whenever **Layout** is.
+
+It's its own undo step, **Remove Background**, after the landing's and before any [**Enhance the microphone when it lands**](/recording/when-it-lands/) and the **When it lands:** boxes. **Edit ▸ Undo** takes it off and keeps the recording. If no camera clip landed, it does nothing and says nothing.
+
+## Change a camera clip afterwards
+
+Each camera clip stays an ordinary clip. You can give it another layout from [**Clip ▸ Camera Layout ▸**](/framing/camera-layouts/) or the [Layout section](/framing/layout-section/).
+
+The layout holds the camera in place, so dragging the clip alone doesn't move it. To make the camera bigger or smaller, or put it somewhere the layouts don't offer, see [Resize or move a laid-out camera](/framing/camera-layouts/#resize-or-move-a-laid-out-camera).
+
+## Good to know
+
+- If the camera stops on its own during the recording, for example because it's unplugged, the screen keeps recording. What the camera wrote lands, later stretches have no camera, and the panel's note gives the reason. If it stops while the recording is starting, the recording doesn't start.
+- A camera file that would keep less than a frame after its trim stays in the [Media tab](/projects/media-tab/) without a clip, and a note says so. If no camera clip can be placed, no **Camera** track is added.
+- If a stretch is left out because its movie can't be read, its camera file stays on disk and the note names it, but it isn't added to the project.
+
+## With an agent
+
+`record_screen` makes the same recording when it names a camera, and it can choose any of the five layouts and remove the camera's background. If no camera clip landed, the agent is told so. Landing in an open project, an agent can also leave the recording's files in the [Media tab](/projects/media-tab/) with no clips, which the panel doesn't offer. In that case no **Camera** track is added, and it can't ask for a layout or a removed background. See [Record with record_screen](/mcp/record-screen/#record-a-camera-beside-the-screen).
+
+## Related
+
+- [Record a camera](/recording/record-a-camera/)
+- [Camera layouts](/framing/camera-layouts/)
+- [Remove Background](/effects/remove-background/)
+- [Where a recording lands](/recording/where-it-lands/)
+- [Polish when a recording lands](/recording/when-it-lands/)
+- [Start, pause and stop](/recording/pause-and-stop/)

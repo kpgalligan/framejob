@@ -1,0 +1,63 @@
+---
+title: "Select on the canvas"
+description: "Pick clips by clicking them in the preview, add to or clear the selection, and read the frame and handles a selected clip gets."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+Click a clip in the preview to work on it there, without hunting for it on the timeline. It's the same selection the timeline and the inspector use.
+
+<AtAGlance keys="⇧-click" where="The preview canvas" tools="set_selection" />
+
+<Shot
+  name="05-clip-picture.window"
+  alt="A video clip selected in the editor. In the preview it has a thin coral outline with white square handles at its four corners and the middle of its four edges, and a round grip on a short stalk above its top edge. The inspector's Clip tab shows the clip's Picture sub-tab."
+/>
+
+## Click a layer
+
+Click the picture to select the front-most visible clip under the pointer at the playhead. The click follows the clip's rotation, so a turned clip is selected by the shape you can see, not by the box it would have upright.
+
+The selected clip's handles come first: a handle lying on top of another clip still grabs the handle, so you can resize a clip that has others in front of it.
+
+Clicking a clip that's already part of a multiple selection keeps the whole selection, so you can drag them together. To narrow it down to one clip, click empty canvas first or use the [timeline](/timeline/selecting-clips/).
+
+## Shift-click
+
+<kbd>⇧</kbd>-click adds a clip to the selection, or takes it out if it's already selected.
+
+## Clear the selection
+
+Click empty canvas, or the area around it, to clear the selection. This also leaves [crop mode](/canvas/crop/).
+
+With <kbd>⇧</kbd> held the selection stays, and crop mode still ends.
+
+## The selection frame
+
+Every selected clip that's drawing at the playhead gets a coral outline with a dark backing line, so it shows on both light and dark pictures. The front-most selected clip has a heavier outline and carries the handles:
+
+- Eight white square handles, at the corners and the middle of each edge, for [scaling](/canvas/move-scale-rotate/#scale).
+- A round grip on a stalk above the top edge, for [rotating](/canvas/move-scale-rotate/#rotate).
+- On a [line or arrow](/text-and-shapes/lines-and-arrows/), a round handle at each end as well.
+
+The handles stay the same size on screen at every zoom. The pointer shows what a handle does: a left-right or up-down resize pointer on an edge handle, and a crosshair on a corner.
+
+A selected clip that isn't at the playhead has no frame, because it isn't in the picture. An adjustment clip never has one, because it has no rectangle of its own. Nor does a nest clip, and a click on its picture goes through to whatever is behind. Select it on the timeline. See [Layers](/canvas/the-canvas/#layers).
+
+## Matte clips
+
+A clip on a [matte track](/canvas/matte-tracks/) can be selected and dragged inside its own box, even though it draws nothing there.
+
+Because it's in front of the clip it cuts, a click inside that box selects the matte clip. To select the clip it cuts, click outside the matte clip's box, or use the timeline.
+
+## Good to know
+
+Clips on hidden tracks can't be clicked, and clips on locked tracks are passed over. See [Hidden and locked tracks](/canvas/the-canvas/#hidden-and-locked-tracks).
+
+## Related
+
+- [Move, scale and rotate](/canvas/move-scale-rotate/)
+- [Select clips](/timeline/selecting-clips/)
+- [Crop](/canvas/crop/)
+- [Edit text on the canvas](/text-and-shapes/edit-text-on-canvas/)

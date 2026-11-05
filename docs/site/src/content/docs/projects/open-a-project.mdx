@@ -1,0 +1,99 @@
+---
+title: Open a project
+description: Open a saved .framejob project from the File menu, the Finder or a drop, and see what happens with older, newer, damaged or incomplete projects.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A project is a `.framejob` package: one item in the Finder that holds your edit. This page is about opening one you've saved. To turn a movie, sound file or picture into a new project, see [Start a project](/projects/start-a-project/).
+
+<AtAGlance
+  menu={['File ▸ Open…', 'File ▸ Open Recent ▸', 'File ▸ Open Recent ▸ Clear Menu']}
+  keys="⌘O"
+  where={['Double-click in the Finder', 'Welcome window ▸ Open Video…', 'Welcome window ▸ Recent', 'A drop on the Dock icon or a window']}
+  tools={['open_project', 'relink_media']}
+/>
+
+## Open a saved project
+
+Choose **File ▸ Open…** (<kbd>⌘O</kbd>) and pick the package, or double-click it in the Finder. A double-click on a `.framejob` always opens it in Frame Job.
+
+The open panel lists projects along with QuickTime, MPEG-4 and M4V files, other movies, and M4A, MP3, WAV, AIFF, PNG, JPEG and HEIC files. Everything but a project opens as a [fresh untitled project](/projects/start-a-project/).
+
+A `.fjgraphic` isn't a project, and **File ▸ Open…** doesn't list one. See [Share a graphic](/graphics/share-a-graphic/).
+
+## Projects from other video editors
+
+Frame Job opens only its own `.framejob` projects. It can't read a project file from another video editor, or an XML, EDL or AAF timeline, and it can't write one. To carry on an edit here, [add its media](/projects/import-media/) and cut it again. To take a finished edit the other way, export a [ProRes master](/export/prores/).
+
+## Open a recent project
+
+**File ▸ Open Recent ▸** lists what you've opened lately. Choose one to reopen it. macOS fills the list, and **Clear Menu** at the foot of it empties it.
+
+The [Welcome window](/projects/welcome-window/#reopen-a-recent-project) shows the five most recent from the same list.
+
+## Drop files to open them
+
+Drag from the Finder onto a project window, the Welcome window or the Dock icon. Each file opens as a document of its own:
+
+- A `.framejob` package opens that project.
+- A media file opens as a fresh untitled project built around it, so several files make several projects.
+
+Only projects and the types **File ▸ Open…** lists are taken: MOV, MP4, M4V and other movies, M4A, MP3, WAV, AIFF, PNG, JPEG and HEIC. Anything else is ignored, with one exception: a `.fjgraphic` dropped on the Dock icon [goes to the Import Graphic sheet](/graphics/share-a-graphic/#open-from-the-finder).
+
+:::caution
+A drop on a project window doesn't add to that project. To add a file to the project you have open, drop it on the [Media tab](/projects/import-media/). Anywhere else in the window, the timeline and preview included, the drop opens a new project.
+:::
+
+## Open a project that's already open
+
+Opening a saved project that's already open brings its window forward. It doesn't open a second copy.
+
+That's for saved projects. A movie opened as an untitled project has no file of its own yet, so opening the same movie again makes a second untitled project.
+
+## Open a project from another version
+
+A project saved by any earlier version of Frame Job opens. It's brought up to the current format as it opens, and the next save writes it in the current format.
+
+A project saved by a newer Frame Job won't open. The message gives both versions and asks you to update:
+
+> project format version *N* is newer than this build understands (version *M*); update Frame Job to open it
+
+## When a project won't open
+
+A damaged project, or one holding values out of range, fails to open with a message naming the problem. The package isn't rewritten, so a failed open costs you nothing.
+
+| The message says | What it means |
+| --- | --- |
+| "*name* does not contain a readable project.json." | The edit file inside the package can't be read as text. |
+| "project json is not valid json: …" | The edit file is damaged. |
+| "project json does not match the schema: …" | The edit file holds something Frame Job can't read as a project. |
+
+If `project.json` inside the package is a folder or a link rather than a file, there's no message: Frame Job quits unexpectedly as it opens the package. The package isn't changed. Put a real `project.json` back, or open a backup copy.
+
+Filmstrips, waveforms and the like inside the package are never needed to open it. A missing or damaged one is made again. See [Troubleshooting](/reference/troubleshooting/).
+
+## Open a project with missing files
+
+A project always opens, even if its files have moved. The clips keep their place on the timeline and show a slate until the files are found, and the **Missing media** sheet appears once, when the window first opens. You can close it and go on working, and use **Relink…** on the [Media tab](/projects/media-tab/) later.
+
+A project with [consolidated media](/projects/consolidate-media/) finds the copies in its own package again after the package moves, with nothing for you to do.
+
+See [Relink missing media](/projects/relink-media/).
+
+## With an agent
+
+[`open_project`](/mcp/tools-projects/#open_project) takes a path, absolute or starting with `~`, to a project, movie, sound file or picture. When that file is already open it brings the window forward and returns `already_open: true`. Unlike a person's open:
+
+- It recognises a movie already open as an untitled project, and brings that window forward instead of making a second one.
+- It never asks the [ffmpeg question](/projects/ffmpeg-conversion/).
+
+See [Tools: projects and history](/mcp/tools-projects/).
+
+## Related
+
+- [Start a project](/projects/start-a-project/)
+- [Save, revert and close](/projects/save-and-revert/)
+- [Relink missing media](/projects/relink-media/)
+- [The .framejob package](/reference/framejob-package/)
+- [Troubleshooting](/reference/troubleshooting/)

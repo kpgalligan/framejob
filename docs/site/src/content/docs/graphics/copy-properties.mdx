@@ -1,0 +1,78 @@
+---
+title: "Paste Graphic Properties"
+description: Copy the text, colours and other properties of one graphic clip onto other clips drawn by the same graphic, and see what stays behind.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Paste Graphic Properties copies what one graphic clip shows, its text and colours included, onto other clips drawn by the same graphic. Use it to give a run of lower thirds the same styling, then change the names.
+
+<AtAGlance
+  menu="Edit ▸ Paste Graphic Properties"
+  tools="paste_attributes"
+/>
+
+## Paste graphic properties
+
+<Steps>
+
+1. Select the graphic clip you want to copy from and press <kbd>⌘C</kbd>.
+
+2. Select the clips to paste onto.
+
+3. Choose **Edit ▸ Paste Graphic Properties**. It has no keyboard shortcut.
+
+</Steps>
+
+Every selected clip drawn by the same graphic takes the copied properties, as one undo step. The menu item is on when there are Frame Job clips on the clipboard and at least one graphic clip is selected.
+
+## What moves and what stays
+
+The target ends up with exactly the copied clip's properties, so a property left at its default on the copied clip goes back to the default on the target.
+
+Each target keeps:
+
+- Its own module, size, **In** and **Length**.
+- Its position, scale and everything else outside the **Properties** section.
+- Any property the copied clip leaves unset and an action on the target animates, so that the action keeps its start.
+
+If you copied several clips, only the earliest one is read.
+
+## When it does nothing
+
+| What you'll see | Why |
+| --- | --- |
+| Some selected clips don't change | They're drawn by another graphic, or they aren't graphics. They're skipped. |
+| A beep | The copied clip isn't a graphic, no selected clip is drawn by the same graphic, or the targets already match. |
+| An alert | The copied properties can't be stored, for example more than 64 of them. It gives the reason, and nothing changes. |
+
+## How it differs from Paste Attributes
+
+**Edit ▸ Paste Attributes** (<kbd>⌥⌘V</kbd>) copies a clip's look, such as its position and opacity, and never carries graphic properties. The two are separate on purpose, because a graphic's properties hold its words as well as its look.
+
+| | Paste Attributes | Paste Graphic Properties |
+| --- | --- | --- |
+| Position, scale, opacity and other picture settings | Yes | No |
+| A graphic's text, colours and other properties | No | Yes |
+
+See [Paste Attributes](/editing/paste-attributes/).
+
+## Copy a graphic clip
+
+Copying and pasting a graphic clip (<kbd>⌘C</kbd>, <kbd>⌘V</kbd>) pastes a clip that names its module. The module's `.js` file, fonts and pictures are not copied.
+
+So in another project without that module, the pasted clip draws the red error card. To fix it, add the module under the same name, for example with **From File…** in **Insert ▸ Graphic…** on a file of that name. **From File…** also places a clip of its own, which you can delete.
+
+See [Copy, cut and paste](/editing/copy-and-paste/).
+
+## With an agent
+
+An agent uses [`paste_attributes`](/mcp/tools-copy-and-nest/#paste_attributes) and has to ask for the graphic group by name, with `groups: ["graphic"]`, since it's never part of the default set. Unlike the menu item, a clip drawn by another graphic stops the paste with an error naming both, unless the agent sets `skip_missing` to skip those. See [Tools: copying and nesting](/mcp/tools-copy-and-nest/).
+
+## Related
+
+- [Paste Attributes](/editing/paste-attributes/)
+- [Graphic properties](/graphics/properties/)
+- [Animate graphic properties](/graphics/animate-properties/)
+- [Copy, cut and paste](/editing/copy-and-paste/)

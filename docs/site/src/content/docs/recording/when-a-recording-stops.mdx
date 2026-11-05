@@ -1,0 +1,136 @@
+---
+title: "When a recording stops on its own"
+description: "What Frame Job keeps when a camera, a microphone or the system stops a recording, and what to do when a recording can't be added."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A recording can lose a device or end without you pressing Stop. Frame Job keeps what it captured, adds it to your project, and tells you what happened. This page calls that adding "landing". It says what lands in each case, and what to do about what doesn't.
+
+<AtAGlance
+  where={["The recorder panel's note", 'The menu-bar item']}
+  tools="record_screen"
+/>
+
+## Where you'll read about it
+
+Unless a section says otherwise, each case here is reported in the note on the [recorder panel](/recording/recorder-panel/). A recording that lands cleanly doesn't bring the panel back, but one with something to say does, as long as the panel was on screen when the recording began.
+
+If the panel wasn't on screen, press <kbd>⌥⌘N</kbd> to open it and read the note.
+
+While a display or a window records, the panel is hidden, so the note only appears when the recording lands. While a camera on its own or a voice-over records, the panel stays up, so the note appears as it happens.
+
+## What's kept
+
+| What happened | Does the recording go on? | What lands |
+| --- | --- | --- |
+| [A camera on its own stops](#a-camera-stops) | No | What was captured |
+| [A camera beside the screen stops](#a-camera-stops) | Yes | The screen, and the camera up to the stop |
+| [The microphone stops](#a-microphone-stops) | Yes | The picture, and the microphone's file only if [it can be used](#a-microphone-stops) |
+| [A voice-over's microphone stops](#a-voice-overs-microphone-stops) | No | What was recorded |
+| [The display sleeps or goes away](#the-display-sleeps-or-the-system-stops-the-recording) | No | What was captured |
+| [A stretch's movie won't read](#a-stretch-wont-read) | It has already ended | Every other stretch, and that stretch's voice if it reads |
+| [A file is too short for a frame](#a-file-is-too-short-for-one-frame) | It has already ended | That file in the Media tab, and the rest as usual |
+| [The recording can't be added](#the-recording-cant-be-added) | It has already ended | Nothing, but the files stay on disk |
+
+## A camera stops
+
+If a camera recording's camera stops, for example because it's unplugged, the recording ends there and what was captured lands. The note gives the reason, then "What was captured was added.":
+
+> The camera FaceTime HD Camera stopped on its own: it was disconnected. What was captured was added.
+
+It can also read "its session was interrupted", or give a reason from macOS.
+
+Beside the screen, a camera that stops doesn't end the recording. The screen keeps recording, what the camera wrote up to then lands, and the note gives the same reason. Anything you record after a later pause and resume has no camera. The one exception is a camera that fails while the recording is still starting. That stops the recording from starting, and the note gives the reason.
+
+If a camera hasn't settled at its rate when the recording begins, the recording begins anyway and the note says what it ran at:
+
+> The camera ran at 24.0 fps, not its 30, in the 1 s it was given to settle; the recording began anyway.
+
+## A microphone stops
+
+A microphone that stops partway through a screen or camera recording doesn't end it. The picture keeps recording and the panel's level meter goes silent. With the panel on screen, its note says so at once:
+
+> The microphone stopped: … The picture is still recording.
+
+The picture lands either way. If the microphone's file didn't finish properly or won't read, it isn't added, and the note says why and where the file is, so you can [import it](/projects/import-media/) yourself. In a camera recording, a microphone that stopped on its own isn't added even if its file is whole. The same goes for a microphone that never started, which reads "The microphone never started recording, so the picture was recorded without it."
+
+## A voice-over's microphone stops
+
+A voice-over has nothing else to record, so if its microphone stops on its own, for example because it's unplugged, the voice-over ends there. What was recorded lands, with a note:
+
+> The microphone stopped recording on its own: … The voice-over ends where it stopped.
+
+## The display sleeps or the system stops the recording
+
+If the display sleeps or goes away, or the system stops the recording, what was captured lands, with the note:
+
+> The system stopped the recording (the display slept or went away); what was captured was added.
+
+Stopping from macOS's own screen-recording indicator in the menu bar also lands the recording. The note reads "Stopped from the system's screen-recording indicator; the recording was added."
+
+## The screen is locked
+
+If the screen is locked or every display is asleep, no display can be shared, so a screen recording can't start until one wakes. The panel's note reads "No display with id … is shareable…", or "No window with id … is shareable." for a window. Wake or unlock the Mac and press **Record** again.
+
+## Resume doesn't work
+
+If **Resume Recording** fails, the recording stays paused and nothing already recorded is lost. Nothing new is recorded until a resume works, so you can try again, or stop and land what you have.
+
+The reason goes in the panel's note, for example "The recording could not be resumed: …". During a voice-over or a camera recording it appears there at once. During a screen recording it appears when the recording lands, and the panel comes back to show it.
+
+A **Pause Recording** that fails only beeps, because the recording is still running.
+
+## A stretch won't read
+
+Each stretch between pauses has its own movie. If one won't read, for example an empty file from a pause right after a resume, it's left out, and the stretches that do read land. The note gives the reason and names everything it left on disk:
+
+> A segment was left out. … Its files are kept at …
+
+Only a recording with no readable movie at all fails, and its note names every file.
+
+### Its voice still lands
+
+If a left-out stretch's microphone file reads, it lands without its picture, on the Microphone track in the slot the picture would have had. The picture track keeps a gap there, and the next picture starts after it. The note reads "The left-out segment's microphone, …, was added to the project without its picture."
+
+That stretch's camera file stays on disk and the note names it, but it isn't added.
+
+In a new project, a left-out voice from before the first picture has no timeline to sit on, so it lands in the Media tab without a clip, and the note says so.
+
+## A file is too short for one frame
+
+A file too short for one frame can't become a clip. It lands in the Media tab, the rest of the recording lands as usual, and the note says so:
+
+> … is too short for a frame (12 ms) and was added to the media list without a clip.
+
+## The recording can't be added
+
+If a recording can't be added, nothing goes on the timeline, but the files are safe. The note names every one, so you can [import them](/projects/import-media/):
+
+> The recording was saved at … but could not be added: …
+
+These are the usual reasons:
+
+| What happened | What to do |
+| --- | --- |
+| The project is at its limit of 64 tracks, counting the tracks inside nests, and the recording needs a new one. If the picture would fit but the microphone wouldn't, none of it is added. | [Remove a track](/timeline/manage-tracks/) you don't need, then import the files. |
+| You were still dragging on the timeline. Frame Job waits for a drag to end, for up to 20 s, then reads "A drag was still in progress after 20 s." | Import the files. |
+
+If a file still hasn't finished writing 10 s after Stop, Frame Job tries to read it anyway. If it won't read, the note reads "The recording did not finish writing within 10 s." and names the files kept on disk.
+
+## Very long recordings
+
+A recording longer than 9:59:59 carries on as usual, but the menu-bar item's label gets wider than the item was sized for.
+
+## With an agent
+
+`record_screen` reports all of this when it finishes, so an agent can tell what stopped and what landed: `camera.problem` and `mic_problem` say why a device stopped, `stopped_by` says what ended the recording, and `unreadable` lists any stretch left out, with the files kept and the reason. With the screen locked, it stops before recording and says that no display is shareable. See [Record with record_screen](/mcp/record-screen/).
+
+## Related
+
+- [Start, pause and stop](/recording/pause-and-stop/)
+- [Where a recording lands](/recording/where-it-lands/)
+- [Recording files and formats](/recording/files-and-formats/)
+- [System audio and the microphone](/recording/system-audio-and-microphone/)
+- [Recording permissions](/recording/permissions/)
+- [The menu-bar item](/recording/menu-bar-item/)

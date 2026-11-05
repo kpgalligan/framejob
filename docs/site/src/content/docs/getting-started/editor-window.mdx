@@ -1,0 +1,127 @@
+---
+title: "A tour of the editor window"
+description: "Name each part of the editor window, and size its panes the way you like them."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+Each project opens in one window. This page names its parts and says where to read about each one.
+
+<AtAGlance
+  menu={['Window ▸ Minimize', 'Window ▸ Zoom']}
+  keys="⌘M"
+  tools="render_frame"
+/>
+
+<Shot
+  name="04-editor.window"
+  alt="The editor window with a small project open. The toolbar runs across the top, with the playhead at 00:00:02:15 of 00:00:05:07. Below it the preview shows a navy frame with the words Frame Job and a lower-third title, and the inspector on the right says Select a clip to edit its properties. At the bottom the timeline holds four tracks of clips with the playhead through them."
+/>
+
+## Window layout
+
+| Part | Where | What it holds |
+| --- | --- | --- |
+| [Title bar](#title-bar) | Top | The project's name, its canvas size and frame rate, and "edited" |
+| [Toolbar](#toolbar) | Under the title bar | Transport, timecode, preview zoom, **Safe** and **Export…** |
+| [Preview](#preview) | Middle left | The frame under the playhead |
+| [Inspector](/getting-started/inspector/) | Middle right | The Clip, Media, Document, Transcript and Assistant tabs |
+| [Timeline bar](#timeline-bar) | Above the timeline | The selection block, clip buttons, **Snap**, the level meter, zoom and track size |
+| [Timeline](/timeline/tracks/) | Bottom | The ruler, the track headers and the lanes |
+
+A new window sizes itself to the canvas, up to 1280 × 720, plus the panes around it. It's never more than 85 % of the screen, so a 4K project doesn't open a 4K window. The smallest a window can be is 900 × 620 points.
+
+## Title bar
+
+The title follows the project's name and changes when you save or rename it. A blank project reads "Untitled Project". A movie you've opened but not saved reads as the movie's name.
+
+The subtitle gives the canvas size and frame rate, then "edited" while there are unsaved changes:
+
+`1920 × 1080 · 30 fps · edited`
+
+"edited" clears after <kbd>⌘S</kbd> and after every silent autosave. Projects autosave in place, so the close button shows no dot. See [Undo and saving](/getting-started/undo-and-saving/).
+
+The subtitle updates after any change to the canvas, including one an agent makes.
+
+## Toolbar
+
+From left to right:
+
+| Control | What it does | Read more |
+| --- | --- | --- |
+| Go to Start (<kbd>Home</kbd>) | Moves the playhead to the start | [Jump around the timeline](/timeline/move-the-playhead/) |
+| Previous Edit Point (<kbd>↑</kbd>) | Jumps back to the last edit point | [Jump around the timeline](/timeline/move-the-playhead/) |
+| Play / Pause (<kbd>Space</kbd>) | Plays and pauses | [Play, pause and shuttle](/timeline/playback/) |
+| Next Edit Point (<kbd>↓</kbd>) | Jumps forward to the next edit point | [Jump around the timeline](/timeline/move-the-playhead/) |
+| Go to End (<kbd>End</kbd>) | Moves the playhead to the end | [Jump around the timeline](/timeline/move-the-playhead/) |
+| Loop | Turns looping on and off | [Loop playback](/timeline/loop/) |
+| Timecode | Shows the playhead's time, then `/` and the length of the timeline. Click the time to type one. | [Jump around the timeline](/timeline/move-the-playhead/) |
+| Preview zoom | Picks **Fit**, **50%**, **100%** or **200%** | [Zoom and pan the preview](/canvas/zoom-and-pan/) |
+| **Safe** | Shows the safe-area guides on the preview | [Safe areas](/canvas/safe-areas/) |
+| **Export…** (<kbd>⌘E</kbd>) | Opens the export sheet | [The export sheet](/export/export-sheet/) |
+
+## Preview
+
+The preview shows the frame under the playhead, letterboxed in a grey well. A caption under it gives the size and rate, for example `960 × 540 · 30 fps`. See [The preview](/timeline/preview/) for everything it does.
+
+## Timeline bar
+
+The bar above the time ruler names the selection and holds the tools that act on clips. From left to right:
+
+- **The selection block.** It says what's selected.
+- **Eight clip buttons.** One click each, and a button's tooltip names its key if it has one. **Add Shape** opens a menu of shapes.
+- **Snap.** Turns [snapping](/timeline/snapping/) on and off.
+- **The [level meter](/audio/level-meter/).** It takes the spare width in the bar, so in a narrow window it shrinks and can disappear.
+- **The zoom controls.** −, a slider, + and Fit (<kbd>⇧Z</kbd>). See [Zoom and scroll the timeline](/timeline/zoom-and-scroll/).
+- **S, M and L.** Sets the [track height](/timeline/track-height/).
+
+### The selection block
+
+| Selected | The block shows |
+| --- | --- |
+| One clip | A chip in the clip's kind colour, the clip's name, and its track and kind under that, for example `Track 2 · video` |
+| Several clips | A count such as `3 clips`, over the track or `2 tracks`, and the kind or `mixed` |
+| Nothing | No selection |
+
+The block has a fixed width, so a long name is cut short and the tools beside it never move.
+
+### The clip buttons
+
+| Button | Key | Read more |
+| --- | --- | --- |
+| Split | <kbd>⌘T</kbd> | [Split clips](/editing/splitting/) |
+| Trim Start to Playhead | <kbd>W</kbd> | [Trim clips](/editing/trimming/) |
+| Trim End to Playhead | <kbd>E</kbd> | [Trim clips](/editing/trimming/) |
+| Ripple Delete | <kbd>⌘⌫</kbd> | [Delete, Ripple Delete and Lift](/editing/delete-clips/) |
+| Add Marker | <kbd>M</kbd> | [Markers](/timeline/markers/) |
+| Duplicate | <kbd>⌘D</kbd> | [Duplicate clips](/editing/duplicate-clips/) |
+| Add Text | <kbd>T</kbd> | [Text clips](/text-and-shapes/text-clips/) |
+| Add Shape | None | [Shape clips](/text-and-shapes/shape-clips/) |
+
+## Pane dividers
+
+Drag the divider left of the inspector to set its width, and the divider above the timeline to set its height. New windows open at the sizes you chose, and the sizes are remembered between launches.
+
+| Pane | Range | To start |
+| --- | --- | --- |
+| Inspector width | 280 to 440 points | 304 points |
+| Timeline height | 140 points up to 60 % of the height under the toolbar | 300 points |
+
+The canvas keeps at least 380 points of width, and the area above the timeline at least 220 points of height.
+
+Only dragging a divider saves a size. Resizing the window, restoring a window, or hiding and showing the inspector changes neither saved size, and the inspector's width isn't saved while it's hidden.
+
+To hide the inspector, see [The inspector](/getting-started/inspector/#hide-or-show-the-inspector).
+
+## Minimize and Zoom
+
+These are the standard window commands. **Window ▸ Minimize** (<kbd>⌘M</kbd>) sends the window to the Dock, and **Window ▸ Zoom** makes it larger or smaller.
+
+Don't confuse **Window ▸ Zoom** with **View ▸ Zoom In** and **View ▸ Zoom Out**, which zoom the [preview](/canvas/zoom-and-pan/).
+
+## Related
+
+- [The inspector](/getting-started/inspector/)
+- [Core concepts](/getting-started/core-concepts/)
+- [What Frame Job remembers](/reference/remembered-choices/)

@@ -28,7 +28,7 @@ Symbols: ⌘ Command, ⌥ Option, ⇧ Shift, ⌃ Control, ⌫ Delete, ↩ Return
 
 | Item | Shortcut | What it does |
 |---|---|---|
-| About Frame Job | | The version and credits panel |
+| About Frame Job | | A panel with the Frame Job mark and the version |
 | Check for Updates… | | Asks whether a newer Frame Job has been published, and offers to install it. Only in the copy you download from GitHub; a build from source has no updater ([Settings](settings.md#updates)) |
 | Settings… | ⌘, | Opens the Settings window ([Settings](settings.md)) |
 | Hide Frame Job | ⌘H | Hides the app |
@@ -47,7 +47,7 @@ Symbols: ⌘ Command, ⌥ Option, ⇧ Shift, ⌃ Control, ⌫ Delete, ↩ Return
 | Make Vertical Version… | | Makes a 9:16, 4:5 or 1:1 version of the timeline, each full-frame movie clip following its subject — with Follow Speaker, a wide shot of two to four people cutting to whoever is talking on the microphones you tick — opened as a new untitled project or made in this one ([Make Vertical Version](vertical-and-framing.md#make-vertical-version)) |
 | Open… | ⌘O | Opens a project or a media file |
 | Open Recent ▸ | | Recently opened documents, then **Clear Menu** |
-| Close | ⌘W | Closes the window |
+| Close | ⌘W | Closes the window. Hold ⌥ and the item becomes **Close All** (⌥⌘W), which closes all the windows |
 | Save | ⌘S | Saves the project |
 | Duplicate | ⇧⌘S | Opens a copy of the project as a new, untitled document. Hold ⌥ and the item becomes **Save As…** (⌥⇧⌘S), which writes the project to a new package |
 | Rename… | | Renames the project's package |
@@ -117,6 +117,11 @@ timeline with clips. The *current track* is the track of the
 first selected clip. With nothing selected it is the front-most track. See
 [Editing](editing.md).
 
+Copy, Cut and Paste don't work for a nest clip. The clipboard carries no
+nest, so Paste stops with an error and nothing lands, even if other clips
+were copied with it. Cut has already removed the clip by then, so use Undo
+to get it back. Duplicate does copy a nest clip.
+
 *Agents:* `undo`, `redo`, `paste`, `paste_attributes`, `duplicate`, `delete`,
 `lift_range`, `ripple_delete`, `ripple_delete_range`, `insert_clip`,
 `overwrite_clip`, `set_selection`.
@@ -126,8 +131,8 @@ first selected clip. With nothing selected it is the front-most track. See
 | Item | Shortcut | What it does |
 |---|---|---|
 | Adjustment Clip | | Adds an adjustment clip over the in/out range. Without a range it covers the selected clips' span, and without a selection the whole timeline. Greyed while a nest is open ([Colour grading](color-grading.md)) |
-| Graphic… | | Opens the Graphic dialog: the bundled templates by category (and This Project's own graphics), a looping preview, and Insert to add the chosen one at the playhead, From File… to add a `.js` file or import a `.fjgraphic` you choose, or Export… to save the chosen one as a `.fjgraphic` file ([Graphics](graphics.md#adding-a-graphic)) |
-| Text Behind Subject | | Puts a title on a new track above the camera clip at the playhead, behind the person, for 4 s or the clip's rest; turns Remove Background on with Keep background when the clip has none ([Canvas and layers](canvas-and-layers.md#text-behind-the-subject)) |
+| Graphic… | | Opens the Insert Graphic dialog: the bundled templates by category (and This Project's own graphics), a looping preview, and Insert to add the chosen one at the playhead, From File… to add a `.js` file or import a `.fjgraphic` you choose, or Export… to save the chosen one as a `.fjgraphic` file ([Graphics](graphics.md#adding-a-graphic)) |
+| Text Behind Subject | | Puts a title on a new track above the video or picture clip at the playhead, behind the person, for 4 s or the clip's rest; turns Remove Background on with Keep background when the clip has none ([Canvas and layers](canvas-and-layers.md#text-behind-the-subject)) |
 
 *Agents:* `add_adjustment_clip`; `list_graphics` and `insert_graphic`, or
 `write_graphic` followed by `add_graphic_clip`; `text_behind_subject`.
@@ -302,7 +307,7 @@ bounds it clears the range).
 | Transcript | ⌃⌘T | Shows the inspector's Transcript tab, ready for its keys ([The Transcript](transcript.md)) |
 | Assistant | ⌃⌘A | Shows the inspector's Assistant tab and puts the cursor in its message field ([Assistant](assistant.md)) |
 | Timeline Track Height ▸ Small · Medium · Large | | Sets the height of the timeline rows |
-| Preview Quality ▸ Full · Half · Quarter | | The preview's render size while you play. Export is not affected |
+| Preview Quality ▸ Full · Half · Quarter | | The preview's render size, playing or paused. Export is not affected |
 | Preview Window | ⇧⌘P | A second window showing the picture without overlays. Choose it again to close the window |
 | Show Ungraded | ⌃⌘U | Shows the preview as if no clip were graded |
 | Show Selection | | Shows which pixels the selected adjustment clip's qualifier picks. Needs a selected adjustment clip to turn on |
@@ -357,7 +362,7 @@ next control instead.
 
 | Key | What it does |
 |---|---|
-| Space | Play / pause, wherever the focus is in the window. In a text field, Space types a space. A button focused with Full Keyboard Access keeps Space to press itself |
+| Space | Play / pause, wherever the focus is in the window. In a text field, Space types a space. A button focused with Full Keyboard Access keeps Space to press itself. On a canvas you've clicked with Caps Lock on, press and release each toggle playback, so a tap leaves it as it was |
 | L | Plays forward. Press it again for 2× and then 4× |
 | J | Plays in reverse. Press it again for 2× and then 4× in reverse |
 | K | Pauses |
@@ -365,8 +370,8 @@ next control instead.
 | ↑ / ↓ | Moves to the previous or next edit point |
 | Home / End | Moves to the start or end of the project |
 
-When the preview canvas has focus, the arrow keys move the selected clips
-instead ([below](#preview-canvas-gestures)).
+The arrow keys do this even when the preview canvas has focus. They don't
+move the selected clips.
 
 ### Editing
 
@@ -411,8 +416,8 @@ instead ([below](#preview-canvas-gestures)).
 
 - A canvas drag in progress (move, scale, rotate, crop, line endpoint,
   obscure region): ⎋ puts everything back as it was before you pressed, and
-  no undo step is added.
-- Crop mode: ⎋ or ↩.
+  no undo step is added. Caps Lock has to be off.
+- Crop mode: ⎋ or ↩, with the canvas focused and Caps Lock off.
 - Region mode (Z, or the Obscure section's **Place on Canvas**). It also
   ends by itself when the selection stops being the clip it was started
   for, or the playhead leaves that clip. Z beeps unless exactly one clip is
@@ -432,7 +437,7 @@ instead ([below](#preview-canvas-gestures)).
 | ⇧-drag | Empty lane | Marquee that adds to the selection |
 | Double-click | Empty part of a lane | Closes that gap |
 | Drag | Clip | Moves the selected clips, in time and to other tracks. Dragging past the top or bottom track puts them on a new track |
-| ⌥-drag | Clip | Duplicates the clips and moves the copies |
+| ⌥-drag | Clip | Duplicates the clips and moves the copies. With no room for Edit ▸ Duplicate, moves the clips themselves |
 | ⌥⇧-drag | Clip | Slip: moves the source under the clip while the clip stays in place |
 | Drag | Clip edge | Trims that edge |
 | ⌥-drag | Clip's end edge | Rate stretch: changes the speed so the clip fills the new length. Works only on a clip that plays a media file. On the start edge, ⌥ trims as usual |
@@ -477,8 +482,8 @@ controls:
 
 | Button | Where | What it does |
 |---|---|---|
-| Add Shape | Timeline bar | Opens a menu of **Rectangle**, **Ellipse**, **Line** and **Arrow**. The shape is added at the playhead. This is the only way to add a shape clip |
-| Loop | Toolbar, beside the transport buttons | Turns looping on and off. Playback repeats the in/out range when one is set, otherwise the whole timeline |
+| Add Shape | Timeline bar | Opens a menu of **Rectangle**, **Ellipse**, **Line** and **Arrow**. The shape is added at the playhead. No menu item does this. **Clip ▸ Add Background ▸ Solid Color** also makes a shape clip, but only a canvas-sized rectangle on a new track behind everything |
+| Loop | Toolbar, beside the transport buttons | Turns looping on and off. Playback repeats the in/out range when one is set. With no range, or a range that ends at the end of the timeline, it goes back to the start of the loop and stops there |
 | − / + (Zoom Out / Zoom In) | Timeline bar | Zooms the timeline out or in |
 | Timeline Zoom slider | Timeline bar | Sets the timeline zoom |
 | Fit Timeline | Timeline bar | The same as **View ▸ Fit Timeline** (⇧Z) |
@@ -493,7 +498,7 @@ controls:
 
 | Drag | Drop on | What it does |
 |---|---|---|
-| A row from the Media tab | A track | Places the clip at the drop point. A drop that would overlap another clip is refused |
+| A row from the Media tab | A track | Places the clip at the drop point. A drop the overlap rule forbids is refused. A smaller overlap goes in and makes a Cross Dissolve ([Editing](editing.md)) |
 | ⌥ + a Media row | A track | Insert: makes room by pushing later clips along |
 | ⇧⌥ + a Media row | A track | Overwrite: replaces what is in the way |
 | A Media row | The preview canvas | Places the clip on a new top track at the playhead |
@@ -513,21 +518,21 @@ or the Color tab instead.
 | Click a clip | Selects it. ⇧-click adds it to the selection or removes it |
 | Click empty canvas | Deselects everything and leaves crop mode. With ⇧, keeps the selection |
 | Drag a clip | Moves the selected clips. They snap to the canvas centre, edges and thirds and to other layers. ⌘ turns snapping off |
-| Drag a corner or side handle | Scales. Video, image, still, graphic and nest clips always scale uniformly. On a shape, ⇧ on a corner handle frees the aspect ratio and a side handle changes only the width or the height. On a text clip, the left and right handles set the wrap width. ⌥ scales around the centre. See [Move, scale and rotate](canvas-and-layers.md#move-scale-and-rotate) |
+| Drag a corner or side handle | Scales. Video, image, still and graphic clips always scale uniformly. On a shape, ⇧ on a corner handle frees the aspect ratio and a side handle changes only the width or the height. On a text clip, the left and right handles set the wrap width. ⌥ scales around the centre. See [Move, scale and rotate](canvas-and-layers.md#move-scale-and-rotate) |
 | Drag the rotation handle | Rotates. ⇧ snaps to 15° steps |
 | Drag a crop handle (crop mode) | Crops |
 | Drag a line or arrow endpoint | Moves that end of the shape |
 | Drag an obscure region's centre grip or one of its eight handles | Moves or resizes that region. ⌥ resizes it around its centre. The grips show only with exactly one unlocked clip selected, outside crop mode. A drag inside the region but away from the grips still moves the clip |
 | Double-click a text clip | Edits the text in place |
 | Double-click any other clip | Turns on crop mode |
-| ← → ↑ ↓ (canvas has focus) | Moves the selected clips 1 pixel. With ⇧, 10 pixels |
-| Hold Space and drag | Pans a zoomed canvas that is larger than the preview. A Space tap still plays and pauses |
+| ← → ↑ ↓ (canvas has focus) | Moves the playhead, as anywhere else in the window ([above](#playback-and-moving-the-playhead)). They don't move the selected clips |
+| Hold Space and drag | Pans a zoomed canvas that is larger than the preview. A Space tap still plays and pauses. Neither works with Caps Lock on |
 | Pinch, or ⌥ / ⌘ with the scroll wheel | Steps the canvas zoom |
 | Scroll | Pans a canvas that is larger than the preview |
 
-Clips on locked tracks don't move. When an action is selected, a drag or an
-arrow-key nudge sets the value at that action's end, not the clip's own
-value. See [Canvas and layers](canvas-and-layers.md).
+Clips on locked tracks don't move. When an action is selected, a drag sets
+the value at that action's end, not the clip's own value. See
+[Canvas and layers](canvas-and-layers.md).
 
 *Agents:* `set_video` (position, scale, rotation, crop), `set_shape`,
 `set_text`.
@@ -560,8 +565,8 @@ The menu is for the track you clicked:
 - **Remove Track**. You are asked first if the track holds clips. Greyed
   when it is the only track.
 
-Remove Track here is the way to delete an empty track that isn't the
-front-most one.
+Remove Track here is the way to delete one empty track that isn't the
+front-most one. **Track ▸ Remove Empty Tracks** deletes all of them at once.
 
 ### Media row (Media tab)
 
@@ -575,15 +580,15 @@ front-most one.
 
 ### Inspector row
 
-Right-click a row's label, slider, checkbox or the space beside them. A text
-field or popup keeps its own menu. The menu shows only the items that apply
+Right-click a row's label, slider, checkbox, popup or the space beside them.
+A text field keeps its own menu. The menu shows only the items that apply
 to that row:
 
 - **Remove from action N**: on a row that the selected action changes
 - **Go to action M**: on a row that another action changes
-- **Reset to default**, or **Set end value to default** while an action that
-  animates the row is selected. Greyed when the row already holds its
-  default.
+- **Reset to default**, or **Set end value to default** on a row that can
+  animate while any action is selected. Greyed when the row already holds
+  its default.
 
 On a row the selected action changes, the ◆ in the row's left gutter turns
 into × when you hover over it. Click it to remove that row from the action,

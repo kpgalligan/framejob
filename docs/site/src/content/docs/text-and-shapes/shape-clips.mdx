@@ -1,0 +1,108 @@
+---
+title: "Shape clips"
+description: "Add a rectangle, ellipse, line or arrow at the playhead, and resize its box on the canvas."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+A shape clip draws a rectangle, an ellipse, a line or an arrow over your video. Use one to frame something, point at it, or put a plate behind a title.
+
+<AtAGlance
+  where={['Add Shape in the timeline bar', 'Clip tab ▸ Shape', 'Drag a shape\'s handles on the canvas']}
+  tools={['add_shape_clip', 'set_shape']}
+/>
+
+<Shot
+  name="08-clip-shape.window"
+  alt="The editor with an ellipse shape clip selected. In the preview a white ellipse outline has an orange frame with handles and a rotation handle, the Ellipse clip is outlined in the timeline, and the inspector shows the Shape sub-tab."
+/>
+
+## Add a shape clip
+
+<Steps>
+
+1. Move the playhead to where the shape should start.
+
+2. Click **Add Shape** in the timeline bar.
+
+3. Choose **Rectangle**, **Ellipse**, **Line** or **Arrow**.
+
+</Steps>
+
+**Add Shape** has no menu item and no key. **Clip ▸ Add Background ▸ Solid Color** also makes a shape clip, a white rectangle the canvas's size on a new track at the back. See [Backgrounds](/canvas/backgrounds/).
+
+The shape goes on the front-most track if there's room at the playhead, and otherwise on a new track in front of everything. With a [nest](/editing/nests/) open, it goes in the nest. Adding it is one undo step, named after the kind, such as "Add Rectangle".
+
+A new shape:
+
+- lasts 5 seconds, and has no source file, so you can [trim](/editing/trimming/) it to any length
+- is a 320 × 120 px box with a 6 px white stroke and no fill, so it shows up over any footage
+- is selected, so the **Shape** sub-tab opens on it
+
+Everything about how it's drawn is on [Shape fill, stroke and size](/text-and-shapes/shape-settings/).
+
+## The four kinds
+
+You can change a shape's kind at any time with [**Kind**](/text-and-shapes/shape-settings/#change-the-kind).
+
+### Rectangle
+
+A rectangle that fills its box. A rounded rectangle is a Rectangle with a [corner radius](/text-and-shapes/shape-settings/#round-a-rectangles-corners), not a separate kind.
+
+### Ellipse
+
+An ellipse that fills its box. Make the box square for a circle.
+
+### Line
+
+A straight line. A new line runs diagonally across its box, from bottom left to top right. Drag the round handle at either end to move that end. See [Lines and arrows](/text-and-shapes/lines-and-arrows/).
+
+### Arrow
+
+A line with an arrowhead. A new arrow runs diagonally across its box like a line, with its head at the end turned on.
+
+## Resize with the handles
+
+Dragging a shape's handle changes the size of its box, not a scale factor, so the stroke stays the same thickness. The box's new size shows in the **Width** and **Height** fields.
+
+| Gesture | What it does |
+| --- | --- |
+| Drag a corner handle | Resizes the box and keeps its aspect ratio. |
+| <kbd>⇧</kbd>-drag a corner handle | Frees the aspect ratio, so width and height move independently. |
+| Drag a side handle | Changes only the width or only the height. |
+| <kbd>⌥</kbd>-drag a handle | Resizes about the centre rather than pinning the opposite handle. |
+
+The drag holds each side of the box between 4 and 20,000 px.
+
+<kbd>⇧</kbd> is special to shapes here. A video or picture has one uniform scale, so <kbd>⇧</kbd> changes nothing on those. For the rest of the canvas gestures, see [Move, scale and rotate](/canvas/move-scale-rotate/).
+
+A box resize always changes the clip itself, even with an [action](/motion/actions/) selected. To animate a shape's size, use **Scale** in the [Transform](/canvas/transform/) section, which enlarges the whole drawing, stroke included.
+
+## Picture sections
+
+A shape clip has three sub-tabs: **Shape**, **Picture** and **Clip**. Its **Picture** sub-tab has these sections, in this order:
+
+- [Transform](/canvas/transform/)
+- [Behind Subject](/effects/text-behind-subject/), on the top-level timeline only, so not while a nest is open
+- [Hide While Silent](/effects/hide-while-silent/)
+- [Shadow](/effects/shadow/)
+- [Filters](/effects/filters/)
+- [Reflection](/effects/reflection/)
+- [Spotlight](/effects/spotlight/)
+- [Obscure](/effects/obscure/)
+
+Crop, Corner Radius, Chroma Key and Background aren't offered, and neither is the **Color** sub-tab. To round a shape's corners, use **Corner radius** on the **Shape** sub-tab.
+
+## With an agent
+
+`add_shape_clip` puts a shape on the track and at the time you name, and can give it its length and look in the same step. It can also make a shape larger than the canvas, which starts scaled to fit when [**Fit new clips to canvas**](/projects/background-and-timecode/#fit-new-clips-to-canvas) is on. An arrow starts with its head on, so pass `arrow_end: false` for a bare diagonal. See [Tools: adding clips](/mcp/tools-adding-clips/#add_shape_clip).
+
+## Related
+
+- [Shape fill, stroke and size](/text-and-shapes/shape-settings/)
+- [Lines and arrows](/text-and-shapes/lines-and-arrows/)
+- [Gradient fills](/text-and-shapes/gradients/)
+- [Move, scale and rotate](/canvas/move-scale-rotate/)
+- [Text clips](/text-and-shapes/text-clips/)

@@ -13,8 +13,11 @@ them, made of pieces copied from whichever camera you want at each moment.
    sound ([Audio](audio.md)). Name each track after its camera (double-click
    the track's header): the names are what Switch Angle lists.
 2. Add a track in front of them for the program, and put the first shots on
-   it. An agent does this with `copy_pieces` (below); by hand, copy a camera's
-   clip onto the program track and cut it with **Clip ▸ Split** (⌘T).
+   it. An agent does this with `copy_pieces` (below); by hand, ⌥-drag a
+   camera's clip straight up onto the program track, which leaves a copy at
+   the same time, and cut it with **Clip ▸ Split** (⌘T). With another clip
+   right after it on the camera's track there is no room for the copy, and the
+   drag moves the clip instead.
 
 The camera tracks stay underneath. They can stay shown — the program track is
 in front and covers them — or be hidden with their track switch; a hidden
@@ -28,8 +31,8 @@ talking. Do it in this order:
 
 1. **Synchronize Audio first** (Setting it up, above). Switch by Speaker trusts
    where the clips sit and does not check that they are in sync, so a camera
-   moved or slipped afterwards — with **Clip ▸ Slip** or by dragging it — puts
-   its shots out of step with the voices.
+   moved or slipped afterwards — by dragging it, or with a ⌥⇧-drag — puts its
+   shots out of step with the voices.
 2. Select every camera's clips and every microphone's clips, then choose
    **Clip ▸ Switch by Speaker…**. It is offered when the selection holds
    clips with a picture on two or more tracks (each such track is a camera, up
@@ -49,16 +52,17 @@ first.
 **The sheet.** One row per person: a Microphone pop-up and the Camera that
 shows them, paired front to back to start with. Then:
 
-- **Wide** — the camera shown when nobody or everybody talks; a camera no
-  person uses is picked to start with when exactly one is left over, else
-  None.
+- **Wide** — the camera shown until someone first talks, and while two talk
+  at once (**Crosstalk shows**); when nobody talks the current shot holds. A
+  camera no person uses is picked to start with when exactly one is left over,
+  else None.
 - **Minimum shot** (2 s) — a shorter shot is merged into its neighbour.
 - **Cut** (0.2 s before speech) — how long before a new speaker's first word
   the cut comes.
 - **Crosstalk shows** — the Wide, or holds the Current speaker, while two talk
   at once for a second or more.
 - **Ignore bleed** (15 dB below a speaker's own level) — every microphone also
-  hears the other people, quieter. A voice this far or further below that
+  hears the other people, quieter. A voice more than this far below that
   microphone's own speaker is bleed, and never counts as that person talking.
   Raise it if a quiet guest is never shown; lower it if someone is shown while
   only the other person talks.
@@ -80,8 +84,8 @@ writes it as one undo step, **Switch by Speaker**:
   a piece of the chosen camera for each shot, in sync, with the picture on and
   the sound off;
 - the camera tracks hidden — or, when a camera track has clips outside the
-  range, those clips cut at the range's ends and their pictures switched off
-  inside it only;
+  range or a clip without a picture, its clips cut at the range's ends and
+  their pictures switched off inside it only;
 - nothing outside the range touched, and the microphones never edited, so what
   you hear is unchanged.
 
@@ -98,15 +102,15 @@ its mouth opening and closing over half a second, at least half as much again
 as the next camera's — and when two mouths move alike it is crosstalk. It
 reads Frame Job's on-device face analysis of each camera; when a camera's
 faces have not been found yet, an **Analyzing** sheet finds them first (Stop
-leaves everything as it was, and what was found is kept), then the Switch by
-Speaker sheet opens. That sheet has one **Microphone** pop-up and lists the
+leaves everything as it was, and keeps what was saved so far: the faces are
+saved every 30 seconds), then the Switch by Speaker sheet opens. That sheet
+has one **Microphone** pop-up and lists the
 **Cameras**; there is no Ignore bleed row, and **Minimum shot** opens at 3 s
 and is not remembered. Choose a **Wide** to show it during crosstalk: the wide
 camera then takes no part in deciding who talks. The summary starts "Faces
 guess who is talking; check the cuts." — mouths that move without speaking
-(laughing, chewing, a hand over the mouth) or a face turned away can put a
-cut in the wrong place, so look through the result and fix shots with Switch
-Angle.
+(laughing, chewing) or a face it cannot find can put a cut in the wrong place,
+so look through the result and fix shots with Switch Angle.
 
 **A limit, measured.** With heavy bleed in a noisy room (another voice 24 dB
 down under −45 dBFS of noise), a cut can come later than Cut before speech
@@ -119,9 +123,9 @@ of 0.2 s.
 camera. Select the one shot, open the submenu, and choose a camera.
 
 - The submenu lists, front first, every other track whose video clips cover
-  the shot's whole span — only clips of a video file with a picture count, and
-  a clip whose picture is switched off still counts. Up to nine tracks are
-  listed. Two tracks with the same name are told apart by their position from
+  the shot's whole span — only clips playing a video file with a picture
+  count, not a freeze frame of one, and a clip whose picture is switched off
+  still counts. Up to nine tracks are listed. Two tracks with the same name are told apart by their position from
   the back, as "Camera (2)" and "Camera (3)". With no single shot selected, or
   no track covering it, the submenu holds a greyed **No Covering Angle**.
 - An item is greyed when the shot's track is locked, or the shot is linked to
@@ -162,7 +166,7 @@ Three MCP tools do the same work ([Driving Frame Job from an AI agent](mcp.md)):
   the clip at both ends would leave in the middle — the same frames, speed,
   speed ramp, actions and timed words — with no dissolve and no link. The
   destination track must be free over every range. An agent cuts a whole
-  program from the cameras with one `copy_pieces` per camera.
+  program from the cameras with one `copy_pieces` per camera clip.
 - `switch_by_speaker` is **Clip ▸ Switch by Speaker…**: over the selected
   clips, with the same values as the sheet (`min_shot`, `lead`, `crosstalk`,
   `bleed_db`, `wide_after`, `mute_cameras`, `track` to replace, `wide`, and
@@ -171,6 +175,6 @@ Three MCP tools do the same work ([Driving Frame Job from an AI agent](mcp.md)):
   not show. `apply: false` answers the shots without editing. Every answer says
   which `mode` ran, `microphones` or `faces` (one microphone for everyone), and
   in the faces mode a `note` that the cuts are a guess; `min_shot` is 3 s there
-  unless given. Where the sheet would show the Analyzing sheet, the tool waits
-  for the faces up to 60 seconds, and past that is refused with what it found
-  kept — call it again to continue.
+  unless given. Where the menu command would show the Analyzing sheet, the
+  tool waits for the faces up to 60 seconds, and past that is refused with
+  what it saved kept — call it again to continue.

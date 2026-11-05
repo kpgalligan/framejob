@@ -1,0 +1,71 @@
+---
+title: The ruler and playhead
+description: Read the timeline's time ruler, scrub along it, and see how the playhead decides where edits land.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The ruler is the strip of time above the tracks. The playhead marks one moment on it: the frame the preview shows, and the point where most edits land.
+
+<AtAGlance where="The ruler above the timeline's tracks" tools="set_playhead" />
+
+## The playhead
+
+The playhead is the coral line down every track, with a triangle head on the ruler. A click or a drag lands it on a frame.
+
+## Scrub on the ruler
+
+Click the ruler to move the playhead there, and drag along it to scrub. Pressing on the ruler pauses playback, and it stays paused when you let go.
+
+While you scrub, you hear the sound under the playhead. The press plays a short piece of it, and the drag plays more as it reaches new frames. See [Hear a scrub](/audio/scrub-audio/).
+
+The scrub [snaps](/timeline/snapping/) like any other drag. Hold <kbd>⌘</kbd> to scrub without snapping.
+
+A press within 6 pt of a marker's line grabs the [marker](/timeline/markers/), not the ruler, so start the scrub beside it.
+
+## Lane clicks
+
+A click in a lane doesn't move the playhead. On empty space it starts a [marquee selection](/timeline/selecting-clips/), and a plain click there clears the selection.
+
+The exception is a click on an [action band](/motion/action-lane/), which moves the playhead to the end of that action so the preview shows its end state.
+
+## The edit point
+
+These commands work at the playhead, so put it where you want the edit first:
+
+| Command | Key |
+| --- | --- |
+| [**Clip ▸ Split**](/editing/splitting/) | <kbd>⌘T</kbd> |
+| [**Clip ▸ Trim Start to Playhead**](/editing/trimming/#trim-to-the-playhead) | <kbd>W</kbd> |
+| [**Clip ▸ Trim End to Playhead**](/editing/trimming/#trim-to-the-playhead) | <kbd>E</kbd> |
+| [**Clip ▸ Freeze Frame**](/speed/freeze-frame/) | <kbd>⇧⌘F</kbd> |
+| [**Edit ▸ Paste**](/editing/copy-and-paste/) | <kbd>⌘V</kbd> |
+| [**Edit ▸ Insert at Playhead**](/editing/insert-and-overwrite/) | No key |
+| [**Edit ▸ Overwrite at Playhead**](/editing/insert-and-overwrite/) | No key |
+| [**Mark ▸ Add Marker**](/timeline/markers/) | <kbd>M</kbd> |
+
+To place the playhead exactly, [step by frames](/timeline/playback/#step-frames) or [jump around the timeline](/timeline/move-the-playhead/).
+
+## Ticks and labels
+
+The ruler's ticks adapt to the zoom. Zoomed in, they mark single frames. As you zoom out, they step through 2, 5 and 10 frames, then 1, 2, 5, 10, 15 and 30 seconds, then 1, 2, 5, 10, 15 and 30 minutes, and at the widest one hour.
+
+Labels use the project's timecode format, **Frames** or **Milliseconds**, set in [the Document tab](/projects/background-and-timecode/). A timeline under an hour long drops the leading `00:` from its labels so they fit.
+
+The ruler also carries [markers](/timeline/markers/), the [in/out range](/timeline/in-out-range/) and the selected [action's](/motion/action-lane/) span. Inside an open [nest](/editing/inside-a-nest/), it counts from the nest's own start and shows no markers.
+
+## Following the playhead
+
+The timeline scrolls itself to keep the playhead in view, during playback and after a jump. When the playhead comes within 24 pt of either edge of the visible part, or leaves it, the view moves so the playhead sits about a third of the way in.
+
+## With an agent
+
+[`set_playhead`](/mcp/tools-view-state/#set_playhead) moves the playhead and the preview, in silence. It isn't an edit, so there's nothing to undo. An agent that splits, freezes a frame or adds a marker without giving a time works at the playhead. See [Tools: playhead, range and selection](/mcp/tools-view-state/).
+
+## Related
+
+- [Play, pause and shuttle](/timeline/playback/)
+- [Jump around the timeline](/timeline/move-the-playhead/)
+- [Zoom and scroll the timeline](/timeline/zoom-and-scroll/)
+- [Snapping](/timeline/snapping/)
+- [Hear a scrub](/audio/scrub-audio/)

@@ -1,0 +1,74 @@
+---
+title: Mute and solo tracks
+description: Silence a track, or hear only the tracks you pick, and see what that does to the picture, nests and an export.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Mute silences one track. Solo silences every other track, so you can hear one part of the mix by itself. Neither touches the picture.
+
+<AtAGlance
+  menu={['Track ▸ Mute Audio', 'Track ▸ Solo']}
+  where={['The speaker and headphones switches in the track header', "The track's right-click menu"]}
+  tools="set_track"
+/>
+
+## Mute a track
+
+Click the speaker switch in the track's header. Every clip on the track goes silent, and the picture is unaffected. Click it again to bring the sound back.
+
+**Mute Audio** in the track's right-click menu does the same for the track you clicked. **Track ▸ Mute Audio** acts on the [current track](/timeline/tracks/#the-current-track): the track of the first selected clip, or the front track when nothing is selected.
+
+To silence one clip and not its whole track, use its own [**Mute**](/audio/volume/#mute-a-clip).
+
+## Solo a track
+
+Click the headphones switch in the track's header, or choose **Solo** in the track's right-click menu or the **Track** menu. The tracks beside it go silent: the other timeline tracks or, inside a nest, that nest's other tracks.
+
+You can solo several tracks. All the soloed tracks play, and the rest are silenced.
+
+**Solo** shows a checkmark in the **Track** menu while it's on. Neither **Solo** nor **Mute Audio** has a keyboard shortcut. Each click is one undo step, named "Mute Track" or "Solo Track".
+
+## How mute and solo combine
+
+- **Mute always wins.** A track that's both muted and soloed stays silent.
+- **Solo doesn't look at what's on the track.** A soloed track with nothing on it still silences the rest, as a mixer's solo button does.
+- **Pictures stay.** A silenced track still draws. To take a picture out, use [Hide Video](/timeline/hide-and-lock-tracks/#hide-video), which leaves the sound playing.
+
+## See what a solo silences
+
+Under a solo, the waveforms on silenced tracks draw faded, as they do on a muted track. Their speaker switches stay unlit, because a speaker shows that track's own setting and not what a solo is doing to it. So the waveform tells you what you'll hear, and the switch tells you what you've set.
+
+## Mute and solo in nests
+
+A solo only reaches the tracks beside it:
+
+- A solo on a timeline track silences the other timeline tracks, and a nest playing on one of them goes silent with it.
+- A solo on a track inside a [nest](/editing/nests/) affects only that nest's other tracks.
+
+Muting the track a nest clip sits on silences everything inside the nest. A new nest's tracks copy the mute and solo of the tracks they came from, so a muted track's clips stay silent once they're nested. Un-nesting doesn't keep what's set on the nest's tracks.
+
+## In an export
+
+Mute and solo are part of the project, so the export hears what you hear. A silenced track isn't in the exported mix, and it writes no [stem](/export/stems/). If every track is silenced, Frame Job won't write stems.
+
+:::caution
+A solo left on silences the rest of the export. Check the header switches before you export.
+:::
+
+## Good to know
+
+- The switches are plain toggles. <kbd>⌥</kbd>-clicking one does what a click does, and <kbd>⌥</kbd>-clicking the header away from its switches [selects the track's clips](/timeline/tracks/#the-track-header).
+- A [scrub](/audio/scrub-audio/) plays the same mix, so mute and solo silence it too.
+- The header's other switches are on [The track header](/timeline/tracks/#the-track-header).
+
+## With an agent
+
+`set_track` sets the same switches. Name the `track` and pass `muted` or `solo` as true or false. It's a direct setting, not a toggle, so asking for what's already set changes nothing. See [Tools: tracks, markers and canvas](/mcp/tools-tracks-and-markers/#set_track).
+
+## Related
+
+- [Track volume and pan](/audio/track-volume-and-pan/)
+- [Clip volume](/audio/volume/)
+- [Hide and lock tracks](/timeline/hide-and-lock-tracks/)
+- [Audio stems](/export/stems/)

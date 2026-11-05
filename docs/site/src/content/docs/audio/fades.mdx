@@ -1,0 +1,83 @@
+---
+title: "Audio fades"
+description: Fade a clip's sound in and out from the inspector or the handles on the clip, and choose the shape of each fade.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A fade brings a clip's sound up from silence at its start or down to silence at its end, so it doesn't begin or stop abruptly. Fades change the sound only.
+
+<AtAGlance
+  where={['Clip tab ▸ Sound ▸ Fades', 'The fade handles on a clip']}
+  tools="set_audio"
+/>
+
+## Set a fade length
+
+Open the **Fades** section on the [Sound tab](/audio/sound-tab/) and set the lengths.
+
+| Control | What it does | Default | Range |
+| --- | --- | --- | --- |
+| **Fade in** | How long the sound takes to rise from silence at the clip's start. | 0 | 0 to 10 s |
+| **Fade out** | How long the sound takes to fall to silence at the clip's end. | 0 | 0 to 10 s |
+
+The field's chevron offers 0, 0.25, 0.5, 1 and 2 s. A length you type here is kept exactly as typed, not rounded to whole frames.
+
+The section's summary shows both lengths, such as "0.50 · 1.00 s", or "none". **Reset** clears both lengths and leaves the shapes as they are.
+
+With an [action selected](/audio/animate-sound/), these two rows write the action's end state.
+
+## Drag a fade handle
+
+Every clip with sound has a small square handle at each top corner of its audio part. Drag the left handle inward to set the fade in, or the right handle inward to set the fade out. The handle then sits at the end of the fade.
+
+The handles and the inspector rows change the same two settings, with these differences:
+
+- A handle's length snaps to whole frames.
+- A handle can go past 10 s, up to the length of the clip. The 10 s limit is the inspector's.
+- A handle changes that one clip, not the whole selection, and it doesn't select the clip.
+- A handle changes the clip's own fade, even with an action selected.
+
+Each drag is one undo step, "Set Fade". Handles don't snap to clip edges, markers or the playhead, because a fade is a length, not a position.
+
+Handles don't respond on a [locked track](/timeline/hide-and-lock-tracks/). They aren't drawn when the clip's audio part is under 10 pt tall.
+
+## Choose a fade shape
+
+**In shape** and **Out shape** set how the level moves across each fade. The default for both is **Linear**.
+
+| Shape | On a fade in | On a fade out | Level halfway |
+| --- | --- | --- | --- |
+| **Linear** | A straight ramp, the same amount every moment. | The same in reverse. | 50 % |
+| **S-Curve** | Starts and ends gently, moving fastest in the middle. | The same. | 50 % |
+| **+3 dB** | Rises quickly, then levels off. Good for a fade in that should be heard straight away. | Holds up, then falls quickly at the end. | 71 %, 3 dB under full |
+| **−3 dB** | Starts slowly and gathers speed. | Falls quickly, then trails away. Good for a fade out that should feel long. | 29 %, about 11 dB under full |
+
+The shapes always belong to the clip itself. With an action selected they're marked ⊘ and still change the clip's own setting, and an action can't [animate](/audio/animate-sound/#what-cant-be-animated) them.
+
+A crossfade between two clips has its own shape, with the same four choices. See [Crossfades](/audio/crossfades/).
+
+## When a clip moves or is trimmed
+
+A fade is measured from the clip's own edges:
+
+- **Move** a clip and the fade travels with it.
+- **Trim** a clip and the fade stays at the edge, the same length.
+- **Split** a clip and both halves keep both fade lengths, so a fade in also starts the second half and a fade out also ends the first.
+
+Where a fade in and a fade out overlap, the two multiply. That gives a dip in the middle rather than a jump. A length you type can be longer than the clip, and that fade is then cut off at the clip's other edge, so the sound never reaches full level.
+
+## Good to know
+
+- On a [nest clip](/audio/how-audio-works/#sound-on-a-nest), fades scale everything inside the nest.
+- The [volume line](/audio/volume-line/) shows a clip's fades, so you can see them against the level.
+
+## With an agent
+
+`set_audio` sets a fade's length and shape on one or more clips, with `fade_in`, `fade_out`, `fade_in_shape` and `fade_out_shape`. See [Tools: clip sound](/mcp/tools-set-audio/#fades-and-fade-shapes). A crossfade is set with `set_transition_style` instead. See [Crossfades](/audio/crossfades/).
+
+## Related
+
+- [Crossfades](/audio/crossfades/)
+- [The volume line](/audio/volume-line/)
+- [Clip volume](/audio/volume/)

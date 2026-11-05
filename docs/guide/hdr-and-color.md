@@ -13,7 +13,7 @@ You don't need to set anything for most footage. Each frame is converted once, a
 | Ordinary Rec. 709 or untagged video, stills, recordings | Drawn as is | Lifted to HDR reference white (203 cd/m², HLG 75 %), so it looks the same as it does in SDR |
 | HLG video (e.g. iPhone HDR) | Converted to Rec. 709 by Frame Job, highlights rolled off smoothly | Kept as HLG, highlights above white intact |
 | PQ / HDR10 video or stills | Converted to Rec. 709, highlights rolled off at the file's own peak (see [HDR10 peak](#hdr10-peak)) | Real HDR: display light up to 1,000 cd/m², brighter highlights rolled off to fit |
-| Wide-gamut SDR (BT.2020 or P3 primaries with an SDR transfer, sRGB included) | Converted to Rec. 709; colours outside Rec. 709 are eased toward their brightness and rolled off instead of clipped | Converted into BT.2020 and lifted |
+| Wide-gamut SDR (BT.2020 or P3 primaries with an SDR transfer, sRGB included) | Converted to Rec. 709; colours outside Rec. 709 are clipped | Converted into BT.2020 and lifted |
 | Camera log (set in the Media tab) | Converted to a normal-looking Rec. 709 picture | Converted to real HDR |
 | Text, captions, shapes, graphics, the background colour | Drawn as is | Lifted to HDR reference white with the SDR sources |
 
@@ -55,7 +55,7 @@ Whether a log file is stored in video range or full range is read from the file 
 
 ### Detection on import
 
-An iPhone **Apple Log** or **Apple Log 2** file is recognised by its label when you import it, so it looks like normal video straight away. The line under the popup then adds "— from the file", for example "Apple Log — from the file". Sony, Panasonic and Canon files carry no label Frame Job can read, so choose their curve by hand. To see an Apple Log file's raw log picture, choose **None**.
+An **Apple Log** or **Apple Log 2** file is recognised by its label when you import it, so it looks like normal video straight away. The line under the popup then adds "— from the file", for example "Apple Log — from the file". Sony, Panasonic and Canon files carry no label Frame Job can read, so choose their curve by hand. To see an Apple Log file's raw log picture, choose **None**.
 
 ### Using your own LUT
 
@@ -67,7 +67,7 @@ If you remove that LUT from the Media list, the alert says how many files use it
 
 ### Camera Log and looks
 
-Camera Log is applied before any look. If a clip's file is converted by Camera Log and you also give the clip a camera LUT as a look, the Look section warns: "This clip's file is converted by Camera Log; a camera LUT here converts it twice." It is only a warning, because a creative LUT on top is legitimate. See [Colour grading](color-grading.md).
+Camera Log is applied before any look. If a clip's file is converted by Camera Log and you also give the clip a camera LUT as a look, the Look section warns: "This clip's file is converted by Camera Log; a camera LUT here converts it twice." It is only a warning, because a creative LUT on top is legitimate. A PQ (HDR10) file with a LUT look shows the same warning, even with **Log** set to **None**. See [Colour grading](color-grading.md).
 
 *Agents:* `set_media_color` (`color` is `{log, gamut?}`, `{lut}` or `null`); `get_project`'s `media[].color` shows `detected: true` for a file set at import.
 
@@ -75,7 +75,7 @@ Camera Log is applied before any look. If a clip's file is converted by Camera L
 
 A PQ (HDR10) file has its highlights roll off to white at the brightness its own metadata names. Import reads the peak from the file: MaxCLL first, then the mastering display's maximum. It looks in the file's sample description and, when that names none, in the video stream's own HDR10 metadata (HEVC SEI, or AV1 metadata), so files from ffmpeg, HandBrake or x265 are read too. A file that names no peak is treated as 1,000 cd/m².
 
-The **HDR10** section of the **Media** tab appears once the project has a PQ file. That can be a video, or a PQ still image (PNG, HEIF or AVIF). Click the file in the list to see and change its peak. The section's header shows the selected file's peak in cd/m² (for example "4,000 cd/m²"), so you can read it with the section collapsed.
+The **HDR10** section of the **Media** tab appears once the project has a PQ file. That can be a video, or a PQ still image. A PNG, HEIC or HEIF still's peak is read from the file; any other still counts as naming none. Click the file in the list to see and change its peak. The section's header shows the selected file's peak in cd/m² (for example "4,000 cd/m²"), so you can read it with the section collapsed.
 
 | Control | What it does |
 |---|---|
@@ -148,7 +148,7 @@ The **Document** tab's **Canvas** section also has a **Blending** popup. It sets
 
 | Item | What it does | Default |
 |---|---|---|
-| Encoded | Layers blend on their encoded values, as most editors do | Yes |
+| Encoded | Layers blend on their encoded values | Yes |
 | Linear light | Layers blend as light. A dissolve between two saturated clips keeps its brightness instead of dipping dark at the midpoint. A title fading over video and a blurred or feathered edge come out brighter, and a glow adds light the way light does. | |
 
 The change is one undo step, **Blending**. It changes no clip and no grade. Grades, the chroma key, qualifiers, Show Selection, luma mattes and the scopes still read the same values they did, so a grade looks the same either way. In an HDR (HLG) project, "linear" means HLG's scene light.
@@ -178,11 +178,11 @@ For formats, sizes and the export queue, see [Export](export.md).
 ## Precision and bit depth
 
 - **16-bit float compositing.** Every frame is composited at 16-bit float, and every video source is decoded at full depth. Gradients from a 10-bit camera file survive grading.
-- **10-bit exports.** HEVC 10-bit (Main 10), both AV1 formats, ProRes 422 and ProRes 4444 keep that depth. H.264, HEVC and HEVC with Alpha are 8-bit.
+- **10-bit exports.** HEVC 10-bit (Main 10), both AV1 formats, ProRes 422 and ProRes 4444 keep that depth. VP9 (WebM) is 10-bit for HLG and HDR10, and 8-bit for an SDR picture. H.264, HEVC, HEVC with Alpha and VP9 with Alpha (WebM) are 8-bit.
 - **Deep stills.** A still deeper than 8 bits per channel, such as a 16-bit PNG or TIFF or a 10-bit HEIC, is drawn at 16-bit float. An 8-bit still is drawn as before.
-- **Saved and rendered frames.** **File ▸ Save Frame…** writes a 16-bit PNG or a 10-bit HEIC when the frame shows a deep still or deep video, and in every HDR (HLG) project. JPEG, Animated GIF and Animated PNG are always 8-bit.
+- **Saved and rendered frames.** **File ▸ Save Frame…** writes a 16-bit PNG or a 10-bit HEIC when the frame shows a deep still or a 10-bit VP9 clip, and in every HDR (HLG) project. A 10-bit HEVC or ProRes clip comes out that deep when it is on the lowest track with video on it. On a higher track, above an 8-bit clip, it comes out at 8 bits. JPEG, Animated GIF and Animated PNG are always 8-bit.
 - **Reversed clips.** A reversed clip's backwards copy is rendered at 10 bits, at the source's exact size, with the source's own colour labels. That means an HDR or log clip still reads correctly when reversed. See [Speed](speed.md).
-- **What stays 8-bit.** Text, shapes, captions, graphics, thumbnails and screen recordings are 8-bit. In an HDR (HLG) project they are still lifted to HDR reference white.
+- **What stays 8-bit.** Text, shapes, captions, graphics and screen recordings are 8-bit. In an HDR (HLG) project they are still lifted to HDR reference white. Thumbnails are 8-bit too, and are not lifted.
 
 ## Limits
 

@@ -20,7 +20,7 @@ The new project lives only in memory until you save it, so it opens already mark
 
 Opening a `.framejob` package opens that project (a double-click on a package always opens it in Frame Job). If it is already open, its window comes forward.
 
-Dropping several files at once on a window, the Welcome window or the Dock icon opens each one as its own untitled project. Only `.framejob` packages and the movie, sound and picture types File ▸ Open… lists are taken; anything else dropped there is ignored. To add files to the project you already have open, drop them on the [Media tab](#the-media-tab) instead.
+Dropping several files at once on a window, the Welcome window or the Dock icon opens each one as its own untitled project. Only `.framejob` packages and the movie, sound and picture types File ▸ Open… lists are taken; anything else dropped there is ignored, except that a `.fjgraphic` dropped on the Dock icon is imported (see [Sharing a graphic](graphics.md#sharing-a-graphic)). To add files to the project you already have open, drop them on the [Media tab](#the-media-tab) instead.
 
 *Agents:* `open_project` (takes a `path` to a package, movie, sound file or picture; answers `already_open: true` when that file is already open).
 
@@ -32,7 +32,7 @@ Dropping several files at once on a window, the Welcome window or the Dock icon 
 
 ### New Project from Range
 
-With an In–Out range set on the timeline (Mark ▸ Set In and Set Out), **File ▸ New Project from Range…** opens a new project holding exactly that range, moved to start at 0. A clip across the range's In or Out is cut there, as **Split** cuts it; a transition across an edge becomes a hard start or end; markers inside the range are kept. Media that no kept clip plays are left out. The item is off with no range set, while a nest is open, and while a sheet is on the window.
+With an In–Out range set on the timeline (Mark ▸ Set In and Set Out), **File ▸ New Project from Range…** opens a new project holding exactly that range, moved to start at 0. A clip across the range's In or Out is cut there, as **Split** cuts it; a transition across an edge becomes a hard start or end; markers inside the range are kept. Media that no kept clip plays are left out, unless a kept clip's look or Hide While Silent names them or they are a kept file's Camera Log. The item is off with no range set, while a nest is open, and while a sheet is on the window.
 
 The new project opens untitled and with unsaved changes, named after the project it came from with " (range)" added (for example "Interview (range)"). It starts at the range: there is no undo step back to the whole timeline. The project you made it from does not change.
 
@@ -55,7 +55,7 @@ When Frame Job starts with nothing to open, and when you click its Dock icon wit
 | **Open Video…** | The same open panel as File ▸ Open…. |
 | **New Project** | A blank 1920 × 1080, 30 fps project. |
 | **New Recording…** | Opens the screen recorder panel; see [Screen recording](screen-recording.md). |
-| **Recent** | Up to five recently opened projects, by name; hover for the full path. Hidden when there are none. |
+| **Recent** | Up to five recently opened projects and media files, by name; hover for the full path. Hidden when there are none. |
 
 The line at the foot lists the file types it opens: MOV · MP4 · M4V · M4A · MP3 · WAV · AIFF · PNG · JPEG · HEIC. You can also drop a file or a package anywhere on the Welcome window to open it. The window closes itself as soon as a project window comes up.
 
@@ -65,10 +65,10 @@ The line at the foot lists the file types it opens: MOV · MP4 · M4V · M4A · 
 |---|---|---|
 | **File ▸ New Project** | ⌘N | A blank 1920 × 1080, 30 fps project. |
 | **File ▸ Open…** | ⌘O | Opens a package, or builds an untitled project around a movie, sound file or picture. |
-| **File ▸ Open Recent ▸** | | Recently opened projects; **Clear Menu** empties the list. |
+| **File ▸ Open Recent ▸** | | Recently opened projects and media files; **Clear Menu** empties the list. |
 | **File ▸ Close** | ⌘W | Closes the window. A project that has been saved writes its changes and closes without asking; an untitled project with changes (an opened movie always counts) asks whether to save first. |
 | **File ▸ Save** | ⌘S | Writes the package. An untitled project asks where. |
-| **File ▸ Save As…** | ⇧⌘S | Writes the project to a new package. |
+| **File ▸ Save As…** | ⌥⇧⌘S | Writes the project to a new package. The File menu shows it while ⌥ is held, in place of **Duplicate** (⇧⌘S). |
 | **File ▸ Revert To ▸** | | Goes back to the last saved version, or browses earlier versions of the package. |
 
 Once a project has been saved it autosaves in place, the macOS way: changes are written to the package as you work, and the package is written beside the old one and swapped in, so a crash part-way through a save cannot leave half a package behind. Because of this, macOS adds its standard document commands to the File menu: **Duplicate**, **Rename…**, **Move To…**, **Revert To ▸** (in place of Revert to Saved) and **Share**, and the same Rename and Move To controls appear when you click the window's title. A project only ever saves as a `.framejob` package. Making a movie or a still is a separate step; see [Export](export.md).
@@ -82,9 +82,9 @@ A package is a folder that the Finder shows as one file:
 | Inside | What it is |
 |---|---|
 | `project.json` | The edit itself: canvas, media list, tracks, clips, markers. The only thing a package needs in order to open. |
-| `cache/` | Things Frame Job can rebuild: filmstrip thumbnails, waveforms, the voice-detection and sync analyses, transcripts, reversed clips, speed-ramp audio, the shot changes, faces, sound events and subjects (people and salient regions) found for an agent, the faces and subjects drawn by View ▸ Show Subjects, and the person masks found for one or made for a clip with Remove Background (`cache/analysis/`; a minute of 1080p video's masks take about 62 MB). A package with a missing or damaged `cache/` still opens and just redraws. |
+| `cache/` | Things Frame Job can rebuild: filmstrip thumbnails, waveforms, the voice-detection and sync analyses, transcripts, reversed clips, speed-ramp audio, the shot changes, faces, sound events and subjects (people and salient regions) found for an agent or for a command such as Clip ▸ Split at Shot Changes or View ▸ Show Subjects, and the person masks found for an agent or made for a clip with Remove Background (`cache/analysis/`; a minute of 1080p video's masks take about 62 MB). A package with a missing or damaged `cache/` still opens and just redraws. |
 | `media/` | Only after **Consolidate Media…**: copies of the footage (see [Consolidate Media](#consolidate-media)). |
-| `graphics/` | Only once you add a graphic: graphic modules, their fonts, images and kept versions. See [Graphics](graphics.md). |
+| `graphics/` | Only once you add a graphic, or a font or image with File ▸ Add Font to Graphics… or Add Image to Graphics…: graphic modules, their fonts, images and kept versions. See [Graphics](graphics.md). |
 
 **Media is referenced, not copied.** By default a project remembers where each file lives (its path and a Finder bookmark, so a moved file is often found again) and reads it from there. The package stays small, but it depends on the footage staying put. Consolidate Media is how you make a package hold everything it needs.
 
@@ -123,7 +123,7 @@ Width and height must both be even. An odd value is refused, for example "canvas
 
 A project can run at a rate the popup does not list. An opened file at 24, 23.976, 25, 30, 29.97, 48, 50, 60 or 59.94 fps keeps that exact rate; any other rate (screen recordings often have odd ones) is kept to three decimals. The popup then shows **24**, while the Document summary's **Frame rate** row shows the real rate. Picking a popup item changes the rate, and **Match First Clip** brings the file's rate back.
 
-Changing the rate moves every clip start, length, action and marker onto the new frame grid. If two markers land on the same frame at the new rate, the later one is dropped.
+Changing the rate moves every clip start, length, action and marker onto the new frame grid. If two markers land on the same frame at the new rate, the one added first stays and the other is dropped.
 
 ### Appearance
 
@@ -150,7 +150,7 @@ Every marker in the project, with its name, **Chapter**, **Go** and **Delete**. 
 | Movies | MOV, MP4, M4V and other containers macOS plays: H.264, HEVC, ProRes, MJPEG and MPEG-4 video; VP9 Profile 0 and 2 in MP4; AV1 on an M3 or later Mac. |
 | WebM and Matroska | `.webm` and `.mkv` with VP9, AV1, H.264 or HEVC video and Opus, Vorbis or AAC sound (see below). |
 | Sound | M4A (AAC, ALAC), MP3, WAV and AIFF everywhere. Other formats macOS plays, such as CAF and FLAC, import when dropped on the Media tab. |
-| Pictures | PNG, JPEG and HEIC everywhere. TIFF, GIF, BMP, HEIF and WebP also import when dropped on the Media tab. |
+| Pictures | PNG, JPEG and HEIC everywhere. TIFF, GIF, BMP, HEIF and WebP also import when dropped on the Media tab. An AVIF does not import as a still: Frame Job shows "Could not read *file*.", or, with ffmpeg installed, offers to convert it to a one-frame H.264 movie (8-bit, no transparency). |
 | LUTs | `.cube` 3D LUTs, applied as a clip's look or as a file's Camera Log. See [Color grading](color-grading.md). |
 
 Caption files (`.srt`) are not media: bring them in with **File ▸ Import Captions…**. See [Captions](captions.md).
@@ -161,7 +161,7 @@ Caption files (`.srt`) are not media: bring them in with **File ▸ Import Capti
 
 Adding puts files in the Media tab, **not** on the timeline. Place them from there (see [Putting media on the timeline](#putting-media-on-the-timeline)).
 
-You can also drag files from the Finder onto the **Media tab**. That adds them to this project. A Finder drop anywhere else on the window (the canvas, the timeline) *opens* the file as a project of its own, as a drop on the Dock icon does.
+You can also drag files from the Finder onto the **Media tab**. That adds them to this project. Frame Job does not look inside a folder: a dropped folder shows "Could not read *folder*.", nothing in it is added, and any files dropped with it are still added. A Finder drop anywhere else on the window (the canvas, the timeline) *opens* the file as a project of its own, as a drop on the Dock icon does.
 
 *Agents:* `import_media` (takes a `path`; answers the new media id and what the check found: kind, duration, display size, frame rate, video/audio/alpha). `add_media` is the raw op behind it, taking a descriptor you supply.
 
@@ -174,8 +174,8 @@ macOS cannot play WebM or MKV directly, so Frame Job copies the video and sound 
 - The copy keeps the colour the file states: HLG, HDR10 (PQ), or a BT.709, BT.601 or BT.2020 SDR picture, read from the file's colour information or, for VP9, from the video itself. A file that states none is shown as macOS reads it.
 - Importing the same file again reuses the copy.
 - The media keeps the original's name, and its tooltip on the Media tab says where the copy lives.
-- If the copy is later deleted, or moved to the Trash, the project makes it again from the original the next time it opens. If that copy is cancelled or fails, the file shows as missing (a slate, the **missing** badge, Relink…) until the next open tries again.
-- Frame Job never deletes anything from the Rewrapped folder, which every project shares, so copies pile up there. You can clear it: WebM and MKV copies are made again on the next open (ffmpeg conversions are not; see below).
+- If the copy is later deleted, or moved to the Trash, the project makes it again from the original, if that can still be found, the next time it opens. If it cannot, or that copy is cancelled or fails, a deleted copy shows as missing (a slate, the **missing** badge, Relink…) until the next open tries again, and one in the Trash goes on playing from there.
+- Frame Job deletes nothing from the Rewrapped folder, which every project shares, except a copy or conversion that turns out not to open, so copies pile up there. You can clear it: WebM and MKV copies are made again on the next open while their originals can be found (ffmpeg conversions are not; see below).
 - **Consolidate Media** copies the copy, not the WebM, into the package's `media/` folder, and the row's tooltip then says it was copied into this project's package.
 
 A stream the built-in copy cannot carry (FLAC, MP3, AC-3, MPEG-2 and similar) is refused with a sentence naming it. If you have ffmpeg installed, Frame Job then offers to help (next section).
@@ -211,7 +211,7 @@ Each row shows a thumbnail (a frame for video, a waveform glyph for sound, a cub
 | Kind | The line reads |
 |---|---|
 | Movie | duration · width×height · frame rate, e.g. `00:01:12:04 · 1920×1080 · 29.97 fps` |
-| Picture | width×height |
+| Picture | width×height · 30 fps, e.g. `3024×4032 · 30 fps` |
 | Sound | duration |
 | LUT | LUT |
 
@@ -225,7 +225,7 @@ Click a row to select it; the selected row is outlined in the accent colour. Sel
 
 ### Putting media on the timeline
 
-- **Drag a row onto a timeline track.** With no modifier it lands at the pointer, snapped to a frame, if that part of the track is free; if it would overlap a clip already there, the drop is refused and the drag springs back. Hold **⌥** as you drop to *insert* (the track opens up to make room) or **⇧⌥** to *overwrite* (whatever is under it on that track is replaced).
+- **Drag a row onto a timeline track.** With no modifier it lands at the pointer, snapped to a frame. A drop the overlap rule forbids ([Editing](editing.md#limits)) places nothing: Frame Job beeps and shows the reason at the foot of the inspector. A smaller overlap goes in and makes a Cross Dissolve. Hold **⌥** as you drop to *insert* (the track opens up to make room) or **⇧⌥** to *overwrite* (whatever is under it on that track is replaced).
 - **Drag a row onto the canvas.** It lands on a new track at the front, at the playhead.
 - **Edit ▸ Insert at Playhead** / **Edit ▸ Overwrite at Playhead** place the selected row at the playhead. They have no shortcut, and they are off until a row (not a LUT) is selected on the Media tab. The track is the selected clip's track, or the front track when no clip is selected. With a nest open, that is a track inside the nest.
 
@@ -243,7 +243,7 @@ Right-click a row for:
 |---|---|
 | **Insert at Playhead** | As Edit ▸ Insert at Playhead, for this row. Off for a LUT. |
 | **Overwrite at Playhead** | As Edit ▸ Overwrite at Playhead, for this row. Off for a LUT. |
-| **Reveal in Timeline** | Selects every clip on the timeline that shows this file and scrolls to the earliest one; the inspector switches to the Clip tab. Off when nothing on the timeline uses the file, including when its only clips are inside a nest. For a LUT, it selects the clips whose look it is. |
+| **Reveal in Timeline** | Selects every clip on the timeline that shows this file and scrolls to the earliest one; the inspector switches to the Clip tab, unless those clips were already selected. Off when nothing on the timeline uses the file, including when its only clips are inside a nest. For a LUT, it selects the clips whose look it is. |
 | **Reveal in Finder** | Shows the file in the Finder. For a WebM or MKV copy, shows the original, or the copy when the original is gone. |
 | **Relink…** | Points this media at another file (see [Missing media and Relink](#missing-media-and-relink)). |
 | **Remove** | Takes the file out of the project (see below). |
@@ -286,7 +286,7 @@ A consolidated package that has been moved or renamed finds its own copies again
 - The project must have been saved first. On an untitled project the command asks "Save this project first?" and offers **Save…**; after the save it carries on.
 - A **Consolidating Media** sheet shows progress ("Copying 4 files (2.1 GB) into the package…") and the file being copied. **Cancel** stops the copying; what was copied stays copied and the rest keep pointing at the originals, so the project always opens.
 - When it finishes the sheet says what happened ("Copied 4 files (2.1 GB) into the package.", plus any files that could not be copied and any missing files it left alone) and offers **Show in Finder** and **Close**. The relinks are one undo step, "Consolidate Media".
-- Two files with the same name are kept apart (`intro.mov`, `intro-2.mov`). Two entries that point at the same file share one copy. Files already inside the package are not copied again.
+- Two files with the same name are kept apart (`intro.mov`, `intro-2.mov`). Two entries that point at the same file share one copy. Files already in the package's `media/` folder are not copied again.
 - Missing files cannot be copied: relink them first. If there is nothing to do, it says "Nothing to consolidate." and why.
 - LUTs are consolidated like footage.
 - A screen recording's cursor file is copied too, next to its movie and named after it (`Recording.mov` and `Recording.fjcursor`), and counts as one of the files copied. It is copied only once its movie is, and the project points at the copy only once it is there: a cursor file that cannot be copied is listed with the files that could not be, and the recording keeps its original cursor file. A cursor file that is missing is left alone ("1 cursor file was missing and left alone.").
@@ -300,6 +300,6 @@ The command is off when the project has no media.
 - Consolidate Media needs a saved project.
 - Canvas width and height are even numbers from 16 to 16384 px.
 - A project holds at most 4,096 clips and 64 tracks (counting those inside nests), 1,024 markers and 1,024 media files, with nests up to 8 deep.
-- The Add Media… and Open panels list movies, M4A, MP3, WAV, AIFF, PNG, JPEG, HEIC and (Add Media… only) `.cube`. Other sound and picture formats import only by a drop on the Media tab, or through `import_media`.
+- The Add Media… and Open panels list movies, M4A, MP3, WAV, AIFF, PNG, JPEG, HEIC and (Add Media… only) `.cube`. The other sound and picture formats under [What Frame Job reads](#what-frame-job-reads) import only by a drop on the Media tab, or through `import_media`.
 - `.cube` files are imported, not opened: File ▸ Open… does not take one, and a `.cube` dropped on the window or the Dock is not imported. Use Add Media… or a drop on the Media tab.
-- A project file that is damaged or out of range fails to open with a message naming the problem; the package is not rewritten. A package saved by a newer Frame Job reports "project format version *N* is newer than this build understands (version *M*); update Frame Job to open it". A package with no readable `project.json` reports "*name* does not contain a readable project.json."
+- A project file that is damaged or out of range fails to open with a message naming the problem; the package is not rewritten. A package saved by a newer Frame Job reports "project format version *N* is newer than this build understands (version *M*); update Frame Job to open it". A package with no `project.json` fails with macOS's own no-such-file message, and a `project.json` that is not text reports "*name* does not contain a readable project.json." A `project.json` that is a folder or a link rather than a file shows no message: Frame Job quits unexpectedly as it opens the package.

@@ -1,0 +1,86 @@
+---
+title: "Image clips"
+description: "Put a still picture on the timeline, set how long it stays, and use the same Picture and Color controls as a video clip."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+An image clip puts a still picture on the timeline: a logo, a photo, a screenshot. It draws like a video clip but has no length of its own, so you decide how long it stays.
+
+<AtAGlance
+  where={['Media tab ▸ drag a picture onto a track or the canvas', 'Clip tab ▸ Picture', 'Clip tab ▸ Color']}
+  tools={['import_media', 'add_clip']}
+/>
+
+## Place an image
+
+<Steps>
+
+1. [Import](/projects/import-media/) the picture the way you'd import a movie, with **File ▸ Add Media…** or by dropping it on the Media tab.
+
+2. Drag its row onto a track, or onto the preview canvas.
+
+</Steps>
+
+The picture lands as a five-second clip. A drop on a track puts it at the pointer, and a drop on the canvas puts it at the playhead on a new track in front. See [Add clips to the timeline](/editing/add-clips/) for what stops a drop, and [Insert and overwrite](/editing/insert-and-overwrite/) to make room for it.
+
+The picture formats Frame Job can read, and how each one comes in, are on [Supported file formats](/reference/file-formats/).
+
+## Length
+
+An image clip starts at 5 seconds. A picture has no end to run out of, so you can [trim](/editing/trimming/) it to any length, down to one frame. Drag either edge on the timeline, or type a time into **In** or **Out** in the **Timing** section of the **Clip** sub-tab.
+
+There's no footage to retime or turn around, so the **Clip** sub-tab has no **Speed** section and **Timing** has no **Reverse** row.
+
+## Starting size
+
+A picture bigger than the canvas on either side starts scaled down so all of it shows, while the Document tab's **Fit new clips to canvas** option is on, which it is by default. With the option off it starts at 100 %, its native size, and runs past the edges of the canvas.
+
+A picture the same size as the canvas or smaller starts at 100 % either way, because the option never scales a clip up. See [Fit new clips to canvas](/projects/background-and-timecode/#fit-new-clips-to-canvas).
+
+## Picture sections
+
+An image clip has three sub-tabs: **Picture**, **Color** and **Clip**. There's no **Sound** sub-tab, because a picture has no sound.
+
+The **Picture** sub-tab has these sections, in this order:
+
+- [Transform](/canvas/transform/)
+- [Behind Subject](/effects/text-behind-subject/), on the top-level timeline only, so not while a nest is open
+- [Hide While Silent](/effects/hide-while-silent/)
+- [Crop](/canvas/crop/)
+- [Corner Radius](/canvas/corner-radius/)
+- [Chroma Key](/effects/chroma-key/)
+- [Background](/effects/remove-background/), which is Remove Background
+- [Shadow](/effects/shadow/)
+- [Filters](/effects/filters/)
+- [Reflection](/effects/reflection/)
+- [Spotlight](/effects/spotlight/)
+- [Obscure](/effects/obscure/)
+
+That's everything a video clip has but two. The **Layout** section is for a clip of a video file and the **Cursor** section for a screen recording, so neither shows here.
+
+Remove Background works on a picture too, keeping its person or its foreground subject. A picture gets a **Subject** row to choose between them. See [Remove Background](/effects/remove-background/).
+
+The [**Color** sub-tab](/color/color-tab/) grades a picture as it grades a movie, with **Light**, **Color**, **Wheels**, **Curves** and **Look**.
+
+The **Clip** sub-tab has **Timing** and **Motion presets**, plus **Transition** when the clip overlaps the one before it. To give a still some movement, use a [motion preset](/motion/motion-presets/) or an [action](/motion/actions/).
+
+## Good to know
+
+- An animated GIF or WebP shows its first frame only.
+- A picture with transparency keeps it, so what's behind shows through. That's how to add a sticker or a watermark. Frame Job has no sticker library, so bring your own PNG.
+- A picture more than 8,192 px on its long side is read at 8,192 px.
+- Opening a PNG, JPEG or HEIC picture with **File ▸ Open…** builds a new project around it instead of adding it to the one you have open. See [Open a project](/projects/open-a-project/).
+
+## With an agent
+
+`import_media` adds the picture to the media list and `add_clip` places it, five seconds long at the size above. See [Tools: media](/mcp/tools-media/#import_media) and [Tools: adding clips](/mcp/tools-adding-clips/#add_clip).
+
+## Related
+
+- [Import media](/projects/import-media/)
+- [Add clips to the timeline](/editing/add-clips/)
+- [The Picture tab](/canvas/picture-tab/)
+- [Motion presets](/motion/motion-presets/)
+- [Supported file formats](/reference/file-formats/)

@@ -1,0 +1,107 @@
+---
+// The exhaustive feature list: src/data/features.json as one filterable table per section.
+import data from '../data/features.json';
+
+interface Feature {
+  name: string;
+  summary: string;
+  page: string;
+  anchor?: string;
+  where?: string;
+  keys?: string;
+  needs?: string;
+}
+
+interface Section {
+  id: string;
+  title: string;
+  features: Feature[];
+}
+
+const sections = data.sections as Section[];
+const total = sections.reduce((sum, section) => sum + section.features.length, 0);
+const href = (feature: Feature) => `/${feature.page}/${feature.anchor ? `#${feature.anchor}` : ''}`;
+---
+
+<div class="fj-filter not-content">
+  <input
+    id="fj-filter"
+    type="search"
+    placeholder={`Filter ${total} features by name, menu or shortcut`}
+    aria-label="Filter the features"
+  />
+  <output id="fj-count" for="fj-filter">
+    {total} features
+  </output>
+</div>
+
+{sections.map((section) => (
+  <section class="fj-section" data-section={section.id}>
+    <h2 id={section.id}>{section.title}</h2>
+    <table class="fj-features">
+      <thead>
+        <tr>
+          <th scope="col">Feature</th>
+          <th scope="col">What it does</th>
+          <th scope="col">Where</th>
+        </tr>
+      </thead>
+      <tbody>
+        {section.features.map((feature) => (
+          <tr>
+            <td>
+              <a href={href(feature)}>{feature.name}</a>
+            </td>
+            <td>{feature.summary}</td>
+            <td class="fj-where">
+              {feature.where}
+              {feature.keys && (
+                <>
+                  {feature.keys.split(' or ').map((key) => (
+                    <>
+                      {' '}
+                      <kbd>{key}</kbd>
+                    </>
+                  ))}
+                </>
+              )}
+              {feature.needs && <div>Needs {feature.needs}</div>}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </section>
+))}
+
+<style is:global>
+  /* This page's table wants more room than prose does. */
+  :root {
+    --sl-content-width: 68rem;
+  }
+</style>
+
+<script>
+  const input = document.querySelector<HTMLInputElement>('#fj-filter');
+  const count = document.querySelector<HTMLOutputElement>('#fj-count');
+  const sections = [...document.querySelectorAll<HTMLElement>('.fj-section')];
+  const rows = sections.flatMap((section) =>
+    [...section.querySelectorAll<HTMLTableRowElement>('tbody tr')].map((row) => ({
+      row,
+      text: row.textContent?.toLowerCase() ?? '',
+    })),
+  );
+
+  input?.addEventListener('input', () => {
+    const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+    let shown = 0;
+    for (const { row, text } of rows) {
+      row.hidden = !words.every((word) => text.includes(word));
+      if (!row.hidden) shown += 1;
+    }
+    for (const section of sections) {
+      section.hidden = !section.querySelector('tbody tr:not([hidden])');
+    }
+    if (count) count.textContent = `${shown} features`;
+  });
+</script>

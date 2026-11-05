@@ -1,0 +1,110 @@
+---
+title: Entrance and exit presets
+description: What each of the nine In and Out presets does, from Fade to Pop, and how a slide works out where to start and stop.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Entrance and exit presets give a clip a ready-made way to arrive and to leave. The same nine kinds fill a clip's **In** and **Out** slots, and each runs for the **In Duration** or **Out Duration** you set, 0.5 s unless you change it. This page says what each kind does at each end. To set one, see [Motion presets](/motion/motion-presets/).
+
+<AtAGlance
+  menu={['Clip ▸ Motion ▸ In', 'Clip ▸ Motion ▸ Out']}
+  where="Clip tab ▸ Clip sub-tab ▸ Motion presets"
+  tools="set_video"
+/>
+
+## How In and Out relate
+
+An In and an Out of the same kind are a pair, not a rewind: a Zoom In grows at both ends and a Slide Left travels left at both ends. An In starts quickly and slows as the clip arrives. An Out starts slowly and speeds up as the clip leaves. Pop is the exception, because it has a spring of its own.
+
+Sizes here are relative to the clip's own size, and fades to its own opacity. A clip placed at 50% scale that zooms in from 60% starts at 30%. See [Motion sits on top of placement](/motion/motion-presets/#motion-sits-on-top-of-placement).
+
+## Fade
+
+The clip's opacity changes and nothing else does.
+
+- **As an In:** fades in from fully transparent.
+- **As an Out:** fades out.
+
+## Zoom In
+
+The clip grows, whichever end it's at.
+
+- **As an In:** grows from 60% to full size while fading in.
+- **As an Out:** grows to 140% while fading out.
+
+## Zoom Out
+
+The clip shrinks, whichever end it's at.
+
+- **As an In:** shrinks from 140% to full size while fading in.
+- **As an Out:** shrinks to 60% while fading out.
+
+## Slide Left
+
+A slide names the direction the clip travels. It doesn't fade, so the clip stays at its own opacity the whole way. This one travels left.
+
+- **As an In:** slides in from the right edge.
+- **As an Out:** slides out past the left edge.
+
+## Slide Right
+
+The clip travels right, with no fade.
+
+- **As an In:** slides in from the left edge.
+- **As an Out:** slides out past the right edge.
+
+## Slide Up
+
+The clip travels up, with no fade.
+
+- **As an In:** slides in from the bottom edge.
+- **As an Out:** slides out past the top edge.
+
+## Slide Down
+
+The clip travels down, with no fade.
+
+- **As an In:** slides in from the top edge.
+- **As an Out:** slides out past the bottom edge.
+
+## Spin
+
+The clip makes half a turn, clockwise at both ends.
+
+- **As an In:** spins half a turn into place, growing from 30% size and fading in.
+- **As an Out:** spins half a turn away, shrinking to 30% size and fading out.
+
+## Pop
+
+The clip springs past full size, so it overshoots where the others stop.
+
+- **As an In:** grows from nothing, overshoots to about 110% and settles at full size. It fades in over the first quarter of its duration.
+- **As an Out:** swells to about 110%, then shrinks to nothing. It fades out over the last quarter.
+
+## How slides measure
+
+A slide measures the clip as it's drawn, with its scale, rotation and crop, from wherever you've placed it. So it starts or ends exactly off the edge of the canvas, however large the clip is and wherever it sits.
+
+Inside a [nest](/editing/nests/), that edge is the nest's own canvas rather than the project's.
+
+## Slides on text
+
+A text clip has no measured size, so a slide can't work out exactly where it leaves the canvas. It starts or ends half a canvas past the edge instead. That clears any text narrower than the canvas. Text wider than the canvas can still show at the start of a slide in or the end of a slide out.
+
+## Good to know
+
+- An Out finishes at the end of the clip's last frame, not on it, so that frame still shows a sliver of the clip. A Fade isn't quite fully transparent there.
+- Every kind works with every During movement, so a clip can slide in while it pulses. See [During presets](/motion/during-presets/).
+- A preset only moves the picture. For sound, see [Audio fades](/audio/fades/).
+
+## With an agent
+
+An agent names a kind in the `motion` key of `set_video`: `fade`, `zoom_in`, `zoom_out`, `slide_left`, `slide_right`, `slide_up`, `slide_down`, `spin` or `pop`. An `in` is measured from the clip's first frame and an `out` back from its last. See [Motion presets](/motion/motion-presets/#with-an-agent) and [Tools: picture and grade](/mcp/tools-set-video/#motion).
+
+## Related
+
+- [Motion presets](/motion/motion-presets/)
+- [During presets](/motion/during-presets/)
+- [Transitions](/motion/transitions/)
+- [Audio fades](/audio/fades/)

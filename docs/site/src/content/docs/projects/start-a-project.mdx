@@ -1,0 +1,89 @@
+---
+title: Start a project
+description: Open a movie, sound file or picture as a new project sized to it, or start from a blank one, and see where the first save goes.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The quickest way in is to open the footage itself. Frame Job builds a project around the file, at its size and frame rate, with the file already on the timeline. If you'd rather start empty, **New Project** gives you a blank one. To open a project you've already saved, see [Open a project](/projects/open-a-project/).
+
+<AtAGlance
+  menu={['File ▸ Open…', 'File ▸ New Project']}
+  keys={['⌘O', '⌘N']}
+  where={['Welcome window ▸ Open Video…', 'Welcome window ▸ New Project', 'Finder ▸ Open With ▸ Frame Job']}
+  tools={['open_project', 'new_project', 'import_media', 'save_project']}
+/>
+
+## Open a movie
+
+Any of these does the same thing:
+
+- Choose **File ▸ Open…** (<kbd>⌘O</kbd>), or **Open Video…** on the [Welcome window](/projects/welcome-window/), and pick the file.
+- In the Finder, choose **Open With ▸ Frame Job**.
+- Double-click the file, once you've made Frame Job the default app for that file type.
+- [Drop the file](/projects/open-a-project/#drop-files-to-open-them) on the Dock icon or on a Frame Job window.
+
+Frame Job appears under **Open With** for movies and for M4A, MP3, WAV, AIFF, PNG, JPEG and HEIC files, but it doesn't take over their double-click unless you make it the default.
+
+You get an untitled project with the movie as its first media file and its first clip, at the very start of Track 1. The window is named after the file, so `Interview.mov` opens as "Interview".
+
+A WebM or MKV file is [copied into a movie](/projects/webm-and-matroska/) first. A file macOS can't open may still come in [through ffmpeg](/projects/ffmpeg-conversion/), if you have it installed.
+
+## Open a sound file
+
+Open a sound file the same way. A sound file has no picture to take a size from, so its project is 1920 × 1080 at 30 fps, with the sound as the first clip on Track 1. A movie file that holds only sound gets the same project.
+
+## Open a picture
+
+Open a PNG, JPEG or HEIC the same way. The project takes the picture's pixel size, runs at 30 fps, and holds the picture as a 5-second clip on Track 1.
+
+## The size and rate you get
+
+| You open | Canvas size | Frame rate | First clip |
+| --- | --- | --- | --- |
+| A movie | The size it displays at | The file's exact rate | The whole movie |
+| A sound file | 1920 × 1080 | 30 fps | The whole sound |
+| A picture | Its pixel size | 30 fps | 5 seconds of the picture |
+
+### Display size
+
+A project built from a movie uses the size the movie displays at, after the file's rotation. A portrait phone clip opens as 1080 × 1920, not sideways.
+
+An odd-sized movie keeps its size, even though a canvas size you type must be even. Once you change either canvas field, both sides have to be even. See [Canvas size](/projects/canvas-size/).
+
+### Exact frame rate
+
+The rate is read from the file and never rounded to a neighbour, so 29.97 stays 29.97 and 23.976 stays 23.976.
+
+A file's rate is matched to a standard rate if it's within 0.01 fps of one: 23.976, 24, 25, 29.97, 30, 48, 50, 59.94 or 60. Any other rate is kept to three decimals, so a 47.3 fps screen recording isn't called 48. A movie that reports no usable rate opens at 30 fps.
+
+Every file you [add to a project](/projects/import-media/) is read the same way. To change the project's rate later, see [Project frame rate](/projects/frame-rate/).
+
+## Start a blank project
+
+Choose **File ▸ New Project** (<kbd>⌘N</kbd>), or **New Project** on the Welcome window. A blank project opens at once, with no dialog, in a window titled "Untitled Project". It's 1920 × 1080 at 30 fps, with one empty track.
+
+**New Project** is always available, whether or not another project is open. Change the size and rate afterwards on the [Document tab](/projects/document-tab/).
+
+## Save it for the first time
+
+A project made from a file exists only in its window until you save it. It opens already marked as changed, so closing it asks whether to save, even if you've done nothing to it yet.
+
+The first **File ▸ Save** (<kbd>⌘S</kbd>) offers to put the project next to the source file, under the source's name: the save panel opens in that file's folder, with the file's name and no extension. `Interview.mov` becomes `Interview.framejob` beside it, unless you choose otherwise.
+
+Saving never writes over the source file. A project only ever saves as a `.framejob` package. See [Save, revert and close](/projects/save-and-revert/).
+
+## With an agent
+
+[`open_project`](/mcp/tools-projects/#open_project) does what opening a file does here, and [`new_project`](/mcp/tools-projects/#new_project) makes the same blank project.
+
+`new_project` can save the blank project at a path straight away, adding `.framejob` if the path lacks it. It won't use a path another open project holds, or one a window is still opening, and then nothing is created. Close the other project first. Without a path the project stays an untitled draft until [`save_project`](/mcp/tools-projects/#save_project). Change the size and rate afterwards with [`set_canvas`](/mcp/tools-tracks-and-markers/#set_canvas). See [Tools: projects and history](/mcp/tools-projects/).
+
+## Related
+
+- [Open a project](/projects/open-a-project/)
+- [The Welcome window](/projects/welcome-window/)
+- [Save, revert and close](/projects/save-and-revert/)
+- [Import media](/projects/import-media/)
+- [Add clips to the timeline](/editing/add-clips/)
+- [Canvas size](/projects/canvas-size/)

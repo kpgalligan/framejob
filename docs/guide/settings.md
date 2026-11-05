@@ -31,9 +31,9 @@ rather than hidden:
   the AssemblyAI engine is chosen (unless every file is already transcribed,
   see [Captions](captions.md)), each **Transcribe** button is greyed, and
   **Clip ▸ Remove Filler Words…** itself is greyed and reads **Remove Filler
-  Words… (needs your AssemblyAI key)** — unless a file in the project already
-  has a transcript made with filler words, which it keeps using without a
-  key.
+  Words… (needs your AssemblyAI key)** — unless a file under the selected
+  clips (with none selected, in the project) already has a transcript made
+  with filler words, which it keeps using without a key.
 - **Your Anthropic key** (Assistant, below) turns on the assistant. With no
   key, **View ▸ Assistant** still opens the Assistant tab, which says how to
   add the key.
@@ -47,9 +47,10 @@ rest — needs no key.
 
 Settings is one window, not a set of tabs. It holds four sections, top to
 bottom: **MCP**, **Assistant**, **Transcription** and **Playback**. On a
-short screen the window stops at the screen's height and scrolls. Closing it
-loses nothing: every control saves as you use it, or when you press its
-**Save** button, as described below. While it is open it is listed in the
+short screen the window stops at the screen's height and scrolls. Every
+control saves as you use it, or when you press its **Save** button, as
+described below, so closing the window saves nothing more: a key you typed
+and did not save stays unsaved. While it is open it is listed in the
 **Window** menu, so you can bring it back from behind other windows.
 
 The Assistant, Transcription and Playback headings each carry an ⓘ button.
@@ -57,15 +58,16 @@ Rest the pointer on it for a moment to see that section's explanation; click
 it to keep the explanation open, and click it again (or anywhere else, or
 press Escape) to close it.
 
-*Agents:* no MCP tool reads or writes anything in Settings. Keys, the model,
-the region and Background render are set only by a person in this window.
+*Agents:* no MCP tool writes anything in Settings. Keys, the model, the region
+and Background render are set only by a person in this window, and no tool
+reads them back, except that a run of `transcribe` or `transcribe_for_fillers`
+with a key answers an `endpoint`, the host it spoke to, which shows the region.
 An agent's cloud tools (`transcribe` with the AssemblyAI engine,
 `transcribe_for_fillers`) do use the key and region saved here, so a person
 must set the key first; without one they refuse, at the point they would
 send, with "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸
 Transcription." A file that already has a transcript they can use is answered
-without a key. The assistant's own tool, `assistant_send` (a dev tool), refuses
-the same way with the Anthropic sentence.
+without a key.
 
 ## MCP
 
@@ -120,7 +122,7 @@ Your key is never shown again once saved. When a key is stored, the field
 shows a fixed row of dots as its placeholder. The row is always the same
 length, so it says nothing about your key, and the key itself is never put in
 the field. When no key is stored, the field reads "Paste your key". The line
-under the controls says "Key saved." or "Key removed." after a press. It says
+above the buttons says "Key saved." or "Key removed." after a press. It says
 "No API key is set." (in ordinary grey, not as an error) whenever there is no
 key in the field, the store or the environment.
 
@@ -129,8 +131,8 @@ writable), the field is still emptied and the line reads "The API key could
 not be saved: <reason>", styled as a problem. A Remove that fails shows the
 same sentence with its own reason, and the stored key stays.
 
-There is no Verify button here. The app does not call Anthropic itself; the
-key is first used when you send a message from the Assistant tab.
+There is no Verify button here. Nothing checks the key ahead of time; it is
+first used when you send a message from the Assistant tab.
 
 ### What a change does
 
@@ -154,7 +156,9 @@ The Assistant ⓘ sums up what the assistant sends and where:
 
 - it sends your messages, the project's details and the frames it renders to
   Anthropic, using your own API key, and what it costs is billed to that key;
-- it asks before writing a file;
+- it asks before writing a file, which holds for the tools listed in
+  [Tools it asks about first](assistant.md#tools-it-asks-about-first); a few
+  other tools write without asking;
 - the key is kept in a file only you can read and is never shown again once
   saved;
 - a blank Model means `claude-opus-5-5`, and changing the key or the model
@@ -206,26 +210,28 @@ On-device captions need no key.
 
 The key field behaves exactly like the Assistant's: a fixed row of dots when
 a key is stored, "Paste your key" when one is not, and "Key saved.",
-"Key removed." or "No API key is set." on the line beneath, and "The API key
-could not be saved: <reason>" if the key file cannot be written or removed.
+"Key removed." or "No API key is set." on the line above the buttons, and
+"The API key could not be saved: <reason>" if the key file cannot be written
+or removed.
 
 A transcript made in one region cannot be seen from the other, so the region
-is a choice you make, not a fallback. Pick the region your AssemblyAI account
-uses.
+is a choice you make, not a fallback. Pick the region you want your audio to
+go to.
 
 ### Verify
 
-**Verify** checks whichever key a real run would use: the one typed in the
-field if you have typed one and not saved it yet, otherwise the stored key,
-otherwise the key in the environment (see below). It is disabled when there
-is no key at all, and while a check of the same key and region is running.
+**Verify** checks the key typed in the field if you have typed one and not
+saved it yet, which a real run does not use until you save it. Otherwise it
+checks the key a real run would use: the stored key, otherwise the key in the
+environment (see below). It is disabled when there is no key at all, and while
+a check of the same key and region is running.
 
-| Line under the controls | Meaning |
+| Line above the buttons | Meaning |
 |---|---|
 | Checking… | The request is in flight. |
 | Key accepted | AssemblyAI accepted the key in this region. |
 | Settings changed since this check began. Verify again. | You changed the key or the region during the check, so its answer no longer applies. |
-| An AssemblyAI message, such as "AssemblyAI refused the API key — check it in Frame Job ▸ Settings" | The check failed; the text says why. |
+| A failure message, such as "AssemblyAI refused the API key — check it in Frame Job ▸ Settings" | The check failed; the text says why. |
 
 Saving, removing or changing the region also tells an open Generate Captions
 sheet straight away, so it can enable its button without being reopened.
@@ -237,7 +243,9 @@ the audio of the files you are captioning is uploaded, transcribed, read back
 and then deleted from AssemblyAI. Frame Job asks for the delete as soon as it
 has the words, and retries it at the start of the next run if it did not go
 through. Nothing is uploaded until you press Generate, and captions made on
-your Mac never leave it. It also gives AssemblyAI's published rate as Frame
+your Mac never leave it. That is written about Generate Captions: **Transcribe**
+in **Clip ▸ Remove Filler Words…** uploads a file's audio in the same way when
+you press it. The ⓘ also gives AssemblyAI's published rate as Frame
 Job last read it: $0.21 an hour of audio, $0.02 more with Speakers on (read on
 2026-09-17).
 
@@ -258,7 +266,8 @@ while you are idle, and how long it waits first.
 | **Background render** | While you leave Frame Job alone, it draws the graphics after the playhead in the window you used last, so they play smoothly from the start. | On |
 | **Start after … seconds** | How long you must be idle before it starts. Type a whole number from 1 to 60, or use the stepper. Disabled while Background render is off. | 5 |
 
-Both save the moment you change them. A number outside 1–60 beeps and the
+The box and the stepper save the moment you change them, and a typed number
+when you press Return or leave the field. A number outside 1–60 beeps and the
 field goes back to the stored value.
 
 Anything you do in Frame Job (a key, a click, a scroll, an edit, play or a
@@ -280,14 +289,18 @@ it never checks.
 
 - **Frame Job ▸ Check for Updates…**, directly under About Frame Job, checks
   now. When a newer Frame Job has been published, a window shows its version
-  and a link to its release page, and offers to install it; **Install
-  Update** replaces the app and relaunches it. When there is nothing newer,
-  it says you are up to date. The item is greyed out while a check is
-  already running.
+  and offers to install it; **Install Update** downloads it, and **Install
+  and Relaunch** then replaces the app and relaunches it. When there is
+  nothing newer, it says you are up to date, and its **Version History**
+  button opens the latest release's page. The item is greyed out while a
+  check is already running.
 - **Automatic checks.** The second time you open Frame Job, it asks whether
   to check for updates automatically. If you agree, it checks about once a
-  day while it is open, and tells you when an update is ready; it never
-  installs one without asking you.
+  day while it is open, and tells you when an update is ready; it installs
+  one only when you say so. The exception is if you tick **Automatically
+  download and install updates**, in that question or in the update window:
+  it then downloads updates in the background and installs them when you
+  quit Frame Job.
 
 Every update is signed, and Frame Job refuses one whose signature does not
 match the key built into the app, so only a release published from the
@@ -369,9 +382,9 @@ alone.
 | `…/Frame Job/spend.jsonl` | The spend ledger: one line per assistant response, with its time, model, token counts and estimated dollars. It never holds your key or the conversation. |
 | `…/Frame Job/anthropic-prices.json` | The assistant's cached copy of the price table it uses for that estimate. |
 | `…/Frame Job/ExportPresets.json` | Your named export presets. |
-| `…/Frame Job/Rewrapped/` | Movies Frame Job converted or repackaged from files macOS could not open. A project refers to these files; moving them leaves the media missing until you relink. |
+| `…/Frame Job/Rewrapped/` | Movies Frame Job converted or repackaged from files macOS could not open. A project refers to these files; Frame Job can usually still find one that was moved, but deleting one leaves the media missing until you relink. |
 | `…/Frame Job/Agent/agent.sock` | The local socket MCP clients connect to, created at every launch. |
-| `~/Movies/Frame Job Recordings/` | Screen recordings and voice-overs, named by date and time (for example `Screen Recording 2026-09-10 at 14.03.22`; a voice-over is `Voice-over 2026-10-02 at 09.15.04.m4a`). |
+| `~/Movies/Frame Job Recordings/` | Screen recordings, camera recordings and voice-overs, named by date and time (for example `Screen Recording 2026-09-10 at 14.03.22`; a camera recording is `Camera Recording 2026-10-26 at 17.14.33.mov`, a voice-over is `Voice-over 2026-10-02 at 09.15.04.m4a`). |
 
 Projects themselves are `.framejob` packages wherever you save them, and hold
 their own caches (see [Projects and media](projects-and-media.md)).
@@ -401,8 +414,9 @@ key. **Verify** checks the variable's key when nothing is typed or stored.
 
 ## Limits
 
-- Settings has no MCP mirror. An agent cannot set or read a key, the model,
-  the region or Background render.
+- Settings has no MCP mirror. An agent cannot set a key, the model, the
+  region or Background render, and of these it can only learn the region,
+  from the `endpoint` a cloud run answers.
 - There is no button to forget the remembered convert-on-import answer. To
   be asked again, run `defaults delete com.kgalligan.FrameJob RCFFmpegImport`
   in Terminal while Frame Job is closed.

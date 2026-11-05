@@ -1,0 +1,74 @@
+---
+title: "Stop a turn"
+description: End what the Assistant is doing, see what stopping leaves in place, and how its tool calls wait for your drags and for each other.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A turn is everything the Assistant does between your message and the end of its reply, including its tool calls, the actions it takes in Frame Job. You can end one at any moment with **Stop**. Nothing you or it has done is undone.
+
+<AtAGlance
+  where="Inspector ▸ Assistant tab ▸ Stop, the Send button while a turn runs"
+  tools={['transcribe', 'get_transcript', 'get_timeline_transcript', 'cancel_export']}
+  needs="An Anthropic API key. See Set up the Assistant."
+/>
+
+## Stop a turn
+
+Click **Stop**. It's the **Send** button, which reads **Stop** while a turn runs or a question waits.
+
+Stop is a click only. Pressing <kbd>↩</kbd> in the message field while a turn runs beeps, and it never stops the turn.
+
+When you click **Stop**, Frame Job:
+
+- ends the request to Anthropic
+- [declines a question](/assistant/what-it-will-not-do/#declining) that's waiting, recorded as `Declined (stop):`
+- cancels every tool call that hasn't started, and tells the Assistant "Cancelled by the user."
+- ends a long-running job that has started, if it's one of those below
+
+Any other tool call that has already started is allowed to finish.
+
+| Running when you stop | What happens |
+| --- | --- |
+| Transcribing on this Mac | The transcription is cancelled. |
+| Reading a clip's or the timeline's transcript | The read is cancelled, and nothing is saved from it. |
+| Measuring loudness for Normalize, Enhance Voice or Match Audio | The measurement ends, and nothing changes. |
+| Waiting for on-device analysis, to read it, split at shots, reframe a clip, make a vertical version, switch by speaker or analyse a cutout | The wait ends, and nothing is made from it. |
+
+A timeline transcript that the [Transcript tab](/captions/transcript-tab/) also wants carries on. Stop withdraws only the Assistant's own request for it.
+
+## What stopping leaves in place
+
+Stop undoes nothing and ends only the turn.
+
+- Edits already made stay, and each one is still its own undo step.
+- The conversation keeps the results of the tool calls that finished before you stopped, and your next message carries on from there.
+- A stopped request shows no error.
+- A response cut short is priced from what had arrived, as "at least $…". See [Responses cut short](/assistant/cost/#responses-cut-short).
+- A stopped turn doesn't [compact](/assistant/context-and-compaction/#compaction) the conversation, even if it has passed the threshold.
+
+## Stop and exports
+
+An export is handed to the [Export Queue](/export/export-queue/) as soon as it starts, so Stop doesn't reach it. Cancel it in the Export Queue, or ask the Assistant to cancel it.
+
+## The 30-round limit
+
+One turn stops after 30 requests to Anthropic, which usually means 30 rounds of tool calls. No error appears at the limit. The turn ends with its `Cost:` line, whatever work was left. Send another message to carry on.
+
+## While you are dragging
+
+If one of the Assistant's tool calls arrives during a drag on the timeline, the canvas or an inspector slider, it waits until you release the mouse. It then runs as its own undo step, after yours, so your drag never undoes the Assistant's change or mixes with it.
+
+The call waits for as long as the mouse is held down, and a drag in any open project holds it. The same applies to agents over [MCP](/mcp/overview/).
+
+## Tool calls take turns
+
+The Assistant's tool calls and MCP agents' calls take turns, one at a time, and each window's calls run in order, so two of them never work on a project at the same moment. While a window waits for your **Allow** or **Deny**, MCP agents and other windows keep working.
+
+## Related
+
+- [What it won't do and what it asks first](/assistant/what-it-will-not-do/)
+- [Chat with the Assistant](/assistant/chat/)
+- [Long conversations](/assistant/context-and-compaction/)
+- [What it costs](/assistant/cost/)
+- [The Export Queue](/export/export-queue/)

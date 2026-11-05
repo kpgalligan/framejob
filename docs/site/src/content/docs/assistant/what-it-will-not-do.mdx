@@ -1,0 +1,127 @@
+---
+title: "What it won't do and what it asks first"
+description: The jobs the Assistant leaves to you, the file writes it asks about first, and how to answer or decline a question.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+The Assistant can do most of what you can do in Frame Job, but a few jobs stay with you. It won't record, close its own project or send audio to the cloud, and it stops to ask before it exports, saves or copies media.
+
+<AtAGlance
+  where="Inspector ▸ Assistant tab, the row headed “The assistant asks first:”"
+  tools={['record_screen', 'close_project', 'transcribe', 'transcribe_for_fillers', 'export', 'export_captions', 'save_project', 'consolidate_media', 'export_graphic', 'new_project_from_range', 'make_vertical_version']}
+  needs="An Anthropic API key. See Set up the Assistant."
+/>
+
+## Tools it will not call
+
+The Assistant works by calling tools, one for each job. Four jobs are yours to do yourself.
+
+| The job | Tool | Why | Do it with |
+| --- | --- | --- | --- |
+| Record the screen or a camera | `record_screen` | Recording needs a person at the Record button. | **File ▸ New Recording…** (<kbd>⌥⌘N</kbd>) |
+| Close the project | `close_project` | Closing the project would close the window the conversation lives in. | **File ▸ Close** (<kbd>⌘W</kbd>) |
+| Transcribe in the cloud | `transcribe` with the AssemblyAI engine | Audio leaves your Mac only when you choose it, with the price in front of you. | **File ▸ Generate Captions…** |
+| Transcribe for filler words | `transcribe_for_fillers` | The same: it uploads audio to the cloud. | **Clip ▸ Remove Filler Words…** |
+
+`record_screen`, `close_project` and `transcribe_for_fillers` are taken out of what the Assistant can see, so it can't call them. `transcribe` stays, because transcribing on this Mac is allowed, and only a call that names the cloud engine is stopped.
+
+If one of the four is called anyway, it doesn't run. The transcript shows a [`failed:` line](/assistant/conversation/#failed-lines), "*tool* is not available to the assistant:" and the reason, which names the menu item to use instead. For the cloud engine the line starts `transcribe with engine "assemblyai"`.
+
+## Tools it asks about first
+
+Before it writes a movie, a caption file, a graphic package or the project, the Assistant waits for you.
+
+<Steps>
+
+1. The row headed "The assistant asks first:" appears in the Assistant tab, with a sentence saying what will happen, and **Allow** and **Deny** buttons. See [what each question reads](#what-each-question-reads).
+
+2. Read the sentence. A capitalised **REPLACES** means a file is already there.
+
+3. Click **Allow** to run the tool, or **Deny** to [decline](#declining).
+
+</Steps>
+
+Nothing runs until you click **Allow**. A question has no time limit, and it waits until you answer. You answer with a click only: no key answers it, and <kbd>↩</kbd> in the message field beeps. While a question waits, the **Send** button reads **Stop**.
+
+The transcript keeps a record of each answer, as `Allowed:` or `Declined:` and the sentence.
+
+## What each question reads
+
+Five tools always ask. The last two in this table ask only when the Assistant gives them a path to save to, because without one they don't write a project package.
+
+| Tool | The question reads |
+| --- | --- |
+| `export` | "export writes *path*", or "export REPLACES *path*" when a file is already there |
+| `export_captions` | "export_captions writes *path*", or "export_captions REPLACES *path*" |
+| `save_project` | "save_project writes *path*", or "save_project REPLACES *path*". With no path known, "save_project writes a file" |
+| `consolidate_media` | "consolidate_media copies every referenced file into *package*/media", or "… into the project's package" when the project has never been saved |
+| `export_graphic` | "export_graphic writes *path*", or "export_graphic REPLACES *path*", with `.fjgraphic` added when it's missing |
+| `new_project_from_range` | "new_project_from_range writes *path*", with `.framejob` added when it's missing |
+| `make_vertical_version` | "make_vertical_version writes *path*", with `.framejob` added when it's missing |
+
+A `~` in the path is expanded before the question is asked, so the sentence shows the full path.
+
+A few answers depend on what's on disk:
+
+- Saving a project that's already on disk reads "save_project REPLACES *path*", because the package is there. That's the normal question for an ordinary save.
+- `new_project_from_range` and `make_vertical_version` never replace anything. With something already at the path the question reads REPLACES, but after **Allow** nothing is written, and the Assistant is told to choose a new path.
+- A project that has never been saved needs a path. If `save_project` has none, the question reads "save_project writes a file" and nothing is written after **Allow**. `consolidate_media` also stops there, and the Assistant has to save the project first.
+- For `export`, `export_captions` and `save_project`, the sentence shows the path as the Assistant wrote it. Frame Job adds or corrects the file extension as it writes, and REPLACES looks only at the path in the sentence, so a question that reads "writes" can still replace a file at the corrected name.
+
+## File writes that do not ask
+
+Some tools write files without a question.
+
+| What it does | Tools |
+| --- | --- |
+| Writes a rendered frame, a PNG unless another format is asked for, to a temporary file or to a path the Assistant names | `render_frame` |
+| Writes a graphic's contact sheet as a PNG, to a temporary file or to a path the Assistant names | `render_graphic` |
+| Writes modules, fonts and assets into the project's graphics folder | `write_graphic`, `import_graphic_font`, `import_graphic_asset`, `import_graphic` |
+| Saves a new, blank project at a path the Assistant names | `new_project` |
+
+`import_graphic` replaces nothing: a name that's already taken gets a suffix, and a picture whose name clashes stops the import.
+
+:::caution
+`new_project` with a path replaces whatever is already there, with no question, unless an open project holds that path. A saved project that isn't open is overwritten by the blank one, and Undo can't bring it back.
+:::
+
+## The dot on the tab
+
+While a question waits, a small dot in the accent colour shows on the **Assistant** tab title, whichever inspector tab you're on. It sits to the right of the title, or raised at the title's top-right corner when the tab is narrow.
+
+The dot takes no clicks, so a click on it reaches the tab underneath. Frame Job doesn't switch tabs for you. If the inspector is hidden, **View ▸ Assistant** (<kbd>⌃⌘A</kbd>) shows it and picks the tab.
+
+## Declining
+
+**Deny** tells the Assistant you declined. The tool doesn't run, and the Assistant is told not to try it again in the same [turn](/assistant/stop-a-turn/) unless you ask. The transcript shows a `failed:` line, "The person declined:" and the sentence, beside the `Declined:` record.
+
+A question also counts as declined when the turn or the conversation ends under it, and the transcript says what ended it:
+
+| What happened | The transcript reads |
+| --- | --- |
+| You clicked **Deny** | `Declined:` |
+| You clicked [**Stop**](/assistant/stop-a-turn/) | `Declined (stop):` |
+| A change of key or model in Settings ended the conversation | `Declined (close):` |
+| The helper, the small program that talks to Anthropic, stopped | `Declined (helper):` |
+
+**Clear** and closing the window decline it too, and those take the transcript with them.
+
+## A waiting question holds only its window
+
+An unanswered question holds that window's Assistant and no other's. Other windows' Assistants and agents over MCP keep working while it waits, and you can go on editing.
+
+## MCP agents are not bound
+
+These rules belong to the Assistant. An agent connected over [MCP](/mcp/overview/) drives the same tools directly, so it's never asked first, and none of these tools is withheld from it.
+
+## Related
+
+- [What the Assistant can do](/assistant/what-it-can-do/)
+- [Stop a turn](/assistant/stop-a-turn/)
+- [Assistant privacy](/assistant/privacy/)
+- [The recorder panel](/recording/recorder-panel/)
+- [Generate Captions](/captions/generate-captions/)
+- [Remove Filler Words](/cleanup/remove-filler-words/)
+- [How an agent reaches Frame Job](/mcp/overview/)

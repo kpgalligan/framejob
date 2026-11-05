@@ -1,0 +1,124 @@
+---
+title: "Enhance Voice"
+description: "Measure a voice recording and set up its cleaning, dynamics and volume in one step, with ordinary settings you can see and change."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Enhance Voice sets a clip up for speech in one step. It measures the voice and the pauses, chooses the clean-up and dynamics the recording needs, and sets the volume that reaches your loudness target.
+
+<AtAGlance
+  menu="Clip ▸ Enhance Voice"
+  where="Clip tab ▸ Sound ▸ Volume"
+  tools="enhance_voice"
+  needs="Nothing. Speech detection and voice isolation run on your Mac, with no key and no upload."
+/>
+
+## Enhance a voice
+
+<Steps>
+
+1. Select one or more clips with speech in them.
+
+2. Check the target in the **Normalize** row of the **Volume** section. It's −16 LUFS unless you've [chosen another](/audio/normalize/#set-the-loudness-target).
+
+3. Press **Enhance Voice**, or choose **Clip ▸ Enhance Voice**.
+
+4. Wait for the [Measuring Sound sheet](/audio/normalize/#the-measuring-sound-sheet) to finish.
+
+</Steps>
+
+However many clips are selected, it's one undo step, named "Enhance Voice". **Cancel** in the sheet changes nothing. If the project changes while it measures, nothing changes either, and a sentence at the foot of the inspector says to choose the command again.
+
+Everything it writes is an ordinary setting, so you can see and change each one in its own section. Pressing it again changes nothing and beeps, and so does [Normalize](/audio/normalize/) at the same target afterwards.
+
+To run it on a recording as soon as the recording lands, see [Polish when a recording lands](/recording/when-it-lands/).
+
+## What it measures
+
+It reads the clip before any of the settings it's about to write: its loudness and true peak, and, every 10 ms of the part that plays, whether the clip is speaking or pausing. It needs at least a second of speech, and half a second of pause to measure the noise between words.
+
+## What it sets
+
+Each of these is a separate decision, made from the clip's own measurements.
+
+### Rumble cut
+
+It always sets the [EQ](/audio/eq/)'s **Rumble Cut**, a high-pass at 80 Hz, 24 dB/oct, to take out low rumble, and keeps the EQ's other parts.
+
+### Noisy pauses
+
+The pauses count as noisy when their median loudness is less than 45 dB under the clip's loudness.
+
+| The pauses are | What it does |
+| --- | --- |
+| Noisy | Turns on [voice isolation](/audio/voice-isolation/) at 80 % with noise reduction off, and fits a [gate](/audio/gate/) to the pauses. |
+| Noisy, on a clip with a speed change, a ramp or a freeze frame | Turns on [noise reduction](/audio/noise-reduction/) at 50 % with voice isolation off, because isolation can't serve that clip, and fits the gate. |
+| Quiet | Turns voice isolation, noise reduction and the gate off. |
+| Under half a second long in total | Leaves all three as they are, because there's nothing to measure. |
+
+The gate opens 10 dB above the pauses' median true peak, held between −40 and −6 dB relative to the clip's loudness.
+
+### Leveller
+
+It turns on the [leveller](/audio/leveller/) at its defaults when the speech's loudness varies a lot from moment to moment, meaning its short-term loudness range is over 6 LU. The range is measured over 3-second stretches of the speech alone. At or under 6 LU the leveller is turned off, and with under 3 seconds of speech it's left as it is.
+
+### De-esser
+
+It turns on the [de-esser](/audio/de-esser/) at its defaults when at least 5 % of the speech has a hot "s" band: 6 kHz and up, within 10 dB of the clip's loudness. Otherwise it's turned off.
+
+### Compressor, limiter and final volume
+
+Every clip it enhances gets all three, whatever else it measured.
+
+- A [compressor](/audio/compressor/) at 3:1, its threshold at the speech's median true peak, with makeup that gives back the loudness it takes.
+- The [limiter](/audio/limiter/). The clip keeps its own, with the ceiling at most −1 dBTP, or gets the default.
+- The volume that takes the clip to the **Normalize** row's target, measured through everything above as the export plays it. It's checked by rendering, to within 0.1 LU, up to three times.
+
+The target is used even when the row is set to Peak and the field is greyed out. Enhance Voice always aims at a loudness.
+
+## What it leaves alone
+
+Hum removal, the channel choice, pan, mono, fades, ducking, **Mute**, **Keep pitch** and the EQ's other parts all stay as they are. Like Normalize, it writes the clip's base settings, even with the playhead inside an action.
+
+## Clips Enhance Voice skips
+
+It's offered where [Normalize](/audio/normalize/#clips-normalize-skips) is, and it leaves out the same clips as Normalize in Loudness mode, plus two more. The rest of the selection is still enhanced. With nothing to enhance, the press beeps, and neither the button nor the menu says why.
+
+| Skipped | Why |
+| --- | --- |
+| A clip that plays no sound, or a nest | There's no voice of its own to measure. Open a nest to enhance the clips inside. |
+| A clip that plays for under 0.4 s | It's too short for a loudness measurement. |
+| A clip quieter than −70 LUFS, before or after its processing | There's no voice to work with. |
+| A clip with under 1 second of speech | There's too little to measure a voice from. |
+| A clip not analysed yet | See [Wait for analysis](#wait-for-analysis). |
+| A clip whose reversed copy is still being made | It can't be rendered yet. |
+| A clip whose processing can't be rendered | There's nothing to measure. |
+
+## Wait for analysis
+
+Enhance Voice needs two results that are worked out on your Mac after a file is imported: the clip's loudness and its speech. A clip without both yet is skipped, which often happens straight after an import. The **Loudness** readout says "measuring…" while the loudness is still running. Wait a moment and press again.
+
+## Check its gate by ear
+
+Enhance Voice sets the gate from the pauses it measured. On a voice with very soft word starts, the gate can bite into them, so listen to those words and lower the [gate](/audio/gate/)'s threshold if you need to.
+
+## Good to know
+
+- Applying the rumble cut also takes the EQ out of bypass if you'd bypassed it.
+- Every clip it enhances ends up with its limiter on, because the volume is solved through it.
+- Measuring takes time in proportion to the clip's length, and it waits for the clip's voice isolation to render first.
+- Two clips in a selection can end up with different settings, because each is measured on its own.
+
+## With an agent
+
+`enhance_voice` takes its own target rather than the **Normalize** row's. It reports what it measured for each clip, exactly which settings it wrote, and one sentence per rule saying why, so an agent can tell you what the button doesn't. Each skipped clip comes back with its reason. See [Tools: audio](/mcp/tools-audio/#enhance_voice).
+
+## Related
+
+- [Normalize](/audio/normalize/)
+- [Match Audio](/audio/match-audio/)
+- [Voice Isolation](/audio/voice-isolation/)
+- [The Sound tab](/audio/sound-tab/)
+- [Polish when a recording lands](/recording/when-it-lands/)

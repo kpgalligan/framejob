@@ -1,0 +1,145 @@
+---
+title: "Speed Up Typing"
+description: "Play the typing in a screen recording faster, while speech and shortcuts stay at normal speed, as one undo step."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Speed Up Typing plays the typing in a screen recording faster, so a viewer doesn't sit through every keystroke. Frame Job finds the typing from the recording's cursor file, leaves anything spoken or any shortcut at normal speed, and makes the whole change one undo step.
+
+<AtAGlance
+  menu="Clip ▸ Speed Up Typing…"
+  where="New Recording panel ▸ When it lands ▸ Speed up typing"
+  tools={['speed_up_typing', 'get_cursor_events']}
+  needs="A screen recording made with Record shortcuts on. Speech detection runs on your Mac, with no key and no upload."
+/>
+
+## Speed up the typing
+
+<Steps>
+
+1. Select the clip. Select both halves if you've split the recording, and any other recordings you want done at the same time.
+
+2. Choose **Clip ▸ Speed Up Typing…**. It has no keyboard shortcut. The sheet reads "Reading cursor files…" for a moment, with **Apply** dimmed.
+
+3. Set [**Rate**, **Shortest stretch** and **Keep pitch**](#the-settings).
+
+4. Read the summary under the settings, for example "2 typing stretches sped up ×4, saving 9.3 s."
+
+5. Choose **Apply**, or **Cancel** to leave the timeline as it was.
+
+</Steps>
+
+The menu item is dimmed unless every selected clip is a movie with a [cursor file](/recording/cursor-files/). It's also dimmed while another sheet is open. It works inside an open [nest](/editing/nests/), on the nest's own clips and tracks.
+
+The edit is one undo step, **Speed Up Typing**.
+
+To do this for every recording as it arrives, tick **Speed up typing** in the recorder panel. See [Polish when a recording lands](/recording/when-it-lands/#speed-up-typing).
+
+## What counts as typing
+
+A typing stretch is a run of at least 3 typed keys, each less than 1 s after the last. It lasts from the first key to the last.
+
+The keys come from the recording's cursor file, which only holds them if the recording was made with [Record shortcuts](/recording/record-shortcuts/) on. Without it the menu item still works, but the sheet finds no typing. The file holds when you typed, never what you typed, and nothing is noted while an app holds secure input, such as a password field.
+
+Only typing in the part of the clip you've kept counts. Typing you've trimmed away is ignored.
+
+### Split recordings
+
+The halves of a recording you split are treated as one when you select them both and they touch, so typing across the cut is one stretch. With one half selected, Frame Job only looks at that half.
+
+## The settings
+
+| Control | What it does | Default | Range |
+| --- | --- | --- | --- |
+| **Rate:** | How much faster the typing plays. | ×4 | ×2 to ×8 |
+| **Shortest stretch:** | Typing shorter than this is left alone. | 3 s | 1 to 30 s |
+| **Keep pitch** | Keeps the sped-up sound at its own pitch. Off, it rises like a fast tape. See [Keep pitch](/speed/keep-pitch/). | On | |
+
+The two number fields take up to two decimal places, and their values stay inside the range. The summary updates when you leave a field or change **Keep pitch**.
+
+Frame Job remembers these from one use to the next. It saves a setting when you apply the edit, and only if you changed it, so **Cancel** saves nothing.
+
+## What the sheet tells you
+
+The sheet says what **Apply** would do before you press it, or why nothing would happen.
+
+| The sheet says | What it means |
+| --- | --- |
+| "2 typing stretches sped up ×4, saving 9.3 s." | What **Apply** will do. |
+| "No typing stretch without speech or a shortcut lasts 3 s or more in the selected clips, so nothing would change." | There's nothing to speed. **Apply** stays dimmed. Try a lower **Shortest stretch**. The figure in the sentence follows that setting. |
+| "Waiting for speech detection on …" | Frame Job is still finding the speech in the files it names. **Apply** is dimmed, and the sheet updates by itself. |
+| "Speech detection has not finished for … Close this sheet and try again." | It waited 5 minutes and stopped. |
+| "… is offline, so its speech cannot be read." | A file under a stretch is missing, so nothing changes. [Relink it](/projects/relink-media/) first. |
+| "Speech detection is unavailable on this Mac, so Speed Up Typing cannot tell typing from talking." | Speech detection can't run here, so nothing changes. |
+| "The typing from … cannot be sped up: …" | One stretch can't be sped. See [When it can't speed up](#when-it-cant-speed-up). |
+
+## What stays at normal speed
+
+Within each stretch, Frame Job sets aside every moment of speech and every shortcut, and leaves them at normal speed. What's left is sped up, if it still lasts as long as **Shortest stretch**.
+
+### Speech
+
+Any part of a stretch with speech under it stays at normal speed. That goes for every clip of a file with sound under the stretch, on any track, even if the clip is muted. So a voice on the Microphone track holds the typing back the same way sound in the movie does.
+
+The speech comes from the same on-device detection [Duck by Speech](/audio/duck-by-speech/#where-the-speech-comes-from) uses. If a file has no saved speech, Frame Job saves it with the project in the same undo step. If detection hasn't finished, the sheet starts it and waits.
+
+### Shortcuts
+
+A recorded shortcut and its overlay are never sped up. What stays at normal speed is the overlay's whole clip on a track named **Shortcuts**, or 1.5 s from the press when there's no overlay.
+
+[Add the overlays](/recording/shortcut-overlays/) first, so that each one's full length stays at normal speed.
+
+### The edges
+
+Each sped stretch keeps 0.3 s at normal speed at both ends. **Shortest stretch** is measured before those edges come off. A 3 s stretch at ×4 speeds its middle 2.4 s down to 0.6 s, which saves 1.8 s. Cuts then land on frames, so the figures can differ slightly.
+
+## What the edit does to the timeline
+
+Each stretch is sped with [Retime Range](/speed/retime-range/) on every unlocked track, so the camera and the microphone stay in sync with the screen and everything after moves up. A title or a graphic over a stretch is squeezed by the same amount, as Retime Range does it.
+
+The sound in a sped stretch is sped too, because it's cut and retimed with the picture.
+
+
+## If a clip would go silent
+
+Rates multiply, so a clip already playing at ×2 goes to ×16 at a **Rate** of ×8. Frame Job leaves a clip's sound out above ×12, so when **Apply** would take a clip with sound past that, an alert asks first.
+
+**Set Speed** goes ahead. **Cancel** leaves the sheet open with nothing changed, so you can lower the **Rate**. See [Sound at high speed](/speed/sound-at-high-speed/).
+
+## When it can't speed up
+
+Speed Up Typing is all or nothing. If any stretch can't be sped, nothing changes, **Apply** is dimmed, and the sheet names the stretch and the reason in place of the summary.
+
+| What stops it | What to do |
+| --- | --- |
+| A locked track has a clip that ends after the stretch begins. | [Unlock the track](/timeline/hide-and-lock-tracks/). |
+| A transition touches the stretch. | Remove the [transition](/motion/add-a-transition/). |
+| Half of a detached pair is in the stretch. | Use [Attach Audio](/audio/detach-and-attach/) first. |
+| A selected clip plays reversed. The sheet reads "Clip … plays reversed; Speed Up Typing speeds only clips that play forward." | Leave that clip out, or [turn off Reverse](/speed/reverse/). |
+| The cursor file is missing or won't read. | Use **Locate…** in the **Cursor** section of the Media tab. See [Cursor files](/recording/cursor-files/). |
+
+A stretch can also be stopped by anything else that stops Retime Range, such as a nest clip or a caption page with timed words. See [When a range can't be retimed](/speed/retime-range/#when-a-range-cant-be-retimed).
+
+## With an agent
+
+`speed_up_typing` makes the same edit, with these differences:
+
+- It takes one clip or a list of clips, not both, rather than reading the selection.
+- It can limit the edit to part of the timeline, which the sheet can't.
+- It doesn't remember anything. It starts from ×4, 3 s and pitch kept unless told otherwise.
+- It doesn't wait for speech detection. It says the speech hasn't been detected yet, and to try again in a moment.
+- It never asks about ×12. The clip's sound is left out, and it reports that when it finishes.
+
+[`get_cursor_events`](/mcp/tools-recording/#get_cursor_events) reads a recording's typing stretches and changes nothing. See [`speed_up_typing`](/mcp/tools-recording/#speed_up_typing).
+
+## Related
+
+- [Record shortcuts](/recording/record-shortcuts/)
+- [Cursor files](/recording/cursor-files/)
+- [Shortcut overlays](/recording/shortcut-overlays/)
+- [Polish when a recording lands](/recording/when-it-lands/)
+- [Retime Range](/speed/retime-range/)
+- [Keep pitch](/speed/keep-pitch/)
+- [Sound at high speed](/speed/sound-at-high-speed/)

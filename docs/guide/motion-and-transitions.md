@@ -41,13 +41,13 @@ A new action from **Add Action** is **Linear**. A zoom action is **Ease In Out**
 - **Graphics.** A graphic clip's properties. Numbers and colours ramp; strings, booleans, choices and images switch at the end. A property the graphic marks as not animatable cannot be put in an action. See [Graphics](graphics.md).
 - **Speed.** A media clip's playback rate, which makes a speed ramp. See [Speed](speed.md).
 
-Some things are never animated. These rows write the clip itself, whatever is selected, and are marked ⊘ in the Clip tab:
+Some things are never animated. These write the clip itself, whatever is selected. While an action is selected their rows are marked ⊘ in the Clip tab, apart from the Shape sub-tab's rows and the filter and obscure add and remove buttons, which carry no mark:
 
 - The Motion presets section (below).
 - In the Sound sub-tab: Ducking, the fade shapes, the Voice Effect, and a nest clip's Mix to mono. Every other audio setting animates ([Audio](audio.md#animating-the-sound)).
 - In the Clip sub-tab's Speed section: Keep pitch and Fit to.
 - **Adding or removing** a filter or an obscure region. Changing a value inside an existing entry still animates.
-- A shape's own properties in the Shape sub-tab (its kind, stroke, fill, gradient and arrows). Its position, scale and opacity animate like any clip's.
+- A shape's own properties in the Shape sub-tab (its kind, size, corner radius, stroke, fill, gradient and arrows). Its position, scale and opacity animate like any clip's.
 
 ### Add an action
 
@@ -80,7 +80,7 @@ Frame Job adds a 1-second **Ease In Out** action at the playhead whose end state
 - **Leaving the mode.** Press Esc, press **Z** again, or click the button again. The mode also closes when the selection changes or the playhead leaves the clip. A rectangle too small to mean anything beeps and leaves the mode on so you can draw again.
 - **During motion.** If the clip has a During motion preset, the band shows "This clip has During motion — the zoom is solved without it", because the preset keeps moving the clip under the zoom.
 
-The mode needs exactly one selected clip that is drawn at the playhead and is not on a locked track. Otherwise **Z** beeps.
+The mode needs exactly one selected clip that is drawn at the playhead and is not on a locked track. A nest clip doesn't count, because it has no box on the canvas. Otherwise **Z** beeps.
 
 To zoom a screen recording at every click at once, use **Clip ▸ Auto Zoom…**, which plans these same zoom actions from the recording's cursor file (see [Auto Zoom](screen-recording.md#auto-zoom)).
 
@@ -104,9 +104,9 @@ Leaving the span keeps the action selected. To leave it, press **Esc**, click th
 
 ### Edit an action's end state
 
-While an action is selected, every field in the Clip tab shows and sets that action's **end state**, the values the clip reaches at the action's end. The same goes for the canvas: dragging the selected clip's handles, or nudging it with the arrow keys, writes the end state.
+While an action is selected, every field in the Clip tab shows and sets that action's **end state**, the values the clip reaches at the action's end. The same goes for the canvas: dragging the selected clip's handles writes the end state. The arrow keys don't nudge the clip; they move the playhead.
 
-Unchecking a switch inside an action (a shadow or an outline, for example) turns that property off when the action ends.
+Unchecking a switch inside an action (a shadow or an outline, for example) turns that property off when the action ends. A qualifier range is the exception: see [Color grading](color-grading.md).
 
 The Clip tab marks each row so you can see what the action touches:
 
@@ -125,7 +125,7 @@ To take a property back out of an action:
 
 - Hover over a ◆ and click the × that replaces it ("Remove from action N").
 - Click **Clear** in a section's header to remove all of that section's keys from the action. While an action is selected and keys the section, Clear takes the place of the header's **Reset**; otherwise Reset shows only while the section differs from its defaults.
-- Right-click a row for its menu: **Remove from action N** on an animated row, **Go to action M** on a ◇ row (selects that action), and **Set end value to default** (on a row the selected action animates) or **Reset to default** (otherwise). The default item is disabled when the row already holds its default.
+- Right-click a row for its menu: **Remove from action N** on an animated row, **Go to action M** on a ◇ row (selects that action), and **Set end value to default** (on a row that can animate, while an action is selected) or **Reset to default** (otherwise). The default item is disabled when the row already holds its default.
 
 *Agents:* `set_action_end` (a `patch` with `video`, `audio`, `text` and `graphic` groups and a top-level `speed`, merged into the end state; `null` removes a key; `off` lists `"group.key"` paths to switch off at the end). `video.motion` and `text.words` are refused.
 
@@ -143,7 +143,7 @@ A drag snaps to whole frames, keeps the action at least one frame long, and stop
 | Control | What it does |
 |---|---|
 | Start | Where the action starts, as a timecode measured from the clip's start |
-| Length | How long it takes, 0.01–36000 s (quick picks 0.25, 0.5, 1, 2) |
+| Length | How long it takes, 0.01–36000 s, held to the clip's length (quick picks 0.25, 0.5, 1, 2) |
 | Curve | Linear, In, Out or In Out, with a glyph of the curve beside it |
 | Trash button | Removes the action |
 
@@ -192,7 +192,7 @@ With several clips selected the lane reads "Select one clip to edit its actions.
 | Slip or Roll | Actions stay where they are in clip time |
 | Change the speed, or rate-stretch | Actions keep their place as a fraction of the clip |
 | Split | Actions after the cut go to the second half; one that spans the cut is divided between the halves |
-| Add a transition at a hard cut | The incoming clip's actions move with its new first frame, so a zoom stays on the frame it was drawn over |
+| Add a transition at a hard cut | If the incoming clip grows at its front, its actions move with its new first frame, so a zoom stays on the frame it was drawn over. Otherwise they stay put |
 | Duplicate, Copy and Paste | The copies keep their actions |
 | Nest | The clips keep their actions inside the nest |
 | Detach Audio | The new audio clip gets a copy of every action, so volume actions keep working |
@@ -231,7 +231,7 @@ Changing a slot's kind keeps the duration, amount and period it already had. The
 
 ### Entrances and exits
 
-The same nine kinds fill both In and Out. An exit is the entrance played the other way: the In eases out as it arrives, and the Out eases in as it leaves.
+The same nine kinds fill both In and Out. Only Fade and Pop exit by playing the entrance backwards; the others keep going the way they came in, as the table shows. The In eases out as it arrives, and the Out eases in as it leaves.
 
 | Kind | As an entrance (In) | As an exit (Out) |
 |---|---|---|
@@ -267,11 +267,11 @@ A clip with a During movement shows a small wave symbol at the right end of its 
 
 ### Inactive presets
 
-An In or Out with a zero duration can come from an agent or an older project. It is kept but does nothing. The section, the summary and the Motion menu mark it "(inactive)" (or "(some inactive)" across a selection), it draws no wedge, and a note reads "Selection includes inactive In motion (zero duration). Increase Duration to reactivate; choose None to clear."
+An In or Out with a zero duration can come from an agent or a project file. It is kept but does nothing. The section's summary marks the first selected clip's "(inactive)". The Motion menu marks it "(inactive)", or "(some inactive)" when only some of the selected clips' presets of that kind are. It draws no wedge, and a note reads "Selection includes inactive In motion (zero duration). Increase Duration to reactivate; choose None to clear."
 
 ### Limits
 
-- A preset is not part of any action. Motion rows are ⊘, and edits always write the clip, even with an action selected.
+- A preset is not part of any action. With an action selected, Motion rows are ⊘, and edits still write the clip.
 - A split gives the first half no Out and the second half no In, so the cut doesn't play an exit and an entrance. A During movement restarts at each cut, so Remove Silences on a clip with Pulse or Drift can make it jump at the cuts.
 - Freeze frame and Add Blurred Background drop the motion. Duplicate, Detach Audio and Paste keep it. Changing the speed doesn't rescale the presets.
 - A text clip has no measured size, so a slide starts or ends half a canvas past the edge. That clears any text narrower than the canvas.
@@ -298,12 +298,13 @@ screens its blurred picture over what is under it.
 
 Drawn sharp, whatever the row says:
 
-- a clip inside a transition, and both halves of a dissolve between nests;
+- a clip inside a transition, and every clip inside a nest clip that is in one;
 - a clip on a matte track, and the clips a matte cuts;
-- a clip with Text Behind Subject's cut, and the person copy it draws;
+- a clip with Text Behind Subject's cut, and the hidden copy of the person that
+  makes the cut (the person you see keeps their blur);
 - a clip with a drop shadow;
 - a nest's own picture: set the blur on the clips inside it. The row is greyed
-  on a nest clip and on an adjustment clip, which has no picture to move.
+  on a nest clip. An adjustment clip has no picture to move, and no Picture tab.
 
 The cursor's click ripples stay sharp.
 
@@ -339,7 +340,7 @@ A fade through a colour changes the layer's own pixels toward the colour. On a c
 
 There are three ways:
 
-- **Overlap two clips.** Whenever an edit makes a clip overlap the clip before it on the same track, and that clip has no transition stored, Frame Job adds a Cross Dissolve, eased (Ease In Out) and crossfading the sound. That holds whether you drag, trim an edge, paste, insert, close a gap or shift clips.
+- **Overlap two clips.** Whenever an edit makes a clip overlap the clip before it on the same track, and that clip has no transition stored, Frame Job adds a Cross Dissolve, eased (Ease In Out) and crossfading the sound. That holds whether you drag, trim an edge, paste, add a clip, close a gap or shift clips.
 - **Clip ▸ Transition ▸ \<style\>.** Works on every selected clip at once:
   - A clip that already overlaps the clip before it gets the chosen style, keeping its curve and crossfade.
   - A clip at a **hard cut** (it starts exactly where the previous clip ends) gets a new half-second overlap, centred on the cut. The overlap is made from footage the two clips aren't showing: the source past the first clip's out point and before the second clip's in point. Nothing else on the timeline moves, and the pair's outer edges stay where they were. If there isn't half a second to spare, the transition comes out shorter.
@@ -361,7 +362,7 @@ The **Transition** section is on the Clip sub-tab when a single selected clip ov
 | Kind | The style, or None | None and the thirteen styles |
 | Curve | How the transition's progress is eased | Linear, Ease In, Ease Out, Ease In Out |
 | Crossfade Audio | On: the outgoing sound fades out and the incoming fades in, eased by the Curve, in the Crossfade Shape. A pair where only one clip has sound still fades that clip. Off: both clips play at their own level across the whole overlap, mixed together. Mute, solo, ducking and volume still apply on top | On or off |
-| Crossfade Shape | The curve of the crossfade, enabled while Crossfade Audio is on. **+3 dB** (constant power, the default) holds the level steady between two unrelated takes. **Linear** is a straight-line pair, which dips 3 dB in the middle of unrelated takes but suits two parts of the same sound. **S-Curve** and **−3 dB** move more of the change to the middle or the end. The incoming clip follows the shape and the outgoing clip follows it in reverse | +3 dB, Linear, S-Curve, −3 dB |
+| Crossfade Shape | The curve of the crossfade, enabled while Crossfade Audio is on. **+3 dB** (constant power, the default) holds the level steady between two unrelated takes. **Linear** is a straight-line pair, which dips 3 dB in the middle of unrelated takes but suits two parts of the same sound. **S-Curve** and **−3 dB** move more of the change to the middle or the end. The incoming clip follows the shape and the outgoing clip follows it in reverse | Linear, S-Curve, +3 dB, −3 dB |
 | Duration | The length of the overlap. Changing it **moves** the later clip to match | 0.02–10 s (quick picks 0.25, 0.5, 1, 2) |
 
 A transition Frame Job makes is eased (Ease In Out) and crossfades its sound. An overlap with no stored transition draws as a linear cross dissolve with no sound crossfade, and in that state the section shows **Linear** and **Crossfade Audio** off. Setting either of them then stores a transition with exactly the values shown.
@@ -374,7 +375,7 @@ Two overlapping clips with no picture (audio-only clips) get the same section. O
 
 ### Remove a transition
 
-Choose **None** in the Kind popup, or **Clip ▸ Transition ▸ None**. None is always available, because a clip can hold a transition the timeline doesn't draw: one left behind when an overlap was dragged apart, for example.
+Choose **None** in the Kind popup, or **Clip ▸ Transition ▸ None**. The menu's None is available with any clip selected, because a clip can hold a transition the timeline doesn't draw: one left behind when an overlap was dragged apart, for example.
 
 None removes the stored transition but not the overlap. While two clips still overlap they keep blending as a plain linear dissolve, with no hatch on the timeline. To get a hard cut back, move or trim the clips so they no longer overlap.
 

@@ -1,0 +1,109 @@
+---
+title: "HDR10 peak"
+description: "See the peak brightness Frame Job read from a PQ file, override it when the metadata is wrong or missing, and go back to the file's own value."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+HDR10 video uses the PQ transfer curve, so Frame Job calls it a PQ file. Such a file's metadata names how bright its highlights get, and Frame Job eases them down to white at that brightness, its peak, rather than cutting them off flat. The peak is read when you import the file, and the **HDR10** section lets you see it and change it when the metadata is wrong or missing.
+
+<AtAGlance
+  where="Media tab ▸ HDR10"
+  tools={['set_media_color', 'get_project']}
+/>
+
+## The peak a file names
+
+Import reads the peak by itself, so most files need nothing from you. It takes MaxCLL, the brightest pixel the file says it holds, when that's present and not zero. Otherwise it takes the maximum of the display the file was mastered on.
+
+| The file is | Frame Job looks in |
+| --- | --- |
+| A video | The description stored with the video track. When that carries no HDR10 metadata at all, the video stream's own (HEVC SEI or AV1 metadata), so files from ffmpeg, HandBrake or x265 are read too. |
+| A PNG still | Its `cLLI` and `mDCV` chunks. |
+| A HEIF or HEIC still | The `clli` and `mdcv` boxes of its main image. |
+
+A file that names no peak is still read as PQ, and it's treated as 1,000 cd/m².
+
+What the peak does depends on the [project's dynamic range](/hdr/dynamic-range/):
+
+- **In an SDR project**, highlights roll off smoothly to white at the peak. A peak below 203 cd/m², HDR reference white (the level ordinary white sits at), counts as 203.
+- **In an HDR (HLG) project**, the picture keeps display light up to 1,000 cd/m². A peak above that rolls brighter highlights off to fit, and a lower peak doesn't change the picture.
+
+## The HDR10 section
+
+The **HDR10** section of the **Media** tab appears once the project has a PQ file, either a video or a still.
+
+Click the file in the list to see and change its peak. The section's header shows the selected file's peak, for example "4,000 cd/m²", so you can read it with the section closed.
+
+When the selected row isn't a PQ file, the section reads "Select a PQ file in the list" and its controls are disabled.
+
+## Set a peak by hand
+
+Override the file's peak when its metadata is wrong, or when it has none and you know the real figure.
+
+<Steps>
+
+1. On the **Media** tab, click the PQ file in the list.
+
+2. In the **HDR10** section, type a value in **Peak** and press <kbd>↩</kbd>, or click the chevron for a [quick pick](/getting-started/inspector-fields/#use-a-quick-pick).
+
+</Steps>
+
+**Peak** takes whole numbers from 1 to 10,000 cd/m², and its quick picks are 1,000, 2,000, 4,000 and 10,000. A typed number outside the range is held to the nearest end. Entering the value already showing isn't a new choice, so it makes no undo step.
+
+## Use File's
+
+**Use File's** clears your override and goes back to the peak the file's HDR10 metadata names. A file with no metadata goes back to the assumed 1,000 cd/m².
+
+The button is available only while an override is set.
+
+## Where the peak came from
+
+A line under the controls says where the peak came from.
+
+| The line says | What it means |
+| --- | --- |
+| "Mastered at 4,000 cd/m² (MaxCLL, from the file)" | The file's own value. |
+| "No HDR10 metadata — 1,000 cd/m² assumed" | The file names no peak. |
+| "Set by hand; the file says 1,000 cd/m² (mastering display)" | Your override, with the value it replaces. |
+| "Set by hand; the file has no HDR10 metadata" | Your override, on a file with no metadata. |
+
+## Undo and Camera Log
+
+Each change is one undo step, **PQ Peak**.
+
+The peak and the [Camera Log](/hdr/camera-log/) keep each other. Changing the peak keeps the file's Camera Log setting, and changing the Camera Log, even to **None**, keeps the peak.
+
+## Good to know
+
+- The peak belongs to the media file, not to a clip, so two clips of one file can't be read differently.
+- Only a PQ file has a peak, so the section's controls are disabled for anything else.
+- The peak is read once, at import. Relinking a PQ file doesn't read it again, so set it by hand if the new file differs. A file that wasn't PQ when you imported it can't take a peak after you relink it to one.
+- A PQ still takes a peak and nothing else. Camera Log is for video files.
+- The peak describes a source file. An [HDR10 export](/hdr/export-hdr/) carries fixed metadata of its own, whatever the peak is.
+
+## With an agent
+
+`set_media_color` sets a PQ file's peak with `peak` in its `color`, a whole number of cd/m². A PQ still takes `peak` alone. `get_project` shows the file's own reading in `media[].color.pq`, where an empty `{}` means the file names no peak.
+
+Two things differ from the app:
+
+- The call replaces the Camera Log and the peak together, so an agent that wants to keep both sends both. In the app each control keeps the other.
+- `color: null` clears the Camera Log and a peak override together, and the peak goes back to the file's own reading.
+
+The call fails in two cases where the app can't go wrong:
+
+| The agent sends | What comes back |
+| --- | --- |
+| A peak outside 1 to 10,000, which the field would hold to the range | "color.peak must be 1–10000 cd/m², not …" |
+| A peak on a file that isn't PQ | "media N is not a PQ file; only a PQ file takes a peak" |
+
+See [Tools: media](/mcp/tools-media/#set_media_color).
+
+## Related
+
+- [How sources are read](/hdr/how-sources-are-read/)
+- [Camera Log](/hdr/camera-log/)
+- [A project's dynamic range](/hdr/dynamic-range/)
+- [Relink missing media](/projects/relink-media/)

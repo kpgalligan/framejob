@@ -1,0 +1,88 @@
+---
+title: "Recording files and formats"
+description: "Where recordings are saved, how their files are named, what format each one is, and why a still screen gives a low frame rate."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Every recording is a set of ordinary files in one folder, so they outlast any project they land in. This page lists what each recording writes and in what format.
+
+<AtAGlance
+  menu="File ▸ New Recording…"
+  keys="⌥⌘N"
+  tools="record_screen"
+/>
+
+## Where recordings are saved
+
+Recordings go in `~/Movies/Frame Job Recordings/`, which Frame Job creates the first time it needs it. The panel's footnote shows the folder before you start.
+
+They're never stored inside the project package. A recording is original footage, so it survives even if you never save the project it opened in, and undoing a landing leaves its files on disk. To carry recordings into the package, use [Consolidate Media](/projects/consolidate-media/).
+
+## What each recording writes
+
+| File | Example name | Format |
+| --- | --- | --- |
+| [Screen movie](#the-screen-movie) | `Screen Recording 2026-09-10 at 14.03.22.mov` | QuickTime movie, HEVC or H.264 |
+| [Its microphone](#the-microphone-file) | `Screen Recording 2026-09-10 at 14.03.22 (Microphone).m4a` | AAC audio |
+| [Its cursor file](/recording/cursor-files/) | `Screen Recording 2026-09-10 at 14.03.22.fjcursor` | Frame Job's own |
+| [Voice-over](#voice-over-files) | `Voice-over 2026-10-02 at 09.15.04.m4a` | AAC audio |
+| [Camera on its own](#camera-files) | `Camera Recording 2026-10-26 at 17.14.33.mov` | QuickTime movie, HEVC or H.264 |
+| [Camera beside the screen](#camera-files) | `Screen Recording 2026-10-26 at 17.14.33 (Camera).mov` | QuickTime movie, HEVC or H.264 |
+
+## How files are named
+
+A file is named by the date and time it began, on a 24-hour clock in your Mac's time zone.
+
+A [pause](/recording/pause-and-stop/) ends a file and a resume starts a new one, so each stretch of a paused recording is its own set of files, named by the time that stretch began.
+
+When a name is already taken, Frame Job adds ` (2)`, ` (3)` and so on.
+
+## The screen movie
+
+A screen recording is a QuickTime `.mov` in HEVC where your Mac offers it, otherwise H.264. Its size comes from the panel's **Size** row, **Nominal (points)** or **Best (pixels)**, measured on the display or on a picked window's own size.
+
+With **System Audio** on, the movie has one stereo 48 kHz sound track of what your Mac plays. Frame Job's own sound is left out, so playing your timeline during a recording doesn't get into it.
+
+The microphone is never a track of the movie.
+
+## The microphone file
+
+The microphone is written beside the movie, named after it with ` (Microphone)` added, as an AAC `.m4a` file.
+
+Keeping it apart from the system sound means you can set the level of your voice and your computer's sound separately. See [System audio and the microphone](/recording/system-audio-and-microphone/).
+
+## Voice-over files
+
+A [voice-over](/recording/voice-overs/) is an AAC `.m4a` named `Voice-over <date> at <time>.m4a`, one file for each stretch between pauses.
+
+## Camera files
+
+A camera recording is a QuickTime `.mov` at the camera's format, in HEVC where that can be used at the format's size, otherwise H.264. It has no sound of its own.
+
+- A [camera on its own](/recording/record-a-camera/) is named `Camera Recording <date> at <time>.mov`.
+- A [camera beside the screen](/recording/camera-beside-the-screen/) is named after the screen movie with ` (Camera)` added, one for each stretch.
+
+Any microphone file sits beside the movie, named as for a screen recording.
+
+## Why a still screen gives a low frame rate
+
+macOS delivers a new frame only when something on screen changes, so a mostly still screen gives a file with a low, fractional frame rate. That rate comes from the file itself and isn't a fault. The picture holds until the next change.
+
+**Rate**, 30 or 60 fps, is the most frames per second the file can hold. A new project uses it as its frame rate, while the media in the project keeps the file's real rate.
+
+Where the picture stops changing before the sound ends, the last frame is held to the end of the clip.
+
+## With an agent
+
+An agent can record into another folder, created if it's missing, which the panel can't. It names the folder only: the file always takes its dated name.
+
+The call's answer gives the files it wrote, as `path`, `mic_path` and `camera_path`. See [Record with record_screen](/mcp/record-screen/#what-it-answers).
+
+## Related
+
+- [Where a recording lands](/recording/where-it-lands/)
+- [System audio and the microphone](/recording/system-audio-and-microphone/)
+- [Cursor files](/recording/cursor-files/)
+- [Consolidate Media](/projects/consolidate-media/)
+- [Project frame rate](/projects/frame-rate/)

@@ -1,0 +1,89 @@
+---
+title: Blend modes
+description: Choose how a layer combines with what's under it, and understand why a blend can look like it isn't working.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A blend mode decides how a layer's colours combine with whatever is already on the canvas under it. Use one to lay a glow over a shot, darken with a texture, or mix two pictures.
+
+<AtAGlance where="Clip tab ▸ Picture ▸ Transform ▸ Blend" tools="set_video" />
+
+## The Blend popup
+
+<Steps>
+
+1. Put the layer you want to blend on a track in front of something to blend with.
+
+2. Select it and open the [Picture tab](/canvas/picture-tab/).
+
+3. In **Transform**, choose a mode from the **Blend** popup.
+
+</Steps>
+
+Every clip starts on **Normal**. The change is one undo step, and with several clips selected it applies to all of them.
+
+Hover over the popup for a reminder of what a blend needs behind it.
+
+## The eight modes
+
+These are in the popup's order. "Underneath" means every layer behind this one, and the canvas background.
+
+| Mode | What it does |
+| --- | --- |
+| **Normal** | Draws over what's underneath. |
+| **Multiply** | Darkens, by multiplying with what's underneath. |
+| **Screen** | Lightens, the inverse of Multiply. A screened white blob reads as a glow. |
+| **Add** | Adds the colours together. |
+| **Overlay** | Multiplies where what's underneath is dark, and screens where it's light. |
+| **Darken** | Keeps the darker of the two colours. |
+| **Lighten** | Keeps the lighter of the two colours. |
+| **Difference** | Gives the absolute difference of the two colours. |
+
+## Nothing behind
+
+A blend needs something under the layer, and over the empty black canvas it can't do much:
+
+| Mode | Over the empty black canvas |
+| --- | --- |
+| **Multiply**, **Darken**, **Overlay** | The layer reads black. |
+| **Screen**, **Add**, **Lighten**, **Difference** | The layer looks unchanged. |
+
+The Transform section warns you when that's what's happening, for example "Nothing behind this clip — multiply reads black here." or "Nothing behind this clip — add changes nothing here."
+
+The note looks at the clip's whole span, not only the frame at the playhead, so it stays away if anything sits behind any part of the clip. Hidden tracks don't count, and neither do clips with their picture turned off. With several clips selected, it's about the first one.
+
+It appears only while the canvas background is opaque black. Over a transparent canvas, a blend draws the layer untouched.
+
+To give the layer something to blend against:
+
+- Use **Clip ▸ Add Background** to put a plate on a new track at the back. See [Backgrounds](/canvas/backgrounds/).
+- Set a non-black **Background** on the Document tab. See [Canvas background and timecode](/projects/background-and-timecode/).
+
+## During a transition
+
+A layer always draws as **Normal** for as long as it's in a [transition](/motion/transitions/), whatever blend mode it has. The popup keeps showing the clip's own mode during the overlap. Only the frames in the overlap draw as Normal.
+
+## Animate a blend mode
+
+An [action](/motion/actions/) can change the mode. It doesn't ramp from one to the other: it holds, then switches at the action's end, and the row shows `at end` while you're editing that action.
+
+## Good to know
+
+- **Nest clips.** The popup is greyed on a nest clip, with the note "A nest has no pixels of its own to blend — un-group it (⇧⌘G) to blend the clips inside." Use **Clip ▸ Un-nest**, blend the clip you wanted, and nest again.
+- **Clips inside a nest.** You can blend a clip inside a nest. It blends against the canvas below the whole nest, not against the nest's own clips under it.
+- **Adjustment clips.** An [adjustment clip](/color/adjustment-clips/) takes no blend mode.
+- **Matte tracks.** A clip on a [matte track](/canvas/matte-tracks/) keeps its blend mode, but it has no effect while the track is a matte.
+- **Encoded or linear light.** A project can blend in either. See [Blending: encoded or linear light](/hdr/blending/).
+
+## With an agent
+
+`set_video` sets the mode with `blend`, one of `normal`, `multiply`, `screen`, `add`, `overlay`, `darken`, `lighten` or `difference`. Any mode but `normal` on a nest clip gets the error "clip 7 shows a nest and cannot take a blend mode". See [Tools: picture and grade](/mcp/tools-set-video/#transform-position-scale-rotation-opacity-and-blend).
+
+## Related
+
+- [Position, scale, rotation and opacity](/canvas/transform/)
+- [Backgrounds](/canvas/backgrounds/)
+- [Blending: encoded or linear light](/hdr/blending/)
+- [Tracks](/timeline/tracks/)

@@ -1,0 +1,68 @@
+---
+title: "Project frame rate"
+description: "Choose the rate your project runs at, match it to your footage, and see what a rate change does to the timeline."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The project's frame rate sets the grid that every edit lands on. A new project runs at 30 fps, and a project opened from a movie takes the movie's rate. A rate chosen for one export is separate: see [Export frame rate](/export/frame-rate/).
+
+<AtAGlance where="Document tab ▸ Frame Rate" tools="set_canvas" />
+
+## Choose a rate
+
+In the **Frame Rate** section of the [Document tab](/projects/document-tab/), choose a rate from **Rate**: **24**, **23.976**, **25**, **30**, **29.97**, **50**, **60** or **Match First Clip**.
+
+The change is one undo step. See [what it does to the timeline](#what-a-rate-change-does).
+
+## Match the first clip
+
+**Match First Clip** takes the rate of the earliest clip on the timeline whose file has video. It beeps if there isn't one.
+
+It sets the rate once, and later changes to the timeline don't move it. The popup then shows that rate, if it [lists it](#rates-the-popup-doesnt-list). A picture counts as having video here, and it reads as 30 fps.
+
+## Footage at a different rate
+
+Clips don't have to match the project's rate, and cameras at different rates can share a timeline. Frame Job doesn't speed a clip up or slow it down to fit. The clip plays in real time, and each project frame shows the clip's picture at that moment. So a 25 fps clip in a 30 fps project repeats some frames, and a 60 fps clip skips some. There's nothing to convert first.
+
+A [variable-rate file](/reference/file-formats/#variable-and-unusual-frame-rates), such as one from a phone, plays the same way. Set the project to your main camera's rate, so its frames land one for one.
+
+## Rates the popup doesn't list
+
+A project can run at a rate the popup doesn't have, because a file's rate is kept as it is when you open it.
+
+- A file at 24, 23.976, 25, 30, 29.97, 48, 50, 60 or 59.94 fps keeps that exact rate.
+- Any other rate is kept to three decimals, so a 47.3 fps recording stays at 47.3 and doesn't become 48. Screen recordings often have odd rates.
+
+:::caution
+At a rate it doesn't list, **Rate** shows **24**. The **Frame rate** row at the top of the Document tab shows the real rate, so trust that one.
+:::
+
+Choosing a popup item changes the rate. **Match First Clip** brings the file's own rate back.
+
+## What a rate change does
+
+Changing the rate moves every clip start, clip length, action and marker onto the new frame grid, inside nests as well.
+
+- A clip's length is held to the media it has left, so a coarser grid can't push a clip past the end of its file.
+- A clip always keeps at least one frame.
+- An action stays inside its clip. A speed ramp's action is only snapped to the new grid.
+- Where a clip starts reading its source doesn't change, and sound fades keep their lengths.
+
+If two markers land on the same frame at the new rate, only one stays: the one added first.
+
+Frame Job doesn't check the new positions for overlaps, and it won't stop a rate change because of one. Each edge moves by less than a frame, so an overlap can grow by a frame at most.
+
+## Read the timeline's length
+
+**Duration**, under **Rate**, is a read-only row showing the timeline's length in the project's [timecode format](/projects/background-and-timecode/#choose-a-timecode-format).
+
+## With an agent
+
+[`set_canvas`](/mcp/tools-tracks-and-markers/#set_canvas) takes `fps` as `[numerator, denominator]`: `[30, 1]`, `[30000, 1001]` for 29.97 or `[24000, 1001]` for 23.976. Any fraction works, so an agent can set a rate the popup doesn't list, such as 48 or 59.94 fps. A 0 in either place fails and the rate stays as it was. See [Tools: tracks, markers and canvas](/mcp/tools-tracks-and-markers/).
+
+## Related
+
+- [The Document tab](/projects/document-tab/)
+- [Export frame rate](/export/frame-rate/)
+- [Markers](/timeline/markers/)

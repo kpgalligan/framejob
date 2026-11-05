@@ -1,0 +1,70 @@
+---
+title: "Text box and wrapping"
+description: "Let a text clip's box fit its words, or set a width and have the words wrap, from the inspector or by dragging on the canvas."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A text clip's box decides where its lines break. By default the box fits the words, and only your own line breaks start a new line. Give it a fixed width and the words wrap to fit.
+
+<AtAGlance
+  where={['Clip tab ▸ Text ▸ Box', 'Drag a text clip\'s left or right handle on the canvas']}
+  tools="set_text"
+/>
+
+## Wrap text at a width
+
+<Steps>
+
+1. Select the text clip.
+
+2. In the inspector's **Clip** tab, open the **Box** section of the **Text** sub-tab.
+
+3. Set **Mode** to **Fixed width**. The width starts at 60 % of the canvas width, which is 1,152 px on a 1920-wide canvas.
+
+4. Type a **Width**, or drag a [side handle](#drag-the-width-on-the-canvas) on the canvas.
+
+</Steps>
+
+To go back, set **Mode** to **Auto-size** or choose the section's **Reset**.
+
+## The Box section
+
+| Control | What it does | Default | Range |
+| --- | --- | --- | --- |
+| **Mode** | **Auto-size** lays the text out without wrapping, so the box fits the words. **Fixed width** wraps the words at **Width**. | Auto-size | |
+| **Width** | The width the words wrap at. It's greyed in Auto-size. | 60 % of the canvas width | 20 to 20,000 px |
+
+A number typed outside the range is brought back to the nearest limit. When the section is closed, its header reads "auto", or the width, such as "1152 px".
+
+## Drag the width on the canvas
+
+Drag a text clip's left or right handle in the preview to set its wrap width. If the box was on Auto-size, it becomes **Fixed width**, starting from the box's current width.
+
+The text stays centred on the same point and grows both ways, whichever handle you drag. The drag holds the width between 4 and 20,000 px, so it can go narrower than the 20 px the **Width** field lets you type.
+
+The other handles do something different. The corners and the top and bottom handles scale the text uniformly and leave the wrap width alone. See [Move, scale and rotate](/canvas/move-scale-rotate/).
+
+## What a fixed width changes
+
+- **The height follows the lines.** A fixed width sets only the width, and the box grows taller as the text wraps onto more lines.
+- **Alignment works across the whole width.** Left, centre and right [alignment](/text-and-shapes/text-style/) line the words up against the width you set, not against the longest line.
+- **A backdrop fills the whole box.** A [backdrop](/text-and-shapes/text-outline-and-backdrop/) is as wide as **Width** plus its padding on each side, even when the words are shorter. **Width** measures the words, and the padding sits outside it.
+
+## Good to know
+
+- In Auto-size a long line never wraps, so it can run off the canvas. Press <kbd>⇧Return</kbd> in the [text area](/text-and-shapes/text-clips/) to start a new line yourself.
+- Text is drawn at no more than 8,192 px on a side, so a box stops growing there whatever **Width** says.
+- With an [action](/motion/edit-an-action/) selected, **Mode**, **Width** and the side handles set the action's end, like any other text property.
+
+## With an agent
+
+`set_text` sets the box through `width`: a wrap width in pixels, or `null` to go back to Auto-size. See [Tools: text, shapes and clip names](/mcp/tools-clip-properties/#set_text).
+
+## Related
+
+- [Text clips](/text-and-shapes/text-clips/)
+- [Font and text style](/text-and-shapes/text-style/)
+- [Text outline and backdrop](/text-and-shapes/text-outline-and-backdrop/)
+- [Move, scale and rotate](/canvas/move-scale-rotate/)

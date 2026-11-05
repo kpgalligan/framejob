@@ -1,0 +1,66 @@
+---
+title: "Add clips to the timeline"
+description: Drag a file from the Media tab onto a track or the canvas, and see where it lands and what stops a drop.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Importing a file puts it in the [Media tab](/projects/media-tab/), not on the timeline. To use it, drag its row onto a track or onto the preview canvas.
+
+<AtAGlance
+  where={['Media tab ▸ drag a row onto a track', 'Media tab ▸ drag a row onto the preview canvas']}
+  tools={['add_clip', 'add_track']}
+/>
+
+This page covers files. [Text](/text-and-shapes/text-clips/), [shapes](/text-and-shapes/shape-clips/) and [graphics](/graphics/insert-a-graphic/) have their own ways in.
+
+## Drag media onto a track
+
+Drag a row from the Media tab onto a track. The whole file lands as one clip at the pointer, on the nearest frame, and nothing else moves. The drop doesn't snap to the edges of other clips.
+
+Hold a modifier as you let go to make room for the file or replace what's there. See [Insert and overwrite](/editing/insert-and-overwrite/#drop-with-a-modifier).
+
+A drop that overlaps a neighbour a little still lands, as long as it keeps to the [overlap rule](/editing/how-edits-work/#the-overlap-rule), and makes a Cross Dissolve over the overlap.
+
+**Edit ▸ Undo** names this step Add Clip.
+
+## Drop media on the canvas
+
+Drop a row on the preview canvas to add the file at the playhead, on a new track at the front. Use this to lay a file over everything else without looking for a free stretch of track.
+
+The new track and the clip are one undo step, Add Clip. Modifier keys do nothing here.
+
+## What a new clip covers
+
+A new clip starts at the head of the file and runs its whole length, at normal speed. The length rounds down to whole frames, so the clip never runs past the end of the file. That can leave a part of a frame at the tail unused.
+
+- **A picture** is 5 seconds long. [Trim it](/editing/trimming/) to any length.
+- **A file larger than the canvas** is scaled to fit, while **Fit new clips to canvas** is on in the [Document tab](/projects/document-tab/). It's on by default. A smaller file keeps its size.
+- **A video or sound file shorter than one frame** of the project can't be placed, and Frame Job says so.
+
+## When a drop doesn't land
+
+| What happened | What you see |
+| --- | --- |
+| The clip would break the [overlap rule](/editing/how-edits-work/#the-overlap-rule) | Frame Job beeps, adds nothing, and gives the reason at the foot of the inspector. Hold <kbd>⌥</kbd> to insert or <kbd>⇧⌥</kbd> to overwrite as you drop instead. |
+| You let go above or below the lanes | The drag springs back. Only a [clip already on the timeline](/editing/move-clips/#move-a-clip-to-a-new-track) makes a new track that way. |
+| You let go in another project's window | The drag springs back. A row can only be placed in its own project. |
+
+A `.cube` LUT row doesn't drag at all. [Apply it as a look](/color/luts/) instead.
+
+## Good to know
+
+- A plain drop onto a [locked track](/timeline/hide-and-lock-tracks/) still places the clip, because nothing has to move.
+- If the project already has 64 tracks, a drop on the canvas adds the file to the front track instead, and the overlap rule can stop it there.
+- Files dragged from the Finder are different. On the Media tab they [import](/projects/import-media/). Anywhere else in the window, each opens as a project of its own.
+
+## With an agent
+
+[`add_clip`](/mcp/tools-adding-clips/#add_clip) places a file on a track at a time you give it, as a plain drop does, and the same rules stop it. To lay a file over everything else, as a drop on the canvas does, an agent calls [`add_track`](/mcp/tools-tracks-and-markers/#add_track) first. See [Tools: adding clips](/mcp/tools-adding-clips/).
+
+## Related
+
+- [Import media](/projects/import-media/)
+- [Insert and overwrite](/editing/insert-and-overwrite/)
+- [Move clips](/editing/move-clips/)
+- [Trim clips](/editing/trimming/)

@@ -1,0 +1,109 @@
+---
+title: "Choose a format"
+description: "Compare Frame Job's fifteen export formats and pick the one that suits where the file is going, YouTube and TikTok included."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The **Format:** popup in the [export sheet](/export/export-sheet/) decides the codec and the container together. Pick it by where the file is going next.
+
+<AtAGlance
+  where="Export sheet ▸ Format"
+  tools="export"
+/>
+
+## Pick by what the file is for
+
+| You want | Choose |
+| --- | --- |
+| A file every player and upload form takes, [YouTube and TikTok](#export-for-youtube-or-tiktok) included | [H.264 (MP4)](/export/h264-and-hevc/#h264-mp4), the default |
+| A smaller file at the same picture | [HEVC (MP4)](/export/h264-and-hevc/#hevc-mp4) |
+| HEVC's picture or better at the same rate | [AV1 (MP4)](/export/av1-and-vp9/#av1-mp4) |
+| To keep a 10-bit source's gradients in a delivery file | [HEVC 10-bit (MP4)](/export/h264-and-hevc/#hevc-10-bit-mp4) |
+| A movie for a web page | [VP9 (WebM)](/export/av1-and-vp9/#vp9-webm) or [AV1 (WebM)](/export/av1-and-vp9/#av1-webm) |
+| A master for another editing application | [ProRes 422 (MOV)](/export/prores/#prores-422-mov) |
+| A title or lower third with transparency | [ProRes 4444 (MOV)](/export/prores/#prores-4444-mov) as a master, [HEVC with Alpha (MOV)](/export/h264-and-hevc/#hevc-with-alpha-mov) for Safari, or [VP9 with Alpha (WebM)](/export/av1-and-vp9/#vp9-with-alpha-webm) for Chrome and Firefox |
+| Sound and no picture | [An audio-only format](/export/audio-only/) |
+| A short silent loop | [Animated GIF or Animated PNG](/export/gif-and-apng/) |
+
+## Export for YouTube or TikTok
+
+Frame Job writes the file and you upload it yourself. It has no upload or publish step. Most of the sheet's defaults suit an upload, so these are the rows to check:
+
+| Control | Choose | What you get |
+| --- | --- | --- |
+| **Format:** | **H.264 (MP4)**, the default | A file every upload form takes. |
+| **Size:** | **Document size**, the default | The canvas as it is, so a 1080 × 1920 canvas writes a vertical file. |
+| **Frame rate:** | **Project rate**, the default | The rate you edited at. |
+| **Quality:** | **Format default**, or **Maximum** for a larger file | About 8.7 Mbps at 1080p and 30 fps, rising with the size and rate. See [Export quality](/export/quality/). |
+| **Loudness:** | **−14 LUFS (streaming)** | Your sound lands at the level YouTube plays at. It's **Off** until you choose. See [Export loudness](/export/loudness/). |
+
+The export sheet can't turn a landscape project into a vertical file, because a size of another shape gets black bars. Make the shape first with [Make Vertical Version](/framing/make-vertical-version/), which frames every clip for you.
+
+Captions on the timeline are already in the picture. For a separate subtitle file to upload, use [Export Captions](/captions/export-captions/). If you make the same export every week, [save it as a preset](/export/presets/).
+
+## The formats
+
+They're listed in the popup's order.
+
+| Format | What it's for | File | Sound | Picture depth | Keeps transparency | Can carry HDR |
+| --- | --- | --- | --- | --- | --- | --- |
+| H.264 (MP4) | The everyday delivery file | `.mp4` | AAC | 8-bit | No | No |
+| HEVC (MP4) | A smaller file at the same picture | `.mp4` | AAC | 8-bit | No | No |
+| HEVC with Alpha (MOV) | A small transparent delivery file | `.mov` | AAC | 8-bit | Yes | No |
+| HEVC 10-bit (MP4) | Keeps a 10-bit source's gradients | `.mp4` | AAC | 10-bit | No | Yes |
+| AV1 (MP4) | HEVC's picture or better at the same rate | `.mp4` | AAC | 10-bit | No | Yes |
+| AV1 (WebM) | The same AV1 picture, for the web | `.webm` | Opus | 10-bit | No | Yes |
+| VP9 (WebM) | A movie for a web page | `.webm` | Opus | 8-bit, or 10-bit when it carries HDR | No | Yes |
+| VP9 with Alpha (WebM) | A transparent movie for Chrome and Firefox | `.webm` | Opus | 8-bit | Yes | No |
+| ProRes 422 (MOV) | An editing master for another application | `.mov` | 16-bit LPCM | 10-bit | No | Yes |
+| ProRes 4444 (MOV) | A master that keeps transparency | `.mov` | 16-bit LPCM | 12-bit | Yes | Yes |
+| Audio only (M4A) | Compressed sound to send | `.m4a` | AAC | None | No | No |
+| Audio only (WAV) | Uncompressed sound for another tool | `.wav` | 16-bit or 24-bit LPCM | None | No | No |
+| Audio only (AIFF) | The same samples as WAV, in an AIFF | `.aiff` | 16-bit or 24-bit LPCM | None | No | No |
+| Animated GIF | A short silent loop to send | `.gif` | None | 8-bit, 256 colours | No | No |
+| Animated PNG | A lossless silent loop | `.png` | None | 8-bit | Yes | No |
+
+In an HDR project, a video format that can't carry HDR writes the project's SDR version. See [Export HDR](/hdr/export-hdr/). On a transparent canvas, a movie format that doesn't keep transparency flattens the picture onto black, and a GIF has a rule of its own. See [Transparent exports](/export/transparency/).
+
+## Sound in each format
+
+Every file with sound is stereo at 48 kHz.
+
+| Sound | Formats |
+| --- | --- |
+| AAC | H.264, HEVC, HEVC with Alpha, HEVC 10-bit, AV1 (MP4) and M4A |
+| Opus | AV1 (WebM), VP9 (WebM) and VP9 with Alpha (WebM) |
+| 16-bit LPCM | ProRes 422 and ProRes 4444 |
+| 16-bit or 24-bit LPCM | WAV and AIFF. See [Export bit depth](/export/bit-depth/). |
+| None | GIF and APNG |
+
+AAC and Opus run at 192 kbps unless a [Quality tier](/export/quality/) says otherwise.
+
+A file's sound is as long as the range it exports, including when a clip in it plays faster or slower. A project with no sound exports a movie with no sound track, in a WebM as in any other movie format.
+
+## Changing the format
+
+Changing the format rebuilds the **Size:** list and returns it to that format's default, because a GIF's default isn't an H.264's. Your frame rate, quality, loudness and range choices stay as they were, whether or not the new format can use them.
+
+Picking the format that's already chosen changes nothing, so a custom size you've typed survives it.
+
+## Software and hardware encoders
+
+AV1 and VP9 are encoded in software, by encoders built into Frame Job, so they take longer to export than the HEVC formats, which use the Mac's hardware encoder. The sheet [estimates the time](/export/export-sheet/#estimated-time) for AV1 and VP9, and AV1's [**Speed:** row](/export/encoder-speed/) trades time against file size.
+
+## No encoder
+
+A Mac with no encoder for a format reports it and leaves no file. The message names the format by its short name, for example: "This Mac cannot export with the “hevc_alpha” preset." Choose another format.
+
+## With an agent
+
+`export` names a format by its preset, such as `h264` or `vp9_alpha_webm`. [Presets](/mcp/export/#presets) lists all fifteen beside the names in the popup.
+
+## Related
+
+- [The export sheet](/export/export-sheet/)
+- [Export quality](/export/quality/)
+- [Export size](/export/size/)
+- [Transparent exports](/export/transparency/)
+- [Export HDR](/hdr/export-hdr/)

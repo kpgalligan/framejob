@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Frame Job — viewfinder</title>
+  <defs><clipPath id="tile"><rect x="100" y="100" width="824" height="824" rx="214.24"></rect></clipPath></defs>
+  <g clip-path="url(#tile)">
+    <rect x="100" y="100" width="824" height="824" fill="#FBF8F1"></rect>
+    <path d="M190 380 V190 H380 V254 H254 V380 Z" fill="#1F8564"></path>
+    <path d="M834 380 V190 H644 V254 H770 V380 Z" fill="#1F8564"></path>
+    <path d="M190 644 V834 H380 V770 H254 V644 Z" fill="#1F8564"></path>
+    <path d="M834 644 V834 H644 V770 H770 V644 Z" fill="#1F8564"></path>
+    <rect x="330" y="400" width="364" height="224" fill="#F2C14E"></rect>
+    <rect x="488" y="310" width="48" height="424" fill="#F4653F"></rect><path d="M461 290 H563 L512 366 Z" fill="#F4653F"></path>
+  </g>
+</svg>

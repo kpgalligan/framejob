@@ -1,0 +1,384 @@
+---
+title: "Tools: framing and vertical"
+description: The agent tools that frame one clip on the canvas, switch camera layouts and make a tall or square version of a project, with every argument, answer and refusal.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These three tools fit pictures to a canvas: `reframe_clip` frames one clip, `switch_layout` arranges a camera and a screen, and `make_vertical_version` makes a 9:16, 4:5 or 1:1 version of the whole timeline.
+
+<AtAGlance
+  menu={['Clip ▸ Follow Subject…', 'Clip ▸ Camera Layout ▸', 'File ▸ Make Vertical Version…']}
+  tools={['reframe_clip', 'switch_layout', 'make_vertical_version']}
+  needs="Nothing to set up. Faces, people and salient regions are found on your Mac, with no key and no upload."
+/>
+
+Times are in ticks, 600,000 a second, and are rounded to the project's frame grid. See [Units and ids](/mcp/units-and-ids/). [What a call answers](/mcp/what-a-call-answers/) covers the `project` summary, the `new_clips` and `new_tracks` lists, and the message you get when a call changes nothing.
+
+## `reframe_clip`
+
+Frames one clip on the current canvas: following a subject, a recorded pointer or whoever is talking, or centring, fitting or rescaling it. **Clip ▸ Follow Subject…** is this tool with `replace: true` on each selected clip and a **Backgrounds** track as `backdrop`, and **File ▸ Make Vertical Version…** calls it for each clip. [Reframe a clip](/framing/reframe-clip/) explains the framing itself.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip to frame. |
+| `follow` | string | Yes | What to do: `subject`, `face`, `person`, `salient`, `cursor`, `layout`, `speaker`, `center`, `fit` or `keep`. Each has a section below. |
+| `zoom` | number | No | How tight the frame is, 1 to 4 times the scale that fills the canvas. Default 1. |
+| `where_empty` | string | No | What shows where there's nothing to follow: `fit`, the whole picture, or `center`. Default `fit`. |
+| `backdrop` | integer | No | A track behind the clip's for a blurred copy of it. Left out, no copy is made. |
+| `replace` | boolean | No | `true` removes the clip's own moves before framing. Default `false`, which builds the framing into them. |
+| `from_width` | integer | No | `keep` and `layout` only: the width of the canvas the clip was placed on. Default the current canvas's. |
+| `from_height` | integer | No | `keep` and `layout` only: the height of that canvas. Default the current canvas's. |
+| `mics` | array of integers | With `speaker` | `speaker` only: two to four clip ids, the microphones of the people in the shot. |
+| `mic_faces` | array of integers | No | `speaker` only: each microphone's face number, in `mics`' order. Left out, Frame Job matches them. |
+| `scope` | integer | No | A nest's id, to edit inside that nest. Inside a nest the nest's canvas is the canvas. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | The open project to act on, by path. Leave it out for the frontmost one. |
+
+Which kind reads which argument is in [Which options each kind reads](/framing/reframe-clip/#which-options-each-kind-reads). An argument a kind doesn't read is ignored, but `zoom` outside 1 to 4, a `from_width` or `from_height` of 0 and an unknown `backdrop` track stop the call whatever the kind.
+
+To frame for a new canvas, call [`set_canvas`](/mcp/tools-tracks-and-markers/#set_canvas) first and leave `rescale_clips` off, which is its default. `keep` and `layout` then take the old size in `from_width` and `from_height`.
+
+This call follows whatever Frame Job finds in clip 12, one and a half times tighter than the scale that fills the canvas:
+
+```json
+{ "clip": 12, "follow": "subject", "zoom": 1.5 }
+```
+
+It answers `ok: true`, `cached` and the `project` summary. `cached` is false when an analysis ran first. A blurred copy adds its id to `new_clips`, and `new_tracks` when it needed a new track.
+
+The framing is written as the clip's position and scale and one action per move, as one undo step, **Reframe Clip**. A framing that would leave the clip exactly as it is changes nothing and makes no undo step.
+
+### `follow: subject`, `face`, `person` and `salient`
+
+These follow [what Frame Job finds](/framing/what-is-found/) in the clip on your Mac. `subject` follows a face, else a person, else a salient region, the part of the picture the eye goes to first. `face`, `person` and `salient` follow only that kind.
+
+- The frame eases onto the subject and moves only when the subject leaves a dead zone, the area around its aim where small movements are ignored.
+- It cuts hard at each shot change.
+- It holds a lost subject for 1 s, then follows another, or eases over 0.8 s to what `where_empty` says.
+- It returns once a subject has been seen for 0.6 s.
+- It frames two people together when both fit.
+
+The tool analyses the clip first. See [The analysis wait](#the-analysis-wait). A clip whose media has a [cursor file](/recording/cursor-files/) can't use these four, because a recording with a cursor file follows its cursor, never faces. See [How a followed frame moves](/framing/reframe-clip/#how-a-followed-frame-moves).
+
+### `follow: cursor`
+
+Follows a screen recording's recorded pointer, read from its media's [cursor file](/recording/cursor-files/). It reads the file at once, with no analysis and no wait.
+
+- The frame sits on the pointer and moves only when the pointer leaves a dead zone reaching 20 % of the frame's width and 12 % of its height either side of where the frame is aimed.
+- It arrives on each click outside that zone, in a move that ends on the click's frame.
+- It holds still while the person types, though a click still arrives.
+
+The frame never shows the whole picture, so `where_empty` and `backdrop` do nothing here. A clip whose media has no cursor file can't use it. A cursor file that's missing or won't read stops the call, in a sentence naming it.
+
+### `follow: layout`
+
+Re-lays a camera clip's [camera layouts](/framing/camera-layouts/), and its screen's, on the current canvas. You can name the camera or the screen, and both are re-laid.
+
+Each switch made on `from_width` × `from_height` is recognised and switched again here at the same time, length and curve. To be recognised, its position, crop and corner radius must match what Frame Job would have made to within 1 px, and its scale and opacity to within 0.001.
+
+- **Side by Side** becomes **Stacked** on a canvas taller than wide.
+- The cut pieces of the recording take the new layout.
+- Any zoom on them is adjusted so it still shows the same part of the picture.
+
+It reads no `zoom`, `where_empty`, `backdrop` or `replace`, and it runs no analysis. A switch edited by hand can't be recognised, and the call stops, naming the clip and the action.
+
+### `follow: speaker`
+
+Frames a wide shot of two to four people on whoever is talking. Each person needs a microphone of their own, named in `mics`: a clip of a sound file or a camera's detached sound, each on its own track, and not the clip being framed. **File ▸ Make Vertical Version…** offers this as Follow **Speaker**. See [Follow the speaker in a vertical](/framing/follow-speaker/).
+
+- Who talks when is read from the microphones as [Switch by Speaker](/multicam/switch-by-speaker/) reads it at its default settings.
+- Each microphone is matched to the face whose mouth moves with it, analysed on your Mac. Faces are numbered 1, 2 and so on from left to right.
+- Each change of speaker is a hard cut, held at least 2 s.
+- Two people talking at once are framed together when they fit. Otherwise the frame stays on one of them, the one already framed if that person is talking.
+- While nobody talks, the last speaker stays.
+
+When the match is weak, because a microphone and its face agree by less than 0.2 (1 is perfect agreement), the call stops and says where each face is, for example "face 1 at 28 % across the picture, face 2 at 71 %". Name each microphone's face in `mic_faces` and call again. Here microphone clip 31 is the right-hand of two faces and clip 32 the left-hand one:
+
+```json
+{ "clip": 12, "follow": "speaker", "mics": [31, 32], "mic_faces": [2, 1] }
+```
+
+A clip that changes shot can't be framed this way. Split it first with [`split_at_shots`](/mcp/tools-cut-and-delete/#split_at_shots). `speaker` reads its microphones in the timeline or nest open in the window, so a call addressed to a nest that isn't open stops and says to open it with [`set_scope`](/mcp/nests/).
+
+### `follow: center`
+
+Holds the frame on the middle of the picture for the whole clip, at `zoom`. It needs no analysis.
+
+### `follow: fit`
+
+Shows the whole picture for the whole clip, scaled to fit the canvas. It needs no analysis and doesn't read `zoom`. With `backdrop`, the blurred copy fills the canvas around it.
+
+### `follow: keep`
+
+Rescales the clip from the canvas it was made for, `from_width` × `from_height`, to the current one, as `set_canvas` does with `rescale_clips`. Every position and scale its actions set moves with it. With neither argument there's nothing to rescale.
+
+`keep` frames clips the other kinds won't, such as a title, a shape, a rotated clip or a clip on a matte track, as long as it has a picture. It reads no `zoom`, `where_empty`, `backdrop` or `replace`.
+
+### `zoom`, `where_empty`, `backdrop` and `replace`
+
+**`zoom`** sets how tight the frame is, from 1 to 4. At 1, the default, the picture covers the canvas with nothing to spare. `center`, the four following kinds, `cursor` and `speaker` read it, and `fit`, `keep` and `layout` don't.
+
+**`where_empty`** is what the four following kinds and `speaker` show where there's nothing to follow: `fit`, the whole picture, or `center`, the middle of the picture.
+
+**`backdrop`** names a track for one blurred copy of the clip, for its whole length, made only when the framing shows the whole picture somewhere. That means `fit`, or a followed clip that falls back to `fit`.
+
+- The copy goes on the named track when that track is unlocked, isn't a matte and is free over the clip. Otherwise it goes on a new track at the back.
+- It's the copy **Clip ▸ Add Blurred Background** makes.
+- It keeps the clip's speed actions, so a ramped clip's copy shows the same frames.
+
+**`replace`** decides what happens to the actions the clip already has. By default they stay, and the framing is built into the clip's position and scale and into every action end that moves or scales it, so a zoom or pan still happens inside the new framing.
+
+- The framing's own moves go in the gaps between the clip's actions. A move that would overlap one is shifted up to 0.5 s earlier, or else made part of that action, following its curve.
+- A cut splits the action it lands in. A linear action plays as before and an eased one eases again on each side. A speed action, or one running past the clip's end, isn't split, and the cut becomes part of it instead.
+- With `replace: true`, every `x`, `y` and `scale` is removed from the clip's action ends and the picture is fitted first. Volume and every other key stay, and an action left with nothing is removed.
+
+`keep` and `layout` don't read `replace`.
+
+### The analysis wait
+
+The four following kinds and `speaker` need the part of the file the clip plays analysed for shots, faces and subjects, with 1 s either side. The tool asks for what's missing and waits up to 60 s.
+
+Past that nothing changes. The answer is `ok: true` with `analyzing` and a `note`, so check for it rather than reading `ok` alone:
+
+| Key | What it holds |
+| --- | --- |
+| `analyzing.media` | The ids of the media still being analysed. |
+| `analyzing.covered` | How much is done, from 0 to 1. |
+| `note` | How far it got, and to call `reframe_clip` again. |
+
+The analysis carries on after the answer, so call again to apply the framing.
+
+- `center`, `fit`, `keep`, `layout` and `cursor` need no analysis.
+- `speaker` also needs its microphones' loudness and speech, which Frame Job measures when a file is added. While that's still running the call stops and says to try again in a moment.
+- If the analysis fails, the call stops, naming the analysis and the media.
+- If the [Assistant](/assistant/stop-a-turn/) is stopped during the wait, nothing is framed.
+- If the project or the open nest changes during the wait, nothing is framed. Call again.
+
+### Refusals
+
+A [refused call](/mcp/what-a-call-answers/#a-refusal) changes nothing and answers with one sentence saying why. Frame Job first checks the arguments, and stops on an unknown clip, a `zoom` outside 1 to 4, a `from_width` or `from_height` of 0, an unknown `backdrop` track or, with `speaker`, an unknown clip in `mics`. Then it checks these in order:
+
+1. Anything but `keep` on a text, shape, graphic or adjustment clip.
+2. A clip with no picture, or a crop or scale that leaves none.
+3. A nest clip, then a still or image clip, with a following kind, `cursor` or `speaker`.
+4. `cursor` on a clip whose media has no cursor file, then a following kind or `speaker` on one whose media has a cursor file.
+5. Unless `keep` or `layout`: a clip on a matte track or cut by a matte, then a turned clip (a rotation, an action turning it, or a spin in its motion).
+6. For `speaker`, its microphones:
+   - `mics` doesn't hold two to four clips, or names a clip twice.
+   - A microphone is the clip being framed, or has no sound from a media file.
+   - A microphone's sound is off.
+   - Two microphones are on one track.
+   - `mic_faces` doesn't have one number for each microphone, names face 0, or names a face twice.
+7. For `layout`:
+   - The clip holds no camera layout.
+   - A clip is laid out both as a camera and as a screen.
+   - A screen layout has no camera switch in front of it.
+   - The first switch isn't a layout Frame Job made on `from_width` × `from_height`, which means it was edited by hand.
+
+These need the analysis, the cursor file or the microphones, so they come last, in this order:
+
+8. For `speaker`:
+   - A microphone is still being measured, or never speaks over the clip.
+   - The clip changes shot.
+   - Fewer faces show than there are microphones. A face counts when it's in at least a quarter of the clip's samples.
+   - `mic_faces` names a face past the ones found.
+   - Nobody speaks inside the clip.
+   - The faces don't show who is whose.
+9. When a blurred copy would be made: a nest clip, or a `backdrop` track that isn't behind the clip's.
+10. A following kind with no analysis for the part that plays, or `cursor` with no recorded point in it.
+
+## `switch_layout`
+
+Lays out a camera clip and the screen recording behind it at a time, as [**Clip ▸ Camera Layout ▸**](/framing/camera-layouts/) and the Picture sub-tab's [Layout section](/framing/layout-section/) do at the playhead. Those pages describe each layout and how far it reaches.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `camera` | integer | Yes | The camera clip's id: a clip with a picture playing at `at`. |
+| `layout` | string | Yes | `corner`, `side_by_side`, `stacked`, `camera_full` or `screen_only`. |
+| `at` | integer | Yes | When the switch starts, in ticks. Inside a nest, this is the nest's own time. |
+| `screen` | integer | No | The screen clip's id, on a track behind the camera's. Left out, it's the clip drawing behind the camera at `at`: the front-most one on a shown, non-matte track, passing over adjustment clips and clips with their picture off. With none there, the camera is laid out alone. |
+| `shape` | string | No | `corner` only: `square`, `rounded` or `circle`. Default `square`. |
+| `corner` | string | No | `corner` only: `bottom_right`, `bottom_left`, `top_right` or `top_left`. Default `bottom_right`. |
+| `duration` | integer | No | How long the switch eases, in ticks. Default 0.5 s (300000). It's clamped to the clip and to its next layout action. |
+| `curve` | string | No | How the switch eases: `linear`, `ease_in`, `ease_out` or `ease_in_out`. Default `ease_in_out`. |
+| `through` | integer | No | Where the layout stops holding, in ticks, after `at`. |
+| `focus` | array of 2 numbers, or null | No | `[x, y]`: the point of the camera's picture a crop is centred on, in the camera media's source pixels from the picture's centre, y down. It's clamped inside the picture. |
+| `nest` | boolean | No | `true` nests the camera's clips, or the screen's, first when one of them zooms or moves after `at`, instead of stopping. Default `false`. |
+| `scope` | integer | No | A nest's id, to edit inside that nest. Inside a nest the nest's canvas is the canvas. |
+| `project` | string | No | The open project to act on, by path. Leave it out for the frontmost one. |
+
+| `layout` | The camera | The screen |
+| --- | --- | --- |
+| `corner` | In a corner box a quarter of the canvas wide and a third tall, 5 % in from the edges | At its full placement, where a newly added clip sits |
+| `side_by_side` | Cropped to fill the right third | Fitted in the left two-thirds |
+| `stacked` | Filling the rest below the screen | Across the top |
+| `camera_full` | Fills the canvas | At its full placement |
+| `screen_only` | Hidden where it is, at opacity 0 | At its full placement |
+
+The camera and the screen each get one layout action at `at`. At a clip's first frame the layout becomes its base, and a one-frame action marks the cut. A layout action already starting at `at` is replaced, and one still easing at `at` is shortened to end there.
+
+The layout holds. Every later clip on the camera's track, and on the screen's, that starts before the next switch on that track, `through` or the track's end takes it as its base and keeps its own actions.
+
+With `focus` left out or null, the tool fills it as the menu does, from the middle of the person in the camera clip, when [`analyze_cutout`](/mcp/tools-analysis/#analyze_cutout)'s person masks are cached for every frame it plays. Otherwise the crop is centred. A filled `focus` is dropped when `nest: true` nests the camera, but a `focus` you send goes as given.
+
+This call puts the camera in a round box at the top right, starting 2 s in:
+
+```json
+{ "camera": 8, "layout": "corner", "at": 1200000, "shape": "circle", "corner": "top_right" }
+```
+
+It answers `ok: true`, `focus` (the `[x, y]` the crop centres on, sent by you or filled from the masks, or null when there's none) and the `project` summary, with `new_clips` and `new_tracks` when `nest: true` made a nest. It's one undo step, **Camera Layout**.
+
+A negative `at`, a `duration` that isn't positive, a `through` not after `at`, or a `focus` that isn't two numbers stops the call before anything else. Then it's refused, with nothing changed and the clip named, when:
+
+- the camera has no picture, or doesn't play at `at`, and the same for a `screen` you name
+- `screen` isn't on a track behind the camera's
+- `side_by_side` or `stacked` has no screen
+- the camera is a nest clip and the shape is `rounded` or `circle`
+- a clip in the layout's reach holds a zoom or another action that moves it after `at`. A screen still at its full placement isn't asked in `corner`, `camera_full` and `screen_only`, since its zooms keep playing. Send `nest: true` to nest those clips first, in the same step, so the layout moves the nest and the zoom stays inside it.
+- with `nest: true`, one of the clips to nest is already laid out, or nesting would make the camera a nest clip in a `rounded` or `circle` corner
+- the project or the open nest changes while the tool reads the person masks. Call again.
+
+## `make_vertical_version`
+
+Makes a vertical (9:16), 4:5 or square (1:1) version of the top-level timeline, as [**File ▸ Make Vertical Version…**](/framing/make-vertical-version/) does. [What Make Vertical changes](/framing/vertical-what-changes/) goes through what happens to each kind of clip. The tool has no `scope`, because it only works on the top-level timeline.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `shape` | string | Yes | The new shape: `9:16`, `4:5` or `1:1`. |
+| `follow` | string | No | What a movie clip follows: `subject`, `face`, `person`, `salient`, `speaker` or `center`. Default `subject`. |
+| `zoom` | number | No | How tight, 1 to 4 times the scale that fills the new canvas. Default 1. |
+| `where_empty` | string | No | What a followed clip shows where nothing is found: `fit`, the whole picture on a blurred copy, or `center`. Default `fit`. |
+| `mics` | array of integers | With `speaker` | `speaker` only: two to four clip ids, each a clip of a sound file or a camera's detached sound on its own track, standing for that track as one person's microphone. |
+| `mic_faces` | array of integers | No | `speaker` only: each microphone's face number, in `mics`' order, faces numbered 1, 2 and so on from left to right. Left out, Frame Job matches them. |
+| `copy` | boolean | No | `true` opens the version as a new project. `false` applies it to the project you name. Default `true`. |
+| `path` | string | No | With `copy` only: where to save the new project, as an absolute path. `.framejob` is added when missing. Nothing may exist there yet. Without it the copy opens untitled. |
+| `captions` | boolean | No | `true` re-pages each word caption track on the new canvas. `false` keeps caption tracks as placed, like any other clip. Default `true`. |
+| `project` | string | No | The open project to act on, by path. Leave it out for the frontmost one. |
+
+The new canvas keeps the old short side, rounded down to even. From 1920 × 1080 that's 1080 × 1920, 1080 × 1350 or 1080 × 1080.
+
+This call makes a 9:16 copy and saves it:
+
+```json
+{ "shape": "9:16", "path": "/Volumes/Work/Interview vertical.framejob" }
+```
+
+It answers these keys beside `ok: true`:
+
+| Key | What it holds |
+| --- | --- |
+| `canvas` | The new `width` and `height`. |
+| `cached` | False when an analysis ran first. |
+| `clips` | One row per clip with a picture, in id order: `clip`, `treatment`, and `reason` when it did less than asked. Clips on a re-paged caption track have no row. They're in `captions`. |
+| `cursor` | The clips followed by their cursor. |
+| `speaker` | The clips framed on whoever is talking, each `clip`, `mics` and `mic_faces`. |
+| `relaid` | Each re-laid switch, in time order: `camera`, `at` (ticks), `from`, `to` and, for a corner, `shape`. `from` and `to` are `switch_layout`'s layout words. |
+| `backgrounds` | Whether the **Backgrounds** track was kept. |
+| `more_tracks` | How many further tracks were made behind it, where clips overlap. |
+| `re_eased` | How many actions were eased again at a cut. |
+| `moves_carried` | How many actions carry a framing move. |
+| `summary` | The same text the sheet shows, in sentences. |
+| `captions` | `relaid` and `kept`, as `relay_captions` answers them. It's absent with `captions: false`. |
+| `graphics` | `resized` (a count), `updated` (names) and `listed` (each `name` and `reason`). |
+| `project` | The summary of the copy, or of the project you named. |
+| `carried` | A copy only: the `files`, `bytes` and `seconds` carried over. |
+| `saved` | With `path`: where the copy was saved. |
+
+A clip's `treatment` is one of:
+
+| `treatment` | What happened |
+| --- | --- |
+| `followed` | It follows its subject, cursor or speaker. |
+| `whole` | It's shown whole on a blurred copy for its full length. |
+| `kept` | It's kept as placed, rescaled from the old canvas. |
+| `refilled` | A blurred copy or plate is made to fill the new canvas. |
+| `removed` | A blurred copy was removed, because its clip is now framed. |
+| `resized` | A graphic was re-sized to the new canvas. |
+| `relaid` | A camera or screen was re-laid. |
+| `not_followed` | It wasn't followed, and `reason` says why and what it did instead. |
+
+### Subject following
+
+Each movie clip that fills the old frame on one side is framed with `reframe_clip` from the old canvas, using your `follow`, `zoom` and `where_empty`. Where nothing is found, it's shown whole on a blurred copy by default. The copies go on a new **Backgrounds** track at the back, which is removed when nothing needs it.
+
+With `follow: center` the picture's centre is held and nothing is analysed.
+
+- A clip Frame Job won't frame, because it's on a matte track, rotated or spinning, is kept as placed, as `not_followed` with the reason.
+- A movie whose file is missing is kept as placed in the same way, unless `follow` is `center`.
+
+### Screen recordings follow the cursor
+
+A screen recording whose media has a cursor file follows its cursor, never faces, with any `follow` but `center`, which centres it. Its own zooms and pans are replaced. If the cursor file can't be read it's shown whole on a blurred copy, and its `reason` says so.
+
+### `follow: speaker` in a vertical
+
+With `follow: speaker`, a movie clip of two to four people, playing beside two or more of the microphones in `mics`, is framed on whoever is talking, as [`follow: speaker`](#follow-speaker) frames it. Every other movie clip follows its faces.
+
+- Each clip in `mics` stands for its track. Under a shot, the clip used is the one on that track that overlaps the shot most, with its sound on or off. If its sound is off, the shot follows its faces.
+- A clip on a microphone's track is never framed this way, and neither is a screen recording with a cursor file.
+- Faces are matched by Frame Job, or named with `mic_faces`.
+- When one clip can't be framed on the speaker, such as a clip that changes shot, it follows its faces instead and its `reason` says why. The rest of the call goes ahead.
+
+See [Follow the speaker in a vertical](/framing/follow-speaker/).
+
+### Camera layouts re-laid
+
+A camera and the screen behind it laid out with **Clip ▸ Camera Layout ▸** are re-laid, not reframed, with [`follow: layout`](#follow-layout) once per camera. Each switch is solved again for the new canvas at its old time, length and curve, and **Side by Side** becomes **Stacked** on a tall canvas. They're never followed and get no blurred copy.
+
+Their `treatment` is `relaid`. A layout edited by hand is kept as placed, as `not_followed` with the reason. The answer's `relaid` lists each switch.
+
+### Stills, graphics, titles and plates
+
+| The clip | What happens | `treatment` |
+| --- | --- | --- |
+| A still picture or a nest that fills the frame on one side | Centred, with the reason | `not_followed` |
+| A graphic exactly the old canvas's size | Re-sized to the new canvas. Its position and its action ends' positions move by the two sides' ratios, and its scale is kept. | `resized` |
+| A title, a picture-in-picture, a shape or a graphic of another size | Kept as placed, rescaled from the old canvas | `kept` |
+| An old **Blurred Background** copy | Removed when its clip is framed, else made to fill the new canvas | `removed` or `refilled` |
+| A full-frame shape plate, or an image named **Background** | Made to fill the new canvas | `refilled` |
+
+### A copy or in place
+
+By default a new project opens, named `<name> (9:16)`, `(4:5)` or `(1:1)`, holding the change as its one undo step, **Make Vertical**. It carries the project's caches and analysis, and the project you named doesn't change. With `path`, the copy is saved there. The [Assistant](/assistant/what-it-will-not-do/) asks before a call that names a `path`.
+
+With `copy: false`, the change goes into the project you named as one undo step, **Make Vertical**.
+
+### Captions re-paged
+
+Each word caption track is split into pages again for the new canvas, from its own words, as [`relay_captions`](/mcp/tools-captions/#relay_captions) does. A track it can't re-lay is kept as placed. The answer's `captions` lists those `relaid` and those `kept`, each kept one with its reason. With `captions: false`, caption tracks stay as placed and the key is left out. See [Re-lay captions for a canvas](/captions/re-lay-captions/).
+
+### Bundled templates updated
+
+In a copy, the project's own older copies of the bundled `lower-third`, `title-card`, `callout`, `bar-chart`, `counter` and `kinetic-type` templates are rewritten with the current template, which fits a tall canvas. A module is known by its text, never its name, and its old text is kept as its previous revision. The names land in `graphics.updated`.
+
+With `copy: false` nothing is rewritten, and each one is in `graphics.listed` with the reason. A module that sizes itself by the canvas's height is listed either way, because it may not fit the narrow frame.
+
+### Analysis and refusals
+
+The tool analyses the movie clips on your Mac first, as `reframe_clip` does, and waits up to 60 s. A screen recording with a cursor file isn't analysed, and neither is anything with `follow: center`. Past 60 s nothing is made. The answer is `ok: true` with `analyzing` and a `note`, as in [The analysis wait](#the-analysis-wait), so call again.
+
+It's refused, with nothing made, when:
+
+- a nest is open. Leave it with `set_scope` first.
+- `path` is given with `copy: false`
+- another open project holds `path`, or something already exists there
+- the canvas already has that shape
+- the canvas can't change or the **Backgrounds** track can't be added, such as when the project already has too many tracks
+- a clip can't be framed even with `keep`
+- `follow: speaker` has no `mics`, or a clip id in `mics` isn't a clip
+- `follow: speaker` finds no movie clip playing beside two of the microphones
+- a microphone is still being analysed or never speaks
+- the analysis fails or is stopped, or the project or the open nest changes during the wait
+
+## Related
+
+- [Reframe a clip (agents)](/framing/reframe-clip/)
+- [Follow Subject](/framing/follow-subject/)
+- [Camera layouts](/framing/camera-layouts/)
+- [Make Vertical Version](/framing/make-vertical-version/)
+- [What Make Vertical changes](/framing/vertical-what-changes/)
+- [Follow the speaker in a vertical](/framing/follow-speaker/)
+- [Tools: reading analysis](/mcp/tools-analysis/)
+- [Tools: tracks, markers and canvas](/mcp/tools-tracks-and-markers/)
+- [Tools: multicam](/mcp/tools-multicam/)

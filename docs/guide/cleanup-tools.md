@@ -12,7 +12,7 @@ The two commands cut the same way:
 - **One edit.** **Remove** cuts every span and closes the timeline over each one, all as a single undo step: **Undo Remove Silences** or **Undo Remove Filler Words**. One ⌘Z restores everything.
 - **Across the timeline.** A cut is a ripple delete across every **unlocked** track, not just the clips that were analysed, so the picture above a voice-over is cut with it. Locked tracks are neither cut nor moved.
 - **Markers stay where they are.** The sheet's footnote says "markers keep their place."
-- **Frame-accurate edges.** Each cut's start rounds up to the next frame and its end rounds down. That way a cut can leave up to a frame of room tone behind, but it never clips the start of the next word.
+- **Frame-accurate edges.** Each cut's start rounds up to the next frame and its end rounds down. That way a cut can leave up to a frame of room tone behind at each end, but it never clips the start of the next word.
 - **Nests and transitions are protected.** A cut never reaches into a nest clip, because a nest always plays from its first frame and cutting into one would strand the rest of it. A cut also never reaches into a transition's overlap or the area around it. To clean up the audio inside a nest, open it first (**Clip ▸ Open Nest**, ⌘↓) and run the command there, or un-nest it (**Clip ▸ Un-nest**, ⇧⌘G). With a nest open, both commands work on the nest's own timeline.
 - **The rest of the editor waits.** Playback pauses when a sheet opens, and other editing commands are unavailable until you close it.
 
@@ -35,7 +35,7 @@ Silence is measured in the **mix**, as you hear it, not in the raw file:
 
 | Mode | What counts as quiet | Default |
 |---|---|---|
-| Voice | Nobody is talking. An on-device voice-activity model listens to each media file once and keeps its answer with the project. A quiet microphone isn't mistaken for silence, and a hum isn't mistaken for speech. | Yes |
+| Voice | Nobody is talking. An on-device voice-activity model listens to each media file once and keeps its answer with the project. It listens for a voice, not for loudness, so a quiet microphone isn't treated as silence for being quiet, and a hum isn't treated as speech for being loud. | Yes |
 | Level | The sound in the mix is quieter than the threshold. | Used when the voice model can't be used |
 
 In Voice mode, a clip with no voice in it at all, such as music or a tone, is judged by level instead. The sheet names each such clip, for example "Intro music at 00:00:12:00 holds no voice and is judged by level." That is why, in Voice mode, the threshold row is labelled **Level if no voice:**.
@@ -49,7 +49,7 @@ Voice analysis runs on your Mac. Nothing is uploaded.
 | Control | What it does | Default | Range |
 |---|---|---|---|
 | **Judge by:** | Voice or Level, as above. | Voice | n/a |
-| **Quieter than:** (Level mode) / **Level if no voice:** (Voice mode) | A slider in whole dBFS, with the value shown beside it. In Level mode, sound at or below it is quiet. In Voice mode, it judges clips that hold no voice, and a clip the mix turns down below it is quiet whatever it contains. | −40 dBFS | −80 to −10 dBFS |
+| **Quieter than:** (Level mode) / **Level if no voice:** (Voice mode) | A slider in whole dBFS, with the value shown beside it. In Level mode, sound at or below it is quiet. In Voice mode, it judges clips that hold no voice, and a clip the mix turns down to or below it is quiet whatever it contains. | −40 dBFS | −80 to −10 dBFS |
 | **Longer than:** | The shortest quiet stretch worth cutting, in seconds. Shorter pauses, such as the gap between two words, are kept. | 0.5 s | 0.05 to 10 s |
 | **Keep at ends:** | How much of each quiet stretch to keep at each end, in seconds, so speech doesn't start or end abruptly. A stretch shorter than twice this value is not cut. | 0.1 s | 0 to 2 s |
 | **In:** | **Selected clips** analyses only the selected clips. **All audible clips** analyses everything you can hear. | Selected clips when the selection includes something audible, otherwise All audible clips | n/a |
@@ -87,7 +87,7 @@ There is nothing to tune. Each run of consecutive fillers becomes one cut:
 
 - The cut widens outward to a 32 ms speech grid so the whole filler goes, but it never reaches into the words on either side.
 - Its edges then snap inward to the frame grid, as Remove Silences does. A tiny filler can end up too short to cut.
-- A filler is **left in whole**, never trimmed, when cutting it would reach into a word spoken in another clip on any unlocked track, into a nest clip, or into a transition. The sheet counts these: "2 fillers are left in: too short to cut, or cutting would reach another clip's word, a nest or a transition."
+- A filler is **left in whole**, never trimmed, when cutting it would reach into a word spoken in another clip on any unlocked track, into a nest clip, or into a transition or the area around it. The sheet counts these: "2 fillers are left in: too short to cut, or cutting would reach another clip's word, a nest or a transition."
 - A clip on a locked track isn't read, because the cut can neither cut nor move it. The sheet says how many such clips there are.
 - A clip that plays in reverse, whose sound is switched off, whose media file is missing, or whose media has no audio track has no words to read. When nothing in scope plays speech from a media file, the sheet says "Nothing in scope plays speech from a media file, so nothing was read."
 
@@ -118,7 +118,7 @@ Pressing **Transcribe** sends one file:
 - While it runs, the row shows its progress, its button reads **Stop**, the other rows' buttons are disabled, and **Remove** is disabled. Return can't make a cut in the middle of a paid upload.
 - When it finishes, the file drops off the list and its fillers join the count. If the run failed, the reason appears in the note.
 
-**Transcribe** is disabled with no API key (the note, and the button's tooltip, read "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription."; saving a key in Settings turns the buttons on with the sheet still open), for a file no clip plays, and while another file's run is going. A project you haven't saved yet can be transcribed; its transcript is kept with the project when you save. Closing the sheet stops a run in progress.
+**Transcribe** is disabled with no API key (the note, and the button's tooltip, read "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription."; saving a key in Settings turns the buttons on with the sheet still open) and while another file's run is going. If a file goes missing while the sheet is open, its row keeps its estimate and **Transcribe** only beeps, uploading nothing; if another file's run then starts, the row reads "No clip plays this file, so it cannot be transcribed" and leaves the list when that run ends. Relink the file and open the sheet again. A project you haven't saved yet can be transcribed; its transcript is kept with the project when you save. Closing the sheet stops a run in progress.
 
 ### Captions stay clean
 
@@ -133,7 +133,7 @@ An agent can read the words of any clip that plays speech from a media file, eac
 - **Where the words come from.** The file's saved AssemblyAI transcript when it has a current one. Otherwise this Mac's own speech recogniser runs over the clip, which takes under a second per minute of speech (an hour of speech took 41 seconds on an M2 Max). Reading a transcript never uses the network and never uploads anything.
 - **Where a word starts.** An on-device word's start is moved to where its sound begins, using the voice model's answer for the file and its waveform (the recogniser's own start is often early, inside the pause before the word). Until the voice model has heard the file, the starts are the recogniser's and the answer's `note` says so; ask again once it has. AssemblyAI words and every word's end are as transcribed.
 - **Fillers are flagged.** Each word says whether it is a filler. The answer also says whether the transcript was made with filler words at all. An on-device transcript never is, so a filler can be in the audio but missing from the words.
-- **A part of the clip.** A `from`/`to` window in timeline time returns only the words that overlap it; a word crossing an edge comes back whole. With a window, the on-device recogniser hears only that part plus 2 seconds on each side. It is faster, but with less context a windowed answer can differ slightly from a whole-clip one. Either end may be given alone: a missing `from` is the clip's start and a missing `to` its end. The window is clamped to the clip and echoed back as `from`/`to`. An empty window, or one outside the clip, is refused.
+- **A part of the clip.** A `from`/`to` window in timeline time returns only the words that overlap it; a word crossing an edge comes back whole. With a window, the on-device recogniser hears only that part plus 2 seconds on each side. It is faster, but with less context a windowed answer can differ from a whole-clip one. Either end may be given alone: a missing `from` is the clip's start and a missing `to` its end. The window is clamped to the clip and echoed back as `from`/`to`. An empty window, or one outside the clip, is refused.
 - **Saved for next time.** What the on-device recogniser heard is saved in the project, per media file and language. A later request inside a stretch it has already heard comes back at once, even from another clip of the same file at any speed. A saved on-device transcript is used only while the media file and the macOS version are unchanged (the recogniser ships with macOS).
 - **Speed and ramps.** Words are placed through the clip's speed, including a speed ramp, so their times match what plays on the timeline.
 - **Stopping a read.** An on-device read can be long. The assistant's **Stop** ends it, and nothing is saved from a stopped read.
@@ -160,7 +160,7 @@ A false start is a phrase the speaker abandoned or said again. Deciding what cou
 
 1. reads the clip's words and their times;
 2. tells you which words it will cut;
-3. cuts them in one step, each cut running from the first cut word's start to the last cut word's end.
+3. cuts them in one step, each cut running from the first cut word's start to the start of the word after the last cut word, taking at most a second of the pause between them.
 
 It cuts false starts only when you ask. It can also remove fillers the same way **Remove Filler Words** does, and take out silences the way **Remove Silences** does (`detect_silence`, then one `ripple_delete_ranges`). Any cut an agent makes this way, whether silences, fillers or false starts, is one undo step labelled **Undo Ripple Delete**, not the sheet's name. The assistant can't start a paid filler transcription: press **Transcribe** in the sheet yourself. See [The assistant](assistant.md).
 
@@ -169,7 +169,7 @@ It cuts false starts only when you ask. It can also remove fillers the same way 
 - **Filler removal is cloud-only.** Without an AssemblyAI key, filler words can't be found in a file that has no filler transcript yet. A project transcribed before filler words were requested is transcribed again, and billed again, before its fillers can be cut.
 - **The service can miss a filler.** A filler AssemblyAI doesn't return isn't cut. A filler it returns that isn't on the list stays in, both in the cut and in captions.
 - **Protection needs a transcript.** A filler cut is kept away from speech in another clip only when that clip's file has a transcript. Speech on another unlocked track with no transcript isn't protected.
-- **Up to a frame can remain.** Inward frame snapping can leave a frame of room tone, or of a filler, behind.
+- **Up to a frame can remain.** Inward frame snapping can leave up to a frame of room tone, or of a filler, behind at each end of a cut.
 - **Wait for analysis.** After import, Remove Silences proposes nothing inside a file until its analysis is ready: the waveform in Level mode, the voice analysis in Voice mode (and the waveform too for a clip with no voice), except where the mix already makes it quiet.
 - **Voice mode can miss a soft first word** in a quiet recording; raise **Keep at ends:** if a word is clipped.
 - **Singing and voice-like instruments** may read as speech.

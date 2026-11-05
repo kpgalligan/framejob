@@ -1,0 +1,112 @@
+---
+title: "Remove Filler Words"
+description: "Find the ums and uhs in your speech, see what would go, and cut them all as one edit."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Remove Filler Words finds the ums and uhs in your speech, shows you what it would cut, and cuts them at the words' own timings, all as one undo step. There's nothing to tune.
+
+<AtAGlance
+  menu="Clip ▸ Remove Filler Words…"
+  tools={['detect_fillers', 'transcribe_for_fillers', 'ripple_delete_ranges', 'get_transcript', 'get_timeline_transcript']}
+  needs="An AssemblyAI key, unless a file it would read already has a transcript made with filler words."
+/>
+
+## Remove the filler words
+
+<Steps>
+
+1. If you only want some clips read, select them. On a show with cameras and separate microphones, select the microphones, so the cameras' sound isn't read as well. See [Which clips are read](#which-clips-are-read).
+
+2. Choose **Clip ▸ Remove Filler Words…**. It's after **Remove Silences…** and has no keyboard shortcut.
+
+3. If the sheet lists files with no filler transcript yet, press **Transcribe** beside each one you want read. This uploads the file's audio to AssemblyAI and costs money, so the sheet shows the estimate first. See [Transcripts for filler words](/cleanup/filler-transcripts/).
+
+4. Check what's shaded on the timeline, and read the count in the sheet, such as "3 cuts · removes 00:00:01:12".
+
+5. Choose **Remove**, or **Cancel** to leave the timeline as it was. Closing the sheet also stops a transcription that's still running.
+
+</Steps>
+
+**Remove** is off while the sheet reads "No cuts" and while a transcription is running. One <kbd>⌘Z</kbd> puts everything back, because the whole cut is a single **Remove Filler Words** undo step.
+
+The command is available when the timeline has a clip that plays sound from a media file, forwards, with its sound on, and you've either set an AssemblyAI key or a file it would read already has a transcript made with filler words. With neither, it's greyed and reads **Remove Filler Words… (needs your AssemblyAI key)**. See [Your AssemblyAI key](/captions/assemblyai-key/).
+
+## Which words are fillers
+
+A word counts as a filler when it's on this fixed list, ignoring capitals and any punctuation at its ends:
+
+um · uh · hmm · mhm · uh-huh · ah · huh · hm · m · er · erm
+
+"Uh huh" written as two words matches as two fillers, and "uh-huh" matches as one.
+
+:::caution
+The list can't be changed, and the sheet can't keep a single filler. A real "ah" or "er", or the letter "M" said aloud, is treated as a filler too, so check the shading before you choose **Remove**.
+:::
+
+## Which clips are read
+
+Remove Filler Words reads the selected clips when the selection includes speech from a media file, and the sheet then says "Only the selected clips are read." Otherwise it reads every clip. The sheet has no menu for this, so make the selection first.
+
+Some clips can't be read:
+
+| Clip | What happens |
+| --- | --- |
+| It's on a locked track | Its fillers aren't read, because the cut can neither cut nor move it. The sheet counts them: "1 clip is on a locked track, which the cut neither cuts nor moves, so its fillers were not read." |
+| It plays in reverse, its sound is switched off, its file is missing, or its file has no audio track | It has no words to read, and it's passed over without a note. |
+| It's a [nest](/editing/nests/) | The words inside a nest aren't read from outside it. Open the nest with <kbd>⌘↓</kbd> and run the command there, where it works on the nest's own timeline. |
+
+When none of those clips has words to read, the sheet says "Nothing in scope plays speech from a media file, so nothing was read."
+
+## What gets cut
+
+Each run of consecutive fillers becomes one cut. A run ends at the next real word, so two fillers with a pause between them and no word go together, pause included. The pauses before and after a run stay. [Remove Silences](/cleanup/remove-silences/) takes those out.
+
+The cut is placed to take the whole filler and nothing else:
+
+- It widens outward to the speech grid, the 32 ms steps Frame Job measures speech in, so all of the filler goes. It never reaches into the words on either side.
+- Its edges then snap inward to whole frames, as Remove Silences' do. Up to a frame of the filler can remain at each end.
+
+Cuts that touch or overlap join into one, and the count in the sheet is of the joined cuts.
+
+After that it's a normal clean-up cut. It runs across every unlocked track, closes the timeline over each cut, and markers keep their place. See [How a clean-up cut works](/cleanup/how-cleanup-cuts-work/).
+
+## Fillers left in whole
+
+A filler is never trimmed. Frame Job leaves the whole run in when:
+
+- It's too short to cut. A tiny filler can end up with nothing left once it's on both grids.
+- Cutting it would reach a word spoken in another clip on any unlocked track, whether or not that clip is being read. The cut runs across every unlocked track, so it would take that word with it.
+- Cutting it would reach a nest clip on an unlocked track.
+- Cutting it would reach a transition on an unlocked track, or the area around one.
+
+The sheet counts these, one for each run: "2 fillers are left in: too short to cut, or cutting would reach another clip's word, a nest or a transition."
+
+## Good to know
+
+- **Protection needs a transcript.** A cut is kept away from speech in another clip only when that clip's file has a kept AssemblyAI transcript, made with or without filler words. Speech on another unlocked track with no such transcript isn't protected, so check the shading there.
+- **The service can miss a filler.** A filler AssemblyAI doesn't return isn't cut. One it returns that isn't on the list stays in, both in the cut and in your captions.
+- **A filler belongs to the clip it starts in.** It's read when it starts inside the part of the file the clip plays.
+
+## With an agent
+
+`detect_fillers` reads the same ranges the sheet would cut and changes nothing. Pass them to `ripple_delete_ranges` to make the cut. Any cut made this way is one undo step called **Ripple Delete**, not **Remove Filler Words**.
+
+- An agent can name the clips to read. Left to itself, it follows the same selection rule as the sheet.
+- `detect_fillers` only reads transcripts that are already saved, so it needs no key and never uses the network. It names the files that have none.
+- `transcribe_for_fillers` makes a transcript for one of those files. It's a paid upload, and the built-in Assistant can't use it, so press **Transcribe** in the sheet yourself.
+- Where the sheet counts, an agent gets detail: every run that's left in with its own reason, every clip on a locked track, and every named clip it couldn't read.
+- `get_transcript` and `get_timeline_transcript` mark each word that's on the [filler list](#which-words-are-fillers).
+
+See [`detect_fillers`](/mcp/tools-clean-up/#detect_fillers), [`transcribe_for_fillers`](/mcp/tools-clean-up/#transcribe_for_fillers) and [`ripple_delete_ranges`](/mcp/tools-cut-and-delete/#ripple_delete_ranges).
+
+## Related
+
+- [Transcripts for filler words](/cleanup/filler-transcripts/)
+- [Your AssemblyAI key](/captions/assemblyai-key/)
+- [How a clean-up cut works](/cleanup/how-cleanup-cuts-work/)
+- [Remove Silences](/cleanup/remove-silences/)
+- [Cut false starts](/cleanup/false-starts/)
+- [Cut by deleting words](/captions/delete-words/)

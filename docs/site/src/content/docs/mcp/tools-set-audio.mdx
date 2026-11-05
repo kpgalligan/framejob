@@ -1,0 +1,230 @@
+---
+title: "Tools: clip sound (set_audio)"
+description: "The Sound tab's settings through one agent tool: volume, fades, ducking, pan, EQ, dynamics, voice isolation and voice effects."
+---
+
+`set_audio` is how an agent changes a clip's sound: its volume, fades, ducking, pan, EQ and every other setting in the [Sound tab](/audio/sound-tab/). You name the clips and send only what should change, and the rest of each clip's sound stays as it is.
+
+## `set_audio`
+
+Changes the base sound settings of one or more clips, as one undo step. Read them back with [`get_project`](/mcp/get-project/), where they're under each clip's `audio`.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | Yes | The clip ids. At least one. |
+| `patch` | object | Yes | The settings to merge. Each key is described below. |
+| `scope` | integer | No | Look the clips up inside this nest. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+```json
+{
+  "clips": [12, 15],
+  "patch": {
+    "volume": 0.8,
+    "eq": { "high_pass": { "frequency": 100 } },
+    "gate": {}
+  }
+}
+```
+
+The patch follows the rules of [Patches](/mcp/patches/):
+
+- A key you leave out keeps what's stored.
+- `duck`, `compressor`, `limiter`, `eq` and each of its slots, `hum`, `gate`, `leveller`, `de_esser` and `voice` are objects, and they merge key by key.
+- `null` on one of those clears it, so `{"duck": null}` turns ducking off.
+- An empty object turns `duck`, `compressor`, `limiter`, `hum`, `gate`, `leveller`, `de_esser` or an EQ slot on at its defaults, so `{"limiter": {}}` adds the limiter.
+
+**Answers** with the [project summary](/mcp/what-a-call-answers/). A patch that changes nothing answers "made no change".
+
+**Refuses** a key it doesn't know, naming its path, and a value out of range, naming the key and the value you sent. Nothing is clamped. A clip with no sound settings, such as a text clip, is refused by id.
+
+All times in the patch are ticks, 600,000 to the second.
+
+### Volume and mute
+
+| Key | Type | What it does |
+| --- | --- | --- |
+| `volume` | number | The clip's gain, from 0 to 32. 1 is unity. |
+| `muted` | boolean | Mutes the clip. |
+
+See [Clip volume](/audio/volume/).
+
+### Fades and fade shapes
+
+| Key | Type | What it does |
+| --- | --- | --- |
+| `fade_in`, `fade_out` | integer | The fade's length in ticks, 0 or more. |
+| `fade_in_shape`, `fade_out_shape` | string | The fade's curve: `linear` (the default), `s_curve`, `plus_3db`, which moves fastest near silence, or `minus_3db`, which moves fastest near full level. |
+
+The shapes are the **Fades** section's **In shape** and **Out shape**. See [Audio fades](/audio/fades/).
+
+### Ducking
+
+`duck` lowers other sound while this clip plays, or only while its speech plays.
+
+| `duck` key | Range | Default | What it does |
+| --- | --- | --- | --- |
+| `level` | 0 to 1 | 0.2 | What the other sound is multiplied by. |
+| `attack` | 0 or more ticks | 300,000 (0.5 s) | How long the sound takes to go down. |
+| `release` | 0 or more ticks | 600,000 (1 s) | How long it takes to come back. |
+| `mode` | `extent` or `speech` | `extent` | `extent` ducks for the clip's whole length. `speech` ducks only while its speech plays. |
+| `pre_roll` | 0 or more ticks | 300,000 (0.5 s) | With `speech`, how far before each stretch of speech to start. |
+| `hold` | 0 or more ticks | 300,000 (0.5 s) | With `speech`, how far after it to hold. |
+
+`mode: "speech"` is **Speech** in the **Ducking** section's **Duck by** pop-up. It saves the media's detected speech in the same undo step, so it needs on-device speech detection to have finished. It's an error for a clip that isn't a media clip with sound, and for one whose speech hasn't been detected yet, which says to try again in a moment. To write the speech spans yourself, use [`set_media_speech`](/mcp/tools-media/#set_media_speech).
+
+See [Ducking](/audio/ducking/) and [Duck by Speech](/audio/duck-by-speech/).
+
+### Mono, keep pitch, pan and channels
+
+| Key | Type | What it does |
+| --- | --- | --- |
+| `mono` | boolean | Plays the clip in mono. |
+| `keep_pitch` | boolean | Keeps the sound's pitch at a new speed. A clip starts with this on. |
+| `pan` | number | From −1 hard left to 1 hard right. |
+| `channels` | string | `both` (the default), `left`, `right` or `swapped`. `left` and `right` play that channel of a stereo source from both sides, and `swapped` exchanges them. It comes after isolation and any voice effect, and a mono source ignores it. |
+
+See [Pan and Mix to mono](/audio/pan-and-mono/), [Keep pitch](/speed/keep-pitch/) and [Channels](/audio/channels/).
+
+### Compressor and limiter
+
+| `compressor` key | Range | Default |
+| --- | --- | --- |
+| `threshold_db` | −60 to 0 dB | −18 |
+| `ratio` | 1 to 20 | 3 |
+| `attack` | 0 or more ticks | 6,000 (10 ms) |
+| `release` | 0 or more ticks | 120,000 (200 ms) |
+| `makeup_db` | 0 to 24 dB | 0 |
+
+`limiter` is a true-peak limiter, last in the clip's chain. Its ceiling holds after the clip's base volume.
+
+| `limiter` key | Range | Default |
+| --- | --- | --- |
+| `ceiling_db` | −24 to 0 dBTP | −1 |
+| `release` | 600 to 600,000 ticks | 60,000 (100 ms) |
+
+See [Compressor](/audio/compressor/) and [Limiter](/audio/limiter/). A track has its own pair, set with [`set_track`](/mcp/tools-tracks-and-markers/#a-tracks-compressor-and-limiter).
+
+### Noise reduction and voice isolation
+
+| Key | Range | What it does |
+| --- | --- | --- |
+| `noise_reduction` | 0 to 1 | Reduces noise in the clip's sound. |
+| `isolation` | 0 to 1 | Isolates a voice with Apple's on-device model, which also reduces room echo. 0 is off, 0.8 is the app's default and 1 leaves silence between words. |
+
+Isolation is rendered offline. The clip plays without it until the render finishes, and an export waits for it. A clip not at ×1 plays without it.
+
+See [Noise Reduction](/audio/noise-reduction/) and [Voice Isolation](/audio/voice-isolation/).
+
+### EQ
+
+`eq` has seven slots, after the channel pick. Each slot is `null` for off, or an object.
+
+| Slot | Keys | Default |
+| --- | --- | --- |
+| `high_pass` | `frequency` 20 to 20,000 Hz, `slope` 12 or 24 dB/octave | 80 Hz, 12 |
+| `low_shelf` | `frequency`, `gain_db` −24 to 24 dB | 100 Hz, 0 dB |
+| `band_1`, `band_2`, `band_3` | `frequency`, `gain_db`, `q` 0.1 to 10 | 1,000 Hz, 0 dB, 1 |
+| `high_shelf` | `frequency`, `gain_db` | 8,000 Hz, 0 dB |
+| `low_pass` | `frequency`, `slope` | 12,000 Hz, 12 |
+
+`bypass: true` keeps the settings and silences them. `{"eq": {"high_pass": {}}}` turns one slot on at its defaults.
+
+The inspector's buttons are these moves:
+
+| Button | Patch |
+| --- | --- |
+| **Rumble Cut** | `high_pass` at 80 Hz, slope 24 |
+| **De-mud** | `band_1` at 300 Hz, −3 dB, Q 1 |
+| **Presence** | `band_3` at 4,000 Hz, +3 dB, Q 1 |
+
+See [EQ](/audio/eq/).
+
+### Hum removal
+
+`hum` notches out mains hum and its harmonics, after the EQ.
+
+| `hum` key | Range | Default |
+| --- | --- | --- |
+| `frequency` | 50 or 60 Hz | 60 |
+| `depth_db` | 6 to 60 dB | 30 |
+| `harmonics` | 1 to 8 | 4 |
+
+See [Hum removal](/audio/hum-removal/).
+
+### Gate
+
+`gate` turns the pauses down. It's a downward expander, after noise reduction. For each dB the sound falls below the threshold, the level drops by a further `ratio` − 1 dB, and never by more than `range_db` in all.
+
+| `gate` key | Range | Default |
+| --- | --- | --- |
+| `threshold_db` | −40 to 0 dB, relative to the clip's measured loudness | −10 |
+| `ratio` | 1 to 20 | 4 |
+| `range_db` | 1 to 80 dB | 20 |
+| `attack` | 0 to 60,000 ticks | 600 (1 ms) |
+| `hold` | 0 to 300,000 ticks | 30,000 (50 ms) |
+| `release` | 600 to 1,200,000 ticks | 60,000 (100 ms) |
+
+The loudness it's relative to is what [`normalize_clip`](/mcp/tools-audio/#normalize_clip) reports, before the clip's volume. See [Gate](/audio/gate/).
+
+### Leveller
+
+`leveller` evens out a speaker who moves on and off the microphone, after the gate. It's a gain curve made ahead of time from the clip's measured loudness and its speech, so it sounds the same in the preview and an export.
+
+| `leveller` key | Range | Default |
+| --- | --- | --- |
+| `target_db` | −20 to 10 dB, relative to the clip's loudness | 0 |
+| `max_up_db` | 0 to 24 dB | 12 |
+| `max_down_db` | 0 to 24 dB | 12 |
+| `response` | 300,000 to 6,000,000 ticks | 1,200,000 (2 s) |
+
+Each phrase's level is brought to `target_db`, never more than the two limits. A pause holds the gain and glides to the next phrase over its last 0.25 s, and a phrase under 1 s takes its neighbour's gain.
+
+It waits for the clip's speech as well as its loudness. It does nothing where speech detection isn't available or no phrase has 1 s of speech. See [Leveller](/audio/leveller/).
+
+### De-esser
+
+`de_esser` comes after the leveller. It turns the band above `frequency` down on sibilance and never boosts it.
+
+| `de_esser` key | Range | Default |
+| --- | --- | --- |
+| `frequency` | 2,000 to 12,000 Hz | 6,000 |
+| `threshold_db` | −30 to 20 dB, relative to the clip's loudness | 0 |
+| `range_db` | 1 to 24 dB | 6 |
+
+The gate, leveller and de-esser act only once the clip's loudness is measured. Until then the clip plays without them, and an export waits. A clip too short or too quiet to measure plays without them, and on a nest clip they do nothing. See [De-esser](/audio/de-esser/).
+
+### Voice effects
+
+`voice` replaces the clip's sound with a rendered effect, after isolation and before the channel pick.
+
+| `voice` key | Range | Default | What it does |
+| --- | --- | --- | --- |
+| `kind` | See below | None | Which effect. Needed when the clip has no voice effect yet. |
+| `amount` | 0 to 1 | 1 | How much of the effect. 0 plays the clip dry. |
+| `pitch` | −12 to 12 semitones | The kind's own: 0 for `pitch`, +5 for `high`, −5 for `deep` | Read only by `pitch`, `high` and `deep`. |
+
+| Group | Kinds |
+| --- | --- |
+| Voice | `pitch`, `high`, `deep`, `robot` |
+| Tone | `bass`, `treble`, `bright`, `telephone`, `radio` |
+| Character | `lofi`, `distorted` |
+| Space | `echo`, `room`, `hall`, `plate`, `cathedral` |
+
+A new `kind` keeps a stored `pitch` unless you send `pitch: null` with it. `{"voice": null}` clears the effect.
+
+The clip plays without the effect until its render finishes, and an export waits for it. A clip not at ×1 plays without it, and reverb and echo tails end with the clip. See [Voice effects](/audio/voice-effects/).
+
+## Animate sound
+
+`set_audio` sets the clip's base values. To change one over time, use an action's `set_action_end`. See [Tools: animation](/mcp/tools-animation/) and [Animate sound with actions](/audio/animate-sound/).
+
+Volume, mute, the fades, `pan`, `mono`, `channels`, `eq`, `hum`, `noise_reduction`, `gate`, `leveller`, `de_esser`, `compressor`, `limiter` and `isolation` can all animate. `duck`, `keep_pitch`, the fade shapes and `voice` can't, and only `set_audio` sets them.
+
+## Related
+
+- [The Sound tab](/audio/sound-tab/)
+- [How audio works](/audio/how-audio-works/)
+- [Animate sound with actions](/audio/animate-sound/)
+- [Patches](/mcp/patches/)
+- [Tools: audio](/mcp/tools-audio/)
