@@ -1,0 +1,62 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M6MYBAFWVP4HTD1G8K9SKFYY",
+  "strategy": "manual-commit",
+  "branch": "worktree-help-docs",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "CLAUDE.md",
+    "docs/guide/assistant.md",
+    "docs/guide/mcp.md",
+    "docs/guide/settings.md",
+    "docs/manual-checks.md",
+    "docs/site/src/content/docs/assistant/context-and-compaction.mdx",
+    "docs/site/src/content/docs/assistant/conversation.mdx",
+    "docs/site/src/content/docs/assistant/privacy.mdx",
+    "docs/site/src/content/docs/assistant/set-up.mdx",
+    "docs/site/src/content/docs/assistant/what-it-can-do.mdx",
+    "docs/site/src/content/docs/assistant/what-it-will-not-do.mdx",
+    "docs/site/src/content/docs/captions/assemblyai-key.mdx",
+    "docs/site/src/content/docs/mcp/overview.mdx",
+    "docs/site/src/content/docs/reference/settings.mdx",
+    "docs/site/src/data/features.json",
+    "tools/proof/README.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0,
+    "subagent_tokens": {
+      "input_tokens": 84,
+      "cache_creation_tokens": 811692,
+      "cache_read_tokens": 3741825,
+      "output_tokens": 82669,
+      "api_call_count": 42
+    }
+  },
+  "redaction": {
+    "replacements": 20,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 20,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}
