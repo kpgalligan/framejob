@@ -4342,10 +4342,12 @@ free.
   (`record_screen`; `close_project`; `transcribe` only with
   `engine: "assemblyai"`; every dev tool, from `AgentServer.devToolNames`) and ask-first (`export`,
   `export_captions`, `save_project`, `consolidate_media`, `export_graphic`,
-  and `new_project_from_range` only with `path` — `AssistantToolRow.askOnlyWith`,
+  and `new_project_from_range`, `make_vertical_version`, `new_project`,
+  `render_frame` and `render_graphic` only with `path` — `AssistantToolRow.askOnlyWith`,
   after which the question is nil and the lane runs the call unasked,
-  CJ-52), a reason on every row; the refusal sentence, the question (main only: the path the call
-  writes, tilde-expanded, and whether a file is already there — "REPLACES")
+  CJ-52), a reason on every row; the refusal sentence, the question (main only: the file the call
+  will write, through the handler's own destination, and whether something is already
+  there — "REPLACES"; nil for a call that can only be refused on its path, AI-21)
   and the assistant's catalog, which drops only an unconditional withheld row.
 - `AssistantSession.swift` · `AssistantHelperInput.swift` — one window's
   assistant conversation (road map

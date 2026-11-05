@@ -303,8 +303,8 @@ do {
 do {
     let refusal = AssistantToolTable.refusal(tool: "transcribe_for_fillers", arguments: ["media": 1])
     let want = "transcribe_for_fillers is not available to the assistant: Audio leaves the "
-        + "machine only by name, with the price in front of the person (spec §11 R6-2). Use "
-        + "Clip ▸ Remove Filler Words…, which shows what is uploaded and what it costs."
+        + "machine only by name, with the price in front of the person. Use Clip ▸ Remove "
+        + "Filler Words… instead."
     let kept = AssistantToolTable.assistantCatalog([
         ["name": "detect_fillers"], ["name": "transcribe_for_fillers"],
     ]).compactMap { $0["name"] as? String }

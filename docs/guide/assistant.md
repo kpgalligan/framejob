@@ -85,6 +85,7 @@ Errors you may see:
 
 - "API error *status*: *message*": Anthropic refused or failed the request (a bad key, a rate limit, an outage). Rate limits, outages and connection failures are retried up to three times before this appears. A bad key fails at once.
 - "The reply was cut off at the output limit."
+- "The reply was cut off because the conversation filled the model's context window."
 - "The model declined this request."
 - "The assistant helper stopped. Clear the conversation to start a new one."
 
@@ -135,27 +136,26 @@ The assistant works only on its own window's project. A tool call that names ano
 
 ### Tools it asks about first
 
-Five tools ask first: `export`, `export_captions`, `save_project`, `consolidate_media` and `export_graphic`; a sixth, `new_project_from_range`, asks only when it names a `path` (without one it opens an untitled project and writes no package); and a seventh, `make_vertical_version`, asks only when it names a `path` too. Before each one runs, the tab shows the ask-first row, "The assistant asks first:", with a sentence that says what will happen, and **Allow** and **Deny** buttons:
+Five tools ask first: `export`, `export_captions`, `save_project`, `consolidate_media` and `export_graphic`. Five more ask only when the call names a `path`: `new_project_from_range`, `make_vertical_version` and `new_project` (without one they write no package), and `render_frame` and `render_graphic` (without one they write a temporary file). Before each one runs, the tab shows the ask-first row, "The assistant asks first:", with a sentence that says what will happen, and **Allow** and **Deny** buttons:
 
 | Tool | The question reads |
 |---|---|
 | `export` | "export writes *path*", or "export REPLACES *path*" when a file is already there |
 | `export_captions` | "export_captions writes *path*" (or REPLACES) |
-| `save_project` | "save_project writes *path*" (or REPLACES); "save_project writes a file" when no path is known |
-| `consolidate_media` | "consolidate_media copies every referenced file into *package*/media", or "… into the project's package" when the project has never been saved |
+| `save_project` | "save_project writes *path*" (or REPLACES), `.framejob` added when missing |
+| `consolidate_media` | "consolidate_media copies every referenced file into *package*/media" |
 | `export_graphic` | "export_graphic writes *path*" (or REPLACES), `.fjgraphic` added when missing |
 | `new_project_from_range` | "new_project_from_range writes *path*", `.framejob` added when missing (only with a `path`) |
 | `make_vertical_version` | "make_vertical_version writes *path*", `.framejob` added when missing (only with a `path`) |
+| `new_project` | "new_project writes *path*" (or REPLACES), `.framejob` added when missing (only with a `path`) |
+| `render_frame` | "render_frame writes *path*" (or REPLACES), with the format's extension (only with a `path`). A scope the call asks for is written beside the picture, and the sentence goes on ", and REPLACES *path*.waveform.json" when that file is already there |
+| `render_graphic` | "render_graphic writes *path*" (or REPLACES), `.png` added when missing (only with a `path`) |
 
-A `~` in the path is expanded before the question is asked, so the sentence shows the full path.
+The path in the sentence is the file the tool will write, with the extension Frame Job adds or corrects, and REPLACES means something is already at that file. A `~` in the path is expanded before the question is asked, so the sentence shows the full path. If another argument can't be read, such as a preset Frame Job doesn't have, the sentence keeps the path as the assistant gave it, and the call is refused after **Allow** with nothing written. A folder that doesn't exist is refused after **Allow** the same way.
 
-`new_project_from_range` and `make_vertical_version` never replace anything. With something already at the path the question reads REPLACES, but after **Allow** nothing is written, and the assistant is told to choose a new path.
+Frame Job doesn't ask about a call it can only refuse because of its path. The assistant gets the reason instead, and nothing is written. That covers a call with no path where one is needed (`export`, `export_captions` and `export_graphic`, and `save_project` or `consolidate_media` in a project that has never been saved), a path another open project holds, and, for `new_project_from_range` and `make_vertical_version`, which never replace anything, a path with something already there.
 
-A project that has never been saved needs a path. If `save_project` has none, the question reads "save_project writes a file" and nothing is written after **Allow**.
-
-For `export`, `export_captions` and `save_project`, the sentence shows the path as the assistant wrote it. Frame Job adds or corrects the file extension as it writes, and REPLACES looks only at the path in the sentence, so a question that reads "writes" can still replace a file at the corrected name.
-
-Other tools the assistant can call write files without asking: `render_frame` and `render_graphic` write a picture (to a temporary file, or to a path the model names); `write_graphic`, `import_graphic_font`, `import_graphic_asset` and `import_graphic` write graphics modules, fonts and assets into the project's package; and `new_project` with a `path` saves a blank project there, replacing whatever is at that path unless an open project holds it.
+Other tools the assistant can call write files without asking: `render_frame` and `render_graphic` with no `path` write a picture to a temporary file, and `write_graphic`, `import_graphic_font`, `import_graphic_asset` and `import_graphic` write graphics modules, fonts and assets into the project's package.
 
 While a question waits, the **Assistant** tab title shows a small dot, whichever inspector tab you are on. Answer with a click: Return never answers a question. Nothing runs until you click **Allow**. **Deny** tells the assistant you declined, and it won't retry that call in the same turn unless you ask. Stopping the turn, ending the conversation (**Clear**, a key or model change, closing the window) or the helper stopping each count as a decline. Other windows' assistants and agents over MCP keep working while one window waits for an answer.
 
@@ -188,7 +188,7 @@ The bar under the figure fills in the accent colour and turns coral past 80%.
 
 **Compaction.** With **Compact when context reaches** on, the conversation is summarised at the end of the first turn that passes the threshold, never in the middle of a turn. The summary keeps what you asked for and your stated preferences, the project and the clips, tracks, markers and media involved, the edits made and undone, and what is still open. The transcript notes "Compacting the conversation (*N* tokens)…" and then "Compacted: *N* → about *M* tokens. Earlier renders are gone; the assistant re-renders when it needs to look.". If no summary comes back, the note says compaction didn't finish and that it will try again after the next turn. The summary request is priced like any other response.
 
-With compaction off, nothing summarises a conversation, so it keeps growing toward the model's window. What happens when the window is full is Anthropic's to decide. A reply that reaches the end of the window stops where it got to, with no error line and nothing to say it was cut short, and a refused request shows as an "API error" line. **Clear** starts a new conversation.
+With compaction off, nothing summarises a conversation, so it keeps growing toward the model's window. What happens when the window is full is Anthropic's to decide. A reply that reaches the end of the window stops where it got to, with the error line "The reply was cut off because the conversation filled the model's context window.", and a refused request shows as an "API error" line. **Clear** starts a new conversation.
 
 **Clearing old tool results.** With **Clear old tool results past 150,000 tokens** on, Anthropic may drop older tool results from what the model sees once the conversation passes 150,000 tokens. It keeps the five most recent, clears at least 50,000 tokens at a time, and can happen mid-turn. Each clearing adds a note, "Cleared *N* old tool results (*M* tokens) from the model's view.", and costs a fresh prompt-cache write. The model may have to fetch something again after a clearing.
 
@@ -234,7 +234,7 @@ When you use the assistant, these go to Anthropic, under your key:
 - what the tools answer: the project's details as JSON (including media file paths), clip transcripts it reads, refusals and other results
 - the frames it renders to look at the picture
 
-Frame Job doesn't send any of this anywhere else. Audio never goes to the cloud transcriber from the assistant (see [Tools it will not call](#tools-it-will-not-call)). The assistant asks before it exports a movie, captions or a graphic, saves the project, consolidates media, or writes a project made from a range or a vertical version to a path; other tools can still write files without asking (a rendered picture, graphics modules, fonts and assets in the project's package, and a blank project saved to a path). Once a day at most, the helper downloads LiteLLM's public price table from GitHub. That request carries no key and no project data.
+Frame Job doesn't send any of this anywhere else. Audio never goes to the cloud transcriber from the assistant (see [Tools it will not call](#tools-it-will-not-call)). The assistant asks before it exports a movie, captions or a graphic, saves the project, consolidates media, or writes a new project, a project made from a range, a vertical version, a rendered frame or a contact sheet to a path; other tools can still write files without asking (a temporary picture, and graphics modules, fonts and assets in the project's package). Once a day at most, the helper downloads LiteLLM's public price table from GitHub. That request carries no key and no project data.
 
 Everything else stays on your Mac: the key file, the spend ledger and the cached price table, `anthropic-prices.json`, all in `~/Library/Application Support/Frame Job/`. The conversation itself is kept in memory only, and goes when you clear it or close the window.
 

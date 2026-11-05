@@ -31,7 +31,7 @@ Ask in your own words, for example "put a title over the first five seconds". Yo
 
 It can open, create and save projects, move the playhead, set the in and out range, change the selection, and enter or leave a nest. It can also make a [new project from a range](/projects/new-project-from-range/) or a [vertical version](/framing/make-vertical-version/).
 
-Saving asks first. Making a new project from a range or a vertical version asks first when it names where to save. A blank new project [doesn't ask](/assistant/what-it-will-not-do/#file-writes-that-do-not-ask), even when it names where to save. Moving the playhead, setting the range and changing the selection aren't edits, so they make no undo step.
+Saving asks first. Making a blank new project, a new project from a range or a vertical version asks first when it names where to save. Moving the playhead, setting the range and changing the selection aren't edits, so they make no undo step.
 
 A project it opens or creates gets a window of its own, and the Assistant stays with the project it started in.
 
@@ -125,7 +125,7 @@ See [Cut false starts](/cleanup/false-starts/).
 
 The Assistant checks its work by rendering a frame of the finished timeline, drawn the way an export draws it. It's told to look before and after a visual edit. It renders at the playhead unless it picks a time, and it's told to keep the image small.
 
-Rendering writes a picture file without asking. By default that's a temporary file.
+Rendering writes a temporary picture file [without asking](/assistant/what-it-will-not-do/#file-writes-that-do-not-ask). Rendering to a path it chose [asks first](/assistant/what-it-will-not-do/#what-each-question-reads).
 
 :::note
 The frames it renders go to Anthropic, along with your messages and the project's details. See [Assistant privacy](/assistant/privacy/).

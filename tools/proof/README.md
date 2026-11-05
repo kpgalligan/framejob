@@ -30053,3 +30053,20 @@ python3 tools/proof/docs_site_proof.py --selftest            # CONTROL + M1..M11
 A new menu file is picked up by its name (`AppDelegate+*Menu*.swift`); a new tool by its catalog
 file (`AgentCatalog*.swift`). The screenshots' own rule is `docs/site/scripts/import-screens.mjs`,
 which refuses a capture that shows a local path.
+
+## What the Assistant asks and promises (`docs_bugs_c1_proof.py`)
+
+Docs bugs batch c1 (#461, #462, #494, #483, #484, #510, spec §11 AI-21). Real turns in the built app
+against `anthropic_fake.py`, with the dummy `proof-key` in a scratch `-RCSecretFolder`: the stand-in
+scripts the model's `tool_use`, and the lane, the question, Allow through the tab and the handler are
+the app's own. Files are hashed before and after. Q rows are the file the question names, N the three
+new rows, S `render_frame`'s scope files, R and H the calls that get no question, P a `null` path, I
+the two ⓘ sentences in the binary, C a reply stopped by the context window, and T the refusal whole in
+its transcript line. The docstring lists every row and marks the controls; every other row is red on
+a build from before AI-21.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_c1_proof.py [--only Q1,N1]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_c1_proof.py
+python3 tools/proof/docs_bugs_c1_proof.py --mutant <name>
+```

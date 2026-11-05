@@ -6,6 +6,9 @@ import Foundation
 /// here, refuses a path whose folder does not exist through `requireFolder`,
 /// and the three that may omit `path` refuse an empty one through
 /// `nonEmptyOutputPath` and name a temporary file through `temporaryOutput`.
+/// `captionDestination` and `namedFrameDestination` are two tools' resolutions
+/// of a path and a format together, here so the assistant's question
+/// (`AssistantToolTable.question`) names what the handler will write (AI-21).
 extension AgentServer {
 
     /// An output path as the tools take one: `~` expanded, and the extension
@@ -66,6 +69,27 @@ extension AgentServer {
         let base = replaceable.contains(current.lowercased())
             ? url.deletingPathExtension() : url
         return base.appendingPathExtension(ext)
+    }
+
+    /// `export_captions`' file and format for `path`: an explicit format wins,
+    /// else the path's own extension, else SubRip.
+    static func captionDestination(_ path: String, requested: CaptionExporter.Format?)
+        -> (url: URL, format: CaptionExporter.Format)
+    {
+        let expanded = (path as NSString).expandingTildeInPath
+        let format = CaptionExporter.format(
+            for: URL(fileURLWithPath: expanded), requested: requested)
+        return (captionDestinationURL(path, format: format), format)
+    }
+
+    /// `render_frame`'s file and format for a named `path`: an explicit format
+    /// wins, else the path's own extension, else PNG.
+    static func namedFrameDestination(_ path: String, requested: FrameWriter.Format?)
+        -> (url: URL, format: FrameWriter.Format)
+    {
+        let expanded = (path as NSString).expandingTildeInPath
+        let format = FrameWriter.format(for: URL(fileURLWithPath: expanded), requested: requested)
+        return (destinationURL(path, extension: format.fileExtension), format)
     }
 
     /// `url` when its folder already exists; refused BY NAME when it does

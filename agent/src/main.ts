@@ -327,6 +327,8 @@ async function runTurn(text: string) {
       emit({ type: "error", message: "The reply was cut off at the output limit." });
     } else if (last?.stop_reason === "refusal") {
       emit({ type: "error", message: "The model declined this request." });
+    } else if (last?.stop_reason === "model_context_window_exceeded") {
+      emit({ type: "error", message: "The reply was cut off because the conversation filled the model's context window." });
     }
   } catch (error) {
     if (inFlight.message) {

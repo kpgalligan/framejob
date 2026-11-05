@@ -149,7 +149,7 @@ Queue that runs while you edit, and single frames as stills.
 → [Exporting](docs/guide/export.md)
 
 **The Assistant.** A conversation with Claude in the inspector that edits the
-open project with the same tools an agent uses, asks before it writes a file,
+open project with the same tools an agent uses, asks before it saves or exports,
 and shows what each turn cost.
 → [The Assistant](docs/guide/assistant.md)
 

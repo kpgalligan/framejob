@@ -17886,7 +17886,7 @@
     {
      "id": "assistant-writes-without-asking",
      "name": "File writes that do not ask",
-     "summary": "Rendered frames, contact sheets, files in the project's graphics folder and a new blank project are written without a question.",
+     "summary": "Temporary renders and files in the project's graphics folder are written without a question.",
      "page": "assistant/what-it-will-not-do",
      "anchor": "file-writes-that-do-not-ask",
      "where": "Assistant tab",

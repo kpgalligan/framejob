@@ -38,7 +38,7 @@ extension AgentServer {
         var sentences: [String] = []
         for kind in ScopeKind.allCases {
             guard let trace = traces[kind] else { continue }
-            let file = URL(fileURLWithPath: url.path + ".\(kind.rawValue).json")
+            let file = scopeFile(kind, beside: url)
             do {
                 let data = try JSONSerialization.data(
                     withJSONObject: trace.json(), options: [.sortedKeys])
@@ -50,6 +50,13 @@ extension AgentServer {
             sentences.append(sentence(trace, file: file))
         }
         return sentences.joined(separator: " ")
+    }
+
+    /// The file a kind's trace is written to beside the image at `url`, the
+    /// one spelling of `<path>.<kind>.json`; the assistant's question reads it
+    /// too (spec §11 AI-21 (g)).
+    static func scopeFile(_ kind: ScopeKind, beside url: URL) -> URL {
+        URL(fileURLWithPath: url.path + ".\(kind.rawValue).json")
     }
 
     /// The sentence `render_frame` says for one kind's trace.

@@ -1263,9 +1263,9 @@ Needs your own Anthropic API key (Setup 3).
 - **Source:** road map 13 P4; spec §11 P-4, P-7.
 
 **AS-6 — A reply cut short**
-- **Do:** With your real key, ask for something long (a paragraph about each clip) and press Stop while the reply streams. Open `~/Library/Application Support/Frame Job/spend.jsonl`, then the Anthropic Console's usage for the same minutes.
-- **Expect:** the turn ends with `Cost: at least $… (a response was cut short) · Frame Job's estimate at LiteLLM prices (…)`; the ledger's last line carries `"partial": true`; the Console's charge for that request is at least that figure, and expect it above: the streamed output is not counted (spec §11 P-8).
-- **Source:** issue batch B15 (#162); spec §11 P-8.
+- **Do:** With your real key, ask for something long (a paragraph about each clip) and press Stop while the reply streams. Open `~/Library/Application Support/Frame Job/spend.jsonl`, then the Anthropic Console's usage for the same minutes. Then, with Compact off in Settings, keep a conversation going until the Context meter reads full.
+- **Expect:** the turn ends with `Cost: at least $… (a response was cut short) · Frame Job's estimate at LiteLLM prices (…)`; the ledger's last line carries `"partial": true`; the Console's charge for that request is at least that figure, and expect it above: the streamed output is not counted (spec §11 P-8). A reply that reaches the end of the window stops where it got to, and the red line "The reply was cut off because the conversation filled the model's context window." follows it.
+- **Source:** issue batch B15 (#162); spec §11 P-8; #484.
 
 **AS-7 — Selecting the conversation, and a message of several lines**
 - **Do:** In light, then dark, after a turn with a tool call: 1. Drag from inside a reply down into the next person line and a tool line; ⌘C; paste into TextEdit. 2. In the composer type a line, ⇧Return, another, ⌥Return, a third, and keep adding lines past five. 3. Press Return. 4. With an input method that composes (Japanese, say), start a word so it is underlined and press Return. 5. Send something long and, while it is working, type in the composer and press Return.

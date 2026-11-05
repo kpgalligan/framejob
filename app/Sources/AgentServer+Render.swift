@@ -286,12 +286,8 @@ extension AgentServer {
             )
         }
         let path = try Self.nonEmptyOutputPath(given)
-        let format = FrameWriter.format(
-            for: URL(fileURLWithPath: (path as NSString).expandingTildeInPath),
-            requested: requested)
-        let url = try Self.requireFolder(
-            of: Self.destinationURL(path, extension: format.fileExtension))
-        return (url, format)
+        let (destination, format) = Self.namedFrameDestination(path, requested: requested)
+        return (try Self.requireFolder(of: destination), format)
     }
 
     /// The `format` argument, refused BY NAME when it names no container —
@@ -306,7 +302,7 @@ extension AgentServer {
     /// accepted in the argument beside it is an inconsistency a caller meets
     /// on its first try. The schema still advertises the three canonical
     /// names, which is what a caller reading the catalog will send.
-    private func requestedFrameFormat(_ a: [String: Any]) throws -> FrameWriter.Format? {
+    func requestedFrameFormat(_ a: [String: Any]) throws -> FrameWriter.Format? {
         guard let name = try stringArg(a, "format") else { return nil }
         let lowered = name.lowercased()
         guard let format = FrameWriter.Format(rawValue: lowered == "jpg" ? "jpeg" : lowered)

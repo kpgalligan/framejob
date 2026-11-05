@@ -440,10 +440,8 @@ extension AgentServer {
         // `get_project` is listing.
         let snapshot = document.editedProject.snapshot
         let path = try requiredString(a, "path")
-        let expanded = (path as NSString).expandingTildeInPath
-        let format = CaptionExporter.format(
-            for: URL(fileURLWithPath: expanded), requested: try requestedFormat(a))
-        let url = try Self.requireFolder(of: Self.captionDestinationURL(path, format: format))
+        let (destination, format) = Self.captionDestination(path, requested: try requestedFormat(a))
+        let url = try Self.requireFolder(of: destination)
 
         // Read through `trackArg` rather than handed to the exporter raw, so
         // an id that names nothing is refused as "No track has id N" here
@@ -486,7 +484,7 @@ extension AgentServer {
     /// The `format` argument, refused BY NAME when it is not one of the two
     /// containers — nil when it is absent, which is what lets
     /// `CaptionExporter.format(for:requested:)` fall back to the path.
-    private func requestedFormat(_ a: [String: Any]) throws -> CaptionExporter.Format? {
+    func requestedFormat(_ a: [String: Any]) throws -> CaptionExporter.Format? {
         try enumArg(a, "format", CaptionExporter.Format.self, folding: true)
     }
 }

@@ -426,12 +426,13 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     /// the key is kept.
     static func explanation() -> String {
         [
-            "With AssemblyAI chosen in the Generate Captions sheet, the AUDIO of the files you "
-                + "are captioning is uploaded to AssemblyAI, transcribed, read back, and then "
-                + "deleted from AssemblyAI — Frame Job asks for the delete as soon as it has the "
-                + "words, and retries it at the start of the next run if it did not land. "
-                + "Nothing is uploaded until you press Generate, and captions made on this Mac "
-                + "never leave it.",
+            "With AssemblyAI chosen in the Generate Captions sheet, and for Transcribe in Remove "
+                + "Filler Words, the AUDIO of those files is uploaded to AssemblyAI, transcribed, "
+                + "read back, and then deleted from AssemblyAI — Frame Job asks for the delete as "
+                + "soon as it has the words, and retries it at the start of the next run if it "
+                + "did not land. "
+                + "Nothing is uploaded until you press Generate or Transcribe, and captions made "
+                + "on this Mac never leave it.",
             "AssemblyAI's published rate is $\(AssemblyAIRates.perHour) an hour of audio, "
                 + "$\(AssemblyAIRates.speakersPerHour) more with Speakers on, read on "
                 + "\(AssemblyAIRates.readOn).",

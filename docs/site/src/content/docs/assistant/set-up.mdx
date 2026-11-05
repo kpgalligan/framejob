@@ -138,7 +138,7 @@ There's no Save button for the compaction and clearing settings. A change reache
 The ⓘ beside the **Assistant** heading sums up the section:
 
 - The Assistant sends your messages, the project's details and the frames it renders to Anthropic, using your own key, and what it costs is billed to that key.
-- It asks before writing a file. That holds for the [tools it asks about first](/assistant/what-it-will-not-do/#tools-it-asks-about-first). A few [other tools write without asking](/assistant/what-it-will-not-do/#file-writes-that-do-not-ask).
+- It asks before saving a project or writing a file to a path it chose. That holds for the [tools it asks about first](/assistant/what-it-will-not-do/#tools-it-asks-about-first). Graphics, fonts and pictures it adds go into the project [without asking](/assistant/what-it-will-not-do/#file-writes-that-do-not-ask).
 - The key is kept in a file only you can read, and it's never shown again once saved.
 - Leave the model blank for `claude-opus-5-5`. Changing the key or the model starts a new conversation.
 - Compaction replaces the conversation with a summary at the end of a turn past the threshold, which is 20,000 to 900,000 tokens and 300,000 by default. Earlier renders don't survive it.

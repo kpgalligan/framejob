@@ -6,11 +6,11 @@ description: The jobs the Assistant leaves to you, the file writes it asks about
 import { Steps } from '@astrojs/starlight/components';
 import AtAGlance from '@components/AtAGlance.astro';
 
-The Assistant can do most of what you can do in Frame Job, but a few jobs stay with you. It won't record, close its own project or send audio to the cloud, and it stops to ask before it exports, saves or copies media.
+The Assistant can do most of what you can do in Frame Job, but a few jobs stay with you. It won't record, close its own project or send audio to the cloud, and it stops to ask before it exports, saves, copies media or writes a file to a path it chose.
 
 <AtAGlance
   where="Inspector ▸ Assistant tab, the row headed “The assistant asks first:”"
-  tools={['record_screen', 'close_project', 'transcribe', 'transcribe_for_fillers', 'export', 'export_captions', 'save_project', 'consolidate_media', 'export_graphic', 'new_project_from_range', 'make_vertical_version']}
+  tools={['record_screen', 'close_project', 'transcribe', 'transcribe_for_fillers', 'export', 'export_captions', 'save_project', 'consolidate_media', 'export_graphic', 'new_project_from_range', 'make_vertical_version', 'new_project', 'render_frame', 'render_graphic']}
   needs="An Anthropic API key. See Set up the Assistant."
 />
 
@@ -31,7 +31,7 @@ If one of the four is called anyway, it doesn't run. The transcript shows a [`fa
 
 ## Tools it asks about first
 
-Before it writes a movie, a caption file, a graphic package or the project, the Assistant waits for you.
+Before it writes a movie, a caption file, a graphic package, the project, or anything else to a path it chose, the Assistant waits for you.
 
 <Steps>
 
@@ -49,26 +49,35 @@ The transcript keeps a record of each answer, as `Allowed:` or `Declined:` and t
 
 ## What each question reads
 
-Five tools always ask. The last two in this table ask only when the Assistant gives them a path to save to, because without one they don't write a project package.
+The first five tools in this table ask whenever they would write. The last five ask only when the Assistant gives them a path: without one they write no project package, or only a temporary file.
 
 | Tool | The question reads |
 | --- | --- |
 | `export` | "export writes *path*", or "export REPLACES *path*" when a file is already there |
 | `export_captions` | "export_captions writes *path*", or "export_captions REPLACES *path*" |
-| `save_project` | "save_project writes *path*", or "save_project REPLACES *path*". With no path known, "save_project writes a file" |
-| `consolidate_media` | "consolidate_media copies every referenced file into *package*/media", or "… into the project's package" when the project has never been saved |
+| `save_project` | "save_project writes *path*", or "save_project REPLACES *path*", with `.framejob` added when it's missing |
+| `consolidate_media` | "consolidate_media copies every referenced file into *package*/media" |
 | `export_graphic` | "export_graphic writes *path*", or "export_graphic REPLACES *path*", with `.fjgraphic` added when it's missing |
 | `new_project_from_range` | "new_project_from_range writes *path*", with `.framejob` added when it's missing |
 | `make_vertical_version` | "make_vertical_version writes *path*", with `.framejob` added when it's missing |
+| `new_project` | "new_project writes *path*", or "new_project REPLACES *path*", with `.framejob` added when it's missing |
+| `render_frame` | "render_frame writes *path*", or "render_frame REPLACES *path*", with the format's extension |
+| `render_graphic` | "render_graphic writes *path*", or "render_graphic REPLACES *path*", with `.png` added when it's missing |
 
-A `~` in the path is expanded before the question is asked, so the sentence shows the full path.
+The path in the sentence is the file the tool will write, with the extension Frame Job adds or corrects, and **REPLACES** means something is already at that file. A `~` in the path is expanded before the question is asked, so the sentence shows the full path.
 
 A few answers depend on what's on disk:
 
 - Saving a project that's already on disk reads "save_project REPLACES *path*", because the package is there. That's the normal question for an ordinary save.
-- `new_project_from_range` and `make_vertical_version` never replace anything. With something already at the path the question reads REPLACES, but after **Allow** nothing is written, and the Assistant is told to choose a new path.
-- A project that has never been saved needs a path. If `save_project` has none, the question reads "save_project writes a file" and nothing is written after **Allow**. `consolidate_media` also stops there, and the Assistant has to save the project first.
-- For `export`, `export_captions` and `save_project`, the sentence shows the path as the Assistant wrote it. Frame Job adds or corrects the file extension as it writes, and REPLACES looks only at the path in the sentence, so a question that reads "writes" can still replace a file at the corrected name.
+- A scope `render_frame` is asked for is written beside the picture, as *path*.waveform.json for a waveform. When that file is already there, the sentence goes on ", and REPLACES *path*.waveform.json".
+
+Frame Job doesn't ask about a call it can only refuse because of its path. The Assistant gets the reason instead, and nothing is written:
+
+- A call with no path where one is needed: `export`, `export_captions` and `export_graphic`, and `save_project` or `consolidate_media` in a project that has never been saved. `consolidate_media` needs the project saved first.
+- A path another open project holds.
+- For `new_project_from_range` and `make_vertical_version`, which never replace anything, a path with something already there. The Assistant is told to choose a new path.
+
+A question can still end in a refusal for another reason, such as a preset Frame Job doesn't have or a folder that doesn't exist, and nothing is written after **Allow**. If another argument can't be read, the sentence keeps the path as the Assistant gave it.
 
 ## File writes that do not ask
 
@@ -76,16 +85,11 @@ Some tools write files without a question.
 
 | What it does | Tools |
 | --- | --- |
-| Writes a rendered frame, a PNG unless another format is asked for, to a temporary file or to a path the Assistant names | `render_frame` |
-| Writes a graphic's contact sheet as a PNG, to a temporary file or to a path the Assistant names | `render_graphic` |
+| Writes a rendered frame, a PNG unless another format is asked for, to a temporary file, when the call names no path | `render_frame` |
+| Writes a graphic's contact sheet as a PNG to a temporary file, when the call names no path | `render_graphic` |
 | Writes modules, fonts and assets into the project's graphics folder | `write_graphic`, `import_graphic_font`, `import_graphic_asset`, `import_graphic` |
-| Saves a new, blank project at a path the Assistant names | `new_project` |
 
 `import_graphic` replaces nothing: a name that's already taken gets a suffix, and a picture whose name clashes stops the import.
-
-:::caution
-`new_project` with a path replaces whatever is already there, with no question, unless an open project holds that path. A saved project that isn't open is overwritten by the blank one, and Undo can't bring it back.
-:::
 
 ## The dot on the tab
 

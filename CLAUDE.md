@@ -130,7 +130,8 @@ agent/               the assistant helper (AI-1): Bun, the Anthropic SDK's Tool 
                        on 2026-10-13), one diff applied to both; but for NM-10's three
                        lines (main.ts's comment, priceTable.test.ts's scratch prefix,
                        priceTable.ts's user-agent `framejob-agent`), recorded in
-                       designs/adr/rename.md for Rasterize to apply (rasterize#654).
+                       designs/adr/rename.md for Rasterize to apply (rasterize#654);
+                       and `main.ts`'s context-window arm (#484), for Rasterize to apply.
                        What the apps differ in arrives in `configure`
   prices/              anthropic.json (LiteLLM's Anthropic rows, $/MTok; written only by
                        `make prices` → update.py; bundled into the helper), cases.json

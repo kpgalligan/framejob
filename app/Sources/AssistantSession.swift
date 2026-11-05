@@ -329,7 +329,7 @@ final class AssistantSession {
         pendingReply = reply
         append([
             "type": "question", "tool": question.tool,
-            "path": question.path.map { $0 as Any } ?? NSNull(),
+            "path": question.path,
             "exists": question.exists, "sentence": question.sentence,
         ])
     }

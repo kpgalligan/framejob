@@ -156,9 +156,10 @@ The Assistant ⓘ sums up what the assistant sends and where:
 
 - it sends your messages, the project's details and the frames it renders to
   Anthropic, using your own API key, and what it costs is billed to that key;
-- it asks before writing a file, which holds for the tools listed in
-  [Tools it asks about first](assistant.md#tools-it-asks-about-first); a few
-  other tools write without asking;
+- it asks before saving a project or writing a file to a path it chose, which
+  holds for the tools listed in
+  [Tools it asks about first](assistant.md#tools-it-asks-about-first), and
+  graphics, fonts and pictures it adds go into the project without asking;
 - the key is kept in a file only you can read and is never shown again once
   saved;
 - a blank Model means `claude-opus-5-5`, and changing the key or the model
@@ -238,14 +239,13 @@ sheet straight away, so it can enable its button without being reopened.
 
 ### What the ⓘ says
 
-The Transcription ⓘ explains what leaves your Mac: with AssemblyAI chosen,
-the audio of the files you are captioning is uploaded, transcribed, read back
-and then deleted from AssemblyAI. Frame Job asks for the delete as soon as it
-has the words, and retries it at the start of the next run if it did not go
-through. Nothing is uploaded until you press Generate, and captions made on
-your Mac never leave it. That is written about Generate Captions: **Transcribe**
-in **Clip ▸ Remove Filler Words…** uploads a file's audio in the same way when
-you press it. The ⓘ also gives AssemblyAI's published rate as Frame
+The Transcription ⓘ explains what leaves your Mac: with AssemblyAI chosen in
+the Generate Captions sheet, and for **Transcribe** in **Clip ▸ Remove Filler
+Words…**, the audio of those files is uploaded, transcribed, read back and then
+deleted from AssemblyAI. Frame Job asks for the delete as soon as it has the
+words, and retries it at the start of the next run if it did not go through.
+Nothing is uploaded until you press Generate or Transcribe, and captions made
+on your Mac never leave it. The ⓘ also gives AssemblyAI's published rate as Frame
 Job last read it: $0.21 an hour of audio, $0.02 more with Speakers on (read on
 2026-09-17).
 

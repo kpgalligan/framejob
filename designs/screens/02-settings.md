@@ -66,7 +66,9 @@ conversation going. Then the status line "No API key is set." and, along its
 bottom, "Save" (blue) and "Remove" (dimmed). It has no Verify and no account
 link. Its ⓘ says the assistant sends the messages, the project's details and
 the frames it renders to Anthropic with the person's own key, which is billed;
-that it asks before writing a file; that the key is kept in a file only the
+that it asks before saving a project or writing a file to a path it chose, and
+that graphics, fonts and pictures it adds go into the project without asking;
+that the key is kept in a file only the
 person can read and never shown again; that a blank model means
 claude-opus-5-5 and that changing the key or the model starts a new
 conversation; and that at the end of a turn past the compaction threshold
@@ -88,12 +90,13 @@ MCP from Assistant): an "AssemblyAI API key:"
 field, empty, whose placeholder reads "Paste your key"; a "Region:" pop-up set
 to "United States"; and the status line "No API key is set." Along its bottom:
 "Save" (blue), "Remove" and "Verify" (both dimmed, since there is no key), and
-"Account Page" on the right. Its ⓘ says what happens when AssemblyAI is
-chosen: the audio of the files being captioned is uploaded, transcribed, read
-back and then deleted from AssemblyAI; nothing is uploaded until Generate is
-pressed; captions made on this Mac never leave it; the published price and the
-date it was read; and that the key is kept in a file only the person can read
-and is never shown again once saved.
+"Account Page" on the right. Its ⓘ says what happens with AssemblyAI chosen in
+the Generate Captions sheet, and for Transcribe in Remove Filler Words: the
+audio of those files is uploaded, transcribed, read back and then deleted from
+AssemblyAI; nothing is uploaded until Generate or Transcribe is pressed;
+captions made on this Mac never leave it; the published price and the date it
+was read; and that the key is kept in a file only the person can read and is
+never shown again once saved.
 
 Under the "Playback" heading, after the same wider gap, one row: a ticked
 checkbox "Background render", then "Start after", a short right-aligned field

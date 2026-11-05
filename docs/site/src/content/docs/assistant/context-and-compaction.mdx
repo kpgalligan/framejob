@@ -71,7 +71,7 @@ Compaction only starts once the conversation reaches the threshold, so the thres
 
 ## With compaction off
 
-Nothing replaces the conversation, so it keeps growing until it fills the model's window. A reply that reaches the end of the window stops where it got to, with no error, and the Context meter reads full. From then on each message fails, with an [error in the transcript](/assistant/conversation/#errors), until you click **Clear**. **Clear** ends the conversation, and nothing of it carries into the next message.
+Nothing replaces the conversation, so it keeps growing until it fills the model's window. A reply that reaches the end of the window stops where it got to, the error "The reply was cut off because the conversation filled the model's context window." follows it, and the Context meter reads full. From then on each message fails, with an [error in the transcript](/assistant/conversation/#errors), until you click **Clear**. **Clear** ends the conversation, and nothing of it carries into the next message.
 
 ## Clearing old tool results
 

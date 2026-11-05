@@ -277,7 +277,7 @@ extension AgentServer {
         var question: Any = NSNull()
         if let asked = session.pendingQuestion {
             question = [
-                "tool": asked.tool, "path": UISnapshot.orNull(asked.path),
+                "tool": asked.tool, "path": asked.path,
                 "exists": asked.exists, "sentence": asked.sentence,
             ]
         }

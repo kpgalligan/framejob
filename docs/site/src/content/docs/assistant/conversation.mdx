@@ -97,12 +97,13 @@ An error is a red line, and it says what went wrong.
 | --- | --- |
 | `API error status: message` | Anthropic turned the request down or it failed, for example a bad key, a rate limit or an outage. The status is Anthropic's, and it's blank when the request never reached Anthropic. |
 | "The reply was cut off at the output limit." | The response reached 32,000 [tokens](/assistant/context-and-compaction/), the small pieces of text a model counts in. Thinking counts toward that as well as the reply. |
+| "The reply was cut off because the conversation filled the model's context window." | The reply reached the end of the model's [context window](/assistant/context-and-compaction/#with-compaction-off) and stopped where it got to. |
 | "The model declined this request." | The model wouldn't do what you asked. |
 | "The assistant helper stopped. Clear the conversation to start a new one." | See [If the helper stops](#if-the-helper-stops). |
 
 If a conversation can't start, for example because the helper won't run, the reason shows as an error and your message stays in the field.
 
-A request you end with **Stop** shows no error. Neither does a reply that reaches the end of the model's [context window](/assistant/context-and-compaction/). It stops where it got to, with nothing to say it was cut short, and the turn's `Cost:` line follows.
+A request you end with **Stop** shows no error.
 
 ## Automatic retries
 
