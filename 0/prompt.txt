@@ -1,0 +1,63 @@
+We need to compact this thread
+
+---
+
+/compact
+
+---
+
+We're low on disk space. Clean anything not currently needed.
+
+---
+
+<task-notification>
+<task-id>bylrj0xwy</task-id>
+<tool-use-id>toolu_0177cLXxmukKcotfgjbZds3h</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kevingalligan-devel-framejob--claude-worktrees-audio-updates/9bb0487d-a352-45e3-9da8-07b6f4762c27/tasks/bylrj0xwy.output</output-file>
+<status>completed</status>
+<summary>Background command "Wait until no builds run and load is low" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+S-TH1 files have been added. I'm not sure I did everything as you were expecting. I did not include a 'side-on beat', as I don't know what that is. But you can start work with the content there currently.
+
+---
+
+<task-notification>
+<task-id>wxbifrh7a</task-id>
+<tool-use-id>toolu_01KSW2byXX5YitJc5PaANm5E</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kevingalligan-devel-framejob--claude-worktrees-audio-updates/9bb0487d-a352-45e3-9da8-07b6f4762c27/tasks/wxbifrh7a.output</output-file>
+<status>completed</status>
+<summary>Dynamic workflow "Road map creator-jobs round 10, lane A: CJ7, the rows owed on S-TH1, with split remainders queued automatically" completed</summary>
+<result>[{"lane":"a","results":[{"ap":"CJ7","status":"landed","sha":"1a487cc3","filed":[],"detail":"CJ7 landed as 1a487cc3 on worktree-creator-jobs. Nothing had landed since the lane's base b4b22392, so the cherry-pick of 1400b374 and abae059c had no conflicts.\n\nChanged: 17 files, all instruments or records. There is no app, core, format or §11 change. New files: tools/proof/creator_spike/sth1.py, audio_tracks.py and audio_tracks_probe.swift. S-TH1 modes were added to faces_spike, subjects_spike, sound_spike, reframe_spike, cutout_spike (with mask_speed.swift) and shots_spike. cut_spike and fill_spike now pick the owner's movie by name. faces_proof.py has F5, which a Debug build skips by name. Also changed: CJ7's section and record, dated S-TH1 notes added to 8 records, samples/README.md, and the proof READMEs.\n\nIntegration edits: the record's \"Landed\" line now names the commits and reads \"no app, core or format change\". Reviews and Integrated paragraphs were added. Two comments in sth1.py were corrected (review nit 3). Review nit 2 (fill_spike's TX-S1-STH1 folder name) was left as is and the reason recorded: each run in its results is keyed by the sample's name.\n\nVerified: every spike's rule_sha256 still matches. make gate on the merged tree printed \"gate: PASS 617s\" (names, typecheck, fmt, lint, test and app all passed), then PASS 1s after the record's last line. The lane recorded faces_proof.py on Release at 13/13 (F5 ratio 1.908).\n\nCLAUDE.md edits owed: none. To file: none, so no issues were filed.\n\nTWO STOPs need the owner's decision. Nothing was amended:\n(1) CJ-S2 rule 6: the face share over the first 60 s is 0.8717 (523/600), under the 95% bar. The cause is the empty chair at 0–7 s; over 8–60 s the share is 0.9962. As written, the rule stops VR1 and SW8 until CJ-30 is amended. The lane recommends amending CJ-30 so the share counts from the first face in frame.\n(2) VR-S2: no grid setting reaches 6 moves a minute or fewer on S-TH1. VR-23's shipped setting gives 8.45 a minute at 96.96% containment. The lane recommends keeping VR-23 and letting JOB-31 judge.\n\nStill owed: VR-S1 rule 4's side-on half, which waits on S-TH1's side-on add-on. The owner said on 2026-11-06 that he did not record a side-on beat and does not know what one is, so the add-on has to be explained to him and asked for again. Also owed: rows needing samples not yet supplied (S-RT1, S-KEY1, S-TH2–S-TH4, S-EV, S-ST1, S-MU, S-LONG1); FC-S2, FC-S3 and TX-S1's cloud arm (paid); JOB-10–14, 31, 60, 62; CP1 and TX8's T1.\n\nWorktrees wf_c13577e6-d12-5 and -d12-7 and their branches were removed, the lock was released, and the line was appended to cj-merges.log. Nothing was pushed. No REMAINDER."}]}]</result>
+<diagnostics>Per-agent results: /Users/kevingalligan/.claude-personal/projects/-Users-kevingalligan-devel-framejob/9bb0487d-a352-45e3-9da8-07b6f4762c27/subagents/workflows/wf_c13577e6-d12/journal.jsonl — one {"type":"result",...} line per completed agent with its full return value.
+If the result above is empty or unexpected, Read this file BEFORE diagnosing — do not assume agents returned non-empty results.
+To re-run with edited post-processing: Workflow({scriptPath: '/Users/kevingalligan/.claude-personal/projects/-Users-kevingalligan-devel-framejob/9bb0487d-a352-45e3-9da8-07b6f4762c27/workflows/scripts/creator-lanes-r10.js', resumeFromRunId: 'wf_c13577e6-d12'}) — agents whose (prompt, opts) are unchanged replay from cache.</diagnostics>
+<usage><agent_count>9</agent_count><agents_done>9</agents_done><agents_error>0</agents_error><agents_skipped>0</agents_skipped><agents_empty_result>0</agents_empty_result><subagent_tokens>1180050</subagent_tokens><tool_uses>388</tool_uses><duration_ms>8903399</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>b5kcxp1h6</task-id>
+<tool-use-id>toolu_0155Qq84QAb3NspeWRfN7hSq</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kevingalligan-devel-framejob--claude-worktrees-audio-updates/9bb0487d-a352-45e3-9da8-07b6f4762c27/tasks/b5kcxp1h6.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the gate on the transcript drag fix" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>wchb4ld2v</task-id>
+<tool-use-id>toolu_01C4cN4P5KhamBdghV2MXh1Z</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kevingalligan-devel-framejob--claude-worktrees-audio-updates/9bb0487d-a352-45e3-9da8-07b6f4762c27/tasks/wchb4ld2v.output</output-file>
+<status>completed</status>
+<summary>Dynamic workflow "Road map creator-jobs round 10, lane A: CJ7b, the rulings on the two CJ7 STOPs, with split remainders queued automatically" completed</summary>
+<result>[{"lane":"a","results":[{"ap":"CJ7b","status":"landed","sha":"b2c72300","filed":[],"detail":"CJ7b landed on worktree-creator-jobs as b2c72300, one commit on top of 85a79cda.\n\nWhat landed:\n- **Rule 6:** CJ-S2 rule 6 now has a dated amendment: its 60 s window starts at the first face in frame, which is 8–68 s on S-TH1 (`sth1.FIRST_FACE`). Its pin was re-recorded as 2865337c…e3c558c4. R0 and rule.py are unchanged.\n- **The re-run:** `faces_spike.py --sth1` was re-run on the new window and printed rule6=pass, face_share_first_60=0.9967 (600 samples, 598/600 from results.json). CJ-30 is unchanged.\n- **VR-S2:** the owner's ruling (\"Keep it; I'll judge it\") is recorded under VR-23 in §11, in VR2a1's addendum and in CJ7's record. JOB-31 in docs/manual-checks.md was extended to cover it.\n- **Indexes:** the CJ-30 and VR-23 index cells, the Lines cells and the folder total were updated.\n\nIntegration:\n- **Merge:** the cherry-pick had no conflicts. CP1's first attempt, which touched designs/creator-jobs.md and tools/proof/README.md, merged automatically. All 27 pinned rules still match after the merge (\"27 27\").\n- **Record:** the lane had already written CJ7b's record. I added a Review line (pass, two nits, neither needed a change) and an Integrated line with the gate result.\n- **Gate:** `make gate` printed \"gate: PASS 118s\" (names 3, test 114; the other steps were skipped as unchanged).\n- **Release proof:** none applies, because no app, core or app-driving proof changed.\n- **CLAUDE.md edits owed:** none.\n\n**Unrelated edit:** while I worked, another session briefly changed CP1's record in designs/creator-jobs.md inside I, and it was gone from disk before I committed. None of it is in this commit, and I left the edit alone.\n\nCleanup: worktree wf_8ee88720-f0b-5 and branch worktree-wf_8ee88720-f0b-5 are removed. The lock is released and the merge log has the new line.\n\nOwed: VR-S2's T1 and T2 rows, and JOB-31. To file: none. No remainder."}]}]</result>
+<diagnostics>Per-agent results: /Users/kevingalligan/.claude-personal/projects/-Users-kevingalligan-devel-framejob/9bb0487d-a352-45e3-9da8-07b6f4762c27/subagents/workflows/wf_8ee88720-f0b/journal.jsonl — one {"type":"result",...} line per completed agent with its full return value.
+If the result above is empty or unexpected, Read this file BEFORE diagnosing — do not assume agents returned non-empty results.
+To re-run with edited post-processing: Workflow({scriptPath: '/Users/kevingalligan/.claude-personal/projects/-Users-kevingalligan-devel-framejob/9bb0487d-a352-45e3-9da8-07b6f4762c27/workflows/scripts/creator-lanes-r10b.js', resumeFromRunId: 'wf_8ee88720-f0b'}) — agents whose (prompt, opts) are unchanged replay from cache.</diagnostics>
+<usage><agent_count>7</agent_count><agents_done>7</agents_done><agents_error>0</agents_error><agents_skipped>0</agents_skipped><agents_empty_result>0</agents_empty_result><subagent_tokens>578395</subagent_tokens><tool_uses>159</tool_uses><duration_ms>2981293</duration_ms></usage>
+</task-notification>
