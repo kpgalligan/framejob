@@ -20,19 +20,19 @@ item or an agent tool it has never heard of. These rows do:
   D10 every tool an `AtAGlance` names is a product tool, and every step of a menu path written on
       a page is a string in `app/Sources` (`MACOS_MENU` allows what macOS draws itself), so a
       renamed menu item can't stay on the site under its old name;
-  D11 the site replaced the user guide, so `docs/guide/` does not exist and no file the gate
-      hashes, outside `archive/` and `designs/adr/`, links into it (a relative link, or a GitHub
-      URL of this repository).
+  D11 the site replaced the user guide, so `docs/guide/` does not exist and no text file the gate
+      hashes, whatever its suffix, outside `archive/`, `designs/adr/` and `GUIDE_ALLOWED`, links
+      into it (a relative link, or a GitHub URL of this repository).
 
     python3 tools/proof/docs_site_proof.py                       # the tree (make test)
     python3 tools/proof/docs_site_proof.py --pages a.mdx b.mdx   # those pages: D1, D6–D9
     python3 tools/proof/docs_site_proof.py --guide               # D11 alone (make gate's names)
-    python3 tools/proof/docs_site_proof.py --selftest            # CONTROL + M1..M14
+    python3 tools/proof/docs_site_proof.py --selftest            # CONTROL + M1..M15
 
 `--selftest` copies the site's inputs to `tools/proof/work/docs_site/` and requires the copy to
 show no problem (CONTROL), then eleven mutants, each on a fresh copy, to show a problem in exactly
-its row; then D11's CONTROL on a scratch root, `tools/proof/work/docs_site_guide/`, and its three
-mutants, fourteen mutants in all. Exit 0 when all hold, 1 otherwise.
+its row; then D11's CONTROL on a scratch root, `tools/proof/work/docs_site_guide/`, and its four
+mutants, fifteen mutants in all. Exit 0 when all hold, 1 otherwise.
 """
 
 import argparse
@@ -75,9 +75,14 @@ BANNED = re.compile(r"\b(?:seamless(?:ly)?|effortless(?:ly)?|robust|powerful|sim
 FENCE = re.compile(r"^```.*?^```", re.M | re.S)
 
 # D11. The history keeps its links to the retired guide; the guide itself existing is its own row.
+# Every other listed file is read, whatever its suffix, unless it is binary (a NUL byte, or not
+# UTF-8): a PNG, a font, a test video.
 GUIDE_EXEMPT = ("archive/", "designs/adr/", "docs/guide/")
-GUIDE_SUFFIXES = (".md", ".mdx", ".astro", ".mjs", ".json", ".swift", ".yml", ".yaml", ".html",
-                  ".plist")
+# The files the tree needs let past, each for its reason:
+GUIDE_ALLOWED = {
+    # this proof: its selftest's fixtures are links into the guide (relative and GitHub URLs)
+    "tools/proof/docs_site_proof.py",
+}
 GUIDE_WORK = os.path.join(ROOT, "tools", "proof", "work", "docs_site_guide")
 GUIDE_LINKS = (
     re.compile(r"\]\(\s*<?([^)\s>]+)"),                              # [text](target)
@@ -271,20 +276,26 @@ def listed(root):
 
 
 def guide_rows(root, paths):
-    """D11: the user guide was retired for the site, so `docs/guide/` must not exist and no file
-    outside the history (`GUIDE_EXEMPT`) may link into it."""
+    """D11: the user guide was retired for the site, so `docs/guide/` must not exist and no text
+    file outside the history (`GUIDE_EXEMPT`) and `GUIDE_ALLOWED` may link into it."""
     problems = []
     if os.path.exists(os.path.join(root, "docs", "guide")):
         problems.append(("D11", "docs/guide exists"))
     seen = set()
     for path in paths:
-        if not path.endswith(GUIDE_SUFFIXES) or path.startswith(GUIDE_EXEMPT):
+        if path.startswith(GUIDE_EXEMPT) or path in GUIDE_ALLOWED:
             continue
         full = os.path.join(root, path)
         if not os.path.isfile(full):
             continue
-        with open(full, encoding="utf-8", errors="replace") as source:
-            text = source.read()
+        with open(full, "rb") as source:
+            data = source.read()
+        if b"\0" in data:
+            continue
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
         for pattern in GUIDE_LINKS:
             for match in pattern.finditer(text):
                 target = re.split(r"[#?]", match.group(1), maxsplit=1)[0]
@@ -377,14 +388,16 @@ def selftest():
         failed += not held
     shutil.rmtree(WORK, ignore_errors=True)
 
-    # D11 on a root of its own: a link into the guide from the README or the app is caught, the
-    # history's links and the site's root-absolute links are not, and a listed file that is gone
-    # from disk is skipped.
+    # D11 on a root of its own: a link into the guide from the README, the app or a proof script
+    # is caught, the history's links and the site's root-absolute links are not, a binary file
+    # and an allowed file are not read, and a listed file that is gone from disk is skipped.
     guide_files = {
         "README.md": "[Audio](docs/site/src/content/docs/audio/how-audio-works.mdx)\n",
         "archive/old.md": "[Old](../docs/guide/audio.md)\n",
         "designs/adr/old.md": "[Old](../../docs/guide/audio.md)\n",
         "docs/site/x.mdx": "[Markers](/timeline/markers/)\n",
+        "tools/proof/docs_site_proof.py": "# https://github.com/kpgalligan/framejob/blob/main/docs/guide/\n",
+        "media/clip.bin": "\0https://github.com/kpgalligan/framejob/blob/main/docs/guide/\n",
     }
 
     def guide_root():
@@ -415,7 +428,14 @@ def selftest():
         control = [("D11", f"raised {error!r}")]
     print(f"CONTROL (D11) {'pass' if not control else 'fail'}: {len(control)} problems")
     failed += bool(control)
-    for name, mutate in (("M12", make_guide), ("M13", readme_link), ("M14", app_link)):
+    def proof_link(root, paths):
+        os.makedirs(os.path.join(root, "tools", "proof"), exist_ok=True)
+        with open(os.path.join(root, "tools", "proof", "x_proof.py"), "w", encoding="utf-8") as target:
+            target.write('"""Its rows are in [MCP](../../docs/guide/mcp.md#tools)."""\n')
+        return paths + ["tools/proof/x_proof.py"]
+
+    for name, mutate in (("M12", make_guide), ("M13", readme_link), ("M14", app_link),
+                         ("M15", proof_link)):
         root, paths = guide_root()
         rows = {problem[0] for problem in guide_rows(root, mutate(root, paths))}
         held = rows == {"D11"}

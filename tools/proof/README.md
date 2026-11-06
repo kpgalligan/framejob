@@ -30138,19 +30138,23 @@ has a title and a description, D2 the sidebar and the pages are one-to-one, D3 e
 an `mcp/` page and no dev tool is named, D5 every menu item is on a reference page, D6 no page
 names something internal, D7 no page or data file holds a local path, D8 every `<Shot>` has both
 captures, D9 no page uses a banned word, D10 every tool in an `AtAGlance` and every step of a menu
-path is real, D11 `docs/guide/` (the user guide the site replaced) doesn't exist and no file
-`git ls-files -co --exclude-standard` lists, outside `archive/` and `designs/adr/`, links into it
-by a relative link or a GitHub URL of this repository. `--guide` runs D11 alone; it is the second
-command of `make gate`'s `names` step, whose inputs are every file, so a `README.md` edit runs it.
-The selftest's M12 makes `docs/guide/`, M13 adds a README link into it and M14 an app string with
-its GitHub URL, each on a scratch root (`tools/proof/work/docs_site_guide/`) whose CONTROL holds
-an archive's and an ADR's links, a site's root-absolute link and a listed file gone from disk.
+path is real, D11 `docs/guide/` (the user guide the site replaced) doesn't exist and no text file
+`git ls-files -co --exclude-standard` lists, whatever its suffix, outside `archive/`,
+`designs/adr/` and `GUIDE_ALLOWED`, links into it by a relative link or a GitHub URL of this
+repository. A binary file (a NUL byte, or not UTF-8) is not read. `GUIDE_ALLOWED` holds one file,
+`docs_site_proof.py` itself, whose selftest fixtures are such links. `--guide` runs D11 alone; it
+is the second command of `make gate`'s `names` step, whose inputs are every file, so a
+`README.md` edit runs it. The selftest's M12 makes `docs/guide/`, M13 adds a README link into it,
+M14 an app string with its GitHub URL and M15 a proof script's docstring link, each on a scratch
+root (`tools/proof/work/docs_site_guide/`) whose CONTROL holds an archive's and an ADR's links, a
+site's root-absolute link, an allowed file's and a binary file's GitHub URLs and a listed file gone
+from disk.
 
 ```sh
 python3 tools/proof/docs_site_proof.py                       # the tree (make test)
 python3 tools/proof/docs_site_proof.py --pages a.mdx b.mdx   # those pages: D1, D6–D9
 python3 tools/proof/docs_site_proof.py --guide               # D11 alone (make gate's names)
-python3 tools/proof/docs_site_proof.py --selftest            # CONTROL + M1..M14
+python3 tools/proof/docs_site_proof.py --selftest            # CONTROL + M1..M15
 ```
 
 A new menu file is picked up by its name (`AppDelegate+*Menu*.swift`); a new tool by its catalog
