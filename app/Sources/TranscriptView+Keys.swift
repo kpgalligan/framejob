@@ -90,6 +90,7 @@ extension TranscriptView {
 
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
+        personScrolled()  // a press pauses the follow, as a scroll does (TX-22 at CP1)
         let point = convert(event.locationInWindow, from: nil)
         if let paragraph = paragraphIndex(at: point) {
             onParagraph?(paragraph)

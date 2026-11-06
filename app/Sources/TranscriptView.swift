@@ -374,7 +374,8 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
             })
     }
 
-    /// A person's own scroll: the follow pauses for `followPause` seconds.
+    /// A person's own scroll, press or drag: the follow pauses for
+    /// `followPause` seconds (TX-22).
     func personScrolled() {
         lastPersonScroll = now()
     }

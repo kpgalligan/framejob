@@ -19,7 +19,10 @@ with `-D FRAMEJOB_DEV_TOOLS`, run with `--fonts app/Resources/Fonts`, the app's
 `Compositor.metal` beside it): T0 builds; T1, T3p, T5, T7, T8, T9, T10, T13p
 as its header says; T4p a click while playing keeps playing; T14p a drag past
 a line's end or before its start maps to the line's last or first character
-(the line answers NSNotFound off its glyphs) and never traps.
+(the line answers NSNotFound off its glyphs) and never traps; T15p eighteen
+drags along a line (the middle, top or bottom line shown; straight, wobbling ±3
+pt, or 80 pt past the edge; paused, then looping while playing) move the scroll
+by no more than 0.5 pt (TX-22 at CP1).
 
 App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
   Z0  no `Frame Job: ` line; `transcript_view` takes exactly click, focus,
@@ -78,6 +81,7 @@ a mutant is caught when every row it names fails.
   live-rebuild           a rebuild during a live gesture (T7)
   clip-picked-switches   a click on a clip switches to Clip (T10)
   line-index-unchecked   the line's NSNotFound added to the offset (T14p)
+  drag-follows           a press and a drag no longer pause the follow (T15p)
   one-wait               every miss wanted at once under a single wait (T12;
                          an app built from a tree copy)
   words-from-ignored     Words from's track filter removed at the fill and at
@@ -111,7 +115,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/transcript_tab"
 PROBE = ROOT / "tools/proof/transcript_tab_probe.swift"
 FONTS = ROOT / "app/Resources/Fonts"
-PROBE_ROWS = ["T0", "T1", "T3p", "T4p", "T5", "T7", "T8", "T9", "T10", "T13p", "T14p"]
+PROBE_ROWS = ["T0", "T1", "T3p", "T4p", "T5", "T7", "T8", "T9", "T10", "T13p", "T14p", "T15p"]
 APP_ROWS = ["Z0", "M1", "T2", "T3", "T4", "T6", "T12", "B1", "B2", "B3"]
 OTHER_ROWS = ["T11", "B4"]
 ROWS = PROBE_ROWS + APP_ROWS + OTHER_ROWS
@@ -127,6 +131,7 @@ TS = "TranscriptTabSource.swift"
 TF = "TranscriptFill.swift"
 IV = "InspectorViewController.swift"
 TL = "TranscriptView+Layout.swift"
+TD = "TranscriptView+Delete.swift"
 MUTANTS = {
     "highlight-containment": ("probe", ["T3p"], [
         (TT, "        return low == 0 ? nil : low - 1\n",
@@ -149,6 +154,9 @@ MUTANTS = {
              ".reveal(selectedClips); return }\n", "")]),
     "line-index-unchecked": ("probe", ["T14p"], [
         (TL, "        guard index != NSNotFound, index >= 0 else {\n", "        guard true else {\n")]),
+    "drag-follows": ("probe", ["T15p"], [
+        (TK, "        personScrolled()  // a press pauses the follow, as a scroll does (TX-22 at CP1)\n", ""),
+        (TD, "        personScrolled()  // the follow waits while the person selects (TX-22 at CP1)\n", "")]),
     "one-wait": ("app", ["T12"], [(TS, "let take = 1\n", "let take = pending.count\n")]),
     "words-from-ignored": ("app", ["B1"], [
         (TS, "        let instances = read.instances.filter { wordsFrom == nil || $0.track == wordsFrom }\n",

@@ -239,6 +239,11 @@ transcript shows: stay and scroll; (3) the title is "Transcript" if T1 passes, e
   **Amended 2026-11-02, by TX-24:** the status, the same-speech notes and the clips with no words
   live in the tab's bar, pinned above the text, not in a stack scrolled with it.
   **Amended 2026-11-04, by TX-36:** a clip with no words is listed by its name, its id beside it.
+  **Amended at CP1 (2026-11-06, the owner's first attempt):** a press or a drag in the view
+  counts as the person's own scroll for the follow. While Loop played, each step of a drag moved
+  the loop's range, and the follow re-centred a word near the top or bottom of the view under the
+  pointer. The owner: "The text view scrolls vertically, even when I'm just trying to select
+  horizontally."
 - **TX-23 — `transcript_view` is a dev tool** (Debug and Release, never Distribution), off main
   with every step through `onMain`: `transcript_view {project?, focus?: boolean, select?: [integer,
   integer] | null, click?: integer, wait?: number}`. It applies `focus` (the view made first

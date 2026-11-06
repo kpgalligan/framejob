@@ -11,6 +11,7 @@ extension TranscriptView {
     /// words), told through `onSelect` whenever it changes.
     override func mouseDragged(with event: NSEvent) {
         guard let anchor = selectionAnchor, selection != nil, !tokenStarts.isEmpty else { return }
+        personScrolled()  // the follow waits while the person selects (TX-22 at CP1)
         autoscroll(with: event)
         let point = convert(event.locationInWindow, from: nil)
         guard let offset = characterOffset(at: point) else { return }

@@ -5564,6 +5564,21 @@ glyphs, `NSTextLineFragment.characterIndex(for:)` answers `NSNotFound` (`Int.max
   `RC_PROOF_APP=release transcript_tab_proof.py`, run whole after it, scored 23/23, T14p included.
 - The checkpoint itself is still owed: the owner's cut of T1, with its notes.
 
+**The second attempt's first note (2026-11-06).** The owner: "Selecting individual words seems to
+work ok, but trying to select and drag to select several words is not great. The text view
+scrolls vertically, even when I'm just trying to select horizontally."
+- **Reproduced:** probe row T15p ran eighteen drags along a line: the middle, top or bottom line
+  shown; straight, wobbling ±3 pt, or running 80 pt past the edge; paused, then looping while
+  playing. The nine paused drags never scrolled. Four looping drags on the top or bottom line
+  moved the view by 203–376 pt.
+- **The cause:** each drag step re-pointed Loop's range, playback jumped to its start, and TX-22's
+  follow re-centred a word near an edge. The follow paused only for a scroll.
+- **The fix:** TX-22 is amended at CP1, before the code. A press or a drag in the view now counts
+  as the person's scroll (`personScrolled()` in `mouseDown` and `mouseDragged`).
+- **The result:** none of the eighteen drags scroll (within 0.5 pt). Every probe row passes, 12/12,
+  T8's follow pause and T4p's click while playing included. The mutant `drag-follows`, which
+  takes out both calls, is caught.
+
 ### CJ5a — `keep_range`: a timeline range as a whole project
 
 The first draft's FC1 and FC2 are CJ5a and CJ5b, made shared because VR3 builds its copy on the same

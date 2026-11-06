@@ -428,11 +428,85 @@ if let (document, editor, window, pane) = openEditor() {
         }
     }
     notes.append("swept \(swept) points, \(answered) answered, outside the text: \(outside)")
+    // T15p a press on a word and a drag along its line, paused and then
+    // looping while playing: the scroll stays where it was (the owner's CP1
+    // note, 2026-11-06: "The text view scrolls vertically, even when I'm
+    // just trying to select horizontally").
+    func mouse(_ type: NSEvent.EventType, _ point: NSPoint) -> NSEvent? {
+        NSEvent.mouseEvent(
+            with: type, location: view.convert(point, to: nil), modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+            context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
+    }
+    // `band`: the line in the middle third of what shows, the top one or the
+    // bottom one fully shown; `wobble`: the pointer drifts ±3 pt as a hand's
+    // does; `past`: the drag runs 80 pt past the view's right edge.
+    func dragAlongLine(_ label: String, band: String, wobble: Bool, past: Bool) -> String {
+        let clip = view.enclosingScrollView?.contentView
+        let shown = view.visibleRect
+        let fits = { (r: CGRect) -> Bool in
+            switch band {
+            case "top": return r.minY >= shown.minY && r.minY < shown.minY + 24
+            case "bottom": return r.maxY <= shown.maxY && r.maxY > shown.maxY - 24
+            default: return r.minY > shown.minY + shown.height / 3 && r.maxY < shown.maxY - shown.height / 3
+            }
+        }
+        guard
+            let start = (0..<model().tokens.count).first(where: { index in
+                guard let r = view.rects(forToken: index).first else { return false }
+                return fits(r) && r.midX < shown.midX
+            }), let rect = view.rects(forToken: start).first,
+            let down = mouse(.leftMouseDown, NSPoint(x: rect.midX, y: rect.midY))
+        else { return "\(label): no word in the \(band) band" }
+        let before = clip?.bounds.origin.y ?? -1
+        view.mouseDown(with: down)
+        spin(0.05)
+        var ys: [CGFloat] = []
+        var step = 0
+        for x in stride(from: rect.midX, through: shown.maxX + (past ? 80 : -2), by: 8) {
+            let dy: CGFloat = wobble ? (step % 2 == 0 ? 3 : -3) : 0
+            step += 1
+            if let drag = mouse(.leftMouseDragged, NSPoint(x: x, y: rect.midY + dy)) { view.mouseDragged(with: drag) }
+            spin(0.03)
+            ys.append(clip?.bounds.origin.y ?? -1)
+        }
+        if let up = mouse(.leftMouseUp, NSPoint(x: shown.maxX - 2, y: rect.midY)) { view.mouseUp(with: up) }
+        spin(0.2)
+        let after = clip?.bounds.origin.y ?? -1
+        let moved = Set((ys + [after]).filter { abs($0 - before) > 0.5 })
+        return "\(label) \(band)\(wobble ? " wobbling" : "")\(past ? " past the edge" : ""): word "
+            + "\(start), top \(before) before, \(ys.count) drag steps, top after \(after), other tops "
+            + "seen \(moved.sorted()), selection \(String(describing: view.selection))"
+    }
+    var drags: [String] = []
+    for playing in [false, true] {
+        if playing {
+            editor.toggleLoop(nil)
+            editor.playPause(nil)
+            _ = until(2) { editor.playback.isPlaying }
+        }
+        for band in ["middle", "top", "bottom"] {
+            for (wobble, past) in [(false, false), (true, false), (false, true)] {
+                view.scrollToToken(120)
+                spin(0.3)
+                drags.append(dragAlongLine(playing ? "looping" : "paused", band: band, wobble: wobble, past: past))
+            }
+        }
+        if playing {
+            editor.playback.pause()
+            editor.toggleLoop(nil)
+            spin(0.3)
+        }
+    }
+    let scrolled = drags.filter { !$0.contains("other tops seen []") }
+    row("T15p", scrolled.isEmpty,
+        "\(scrolled.count) of \(drags.count) drags scrolled: " + (scrolled.isEmpty ? drags : scrolled).joined(separator: "; "))
+
     row("T14p", ordered && outside.isEmpty && answered > 0,
         notes.joined(separator: "; ") + " (text length \(length); want four offsets inside it, "
             + "both lefts equal, each left before each right, and every swept answer inside)")
 } else {
-    for id in ["T4p", "T5", "T7", "T10", "T14p"] { row(id, false, "the editor did not open on \(package)") }
+    for id in ["T4p", "T5", "T7", "T10", "T14p", "T15p"] { row(id, false, "the editor did not open on \(package)") }
 }
 
 if let data = try? JSONSerialization.data(withJSONObject: ["rows": rows], options: [.sortedKeys]),
