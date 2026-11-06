@@ -11,7 +11,7 @@
   3:53, look away 4:09) as whole-second spans of movie time, read from
   autorotated `fps=1` frames (CJ7's record names the frames that set each
   bound). `ABSENT` are the spans with nobody in the chair: the first seconds
-  before the owner sits (no face until 8 s) and the end after he stands
+  before the owner sits (no face until 8 s) and the end after they stand
   (gone from 285 s). `face_present(t)` is false inside either.
 - `FACING_0_60` is the part of 0–60 s with the owner's face in frame.
 - `profile_span(samples)` finds the profile stretch in the add-on from the

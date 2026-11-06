@@ -7999,7 +7999,7 @@ empty chair (0–7 s and from 284 s), read from autorotated frames (CJ7's record
   20.8, 23.4, 27.0 and 64.2 s, and the runs 8.74×, 5.66×, 3.29× and 0.86× real time with decode
   (one-minute loads 66.42, 38.57, 14.21 and 43.22: another session was building).
 - **Rule 6: STOP.** A face in 523 of the first 60 s's 600 samples, 0.8717 at 720 (0.8700 at 1920),
-  under 95 %. The frames show an empty chair from 0 to 6 s, the owner sitting down at 7 s and his
+  under 95 %. The frames show an empty chair from 0 to 6 s, the owner sitting down at 7 s and their
   face from 8 s; over 8–60 s the share is 518/520 = 0.9962. By the rule this stops VR1 and SW8
   until CJ-30 is amended; both have shipped. It is put to the owner (CJ7's record); CJ-30 is not
   amended here.
@@ -11106,7 +11106,7 @@ one a second; 0–55 s and 60–288 s one every 5 and 3 s), whole seconds, both 
 | `look_away` | 249–254 | 248 facing, 249 turned, 250–253 away, 254 turning back, 255 facing |
 | `arrive` (no one in the chair) | 0–7 | 0–6 the empty chair, 7 a torso, 8 the first face |
 | `exit` (no one in the chair) | 284–292 | 283 a face, 284 standing, 285–290 the empty chair |
-| `FACING_0_60` | 8–60 | 10 of the 12 frames at 0, 5, … 55 s show the face (not 0 and 5); 10 s faces the lens, and from 15 s the owner looks off camera, the face in three-quarter view; at 11 s he is turned away |
+| `FACING_0_60` | 8–60 | 10 of the 12 frames at 0, 5, … 55 s show the face (not 0 and 5); 10 s faces the lens, and from 15 s the owner looks off camera, the face in three-quarter view; at 11 s the owner is turned away |
 
 `face_present(t)` is false inside every span, each widened by 0.5 s. The retakes, false starts
 and the 3 s pause were not needed by any row that ran: TX-S4 (S-RT1) and JOB-14 are where they
