@@ -1,0 +1,6 @@
+> TX4 waits on your notes
+What notes?
+
+---
+
+I was trying to select text in the transcript window to delete, and the app seems to have run into a crash. See [Image #2]
