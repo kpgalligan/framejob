@@ -30045,7 +30045,7 @@ python3 tools/proof/vr6b_proof.py --mutant <name>
 The recorded runs are in `designs/creator-jobs.md`'s VR6b record; JOB-37 is what only a person
 judges.
 
-## Docs-bugs batch a1 — timeline and clipboard (`docs_bugs_a1_proof.py`, `docs_bugs_a1_probe.swift`; eleven mutants by `--mutant`; `core/tests/duplicate_destination.rs`; spec §11 #465)
+## Docs-bugs batch a1 — timeline and clipboard (`docs_bugs_a1_proof.py`, `docs_bugs_a1_probe.swift`; sixteen mutants by `--mutant`; `core/tests/duplicate_destination.rs`; spec §11 #465)
 
 #464, #465, #507 and #511. **`docs_bugs_a1_proof.py`** has the app under test make its projects over
 MCP, runs the `app` rows there (D7, D8, F1–F5, Z1) and the rest through **`docs_bugs_a1_probe.swift`**,
@@ -30059,6 +30059,14 @@ docstring has every row.
 `--tree PATH` builds the probe from another tree, `PATH/core/target/release/libframejob_core.a`
 included; `--expect-red` is the run against the base, exiting 0 only when every row not marked
 CONTROL fails and every CONTROL passes.
+
+D15–D21 (batch ra) are #465's springback against the core's own landing rule
+(`ClipDragSession.landed`): a drop that landed never flashes and one the core refused always does,
+with a staggered two-lane selection, a refused tick after a good one, and the back clip dragged
+straight up. Their baseline is the tree at 8e007141, not the frozen base, so `--expect-red` with no
+`--only` leaves them out (`RESIDUE`); run them red on that tree's Debug app, with this probe and
+proof copied in, by `--only D15,D16,D17,D18,D19,D20,D21 --expect-red`: D15, D16, D17 and D20
+fail, the controls D18, D19 and D21 pass.
 
 ```sh
 make app-debug && python3 tools/proof/docs_bugs_a1_proof.py [--only N1,D5]

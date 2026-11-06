@@ -21,8 +21,8 @@ final class PaneSplitView: NSSplitView {
 extension EditorViewController {
     /// ⌥⌘I's re-layout. A shown inspector comes back inside its 280–440 pt:
     /// `adjustSubviews` alone hands back a width scaled by any window resize
-    /// made while it was hidden (258 pt after a 120 pt wider window). The
-    /// canvas keeps its own minimum, as `constrainMaxCoordinate` does.
+    /// made while it was hidden (under 280 pt after a 120 pt wider window).
+    /// The canvas keeps its own minimum, as `constrainMaxCoordinate` does.
     static func adjustInspector(in split: NSSplitView, inspector: NSView) {
         split.adjustSubviews()
         guard !inspector.isHidden else { return }

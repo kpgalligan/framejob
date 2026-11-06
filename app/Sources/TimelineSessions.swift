@@ -190,6 +190,39 @@ struct ClipDragSession {
         return ops
     }
 
+    /// Whether the drop landed where the core's rule puts it, read back from
+    /// `now`, the project after the drop, against `base`, the gesture's
+    /// (spec §11 #465). The rule is `move_clips`' and `duplicate_clips`':
+    /// the named clip on the back-most track, then the earliest, lands on
+    /// `destination` and every named clip shifts by the same number of
+    /// tracks, none when `destination` is nil, each `delta` later. Track
+    /// indices are read in `now`, after any `add_track`, as the core reads
+    /// them. Every named clip, or on ⌥ a copy the base did not have, must
+    /// sit at its expected start on its expected track.
+    func landed(base: ProjectSnapshot, now: ProjectSnapshot, destination: UInt32?) -> Bool {
+        let selected = base.clips.filter { clips.contains($0.id) }
+        let keyed = selected.compactMap { c in
+            now.trackIndex(of: c.track).map { (index: $0, start: c.start, id: c.id) }
+        }
+        guard !selected.isEmpty, keyed.count == selected.count,
+              let back = keyed.min(by: { ($0.index, $0.start, $0.id) < ($1.index, $1.start, $1.id) })
+        else { return false }
+        var shift = 0
+        if let destination {
+            guard let index = now.trackIndex(of: destination) else { return false }
+            shift = index - back.index
+        }
+        let known = Set(base.clips.map { $0.id })
+        let pool = duplicating
+            ? now.clips.filter { !known.contains($0.id) }
+            : now.clips.filter { clips.contains($0.id) }
+        return keyed.allSatisfy { c in
+            let to = c.index + shift
+            guard now.tracks.indices.contains(to) else { return false }
+            return pool.contains { $0.start == c.start + delta && $0.track == now.tracks[to].id }
+        }
+    }
+
     /// Advances the drag. `time` is the time under the pointer and `row` the
     /// lane under it; snapping is applied to the GROUP's start so the whole
     /// selection clicks into place together.

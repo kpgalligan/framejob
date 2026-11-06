@@ -811,11 +811,10 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     }
 
     /// Compares what the drag asked for with what the core did. `onLiveEnd`
-    /// has already published, so `snapshot` is the answer: the clip asked
-    /// about is the anchor, or on a duplicating drag any clip the drag's base
-    /// did not have, and it landed when it starts at the proposed start on
-    /// the row under the pointer or, past the lanes, when the new track is
-    /// there. Anything else springs back (spec §11 #465).
+    /// has already published, so `snapshot` is the answer: it landed when
+    /// every dragged clip, or on ⌥ its copy, is where the core's rule puts
+    /// it, past the lanes on the track the drop made
+    /// (`ClipDragSession.landed`). Anything else springs back (#465).
     private func checkRefusal(of session: ClipDragSession) {
         let created = session.createdTrack
         guard session.didMove, !session.needsNewTrack || created != nil, let base = dragBase,
@@ -826,10 +825,8 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         }
         let known = Set(base.clips.map { $0.id })
         let copies = snapshot.clips.filter { !known.contains($0.id) }
-        let landed = created.map { id in snapshot.tracks.contains { $0.id == id } }
-            ?? (session.duplicating ? copies : [anchor]).contains {
-                $0.start == session.proposedStart && lane(of: $0) == session.row
-            }
+        let landed = session.landed(
+            base: base, now: snapshot, destination: created ?? destination(for: session))
         guard !landed else { return }
         let nearest = copies.min {
             abs($0.start - session.proposedStart) < abs($1.start - session.proposedStart)

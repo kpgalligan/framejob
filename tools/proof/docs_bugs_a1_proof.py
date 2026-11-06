@@ -41,6 +41,17 @@ Red on the base unless marked CONTROL:
   step, the flash. D13 the same plain-dragged: track count unchanged, no undo step, the flash. D14
   (CONTROL) those two, with free time after them, ⌥-dragged past the bottom lane: one new track,
   copies landed, one undo step.
+- #465's springback, the residue rows (batch ra): red on the tree at 8e007141, not on the frozen
+  base, so `--expect-red` with no `--only` leaves them out (RESIDUE). Staggered: the back clip on
+  index 0 at 0 s, the front one on index 1 at 2 s, two free tracks above; the front one is grabbed
+  with both selected. D15 ⌥ onto index 2 at 30 s: copies on index 2 at 28 s and index 3 at 30 s,
+  one undo step, no flash. D16 the same plain: the pair moved there, no flash. D17 the linked
+  picture ⌥-dragged past the top lane at 12 s, then on to 0 s there, refused: the 12 s copies kept,
+  the flash. D18 (CONTROL) ⌥ past the bottom lane at 30 s: copies on the new index 0 at 28 s and
+  index 1 at 30 s, no flash. D19 (CONTROL) the lanes pair, the back clip plain-dragged straight
+  up: refused, the flash. D20 the lanes pair ⌥-dragged by the back clip to 30 s on its own row,
+  then a row up, refused: the 30 s copies kept, the flash. D21 (CONTROL) staggered, the front clip
+  plain-dragged along its own row to 30 s: the pair moved, no flash.
 - #507. M1 a row squarely on a clip: performDragOperation false, strip sentence, no change, no
   undo. M2 (CONTROL) below the lanes: false. M3 (CONTROL) free time: true, landed. M4 (CONTROL) a
   small overlap: true, landed with a cross_dissolve. M6 (CONTROL) a canvas drop: true, on a new
@@ -56,8 +67,9 @@ mutant builds the probe from the copy; an `app` row's builds the copy's app; a c
 the core in the copy, in a real folder with its own target. `nests-one-level` N5,
 `inner-media-dropped` N4, `nests-in-depth-form` N1, `closure-anchor` D9, `partner-shifts` D9 and
 `core/tests/duplicate_destination.rs`, `no-duplicating-flash` D5, `tick-not-whole` D12,
-`new-track-returns-early` D12, `drop-always-true` M1, `still-walks` F3, `image-walks` F1. An
-instrument that cannot run is a scored failure, never an exit.
+`new-track-returns-early` D12, `drop-always-true` M1, `still-walks` F3, `image-walks` F1,
+`anchor-shift` D15 D16, `any-clip` D20, `start-unchecked` D17, `shift-without-destination` D21,
+`first-spec-rule` D19. An instrument that cannot run is a scored failure, never an exit.
 """
 
 import argparse
@@ -96,14 +108,19 @@ TOLERANCE = 16
 LANE_Y, LANE_X = 110, 134    # points: inside the first lane's strip, just right of the header
 
 PROBE_ROWS = ["N1", "N2", "N3", "N4", "N5", "N6", "N8", "N9", "PB", "D1", "D2", "D3", "D4", "D5",
-              "D6", "D9", "D10", "D11", "D12", "D13", "D14", "M1", "M2", "M3", "M4", "M6"]
+              "D6", "D9", "D10", "D11", "D12", "D13", "D14", "D15", "D16", "D17", "D18", "D19",
+              "D20", "D21", "M1", "M2", "M3", "M4", "M6"]
 APP_ROWS = ["D7", "D8", "F1", "F2", "F3", "F4", "F5"]
 ROWS = PROBE_ROWS + APP_ROWS + ["Z1"]
-CONTROLS = {"N9", "PB", "D3", "D4", "D8", "D14", "M2", "M3", "M4", "M6", "F5", "Z1"}
+CONTROLS = {"N9", "PB", "D3", "D4", "D8", "D14", "D18", "D19", "D21", "M2", "M3", "M4", "M6", "F5",
+            "Z1"}
+# Red on the tree at 8e007141 (batch ra), not on the frozen base the other rows are red on.
+RESIDUE = {"D15", "D16", "D17", "D18", "D19", "D20", "D21"}
 GROUP = {"N": "464", "D": "465", "M": "507"}
 
 CLIPBOARD = "app/Sources/EditorViewController+Clipboard.swift"
 TIMELINE = "app/Sources/TimelineView.swift"
+SESSIONS = "app/Sources/TimelineSessions.swift"
 DRAWING = "app/Sources/TimelineClipDrawing.swift"
 EDIT_CLIP = "core/src/edit_clip.rs"
 MUTANTS = {
@@ -159,6 +176,24 @@ MUTANTS = {
         "        case .still(_, let at):\n            return Int(max(at, 0) / ReelTime.perSecond)\n",
         "")]),
     "image-walks": (["F1"], [(DRAWING, "        case .image:\n            return 0\n", "")]),
+    "anchor-shift": (["D15", "D16"], [(
+        SESSIONS, "            shift = index - back.index\n",
+        "            shift = index - (keyed.first { $0.id == anchor }?.index ?? back.index)\n")]),
+    "any-clip": (["D20"], [(
+        SESSIONS, "        return keyed.allSatisfy { c in\n", "        return keyed.contains { c in\n")]),
+    "start-unchecked": (["D17"], [(
+        SESSIONS,
+        "            return pool.contains { $0.start == c.start + delta && $0.track == now.tracks[to].id }\n",
+        "            return pool.contains { $0.track == now.tracks[to].id }\n")]),
+    "shift-without-destination": (["D21"], [(
+        SESSIONS, "        var shift = 0\n",
+        "        var shift = (keyed.first { $0.id == anchor }?.index ?? back.index) - back.index\n")]),
+    "first-spec-rule": (["D19"], [(
+        SESSIONS, "        return keyed.allSatisfy { c in\n",
+        "        let onto = destination ?? base.clip(anchor)?.track\n"
+        "        if pool.contains(where: { $0.start == proposedStart }),\n"
+        "           pool.contains(where: { $0.track == onto }) { return true }\n"
+        "        return false && keyed.allSatisfy { c in\n")]),
 }
 CORE_TEST = {"partner-shifts": "duplicate_destination"}   # the core test the mutant must fail too
 
@@ -277,7 +312,17 @@ def make_fixtures(c):
     ids["drop"] = {"clip": add(c, p8, t, a, 0), "free_media": b, "track": t}
     c.call_with("save_project", {"project": p8})
 
-    for path in (p, p2, p3, p4, p5, p6, p7, p8):
+    # staggered: A on index 0 at 0 s, B on index 1 at 2 s, two free tracks above them.
+    p9, t = start(c, "staggered")
+    for index in (1, 2, 3):
+        c.call_with("add_track", {"project": p9, "index": index})
+    order = [x["id"] for x in state(c, p9)["tracks"]]
+    a, b = (imported(c, p9, MEDIA / f"{n}.mov") for n in "AB")
+    ids["staggered"] = {"back": add(c, p9, order[0], a, 0),
+                        "front": add(c, p9, order[1], b, 2 * SEC)}
+    c.call_with("save_project", {"project": p9})
+
+    for path in (p, p2, p3, p4, p5, p6, p7, p8, p9):
         c.call_with("close_project", {"project": path})
     (FIXTURES / "ids.json").write_text(json.dumps(ids, indent=1))
     return ids
@@ -742,6 +787,55 @@ def score_465(r, ids):
         check("D14", len(made) == 2 and all(x["start"] == 30 * SEC for x in made)
               and len(row["after"]["tracks"]) == len(row["before"]["tracks"]) + 1
               and row["undo"] == "Duplicate Clips" and row["undo_steps"] == 1, told(row))
+    score_springback(r, ids)
+
+
+def spots(clips):
+    """(track index, start in seconds) of each clip, sorted."""
+    return sorted((x["index"], x["start"] / SEC) for x in clips)
+
+
+def step(row, name, tracks=0):
+    """One undo step named `name` that undoes back, `tracks` new tracks."""
+    return (row["undo"] == name and row["undo_steps"] == 1 and row["restored"]
+            and len(row["after"]["tracks"]) == len(row["before"]["tracks"]) + tracks)
+
+
+def moved(row, ids, fixture):
+    """(track index, start in seconds) of the fixture's back and front clips after the drop."""
+    now = {x["id"]: (x["index"], x["start"] / SEC) for x in row["after"]["clips"]}
+    return now.get(ids[fixture]["back"]), now.get(ids[fixture]["front"])
+
+
+def score_springback(r, ids):
+    """D15–D21: the flash goes up exactly when the core refused the drop."""
+    if "D15" in r:
+        row = r["D15"]
+        check("D15", spots(new_clips(row)) == [(2, 28.0), (3, 30.0)] and originals_in_place(row)
+              and step(row, "Duplicate Clips") and row["flash"] is False, told(row))
+    if "D16" in r:
+        row = r["D16"]
+        check("D16", not new_clips(row) and moved(row, ids, "staggered") == ((2, 28.0), (3, 30.0))
+              and step(row, "Move Clips") and row["flash"] is False, told(row))
+    if "D17" in r:
+        row = r["D17"]
+        made = new_clips(row)
+        check("D17", len(made) == 2 and all(x["start"] == 12 * SEC for x in made)
+              and step(row, "Duplicate Clips", tracks=1) and row["flash"] is True, told(row))
+    if "D18" in r:
+        row = r["D18"]
+        check("D18", spots(new_clips(row)) == [(0, 28.0), (1, 30.0)]
+              and step(row, "Duplicate Clips", tracks=1) and row["flash"] is False, told(row))
+    if "D19" in r:
+        check("D19", refused(r["D19"]), told(r["D19"]))
+    if "D20" in r:
+        row = r["D20"]
+        check("D20", spots(new_clips(row)) == [(0, 30.0), (1, 30.0)] and originals_in_place(row)
+              and step(row, "Duplicate Clips") and row["flash"] is True, told(row))
+    if "D21" in r:
+        row = r["D21"]
+        check("D21", not new_clips(row) and moved(row, ids, "staggered") == ((0, 28.0), (1, 30.0))
+              and step(row, "Move Clips") and row["flash"] is False, told(row))
 
 
 def dropped(row):
@@ -897,6 +991,8 @@ def main():
             print(f"unknown rows: {sorted(unknown)}")
             return 2
         selected.add("Z1")
+    elif args.expect_red:
+        selected -= RESIDUE   # their baseline is the tree at 8e007141, not the frozen base
     shutil.rmtree(WORK, ignore_errors=True)
     WORK.mkdir(parents=True)
     if args.mutant:

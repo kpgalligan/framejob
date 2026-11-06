@@ -63,7 +63,7 @@ Red on the base unless marked CONTROL:
   (CONTROL) no action: no ⊘ and every tag hidden. M5 (CONTROL) a filter's Amount stays animating.
 - #485. S1 a drag to 138, 60 and 4 pt from the edge: held at 280, View "Hide Inspector", the key
   false. S2 ⌥⌘I hides, the key true, it survives a window resize, and ⌥⌘I shows it again at
-  280–440 pt (the base comes back at 258).
+  280–440 pt (the base comes back under 280).
   S3 ⌥⌘I, then a drag out: shown, the key false, a new window shown. S4 (CONTROL) ⌥⌘I, then a new
   window hidden.
 - Z1 (CONTROL) `grep "Frame Job: "` on the log prints nothing.

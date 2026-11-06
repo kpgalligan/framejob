@@ -15,7 +15,10 @@ them, made of pieces copied from whichever camera you want at each moment.
 2. Add a track in front of them for the program, and put the first shots on
    it. An agent does this with `copy_pieces` (below); by hand, ⌥-drag a
    camera's clip straight up onto the program track, which leaves a copy at
-   the same time, and cut it with **Clip ▸ Split** (⌘T).
+   the same time — except a clip with a detached sound, whose sound's copy
+   would sit on the sound, so give it a change in time (see
+   [Moving clips](editing.md#moving-clips)) — and cut it with
+   **Clip ▸ Split** (⌘T).
 
 The camera tracks stay underneath. They can stay shown — the program track is
 in front and covers them — or be hidden with their track switch; a hidden

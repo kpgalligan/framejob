@@ -380,6 +380,11 @@ impl Project {
         let Some(outermost) = instance.inside.first() else {
             return Value::Null;
         };
+        // `frame_of` computed this same level-0 value for the layer already;
+        // the repeat is deliberate. Passing it through would change
+        // `frame_of`'s return for its three callers (`layer` and `placement`
+        // here, `recipe_dissolve.rs`), and the repeat costs one
+        // `evaluate_clip` per nested layer, which `frame_of`'s doc accepts.
         let moved = self.nest_moved(&instance.inside, 0, t);
         let mut out = Map::new();
         out.insert("clip".to_string(), Value::from(outermost.clip.id));

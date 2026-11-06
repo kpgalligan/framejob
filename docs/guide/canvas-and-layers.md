@@ -145,9 +145,11 @@ cut away is shown as a faint white area inside the uncropped frame's dashed
 outline. Press **Esc**, **Return** or the keypad's **Enter** from anywhere but
 a text field, or click empty canvas, to leave crop mode. Clicking a video, image
 or still clip that isn't selected keeps crop mode on and moves the crop handles
-to that clip; clicking a text, shape or graphic clip ends it. With
-several clips selected, crop mode ends if the clip you click isn't the
-front-most selected clip afterwards. Crop mode doesn't open on a nest clip, so **C** and a double-click only beep on one, unless it's on a matte track.
+to that clip; clicking a text, shape or graphic clip ends it, unless it's on a
+matte track. With several clips selected, crop mode ends if the clip you click
+isn't the front-most selected clip afterwards. Crop mode doesn't open on a nest
+clip, so **C** and a double-click only beep on one, unless it's on a matte
+track.
 
 A crop removes edges in place: the picture never shifts as you crop. Crop
 amounts are in the source's own pixels, so they stay correct when you scale

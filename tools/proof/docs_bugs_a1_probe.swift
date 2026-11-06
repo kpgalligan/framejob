@@ -313,16 +313,25 @@ func mouse(_ type: NSEvent.EventType, _ o: Open, _ point: CGPoint, _ flags: NSEv
 }
 
 /// The drag, and whether the timeline's refusal flash is up the moment mouse-up returns (it runs
-/// 0.22 s). `steps` 1 is a jump: no tick lands on a spot the drop then leaves.
-func drag(_ o: Open, from: CGPoint, to: CGPoint, flags: NSEvent.ModifierFlags, steps: Int) -> Bool {
+/// 0.22 s). `steps` 1 is a jump: no tick lands on a spot the drop then leaves. `via` is a list of
+/// points the drag passes first, `steps` ticks to each in turn, every leg ending on its point.
+func drag(
+    _ o: Open, from: CGPoint, to: CGPoint, flags: NSEvent.ModifierFlags, steps: Int,
+    via: [CGPoint] = []
+) -> Bool {
     let content = o.controller.timeline!.content
     content.mouseDown(with: mouse(.leftMouseDown, o, from, flags))
     spin(0.05)
-    for step in 1...steps {
-        let f = CGFloat(step) / CGFloat(steps)
-        let p = CGPoint(x: from.x + (to.x - from.x) * f, y: from.y + (to.y - from.y) * f)
-        content.mouseDragged(with: mouse(.leftMouseDragged, o, p, flags))
-        spin(0.05)
+    var leg = from
+    for end in via + [to] {
+        for step in 1...steps {
+            let f = CGFloat(step) / CGFloat(steps)
+            let p = step == steps
+                ? end : CGPoint(x: leg.x + (end.x - leg.x) * f, y: leg.y + (end.y - leg.y) * f)
+            content.mouseDragged(with: mouse(.leftMouseDragged, o, p, flags))
+            spin(0.05)
+        }
+        leg = end
     }
     content.mouseUp(with: mouse(.leftMouseUp, o, to, flags))
     let flashed = o.controller.timeline!.refusal != nil
@@ -356,10 +365,12 @@ func dropPoint(_ o: Open, row: Int, seconds: Double, grabbed: UInt32, from: CGPo
 }
 
 /// One drag: `grab` is pressed, with `clips` selected first, and dropped on display row `row`
-/// (track index `index` when given) at `seconds`.
+/// (track index `index` when given) at `seconds`, through the display row and seconds of `via`
+/// first when it is given.
 func trial(
     _ id: String, _ o: Open, grab: UInt32, clips: [UInt32], index: Int? = nil, row: Int? = nil,
-    seconds: Double, flags: NSEvent.ModifierFlags, steps: Int = 4
+    seconds: Double, flags: NSEvent.ModifierFlags, steps: Int = 4,
+    via: (row: Int, seconds: Double)? = nil
 ) {
     let before = o.doc.project.json
     select(o, clips)
@@ -367,7 +378,10 @@ func trial(
     let display = row ?? t.layout.row(forTrackIndex: index!)
     let from = clipPoint(o, grab)
     let to = dropPoint(o, row: display, seconds: seconds, grabbed: grab, from: from)
-    let flashed = drag(o, from: from, to: to, flags: flags, steps: steps)
+    let stops = via.map {
+        [dropPoint(o, row: $0.row, seconds: $0.seconds, grabbed: grab, from: from)]
+    } ?? []
+    let flashed = drag(o, from: from, to: to, flags: flags, steps: steps, via: stops)
     var answer: [String: Any] = [
         "flash": flashed, "undo": undoName(o), "strip": strip(o), "alert": settle(o, wait: 0.1),
         "before": facts(before), "after": facts(o.doc.project.json),
@@ -397,6 +411,9 @@ func run465() {
     trial("D9", l, grab: picture, clips: [picture], index: 2, seconds: 12, flags: [.option])
     trial("D10", l, grab: picture, clips: [picture], row: -1, seconds: 12, flags: [.option])
     trial("D11", l, grab: picture, clips: [picture], index: 2, seconds: 0, flags: [.option], steps: 1)
+    // A good tick past the top lane at 12 s, then a refused one there at 0 s.
+    trial("D17", l, grab: picture, clips: [picture], row: -1, seconds: 0, flags: [.option], steps: 1,
+          via: (row: -1, seconds: 12))
     l.window.orderOut(nil)
 
     let lanes = ids["lanes"]!
@@ -406,7 +423,24 @@ func run465() {
     trial("D12", two, grab: front, clips: pair, row: -1, seconds: 30, flags: [.option], steps: 1)
     trial("D13", two, grab: front, clips: pair, row: -1, seconds: 30, flags: [], steps: 1)
     trial("D14", two, grab: back, clips: pair, row: 2, seconds: 30, flags: [.option])
+    // The back clip straight up a row: the front one would leave the track list.
+    trial("D19", two, grab: back, clips: pair, row: 0, seconds: 0, flags: [])
+    // A good tick on the back clip's own row at 30 s, then a refused one a row up.
+    trial("D20", two, grab: back, clips: pair, row: 0, seconds: 30, flags: [.option], steps: 1,
+          via: (row: 1, seconds: 30))
     two.window.orderOut(nil)
+
+    // Staggered: the back clip on index 0 at 0 s, the front one on index 1 at 2 s, two free
+    // tracks above. The front clip is grabbed.
+    let staggered = ids["staggered"]!
+    let lower = u32(staggered["back"]), upper = u32(staggered["front"])
+    let st = open("staggered")
+    let both = [lower, upper]
+    trial("D15", st, grab: upper, clips: both, index: 2, seconds: 30, flags: [.option])
+    trial("D16", st, grab: upper, clips: both, index: 2, seconds: 30, flags: [])
+    trial("D18", st, grab: upper, clips: both, row: 4, seconds: 30, flags: [.option])
+    trial("D21", st, grab: upper, clips: both, index: 1, seconds: 30, flags: [])
+    st.window.orderOut(nil)
 }
 
 // MARK: - #507

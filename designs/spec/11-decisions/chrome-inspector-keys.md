@@ -471,6 +471,13 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   the one case where a drag and a typed value write different places.
   **Amended by CI-19:** past a finished action holding a key it writes, a
   single clip's gesture refuses.
+- **CI-18 — A list's add and remove buttons carry the boxed "clip" tag**
+  (#481, 2026-11-05). Add Filter, Add Region with Place on Canvas (one tag
+  for the row) and each Remove take `InspectorClipTag`, #102's mark for a
+  lone ⊘ button in an animatable section, and not a gutter ⊘: their section
+  animates, and the gutter on a Remove row speaks for the kind popup beside
+  it. Shape rows take the real ⊘ under CI-7, through `paths(of:)`'s
+  `set_shape` group, and CI-9's Reset stays.
 - **CI-19 — A canvas gesture past a finished action that holds a key it
   writes refuses, when it writes one clip and no action is selected; amends
   CI-13 and CI-17** (#469, the owner 2026-11-05, "Refuse and explain"). It
@@ -501,13 +508,6 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   (CI-2, ◇); and `set_video`, `set_text` and `set_action_end` over MCP — no
   tool reaches a canvas gesture, so no agent mirror changes. CI-2 and CI-13
   stand: the refusal only says where the write would go.
-- **CI-18 — A list's add and remove buttons carry the boxed "clip" tag**
-  (#481, 2026-11-05). Add Filter, Add Region with Place on Canvas (one tag
-  for the row) and each Remove take `InspectorClipTag`, #102's mark for a
-  lone ⊘ button in an animatable section, and not a gutter ⊘: their section
-  animates, and the gutter on a Remove row speaks for the kind popup beside
-  it. Shape rows take the real ⊘ under CI-7, through `paths(of:)`'s
-  `set_shape` group, and CI-9's Reset stays.
 - **SH-4 — `StickerButton` is Rasterize's square block, drawn in place;
   supersedes SH-1** (kpgalligan/framejob#100, the owner, 2026-09-30). The
   class, its name, its `init(title:style:target:action:)` and all 28 calls

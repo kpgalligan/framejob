@@ -1583,8 +1583,11 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   stands only with `delta` absent: `delta: 0` on the same tracks reaches the
   rule and is refused. **A refused drop springs back.** `checkRefusal` asks
   one question of every clip drag, plain or ⌥, on a lane or past the lanes:
-  did the clip asked about land at the proposed start on the row under the
-  pointer, or, past the lanes, on the track the drop made? Anything else
+  did every dragged clip, or on ⌥ its copy, land at its own start plus the
+  drag's change in time, on the track the core gives it? The core puts the
+  back-most, earliest dragged clip on the track under the pointer, or past the
+  lanes on the track the drop made, and keeps the rest the same distance from
+  it; on the grabbed clip's own row every clip keeps its track. Anything else
   flashes from the proposed ghost to where the clip is, as a refused plain
   move always has. **The tick.** #88's fold in `ReelProject.applying` keeps
   a list that half applied, which is right for a compound gesture and wrong
