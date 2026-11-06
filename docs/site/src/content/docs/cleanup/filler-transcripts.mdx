@@ -1,0 +1,167 @@
+---
+title: "Transcripts for filler words"
+description: "Get the AssemblyAI transcript that Remove Filler Words reads, see what it costs, and know what happens to your audio and your captions."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+[Remove Filler Words](/cleanup/remove-filler-words/) reads filler words from an AssemblyAI transcript made with filler words, a filler transcript for short, because transcription on your Mac doesn't report them. This page explains which files already have one, how to get one for a file that doesn't, and what that means for your captions.
+
+<AtAGlance
+  menu="Clip ▸ Remove Filler Words…"
+  where="Frame Job ▸ Settings… ▸ Transcription, for the key"
+  tools={['detect_fillers', 'transcribe_for_fillers']}
+  needs="Your own AssemblyAI API key, unless every file you want to clean up already has a filler transcript."
+/>
+
+## Filler words need a cloud transcript
+
+Filler removal is a cloud feature. You need [your own AssemblyAI API key](/captions/assemblyai-key/), set in **Frame Job ▸ Settings…** (<kbd>⌘,</kbd>) under **Transcription**. A transcript this Mac made is never used here, so without a key Frame Job can't find fillers in a file that has no filler transcript yet.
+
+### Every AssemblyAI transcription asks for fillers
+
+Any file you've captioned with AssemblyAI (**File ▸ Generate Captions…**, AssemblyAI engine) is already ready for Remove Filler Words, with no second upload.
+
+A file needs a new transcript only when:
+
+- it has never been transcribed in the cloud
+- it was transcribed before Frame Job started asking for filler words
+- the file itself has changed since it was transcribed
+
+## Transcribe a file
+
+<Steps>
+
+1. Choose **Clip ▸ Remove Filler Words…**. Files with no filler transcript are listed in the sheet.
+
+2. Read what the row would upload and what it would cost.
+
+3. Choose **Transcribe** on the row. One press sends one file, and only one file can run at a time.
+
+4. When the run finishes, the file drops off the list and its fillers join the count above the list.
+
+5. Repeat for any other file, then choose **Remove**.
+
+</Steps>
+
+Pressing **Transcribe** only updates that file's kept transcript. It places no captions and adds no undo step.
+
+The run keeps the choices the file was last transcribed with, its language, speaker labels and vocabulary, and adds filler words. A file that's never been transcribed uses language detection, no speakers and no vocabulary.
+
+:::caution
+A listed file that already has a caption transcript is uploaded again. That older transcript was made without filler words, so this is a second paid transcription.
+:::
+
+### The list of files with no transcript
+
+Each file the sheet reads that has no filler transcript gets a row, under the heading "Filler words are found only in an AssemblyAI transcript made with filler words — transcription on this Mac does not report them. These files have none yet:". The whole section is hidden when every file the sheet reads has a filler transcript.
+
+A row has the file's name, an estimate and a **Transcribe** button. The estimate reads, for example:
+
+`1 file to upload · 00:00:05.249 of audio · under $0.01 at AssemblyAI's published rate`
+
+The upload is the whole file's audio, not only the part your clips play. Rest the pointer on the estimate to see the rate. It's $0.21 an hour, or $0.23 an hour when the file's earlier transcript used speaker labels.
+
+The list covers [the same clips as the rest of the sheet](/cleanup/remove-filler-words/#which-clips-are-read): the selected clips when the selection holds a clip Frame Job can read, otherwise every clip. A file is listed only if one of those clips plays its sound. Clips that play in reverse, clips with their sound switched off, clips on a locked track and clips whose file is missing don't count. A clip inside a [nest](/editing/nests/) counts only while that nest is open.
+
+### Where the audio goes
+
+Above the rows, the sheet says where the audio goes before anything is sent:
+
+> The audio of these files is uploaded to AssemblyAI (United States), transcribed with Universal-3.5 Pro, and deleted from AssemblyAI once the words have been read back. Nothing is uploaded until Transcribe is pressed.
+
+It names European Union instead when that's the **Region:** set in Settings, and it follows a change you make with the sheet open. See [What goes to AssemblyAI](/captions/assemblyai-privacy/).
+
+### Progress and Stop
+
+While a run goes, its row shows where it has got to, starting with **Starting…** and then a phase with a percentage:
+
+| The row reads | What's happening |
+| --- | --- |
+| Extracting *file* | Frame Job is pulling the audio out of the file. |
+| Uploading *file* · 12 MB of 40 | The audio is on its way to AssemblyAI. |
+| Submitting *file* | Frame Job is asking AssemblyAI to transcribe it. |
+| Waiting for AssemblyAI · 8 s | AssemblyAI is working on it. |
+| Saving *file* | The words are back and being saved. |
+
+The row's button reads **Stop**. The other rows' buttons are disabled, and so is **Remove**, so <kbd>↩</kbd> can't make a cut in the middle of a paid upload.
+
+Press **Stop** to end the run. Closing the sheet stops it too.
+
+### When a run ends
+
+When a run finishes, the file drops off the list and its fillers join the count.
+
+If it doesn't finish, the file stays on the list and the reason appears in the small note under the count, where it stays until the next run. After **Stop** the note reads "The transcription was cancelled."
+
+## When Transcribe is disabled
+
+A row's **Transcribe** button can be dimmed for four reasons.
+
+| What you see | Why | What to do |
+| --- | --- | --- |
+| The note and the button's tooltip read "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription." | There's no API key. | Save a key in Settings. The buttons turn on with the sheet still open. |
+| The other rows' **Transcribe** buttons are disabled, and one row reads **Stop** | Another file's run is going. | Wait for it, or stop it. |
+| The row reads "Save the project to transcribe it", and the note reads "This project has nowhere to keep its transcript cache, so it cannot be transcribed with AssemblyAI. Save it first." | The project has no folder to keep transcripts in, which is rare. | Save the project. |
+| The row reads "This file is missing. Relink it to transcribe it." | The file went missing while the sheet was open. | [Relink the file](/projects/relink-media/) and open the sheet again. |
+
+## With no key
+
+You can only cut fillers without a key in a file that already has a filler transcript. With no key and no such file, the command stays off.
+
+### The menu item with no key
+
+With no key, the menu item is greyed and reads **Remove Filler Words… (needs your AssemblyAI key)**. Resting the pointer on it says "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription." Saving a key turns the command on at once. See [AI features and your own keys](/getting-started/ai-and-your-keys/).
+
+If nothing in the project plays sound from a file, the item is greyed with its plain title, key or no key.
+
+### Use a transcript you already have
+
+If a file the command would read already has a filler transcript, the command stays on and cuts that file's fillers with no key, because that transcript is already paid for. The transcript only counts if the file hasn't changed since it was made.
+
+Any other files stay on the list, with **Transcribe** disabled.
+
+Your selection matters here too. If you've selected a clip of a file with no filler transcript, the greyed item doesn't mean the project has none. Deselect the clip so the command reads every clip.
+
+## Captions stay clean
+
+Filler words never reach captions made from an AssemblyAI transcript. **File ▸ Generate Captions…** removes them first, and the sheet's preview leaves them out too, so a transcript made with filler words produces the same captions as one made without them.
+
+The words it removes are um, uh, hmm, mhm, uh-huh, ah, huh, hm, m, er and erm, with capitals and punctuation ignored. Any word on that list goes, even one said on purpose, such as a surprised "Huh?".
+
+The kept transcript has every word as it was heard. Only captions filter them, which is how Remove Filler Words can still find them.
+
+Captions made on this Mac aren't filtered. They hold what the Mac's recogniser wrote.
+
+### The transcript also serves captions
+
+A transcript made for Remove Filler Words also serves Generate Captions, so that file isn't uploaded or billed again. This holds as long as you ask for the same language, speaker labels and vocabulary it was transcribed with. Change one and the file goes up again. See [Transcribe with AssemblyAI](/captions/assemblyai-transcription/).
+
+## Good to know
+
+- You can transcribe a project you haven't saved yet. Its transcript is kept with the project when you save.
+- AssemblyAI takes up to 10 hours in one file. Frame Job says so in the note before it uploads anything.
+- If Frame Job can't read a file, its row reads "Nothing to upload · 1 file could not be read". **Transcribe** then uploads nothing, and the note says the media file couldn't be read.
+- If a file goes missing while the sheet is open, for example on a drive you eject, its row keeps its estimate until you press **Transcribe**. Nothing is uploaded: the row reads "This file is missing. Relink it to transcribe it.", its button turns off and the note says the file is missing. Starting another file's run changes the row the same way. When that run ends, or when you open the sheet again, the file has no row and the note reads "“Interview.mov” is missing, so its fillers cannot be found. Relink it, then open this sheet again." [Relink the file](/projects/relink-media/) and open the sheet again.
+- If AssemblyAI hasn't confirmed deleting an earlier transcript of a file, the row reads "Nothing to upload · 1 file waiting on an earlier delete". **Transcribe** tries that delete again first. If it goes through, the file uploads as normal. If it doesn't, nothing is uploaded and the note says why.
+- If AssemblyAI rejects your key, the note reads "AssemblyAI refused the API key — check it in Frame Job ▸ Settings".
+
+## With an agent
+
+`transcribe_for_fillers` is the **Transcribe** button for an agent connected over MCP, and it's the same paid upload of one file, keeping the file's earlier choices. It writes only the transcript, with no captions and no undo step. `detect_fillers` lists the files that need it under `needs_transcript`, and needs no key to do that.
+
+The agent gets `ready: true` once `detect_fillers` can read the file. The tool stops with a message if the file is missing, if no clip on the timeline plays the file, or if it would upload and no key is set.
+
+It differs from the button in two ways. A file that already has a filler transcript uploads nothing and needs no key, and an agent's run has no **Stop**.
+
+The built-in [Assistant](/cleanup/false-starts/#the-assistant-wont-start-a-paid-transcription) can't use this tool. See [`transcribe_for_fillers`](/mcp/tools-clean-up/#transcribe_for_fillers) for its arguments.
+
+## Related
+
+- [Remove Filler Words](/cleanup/remove-filler-words/)
+- [Your AssemblyAI key](/captions/assemblyai-key/)
+- [What goes to AssemblyAI](/captions/assemblyai-privacy/)
+- [Transcribe with AssemblyAI](/captions/assemblyai-transcription/)
+- [Generate Captions](/captions/generate-captions/)
+- [Cut false starts](/cleanup/false-starts/)

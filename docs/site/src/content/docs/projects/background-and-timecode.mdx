@@ -1,0 +1,85 @@
+---
+title: "Canvas background and timecode"
+description: "Set the colour behind every layer, make the canvas transparent, choose how times are shown, and decide how new clips are sized."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The **Appearance** section of the [Document tab](/projects/document-tab/) sets three things for the whole project: the colour behind your clips, how times are written, and how big a new clip starts.
+
+<AtAGlance where="Document tab ▸ Appearance" tools={['set_canvas', 'add_clip']} />
+
+| Control | What it does | Default |
+| --- | --- | --- |
+| **Background** | The colour behind every layer. | Black, opaque |
+| **Timecode** | How the project shows a time. | Frames |
+| **Fit new clips to canvas** | Scales down a new clip that's bigger than the canvas. | On |
+
+A change to **Timecode** or **Fit new clips to canvas** is one undo step.
+
+## Set the background colour
+
+Click the **Background** swatch and pick a colour in the Colors panel. The colour sits behind every layer, so it shows wherever no clip covers the canvas.
+
+To put a colour on the timeline as a clip instead, see [Backgrounds](/canvas/backgrounds/).
+
+## Make the background transparent
+
+Lower the opacity in the Colors panel. The swatch shows a checkerboard behind the colour, and the **Background** row of the [Document summary](/projects/document-tab/#the-document-summary) reads `Transparent`, or the colour with its opacity.
+
+Most export formats can't carry transparency, so while the background isn't fully opaque, the section adds a note about the formats that can.
+
+| The note says | When |
+| --- | --- |
+| "Transparent — kept by 4 export formats." | Three or more formats keep it, so the note counts them. They're HEVC with Alpha (MOV), VP9 with Alpha (WebM), ProRes 4444 (MOV) and Animated PNG. |
+| "Transparent — needs an alpha format." | Frame Job can't name the formats yet, which can happen on a project with nothing on the timeline. |
+
+See [Transparent exports](/export/transparency/).
+
+## Choose a timecode format
+
+**Timecode** sets how times are written everywhere the project shows one, including the toolbar, the ruler, the inspector, markers and the transcript.
+
+| Choice | Looks like |
+| --- | --- |
+| **Frames** | `HH:MM:SS:FF` |
+| **Milliseconds** | `HH:MM:SS.mmm` |
+
+**Frames** doesn't drop frames, so at 29.97 fps the count runs slightly behind the clock over a long timeline.
+
+The count starts at zero, and there's no start-timecode setting. Frame Job doesn't read a file's source timecode, and an export has no timecode track. To put the timecode in a file, [burn it in](/export/burn-in-timecode/).
+
+## Fit new clips to canvas
+
+This decides how big a new clip starts. It's on by default.
+
+| Setting | A clip bigger than the canvas | Any other clip |
+| --- | --- | --- |
+| On | Starts at Fit scale: scaled down until all of it shows. | Starts at 100 %, its native size. |
+| Off | Starts at 100 %, so it runs past the edges of the canvas. | Starts at 100 %. |
+
+A clip counts as bigger when either its width or its height is larger than the canvas. Fit never scales a clip up, and changing the setting leaves clips already on the timeline as they are. To fit or fill one clip, see [Position, scale, rotation and opacity](/canvas/transform/).
+
+## Reset the section
+
+**Reset** on the **Appearance** header puts all three back to their defaults: opaque black, **Frames** and on. It's offered only while one of them differs, and it's one undo step.
+
+## With an agent
+
+[`set_canvas`](/mcp/tools-tracks-and-markers/#set_canvas) sets all three, and anything it doesn't name keeps its value.
+
+| Argument | What it takes |
+| --- | --- |
+| `background` | Four numbers from 0 to 1, `[r, g, b, a]`. Three numbers, or one outside the range, fails and nothing changes. |
+| `timecode_frames` | `true` for **Frames**, `false` for **Milliseconds**. |
+| `fit_new_clips` | `true` or `false`, as the checkbox. |
+
+[`add_clip`](/mcp/tools-adding-clips/#add_clip) follows **Fit new clips to canvas** as the app does. See [Tools: tracks, markers and canvas](/mcp/tools-tracks-and-markers/).
+
+## Related
+
+- [The Document tab](/projects/document-tab/)
+- [Add clips to the timeline](/editing/add-clips/)
+- [Image clips](/text-and-shapes/image-clips/)
+- [Backgrounds](/canvas/backgrounds/)
+- [Transparent exports](/export/transparency/)

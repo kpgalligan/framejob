@@ -1,0 +1,110 @@
+---
+title: Nests
+description: Collapse several clips into one clip that moves, trims, fades and transforms as a group, and open it back out when you're done.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A nest, which some editors call a compound clip, collapses several clips into one clip that stands for the group. From then on the group moves, trims, fades and transforms as one thing, and the clips inside stay as you built them. It's the nearest thing Frame Job has to a nested sequence: a timeline of its own, placed as one clip.
+
+<AtAGlance
+  menu={['Clip ▸ Nest', 'Clip ▸ Un-nest']}
+  keys={['⌘G', '⇧⌘G']}
+  tools={['nest', 'unnest', 'set_clip']}
+/>
+
+## Make a nest
+
+<Steps>
+
+1. Select the clips.
+
+2. Press <kbd>⌘G</kbd>, or choose **Clip ▸ Nest**.
+
+</Steps>
+
+The clips are replaced by one nest clip, which is selected so you can move or transform it straight away. The nest is one undo step, called Nest.
+
+The nest clip goes on the front-most track the selection used, and runs from the earliest start to the latest end, including any gaps. A matte track is the exception: the nest clip goes on the front-most track that isn't a matte, and a matte only stays one inside the nest if the track it cuts goes in with it. See [Mattes inside nests](/canvas/mattes-in-nests/).
+
+A clip's [detached sound](/audio/detach-and-attach/) goes in with it, unless the sound is on a locked track.
+
+To work on the contents later, double-click the nest clip. See [Work inside a nest](/editing/inside-a-nest/).
+
+## What a nest keeps
+
+Inside the nest, clips keep their properties, [actions](/motion/how-edits-move-actions/) and transitions, their timing relative to each other and their stacking order. The earliest clip starts at 0 on the nest's own timeline.
+
+The tracks inside are new, and each keeps the name, the hidden, muted, locked and solo states, and the volume and pan of the track it came from. There are two exceptions:
+
+- The track the nest clip lands on still applies its volume and pan over the whole nest clip, so its copy inside starts at full volume and centred. A selection from one track sounds the same nested.
+- A track [compressor or limiter](/audio/track-dynamics/) isn't copied inside. The one on the nest clip's own track goes on working over the nest clip.
+
+The nest clip itself starts at the default position and scale, at full opacity. It has a **Sound** tab only when something inside can make a sound.
+
+## Name a nest
+
+Nests are named `Nest 1`, `Nest 2` and so on. To give a nest clip your own name, select it and press <kbd>⇧⌘R</kbd> (**Clip ▸ Rename…**), or use the name field at the top of the Clip tab.
+
+A double-click on a nest clip opens it, so it doesn't start a rename as it does on other clips.
+
+## A nest's size is fixed
+
+A nest's canvas is fixed at the project's size at the moment you nest. Changing the [project's size](/projects/canvas-size/) later doesn't re-lay out what's inside, and opening the nest lets you edit its contents but not its size.
+
+To change a nest's size:
+
+<Steps>
+
+1. Press <kbd>⇧⌘G</kbd> to un-nest it.
+
+2. Change the project size if you need to.
+
+3. Press <kbd>⌘G</kbd> to nest it again.
+
+</Steps>
+
+## Un-nest
+
+Select one or more nest clips and press <kbd>⇧⌘G</kbd>, or choose **Clip ▸ Un-nest**. The item is available when the selection includes a nest clip, and anything else selected is left alone.
+
+Every selected nest clip opens back out in one undo step, called Un-nest, or Un-nest Clips for several. What came out is selected.
+
+- Clips return at the nest clip's start plus their own times, on tracks counted back from the nest clip's track. Missing tracks are added behind it.
+- A clip that would break the [overlap rule](/editing/how-edits-work/#the-overlap-rule) goes on a new front track and isn't lost.
+- A nest clip trimmed shorter than its contents still gives everything back, because trimming a nest hides content and doesn't cut it.
+- If other clips show the same nest, they keep it. See [Shared and independent nest copies](/editing/nest-copies/).
+
+:::caution
+Un-nesting discards the nest clip's own transform, opacity, fades and volume. To change the contents and keep those, [open the nest](/editing/inside-a-nest/) and edit inside it.
+:::
+
+The settings of the tracks inside the nest don't come out either. Clips that return take on the settings of the timeline tracks they land on.
+
+## Nests inside nests
+
+A nest can hold other nests, up to eight levels deep. Select a nest clip with other clips and press <kbd>⌘G</kbd>, or press it while a nest is open.
+
+The depth counts the whole project, even while you edit inside a nest, so an edit that looks fine there can still stop at the limit. The same goes for the project's limits of 64 tracks and 4,096 clips, and a nest's own tracks count towards the 64.
+
+## When Nest won't work
+
+**Clip ▸ Nest** is greyed out with nothing selected, and when the only selected clip is already a nest clip, since wrapping one nest in another on its own changes nothing you can see.
+
+With the item available, two things can still stop a nest. Frame Job beeps, changes nothing, and gives the reason at the foot of the inspector.
+
+- **Something unselected is in the way.** The nest clip would overlap a clip you didn't select on its track, by more than the [overlap rule](/editing/how-edits-work/#the-overlap-rule) allows. This often means an unselected clip sits inside the span. Select it too, or move it.
+- **The selection holds an adjustment clip.** An [adjustment clip](/color/adjustment-clips/) can't go inside a nest.
+
+If the nest clip overlaps the clip before it by an amount the rule allows, it gets a Cross Dissolve over the overlap. See [Transitions](/motion/transitions/).
+
+## With an agent
+
+`nest` can name the nest as it's made, [`set_clip`](/mcp/tools-clip-properties/#set_clip) renames a nest clip, and [`get_project`](/mcp/get-project/) lists every nest with its own tracks and clips. [`unnest`](/mcp/tools-copy-and-nest/#unnest) opens one nest clip at a time, and gives an error on any other kind of clip. The clips it brings back are new clips, with new ids. See [Tools: copying and nesting](/mcp/tools-copy-and-nest/#nest) and [Editing inside a nest](/mcp/nests/).
+
+## Related
+
+- [Work inside a nest](/editing/inside-a-nest/)
+- [Shared and independent nest copies](/editing/nest-copies/)
+- [Mattes inside nests](/canvas/mattes-in-nests/)

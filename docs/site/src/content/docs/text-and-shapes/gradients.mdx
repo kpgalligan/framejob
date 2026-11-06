@@ -1,0 +1,105 @@
+---
+title: "Gradient fills"
+description: "Fill a rectangle or ellipse with a linear or radial ramp of up to eight colours."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A gradient fills a rectangle or ellipse with a ramp of colours in place of a flat fill. Use one for a sky behind a title, or a plate that fades out at one side.
+
+<AtAGlance
+  where="Clip tab ▸ Shape ▸ Gradient"
+  tools="set_shape"
+/>
+
+## Add a gradient
+
+<Steps>
+
+1. Select a rectangle or ellipse. The **Shape** sub-tab opens. If you don't have one yet, [add a shape clip](/text-and-shapes/shape-clips/#add-a-shape-clip).
+
+2. Open the **Gradient** section. It starts closed, and its header reads "off".
+
+3. Tick **Gradient**.
+
+4. Set the [kind](#kind), the [angle](#angle) and the colours of the [stops](#stops).
+
+</Steps>
+
+A new gradient is **Linear**, black to white, at 0°, so it runs from black on the left to white on the right. It's clipped to the shape, rounded corners included.
+
+Once it's on, the section's header reads the kind and the number of stops, such as "linear, 2 stops".
+
+### The fill and the stroke
+
+A gradient covers the [flat fill](/text-and-shapes/shape-settings/#fill-the-shape) but doesn't remove it, so the fill's rows stay live. While both are on, the section says "The gradient covers the Fill colour above; Reset brings it back."
+
+The stroke is drawn over the gradient in its own colour.
+
+### Turn it off
+
+Untick **Gradient** or choose **Reset** in the section's header. Either one brings the flat fill back, or leaves the shape hollow if it had none.
+
+Turning the gradient off forgets it. Ticking **Gradient** again starts over at black to white, so use **Edit ▸ Undo** to get a ramp back.
+
+## Kind
+
+| Kind | How the ramp runs |
+| --- | --- |
+| **Linear** | In a straight line across the shape, in the direction of **Angle**. The first and last positions land on the box's edges at every angle. |
+| **Radial** | Outward from the centre of the box, in an ellipse with the box's proportions. 0 % is the centre and 100 % touches the middle of each side, so a rectangle's corners are past the end of the ramp. |
+
+**Kind** starts on **Linear**.
+
+## Angle
+
+**Angle** points a linear gradient. It runs from 0 to 360°, with quick picks every 45°, and it starts at 0°.
+
+0° runs to the right, and the angle turns anticlockwise.
+
+| Angle | The ramp runs |
+| --- | --- |
+| 0° | Left to right |
+| 90° | Bottom to top |
+| 180° | Right to left |
+| 270° | Top to bottom |
+
+A radial gradient has no direction, so **Angle** is greyed for **Radial**. It keeps its number for when you switch back to **Linear**.
+
+## Stops
+
+A stop is one colour at one place on the ramp. Each stop has a row, **Stop 1**, **Stop 2** and so on, with three controls.
+
+| Control | What it does | Range |
+| --- | --- | --- |
+| Swatch | The stop's colour. Lower its opacity in the colour panel to let what's behind show through. | |
+| Position | How far along the ramp the stop sits. Quick picks 0, 25, 50, 75 and 100. | 0 to 100 % |
+| **Remove** | Takes the stop off the ramp. Greyed at two stops, because a gradient keeps at least two. | |
+
+Rows keep their order when you change a position, so a stop can move past another one. Frame Job sorts the stops by position when it draws, so the order of the rows doesn't change the picture.
+
+Past the first and last stops, the end colours carry on to the shape's edge. A ramp whose stops sit at 40 % and 60 % is solid at both sides, with the change in the middle.
+
+### Add Stop
+
+**Add Stop** puts a new stop in the middle of the widest gap between two stops, in the colour the ramp already has there. The picture doesn't change until you recolour or move the new stop. When two gaps tie, it uses the one nearer 0 %. The new row goes just under the row of the stop at the gap's lower end.
+
+A gradient can have up to eight stops. The row says "8 at most", and **Add Stop** is greyed at eight or while the gradient is off.
+
+## Good to know
+
+- Lines and arrows have no area to fill. The section is greyed for them, and it says "Fills the rectangle or ellipse; a line or arrow keeps its stroke colour." A gradient isn't lost when you switch **Kind** to Line or Arrow, and it's there again when you switch back.
+- A gradient can't be animated. Its rows always change the clip itself, even while an action is selected. See [Why shape colours don't animate](/text-and-shapes/shape-settings/#why-shape-colours-dont-animate).
+- With several shapes selected, any change gives them all the same whole gradient, not only the row you changed.
+- **Opacity** in the **Fill** section doesn't touch a gradient. Use each stop's colour, or **Opacity** in [Transform](/canvas/transform/) to fade the whole shape.
+
+## With an agent
+
+`set_shape` sets a gradient through its `gradient` key, which holds `kind`, `angle` and `stops`. Each stop is a colour and an `at` from 0 to 1, where the inspector shows 0 to 100 %. Sending `stops` replaces them all, and fewer than 2 or more than 8 is an error that names the count. `{gradient: null}` brings the flat fill back. See [Tools: text, shapes and clip names](/mcp/tools-clip-properties/#set_shape).
+
+## Related
+
+- [Shape fill, stroke and size](/text-and-shapes/shape-settings/)
+- [Shape clips](/text-and-shapes/shape-clips/)
+- [Backgrounds](/canvas/backgrounds/)

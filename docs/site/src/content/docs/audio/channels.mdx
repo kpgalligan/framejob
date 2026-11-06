@@ -1,0 +1,63 @@
+---
+title: "Channels"
+description: "Choose which channels of a stereo file play, to fix a microphone recorded on one side or swap left and right."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+**Channels** chooses which channels of a stereo file a clip plays. It's the fix for a microphone recorded onto one side of a stereo file, which otherwise plays from one speaker only.
+
+<AtAGlance
+  where="Clip tab ▸ Sound ▸ Channels"
+  tools="set_audio"
+/>
+
+## Choose channels
+
+Open the **Channels** section and pick from **Play**. With several clips selected, the choice goes to all of them.
+
+| **Play** | What you hear |
+| --- | --- |
+| **Both** | The file as it is. This is the default. |
+| **Left Only** | The left channel, from both speakers. |
+| **Right Only** | The right channel, from both speakers. |
+| **Swap Left and Right** | The two channels exchanged. |
+
+For a microphone on one channel, choose **Left Only** or **Right Only**. The voice then plays from both speakers at its own level. [Mix to mono](/audio/pan-and-mono/#mix-to-mono) would also put it in both speakers, but averaging it with the silent channel halves its level.
+
+The header of the section shows the current choice. **Reset** there puts it back to **Both**.
+
+## Two people on one stereo file
+
+A recorder or mixer can put one person on each side of a stereo file. To treat them as two microphones, give each side its own track.
+
+<Steps>
+
+1. Line the file up with the cameras first, if you're using [Synchronize Audio](/audio/synchronize-audio/).
+
+2. Hold <kbd>⌥</kbd> and drag the clip to another track, so a copy sits at the same time. See [Duplicate clips](/editing/duplicate-clips/#drag-a-copy).
+
+3. Set **Play** to **Left Only** on one clip and **Right Only** on the other.
+
+</Steps>
+
+Each person now has their own clip settings and track. [Switch by Speaker](/multicam/switch-by-speaker/) reads a clip's level after its **Channels** choice, so the two tracks work as two microphones.
+
+## Good to know
+
+- A mono file has only one channel, so the choice has no effect on it.
+- On a nest clip the choice has no effect. Set it on the clips inside.
+- The Volume section's **Loudness** readout counts the choice, and so does [Normalize](/audio/normalize/) in Loudness mode. Normalize in Peak mode reads the file's waveform and doesn't.
+- The choice comes after [voice isolation](/audio/voice-isolation/) and any [voice effect](/audio/voice-effects/), and before the [EQ](/audio/eq/) and [Mix to mono](/audio/pan-and-mono/#mix-to-mono). So on a stereo file with a voice effect, it picks from the sound after the effect.
+- With an [action](/motion/edit-an-action/) selected, the choice is what the action changes to. It switches at the action's end with no glide, and its row says "at end".
+
+## With an agent
+
+`set_audio` sets this with `channels`: `both`, `left`, `right` or `swapped`. See [Tools: clip sound](/mcp/tools-set-audio/#mono-keep-pitch-pan-and-channels).
+
+## Related
+
+- [Pan and Mix to mono](/audio/pan-and-mono/)
+- [The Sound tab](/audio/sound-tab/)
+- [Normalize](/audio/normalize/)

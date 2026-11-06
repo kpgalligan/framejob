@@ -167,7 +167,7 @@ func names(_ ops: [ReelOp]) -> [String] { ops.map(\.name) }
 // MARK: - K1 the canvas follows the mode (CI-13)
 
 let selected = CanvasEditTarget(
-    selected: .init(clip: 2, action: 4, endTime: at(4.0)))
+    selected: .init(clip: 2, action: 4, endTime: at(4.0), cut: false))
 do {
     let mine = selected.op(video: VideoPatch(x: 5), clip: 2)
     let other = selected.op(video: VideoPatch(x: 5), clip: 7)
@@ -270,6 +270,10 @@ if let (document, _, _) = clipPane("chrome", playhead: 3.0, action: 4),
 // `refreshCanvas`, which the editor's own selection intents already fire
 // (`selectAction(_:)`, the lane's and the chip's). The playhead starts
 // outside every span, so nothing is selected until the editor selects it.
+// Selecting action 4 puts the playhead at its end, 4.0 s, so once it is
+// deselected action 4 has finished holding `x`, and the plain nudge refuses
+// (spec §11 CI-19, docs-bugs batch a5): the base stays 0, the end 110, and the
+// strip names it by its lane number, 2.
 if let document = opened("chrome") {
     document.selection = [2]
     document.playhead = at(5.0)
@@ -291,13 +295,16 @@ if let document = opened("chrome") {
     spin(0.2)
     let afterPlain = (number(group(storedEnd(document, 2, 4), "video")?["x"]),
                       base(document, 2)?.videoProps.x)
+    let strip = controller?.inspector?.refusalStrip.text
+    let refusal = "Refused: action 2 on this clip's lane holds its position at the playhead, so a "
+        + "move here would show only before it. Select action 2 first."
     check("K1 nudge in a real editor: with action 4 selected its END x goes 100 → 110 (base 0); "
-            + "with none the BASE x goes 0 → 10 (end 110)",
+            + "with none, at its end, the nudge refuses naming action 2 (base 0, end 110)",
           keyed && plain && afterKeyed.0 == 110 && afterKeyed.1 == 0 && afterPlain.0 == 110
-            && afterPlain.1 == 10,
+            && afterPlain.1 == 0 && strip == refusal,
           "editor \(controller != nil), selected \(describe(document.selectedAction)): end \(describe(afterKeyed.0)), base "
             + "\(describe(afterKeyed.1)); none: end \(describe(afterPlain.0)), base "
-            + "\(describe(afterPlain.1))")
+            + "\(describe(afterPlain.1)), strip \(strip ?? "none")")
     document.close()
 }
 
@@ -345,10 +352,12 @@ if let document = opened("chrome") {
 // from. The move begins with no action selected; the playhead then scrubs
 // into action 4's span, so `canvasPlayheadMoved` rewrites the live
 // `editTarget` mid-drag; the tick must still go to the BASE. ⌘ suppresses
-// snapping at the press and on every tick.
+// snapping at the press and on every tick. It begins at 2.0 s, before action
+// 4 starts: at 5.0 s action 4 has finished holding `x`, and CI-19 refuses the
+// move (docs-bugs batch a5); action 3, finished at 2.0 s, holds only opacity.
 if let document = opened("chrome") {
     document.selection = [2]
-    document.playhead = at(5.0)
+    document.playhead = at(2.0)
     NSDocumentController.shared.addDocument(document)
     document.makeWindowControllers()
     document.showWindows()

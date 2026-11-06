@@ -1,0 +1,55 @@
+---
+title: "ProRes"
+description: "Export a ProRes 422 or ProRes 4444 master for another application, and see what each one keeps."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+ProRes files are masters: their next reader is another application, not a viewer. ProRes 422 is the one to reach for first. ProRes 4444 is larger, and you choose it when you need the alpha channel.
+
+<AtAGlance
+  where="Export sheet ▸ Format"
+  tools="export"
+/>
+
+| | ProRes 422 (MOV) | ProRes 4444 (MOV) |
+| --- | --- | --- |
+| Picture | 10-bit | 12-bit |
+| Keeps transparency | No | Yes |
+| Odd width or height | Written one pixel smaller | Kept |
+| A custom size of a different shape | Letterboxed with black | Won't export |
+
+These are the only two ProRes profiles Frame Job writes. **ProRes 422 (MOV)** is the standard profile, so there's no 422 HQ, LT or Proxy, and there's no 4444 XQ.
+
+Both are `.mov` files with these in common:
+
+- The data rate is fixed by the profile, so **Quality:** is greyed out.
+- The sound is 16-bit, 48 kHz stereo LPCM. **Bit depth:** is greyed out, because 24-bit is for WAV and AIFF.
+- Both can carry HDR. In an HDR project they write HLG unless you change **Dynamic Range:**. See [Export HDR](/hdr/export-hdr/).
+- [Chapters](/export/chapters/) are written.
+- [Fast start](/export/h264-and-hevc/#fast-start) is off, because an editing master has no need of it.
+
+## ProRes 422 (MOV)
+
+Use this as an editing master for another application. It keeps 10 bits of the 16-bit frames Frame Job draws. Frame Job writes no XML, EDL or AAF, so a rendered master is how a finished timeline reaches another application.
+
+ProRes 422 has no alpha channel, so a transparent canvas is flattened onto black.
+
+## ProRes 4444 (MOV)
+
+Use this for a title, a lower third or anything else another application will composite over its own footage. It keeps 12 bits and the alpha channel, and the [footnote](/export/export-sheet/#the-footnote) ends in `alpha`. The colour is straight, not multiplied by the transparency, so a re-imported file composites to the right colour.
+
+It's the only movie format that keeps an odd width or height.
+
+A **Custom…** size of a different shape from the canvas won't export, because padding would lose the alpha. The readout names the canvas's size, and **Export…** and **Add to Queue** grey out. Every row in the **Size:** popup has the canvas's shape, and any custom size in the same proportions is fine.
+
+## With an agent
+
+`export` names these formats `prores_422` and `prores_4444`. Both ignore `video_bitrate` and `audio_bitrate`, because the profile sets the rate and the sound is uncompressed. See [Export: start, then poll](/mcp/export/#exact-bitrates).
+
+## Related
+
+- [Choose a format](/export/formats/)
+- [Transparent exports](/export/transparency/)
+- [Export size](/export/size/)
+- [Precision and bit depth](/hdr/precision/)

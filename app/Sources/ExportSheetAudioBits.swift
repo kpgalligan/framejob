@@ -29,6 +29,7 @@ extension ExportSheetController {
     @objc func audioBitsChanged(_ sender: Any?) {
         guard let bits = audioBitsPopup.selectedItem?.representedObject as? Int else { return }
         audioBitsChoice = bits
+        presetEdited()
         resolveCard()
     }
 

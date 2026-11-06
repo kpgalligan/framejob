@@ -1,0 +1,57 @@
+---
+title: The Welcome window
+description: Use the window Frame Job shows when nothing is open to open a file, start a project or a recording, or reopen something recent.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+The Welcome window is where you start when no project is open. It offers the ways in and your recent projects, and it takes dropped files.
+
+<AtAGlance
+  where={['Shown when Frame Job starts with nothing to open', 'Shown when you click the Dock icon with no window open']}
+  tools={['open_project', 'new_project', 'record_screen']}
+/>
+
+<Shot
+  name="01-welcome.window"
+  alt="The Welcome window: the Frame Job mark and name, the line Open a file. Start cutting., a note about what opening a movie does, the buttons Open Video…, New Project and New Recording…, and a line of file types at the foot."
+/>
+
+## Start something
+
+| Button | What it does |
+| --- | --- |
+| **Open Video…** | Shows the same open panel as **File ▸ Open…**. A movie becomes an untitled project at its own size and rate, with the file as the first clip on Track 1. Despite the name it also opens sound files, pictures and saved `.framejob` projects. |
+| **New Project** | Starts a blank 1920 × 1080, 30 fps project. |
+| **New Recording…** | Opens the [recorder panel](/recording/recorder-panel/), with no project needed. |
+
+**New Recording…** never stops a recording, unlike the **File** menu item, which reads **Stop Recording** while one runs. During a screen recording, when the recorder panel is hidden, it only beeps. During a camera or microphone-only recording it shows the panel again.
+
+For what you get from each, see [Start a project](/projects/start-a-project/).
+
+## Reopen a recent project
+
+Under the buttons, **Recent** lists up to five recent documents by name, most recent first. Click one to reopen it. Hover over a row to see its full path.
+
+The heading and the list disappear when there's nothing recent. [**File ▸ Open Recent**](/projects/open-a-project/#open-a-recent-project) keeps the same list, so **Clear Menu** empties this one too, the next time the window opens.
+
+## Drop files on it
+
+Drag a file or a project from the Finder and drop it anywhere on the window. Each file opens as its own document, so several files make several projects.
+
+The window takes `.framejob` projects and the movie, sound and picture types **File ▸ Open…** lists, and ignores anything else. The line at the foot of the window names the common ones: MOV · MP4 · M4V · M4A · MP3 · WAV · AIFF · PNG · JPEG · HEIC.
+
+## When it appears and goes away
+
+Frame Job shows the Welcome window when it starts with nothing to open, and when you click its Dock icon with no window open. It closes itself as soon as a project window comes up.
+
+Closing the last project doesn't bring it back on its own, and Frame Job keeps running. Click the Dock icon to see it again.
+
+The window is a fixed 720 × 600 and can't be resized.
+
+## Related
+
+- [Start a project](/projects/start-a-project/)
+- [Open a project](/projects/open-a-project/)
+- [The recorder panel](/recording/recorder-panel/)

@@ -1,0 +1,139 @@
+---
+title: What an action can animate
+description: Which properties ramp across an action, which switch at its end, and which can't animate at all, sub-tab by sub-tab.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+An [action](/motion/actions/) can animate most of what's in the Clip tab. This page goes through the tab by sub-tab, so you can see what ramps smoothly, what switches when the action ends, and what can't animate.
+
+<AtAGlance
+  where="Clip tab, with an action selected"
+  tools="set_action_end"
+/>
+
+With an action selected, the Clip tab marks each row. A row that switches shows "at end" once the action changes it, and most rows that can't animate show ⊘. See [Set what an action animates to](/motion/edit-an-action/) for all the marks.
+
+One rule applies everywhere. A section you turn on inside an action has no numbers to ramp from, so it appears whole when the action ends. For a gradual start, turn the section on for the clip first and animate its numbers. Turning a section off inside an action turns it off when the action ends.
+
+## Picture
+
+An action can animate every value in the **Picture** sub-tab, apart from the few under [What never animates](#what-never-animates).
+
+| Section | Ramps | Switches at the end |
+| --- | --- | --- |
+| [Transform](/canvas/transform/) | **Scale**, **Position X**, **Position Y**, **Rotation**, **Opacity**, [**Motion Blur**](/motion/motion-blur/) | **Blend** |
+| [Behind Subject](/effects/text-behind-subject/) | | **Behind subject** |
+| [Crop](/canvas/crop/) | **Left**, **Top**, **Right**, **Bottom** | |
+| Corner Radius | **Radius** | |
+| [Chroma Key](/effects/chroma-key/) | **Key Color**, **Tolerance**, **Softness**, **Spill** | **Key out a color** |
+| [Background](/effects/remove-background/) | **Edge**, **Feather** | **Background** |
+| [Cursor](/recording/cursor-settings/) | **Size**, **Ripple size** | **Show cursor**, **Style**, **Clicks**, **Ripple color** |
+| [Shadow](/effects/shadow/) | **Color**, **Opacity**, **Blur**, **Angle**, **Distance** | **Drop shadow** |
+| [Filters](/effects/filters/) | Each filter's **Amount** | A filter's kind |
+| [Reflection](/effects/reflection/) | **Opacity**, **Height**, **Gap**, **Falloff** | **Mirror the layer below itself** |
+| [Spotlight](/effects/spotlight/) | **Center X**, **Center Y**, **Width**, **Height**, **Feather**, **Dim**, **Zoom** | **Spotlight a region**, **Shape** |
+| [Obscure](/effects/obscure/) | Each region's position, size, **Amount** and **Feather** | A region's kind and **Shape** |
+
+Filters and obscure regions follow the [list rule](/motion/actions/#lists). Changing a value inside an existing entry animates, but adding or removing an entry [changes the clip](#what-never-animates).
+
+The **Layout** section's **Switch at Playhead** makes actions of its own. See [Camera layouts](/framing/camera-layouts/).
+
+## Color
+
+An action can animate the whole grade in the **Color** sub-tab.
+
+| Section | What animates |
+| --- | --- |
+| Light | Every slider |
+| Color | Every slider |
+| [Wheels](/color/wheels/) | Each wheel and its master strip |
+| [Curves](/color/curves/) | Every channel, whatever the number of points |
+| [Look](/color/looks/) | **Amount** |
+| [Adjustment](/color/adjustment-clips/), on an adjustment clip | **Strength** |
+| [Qualifier](/color/qualifiers/), on an adjustment clip | Each range's numbers. **Invert** and turning a range on or off switch at the end |
+
+Choosing a look or a LUT, changing it or removing it changes the clip itself, even with an action selected. Only **Amount** animates. If an agent gives an action a different look, it switches at the end. See [Animate a grade](/color/animate-a-grade/).
+
+## Sound
+
+An action can animate the **Sound** sub-tab's **Volume** and **Fades** sections, and every other audio setting apart from the few listed under [What never animates](#what-never-animates). <kbd>⌥</kbd>-clicking the [volume line](/audio/volume-line/) adds volume actions too.
+
+Numbers ramp. Switches change when the action ends: **Mute**, **Mix to mono**, **Channels**, the EQ's slots and slopes, Hum's mains and harmonics, the Leveller's **Response**, and turning a section on or off. Voice Isolation is the exception: **Isolate voice** and **Amount** both ramp from 0 on a clip with none.
+
+**Normalize** sets the clip's own level whatever is selected, and its row shows a small "clip" tag while an action is selected.
+
+See [Animate sound with actions](/audio/animate-sound/).
+
+## Text
+
+An action can animate the **Text** sub-tab's style, size and colours.
+
+| Section | Ramps | Switches at the end |
+| --- | --- | --- |
+| Content | | The words |
+| Font | **Size** | **Family**, **Style** |
+| Style | **Color**, **Line spacing**, **Tracking** | **Align**, **Vertical**, **UPPERCASE** |
+| Outline | **Width**, **Color** | **Outline** |
+| Backdrop | **Fill**, **Padding**, **Radius** | **Backdrop** |
+| Box | **Width** | **Mode** |
+| Reveal | **In**, **Out** | **Reveal** |
+
+Choosing one of the **Presets** with an action selected sets the action's end state, and each value then ramps or switches as above.
+
+A word caption page's timing can't animate, because it belongs to the speech. There's no inspector section for its word colours and pop scale, so only an agent can put those in an action. They ramp when it does. See [Word caption styles](/captions/word-caption-styles/).
+
+For the rows themselves, see [Font and text style](/text-and-shapes/text-style/).
+
+## Graphics
+
+An action can animate a graphic clip's properties in the **Properties** section of the **Graphic** sub-tab. Numbers and colours ramp, while strings, booleans, choices and images switch at the end. A property the graphic marks as not animatable shows ⊘, and so do the **Size** and **Timeline** sections.
+
+See [Animate graphic properties](/graphics/animate-properties/).
+
+## Speed
+
+An action can change a media clip's playback rate, which makes a [speed ramp](/speed/speed-ramps/). With an action selected, **Rate** in the **Clip** sub-tab's **Speed** section sets the rate the action ends at, and the clip holds that rate afterwards.
+
+- The rate goes from ×0.1 to ×1000.
+- The clip keeps its start and length, and plays more or less of its source.
+- Frame Job won't set a rate that would read past the end of the media, and it names the largest rate that fits.
+- Above ×12 the clip's sound is left out, and Frame Job asks first. See [Sound at high speed](/speed/sound-at-high-speed/).
+
+**Keep pitch** and **Fit to** always change the clip.
+
+## What never animates
+
+These change the clip itself whatever is selected. Unless the list says otherwise, their rows are marked ⊘ in the Clip tab while an action is selected, and a section where every row is ⊘ says "Actions don't animate this. Edits here change the clip."
+
+- **Clip sub-tab:** the [Motion presets](/motion/motion-presets/) section, and **Keep pitch** and **Fit to** in the Speed section. The Timing and Transition sections change the clip too, and their rows carry no mark.
+- **Sound sub-tab:** Ducking, the fade shapes (**In shape** and **Out shape**), the Voice Effect, and a nest clip's **Mix to mono**.
+- **Picture sub-tab:** the [Hide While Silent](/effects/hide-while-silent/) section, **Remove background**, **Subject** and the header's **Reset** (which carries no mark) in the Background section, and **Smoothing**, **Hide when idle** and **Polish** in the Cursor section.
+- **Filters and Obscure:** adding or removing a filter or a region. These buttons show a small "clip" tag while an action is selected. Changing a value inside an existing entry still animates.
+- **Shape sub-tab:** a [shape's](/text-and-shapes/shape-settings/) kind, size, corner radius, stroke, fill, gradient and arrows. Its position, scale and opacity animate like any clip's, through the **Picture** sub-tab. Dragging a shape's handles on the canvas to resize it changes the shape itself.
+- **Graphic sub-tab:** the **Size** and **Timeline** sections, and any property the graphic marks as not animatable.
+
+A track's own volume, pan, compressor and limiter aren't part of a clip, so an action can't reach them.
+
+## Colours blend in OKLab
+
+Every colour that ramps in an action blends through the OKLab colour space. It keeps the midpoints even and avoids the muddy middle of a straight RGB blend. Pure red to pure blue passes through `#8c53a2` halfway, for example, where a straight RGB blend would give the darker `#800080`.
+
+This covers the shadow, chroma key, text, outline, backdrop, word caption and graphic colours. A cursor's **Ripple color** doesn't ramp, and switches at the end. Opacity moves separately from the colour. A colour whose two ends are equal stays exact all the way through, and there's no setting for any of this.
+
+Shape colours can't animate at all.
+
+## With an agent
+
+`set_action_end` writes an action's end state. It takes the same keys as `set_video`, `set_audio` and `set_text`, grouped under `video`, `audio` and `text`, with a graphic's properties under `graphic`. A rate goes in `speed`, beside those groups, and `speed: null` takes it back out.
+
+Frame Job won't accept the keys that belong to the clip: `video.motion`, `video.hide_silent`, `text.words`, `video.cutout.subject` and `video.cutout.quality`. See [`set_action_end`](/mcp/tools-animation/#set_action_end).
+
+## Related
+
+- [Actions](/motion/actions/)
+- [Set what an action animates to](/motion/edit-an-action/)
+- [Animate a grade](/color/animate-a-grade/)
+- [Animate sound with actions](/audio/animate-sound/)
+- [Animate graphic properties](/graphics/animate-properties/)
+- [Build a ramp by hand](/speed/build-a-ramp/)

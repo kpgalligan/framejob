@@ -1,0 +1,143 @@
+---
+title: "Style the recorded cursor"
+description: Change how a recording's pointer looks after you've recorded it, from its size and path to when it hides and a ring that highlights every click.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+When a screen recording keeps its pointer out of the movie, Frame Job draws the pointer for you, so you can restyle it long after you stopped recording. The **Cursor** section makes it bigger, calms a shaky path, hides it when it rests and puts a ring on every click.
+
+<AtAGlance
+  where="Clip tab ▸ Picture ▸ Cursor"
+  tools={['set_video', 'paste_attributes', 'get_cursor_events']}
+  needs="A screen recording made with Cursor set to Separate, the default, so its pointer isn't in the movie."
+/>
+
+## Find the Cursor section
+
+<Steps>
+
+1. Select a recording's clip on the timeline.
+
+2. Open the **Clip** tab's **Picture** sub-tab.
+
+3. Open the **Cursor** section, after **Background**. It starts shut.
+
+</Steps>
+
+The section's header sums up what's set: **off**, **on** or **arrow**, with **+ ripples** when clicks ripple.
+
+The section is there only when every selected clip comes from a movie with a [cursor file](/recording/cursor-files/) that the picture doesn't already show:
+
+- A recording made with **Cursor:** set to **In the picture** has no section, because the pointer is part of the movie and would otherwise be drawn twice. See [The cursor in a recording](/recording/cursor/).
+- A movie with no cursor file has no section. If the file exists but didn't come along, [attach it with Locate…](/recording/cursor-files/#attach-or-re-point-a-cursor-file).
+- A selection that also holds any other kind of clip has no section.
+
+A freeze frame of a recording has the section too, with the pointer held where it was on that frame.
+
+Each row is its own undo step. If the selected clips disagree about a row, it shows as mixed.
+
+## Tidy the pointer in one click
+
+Choose **Polish** at the bottom of the section. It sets **Smoothing** to **Medium** and **Hide when idle** to **3 s**, as one undo step called "Polish Cursor". Nothing else changes, and you can adjust either row afterwards.
+
+## The controls
+
+| Control | What it does | Default | Range |
+| --- | --- | --- | --- |
+| **Show cursor** | Draws the pointer. | On | On, off |
+| **Size** | How big the pointer is drawn. | 100 % | 25–800 % |
+| **Style** | Which pointer is drawn. | As recorded | As recorded, Arrow |
+| **Smoothing** | Calms a shaky path. | Off | Off, Light, Medium, Strong |
+| **Hide when idle** | Fades out a resting pointer. | Never | Never, 1, 2, 3, 5 or 10 s |
+| **Clicks** | Draws a ring out of every click. | None | None, Ripple |
+| **Ripple color** | The ring's colour, with opacity. | White at 80 % | Any colour |
+| **Ripple size** | How big the ring grows. | 100 % | 25–400 % |
+
+## Show or resize the pointer
+
+Untick **Show cursor** to draw no pointer on this clip. Click rings are separate, so with **Clicks** set to **Ripple** the rings still draw without a pointer. That's useful when you want to show where someone clicked and nothing else.
+
+**Size** has quick picks at 50, 100, 150, 200 and 400 %. Its slider runs to 400 %, and you can type up to 800 % in the field.
+
+## Choose the pointer's style
+
+**Style** offers **As recorded** and **Arrow**. Frame Job's recordings don't store pictures of the pointer, so both choices draw Frame Job's arrow, and a pointer that was an I-beam or a hand on screen is drawn as the arrow too. The only difference you'll see is that the section's header reads **arrow** rather than **on**.
+
+Frame Job's arrow is a black arrow with a white outline, 14 by 21 points at 100 %. It's drawn at the recording's own pixel density and redrawn for each **Size** rather than stretched, so it stays crisp.
+
+## Calm a shaky path
+
+**Smoothing** irons out the wobble in the pointer's path, from **Light** through **Medium** to **Strong**. The pointer still reaches every click exactly, at the moment of the click, and a pause stays a pause.
+
+## Hide a resting pointer
+
+**Hide when idle** fades the pointer out after the time you pick with no movement and no mouse press. Scrolling and typing don't count as activity. The fade takes 0.2 s, and the pointer comes back 0.15 s before it next moves or clicks, so it's already there when it sets off.
+
+## Show clicks
+
+Set **Clicks** to **Ripple** to draw a ring growing out of every press of a mouse button. A ring lasts 0.45 s, growing quickly at first and fading as it goes, and up to four can show at once. At 100 % it reaches 24 points from the click.
+
+**Ripple color** and **Ripple size** are live only while **Clicks** is **Ripple**. **Ripple size** has quick picks at 50, 100, 150 and 200 %.
+
+**Clicks** starts at **None**, unless the recording was made with **Show Clicks:** on and **Cursor:** set to **Separate**. Those clips land with **Ripple** already set.
+
+## Put everything back
+
+**Reset** in the section's header appears once something differs from its default. It sets all eight rows back to the defaults in the table, as one undo step called "Reset Cursor".
+
+## Change the pointer part-way through a clip
+
+Select an [action](/motion/actions/) on the clip and the section edits that action instead of the whole clip:
+
+| Rows | With an action selected |
+| --- | --- |
+| **Size**, **Ripple size** | Animate across the action. |
+| **Show cursor**, **Style**, **Clicks**, **Ripple color** | Switch at the action's end. The row says **at end**. |
+| **Smoothing**, **Hide when idle** | Always change the clip itself. Their rows show ⊘. |
+
+**Polish** also changes the clip itself, whatever is selected. **Reset** isn't offered while an action is selected. Once the action holds a cursor change, the section's header shows **Clear** in its place, which takes every cursor change out of that action as one undo step called "Clear". **Smoothing** and **Hide when idle** stay as they are on the clip.
+
+The first time you change one of the action rows on a clip with no cursor settings of its own, Frame Job stores the defaults on the clip in the same step. That's what lets **Size** and **Ripple size** animate from 100 % instead of jumping.
+
+## Copy the settings to another clip
+
+**Edit ▸ Paste Attributes** (<kbd>⌥⌘V</kbd>) carries a clip's cursor settings to another clip, along with the rest of its picture settings. The settings are replaced as a whole, so pasting from a clip whose cursor you never changed puts the target's back to the defaults. See [Paste Attributes](/editing/paste-attributes/).
+
+## Streak a moving pointer
+
+With the clip's **Motion Blur** above 0, in the **Transform** section, a moving pointer is streaked along its path across the shutter. That happens even when the clip itself stands still. A still pointer and the click rings stay sharp.
+
+The streak shows in the preview, in rendered frames and in every export. A clip that [motion blur](/motion/motion-blur/) draws sharp keeps its pointer sharp, and so does a freeze frame.
+
+## How the pointer sits in the picture
+
+The pointer is drawn inside its clip, as if it were part of the movie. So it follows the clip's zooms, placement and crop, it takes the clip's grade, and the preview, rendered frames and exports all agree. In an HLG project the pointer and its rings are lifted to match the picture.
+
+It also follows the clip's time. Change the clip's speed and the pointer speeds up with it. [Reverse the clip](/speed/reverse/) and the pointer plays backwards too.
+
+## Good to know
+
+- A cursor file loads in the background and never holds up the preview. Until it's ready the frame draws without the pointer, then redraws with it. Changing **Smoothing** can do the same for a moment, because the new path has to be worked out. Rendered frames and exports wait for the file.
+- **Hide when idle** and the ring's 0.45 s count in the recording's own time, so on a clip at 2× they pass twice as fast.
+- [Splitting](/editing/splitting/) a clip or making a freeze frame keeps the clip's own **Smoothing** and **Hide when idle**, even from inside an action.
+- Paste onto a clip with no cursor file and the settings are kept but nothing is drawn.
+- If a cursor file is missing or can't be read, the clip draws with no pointer. See [When a cursor file has a problem](/recording/cursor-files/#when-a-cursor-file-has-a-problem).
+
+## With an agent
+
+`set_video`'s `cursor` key sets the same eight values, and it isn't held to the pop-ups' steps. **Smoothing** can be any value from 0 to 1, where **Light** is 0.25, **Medium** 0.5 and **Strong** 1, and **Hide when idle** anything from 0.5 to 30 seconds. **Size** is a scale from 0.25 to 8 and **Ripple size** one from 0.25 to 4.
+
+`{cursor: {}}` stores all eight defaults on the clip and `cursor: null` clears them. Frame Job won't accept a value outside its range, and it doesn't round one to fit. See [the `cursor` key](/mcp/tools-set-video/#cursor) for the full list.
+
+To see what a recording's pointer did before styling it, an agent reads the cursor file with [`get_cursor_events`](/mcp/tools-recording/#get_cursor_events).
+
+## Related
+
+- [The cursor in a recording](/recording/cursor/)
+- [Cursor files](/recording/cursor-files/)
+- [Auto Zoom](/recording/auto-zoom/)
+- [Actions](/motion/actions/)
+- [Paste Attributes](/editing/paste-attributes/)
+- [Motion blur](/motion/motion-blur/)

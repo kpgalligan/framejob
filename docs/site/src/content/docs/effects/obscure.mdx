@@ -1,0 +1,145 @@
+---
+title: Obscure
+description: Hide a face, a password or a phone number behind pixelated or blurred regions that stay on the clip as it moves.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Obscure hides part of a clip's picture, such as a face, a password field or a phone number, behind a pixelated or blurred region. A clip can carry up to four regions.
+
+<AtAGlance
+  where="Clip tab ▸ Picture ▸ Obscure"
+  tools={['set_video', 'set_action_end']}
+/>
+
+## Draw a region on the picture
+
+<Steps>
+
+1. Select the clip, and move the playhead to a frame that shows what you want to hide.
+
+2. In the Clip tab's **Picture** sub-tab, open the **Obscure** section. It's closed until you open it.
+
+3. Choose **Place on Canvas**. The preview reads "Drag a rectangle to obscure · Esc to cancel".
+
+4. Drag a rectangle over what you want to hide.
+
+</Steps>
+
+The region lands pixelated at full strength, and it's one undo step, called Obscure Region. Its controls appear in the section as **Region 1**, **Region 2** and so on.
+
+A region lasts the whole clip and keeps its place on the clip's picture. It doesn't track anything that moves in the footage. To hide something for part of a clip, [split](/editing/splitting/) the clip first and put the region on the piece that needs it. To follow something across the shot, [animate the region](#animate-a-region).
+
+Place on Canvas draws one region and then ends. It needs exactly one selected clip, drawing at the playhead and not on a locked track, with fewer than four regions. It beeps on a nest clip, which has no pixels of its own to cover, and otherwise when one of those fails, and at four regions the button is greyed.
+
+While you're drawing:
+
+- You can start the drag outside the picture, which is the way to catch the edge of the frame.
+- A drag under 6 canvas pixels wide or tall counts as a miss. It beeps and you can draw again.
+- <kbd>Esc</kbd> or a second press of **Place on Canvas** stops without adding anything. Once focus has moved to a field in the inspector, <kbd>Esc</kbd> no longer reaches the preview, so use the button.
+- Changing the selection, or moving the playhead off the clip, also stops it.
+
+Only one mode that waits for a click or drag on the preview can be on at a time: Place on Canvas, [Zoom to Region](/motion/zoom-to-region/), [Chroma Key's Pick from Canvas](/effects/chroma-key/) and the [qualifier's Pick from Canvas](/color/pick-from-canvas/). Turning one on ends the other.
+
+## Add a region without drawing
+
+**Add Region** puts a 480 × 270 region at the centre of the clip, as one undo step called Add Region. It's a **Rectangle**, set to **Pixelate** at 100 % **Amount** with 20 px **Feather**. A region you draw takes the same settings, apart from its position and size.
+
+The button is greyed at four regions, and the note beside it reads "4 at most". With no regions, the section reads "No obscured regions."
+
+The section's header sums up what's on the clip: **none**, the kind when there's one region, or the count, such as **2 regions**.
+
+## Choose Pixelate or Blur
+
+The popup in each **Region** row sets how the region hides what's under it.
+
+| Kind | What it does | At 100 % Amount |
+| --- | --- | --- |
+| **Pixelate** | Replaces the picture with coarse blocks, destroying the detail. This is the default. | Blocks 64 of the clip's own pixels across |
+| **Blur** | Softens the picture. | A blur reaching 24 of the clip's own pixels |
+
+:::caution
+Blur at its strongest is still a soft blur, and large text can be read through it. Use **Pixelate** for anything that must not be read.
+:::
+
+Both are measured in the clip's own pixels, so they grow and shrink with the clip. On a 4K recording, a block is half as wide, as a share of the picture, as it is on a 1080p one. Check that what you've hidden stays hidden at the size you'll export.
+
+## The region controls
+
+Each region has its own group of rows.
+
+| Control | What it does | Default | Range | Quick picks |
+| --- | --- | --- | --- | --- |
+| **Region 1** popup | The kind, [Pixelate or Blur](#choose-pixelate-or-blur). | Pixelate | | |
+| **Shape** | The outline of the region. | Rectangle | Rectangle, Ellipse | |
+| **Amount** | How strongly it hides. At 0 % the region is there and hides nothing. | 100 % | 0 to 100 % | 0, 25, 50, 75, 100 |
+| **Feather** | How wide the ramp is over the region's edge. At 0 the edge is hard. | 20 px | 0 to 200 px | 0, 10, 20, 40, 80 |
+| **Center** | Where the region's centre sits, as x and y from the centre of the clip's picture, with y counting down. | 0, 0 | −20,000 to 20,000 px | |
+| **Size** | The region's width and height. | 480 × 270 | 1 to 20,000 px | Width 120, 240, 480, 960. Height 68, 135, 270, 540 |
+
+**Center** and **Size** are in the clip's own pixels, not the canvas's, so 480 × 270 covers less of a 4K recording than of a 1080p one. A region can sit partly or wholly off the clip.
+
+**Feather** straddles the outline, half inside and half outside. At 20 px the effect is at full strength only from 10 px inside the outline, so leave a margin around anything that must stay hidden.
+
+## Move and resize a region on the canvas
+
+Select one clip and its regions draw on the preview as dashed outlines, each with a cross at its centre and eight handles.
+
+| To | Do this |
+| --- | --- |
+| Move a region | Drag its centre cross. |
+| Resize a region | Drag one of its handles. The far edge stays where it is. |
+| Resize about the centre | Hold <kbd>⌥</kbd> while you drag a handle. |
+| Cancel the drag | Press <kbd>Esc</kbd>. Everything goes back, with no undo step. |
+
+Each drag is one undo step, called Move Region or Resize Region. A side stays between 1 and 20,000 of the clip's own pixels.
+
+The outlines show only with exactly one clip selected, on an unlocked track, outside [crop mode](/canvas/crop/) and the text editor.
+
+The clip's own handles win where they overlap a region's. A drag inside a region, away from its cross and handles, moves the clip. While Place on Canvas or Zoom to Region is on, it takes every press, and the outlines stay drawn underneath.
+
+## Remove a region
+
+Choose **Remove** in the region's row. It's one undo step, called Remove Region, and the regions after it renumber.
+
+**Reset** in the section's header clears every region on the clip. It isn't there while an action is selected. See [Clear and Reset](/motion/edit-an-action/#clear-and-reset).
+
+## Animate a region
+
+Each region's numbers can change over an [action](/motion/actions/), which is how a region follows something moving across the shot or fades in over a few seconds.
+
+With an action selected, the rows and the canvas handles set how the region looks at the action's end:
+
+- **Amount**, **Feather**, **Center** and **Size** ramp to the new value along the action's curve.
+- **Shape** and the kind switch at the action's end. The other regions on the clip keep ramping.
+
+With an action selected, the inspector shows the action's end state, so a changed kind or shape reads as the new one straight away. The picture keeps the old one until the action's end.
+
+**Add Region**, **Place on Canvas** and **Remove** always change the clip itself, even with an action selected, because three regions can't ramp into four. If an action already animates the regions, it keeps the number it had, so the clip and the action now disagree. All the regions then switch at the action's end instead of ramping, and while the two numbers differ the outlines stay on the preview without their cross and handles.
+
+See [Set what an action animates to](/motion/edit-an-action/).
+
+## Good to know
+
+- **Regions ride with the clip.** They stay on the same part of the picture through a move, a scale, a rotation and a [zoom](/motion/zoom-to-region/). A region drawn on a rotated clip is the box around your drag in the clip's own axes, so it turns with the clip and comes out larger than the rectangle you dragged.
+- **Cropping can shift a region.** A region is measured from the centre of the cropped picture, so cropping more off one side than the other moves the region across the picture by half the difference. Check your regions after a [crop](/canvas/crop/).
+- **Overlapping regions.** Where two overlap, whichever hides more wins, and two overlapping blurs add up. So the order of the regions doesn't matter, and there's no way to reorder them.
+- **Filters and the grade.** A region's colour is graded and filtered like the picture around it. A [Sharpen filter](/effects/filters/) can't bring the hidden detail back. On a clip with a Blur filter, a pixelated region's blocks aren't blurred.
+- **Pixelate's blocks sit on a grid across the whole picture.** Moving a region doesn't shift them, and its edge can cut through a block.
+- **Several clips selected.** Any change gives them all the same regions, taken from the first selected clip and replacing what the others had.
+- **What it works on.** Every clip that draws has the section, text and shapes included. It shows on a [nest](/editing/nests/) clip but has no effect there, so set it on the clips inside. An adjustment clip has no **Picture** sub-tab.
+- **Missing files.** While a clip's file is missing, its slate shows without the regions.
+- **Copying regions.** [Paste Attributes](/editing/paste-attributes/) carries a clip's regions, along with the rest of its picture settings.
+
+## With an agent
+
+`set_video` sets a clip's regions as one list, `obscure`. Each call replaces the whole list, and `[]` clears it. A list of more than four fails with an error, so no region is ever dropped without you knowing. To change a region over time, use `set_action_end`. See [Tools: picture and grade](/mcp/tools-set-video/#obscure) and [Tools: animation](/mcp/tools-animation/#set_action_end).
+
+## Related
+
+- [Spotlight](/effects/spotlight/)
+- [Filters](/effects/filters/)
+- [Split clips](/editing/splitting/)
+- [Actions](/motion/actions/)
+- [Zoom to Region](/motion/zoom-to-region/)

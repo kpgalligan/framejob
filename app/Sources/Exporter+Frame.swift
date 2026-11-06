@@ -47,7 +47,8 @@ extension Exporter {
     /// `graphics` is pinned on the frame's own key, as `export` pins it on
     /// its own; nil draws every graphic's slate. `keepsDepth` is the caller's
     /// format (`carriesDepth`): when true and `DeepVideoFrame.reads` the frame (a deep still,
-    /// PR-9, or a deep VP9 track, PR-12), `DeepStillFrame.read`'s reader reads it.
+    /// PR-9, or a deep VP9 track, PR-12), `DeepStillFrame.read`'s reader reads it, and
+    /// it re-reads a frame the generator answers 8-bit while it shows a deep source (PR-14).
     static func renderFrame(
         project: ReelProject, urls: [UInt32: URL], at t: Ticks, maxWidth: Int?,
         options: RecipeOptions = .none, graphics: GraphicSet? = nil, keepsDepth: Bool = false
@@ -127,8 +128,17 @@ extension Exporter {
         if let maxWidth = maxWidth, maxWidth > 0 {
             generator.maximumSize = scaledSize(built.videoComposition.renderSize, to: maxWidth)
         }
-        let image = try? generator.copyCGImage(
+        var image = try? generator.copyCGImage(
             at: CompositionBuilder.time(max(0, t)), actualTime: nil)
+        // The generator's depth follows the lowest track that has video, so a
+        // deep clip above an 8-bit one comes back 8-bit (spec §11 PR-14). A
+        // frame already deep never asks, so HEVC or ProRes alone stays byte
+        // for byte; a read that fails keeps the generator's image.
+        if keepsDepth, let shallow = image, shallow.bitsPerComponent <= 8,
+            DeepVideoFrame.showsDeepSource(project, built, at: t, options: options)
+        {
+            image = DeepStillFrame.read(built, at: t, maxWidth: maxWidth) ?? image
+        }
         return RenderedFrame(
             image: image, graphics: GraphicRegistry.shared.reports(for: key),
             cursorWarnings: cursorWarnings, uncut: uncut)

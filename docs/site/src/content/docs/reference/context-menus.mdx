@@ -1,0 +1,134 @@
+---
+title: "Buttons and context menus"
+description: "Every toolbar and timeline-bar button with no menu item, and every right-click menu in Frame Job, with what each item does and when it's greyed."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Most commands live in the menu bar, and [Menus](/reference/menus/) lists them. This page covers the rest: the buttons that do something no menu item does, and the menus you open with a right-click.
+
+<AtAGlance
+  keys="⌃-click"
+  where={['The toolbar', 'The timeline bar', 'Right-click a track, a Media row, an inspector row or a curves channel']}
+  tools={['add_text_clip', 'add_shape_clip', 'set_track', 'remove_track', 'insert_clip', 'overwrite_clip', 'set_selection', 'relink_media', 'remove_media', 'set_action_end', 'set_video', 'record_screen']}
+/>
+
+## Buttons with no menu item
+
+Most buttons in the toolbar and the timeline bar repeat a menu item, and their tooltips give its shortcut. These have no menu item at all.
+
+| Button | Where | What it does |
+| --- | --- | --- |
+| **Loop** | Toolbar, at the end of the transport buttons | Turns [looping](/timeline/loop/) on and off. Playback repeats the in/out range when one is set, and the whole timeline when none is. The button is dimmed while Loop is off. |
+| **Zoom Out** and **Zoom In** (− and +) | Timeline bar | Zoom the [timeline](/timeline/zoom-and-scroll/) out or in by a step. |
+| **Timeline Zoom** slider | Timeline bar, between − and + | Sets the timeline zoom about the middle of the view. The slider is logarithmic, so the same distance always changes the zoom by the same ratio. |
+| **Add Text** (**Aa**) | Timeline bar | Adds a text clip at the playhead, the same as <kbd>T</kbd>. See [Text clips](/text-and-shapes/text-clips/#add-a-text-clip). |
+| **Add Shape** | Timeline bar | Opens the shape menu. See [Add Shape](#add-shape). |
+
+These have their own control, and do the same as a **View** menu item:
+
+| Button | Where | The same as |
+| --- | --- | --- |
+| **Fit Timeline** | Timeline bar, after + | **View ▸ Fit Timeline** (<kbd>⇧Z</kbd>) |
+| **Snap** | Timeline bar | **View ▸ Snapping** (<kbd>N</kbd>) |
+| **S**, **M** and **L** | Timeline bar | **View ▸ Timeline Track Height**: Small, Medium and Large tracks |
+| Zoom popup: **Fit**, **50%**, **100%**, **200%** | Toolbar | The canvas zoom. **View ▸ Zoom In**, **Zoom Out** and **Zoom to Fit** move through the same four steps. |
+| **Safe** | Toolbar | **View ▸ Safe Areas** |
+
+## Add Shape
+
+The **Add Shape** button in the timeline bar is the only way to choose a shape to add. There's no menu bar item for it. **Clip ▸ Add Background ▸ Solid Color** also makes a shape clip, but only a white rectangle the canvas's size.
+
+<Steps>
+
+1. Move the playhead to where the shape should start.
+2. Click **Add Shape**.
+3. Choose **Rectangle**, **Ellipse**, **Line** or **Arrow**.
+
+</Steps>
+
+The shape goes on the front track at the playhead. If it doesn't fit there, Frame Job adds a new track above everything and puts it on that. The new clip is selected, and the undo step names the shape, for example **Add Ellipse**. See [Shape clips](/text-and-shapes/shape-clips/).
+
+## Context menus
+
+Right-click or <kbd>⌃</kbd>-click opens a menu in four places in the editor:
+
+- [A track's header, or the empty part of its lane](#track-header-or-empty-lane)
+- [A row in the Media tab](#media-row)
+- [A row in the inspector](#inspector-row)
+- [A channel in the Color tab's curves strip](#curves-channel-strip)
+
+A right-click on a clip, the ruler or the timeline's corner opens no menu.
+
+A menu acts on what you clicked, not on the selection or the current track.
+
+While you record, the [recording status item](#recording-status-item) in the macOS menu bar has a menu too, and a plain click opens it.
+
+### Track header or empty lane
+
+Right-click a track's header, one of the buttons on it, or the empty part of its lane. The menu is for that track, and its checkmarks show that track's own state.
+
+| Item | What it does | Undo step |
+| --- | --- | --- |
+| **Hide Video** | Turns the track's picture off or on. See [Hide and lock tracks](/timeline/hide-and-lock-tracks/). | Hide Track |
+| **Mute Audio** | Turns the track's sound off or on. | Mute Track |
+| **Lock Track** | Locks or unlocks the track. | Lock Track |
+| **Solo** | Solos the track, or stops soloing it. See [Mute and solo tracks](/audio/mute-and-solo/). | Solo Track |
+| **Mix…** | Opens the track's mix panel. See [Track volume and pan](/audio/track-volume-and-pan/). | |
+| **Matte ▸** | **Off**, **Alpha**, **Inverted Alpha**, **Luma** or **Inverted Luma**, with a checkmark on the track's mode. Choosing the mode it already has beeps. See [Matte tracks](/canvas/matte-tracks/). | Track Matte |
+| **Remove Track** | Removes the track. If it holds clips, Frame Job asks first and says how many go with it. Greyed when it's the only track. | Remove Track |
+
+**Remove Track** here is the way to delete one empty track that isn't the front-most one, because an empty track has no clip to select. **Track ▸ Remove Empty Tracks** deletes every empty track at once.
+
+### Media row
+
+Right-click a row in the [Media tab](/projects/media-tab/). The menu acts on that file, whatever the list's selection is.
+
+| Item | What it does |
+| --- | --- |
+| **Insert at Playhead** | Places the file at the playhead, pushing later clips along, and selects its row. Greyed for a LUT. See [Insert and overwrite](/editing/insert-and-overwrite/). |
+| **Overwrite at Playhead** | Places the file at the playhead, replacing what's in the way, and selects its row. Greyed for a LUT. |
+| **Reveal in Timeline** | Selects the clips that use the file, scrolls to the first one and switches to the Clip tab. Greyed when no clip on the timeline itself uses the file, which includes a file no clip uses and one used only inside a [nest](/editing/nests/). |
+| **Reveal in Finder** | Shows the file in the Finder: the original, or the project's copy when there's no original. It beeps when it has neither. |
+| **Relink…** | Points this entry at a file you choose. It takes the new file's duration, size, frame rate and its audio, video and alpha flags. Frame Job won't relink to a file of another kind, and a clip past the end of a shorter file is shortened to end with it. See [Relink missing media](/projects/relink-media/). |
+| **Remove** | Removes the file from the project. An unused file goes at once. A used file asks first, and its clips go with it, including clips inside nests. When the file is a LUT, the clips using it keep their place and lose the look, and any file it converts loses its Camera Log. See [Remove media](/projects/remove-media/). |
+
+### Inspector row
+
+Right-click a row's label, slider, checkbox or pop-up, or the space beside them. The menu shows only what applies to that row, and with nothing that applies there's no menu. A text field keeps its own menu.
+
+| Item | When it's there | What it does |
+| --- | --- | --- |
+| **Remove from action N** | The selected action changes this row | Takes the row out of that action. |
+| **Go to action M** | Another action changes this row | Selects that action. |
+| **Reset to default** | The row has a default | Puts the row back to its default. Greyed when it's already there. |
+| **Set end value to default** | The row has a default and animates, and an action is selected | Takes the place of **Reset to default**, and sets the row's value at the action's end. Greyed when it's already there. |
+
+On a row the selected action changes, the ◆ in the left gutter turns into × when you hover over it. Click it to remove the row from the action, the same as **Remove from action N**. See [Set what an action animates to](/motion/edit-an-action/).
+
+### Curves channel strip
+
+Right-click a cell of the curve editor's channel strip in the Color tab. **Reset Master**, **Reset Red**, **Reset Green**, **Reset Blue**, **Reset Hue** or **Reset Sat** puts that one curve back to flat, and is greyed when it already is.
+
+### Recording status item
+
+This one is in the macOS menu bar, not the editor. While a recording runs its time shows there, and a click opens its menu:
+
+- **Recording keyboard shortcuts**, a dimmed row shown only while shortcuts are being recorded
+- **Pause Recording**, or **Resume Recording** while paused
+- **Stop Recording**
+
+Its tooltip says whether Frame Job is recording or paused. If you quit while a display or window recording is running with the recorder panel hidden, Frame Job opens this menu so you can stop it.
+
+If macOS hides the item, for example behind the notch, **File ▸ Stop Recording** and **Pause Recording** still work. See [The menu-bar item](/recording/menu-bar-item/).
+
+## Related
+
+- [Menus](/reference/menus/)
+- [The Clip menu](/reference/clip-menu/)
+- [Keyboard shortcuts](/reference/keyboard-shortcuts/)
+- [Gestures with no menu item](/reference/gestures/)
+- [Shape clips](/text-and-shapes/shape-clips/)
+- [The Media tab](/projects/media-tab/)
+- [The inspector](/getting-started/inspector/)

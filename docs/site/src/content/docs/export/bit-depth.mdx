@@ -1,0 +1,44 @@
+---
+title: Export bit depth
+description: Write a WAV or AIFF export at 16 or 24 bits.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The **Bit depth** row sets how finely a WAV or AIFF file records each sample of the sound. It's about sound only. The depth of the picture comes from the format you choose, and is on [Precision and bit depth](/hdr/precision/).
+
+<AtAGlance
+  menu="File ▸ Export…"
+  keys="⌘E"
+  where="Export sheet ▸ Bit depth"
+  tools="export"
+/>
+
+## Choose a bit depth
+
+In the export sheet, choose **Audio only (WAV)** or **Audio only (AIFF)** in **Format**, then pick a row in **Bit depth**, which sits under **Quality**.
+
+| Row | What it's for |
+| --- | --- |
+| **16-bit** | The default. About 11.5 MB a minute. |
+| **24-bit** | Keeps detail 16-bit can't. It matters most for a quiet recording you're going to raise or process later. About 17.3 MB a minute. |
+
+A 24-bit file shows `24-bit` in the footnote, for example `LPCM · WAV · 24-bit`.
+
+Both depths are rounded once from the [float mix](/export/audio-only/#the-48-khz-stereo-master), to the nearest value, and neither is dithered.
+
+## Good to know
+
+- On every other format **Bit depth** is greyed out and keeps your last choice.
+- ProRes sound stays 16-bit, and AAC and Opus sound is encoded from 16-bit samples.
+- The choice is remembered with the rest of the sheet and stored in [presets](/export/presets/).
+
+## With an agent
+
+An agent passes `audio_bits` to `export`, as 16 or 24. It works on `audio_wav` and `audio_aiff` only, and any other format returns an error. See [Export: start, then poll](/mcp/export/#audio-bits).
+
+## Related
+
+- [Audio-only exports](/export/audio-only/)
+- [Export loudness](/export/loudness/)
+- [Precision and bit depth](/hdr/precision/)

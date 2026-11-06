@@ -1,0 +1,35 @@
+---
+title: "Chapters"
+description: "Turn chapter markers into chapters in exported MP4, MOV, M4A and WebM files, and see how a range export treats them."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Chapters let someone jump through a long video in their player. In Frame Job they come from markers with **Chapter** turned on, with nothing to set on the export sheet.
+
+<AtAGlance where="Document tab ▸ Markers ▸ Chapter" tools={['export', 'add_marker', 'set_marker']} />
+
+## Chapters in exports
+
+[Mark a chapter](/timeline/markers/#make-a-chapter) on the timeline, then export to any format that writes an MP4, MOV, M4A or WebM file. Chapter markers become the file's chapters, in time order.
+
+- **Names.** A chapter takes its marker's name. An unnamed marker becomes "Chapter 1", "Chapter 2" and so on, counted over the chapter markers only, so removing a plain marker never renumbers them. A name of only spaces counts as unnamed.
+- **Lengths.** Each chapter runs to the next one, and the last runs to the end of the file. Time before the first chapter marker belongs to no chapter, so put a marker on the first frame if you want the file to open in one.
+- **Queued jobs.** A job writes the chapters the timeline had when you confirmed it, whatever you do to the markers afterwards. See [A queued job's snapshot](/export/export-queue/#a-queued-jobs-snapshot).
+
+WAV, AIFF, Animated GIF and Animated PNG files have no chapters. Neither do [stems](/export/stems/): only the mix carries them.
+
+## Chapters in a range export
+
+An [export of a range](/export/range/) keeps the chapters inside the range, with their times counted from the start of the file. The chapter already running when the range starts opens the file, and a chapter starting at or after the range's end is left out.
+
+Say the timeline has chapters at 0:00, 1:00 and 3:00, named Intro, Demo and Outro, and you export from 2:00 to 4:00. The file has two chapters: Demo at 0:00 and Outro at 1:00.
+
+An unnamed chapter keeps its number from the whole timeline, so the third chapter marker is still "Chapter 3" in a file that holds only two.
+
+## Related
+
+- [Markers](/timeline/markers/)
+- [Export a range](/export/range/)
+- [Choose a format](/export/formats/)
+- [What an export includes](/export/what-an-export-includes/)

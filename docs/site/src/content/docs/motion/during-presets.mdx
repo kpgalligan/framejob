@@ -1,0 +1,123 @@
+---
+title: During presets
+description: Give a clip a movement that runs all the way through it, such as a pulse, a shake or a slow push-in, and set how strong and how fast it is.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A During preset is a movement that runs for a clip's whole length: a gentle pulse, a shake, a spin, a hop or a slow push-in. It's one of a clip's three [motion presets](/motion/motion-presets/), beside [In and Out](/motion/entrances-and-exits/), and it works on any clip that draws a picture: video, stills, text, shapes, graphics and nests.
+
+<AtAGlance
+  menu="Clip ▸ Motion ▸ During"
+  where="Clip tab ▸ Clip sub-tab ▸ Motion presets"
+  tools="set_video"
+/>
+
+## Add a During movement
+
+<Steps>
+
+1. Select one or more clips.
+
+2. On the Clip tab's **Clip** sub-tab, open the **Motion presets** section.
+
+3. Choose a kind from **During**: Pulse, Shake, Spin, Bounce or Drift. It starts at half strength with a one-second cycle.
+
+4. Set [Amount](#amount) and [Period](#period).
+
+5. Choose **Preview** to watch it. Preview sets the in/out range to the clip, turns Loop on and plays, and both stay until you clear them.
+
+</Steps>
+
+**Clip ▸ Motion ▸ During** sets the kind too. A checkmark shows the kind every selected clip shares, and there's no checkmark when they differ. The menu is dimmed with nothing selected, or when every selected clip comes from a sound-only file.
+
+To take the movement off, choose **None** in the row or in the menu. Switching straight from one kind to another keeps the Amount and Period you set, but going through **None** clears them, so the next kind starts at 50% and 1 s.
+
+A clip with a During movement shows a small wave symbol at the right end of its name strip, when the strip has room.
+
+With several clips selected, a new kind goes to every clip that draws a picture, and each clip keeps its own In and Out. **Amount** and **Period** change only the selected clips that already have a During movement. Each change is one undo step, however many clips it touches.
+
+## The movements
+
+Every kind is described at 100% and at the default 50%. [Amount](#amount) scales between them, and 0% is no movement.
+
+### Pulse
+
+The clip gently grows and shrinks, once per Period. It starts at its own size, is largest halfway through the cycle, and is back at its own size at the end. At 100% it grows to 20% larger, and at 50% to 10% larger.
+
+### Shake
+
+The clip jitters in every direction, in a pattern that never visibly repeats. At 100% it moves up to 4% of the canvas's shorter edge on each axis, and at 50% up to 2%. A shorter Period shakes faster.
+
+### Spin
+
+The clip turns clockwise without stopping. At 50% it makes one full turn per Period, at 100% two turns, and at 25% half a turn.
+
+### Bounce
+
+The clip hops upward once per Period and lands back where it started. At 100% each hop is up to 8% of the canvas height, and at 50% up to 4%.
+
+### Drift
+
+A slow push-in across the whole clip. The clip grows steadily from its own size and ends 24% larger at 100%, or 12% larger at 50%.
+
+Drift ignores Period. Its speed comes from the clip's length, so a longer clip reaches the same size more slowly.
+
+## Amount
+
+How strong the movement is, from 0 to 100%, with quick picks at 25, 50, 75 and 100. The default is 50%. A number outside the range is brought back to the nearest end.
+
+At 0% the clip stays still but keeps its During kind. **Amount** is greyed while **During** is **None**.
+
+## Period
+
+How long one cycle takes, from 0.1 to 10 s, with quick picks at 0.25, 0.5, 1 and 2. The default is 1 s, and what you type lands on the nearest frame.
+
+**Period** is greyed while **During** is **None**, and for Drift. Drift keeps the value, so it's still there if you switch to another kind.
+
+## How During starts
+
+Every During movement starts from the clip's own placement on its first frame. The clip begins exactly where you put it, whatever it goes on to do.
+
+The movement sits on top of that placement and of any [actions](/motion/actions/). Its size multiplies the clip's own scale, and its turn and offset add to the clip's own rotation and position. Pulse, Spin and Drift work around the clip's visible centre, after any crop.
+
+The inspector still shows the clip's own values, not the moved ones, even though the preview and the export show it moving.
+
+## During with In and Out
+
+A During movement runs under the In and Out, so a clip can slide in while it pulses. Their sizes multiply, and their turns and offsets add, so a Spin entrance and a During Spin turn together.
+
+A During movement never changes a clip's opacity. Only In and Out fade a clip.
+
+## During restarts at a cut
+
+A During movement counts from each clip's own first frame, so cutting a clip restarts it. After a [split](/editing/splitting/), both halves keep the movement and the second half starts over.
+
+That can show as a jump at the cut. A Pulse goes back to the start of its cycle, and a Drift drops back to the clip's own size and drifts again across the shorter piece. [Remove Silences](/cleanup/remove-silences/) on a clip with Pulse or Drift can make it jump at every cut.
+
+To keep one movement going across cuts, [nest](/editing/nests/) the pieces and give the nest clip the During movement.
+
+## Good to know
+
+- A preset is not part of any [action](/motion/what-can-animate/). With an action selected, the **Motion presets** rows are marked ⊘ and still edit the clip, so **Amount** can't ramp.
+- Changing a clip's speed doesn't change its During movement. **Period** stays the same length on the timeline, and a Drift spreads over the clip's new length.
+- Inside a nest, Shake and Bounce measure against the nest's canvas, not the project's.
+- A Pulse or Drift can't draw a clip past 1,000%, the largest scale a clip can have.
+- Freeze Frame and Add Blurred Background leave the movement behind. Duplicate, Detach Audio and Paste keep it.
+- A drag on the canvas that starts while the clip is moving starts from the clip's own position, not the moved one.
+- [Follow Subject](/framing/follow-subject/) won't frame a clip with a Spin, whether it's the In, the Out or the During, because it needs an upright picture.
+- [Motion blur](/motion/motion-blur/) counts a During movement as motion.
+
+## With an agent
+
+An agent sets During through `set_video`, with a `kind` of `pulse`, `shake`, `spin`, `bounce` or `drift`, an `amount` from 0 to 1, and a `period`.
+
+An agent isn't held to the row's range for Period. A period shorter than one frame becomes one frame. See [Tools: picture and grade](/mcp/tools-set-video/#motion).
+
+## Related
+
+- [Motion presets](/motion/motion-presets/)
+- [Entrance and exit presets](/motion/entrances-and-exits/)
+- [Motion blur](/motion/motion-blur/)
+- [Actions](/motion/actions/)

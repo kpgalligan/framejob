@@ -1,0 +1,63 @@
+---
+title: "Zoom and pan the preview"
+description: "Look closer at the picture with the zoom popup, the View menu or a pinch, and move around a canvas bigger than the pane."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Zoom the preview to look closely at the picture or to place something precisely, then pan to reach the part you want. Zooming is only a way of looking: it changes nothing in the project, makes no undo step and is never exported. To zoom in on part of the video so your viewers see it, use [Zoom to Region](/motion/zoom-to-region/) or [Auto Zoom](/recording/auto-zoom/).
+
+<AtAGlance
+  menu={['View ▸ Zoom In', 'View ▸ Zoom Out', 'View ▸ Zoom to Fit']}
+  keys={['⌘+', '⌘=', '⌘-', '⌘0']}
+  where={['The zoom popup in the toolbar', 'Pinch, ⌥-scroll or ⌘-scroll over the preview', 'Scroll or Space-drag to pan']}
+/>
+
+## The zoom popup
+
+The popup in the toolbar sets how large the picture appears. Its stops are **Fit**, **50%**, **100%** and **200%**. It always shows the zoom the canvas is at, however you got there.
+
+**Fit** sizes the canvas to the pane and follows the pane as it changes. At **100%**, one canvas pixel takes one point on screen.
+
+Each window starts at **Fit**, and the zoom isn't saved with the project.
+
+## View menu commands
+
+| Command | Key | What it does |
+| --- | --- | --- |
+| **View ▸ Zoom In** | <kbd>⌘+</kbd> or <kbd>⌘=</kbd> | Goes to the next stop up. Greyed at 200%. |
+| **View ▸ Zoom Out** | <kbd>⌘-</kbd> | Goes to the next stop down. Greyed at Fit. |
+| **View ▸ Zoom to Fit** | <kbd>⌘0</kbd> | Goes straight back to Fit and centres the canvas. Greyed at Fit. |
+
+These zoom the preview. To zoom the timeline, see [Zoom and scroll the timeline](/timeline/zoom-and-scroll/).
+
+## Pinch and scroll
+
+Pinch on a trackpad over the preview, or scroll with <kbd>⌥</kbd> or <kbd>⌘</kbd> held, to step through the same four stops. The stops are separate steps, so a gesture has to build up a little before it takes the next one.
+
+## Panning
+
+When the zoomed canvas is bigger than the pane, there are two ways to move it:
+
+- Scroll over the preview.
+- Hold <kbd>Space</kbd> and drag. If you've been working elsewhere, click the canvas first, or <kbd>Space</kbd> plays and pauses instead of panning.
+
+You can only pan in a direction where the canvas overflows the pane, so you can't drag the canvas out of view. While the canvas fits, a plain scroll does nothing.
+
+Moving between stops keeps your pan, pulled back if it no longer fits. Going back to **Fit** centres the canvas again.
+
+## Space on the canvas
+
+After you've clicked the canvas, <kbd>Space</kbd> still plays and pauses. Frame Job can't tell a tap from a pan until you let go, so playback starts or stops on the release rather than the press. If you panned while <kbd>Space</kbd> was down, the release does nothing to playback.
+
+## Good to know
+
+- The stops count up from **Fit** in order, whatever size Fit happens to be. On a small canvas in a large pane, **50%** can be smaller than **Fit**.
+- While the canvas fits, holding <kbd>Space</kbd> and dragging a clip moves the clip as usual, and playback toggles when you let go of <kbd>Space</kbd>.
+
+## Related
+
+- [The canvas](/canvas/the-canvas/)
+- [Preview Quality](/timeline/preview-quality/)
+- [The Preview Window](/timeline/preview-window/)
+- [Play, pause and shuttle](/timeline/playback/)

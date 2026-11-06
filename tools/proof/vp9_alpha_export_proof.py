@@ -95,7 +95,8 @@ run in the copy):
   alpha-cq-63           `alphaCQLevel(pixels:)` 63 at every size: A4
   alpha-cq-one-band     the size bands collapsed to the 1080p band's level (40): A4, on DISC
                         at 640 × 360 alone (measured: DISC 1280 × 720 reads 48.75 dB at 40)
-  no-shape-guard        `ExportWebMWriter` without `checkAlphaSurvivesTheSize`: A10
+  no-shape-guard        `ExportWebMWriter` and `Exporter.settingsRefusal` without
+                        `checkAlphaSurvivesTheSize`: A10
   alpha-row-hdr         `vp9_alpha_webm` among the core's HDR_ROWS: A9, S1 (the Dynamic Range
                         popup live on HDR (HLG)), cargo dynamic_range
 
@@ -177,7 +178,9 @@ MUTANTS = {
          "        let band = alphaCQBands[2]\n")]},
     "no-shape-guard": {"rows": ["A10"], "anchors": [
         (f"{SOURCES}/ExportWebMWriter.swift",
-         "        try ExportWriter.checkAlphaSurvivesTheSize(settings, canvas: canvas)\n", "")]},
+         "        try ExportWriter.checkAlphaSurvivesTheSize(settings, canvas: canvas)\n", ""),
+        (f"{SOURCES}/ExporterSettings.swift",
+         "            try ExportWriter.checkAlphaSurvivesTheSize(settings, canvas: canvas)\n", "")]},
     "alpha-row-hdr": {"rows": ["A9", "S1"], "cargo": "dynamic_range", "anchors": [
         ("core/src/dynamic_range.rs", 'pub(crate) const HDR_ROWS: [&str; 6] = [\n',
          'pub(crate) const HDR_ROWS: [&str; 7] = [\n'),

@@ -1,0 +1,128 @@
+---
+title: "Where Frame Job keeps its files"
+description: "Find your API keys, spend ledger, export presets, converted movies, recordings and projects on your Mac, and see how Frame Job protects your keys."
+---
+
+Frame Job keeps its own data in one folder in your Library and your recordings in your Movies folder. Projects live wherever you save them. Use this page when you want to back something up, clear something out, or check what's stored on your Mac.
+
+## What's where
+
+In this table, `…/Frame Job/` is short for `~/Library/Application Support/Frame Job/`.
+
+| Path | What it is |
+| --- | --- |
+| `…/Frame Job/assemblyai-key` | Your [AssemblyAI key](#key-files) |
+| `…/Frame Job/anthropic-key` | Your [Anthropic key](#key-files) |
+| `…/Frame Job/spend.jsonl` | The [spend ledger](#the-spend-ledger) |
+| `…/Frame Job/anthropic-prices.json` | The Assistant's [cached price table](#the-spend-ledger) |
+| `…/Frame Job/ExportPresets.json` | Your [named export presets](#export-presets) |
+| `…/Frame Job/Rewrapped/` | [Movies Frame Job copied or converted](#rewrapped-copies) from files macOS could not open |
+| `…/Frame Job/Agent/agent.sock` | The [local socket](#the-agent-socket) AI agents connect through |
+| `~/Movies/Frame Job Recordings/` | [Screen recordings, camera recordings and voice-overs](#recordings) |
+| Wherever you save them | [Projects](#projects), as `.framejob` packages |
+| The `com.kgalligan.FrameJob` preferences domain | [View settings and other remembered choices](#preferences) |
+| macOS's temporary folder | [Files Frame Job can make again](#temporary-files) |
+
+## The Application Support folder
+
+Frame Job's own folder is `~/Library/Application Support/Frame Job/`. The Finder hides your Library, so to open it choose **Go ▸ Go to Folder…** in the Finder and paste the path.
+
+Frame Job makes the folder when something first needs it, and each folder under it only when there's something to put there. You won't find empty folders for features you've never used.
+
+Each folder it makes has mode `0700`, so only your user account can open it. If you've already set a folder's permissions yourself, Frame Job leaves them alone.
+
+## Key files
+
+Your keys are two files in that folder:
+
+| File | What it holds |
+| --- | --- |
+| `assemblyai-key` | Your AssemblyAI key, for cloud transcription. See [Your AssemblyAI key](/captions/assemblyai-key/). |
+| `anthropic-key` | Your Anthropic key, for the Assistant. It goes to the Assistant's helper, the background program that talks to Anthropic, when a conversation starts, and nowhere else. See [Set up the Assistant](/assistant/set-up/). |
+
+Save, replace and remove keys in [Settings](/reference/settings/). A file that's empty, or holds only spaces, counts as no key.
+
+## How keys are stored
+
+Each key is a plain file that only your user account can read or write (mode `0600`). It's written to a temporary name and renamed into place, so it never exists with looser permissions and is never half-written.
+
+A key is never:
+
+- put in macOS preferences
+- logged
+- passed as a launch argument
+- passed to an agent tool, or returned by one
+- shown in the Settings window again
+
+:::caution
+Frame Job doesn't use the Keychain. Anything running as your user account can read these files, so treat your Mac account as the protection.
+:::
+
+## Keys from the environment
+
+If no key is stored, Frame Job falls back to an environment variable. This only helps when you start Frame Job from a shell that sets the variable, because an app opened from the Finder or the Dock doesn't see your shell's variables.
+
+| Key | Variable |
+| --- | --- |
+| Anthropic (Assistant) | `ANTHROPIC_API_KEY` |
+| AssemblyAI (Transcription) | `RC_ASSEMBLYAI_KEY` |
+
+- A stored key always wins over the variable.
+- An empty variable counts as no key.
+- **Verify** in Settings' Transcription section checks the variable's key when nothing is typed or stored. The Assistant section has no **Verify**.
+- A key from a variable isn't stored, so **Remove** stays dimmed unless you've saved one too.
+
+## The spend ledger
+
+`spend.jsonl` records one line per Assistant response, with its time, model, token counts and estimated dollars. A response that was cut short is marked as one. The file never holds your key or the conversation, and only your user account can read it.
+
+The month's spend in Settings is added up from this file. If Frame Job can't write to it, the conversation carries on and the transcript shows a note saying why.
+
+`anthropic-prices.json` is the Assistant's cached copy of the price table it uses for that estimate. It's refreshed at most once a day. See [What it costs](/assistant/cost/).
+
+## Export presets
+
+Your named export presets are in `ExportPresets.json`. If that file is missing or damaged, the presets list is empty and nothing else is affected. See [Export presets](/export/presets/).
+
+## Rewrapped copies
+
+The `Rewrapped/` folder holds movies Frame Job made from files macOS could not open: [WebM and MKV copies](/projects/webm-and-matroska/) and [ffmpeg conversions](/projects/ffmpeg-conversion/). Your originals stay where they are.
+
+A project refers to the file in this folder, not to the original. If Frame Job can't find that file or make it again, the media is missing until you [relink](/projects/relink-media/) it.
+
+Every project shares this folder, and the only thing Frame Job deletes from it is a copy that turns out not to open, so copies pile up. You can clear it yourself:
+
+- WebM and MKV copies are made again from the original the next time a project using them opens, as long as the original is still there.
+- ffmpeg conversions aren't. That media stays missing until you relink it.
+
+[Consolidate Media](/projects/consolidate-media/) copies a project's rewrapped files into its package, which frees that project from this folder.
+
+## The agent socket
+
+An AI agent outside Frame Job reaches it through an MCP client, and that client connects through `~/Library/Application Support/Frame Job/Agent/agent.sock`, a local socket Frame Job creates at every launch. See [The helper and the socket](/mcp/helper-and-socket/).
+
+## Recordings
+
+Screen recordings, camera recordings and voice-overs go to `~/Movies/Frame Job Recordings/`, named by date and time: `Screen Recording 2026-09-10 at 14.03.22`, `Camera Recording 2026-10-26 at 17.14.33`, or `Voice-over 2026-10-02 at 09.15.04.m4a`. The folder is made when a recording first has something to put in it.
+
+See [Recording files and formats](/recording/files-and-formats/) for every file a recording writes.
+
+## Projects
+
+A project is a `.framejob` package, saved wherever you choose. Each package holds its own caches, so they move with it. See [The .framejob package](/reference/framejob-package/).
+
+## Preferences
+
+View settings and other remembered choices are in the `com.kgalligan.FrameJob` preferences domain. Keys are never stored there. See [What Frame Job remembers](/reference/remembered-choices/).
+
+## Temporary files
+
+Files Frame Job can always make again go in macOS's temporary folder, outside any project: the caches of a project you haven't saved yet, and the [48 kHz copies](/reference/file-formats/#any-sample-rate) of sound at other sample rates. You don't need to keep them.
+
+## Related
+
+- [The .framejob package](/reference/framejob-package/)
+- [Supported file formats](/reference/file-formats/)
+- [Settings](/reference/settings/)
+- [What Frame Job remembers](/reference/remembered-choices/)
+- [AI features and your own keys](/getting-started/ai-and-your-keys/)

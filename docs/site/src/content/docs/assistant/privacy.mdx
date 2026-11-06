@@ -1,0 +1,59 @@
+---
+title: "Assistant privacy"
+description: What goes to Anthropic when you use the Assistant, what stays on your Mac, and how long a conversation lasts.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The Assistant works by sending your conversation to Anthropic, so it's worth knowing what that includes. Frame Job has no account or relay of its own: what you send goes to Anthropic under your own key, and nowhere else.
+
+<AtAGlance
+  where={['Inspector ▸ Assistant tab', 'Frame Job ▸ Settings… ▸ Assistant ▸ ⓘ']}
+  needs="An Anthropic API key. See Set up the Assistant."
+/>
+
+## What goes to Anthropic
+
+When you use the Assistant, these go to Anthropic under your key:
+
+- **Your messages**, and a short block in front of each one: the project's name and path, the open nest, the playhead and the selection.
+- **What the tools send back**: the project's details as JSON, including media file paths, any clip transcripts it reads, the reason when something couldn't be done, and other results.
+- **The frames it renders** to look at the picture.
+
+What it costs is billed to your key. See [What it costs](/assistant/cost/).
+
+Your key is handed straight to the helper, the small program Frame Job runs to talk to Anthropic. It isn't placed on a command line or in the helper's environment.
+
+When a conversation starts, the helper also asks Anthropic for the model's context window, under your key. That request names only the model.
+
+The Assistant [asks before](/assistant/what-it-will-not-do/#tools-it-asks-about-first) it exports a movie, captions or a graphic, saves a project, consolidates media or writes a file to a path it chose. Temporary renders and files in the project's graphics folder are [written without asking](/assistant/what-it-will-not-do/#file-writes-that-do-not-ask).
+
+## No audio to the cloud transcriber
+
+Audio never goes to the cloud transcriber from the Assistant. [Cloud transcription is withheld](/assistant/what-it-will-not-do/#tools-it-will-not-call), so uploading audio stays your choice, in **File ▸ Generate Captions…** or **Clip ▸ Remove Filler Words…**.
+
+## The price table download
+
+Once a day at most, the helper downloads LiteLLM's public price table from GitHub. That request carries no key and no project data. See [Prices refreshed daily](/assistant/cost/#prices-refreshed-daily).
+
+## What stays on your Mac
+
+Everything else stays on your Mac. The Assistant keeps these files in `~/Library/Application Support/Frame Job/`:
+
+| File | What it is |
+| --- | --- |
+| `anthropic-key` | Your key, in a file only you can read. |
+| `spend.jsonl` | The [spend ledger](/assistant/cost/#the-spend-ledger). It holds token counts and dollars, never your key or the conversation's content. |
+| `anthropic-prices.json` | The cached price table. |
+
+## The conversation lives in memory
+
+The conversation is kept in memory only, and goes when you clear it or close the window. Nothing of it is saved in the project or in the spend ledger.
+
+## Related
+
+- [Set up the Assistant](/assistant/set-up/)
+- [What it won't do and what it asks first](/assistant/what-it-will-not-do/)
+- [What it costs](/assistant/cost/)
+- [What goes to AssemblyAI](/captions/assemblyai-privacy/)
+- [Where Frame Job keeps its files](/reference/file-locations/)

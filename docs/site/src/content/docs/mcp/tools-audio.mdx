@@ -1,0 +1,279 @@
+---
+title: "Tools: audio"
+description: "The agent tools that detach and attach a clip's sound, normalise it, set it up for speech, match it to a reference and line clips up by their sound."
+---
+
+These tools work on a clip's sound as a whole: split it off, set its level, set it up for speech, match it to another clip, or line clips up by what they hear. For single settings, use [`set_audio`](/mcp/tools-set-audio/).
+
+`normalize_clip`, `enhance_voice`, `match_audio` and `sync_audio` measure sound, so they share three things:
+
+- **They take no `scope`.** They work in whatever nest `set_scope` has open. To work inside a nest, open it first. See [Editing inside a nest](/mcp/nests/).
+- **They can take seconds**, and longer on a long clip. `enhance_voice` and `match_audio` render a clip to measure it, and so does `normalize_clip`'s loudness mode for a clip with processing.
+- **They give up if the project changes meanwhile.** Nothing changes, and the answer says to call again.
+
+All four are one undo step, and a second identical call changes nothing.
+
+## `detach_audio`
+
+Splits a clip's sound onto its own clip on the track below. It's **Clip ▸ Detach Audio** (<kbd>⌥⌘D</kbd>), see [Detach and Attach Audio](/audio/detach-and-attach/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip's id. |
+| `scope` | integer | No | Look the clip up inside this nest. |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+The original keeps its picture with its audio switched off, and loses its `audio.duck`: ducking stays with the sound. The new clip plays the sound with its video switched off. When the clip is on the bottom track, a new track is added under it.
+
+The two are linked, and each names the other under `linked`. Moves, splits, ripples, nests and copies keep them in step. To make a [J-cut or L-cut](/audio/j-and-l-cuts/), use `trim_start` or `trim_end` with `alone: true` on the sound. Speed and reverse edits are refused until [`attach_audio`](#attach_audio).
+
+**Answers** with `new_clips` and, when one was added, `new_tracks`, then the [project summary](/mcp/what-a-call-answers/).
+
+**Refuses**, saying why, a clip that isn't a media clip, media with no audio, a clip whose audio is off (which is also what an already detached clip reads as), and a sound clip that would overlap the track below by more than an overlap allows: more than half the shorter clip, more than one neighbour on a side, or an adjustment clip. A smaller overlap becomes a cross dissolve.
+
+## `attach_audio`
+
+Merges a detached pair back into one clip. It's **Clip ▸ Attach Audio** (<kbd>⇧⌥⌘D</kbd>), see [Detach and Attach Audio](/audio/detach-and-attach/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | Either half of the pair. |
+| `scope` | integer | No | Look the clip up inside this nest. |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+The picture's audio comes back on with the sound clip's audio settings, and the sound clip goes. Its track stays.
+
+**Answers** with the project summary.
+
+**Refuses** a clip that isn't linked, and a pair that no longer covers the same time, such as a J-cut or L-cut. Trim them to match first.
+
+## `normalize_clip`
+
+Sets each clip's volume so its loudness, or its loudest moment, lands on a target. It's the **Normalize** button in the Clip tab's **Volume** section and **Clip ▸ Normalize**, see [Normalize](/audio/normalize/). Those follow the mode chosen in the section's **Normalize** row. The tool doesn't read that row: it goes by its own `mode`.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | Yes | The clip ids. At least one. |
+| `mode` | string | No | `loudness` takes each clip's integrated loudness to `target_lufs`, under a −1 dBTP ceiling. `peak` takes each clip's loudest moment to `peak_db`. Default: `loudness`, or `peak` when you give `peak_db` and no mode. |
+| `target_lufs` | number | No | Loudness mode only. The loudness to land at, −50 to −5 LUFS. Default: −16. −14 is YouTube's playback reference and −23 is EBU R 128's. |
+| `peak_db` | number | No | Peak mode only. Where the loudest moment lands, −60 to 0 dBFS. Default: −1, which is what the button uses in Peak mode. |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+The level is measured before the clip's fader, over the part of the clip that plays. It knows nothing of the volume, fades, ducking, mute or solo already on the clip, because it's about the material, not the mix. Loudness is measured to BS.1770-4, gated, as the export plays the clip: a mono clip as dual mono, a stereo clip through its own channel choice, mono and pan. That has three results:
+
+- It **replaces** the volume rather than multiplying it, so a second call answers "made no change".
+- It writes the clip's base volume, even with the playhead inside an action.
+- It leaves `muted` alone.
+
+In peak mode each clip gets its own gain to the same peak, so levels aren't matched across a selection. In loudness mode each clip goes to the one target, which does match them.
+
+The volume can't go past 32×, so a clip quieter than about −31 dBFS can't reach −1. It's still normalised as far as it goes, and the answer says where it landed.
+
+In loudness mode:
+
+- A clip whose true peak would pass −1 dBTP at the target, or that already has a limiter, gets the clip's [limiter](/mcp/tools-set-audio/#compressor-and-limiter) in the same edit. Its own is kept with the ceiling at −1 dBTP at most, otherwise it's the default.
+- A clip with an active EQ, hum notch, voice isolation, noise reduction, gate, leveller, de-esser, compressor or voice effect is measured through that processing, rendered offline as the export plays it. It waits for any isolation or voice render.
+- A worked-out volume within 0.05 dB of the clip's own is kept, so a second call still changes nothing.
+
+**Answers**, in peak mode, `peak_db` and a `normalized` list:
+
+| Key | What it says |
+| --- | --- |
+| `clip`, `media` | Which clip and file. |
+| `measured_db` | The clip's measured peak. |
+| `volume` | The volume written. |
+| `result_db` | Where the peak lands. |
+| `clamped` | True when the 32× ceiling stopped it short. |
+
+**Answers**, in loudness mode, `target_lufs`, `ceiling_dbtp` and a `normalized` list:
+
+| Key | What it says |
+| --- | --- |
+| `clip`, `media` | Which clip and file. |
+| `measured_lufs`, `true_peak_dbtp` | The **Volume** section's Loudness readout. For a rendered clip the true peak is the processed one. |
+| `processed_lufs` | The loudness through the clip's processing. `null` for a clip measured without a render. |
+| `renders` | The renders it took. 0 for a clip measured without one. |
+| `volume` | The volume written. |
+| `limiter` | The clip's limiter after the edit, or `null` for a volume alone. |
+| `result_lufs` | Where the clip lands. |
+| `result_true_peak_dbtp` | Its true peak after the edit, held at the limiter's ceiling. |
+| `limited_by` | `max_gain` when the volume ceiling stopped it short, otherwise `null`. |
+
+Either mode adds `skipped`, one sentence per clip it left out, and `note` when the ceiling stopped a clip short. The rest are still normalised.
+
+**Skips** by name a clip that plays no sound and a nest. Peak mode also skips one that's silent over the part that plays, or whose waveform hasn't been analysed yet. Loudness mode also skips one that plays under 0.4 s, is under −70 LUFS over the part that plays, or whose loudness hasn't been measured yet. In loudness mode a clip with processing is also skipped when its reversed copy is still being made, its processing can't be rendered, or it's under −70 LUFS after it. When every clip is skipped, the call fails with "Nothing could be normalised" and every reason.
+
+**Refuses** a `target_lufs` or `peak_db` out of range, and either one in the other's mode. Neither is clamped.
+
+## `enhance_voice`
+
+Sets each clip up for speech from its own measurements. It's **Clip ▸ Enhance Voice** and the **Enhance Voice** button in the Clip tab's **Volume** section, see [Enhance Voice](/audio/enhance-voice/). Those use the **Normalize** row's target and show the Measuring Sound sheet while they work.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | Yes | The clip ids. At least one. |
+| `target_lufs` | number | No | The loudness each clip should land at, −50 to −5 LUFS. Default: −16. −14 is YouTube's playback reference and −23 is EBU R 128's. |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+Speech detection runs on your Mac, with no key and no upload.
+
+It measures the clip before any of its settings, then writes ordinary settings you can see and change in each section:
+
+| Setting | When | What it sets |
+| --- | --- | --- |
+| EQ | Always | The **Rumble Cut** high-pass, 80 Hz at 24 dB/octave. The EQ's other slots stay. |
+| Voice isolation and gate | When the pauses' floor is less than 45 dB under the clip's loudness | Isolation at 0.8, or noise reduction at 0.5 where isolation can't serve the clip (a speed other than 1, a ramp or a freeze). The gate opens 10 dB above the pauses' median true peak, held to −40 to −6 relative to the loudness. With quiet pauses all three are off, and with under 0.5 s of pause they're left as they are. |
+| Leveller | When the speech's short-term loudness range is over 6 LU | The leveller at its defaults, otherwise off. With under 3 s of speech it's left as it is. |
+| De-esser | When at least 5% of the speech has its 6 kHz band within 10 dB of the loudness | The de-esser at its defaults, otherwise off. |
+| Compressor | Always | 3:1 at the speech's median true peak, with makeup that gives back what it takes. |
+| Limiter | Always | The clip's own, with its ceiling at −1 dBTP at most, otherwise the default. |
+| Volume | Always | What takes the clip to `target_lufs`, worked out on the clip rendered through these settings. |
+
+It overwrites only `eq`, `isolation`, `noise_reduction`, `gate`, `leveller`, `de_esser`, `compressor`, `limiter` and `volume`. Hum, channels, pan, mono, fades, ducking and mute stay. It writes base settings even with the playhead inside an action.
+
+[`normalize_clip`](#normalize_clip) at the same target afterwards changes nothing, because it measures a processed clip the same way.
+
+**Answers** `target_lufs`, `ceiling_dbtp` and an `enhanced` list:
+
+| Key | What it says |
+| --- | --- |
+| `clip`, `media` | Which clip and file. |
+| `measured_lufs`, `true_peak_dbtp` | The clip's loudness and true peak, before its settings. |
+| `speech_seconds` | How much speech it found. |
+| `floor_lufs`, `floor_gap_db`, `pause_peak_dbfs` | The pauses' floor, its gap under the loudness, and their median true peak. |
+| `sibilance_share` | The share of the speech that's sibilant. |
+| `speech_range_lu` | The speech's short-term loudness range. `null` under 3 s of speech. |
+| `set` | Exactly the keys written, in `set_audio`'s spelling. |
+| `reasons` | One sentence per rule: the measurement, the threshold and what it set. |
+| `volume`, `processed_lufs`, `renders` | The volume written, the loudness through the new settings before it, and the renders it took. |
+| `result_lufs`, `result_true_peak_dbtp`, `limited_by` | Where the last render lands, and `max_gain` when the volume ceiling stopped it short. |
+
+It adds `skipped` and `note` as `normalize_clip` does. A second call answers "Enhance Voice made no change".
+
+**Skips** by name a clip that plays no sound, is a nest, plays under 0.4 s, is under −70 LUFS, or has under 1 s of speech. So too a clip whose loudness or speech hasn't been analysed yet, whose reversed copy is still being made, whose processing can't be rendered, or that's under −70 LUFS after its processing. When every clip is skipped, the call fails with "Nothing could be enhanced" and every reason.
+
+**Refuses** a `target_lufs` out of range. It isn't clamped.
+
+## `match_audio`
+
+Gives clips the loudness and speech tone of a reference clip. It's **Clip ▸ Match Audio…**, see [Match Audio](/audio/match-audio/), whose sheet picks the reference among the selected clips and has a **Loudness** and an **EQ** box.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `reference` | integer | Yes | The clip whose loudness and tone the others take. It isn't changed. |
+| `clips` | array of integers | Yes | The clips to change. At least one. |
+| `loudness` | boolean | No | Match the loudness, through the volume and limiter. Default: true. |
+| `eq` | boolean | No | Match the tone, through the EQ's shelves and bands. Default: true. |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+Speech detection runs on your Mac, with no key and no upload.
+
+The reference is rendered once as it plays, with its settings, limiter and volume but no fades, ducks or mute, and its loudness is read.
+
+**Loudness** is [`normalize_clip`](#normalize_clip)'s loudness mode at that target for every clip. It sets the volume, and the limiter when the peaks need it, worked out on the clip rendered through its new settings.
+
+**EQ** renders each clip with its shelves and bands off, keeping its high- and low-pass. Both clips' average spectra are measured over their speech only, needing about 1 s of it, in 23 third-octave bands from 79 Hz to 12.7 kHz. The difference between them, with the overall level taken out, is fitted by the EQ's low shelf, three bands and high shelf, with gains within ±12 dB and Q from 0.5 to 4. A band is used only where the difference is at least 0.5 dB. These replace the clip's own five, its high- and low-pass and hum stay, and `bypass` goes off.
+
+It writes only `volume`, `limiter` and `eq`, as base settings even inside an action.
+
+**Answers** `reference` (its `clip`, `media`, `lufs` and `speech_seconds`), `target_lufs` and a `matched` list:
+
+| Key | What it says |
+| --- | --- |
+| `clip`, `media` | Which clip and file. |
+| `set` | Exactly the keys written. |
+| `eq`, `eq_fit_rms_db` | The fitted EQ, and how far it is from the difference in dB RMS. |
+| `volume`, `measured_lufs`, `processed_lufs`, `result_lufs`, `result_true_peak_dbtp`, `limited_by` | The same figures as `normalize_clip`. |
+| `renders` | The renders it took. |
+
+It adds `skipped` and `note` as `normalize_clip` does. A second call answers "Match Audio made no change".
+
+**Refuses** a call with `loudness` and `eq` both false, and a reference that plays no sound, is a nest, plays under 0.4 s, is under −70 LUFS, hasn't been analysed yet or, with `eq`, has under 1 s of speech or under 12 third-octave bands within 50 dB of its loudest.
+
+**Skips** a clip that can't be matched for one of those reasons, that shares under 12 such bands with the reference, or that is the reference. The rest are still matched.
+
+## `sync_audio`
+
+Lines clips up by their sound. One clip, the anchor, stays where it is. Every other clip moves along its own track by a whole number of frames, so its sound plays at the same moment as the anchor's. It's **Clip ▸ Synchronize Audio**, see [Synchronize Audio](/audio/synchronize-audio/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | Yes | The clips to line up. At least two, each on its own track. |
+| `anchor` | integer | No | The clip that stays put, one of `clips`. Default: among the clips with pictures (all of them when none has), the earliest start, then the rearmost track, then the lowest id. |
+| `accept_weak` | boolean | No | Apply a weak match. Default: false. |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+The matching runs on your Mac, with no key and no upload. The menu item leaves out a nest or a clip that plays no sound, where the tool stops and names it.
+
+### How a match is chosen
+
+Each file's sound is compared on features that ignore gain, microphone and room. When both stretches hold at least 2 s of speech, only their speech is compared. The clips' played windows are searched first, and the whole files only when that chooses nothing and a clip is trimmed.
+
+- A **confident** match has a confidence of at least 10 and is 1.5 above the next candidate.
+- A **weak** match is the best peak within 3 s of where the clip already sits, with a confidence of at least 4.
+
+Either kind must then pass a check on the waveforms, which needs a clear peak, with a confidence of at least 15, within ±48 ms. A match that fails it is refused as not one recording, because features alone can match two takes of similar words.
+
+See [Confident and weak matches](/audio/weak-sync-matches/).
+
+### Apply a weak match
+
+A weak match that would move anything isn't applied. The answer is `moved: false`, with `weak` naming the clips, each row's move and a `note`, and nothing changes.
+
+:::caution
+Pass `accept_weak: true` only after the person has agreed to that move, naming it. A weak match can be unrelated sound.
+:::
+
+### What it does to a clip
+
+- **A clip that would start before 0** is trimmed at its head by that much and starts at 0. The anchor never moves or trims.
+- **Clock drift** between the two recordings is measured over at least 60 s of overlap and corrected with a tiny speed change, as a resample. It's left alone when it's under 5 ms, under 3× its uncertainty, or would need a speed more than 0.2% from ×1, and `drift_note` says why.
+
+### What it answers
+
+An answer that isn't a refusal has `anchor`, `moved`, `weak` (the clip ids of weak moves) and a `synced` list. A second call answers `moved: false` and "already in sync".
+
+| Key | What it says |
+| --- | --- |
+| `clip`, `media` | Which clip and file. |
+| `offset` | Anchor source minus clip source at the overlap's centre, refined, in ticks. |
+| `coarse_offset` | The match before the waveform refinement. |
+| `refined`, `refine_confidence` | `phat` when the waveform check refined it, otherwise `coarse`, and that check's confidence, or `null` when none ran. |
+| `delta`, `start` | How far the clip moves, and its new start. |
+| `confidence` | How strong the chosen match is. |
+| `search` | `played` or `whole`. |
+| `chosen_by` | `confidence`, or `placement` for the weak tier. |
+| `matched_on` | `speech` or `sound`. |
+| `candidates` | Each search's candidates, as `offset`, `delta` and `confidence`. |
+| `trimmed` | The ticks cut off its head, 0 when none. |
+| `speed` | The clip's speed after the call. |
+| `drift_ppm`, `drift_ms`, `drift_error_ms` | The drift measured and its uncertainty. |
+| `drift_on`, `drift_windows` | `features` or `phat`, the points the drift line went through, and how many windows it used. |
+| `drift_corrected`, `residual_ms`, `drift_note` | Whether it was corrected, the error left, and why not. |
+
+### When it refuses
+
+It's all or nothing: when any clip can't be matched, nothing moves and every reason is named. When no match is chosen, the message gives each search's candidates as the move each would make and its confidence, so you can move the clip near one and call again.
+
+A clip can't be matched when it:
+
+- is a nest, or plays no sound
+- is still being analysed
+- holds under 2 s of sound
+- plays more than 0.2% away from ×1, plays at a rate other than its speed, plays reversed, or has a speed ramp
+- shares a track with another of the clips
+- would be left with under a frame after its head trim
+- would never play beside the anchor, or would overlap another clip on its track
+
+`anchor` must be one of `clips`.
+
+## Related
+
+- [How audio works](/audio/how-audio-works/)
+- [Normalize](/audio/normalize/)
+- [Enhance Voice](/audio/enhance-voice/)
+- [Match Audio](/audio/match-audio/)
+- [Synchronize Audio](/audio/synchronize-audio/)
+- [Tools: clip sound (set_audio)](/mcp/tools-set-audio/)
+- [Tools: multicam](/mcp/tools-multicam/)
+- [How tool calls behave](/mcp/tool-calls/)

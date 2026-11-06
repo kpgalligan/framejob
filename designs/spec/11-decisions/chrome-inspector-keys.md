@@ -261,7 +261,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   selection (`refreshCanvas`) AND on the playhead's own path
   (`canvasPlayheadMoved`), and a gesture writes through the target captured
   at mouse-down (`gestureTarget`), so playback entering a span mid-drag
-  does not move the drag's writes.
+  does not move the drag's writes. **Amended by CI-17:** a single clip's
+  gesture on a first-frame cut goes to the cut, and writes the base too.
+  **Amended by CI-19:** past a finished action holding a key it writes, a
+  single clip's gesture refuses.
 - **CI-14 — `set_action_end.off` keys an optional property OFF at the end**
   (phase 5, P10). The end state holding `null` at an optional key is the
   property switched off when the action finishes: the evaluator already
@@ -279,7 +282,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   off"; the RAW builder, which `clearOps` and every agent call use,
   forwards its nulls as removals and its caller chooses `off` itself. Extended by AU-88: `off` also accepts
   `audio.eq.<slot>`, one EQ slot keyed off, which the typed builder lifts
-  from a null slot inside `audio.eq`.
+  from a null slot inside `audio.eq`. Extended by GR-36: `off` also accepts
+  `video.qualifier.<range>`, one qualifier range keyed off, which the typed
+  builder lifts from a null range inside `video.qualifier`.
 - **CI-15 — Every sub-row carries `mixed`, and the collapse is the one
   animation** (phase 5, P12 and Reduce Motion). A row nested under a switch
   (a shadow's Blur, a compressor's Ratio, a stroke's Width) shows the
@@ -372,6 +377,38 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   Esc is unchanged everywhere. Sheets, Settings
   and Welcome are other windows and keep AppKit's dialog keys. No MCP
   mirror: focus is view state, app/CLAUDE.md's exemption.
+- **K-5 — The canvas's keys take ⇧ ⇪ and the keypad and fn flags, an arrow on
+  a focused canvas nudges a clip that is showing, and a press outside the
+  canvas hands the keys back** (kpgalligan/framejob#463, 2026-11-05). The
+  canvas's keys read `CanvasKey.isPlain`: ⇧, ⇪, `.numericPad` and `.function`
+  are allowed, ⌘ ⌥ ⌃ never, because every real arrow carries `.numericPad`
+  and `.function` and keypad Enter `.numericPad`. An arrow on a focused canvas
+  nudges when a selected clip is drawn at the playhead (`primaryBox`), and
+  otherwise stays the transport's: §4.2's nudge is the exception to §9's arrow
+  rows. Space arms only under K-1's rule (⇧ ⇪), and a key-up settles only a
+  press the canvas armed, so ⌥Space and a Space the window took toggle nothing
+  on release. A press in the content view outside the canvas hands the keys to
+  the content view before dispatch, as K-4 does for text, because a timeline
+  click, which refuses first responder, otherwise left the arrows nudging.
+  While a canvas drag is open an arrow does nothing: a committed edit inside a
+  live edit keeps its undo step through Esc, which CI-16 forbids. No MCP
+  mirror: focus is view state, and `set_video` is the nudge's capability.
+- **K-6 — Crop mode's Esc, Return and keypad Enter work from any focus but
+  typing** (kpgalligan/framejob#474, 2026-11-05). They leave the mode from the
+  bare-key map as well as from the canvas, plain by K-5's rule, ahead of its
+  other arms; typing and an attached sheet keep them, as they keep the whole
+  map. Entering the mode takes no focus. Esc leaves crop mode before it
+  deselects an action, as it does on the canvas. No MCP mirror: the mode is
+  view state.
+- **K-7 — Crop mode opens only on a clip with source pixels** (§4.3's rule,
+  `InspectorTab.hasSourcePixels`; kpgalligan/framejob#475, 2026-11-05). C and
+  a double-click beep on any other clip; a text clip's double-click still
+  edits it. The mode ends when its primary clip stops qualifying, by a click,
+  a selection or the playhead. A clip on a matte track keeps the mode whatever
+  its kind, because crop shapes the matte (MT-4) and MT-7 has it handled like
+  any clip; the owner kept it (#475, 2026-11-05, 'Keep it'): no Crop section
+  is added, so such a crop has no field and no Reset. `set_video` and
+  `paste_attributes` are unchanged.
 - **SH-3 — An inspector name field is the inspector's value field**
   (kpgalligan/framejob#171, 2026-09-30). `InspectorNameField` — the Graphic
   sub-tab's string rows, the Document tab's marker name and the clip
@@ -415,6 +452,62 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   press; the outlines and grips stay drawn under it, as the layer's box and
   handles do. Accepted: a grip under a layer handle is not reachable there,
   and an ellipse is outlined as its box.
+- **CI-17 — A canvas gesture on a clip with a first-frame cut writes the cut
+  and the base; amends CI-13** (#469, 2026-11-05). A **cut** is a layout
+  action (`VerticalVersion.isLayoutAction`) at clip time 0, at most one
+  canvas frame long (CO-61, CO-80 (b)): it holds the clip's placement for
+  every frame after the first, so a base write moves frame 0 alone. With ONE
+  clip selected and no action selected, a move, nudge, scale or crop on a
+  clip whose cut holds a key the gesture writes goes to that cut: it starts
+  from the cut's end and writes it as CI-13's selected action. A gesture on
+  a cut, held this way or selected, writes the same patch to the base too,
+  so frame 0 and the rest stay together: CAM-10 (3)'s "an ordinary clip a
+  person moves". The two ops go as one list, one undo step named as before.
+  The selection is not changed, and the playhead decides nothing, so CI-2
+  stands. Unchanged: every other finished action (CI-13's base); a
+  multi-selection and a shape's box scale stay on the base; a rotate stays
+  on the base unless the cut holds `rotation`, which `PLACEMENT_KEYS` does
+  not name; the inspector's fields keep CI-2 and their ◇. A cut is therefore
+  the one case where a drag and a typed value write different places.
+  **Amended by CI-19:** past a finished action holding a key it writes, a
+  single clip's gesture refuses.
+- **CI-18 — A list's add and remove buttons carry the boxed "clip" tag**
+  (#481, 2026-11-05). Add Filter, Add Region with Place on Canvas (one tag
+  for the row) and each Remove take `InspectorClipTag`, #102's mark for a
+  lone ⊘ button in an animatable section, and not a gutter ⊘: their section
+  animates, and the gutter on a Remove row speaks for the kind popup beside
+  it. Shape rows take the real ⊘ under CI-7, through `paths(of:)`'s
+  `set_shape` group, and CI-9's Reset stays.
+- **CI-19 — A canvas gesture past a finished action that holds a key it
+  writes refuses, when it writes one clip and no action is selected; amends
+  CI-13 and CI-17** (#469, the owner 2026-11-05, "Refuse and explain"). It
+  applies when the selection is exactly the clip the gesture writes (the
+  anchor for a move, the pressed clip for a scale, width, rotate or crop,
+  `primaryBox` for a nudge), no action is selected, the clip's track is
+  unlocked, and some action of that clip that is not its first-frame cut
+  (CI-17) has FINISHED at the playhead — its end at or before the playhead's
+  clip time — with an end naming a key the gesture WRITES: x or y for a move
+  or nudge ("position"); x, y or `scale` for a scale, which is a picture's
+  handles and a text clip's corners and top and bottom edges ("position",
+  "size"); `text.width` alone for a text clip's left or right edge
+  ("width"); `rotation` for a rotate; `crop` for a crop. Then the gesture
+  makes no edit and no undo step: Frame Job beeps and CI-10's strip shows
+  the app's sentence, naming the LATEST such action by its lane number,
+  "action N on this clip's lane holds its position at the playhead, so a
+  move here would show only before it. Select action N first." (the noun is
+  move, resize, rotation or crop; two keys are joined by "and"). A drag
+  refuses on its first drag tick, so a press that only selects stays
+  silent; a nudge refuses at once. The playhead decides here, where CI-17
+  does not let it: before the action starts, or while it runs with no
+  action selected (after Esc), the gesture writes CI-13's base, and a clip
+  whose only holder is its cut keeps CI-17. Unchanged: a multi-selection
+  (CI-13; #529), including a scale, rotate or crop on its primary box; a
+  ⇧-press that takes the dragged clip out of the selection; a shape's box
+  scale and an endpoint drag (`set_shape` has no action form, so selecting
+  the action would not help); obscure grips (CI-16); the inspector's fields
+  (CI-2, ◇); and `set_video`, `set_text` and `set_action_end` over MCP — no
+  tool reaches a canvas gesture, so no agent mirror changes. CI-2 and CI-13
+  stand: the refusal only says where the write would go.
 - **SH-4 — `StickerButton` is Rasterize's square block, drawn in place;
   supersedes SH-1** (kpgalligan/framejob#100, the owner, 2026-09-30). The
   class, its name, its `init(title:style:target:action:)` and all 28 calls
@@ -453,3 +546,12 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `toolTip`, which would double the popover; VoiceOver reads it as "About
   <section>" with the text as its help. Accepted: one rounded shape in
   square chrome.
+- **#495 — The Document tab's Rate popup reads Custom for a rate it does
+  not list** (2026-11-05). Its items are `Fps.common`, Match First Clip and
+  a trailing **Custom**, the Canvas Preset's own Custom
+  (`DocumentPane.canvasSection`). Custom is shown, and checked, for a
+  project rate the popup does not list, such as 59.94 or 48 fps from a file
+  or an agent; picking it beeps and changes nothing, since no field types a
+  rate there. The popup used to fall back to its first item, so it drew and
+  checked 24 for any unlisted rate. `Fps.common` and the Export sheet's
+  rates are unchanged.

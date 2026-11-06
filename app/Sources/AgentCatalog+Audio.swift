@@ -126,7 +126,7 @@ extension AgentServer {
                     + "that section's Normalize row (Loudness unless changed). The level is measured from the clip's "
                     + "cached waveform (peak) or loudness cache (BS.1770-4 gated, as the "
                     + "export plays it: a mono clip as dual mono, a stereo clip through its own "
-                    + "mono and pan) over the part of it that actually plays, which is "
+                    + "channel pick, mono and pan) over the part of it that actually plays, which is "
                     + "PRE-FADER: it knows nothing about the volume, fades, ducking, mute or "
                     + "solo already on the clip, because normalise is a statement about the "
                     + "material and not about the mix. Three things follow, and each is a "
@@ -154,8 +154,8 @@ extension AgentServer {
                     + "result_true_peak_dbtp is held at the limiter's ceiling, and "
                     + "measured_lufs and true_peak_dbtp are the Volume section's Loudness "
                     + "readout. In loudness mode a clip with an active EQ, a hum notch, voice "
-                    + "isolation, noise reduction, a gate, a de-esser, a compressor or a voice "
-                    + "effect is measured THROUGH that processing: its window is rendered "
+                    + "isolation, noise reduction, a gate, a de-esser, a leveller, a compressor "
+                    + "or a voice effect is measured THROUGH that processing: its window is rendered "
                     + "offline as the export plays it, pre-fader (waiting for its isolation or "
                     + "voice render; seconds on a long clip), the volume is solved on what comes "
                     + "out and, with a limiter, checked by render to within 0.1 LU; "
@@ -307,8 +307,11 @@ extension AgentServer {
                     + "project changes meanwhile, nothing changes and the call says so. A "
                     + "reference that plays no sound, is a nest, plays under 0.4 s, is under "
                     + "-70 LUFS, has not been analysed yet or (with eq) has under 1 s of speech "
+                    + "or under \(AudioMatchFit.minimumBands) third-octave bands within "
+                    + "\(Int(AudioMatchFit.contentRangeDB)) dB of its loudest "
                     + "is refused by name; a clip that cannot be matched for one of those "
-                    + "reasons, or is the reference, is reported under skipped and the rest are "
+                    + "reasons, shares under \(AudioMatchFit.minimumBands) such bands with the "
+                    + "reference, or is the reference, is reported under skipped and the rest are "
                     + "still matched.",
                 [
                     "reference": [
@@ -439,8 +442,10 @@ extension AgentServer {
                     + "named under dropped with the reason, when it is too short once on both "
                     + "grids, when it overlaps a word of another clip on any unlocked track "
                     + "(the ripple cuts every unlocked track, in scope or not), when it crosses "
-                    + "a nest clip, and when it crosses a transition. fillers lists each kept "
-                    + "run with its clip, words and range; ranges merges them. A clip on a "
+                    + "a nest clip, and when it reaches an overlap between two clips on one "
+                    + "unlocked track, with a stored transition or without one, or the area "
+                    + "around it, as wide again as the overlap on each side. fillers lists each "
+                    + "kept run with its clip, words and range; ranges merges them. A clip on a "
                     + "locked track is not read and is named under locked, since "
                     + "ripple_delete_ranges neither cuts nor moves a locked track. Media with "
                     + "no such transcript are named under needs_transcript: "
@@ -469,8 +474,9 @@ extension AgentServer {
                     + "uploaded, cached, audio_seconds, engine, language and, when there is "
                     + "something to say, note. A media that already has a transcript made with "
                     + "filler words makes no request and answers ready true, uploaded []. "
-                    + "Refused for a document with nowhere to keep its transcript cache and a "
-                    + "media no clip plays from its file. " + ModelKey.assemblyAI.catalogClause
+                    + "Refused for a document with nowhere to keep its transcript cache, a "
+                    + "media whose file is missing and a media no clip plays from its file. "
+                    + ModelKey.assemblyAI.catalogClause
                     + ".",
                 [
                     "media": [

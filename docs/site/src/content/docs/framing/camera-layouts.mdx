@@ -1,0 +1,165 @@
+---
+title: Camera layouts
+description: Switch a screen recording and the webcam or camera in front of it between corner, circle, side-by-side, stacked and full-frame layouts as it plays.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A camera layout decides how a camera clip and the screen recording behind it share the frame. Choose one at any moment and the picture eases into it there, so a tutorial can go from a small picture-in-picture corner to a full-frame talking head and back as it plays.
+
+<AtAGlance
+  menu="Clip ▸ Camera Layout ▸"
+  where="Clip tab ▸ Picture ▸ Layout"
+  tools="switch_layout"
+/>
+
+## Switch the layout
+
+<Steps>
+
+1. Move the playhead to where the switch should start.
+
+2. Tell Frame Job which clips to use. With nothing selected it looks for the track named "Camera", which is where a recording's camera lands, so usually there's nothing to do. Otherwise select the camera, or the camera and the screen. See [Which clips](#which-clips).
+
+3. Choose a layout from **Clip ▸ Camera Layout ▸**.
+
+</Steps>
+
+To change layout again later, move the playhead on and choose another. To undo a switch, press <kbd>⌘Z</kbd>: one undo step, **Camera Layout**, takes the whole switch back. These items have no keyboard shortcut.
+
+The [Layout section](/framing/layout-section/) in the inspector does the same thing for one selected clip, with a switch length you choose. To start a recording in a layout, [choose it in the recorder panel](/recording/camera-beside-the-screen/#choose-a-layout) before you record.
+
+## The layouts
+
+The submenu holds **Corner ▸**, **Rounded Corner ▸** and **Circle ▸**, each with **Bottom Right**, **Bottom Left**, **Top Right** and **Top Left**, then **Side by Side**, **Stacked**, **Camera Full** and **Screen Only**.
+
+In the three corner layouts, Camera Full and Screen Only, the screen goes to its full placement. That's where **Add Clip** puts a new clip: centred, and scaled down to fit when it's bigger than the canvas and **Fit new clips to canvas** is on in the [Document tab](/projects/document-tab/). A screen smaller than the canvas isn't scaled up.
+
+### Corner
+
+The camera shows its whole picture, with square corners, in the corner you choose. It's fitted inside a box a quarter of the canvas wide and a third tall, 5 % in from the canvas's edges. This is the box a recording's camera lands in by default.
+
+### Rounded Corner
+
+The same box with rounded corners, the radius 8 % of the box's shorter side.
+
+### Circle
+
+The largest square of the camera's picture, cropped to a circle in the corner you choose. The circle is as wide as the box's shorter side, so on a 16:9 canvas it's a third of the canvas's height, and it sits 5 % in from the edges.
+
+### Side by Side
+
+The screen is fitted in the left two-thirds and the camera is cropped to fill the right third. There's a margin of 4 % of the canvas's shorter side around and between them, and both have their corners rounded by 2 % of that side. It needs a screen.
+
+### Stacked
+
+The screen runs across the top, centred, and takes up to two-thirds of the height inside the margins. The camera is cropped to fill the rest below it. The margins and corners are the same as Side by Side's. It needs a screen, and it works on any canvas, not only a tall one.
+
+### Camera Full
+
+The camera fills the canvas, with square corners. It's scaled until no canvas shows, so a picture of another shape runs off two edges.
+
+### Screen Only
+
+The camera is hidden where it is, its opacity going to 0, and the screen goes to its full placement. The camera clip keeps playing, so its sound carries on.
+
+## Which clips
+
+Frame Job works out the camera and the screen from the selection and the playhead. They don't have to come from a recording: any clip with a picture can be the camera, and any clip with a picture behind it can be the screen.
+
+| Selected | The camera | The screen |
+| --- | --- | --- |
+| Two clips with a picture, on different tracks | The front one | The other one |
+| One clip with a picture | That clip | The clip drawing behind it at the playhead |
+| Nothing | The clip at the playhead on the front-most track named "Camera" | The clip drawing behind it at the playhead |
+
+The clip drawing behind the camera is the front-most one playing at the playhead on a track behind the camera's. Frame Job passes over hidden tracks, [matte tracks](/canvas/matte-tracks/), [adjustment clips](/color/adjustment-clips/) and clips with their picture switched off.
+
+With no screen, the corner layouts, Camera Full and Screen Only lay out the camera alone. Side by Side and Stacked won't.
+
+The items are dimmed when:
+
+- the camera doesn't play at the playhead. A selected clip the playhead isn't on doesn't fall back to the "Camera" track
+- three or more clips are selected, or two on one track
+- a selected clip has no picture of its own, such as a text clip, an adjustment clip or a sound-only clip
+- a sheet is open
+
+The menu works inside an open [nest](/editing/nests/). There, the nest's canvas is the canvas and the "Camera" track is the one inside the nest.
+
+## The switch
+
+A switch eases from the old layout into the new one over 0.5 s from the playhead. It's a layout action on each clip, so you can see it on the clip's [action lane](/motion/action-lane/) and retime it like any other action. Each action sets position, scale, crop, corner radius and opacity.
+
+- **At a clip's first frame** it cuts instead of easing. The layout becomes the clip's own placement there, and a one-frame action marks the cut. Each clip is judged on its own, so a camera that starts at the playhead cuts while the screen behind it eases.
+- **Near an end** the switch is shortened to finish by the clip's end or the clip's next layout action, and it's never shorter than one frame.
+- **While another layout is still easing,** the first one ends where the second begins.
+- **Where a layout action already starts,** the new layout replaces it.
+
+## How far a layout reaches
+
+A layout holds until the next switch, so a camera cut into pieces stays in the corner.
+
+Every later clip with a picture on the camera's track, and on the screen's, that starts before the next layout action on that track takes the layout as its own placement, with no easing. With no later switch, that runs to the end of the track. Each track's reach is worked out separately.
+
+Those later clips keep their own actions, though an action that moves one can [stop the switch](/framing/layout-section/#a-layout-meets-a-zoom). Because a later clip takes the layout as its placement, removing the layout action afterwards doesn't put that clip back. Use Undo for that.
+
+## Resize or move a laid-out camera
+
+The layouts have fixed sizes and places. A switch on a clip's first frame, which is what a camera that landed with a recording has, is the easy case: select that one clip and drag it. A move, a nudge, a resize or a crop on the canvas changes the switch and the clip's own values together, so the clip moves on every frame, with or without the action selected. A rotate changes the clip's own values, which reach every frame too.
+
+A switch later in a clip takes more. It's an action, and a clip shows an action's end state until a later action changes it. With the playhead past the switch and no action selected, a move, nudge, resize or crop on the camera changes nothing: Frame Job beeps, and [the foot of the inspector](/getting-started/refused-edits/#the-refusal-strip) names the switch's action and asks you to select it first. Before the switch, a drag changes the clip's own values, which show only until the switch. To go past it, change the layout itself.
+
+<Steps>
+
+1. Move the playhead into the switch and select the camera clip. That selects the layout action.
+
+2. Press <kbd>→</kbd> until the playhead is past the switch, so the preview shows where the action ends. The action stays selected.
+
+3. Drag or resize the camera on the canvas, or type in the [Transform](/canvas/transform/) rows.
+
+4. Press <kbd>Esc</kbd> to leave the action.
+
+</Steps>
+
+Typing is the one thing a first-frame switch does differently from a drag. A switch on a clip's first frame is one frame long, and that first frame shows the clip's own values. The Transform rows change one place, so with the action selected the first frame stays where it was. To move it too, put the playhead on the first frame, press <kbd>Esc</kbd>, and type the same values in the Transform rows.
+
+Each stretch of a [paused recording](/recording/pause-and-stop/#paused-recordings-are-stretches) has its own camera clip, so change each one.
+
+## When a switch is refused
+
+A switch that can't be made changes nothing. Frame Job beeps, and [the foot of the inspector](/getting-started/refused-edits/#the-refusal-strip) shows the reason after "Refused:". The numbers in it are Frame Job's own ids for the clip and the action, and the timecode is when that clip starts or, in the first two rows, the playhead.
+
+| The inspector says | What it means |
+| --- | --- |
+| "clip 12 does not play at 00:00:04:10" | The clip isn't under the playhead. Move the playhead onto it. With two clips selected, this can be the screen. |
+| "no clip draws behind clip 12 at 00:00:04:10 to be the screen" | Side by Side or Stacked found no screen. Pick another layout, or put a clip behind the camera. |
+| "clip 12 is a nest clip, which cannot draw a rounded corner or a circle." | A nest clip shows square corners only, so a nest can't take Rounded Corner or Circle as the camera. That goes for a later camera clip in the layout's reach too. Use Corner. |
+| "The screen clip 8 at 00:00:00:00 zooms (action 10); nest the screen's clips…" | The clip holds a zoom or another moving action after the playhead. See [A layout meets a zoom](/framing/layout-section/#a-layout-meets-a-zoom), which also covers the sheet Frame Job usually offers here. |
+| "action 10 on clip 8 already runs from …, and two actions on one clip may not overlap" | Two actions on one clip can't overlap, and the switch's span runs into another action, such as a volume change. Move the playhead, shorten the switch in the [Layout section](/framing/layout-section/), or move that action. |
+
+## Good to know
+
+- A layout sets position, scale, crop, corner radius and opacity on both clips, replacing what you'd set by hand. Rotation and everything else stay as they were.
+- A nest clip in Side by Side or Stacked keeps square corners.
+- Side by Side stays side by side on a tall canvas if you choose it there. [Make Vertical Version](/framing/vertical-what-changes/) is what re-lays your switches for a new shape, and it turns Side by Side into Stacked on a canvas taller than wide.
+- The camera's crop in Circle, Side by Side and Stacked can [centre on the person](/framing/layout-section/#the-crop-centred-on-the-person) instead of the picture.
+
+## With an agent
+
+[`switch_layout`](/mcp/tools-framing/#switch_layout) does what the menu does, at any time rather than the playhead. An agent can also:
+
+- name the camera and the screen itself. The screen must be on a track behind the camera's, and each must have a picture and play at that time
+- set how long the switch takes and how it eases, where the menu always eases in and out over 0.5 s
+- stop a layout holding at a time of its choosing, with no later switch
+- switch inside a nest without opening it, where that nest's canvas is the canvas. See [Editing inside a nest](/mcp/nests/)
+
+See [Tools: framing and vertical](/mcp/tools-framing/). An agent can also choose a recording's layout when it [records](/mcp/record-screen/).
+
+## Related
+
+- [The Layout section](/framing/layout-section/)
+- [Record a camera beside the screen](/recording/camera-beside-the-screen/)
+- [Action bands and the action lane](/motion/action-lane/)
+- [What Make Vertical changes](/framing/vertical-what-changes/)
+- [The Clip menu](/reference/clip-menu/)

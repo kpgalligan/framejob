@@ -1,0 +1,105 @@
+---
+title: "The volume line"
+description: See a clip's level over time on the timeline, drag it, and add points to shape it, as you would a rubber band or volume automation.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+The volume line is the thin white line over a clip's waveform. It shows how loud that clip plays over time, and you can drag it to change the level without leaving the timeline.
+
+<AtAGlance
+  keys="⌥-click"
+  where="On a clip's audio part in the timeline"
+  tools={['set_audio', 'add_action', 'set_action_end', 'set_action']}
+/>
+
+## The line on a clip
+
+Every clip with sound draws the line, except a nest clip. It's the level you hear from that clip, with everything that shapes it folded in:
+
+- the clip's **Volume** and its volume actions
+- its fades and crossfades
+- ducking from other clips
+- the track's volume
+
+The top of the clip's audio part is +30 dB (3200 %) and the bottom is −60 dB or quieter. A clip at 100 % sits about a third of the way down.
+
+A clip you can't hear has its line along the bottom. That's a muted clip, one on a muted track, or one silenced by another track's solo.
+
+A small square in the action colour marks each action end that sets the volume. Those squares are the line's points.
+
+The line starts below the [action lane](/motion/action-lane/) and is only drawn where the audio part is at least 12 pt tall, so at the Small [track height](/timeline/track-height/) it may not show.
+
+## Drag the line
+
+Press within 3 pt of the line and drag up or down. The press selects the clip. The new level appears beside the pointer, such as "+2.5 dB", or "−∞ dB" at silence. One drag is one undo step, "Set Volume".
+
+What the drag changes depends on where you press:
+
+| You press | The drag changes |
+| --- | --- |
+| Inside an action that sets the volume | That action's end level |
+| After such an action | The end level of the last one before the point |
+| Anywhere else | The clip's own **Volume** |
+
+The drag is vertical only and relative to where you pressed. It moves in decibels, and it covers the whole scale over the height of the audio part, so a taller [track](/timeline/track-height/) gives you finer control.
+
+To go to silence, drag down to the very bottom of the audio part. Upwards, the level stops at 3200 %.
+
+The readout is the level you're setting, not the sum on the line. The line includes track volume and ducking, but a drag changes only the clip's own level, so on a silenced clip the line stays on the floor while the readout changes.
+
+## Add a point
+
+A point lets the level change partway through a clip.
+
+<Steps>
+
+1. Hold <kbd>⌥</kbd> and click the line where you want the point.
+
+2. Keep the mouse down and drag to set its level, or let go and drag the line later.
+
+</Steps>
+
+A point is an [action](/motion/actions/), not a keyframe. Frame Job adds an action running from the end of the previous action, or the clip's start, up to where you clicked, ending at the volume the clip already has there. The click on its own changes nothing you hear. It's one undo step, "Add Volume Point".
+
+Inside an action that changes only the volume, the click splits that action in two at the point. Both halves keep its curve, so a linear action sounds the same until you drag, and an eased one eases again on each side of the point.
+
+The click beeps and adds nothing:
+
+- inside an action that doesn't set the volume, or that changes anything else as well
+- inside an action that runs past the clip's end, as one can after a trim
+- within one frame of the clip's start, the start of the action it's in, or the previous action's end
+
+## Move or remove a point
+
+To move a point in time, drag its action band. To remove one, select the band and press <kbd>⌫</kbd>. See [Move, resize or remove an action](/motion/change-an-action/).
+
+## Clicks that reach the clip instead
+
+Some presses on the line act on the clip, as they do anywhere else on it:
+
+| Press | What it does |
+| --- | --- |
+| <kbd>⇧</kbd>-click | Adds the clip to the selection or takes it out |
+| <kbd>⌥⇧</kbd>-drag | Slips the clip |
+| Double-click | Renames the clip |
+
+The fade handles, the action lane and the clip's edges take a press before the line does.
+
+## Good to know
+
+- The line doesn't respond on a [locked track](/timeline/hide-and-lock-tracks/).
+- A clip with its [sound switched off](/editing/enable-picture-and-sound/) draws no line, and neither does one playing [too fast to have sound](/speed/sound-at-high-speed/).
+- Inside an open nest, the line is the nest's own mix. It doesn't include the volume, fades, mute or solo of the nest clip and the tracks outside it.
+
+## With an agent
+
+There's no separate tool for the line. A drag is `set_audio`, or `set_action_end` on the action that sets the level there, and a point is `add_action` then `set_action_end`, with `set_action` when it splits an action. See [Tools: clip sound](/mcp/tools-set-audio/#volume-and-mute) and [Tools: animation](/mcp/tools-animation/#set_action_end).
+
+## Related
+
+- [Clip volume](/audio/volume/)
+- [Animate sound with actions](/audio/animate-sound/)
+- [Audio fades](/audio/fades/)
+- [Reading a clip on the timeline](/timeline/reading-a-clip/)

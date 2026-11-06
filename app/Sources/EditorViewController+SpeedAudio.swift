@@ -26,6 +26,21 @@ extension EditorViewController {
         if document.project !== before { lastLiveOps = ops }
     }
 
+    /// `timeline.onDragUpdate`: a clip drag's tick. A tick of more than one
+    /// op (`add_track`, then the op that places the clips) is tried op by op
+    /// on the gesture's base, and a refusal drops it whole, so a refused drop
+    /// past the lanes leaves no empty track (spec §11 #465; #88's fold is
+    /// unchanged). An op that throws is left to `updateLiveEdit`, which
+    /// swallows the list.
+    func timelineDragUpdated(_ ops: [ReelOp]) {
+        if ops.count > 1, let document = document, let base = document.liveEditBase {
+            let container = document.scope.flatMap { base.scoped($0) } ?? base
+            var trial = SwitchAngle.Trial(project: container)
+            for op in ops where (try? trial.require(op)) != nil { return }
+        }
+        timelineLiveUpdated(ops)
+    }
+
     /// `timeline.onLiveEnd` and `inspector.onLiveEnd`: the captions the
     /// gesture re-times are added as one more tick (spec §11 SR-27), so they
     /// jump at mouse-up and the step is named "and Re-time Captions". A

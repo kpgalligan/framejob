@@ -118,6 +118,21 @@ the same way.
 - **Expect:** each drag plays the speech under the playhead in short pieces, words recognisable at a slow drag, with no clicks or pops between pieces; the music under it is heard as well. Dragging left plays each piece forwards. On the hold, the sound stops within about a tenth of a second and stays silent; nothing plays after the mouse-up. A single click plays one short piece. With the track muted the speech is not heard; at 25 % it is quieter. The level meter does not move while scrubbing. Play, the arrow keys and the marker click play no scrub sound (playback plays as before).
 - **Source:** road map "audio" AP13 (spec §11 AU-130…AU-136; `scrub_audio_probe.py` scores the scheduler, the window, the reader and the queue, never the sound on the Mac's output).
 
+**PB-15 — Loop goes round at the timeline's end, with its sound**
+- **Do:** 1. Put one clip with sound alone on a timeline. 2. Click **Loop** in the toolbar. 3. Press Home, then Space, and watch at least three passes.
+- **Expect:** playback goes round until you stop it, and the sound plays across each wrap. The picture shows no black flash at the wrap.
+- **Source:** #466 (spec §4.1); `docs_bugs_b1_proof.py` L1–L5 and `playhead_echo_probe.py` `loopend·1`–`·11` score the playhead through Motion Preview, `play_preview` and `editor.toggleLoop`, never the real button, the keys or the sound.
+
+**PB-16 — A package whose project.json is a folder shows a message, and the app stays open**
+- **Do:** 1. With a project open, make a copy of a saved `.framejob` package. In Terminal, replace the copy's `project.json` with a folder of that name. 2. Choose File ▸ Open… and pick the copy. 3. Double-click the copy in the Finder.
+- **Expect:** each time an alert reads "`<name>` does not contain a readable project.json.", Frame Job stays running and the other window stays open.
+- **Source:** #482; `docs_bugs_b2_proof.py` P1–P7 score `open_project`, whose refusal shows no alert: the proof cannot show this alert without putting a window in front of you.
+
+**PB-17 — A folder dropped on the Media tab adds the media files in it**
+- **Do:** 1. Make a folder holding two movies, a `.txt`, a subfolder with a movie in it, and a hidden movie (`cp A.mov .h.mov` in Terminal). 2. Drag the folder from the Finder onto the Media tab. 3. Choose Edit ▸ Undo. 4. Drag the folder onto the Media tab together with another movie.
+- **Expect:** while dragging, the pointer shows the copy badge; the two movies are added in the Finder's order as one undo step, "Add 2 Media Files", with no alert; the undo takes both out; the mixed drop adds three.
+- **Source:** #497; `docs_bugs_b5_proof.py`'s D rows reach the drop's handler through a stub drag, not a Finder drag.
+
 **JOB-60 — Remove Background's edges**
 - **Do:** On S-TH1, S-TH2 and S-TH5 (`samples/README.md`; until they exist, any recording of yourself in a busy room with hair, glasses and moving hands), turn Remove Background on and wait for Status to read Ready. Step through hair, hands in motion, glasses and the outline against the room at Edge −0.5, 0 and 0.5.
 - **Expect:** the outline stays on the person; Edge moves it in and out.
@@ -216,7 +231,7 @@ the same way.
 - **Source:** spec §10 step 6.
 
 **TL-2 — Drags, trims and their transients feel right**
-- **Do:** 1. Drag a clip near another's edge. 2. Trim both edges. 3. ⌥-drag a body (duplicate) and ⌥-drag an edge (rate stretch). 4. Drop a clip where it is refused. 5. Drag a clip's fade handles. 6. ⌘Z after each.
+- **Do:** 1. Drag a clip near another's edge. 2. Trim both edges. 3. ⌥-drag the first of two abutting clips onto free space (a copy lands, the original stays) and ⌥-drag an edge (rate stretch). 4. Drop a clip where it is refused. 5. Drag a clip's fade handles. 6. ⌘Z after each.
 - **Expect:** the snap guide shows; the trim cursor appears at an edge; a refused drop springs back; each gesture is one undo step and undo restores the frame.
 - **Source:** #48; spec §10 step 7.
 
@@ -289,6 +304,41 @@ the same way.
 - **Do:** With a real keyboard and mouse, Full Keyboard Access off, and a clip selected: 1. Click the clip's name in the inspector, type a new name, press Return, then Space. 2. Click the name again, type, then click an empty part of the timeline and press Space. 3. Click an inspector number, type a value, press Tab, then Space. 4. On a text clip, click the Text tab's Content, type, press ⇧Return and type a second line, then press Return and Space. 5. Click into a field and click inside that same field again; click a number field's border. 6. In the Assistant tab, type a message and press Return, then Space. 7. Turn Full Keyboard Access on, click a field and press Tab.
 - **Expect:** 1–4 and 6: each value is applied once (one undo step each), no space appears in any field, and Space plays at once with no beep and no extra click. In 4 ⇧Return starts a new line and Return applies both lines. 5: the field keeps its caret. 7: Tab moves to the next control instead.
 - **Source:** spec §11 K-4.
+
+**TL-17 — A refused Media row slides back**
+- **Do:** Drag a row from the Media tab squarely onto a clip on the timeline and let go.
+- **Expect:** Frame Job beeps, the reason shows at the foot of the inspector, nothing lands, and the dragged row slides back to its row instead of vanishing at the pointer.
+- **Source:** #507.
+
+**TL-18 — Canvas keys on a real keyboard**
+- **Do:** Click a clip on the canvas, press each arrow and ⇧→, then click the timeline and press →. With Caps Lock on, press C and Esc, tap Space, and Space-drag on a zoomed canvas. Press C from the timeline, then keypad Enter.
+- **Expect:** 1 px and 10 px moves, then a frame step with the clip still. Crop mode leaves on each key. Space plays once on release and pans when dragged.
+- **Source:** #463, #474.
+
+**TL-19 — A recording's camera drags on a real canvas**
+- **Do:** Land a screen recording with a camera. With the playhead past the first frame, drag the camera on the canvas, resize it by a corner, press ←, then Undo each. Play from the first frame after a drag.
+- **Expect:** The camera follows the pointer. Each is one undo step, and playback has no one-frame jump at the start.
+- **Source:** #469, spec §11 CI-17.
+
+**TL-20 — A nest clip by hand**
+- **Do:** Nest a clip in a corner of the picture over a full-size clip. Click the corner picture, drag it, scale it by a corner, rotate it, then press Z and draw a band. Click elsewhere on the picture. Press C and double-click the nest.
+- **Expect:** The nest selects with an outline around the whole canvas and takes each gesture. The click elsewhere picks the clip behind. C and the double-click beep.
+- **Source:** #476.
+
+**TL-21 — The first click takes the inspector**
+- **Do:** On the Assistant tab with nothing selected, click a clip on the timeline, then again from the Assistant tab on the canvas. On the Transcript tab, click a second clip once. On the Assistant tab, drag a marquee over a clip.
+- **Expect:** The Clip tab shows on the first click each time. The Transcript's top line is that clip's first word. The marquee leaves the Assistant tab showing.
+- **Source:** #471.
+
+**TL-22 — The inspector's divider**
+- **Do:** Drag the inspector's divider hard to the window's right edge and let go. Choose View ▸ Hide Inspector, drag the divider back out, then open a new window.
+- **Expect:** The drag stops at the inspector's smallest width and it never hides. The drag out shows the inspector, and the new window shows it too.
+- **Source:** #485.
+
+**TL-23 — A gesture past a finished zoom is refused**
+- **Do:** Add a zoom to a clip and put the playhead past its end. Click the clip on the canvas (no action selected), then drag it, resize it by a corner, and press ←.
+- **Expect:** Each beeps, and the inspector's foot reads "Refused: action 1 …" naming the zoom. The Edit menu has no Undo item for any of them, and the picture doesn't change.
+- **Source:** #469, spec §11 CI-19.
 
 **JOB-2 — Split at Shot Changes on a finished video**
 - **Do:** 1. Import a finished video of your own with several hard cuts and at least one dissolve, place it, select it and choose Clip ▸ Split at Shot Changes. 2. Watch the Analyzing sheet until it closes. 3. Play across each new edit. 4. Undo, place a second copy of the video in a new project, choose the command again and press Stop at once. 5. In a third new project, place the video, choose the command, and while the sheet shows a percentage minimize the window, then restore it.
@@ -505,7 +555,7 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Do:** 1. Make a project with a transparent background (Document tab ▸ Background), a title with soft edges and a shape that moves across it for a few seconds, and some sound. 2. Export it as **VP9 with Alpha (WebM)** from File ▸ Export…. 3. Make a web page that plays the file in a `<video autoplay loop muted controls>` over a checkerboard or a bright coloured background, and open it in Chrome, Firefox and Safari. 4. In each, watch it through, then drag the playhead to the middle and to near the end.
 - **Expect:** in Chrome and Firefox the page's background shows through wherever the canvas was transparent, the title's and the shape's edges are clean — no dark fringe, no halo, no box around them — and the picture's colour is the project's; seeking lands where it is asked with the transparency intact, and no frame flashes opaque or black. Safari is the open question: it may play the picture opaque or not at all.
 - **Answer:** is the file transparent, with clean edges, through play and seek in Chrome and in Firefox? What does Safari do with it — transparent, opaque, or not at all?
-- **Source:** #377, codec-export C5 (spec §11 CX-17 (8)); `tools/proof/vp9_alpha_export_proof.py` decodes the alpha with ffmpeg's libvpx decoder and walks the file, not how a browser composites it. Safari's answer goes into CX-17 and the guide's Limits.
+- **Source:** #377, codec-export C5 (spec §11 CX-17 (8)); `tools/proof/vp9_alpha_export_proof.py` decodes the alpha with ffmpeg's libvpx decoder and walks the file, not how a browser composites it. Safari's answer goes into CX-17 and the site's `export/transparency.mdx` and `export/av1-and-vp9.mdx` pages.
 
 **SE-22 — Normalize lifts a quiet microphone past 400 % and it plays clean**
 - **Do:** 1. Import a quiet desktop-microphone recording (`samples/Rode-usb-mic.m4a`, or any voice peaking near −18 dBFS) and put it on the timeline. 2. Set the Normalize row's Mode to Peak (Loudness is the default since AP2, spec §11 AU-25), press Normalize in the Clip tab's Volume section and play it in the preview through headphones and the built-in speakers. 3. Type 1200 in the Volume field, then drag the slider.
@@ -624,6 +674,21 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Expect:** the quiet sentences come up and the loud ones come down, each from its first word, so the voice sits at a steady level; the room noise in the pauses does not swell up while nobody speaks; a phrase after a pause starts at its own level with no audible glide, jump or pumping rise into it; a 1 s response follows changes inside a sentence more closely, a 4 s one is gentler; the preview sounds the same after a seek as from the start, and the export sounds like the preview. The section reads "Ride the level", Target, Max Boost, Max Cut, Response, "Aims at … LUFS" and Loudness, nothing cut off.
 - **Answer:** does the levelled voice sound even and natural: pauses not swelling, and a phrase after a pause at its level with no audible glide?
 - **Source:** road map "audio" AP6 part 2 (spec §11 AU-66, AU-67); `tools/proof/audio_ap6b_proof.py` measures the speech's loudness range, each segment's start against its settled gain, the pauses' gain, the meter against the export, Enhance's rule and repeatability, and an action's target (P1–P8), not how it sounds.
+
+**SE-42 — A detached ducker keeps its voice and ducks the music once**
+- **Do:** 1. Put music on the bottom track and a clip with a voice on a track above it, with an empty track between. 2. Select the voice and tick **Duck other audio** in its Sound tab. 3. Press ⌥⌘D. 4. Play across the voice.
+- **Expect:** the voice stays at full level, and the music sits at 20 % under it.
+- **Source:** #468 (spec §11 AU-157); `docs_bugs_b1_proof.py` D1–D6 read the levels from exports through the op the checkbox sends and the Clip menu, never the real checkbox, the key or the sound.
+
+**SE-43 — A Custom size of another shape, typed and clicked past, stops at the click**
+- **Do:** 1. Open File ▸ Export… and choose HEVC with Alpha. 2. Set Size to Custom… and type 1000 × 1000. 3. Without leaving the field, click **Export…**.
+- **Expect:** a beep, the same-shape sentence in the readout, **Export…** and **Add to Queue** greyed out, and no save panel.
+- **Source:** #470 (spec §11 #470); `docs_bugs_b3_proof.py` G4 and B1 read the card once the size is resolved. No script presses the button, because on the base the press opens a save panel.
+
+**SE-44 — Quitting while an Exporting sheet writes keeps Frame Job open and brings the sheet back** (provisional)
+- **Do:** 1. Start a long File ▸ Export… (choose Export). 2. With the Exporting sheet on screen, press ⌘Q. 3. Minimise the window and press ⌘Q. 4. Press ⌘H, then choose Quit from the Dock menu. 5. Repeat step 3 with an unsaved change in the project.
+- **Expect:** each time, Frame Job stays open, the Exporting sheet keeps writing, and the finished file plays. In step 3 the window comes back out of the Dock. In step 4 Frame Job is shown again and comes to the front. Step 5 doesn't hang.
+- **Source:** #477 (spec §11 #477); `docs_bugs_b4_proof.py` T1/T2 ask the delegate directly, because no script may minimise a window or hide the app.
 
 ## Speed ramps
 
@@ -995,6 +1060,11 @@ These rows are run on a Release build (`make app`), with real camera footage of 
 - **Expect:** only the sky inside the rectangle darkens — blue outside it and the rest of the frame are untouched; Show Selection shows white only where the sky meets the rectangle; moving the rectangle moves the darkened area; the animated centre sweeps the short way between the two hues, never through red.
 - **Source:** grading-2's G2-4 (spec §11 GR-13, matte × qualifier); `qualifier_proof.py`'s M1 measures the product on a card.
 
+**GRD-20 — A qualifier range switches off at an action's end**
+- **Do:** 1. Add an adjustment clip with Saturation at −100 and a Hue range on, and Clip ▸ Add Action with the clip selected. 2. With the action selected, click the Hue box in the Qualifier section to untick it. 3. Play across the action's end. 4. Click the box to tick it again.
+- **Expect:** after the click the box reads unticked and the Qualifier rows show their marks; the picture keeps the range up to the action's end and drops it there; ticking the box puts the range back on at the clip's numbers, and Undo walks both clicks back.
+- **Source:** spec §11 GR-36 (#480); `docs_bugs_c3_proof.py`'s Q rows measure the pictures and its P rows press the box with a synthesised event, not a real click or a played preview.
+
 **GRD-16 — iPhone HDR footage**
 - **Do:** 1. Import an ordinary iPhone HDR clip (default Camera settings, HEVC) into a project of its own. 2. Look at it in the preview — with the playhead parked, paused, on the clip's first frame, and again just after Play from there; then play the composition through to its end — save a frame (File ▸ Save Frame…) and export a short GIF, and compare each side by side with the clip in QuickTime Player. 3. Export `prores_422` and step through the first frames where the clip starts in QuickTime Player. 4. Select the clip, open the Chroma Key section, press Pick from Canvas and click something green (or any distinct colour) in the frame; play. 5. Re-run PRC-3's HLG half (steps 1, 2 and 4) on this clip. 6. In another project, put a short Frame Job screen recording (File ▸ New Recording…) beside the iPhone HDR clip, and look at the recording there, in a project of its own, and in QuickTime Player. 7. (hdr H-2) In the first project set the Document tab's Dynamic Range to HDR (HLG) and repeat step 4's key on the same colour; export `hevc_10bit` and open it in QuickTime Player.
 - **Expect:** the preview, the saved frame and the GIF all look like QuickTime Player's picture — not flat and grey, highlights rolling off rather than clipping, saturated colours not clipped; the preview's first frame, paused and on Play, is not washed out, and playback to the end stays smooth and never turns washed out; no washed-out flash on the clip's first exported frame; the key removes the colour that was picked, in the preview and in an export; PRC-3's expectations hold; the screen recording looks the same in all three places; the clip's timeline filmstrip and its Media-tab thumbnail look like the preview (spec §11 GR-21); (step 7) in the HLG project the clip's highlights are brighter than in the SDR one on an XDR display and nothing washes out, the key still removes the colour with no re-pick (in an HLG project a key on an HDR clip compares the colour an SDR project shows, spec §11 HD-19 (c)), a fresh pick in the HLG project keys the same colour, and the HEVC file looks the same in QuickTime Player as in the preview.
@@ -1072,7 +1142,7 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 
 **REC-2 — Microphone permission**
 - **Do:** 1. Reset Frame Job's Microphone permission; choose a microphone in the panel; Record. 2. Deny it in Settings; Record again.
-- **Expect:** first, the system microphone prompt naming Frame Job, in front of the panel; once denied, Record opens System Settings ▸ Privacy & Security ▸ Microphone, in front of the panel.
+- **Expect:** first, the system microphone prompt naming Frame Job, in front of the panel, reading "Frame Job records the microphone you choose, into a file of its own. Nothing is sent anywhere."; once denied, Record opens System Settings ▸ Privacy & Security ▸ Microphone, in front of the panel.
 - **Source:** spec §11 recording.md; #55 R1.
 
 **REC-3 — Launched from a terminal**
@@ -1159,6 +1229,11 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Expect:** in step 3 the recording lands at once, as without the box, and a few seconds later the Measuring Sound sheet comes up on the project's window and goes; the clip's Sound tab then shows Rumble Cut, isolation or noise reduction, a gate, a compressor and the limiter set, and Edit ▸ Undo reads Undo Enhance Voice. The voice is clear, steady and at a comfortable level, with quiet but natural pauses and no clipped word starts (SE-38's ear test). In step 4 the undo leaves the recording on the timeline as it was recorded, and the next undo would read Undo Add Recording. In step 5 the box greys with Off, keeping its tick, and comes back live with a microphone; after the relaunch it is still ticked.
 - **Answer:** does a real voice-over land enhanced and sound right, with the processing one undo away from the recording?
 - **Source:** road map "audio" AP6 part 3 (spec §11 AU-68, AU-69); `tools/proof/audio_ap6c_proof.py` drives both doors with `land_recording` over fixture files and `audio_ap6c_probe.py` the box, not a live recording or how it sounds.
+
+**REC-20 — ⌥⌘N while the panel reads Starting… stops the recording**
+- **Do:** 1. File ▸ New Recording…, choose a display in Source, and press Record. 2. As the countdown ends and the Record button reads **Starting…**, open the File menu and look at the item under New Project (a slow first start, such as the first recording after a launch, gives the most time); then press ⌥⌘N. 3. Do it again, pressing ⌥⌘N a moment later, just as the panel leaves the screen.
+- **Expect:** in step 2 the item reads **Stop Recording**, never New Recording…. If the press came before the recording began, the panel stays up, back at Record, with the note "Stopped before the recording began; nothing was recorded." and nothing lands. In step 3 the recording ends as soon as it has begun and what it captured lands as usual.
+- **Source:** spec §11 #478; `tools/proof/docs_bugs_a4_proof.py` N1–N5 reach the title and the stop through `docs_bugs_a4_probe.swift` with the phase written by hand, not a real start or a real key.
 
 **JOB-20 — A real recording's clicks are all in its cursor file**
 - **Do:** 1. File ▸ New Recording…, choose a display, and press Record. 2. Click exactly ten times, counting them, in another app's window (a TextEdit document, say), with a pause in the middle: press Pause from the menu-bar item after the fifth click, wait, Resume, and click five more times; scroll a little in each stretch. 3. Stop. 4. In Terminal, for each `.fjcursor` file beside the two movies in `~/Movies/Frame Job Recordings/`, run `python3 -c "import json,sys; c=json.load(open(sys.argv[1]))['clicks']; print(sum(c['down']), len(c['t']))" <file>`.
@@ -1263,9 +1338,9 @@ Needs your own Anthropic API key (Setup 3).
 - **Source:** road map 13 P4; spec §11 P-4, P-7.
 
 **AS-6 — A reply cut short**
-- **Do:** With your real key, ask for something long (a paragraph about each clip) and press Stop while the reply streams. Open `~/Library/Application Support/Frame Job/spend.jsonl`, then the Anthropic Console's usage for the same minutes.
-- **Expect:** the turn ends with `Cost: at least $… (a response was cut short) · Frame Job's estimate at LiteLLM prices (…)`; the ledger's last line carries `"partial": true`; the Console's charge for that request is at least that figure, and expect it above: the streamed output is not counted (spec §11 P-8).
-- **Source:** issue batch B15 (#162); spec §11 P-8.
+- **Do:** With your real key, ask for something long (a paragraph about each clip) and press Stop while the reply streams. Open `~/Library/Application Support/Frame Job/spend.jsonl`, then the Anthropic Console's usage for the same minutes. Then, with Compact off in Settings, keep a conversation going until the Context meter reads full.
+- **Expect:** the turn ends with `Cost: at least $… (a response was cut short) · Frame Job's estimate at LiteLLM prices (…)`; the ledger's last line carries `"partial": true`; the Console's charge for that request is at least that figure, and expect it above: the streamed output is not counted (spec §11 P-8). A reply that reaches the end of the window stops where it got to, and the red line "The reply was cut off because the conversation filled the model's context window." follows it.
+- **Source:** issue batch B15 (#162); spec §11 P-8; #484.
 
 **AS-7 — Selecting the conversation, and a message of several lines**
 - **Do:** In light, then dark, after a turn with a tool call: 1. Drag from inside a reply down into the next person line and a tool line; ⌘C; paste into TextEdit. 2. In the composer type a line, ⇧Return, another, ⌥Return, a third, and keep adding lines past five. 3. Press Return. 4. With an input method that composes (Japanese, say), start a word so it is underlined and press Return. 5. Send something long and, while it is working, type in the composer and press Return.
@@ -1342,6 +1417,29 @@ on your own account, never the spike's.
 - **Expect:** the Dock shows the cream rounded tile with four green corner brackets, a yellow frame and a coral playhead; About shows the same mark with no tile, sharp-edged, in both appearances; the package's document icon carries the new icon. An old two-block icon after a rebuild is the icon cache: log out and back in, then look again before answering.
 - **Answer:** do the Dock, the About panel (Light and Dark) and the package's document icon all show the new viewfinder mark?
 - **Source:** spec §11 NM-11, rename R2.
+
+## The documentation site
+
+What `docs/site/` states that the code leaves to macOS. Each one is a sentence on a page that a
+person can settle in a moment; correct the page if it reads otherwise.
+
+**DOC-1 — The File menu's Duplicate and Save As… keys**
+- **Do:** 1. Open a saved project. 2. Open the File menu. 3. Hold ⌥ with the menu open.
+- **Expect:** the menu shows Duplicate on ⇧⌘S, and holding ⌥ turns it into Save As… on ⌥⇧⌘S, as `/projects/save-and-revert/` says. The code builds Save As… on ⇧⌘S and macOS supplies the swap.
+- **Answer:** do the two items and their keys match the page?
+- **Source:** `docs/site/src/content/docs/projects/save-and-revert.mdx`.
+
+**DOC-2 — Return in the export sheet's custom size field**
+- **Do:** 1. Open the export sheet and set Size to Custom. 2. Type a width and press Return.
+- **Expect:** you can tell whether Return only applies the size or also starts the export. `/export/size/` names only Tab, a click in the other field and Export…; add Return there if it only applies the size, and warn of it if it starts the export.
+- **Answer:** which of the two does Return do?
+- **Source:** `docs/site/src/content/docs/export/size.mdx`.
+
+**DOC-3 — One drag in the Colors panel on the canvas background**
+- **Do:** 1. In the Document tab, click the background colour. 2. Drag in the Colors panel for a second or two. 3. Choose Edit ▸ Undo.
+- **Expect:** you can tell how many undo steps the drag made. `/projects/background-and-timecode/` doesn't say; add it if it isn't one.
+- **Answer:** did one Undo put the colour back?
+- **Source:** `docs/site/src/content/docs/projects/background-and-timecode.mdx`.
 
 ## Published build
 

@@ -1,0 +1,52 @@
+---
+title: "The Preview Window"
+description: Show the picture in a second window with no handles or guides, on another display or full screen.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The Preview Window shows the picture on its own, with no handles or guides over it. Use it to put the picture on a second display while you edit in the main window.
+
+<AtAGlance menu="View ▸ Preview Window" keys="⇧⌘P" />
+
+## Open the Preview Window
+
+Press <kbd>⇧⌘P</kbd> or choose **View ▸ Preview Window**. The same key hides it again, and the menu item has a checkmark while it's open. It opens on an empty timeline too, where the window is black.
+
+The window is titled after the project, for example "Intro — Preview", and has a black surround. You can resize it down to 320 × 200, and it can go full screen.
+
+It uses the same player as the main preview, so the two never drift apart. [Preview Quality](/timeline/preview-quality/), **Show Ungraded**, **Show Selection** and **Show SDR Version** all apply to it, but the [corner tags](/timeline/preview/#preview-tags) don't appear in it.
+
+The window is only for looking. Safe-area guides, zoom and the handles for moving clips stay in the main preview.
+
+## Remembered position
+
+The window remembers its position and size between launches, so it opens where you last left it, on a second display for example. The first time, it opens at 640 × 360 in the middle of the screen. It stays visible when you switch to another app.
+
+It closes with its project window. Whether it's open isn't remembered, so it starts off in each new window.
+
+## Keys
+
+The window doesn't take you away from the editor. While it has the focus:
+
+- Playback keys work: <kbd>Space</kbd>, <kbd>J</kbd>, <kbd>K</kbd>, <kbd>L</kbd>, the arrows, Home and End.
+- The editor's other single-letter keys work too, such as <kbd>M</kbd> for a marker or <kbd>I</kbd> and <kbd>O</kbd> for the range.
+- Every editor ⌘ command works, so <kbd>⌘E</kbd> opens the export sheet and <kbd>⌘T</kbd> splits.
+- <kbd>⌘Z</kbd> undoes the project's last step, and <kbd>⇧⌘Z</kbd> redoes it, the same steps as in the editor.
+- <kbd>⌘W</kbd> closes the Preview Window, not the project.
+
+Single-letter keys stop while a field in the editor window is being edited, or while the editor has a sheet open.
+
+## Good to know
+
+- It's an ordinary window on a display macOS can see. Frame Job has no video output for a reference monitor: no SDI, no I/O card and no separate clean feed. See [Colour on your display](/timeline/preview/#colour-on-your-display).
+- There's one saved position for every project. With two projects' Preview Windows open at once, the second opens on top of the first, and only one of them saves where it's moved to.
+- The window isn't listed in the **Window** menu. Use **View ▸ Preview Window** to find it.
+- After you save a project under a new name, the title updates the next time you show the window.
+
+## Related
+
+- [The preview](/timeline/preview/)
+- [Preview Quality](/timeline/preview-quality/)
+- [Play, pause and shuttle](/timeline/playback/)
+- [Keys and typing](/getting-started/keys-and-typing/)

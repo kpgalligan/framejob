@@ -1,0 +1,139 @@
+---
+title: Word caption styles
+description: Make the large word-by-word captions used on TikTok, shorts and reels, choose how the spoken word is marked, and see how pages are filled for your canvas.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+The five word styles make the large captions used on TikTok, shorts and reels, where each word is marked as it's said. For classic two-line cues, use [Subtitles](/captions/subtitles/) instead.
+
+<AtAGlance
+  menu="File ▸ Generate Captions…"
+  where="The Generate Captions sheet ▸ Style:"
+  tools="transcribe"
+/>
+
+## Make word captions
+
+<Steps>
+
+1. Choose **File ▸ Generate Captions…**.
+
+2. Set **Language:**, **Engine:** and **From:**. [Generate Captions](/captions/generate-captions/) explains each one.
+
+3. Set **Style:** to **Highlight**, **Pill**, **Karaoke**, **Build** or **One Word**. The sheet remembers your choice for next time.
+
+4. Tick any [looks](/captions/word-caption-looks/) you want, and check the [preview](#the-sheets-two-frame-preview).
+
+5. Choose **Generate**.
+
+</Steps>
+
+## Word caption pages
+
+A word style doesn't make cues. Each clip holds a **page** of words, with each word's timing, and the word being spoken is drawn the way the style says. A page is still an ordinary [text clip](/captions/how-captions-work/), so you can drag, trim and split it.
+
+All five styles are white with the spoken word marked. Words are marked by their timing only, so there's no keyword emphasis and no emoji.
+
+The text is 7.5% of the canvas's shorter side, or 12% for One Word. That means a vertical and a horizontal canvas get the same text height: on both 1080 × 1920 and 1920 × 1080 it's 81 px, or 130 px for One Word. Where a style pops the spoken word, the pop takes 0.12 s.
+
+## The five styles
+
+### Highlight
+
+The spoken word turns yellow and pops to 112%, and the other words stay white.
+
+Montserrat Black with a black outline, in capitals. The box is centred a quarter of the frame height below the middle.
+
+### Pill
+
+The spoken word sits on a violet pill, and doesn't change size. [Slide the pill](/captions/word-caption-looks/#slide-the-pill) makes the pill travel between words instead of jumping.
+
+Montserrat ExtraBold, in capitals. The box is centred a quarter of the frame height below the middle.
+
+### Karaoke
+
+Words turn yellow as they're said and stay yellow. Words still to come are white at 55% opacity.
+
+Montserrat ExtraBold, as written. Karaoke can use up to two lines, and it's the only style that wraps a page of several words. The box is centred 28% of the frame height below the middle.
+
+### Build
+
+Words appear one by one. The newest is yellow and pops to 115%, and the ones before it are white.
+
+Anton with a black outline, in capitals. The box is centred a quarter of the frame height below the middle.
+
+### One Word
+
+One large word at a time, white, popping to 120%. Every page holds one word.
+
+Bebas Neue with a black outline, in capitals. The box is centred 18% of the frame height below the middle.
+
+## Bundled typefaces
+
+Montserrat Black, Montserrat ExtraBold, Anton and Bebas Neue ship inside the app under the SIL Open Font License, so there's nothing to install.
+
+## Pages are filled to their measured width
+
+A page holds as many words as fit, not a set number. Frame Job measures each page in its style's typeface, size, case and outline on your canvas, and fills it up to 86% of the canvas width, on one line. Karaoke can use two lines, and One Word always holds one word.
+
+So the same speech makes shorter pages on a 9:16 canvas than on a 16:9 one. On a 1080 × 1920 canvas a page can be about 929 px wide. If you change the canvas size later, [Re-lay Captions for This Canvas](/captions/re-lay-captions/) pages them again.
+
+When a page ends because the width ran out, Frame Job can move its last word onto the next page if the two then come closer in width. That stops a sentence ending on one word alone.
+
+## Where a page breaks
+
+A page ends early at any of these:
+
+- a pause of 0.25 s or more between two words
+- a word ending in `.` `?` `!` or `…`
+- 3 seconds on screen, up to the end of the page's last word
+- a change of speaker, when [**Speakers:**](/captions/assemblyai-transcription/) is ticked
+
+When the width runs out within two words of a comma, semicolon or colon, the break moves back to that mark. It only does this when the page is already at least half full and the words that move still fit on the next page.
+
+On-device words rarely carry a pause, so pages from **On this Mac** break at pauses less often than pages from AssemblyAI.
+
+## A word too wide for the frame
+
+A word too wide for a page gets a page of its own and shrinks in 5% steps, down to 80% of the style's size, until it fits. If it's still too wide at 80%, it stays at that size and wraps.
+
+## How long a page stays up
+
+A page stays up 0.5 s after its last word, and the row is empty until the next page. If the next page starts sooner than that, the page runs right up to it, so the row doesn't blink between pages.
+
+Pages never run past the end of the clip they came from.
+
+## The sheet's two-frame preview
+
+The preview under the looks shows a sample page, drawn the way the canvas draws it and paged for this canvas's proportions. It shows you how the style looks, not how big it will be, because each frame is scaled to fit the strip.
+
+| What you see | What it means |
+| --- | --- |
+| Two frames | A word style, with the first word active in the top frame and the second word in the bottom one. A page of one word shows that word in both. |
+| One frame | Subtitles. |
+| The sample words | The first words of the first clip's kept AssemblyAI transcript when there is one, otherwise "This is how it looks". |
+| A half-filled word | **Fill words as spoken** is ticked. |
+| A pill between two words | **Slide the pill** is ticked. It shows in the second frame. |
+
+**Dim in pauses** isn't previewed.
+
+## Good to know
+
+- A style is set when the captions are generated, and you can't switch it on a placed track. To change it, see [Restyle a caption track](/captions/restyle-captions/).
+- The capitals are applied when a page is drawn, so the words stay as written in the **Content** box and in an [exported caption file](/captions/export-captions/). To show a page as written, untick **UPPERCASE**. See [Edit captions](/captions/edit-captions/).
+- [Text reveals](/text-and-shapes/text-reveal/) don't apply to a timed page.
+- The [Subtitles](/captions/subtitles/) style is the first choice in the **Style:** pop-up, and it works differently: two-line cues with no word timing.
+
+## With an agent
+
+`transcribe` makes word captions when it asks for a word style: `highlight`, `pill`, `karaoke`, `build` or `one_word`. It never uses the style the sheet last chose. See [`transcribe`](/mcp/tools-captions/#transcribe).
+
+## Related
+
+- [Generate Captions](/captions/generate-captions/)
+- [Looks for word captions](/captions/word-caption-looks/)
+- [Restyle a caption track](/captions/restyle-captions/)
+- [Re-lay captions for a canvas](/captions/re-lay-captions/)
+- [Edit captions](/captions/edit-captions/)

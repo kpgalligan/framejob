@@ -1,0 +1,79 @@
+---
+title: Edit text on the canvas
+description: Double-click a text clip in the preview to type into it, then apply, add new lines or back out.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+You can type straight into a text clip in the preview, and see the words wrap where they'll sit in the picture.
+
+<AtAGlance
+  keys={['Return', '⇧Return', 'Esc']}
+  where="Double-click a text clip in the preview"
+  tools="set_text"
+/>
+
+## Type on the canvas
+
+<Steps>
+
+1. Move the playhead so the clip is on the canvas.
+
+2. Double-click the clip. The editor opens over it with all the text selected.
+
+3. Type. The editor grows and wraps as you go, the way the text will once applied.
+
+4. Press <kbd>Return</kbd> to apply.
+
+</Steps>
+
+The editor uses the clip's own font, tracking and line spacing at the canvas's zoom, so the lines break where they will in the picture. It draws in the interface's own colours, not the clip's, so you can always read what you're typing.
+
+**UPPERCASE** text shows as you typed it. A rotated clip's editor stays upright, and the text you apply is the same either way.
+
+Opening the editor leaves [crop mode](/canvas/crop/). Double-clicking a video clip, image clip or freeze frame enters it.
+
+## Apply the text
+
+Any of these applies the text and closes the editor:
+
+- <kbd>Return</kbd> or keypad <kbd>Enter</kbd>
+- <kbd>Tab</kbd>, unless Full Keyboard Access is on in System Settings
+- A click elsewhere in the window, below its title bar
+
+Applying is one undo step, **Edit Text**. If the words haven't changed, there's no undo step. After <kbd>Return</kbd> the keys go back to the canvas, so its single-letter keys work again.
+
+## Start a new line
+
+<kbd>⇧Return</kbd>, <kbd>⌥Return</kbd>, <kbd>⌘Return</kbd> and <kbd>⌃Return</kbd> all start a new line. Caps Lock and <kbd>fn</kbd> don't count, so <kbd>Return</kbd> with either of those still applies.
+
+## Leave with Esc
+
+Over unchanged text, <kbd>Esc</kbd> closes the editor at once.
+
+Over changed text, a sheet asks "Apply your changes to this text?", and reminds you that "Return applies while you type; ⇧Return starts a new line."
+
+| Button | What it does |
+| --- | --- |
+| **Apply** | Keeps your text and closes the editor. It's the default, on <kbd>Return</kbd>. |
+| **Revert** | Closes the editor and drops your changes. |
+| **Cancel** | Goes back to editing. <kbd>Esc</kbd> in the sheet does the same. |
+
+While the sheet is up, clicking away doesn't apply the text behind your back.
+
+## Use an input method
+
+While an input method is composing, <kbd>Return</kbd>, keypad <kbd>Enter</kbd> and <kbd>Esc</kbd> go to the input method, not the editor. They do their usual jobs again once the composition ends.
+
+## Good to know
+
+- You can only double-click what's on the canvas, and a clip on a [locked track](/timeline/hide-and-lock-tracks/) can't be picked there. To change those words, use **Content** in the [Text sub-tab](/text-and-shapes/text-clips/#write-the-words).
+- The editor always changes the clip's own words, even with an [action](/motion/actions/) selected. To change the words at an action's end, use **Content**.
+- On a caption timed word by word, changing the number of words drops the page's timing. See [Text clips](/text-and-shapes/text-clips/#good-to-know).
+
+## Related
+
+- [Text clips](/text-and-shapes/text-clips/)
+- [Font and text style](/text-and-shapes/text-style/)
+- [Text box and wrapping](/text-and-shapes/text-box/)

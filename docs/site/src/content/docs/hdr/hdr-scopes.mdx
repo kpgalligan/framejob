@@ -1,0 +1,81 @@
+---
+title: "Scopes in an HDR project"
+description: "Read the Waveform, Parade, Vectorscope and Histogram in an HDR (HLG) project, where they measure the HLG signal and label brightness in cd/m²."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+In an HDR (HLG) project the scopes measure the HLG signal instead of Rec. 709, and their scales and targets change to match. Use them to see how far a highlight rises above white, and to check that titles and SDR clips sit at reference white.
+
+<AtAGlance menu="View ▸ Scopes" keys="⌃⌘W" tools="render_frame" />
+
+This page covers what's different in an HDR project. For everything else about the panel, see [Scopes](/color/scopes/).
+
+## Scopes read the HLG signal
+
+Turn the panel on with **View ▸ Scopes** (<kbd>⌃⌘W</kbd>). There's nothing to set: the scopes follow the frame they're measuring.
+
+| What the preview shows | What the scopes read |
+| --- | --- |
+| An HDR (HLG) project's picture | The HLG signal, with the scales on this page |
+| The picture with [Show Ungraded](/color/show-ungraded/) on | The HLG signal, of the ungraded picture |
+| The picture with [Show SDR Version](/hdr/show-sdr-version/) on | The SDR version, exactly as they would in an SDR project |
+
+## Waveform and Parade
+
+The Waveform and Parade label every line in cd/m², the same unit as nits. An SDR project labels only 0, 50 and 100 on the same five lines.
+
+| Line | Label (cd/m²) |
+| --- | --- |
+| 100 % | 1000 |
+| 75 % | 203, drawn dashed |
+| 50 % | 51 |
+| 25 % | 10 |
+| 0 % | 0 |
+
+Each figure is the light a grey at that level gives on a nominal 1,000 cd/m² display.
+
+The dashed 75 % line is HDR reference white, and only an HDR (HLG) signal has it. Titles and SDR material sit on it, because they're [lifted to reference white](/hdr/dynamic-range/). HDR highlights rise above it.
+
+The red clip marks stay on the scope's top and bottom edges, so in an HDR project the top one means a signal at the 1000 line.
+
+The Waveform's trace is luma, taken with BT.2020's weights. The Parade shows the red, green and blue signals themselves.
+
+## Vectorscope
+
+The vectorscope measures colour with BT.2020's weights, and its targets are BT.2020's too. That covers the six colour-bar boxes (R, Mg, B, Cy, G and Yl), the ticks on the rim that stand in for them at 2× and 4× zoom, and the skin line. Judge a colour against these targets, not against where it sat in an SDR project.
+
+## Histogram
+
+The Histogram counts the HLG signal's levels, and its luma line uses BT.2020's weights. It has no cd/m² labels.
+
+## Captions
+
+Each scope [slot's caption](/color/scopes/#read-a-slots-caption) names what it's reading, so you can tell at a glance which picture you're measuring.
+
+| Scope | HDR (HLG) signal | SDR project or SDR version |
+| --- | --- | --- |
+| Waveform, Parade | HLG · cd/m² | Rec. 709 · encoded |
+| Vectorscope, Histogram | Rec. 2100 HLG | Rec. 709 · encoded |
+
+## With an agent
+
+`render_frame` measures the same four scopes and gives an agent their numbers. In an HDR (HLG) project each scope's JSON adds `signal: "hlg"`, and the sentence that comes back names the HLG signal. The Waveform, Parade and Histogram also add `scale`:
+
+| Key | What it holds |
+| --- | --- |
+| `unit` | `cd/m²` |
+| `ticks` | Each line's `percent`, `level` and `nits` |
+| `reference_white_percent` | 75 |
+| `clip_percent` | 100 |
+
+Luma and the vectorscope use BT.2020's weights and targets, and the vectorscope's `matrix` reads "Rec. 2020". A frame asked for as the SDR version gets an SDR project's scopes, with nothing added. See [Check the picture: render_frame](/mcp/render-frame/#frames-from-an-hdr-project).
+
+## Related
+
+- [Scopes](/color/scopes/)
+- [A project's dynamic range](/hdr/dynamic-range/)
+- [Show SDR Version](/hdr/show-sdr-version/)
+- [Waveform and RGB Parade](/color/waveform-and-parade/)
+- [Vectorscope](/color/vectorscope/)
+- [Histogram](/color/histogram/)

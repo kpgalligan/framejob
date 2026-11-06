@@ -1,0 +1,194 @@
+---
+title: Limits
+description: Every hard number in Frame Job in one place, from how many clips a project holds to each area's ceilings.
+---
+
+The hard numbers, in one place. Each section gives an area's ceilings and links to the page that explains them. For what to do when you hit one, see [Troubleshooting](/reference/troubleshooting/).
+
+## Project size
+
+| A project holds at most | |
+| --- | --- |
+| Clips | 4,096 |
+| Tracks | 64 |
+| Markers | 1,024 |
+| Media files | 1,024 |
+| Levels of nesting | 8 |
+
+Clips and tracks inside [nests](/editing/nests/) count towards the same totals.
+
+An edit that would go past one of these isn't made, and an alert names the limit, for example "too many clips: 4097 (max 4096)". A project file already past a limit won't open, the message names the limit, and the package isn't rewritten.
+
+A [recording](/recording/where-it-lands/) that needs a new track can't be added to a project at its track limit. Its files stay on disk and the note names them.
+
+Files in a project have one more limit: a [`.cube` LUT](#colour) can be at most 32 MiB.
+
+## Canvas and layers
+
+| Limit | Value |
+| --- | --- |
+| [Canvas](/projects/canvas-size/) width and height | Even numbers, 16 to 16,384 px |
+| [Scale](/canvas/transform/) | 1 to 1,000 % |
+| [Shape](/text-and-shapes/shape-settings/) width and height | 1 to 20,000 px in the fields. A drag on the canvas stops at 4 and 20,000 px. |
+| [Filters](/effects/filters/) on one clip | 4 |
+| [Obscure](/effects/obscure/) regions on one clip | 4 |
+| An obscure region's width and height | 1 to 20,000 source pixels in the fields |
+| [Gradient](/text-and-shapes/gradients/) stops | 2 to 8 |
+| [Preview zoom](/canvas/zoom-and-pan/) steps | Fit, 50%, 100%, 200% |
+
+Scale is uniform for pictures. Only a shape's box and a text clip's wrap width can be stretched on one axis.
+
+The Crop, Corner Radius and Chroma Key sections show only for video, image and still clips. On a matte track, a text, shape or graphic clip can still be [cropped on the canvas](/canvas/crop/#good-to-know). A nest clip can't take a [blend mode](/canvas/blend-modes/), and Add Blurred Background isn't offered for one.
+
+## Timeline and editing
+
+| Limit | Value |
+| --- | --- |
+| Overlaps | On one track, a clip may overlap at most one neighbour on each side, and each overlap may be at most half the length of the shorter clip |
+| Shortest clip after a trim or roll | 1 frame |
+| [Timeline zoom](/timeline/zoom-and-scroll/) | 0.35 to 4,000 points per second, 42 by default |
+| [Snapping](/timeline/snapping/) radius | 8 points, on the timeline and on the [canvas](/canvas/canvas-snapping/) |
+
+A media clip can't be trimmed, rolled or slipped past either end of its file. Every time you set lands on the project's frame grid. See [How edits work](/editing/how-edits-work/).
+
+[Markers](/timeline/markers/) live on the main timeline only. Inside a nest you can't add one, step to one or jump to one, though the Document tab can still rename, chapter and delete them. Only an agent can change a marker's colour.
+
+## Speed
+
+| Limit | Value |
+| --- | --- |
+| Slowest rate | ×0.1 |
+| Fastest rate | ×1000 |
+| Fastest rate with sound | ×12, with Keep pitch on or off |
+| [Freeze frame](/speed/freeze-frame/) length, when none is given | 2 s |
+| [Speed Ramp…](/speed/make-a-ramp/) **Hold** | None, 25%, 50% or 75%, 50% by default. An agent can use any hold from 0 to 0.9. |
+
+Frame Job asks before an edit takes a clip with sound past ×12. On a ramped clip, one rate above ×12 anywhere silences the whole clip. See [Sound at high speed](/speed/sound-at-high-speed/).
+
+With Keep pitch on, a ramp's sound can lag the picture by up to about 24 ms after a steep slow-down. See [Sound on a ramp](/speed/ramp-audio/), and [Speed at a glance](/speed/overview/) for how the rates fit together.
+
+## Audio
+
+| Limit | Value |
+| --- | --- |
+| [Clip volume](/audio/volume/) | Up to 3200 % (about +30 dB). The slider covers 0 to 400 %, and the field takes the rest. |
+| [The volume line](/audio/volume-line/) | +30.1 dB to −60 dB |
+| [Track volume](/audio/track-volume-and-pan/) | Up to +12 dB (×4) |
+| [Synchronize Audio](/audio/synchronize-audio/) drift correction | Up to 0.2 % from ×1 |
+| [Match Audio](/audio/match-audio/) | Matches with the [EQ](/audio/eq/)'s five shelves and bands |
+
+The [gate](/audio/gate/), the [leveller](/audio/leveller/) and the [de-esser](/audio/de-esser/) need a measured clip. A clip shorter than 0.4 s, or too quiet to measure, plays and exports without them. An export waits up to five minutes for a measurement still running, then stops and names the clip.
+
+A file with more than two channels is measured from a two-channel mix of it. The [Loudness Meter](/audio/loudness-meter/) reads only the first two channels of a track with more.
+
+See [How audio works](/audio/how-audio-works/).
+
+## Captions
+
+| Limit | Value |
+| --- | --- |
+| Longest file [AssemblyAI](/captions/assemblyai-transcription/) takes | 10 hours |
+| **Vocabulary** terms | 1,000 |
+| [Caption import](/captions/import-captions/) | SubRip and WebVTT. |
+
+AssemblyAI uploads and bills each whole media file. Two media entries over the same file are uploaded and billed separately.
+
+Captions are burned-in text clips, never a switchable subtitle stream.
+
+A clip played in reverse, a clip with its audio off, and a clip whose media is missing or silent can't be transcribed. See [What can be transcribed](/captions/what-can-be-transcribed/).
+
+## Colour
+
+| Limit | Value |
+| --- | --- |
+| Points on a [curve](/color/curves/) | 2 to 16 |
+| [`.cube` LUT](/color/luts/) | 3D only, size 2 to 65, file up to 32 MiB |
+| [HDR10 peak](/hdr/hdr10-peak/) override | 1 to 10,000 cd/m² |
+| SDR reference white in an HDR project | Fixed at 203 cd/m² |
+
+An [adjustment clip](/color/adjustment-clips/) can't go inside a nest, take a transition or overlap another clip on its track. Blur, sharpen, pixelate and blend modes aren't available on it.
+
+The Color tab needs every selected clip to be gradable, so deselect text, shape, graphic and nest clips first.
+
+[Qualifiers](/color/qualifiers/) exist only on adjustment clips. There is no Offset wheel.
+
+## Export
+
+| Limit | Value |
+| --- | --- |
+| [Custom size](/export/size/) | 16 to 8,192 px on each edge |
+| [Animated GIF or PNG](/export/gif-and-apng/) | 600 frames: 48 s at GIF's 12.5 fps, or 24 s at APNG's 25 fps |
+| [Loudness target](/export/loudness/) | At most 40 dB of gain. A target further above the mix lands quieter than asked. |
+| [Master limiter](/export/loudness/#the-master-limiter) | Can't be turned off. 0 dBTP is its loosest ceiling. |
+| [24-bit sound](/export/bit-depth/) | WAV and AIFF only. The sound is never dithered. |
+| [AV1 and VP9](/export/av1-and-vp9/) file size | The rate is a soft cap. Very detailed footage can come in up to about 1.25 times over it with AV1, and 1.15 times with VP9. |
+
+[ProRes 4444, HEVC with Alpha and VP9 with Alpha (WebM)](/export/transparency/) won't export at a custom size of a different shape from the canvas. VP9 with Alpha (WebM) is 8-bit SDR only.
+
+On an M1 or M2 Mac, Frame Job can't play or re-import its own AV1 file.
+
+Queued jobs run one at a time. A queued AV1 or VP9 job waits while those already running would use more than a quarter of the Mac's memory with it. See [The Export Queue](/export/export-queue/).
+
+## Graphics
+
+| Limit | Value |
+| --- | --- |
+| Largest [graphic](/graphics/size-and-timing/) | 8,192 px on a side |
+| [Property](/graphics/properties/) values on one clip | 64 |
+| Options on one property | 32 |
+| Characters in a string property | 4,096 |
+| [Kept versions](/graphics/manage-graphics/) of each module | The last 10 |
+| [Files watched for your saves](/graphics/edit-a-module/) | The first 16 module, font and picture files one by one, as well as the folders that hold them |
+| [Memory for drawn frames](/graphics/playback-and-memory/) | A quarter of the Mac's memory |
+
+In a folder with more than 16 files, a save that rewrites a later file in place may not show until something else in the folder changes.
+
+## Recording
+
+| Limit | Value |
+| --- | --- |
+| [Camera](/recording/record-a-camera/) frame rate | One of the camera's formats, at that format's highest frame rate |
+| [Camera layouts](/recording/camera-beside-the-screen/) in the panel | Five. A corner layout is always the bottom-right one. |
+| Length shown in the [menu-bar item](/recording/menu-bar-item/) | Sized for up to 9:59:59. A longer recording shows a wider label. |
+
+There's no global shortcut to stop a recording, so use the menu-bar item or the **File** menu.
+
+If the screen is locked or every display is asleep, nothing can be recorded until one wakes. See [When a recording stops on its own](/recording/when-a-recording-stops/).
+
+## Assistant and agents
+
+| Limit | Value |
+| --- | --- |
+| [Compaction](/assistant/context-and-compaction/) threshold | 20,000 to 900,000 tokens, 300,000 by default |
+| **Clear old tool results** | Past 150,000 tokens, when it's ticked |
+| Wait for a launched copy to be ready for calls | 60 seconds |
+| Wait for `get_media_analysis` | 60 seconds |
+
+If Frame Job launches but isn't ready within 60 seconds, the call says so, and later calls in that client session don't launch another copy.
+
+Agent calls run one at a time, and any call waits while you hold the mouse down mid-drag. See [How an agent reaches Frame Job](/mcp/overview/).
+
+`get_media_analysis` keeps what it covered in its 60 seconds, then stops and says how much that was. See [What the Assistant can do](/assistant/what-it-can-do/) for the Assistant's own limits.
+
+## Settings
+
+| Limit | Value |
+| --- | --- |
+| [Background render](/graphics/playback-and-memory/#set-how-long-it-waits)'s **Start after** | 1 to 60 seconds, 5 by default |
+| Inspector width | 280 to 440 points |
+| Timeline height | 140 points to 60 % of the window |
+
+[Converting on import](/projects/ffmpeg-conversion/) needs `ffmpeg` and `ffprobe`. Frame Job looks on your `PATH`, then in `/opt/homebrew/bin`, `/usr/local/bin`, `/opt/local/bin`, `/usr/bin` and `/bin`. For an install anywhere else, run this in Terminal:
+
+```sh
+defaults write com.kgalligan.FrameJob RCFFmpegPath /path/to/ffmpeg
+```
+
+`ffprobe` is taken from beside it, or else found by the same search.
+
+## Related
+
+- [Troubleshooting](/reference/troubleshooting/)
+- [When an edit is refused](/getting-started/refused-edits/)
+- [How edits work](/editing/how-edits-work/)
+- [Supported file formats](/reference/file-formats/)

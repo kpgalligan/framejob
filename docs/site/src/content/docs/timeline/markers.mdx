@@ -1,0 +1,77 @@
+---
+title: Markers
+description: Flag moments on the timeline, name them, jump between them, and turn them into chapters in an exported movie.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A marker is a flag on the ruler that remembers a moment in the project: a beat to cut on, a line to come back to, the start of a chapter.
+
+<AtAGlance
+  menu={['Mark ▸ Add Marker', 'Mark ▸ Next Marker', 'Mark ▸ Previous Marker']}
+  keys="M"
+  where={['The bookmark button in the timeline bar', 'Document tab ▸ Markers']}
+  tools={['add_marker', 'set_marker', 'remove_marker']}
+/>
+
+## Add a marker
+
+Move the playhead to the moment and press <kbd>M</kbd>. The bookmark button in the timeline bar and **Mark ▸ Add Marker** do the same. <kbd>M</kbd> is a [single-letter key](/getting-started/keys-and-typing/), so the menu shows no shortcut beside the item, and it doesn't fire while you're typing in a field.
+
+A new marker is red and is called `Marker 1`, `Marker 2` and so on. Markers sit on whole frames, and two can't share one, so pressing <kbd>M</kbd> on a frame that already has one adds nothing. Frame Job beeps and says at the foot of the inspector which marker is already there.
+
+A marker draws on the ruler as a small flag with a thin line down the ruler, in its colour. An ordinary marker's flag is an outline, and a [chapter](#make-a-chapter) marker's is filled. A project can hold up to 1,024 markers.
+
+## Move, rename and remove a marker
+
+| To | Do this |
+| --- | --- |
+| Move a marker | Drag its flag along the ruler. You can grab it within 6 points of its line. It snaps as the playhead does, and it won't land on a frame that already has a marker. |
+| Rename a marker | Double-click its flag, or type in its row in the Document tab. |
+| Remove a marker | Choose **Delete** in its row in the Document tab. |
+
+Each of these is one undo step: **Move Marker**, **Rename Marker** or **Remove Marker**.
+
+Double-clicking a flag opens a field on the ruler. Return, Tab or a click elsewhere saves the name. <kbd>Esc</kbd> closes the field and keeps the old name, and saving an empty field does nothing. The name field in the Document tab is different: empty it and the marker has no name, and the field shows **Marker** in grey.
+
+## Jump between markers
+
+**Mark ▸ Next Marker** and **Mark ▸ Previous Marker** pause playback and move the playhead to the marker. Neither has a keyboard shortcut. They beep when there's no marker further in that direction, and they're dimmed when the project has no markers.
+
+You can also choose **Go** in a marker's row in the Document tab.
+
+## The Markers list
+
+The **Markers** section of the [Document tab](/projects/document-tab/) lists every marker in time order, with its time, its name, **Chapter**, **Go** and **Delete**. With no markers it reads "No markers. Press M to add one."
+
+## Make a chapter
+
+Tick **Chapter** in a marker's row, and its flag fills. It's one undo step, **Chapter Marker**, and unticking the box makes it an ordinary marker again.
+
+Chapter markers become chapters in exported MP4, MOV, M4A and WebM files, in time order. A chapter takes the marker's name, or "Chapter 1", "Chapter 2" and so on when the marker has no name. See [Chapters](/export/chapters/) for how a range export treats them.
+
+## Marker colours
+
+Markers are red unless an agent changes them, because a colour can only be set with `add_marker` or `set_marker`. The Document tab has no colour control. The colours are names, not hex values: `red`, `orange`, `yellow`, `green`, `blue` and `purple`, the same six as [clip labels](/timeline/names-and-labels/#colour-labels). Any other name draws the marker in the neutral text colour.
+
+## Good to know
+
+Markers belong to the whole timeline, and a nest has none of its own. While a [nest](/editing/nests/) is open:
+
+- The ruler shows no markers, and drags don't snap to them.
+- The three marker commands in the **Mark** menu are off, and pressing <kbd>M</kbd> beeps.
+- **Go** is disabled, because the playhead inside a nest counts from the nest's own start. Leave the nest with <kbd>⌘↑</kbd> to use it.
+- The Document tab's list still shows every marker, and its name field, **Chapter** and **Delete** still work.
+
+## With an agent
+
+[`add_marker`](/mcp/tools-tracks-and-markers/#add_marker) adds a marker at the playhead or at a time you give it, with its name, colour and chapter setting in the same call. [`set_marker`](/mcp/tools-tracks-and-markers/#set_marker) moves a marker or changes any of those, and anything you leave out keeps its value. [`remove_marker`](/mcp/tools-tracks-and-markers/#remove_marker) removes one. See [Tools: tracks, markers and canvas](/mcp/tools-tracks-and-markers/).
+
+An agent works to the same rule as you do inside a nest. With a nest open it can't add a marker or move one, but it can rename one, change its colour or chapter setting, or remove it. Sending any of the three with an explicit `scope` fails, because a nest has no markers. See [Editing inside a nest](/mcp/nests/).
+
+## Related
+
+- [Snapping](/timeline/snapping/)
+- [The in/out range](/timeline/in-out-range/)
+- [Chapters](/export/chapters/)
+- [The Document tab](/projects/document-tab/)

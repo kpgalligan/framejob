@@ -1,0 +1,81 @@
+---
+title: "H.264 and HEVC"
+description: "Know what the H.264, HEVC, HEVC 10-bit and HEVC with Alpha formats write, and which one suits your delivery file."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These four formats are for delivery. H.264 is the file everything takes, HEVC is smaller, HEVC 10-bit keeps a deep source's gradients, and HEVC with Alpha keeps a transparent canvas.
+
+<AtAGlance
+  where="Export sheet ▸ Format"
+  tools="export"
+/>
+
+| Format | File | Picture | Keeps transparency | In an HDR project | Rate at 1080p, 30 fps with Format default |
+| --- | --- | --- | --- | --- | --- |
+| [H.264 (MP4)](#h264-mp4) | `.mp4` | 8-bit | No | Writes the SDR version | About 8.7 Mbps |
+| [HEVC (MP4)](#hevc-mp4) | `.mp4` | 8-bit | No | Writes the SDR version | About 4.4 Mbps |
+| [HEVC 10-bit (MP4)](#hevc-10-bit-mp4) | `.mp4` | 10-bit | No | Writes HDR | About 4.4 Mbps |
+| [HEVC with Alpha (MOV)](#hevc-with-alpha-mov) | `.mov` | 8-bit | Yes | Writes the SDR version | About 4.4 Mbps |
+
+All four share these:
+
+- A keyframe at least every 2 seconds, so the file scrubs and re-cuts well.
+- AAC sound, stereo at 48 kHz, at 192 kbps unless a [Quality tier](/export/quality/) says otherwise.
+- Even dimensions. An odd width or height is written one pixel smaller. See [Export size](/export/size/).
+- [Chapters](/export/chapters/) from your chapter markers.
+- [Fast start](#fast-start) on the three MP4s.
+
+## H.264 (MP4)
+
+This is the default, the first row of the **Format:** popup, so <kbd>⌘E</kbd> writes it unless you've chosen otherwise. Every player and upload form takes it.
+
+It writes 8-bit video in the High profile, with the level chosen automatically. With **Format default**, the rate follows the frame at 0.14 bits per pixel per frame, held between 1 and 200 Mbps.
+
+H.264 has no alpha channel, so a transparent canvas is flattened onto black.
+
+## HEVC (MP4)
+
+HEVC gives you the same picture at a lower rate than H.264, though not everything accepts it yet. It uses the Mac's hardware encoder.
+
+It writes 8-bit video in the Main profile, even from a 10-bit source. With **Format default**, the rate is 0.07 bits per pixel per frame, held between 1 and 200 Mbps. The Quality tiers ask for 60 % of H.264's rate.
+
+## HEVC 10-bit (MP4)
+
+HEVC 10-bit writes HEVC's Main 10 profile from the 16-bit frames Frame Job draws, so a 10-bit source keeps its gradients in a delivery file. Its rates are HEVC's.
+
+It's one of the six formats that can carry HDR. In an HDR project it writes HLG unless you change **Dynamic Range:**, and no Dolby Vision is added to the file. See [Export HDR](/hdr/export-hdr/).
+
+## HEVC with Alpha (MOV)
+
+This is a small delivery movie that keeps a transparent canvas, for laying over another background. It's the transparent movie for Safari. For a web page in Chrome or Firefox, see [VP9 with Alpha (WebM)](/export/av1-and-vp9/#vp9-with-alpha-webm), and for a master, [ProRes 4444 (MOV)](/export/prores/#prores-4444-mov).
+
+- It's a `.mov` because this codec can't be written into an `.mp4`.
+- The picture and its alpha are both 8-bit, and the colour is straight, not multiplied by the transparency. Transparent pixels beside the picture take its colour, so compression doesn't darken the edges.
+- It takes HEVC's rates and Quality tiers, and the [footnote](/export/export-sheet/#the-footnote) ends in `alpha`.
+- [Fast start](#fast-start) is off.
+
+Every row in the **Size:** popup has the canvas's shape, so those are all fine. A **Custom…** size of a different shape won't export, because padding it would lose the alpha. The readout names the canvas's size, and **Export…** and **Add to Queue** grey out. A size within a pixel of the canvas's shape, or in the same proportions at any scale, is fine.
+
+## Fast start
+
+MP4 and M4A files are written with their index at the front, so a player can start before the whole file has downloaded. There's no control for this in the sheet.
+
+Fast start is on for MP4 and M4A, and off for MOV, WAV, AIFF, GIF and APNG. A WebM's index is at the front anyway.
+
+## Good to know
+
+H.264, HEVC and HEVC with Alpha are all 8-bit, so in an HDR project they write the project's SDR version and **Dynamic Range:** stays greyed out on **SDR version**. To deliver HDR in this family, use HEVC 10-bit.
+
+## With an agent
+
+`export` names these formats `h264`, `hevc`, `hevc_10bit` and `hevc_alpha`. It sets rates as numbers rather than tiers. See [Export: start, then poll](/mcp/export/#exact-bitrates).
+
+## Related
+
+- [Choose a format](/export/formats/)
+- [Export quality](/export/quality/)
+- [AV1 and VP9](/export/av1-and-vp9/)
+- [Transparent exports](/export/transparency/)
+- [Export HDR](/hdr/export-hdr/)

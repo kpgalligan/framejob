@@ -1,0 +1,107 @@
+---
+title: "Delete, Ripple Delete and Lift"
+description: "Remove clips or a stretch of the timeline, and choose whether the hole stays open or closes up."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+There are two delete keys, and the difference between them is what happens to the hole. <kbd>⌫</kbd> leaves it open, so everything else keeps its timing. <kbd>⌘⌫</kbd> closes it, so the rest of the timeline moves left.
+
+<AtAGlance
+  menu={['Edit ▸ Delete', 'Edit ▸ Ripple Delete']}
+  keys={['⌫', '⌘⌫']}
+  where="The Ripple Delete button in the timeline bar"
+  tools={['delete', 'ripple_delete', 'lift_range', 'ripple_delete_range', 'ripple_delete_ranges']}
+/>
+
+## Choose a delete
+
+Each key acts on the selection, or on the [in/out range](/timeline/in-out-range/) when nothing is selected.
+
+| | Clips selected | Nothing selected, a range set |
+| --- | --- | --- |
+| <kbd>⌫</kbd> **Edit ▸ Delete** | **Delete:** removes the clips and leaves gaps. | **Lift:** removes what's in the range and moves nothing. |
+| <kbd>⌘⌫</kbd> **Edit ▸ Ripple Delete** | **Ripple Delete:** removes the clips and closes each hole. | **Ripple Delete:** removes what's in the range and closes the hole. |
+
+A selection takes priority over a range, so [deselect](/timeline/selecting-clips/) first to act on the range. An empty range is ignored. With nothing to remove, both menu items are greyed out and the keys beep.
+
+## Delete clips and leave a gap
+
+Select the clips and press <kbd>⌫</kbd>. They go, the gaps stay, and nothing else moves. It's one undo step, named Delete.
+
+- A picture takes its [linked sound](/audio/detach-and-attach/) with it, unless the sound's track is locked.
+- A linked sound clip goes alone, and leaves its picture silent.
+- A clip on a locked track that you selected by clicking is still removed.
+
+## Ripple delete clips
+
+Select the clips and press <kbd>⌘⌫</kbd>, or use the timeline bar's button. The clips go, and each hole closes: everything later on every unlocked track moves left. It's one undo step, named Ripple Delete.
+
+- Each clip's linked partner on an unlocked track goes too, whichever half you selected.
+- A clip on a locked track that you selected is removed, but clips on locked tracks don't move.
+- [Markers](/timeline/markers/) don't move.
+
+:::caution
+Unlike <kbd>⌫</kbd>, <kbd>⌘⌫</kbd> ignores a [selected action](/motion/select-an-action/). With an action selected it ripple-deletes the whole clip. Undo brings it back.
+:::
+
+## Lift a range
+
+Set an in/out range, select nothing and press <kbd>⌫</kbd>. Every clip on an unlocked track is cut at both ends of the range, and what lies between is removed. Nothing moves, markers included. It's one undo step, named Lift.
+
+Lift is the safe cut when a mix or a caption track is already timed, because everything after the range keeps its moment. Clips on locked tracks are neither cut nor removed. If the range held nothing to remove, Frame Job beeps.
+
+## Ripple delete a range
+
+Set an in/out range, select nothing and press <kbd>⌘⌫</kbd>. Every clip on an unlocked track is cut at both ends of the range, what lies between is removed, and the hole closes. It's one undo step, named Ripple Delete.
+
+Clips on locked tracks are neither cut, removed nor moved, even inside the range. Everything else after the range moves left by its length, so a locked track falls out of step with the rest. That's what the lock is for. Frame Job has no separate sync locks: a lock is the one way to leave a track out of a ripple.
+
+## How a ripple closes holes
+
+Each hole closes with one shift of everything after it, so clips that touched before still touch.
+
+- A clip past several holes moves by their combined length. Two removed clips that touch leave one hole.
+- A clip moves if it starts at or after the end of the hole. When you ripple-delete clips, a clip on another track that spans the hole stays where it is, and isn't shortened.
+- A clip's linked partner on an unlocked track moves with it.
+- Markers stay at their times, because a marker inside a removed stretch would have nowhere to go.
+- A clip that slides onto a neighbour gets a Cross Dissolve over the overlap. A ripple is never stopped by the [overlap rule](/getting-started/refused-edits/).
+
+:::caution
+Clips that span the hole are why a ripple delete of a selected clip can break sync. A camera or microphone running under the clip isn't cut, so everything after the hole slips against it. To keep synced tracks together, [ripple delete a range](#ripple-delete-a-range) instead.
+:::
+
+One thing does stop a ripple. If it would push a linked clip before the start of the timeline, as a sound leading its picture in a [J-cut](/audio/j-and-l-cuts/) can, nothing moves, and the foot of the inspector names both clips.
+
+## Ripple delete several ranges
+
+An agent can cut a list of time ranges out of the timeline as one edit and one undo step, with [`ripple_delete_ranges`](/mcp/tools-cut-and-delete/#ripple_delete_ranges). It shows as Ripple Delete under **Edit ▸ Undo**. [Remove Silences](/cleanup/remove-silences/) and [Remove Filler Words](/cleanup/remove-filler-words/) make the same cut from their sheets.
+
+Ranges that touch or overlap merge into one before anything is cut, so two ranges that meet leave one hole, and all the cuts use times from the timeline as it was before the edit. Each range then behaves as [a ripple-deleted range](#ripple-delete-a-range) does: locked tracks are left alone and markers don't move. See [Tools: cutting and deleting](/mcp/tools-cut-and-delete/).
+
+## When the delete keys do something else
+
+<kbd>⌫</kbd> removes the first of these it finds:
+
+1. Words or a pause selected in the [Transcript tab](/captions/delete-words/), while that tab has the focus. They ripple out and the gap closes, as deleting text does.
+2. A [selected action](/motion/change-an-action/). The action goes and its clip stays.
+3. The selected clips.
+4. The in/out range.
+
+<kbd>⌘⌫</kbd> follows the same order without the second step.
+
+While you type in a text field, both menu items are greyed out, so <kbd>⌫</kbd> and <kbd>⌘⌫</kbd> edit the text. That covers the timecode fields, a rename and a text clip.
+
+While a point is selected in a [curve](/color/curves/), <kbd>⌫</kbd> deletes the point and **Edit ▸ Delete** is greyed out.
+
+## With an agent
+
+[`delete`](/mcp/tools-cut-and-delete/#delete) and [`ripple_delete`](/mcp/tools-cut-and-delete/#ripple_delete) take a list of clips. [`lift_range`](/mcp/tools-cut-and-delete/#lift_range) and [`ripple_delete_range`](/mcp/tools-cut-and-delete/#ripple_delete_range) take a start and an end time, `from` and `to`, and `to` has to be after `from`. See [Tools: cutting and deleting](/mcp/tools-cut-and-delete/).
+
+## Related
+
+- [Close gaps and insert time](/editing/close-gaps/)
+- [Split clips](/editing/splitting/)
+- [The in/out range](/timeline/in-out-range/)
+- [Hide and lock tracks](/timeline/hide-and-lock-tracks/)
+- [How a clean-up cut works](/cleanup/how-cleanup-cuts-work/)

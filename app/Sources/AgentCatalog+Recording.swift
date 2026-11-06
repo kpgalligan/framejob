@@ -212,7 +212,7 @@ extension AgentServer {
         let recordingCursorClause: String =
             " CURSOR: every display, window or picked recording also writes the pointer's "
             + "path, clicks, scrolls and the frames' geometry beside each segment movie as "
-            + "<movie stem>.fjcursor (the pointer is still in the picture too). Each entry of "
+            + "<movie stem>.fjcursor. Each entry of "
             + "segments then also carries cursor_path and cursor_image (\"none\": no cursor "
             + "image is recorded) when that segment's cursor file was written, and "
             + "cursor_problem when it was not or holds only the geometry the screen had when "

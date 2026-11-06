@@ -1,0 +1,167 @@
+---
+title: "Edit a module"
+description: "Change a graphic's code in any editor, see the result as soon as you save, read what went wrong, and find the versions Frame Job kept."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A module is the JavaScript file that draws a graphic. It's an ordinary file in your project, so you can edit it in any editor, and Frame Job redraws as soon as you save.
+
+<AtAGlance
+  menu={['Help ▸ Graphics Reference', 'File ▸ Restore Graphic Version…']}
+  where={['Clip tab ▸ Graphic ▸ Source ▸ Open in Editor', 'Clip tab ▸ Graphic ▸ Source ▸ Reveal in Finder']}
+  tools={['get_graphic', 'write_graphic', 'restore_graphic', 'render_graphic', 'render_frame', 'graphic_reference']}
+/>
+
+## Edit in any editor
+
+<Steps>
+
+1. Select a graphic clip and open the **Graphic** sub-tab of the **Clip** tab.
+
+2. Open the **Source** section and choose **Open in Editor**. The module opens in the app your Mac uses for `.js` files.
+
+3. Change the code and save. The preview redraws within a moment.
+
+</Steps>
+
+To use a different editor, choose **Reveal in Finder** in the same section and open the file from there.
+
+The file is `graphics/<name>.js` inside your `.framejob` project package, and **Reveal in Finder** takes you straight to it. Your own scripts and tools can write to that folder too, and fonts in `graphics/fonts/` and pictures in `graphics/assets/` are watched the same way. See [Fonts and pictures in graphics](/graphics/fonts-and-pictures/). The folder appears the first time something is written to it.
+
+A module's name is lowercase letters, digits and `-`, starting with a letter or a digit, and at most 63 characters. A `.js` file with any other name is skipped, and the **Source** section lists it under **In the graphics folder**.
+
+To write a module from scratch, see [Write a graphic module](/graphics/write-a-module/) and [The module API](/graphics/module-api/).
+
+:::caution
+Every clip drawn by a module changes when you edit it. To change one clip's look, use [Duplicate as New Graphic…](/graphics/manage-graphics/#duplicate-as-new-graphic) first.
+:::
+
+## Live reload
+
+Frame Job watches the graphics folder, so you never reimport anything. When a module, a font or a picture changes:
+
+- The paused preview redraws.
+- The inspector updates, including a property list the module's new code changed.
+- A playing preview picks the change up on its next frame.
+
+Changes are gathered over about 100 ms, so a burst of saves lands as one.
+
+A save isn't an undo step and doesn't mark the project as edited. **Edit ▸ Undo** won't take your code back, but [kept versions](#kept-versions) will.
+
+## Diagnostics
+
+The **Source** section reports what the module says about the selected clip, grouped under headings. Its header shows the number of errors or warnings, or the module's display name when all is well, so you can read it with the section closed.
+
+| Heading | What's under it |
+| --- | --- |
+| **Compiling the module** | The compile error, or the warnings the module's top level gave. |
+| **No errors or warnings at the clip's first frame** | Nothing. That frame drew cleanly. |
+| **Checked at the clip's first frame** | What drawing that frame reported, such as a missing font or a picture that isn't in the project. |
+| **In the graphics folder** | Files the folder scan skipped (a bad module or picture name, an empty picture, a font that loads no face) or couldn't watch. Each has a **Reveal** button. |
+
+Each row reads like "line 12, column 4 — message". Click the row, or its **Open** button, to open the module in your editor.
+
+Every problem is one of two kinds:
+
+- An **error** means nothing drew.
+- A **warning** means the graphic drew anyway.
+
+The line and column are the module's own, when they're known. Some things to know when reading them:
+
+- For a timeout, they point at where the function begins, not the statement that ran long.
+- Some problems found while drawing name the frame in their message, such as "render returned undefined at frame 12 — did you forget `return`?".
+- A warning from the module's top level, such as `asset("x")` outside `render` when `x` isn't in `graphics/assets/`, has no frame. It comes with the compile, and the module still compiles.
+
+**Help ▸ Graphics Reference** sets out the same rules under **Diagnostics**.
+
+The inspector only checks the clip's first frame. A problem that starts later shows up as the error card when the playhead reaches it.
+
+When the module file is gone, **Open in Editor**, **Reveal in Finder** and **Duplicate as New Graphic…** are dimmed, **Revision** reads "missing", and the section shows `No module named "<name>" in graphics/`. When the selected clips are drawn by different modules, **Source** names them and asks you to select one module's clips.
+
+## Debug a module
+
+A module has no `console`, so `console.log` stops the frame with an error. To see a value while you work, do one of these:
+
+- **Draw it.** Add a `<text>` element to what `render` returns, and take it out when you're done.
+- **Throw it.** An error your code throws goes on the [error card](#the-error-card), so `throw new Error(JSON.stringify(props))` shows the value there.
+
+```js
+const debug = `<text x="40" y="80" font-family="monospace" font-size="32" fill="#ffffff">${escapeXml(JSON.stringify(props))}</text>`;
+```
+
+An agent can read the markup a frame produced with [`render_graphic`](/graphics/agents-and-graphics/#one-frames-svg).
+
+## The error card
+
+A graphic that fails draws an error card in its own box, in place of the graphic. The card is dark red with a 2 px bright red border and white monospaced text. You'll see it in the preview and in stills.
+
+It appears for:
+
+- a missing module
+- a module that doesn't compile
+- an error your code throws
+- a frame that runs out of time, which is 250 ms in the preview
+- a frame whose picture can't be made
+
+The card reads, line by line:
+
+```text
+lower-third · frame 42
+render returned undefined at frame 42 — did you forget `return`?
+```
+
+Its first line is the module's name and the frame, or `lower-third · does not compile`. The message follows, then a line such as `line 7, column 3` when the position is known. The frame number is the graphic's own, counted from its first frame.
+
+An error card never reaches a movie. An export [stops instead](/graphics/graphics-in-exports/#when-a-graphic-fails-partway).
+
+## Kept versions
+
+Whenever Frame Job sees a module's code replaced while the project is open, it keeps the code that was there. The last 10 versions of each module are kept.
+
+| Code is kept when | Code isn't kept when |
+| --- | --- |
+| You save from your editor | The file changes while the project is closed |
+| An agent writes the module | Something other than Frame Job removes the file |
+| You restore a version | |
+| You delete the module | |
+
+The code the module holds now is never in the list, and code kept twice is listed once.
+
+To go back, choose **File ▸ Restore Graphic Version…**. See [Restore Graphic Version](/graphics/manage-graphics/#restore-graphic-version).
+
+Kept versions live in `graphics/history/` and travel with every save. Leave that folder to Frame Job. Fonts and pictures aren't versioned.
+
+## API.md and API.d.ts
+
+Frame Job keeps two files in `graphics/` for an editor or an agent working in the folder: `API.md`, the reference, and `API.d.ts`, its TypeScript definitions.
+
+They never create the folder. When the folder exists, Frame Job writes them as it opens the project and each time it writes a module, replacing either file if it differs from its own copy, so any edit you make to them is lost.
+
+**Help ▸ Graphics Reference** opens the same reference in your default Markdown app, with or without a project open.
+
+## How many files are watched
+
+Frame Job watches the graphics folder itself, its `fonts/` and `assets/` folders, and the first 16 files one by one: modules first, then fonts, then pictures, each in name order.
+
+That only matters in a folder with more than 16 files. An editor that saves by swapping in a new file is always seen. A save that rewrites a later file in place may not show until something else in the folder changes.
+
+## Good to know
+
+- In an untitled project, graphics live in a temporary folder and move into the package when you first save. A file you already have open in an editor is left at the old path, so choose **Open in Editor** again after saving.
+- Saves less than about 100 ms apart count as one, so only the code from before the burst is kept.
+
+## With an agent
+
+An agent reads a module with [`get_graphic`](/mcp/tools-graphics/#get_graphic) and writes one with [`write_graphic`](/mcp/tools-graphics/#write_graphic), or edits the folder with its own file tools. `write_graphic` compiles the code as it writes it and returns the result, so an agent sees each problem's level, message, line, column and frame straight away. A module that doesn't compile comes back as a list of problems to fix, not as a failed call. [`render_frame`](/mcp/tools-render-and-export/#render_frame) and [`render_graphic`](/mcp/tools-graphics/#render_graphic) show it the error card and report what went wrong.
+
+See [Graphics with an agent](/graphics/agents-and-graphics/) and [Tools: graphics](/mcp/tools-graphics/).
+
+## Related
+
+- [The Graphic sub-tab](/graphics/graphic-tab/)
+- [Rename, delete and restore graphics](/graphics/manage-graphics/)
+- [Write a graphic module](/graphics/write-a-module/)
+- [The module API](/graphics/module-api/)
+- [Graphics in exports](/graphics/graphics-in-exports/)

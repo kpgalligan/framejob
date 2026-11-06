@@ -1,0 +1,156 @@
+---
+title: "Tools: projects and history"
+description: The agent tools that open, make, save, close and read a project, and walk its undo history, with every argument, answer and refusal.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These tools work on whole projects: opening, making, saving and closing them, reading one back, and stepping through its undo history. None of them takes `scope`, because none of them edits inside a [nest](/mcp/nests/).
+
+<AtAGlance
+  tools={['open_project', 'new_project', 'new_project_from_range', 'save_project', 'close_project', 'get_project', 'undo', 'redo']}
+/>
+
+Every tool takes an optional `project`, the path of an open project as `get_project` reports it. Without it the call goes to the frontmost project. A path that names no open project is refused, and so is a call with no project open at all, which is told to call `open_project` or `new_project` first. Times are in ticks, 600,000 per second. See [Units and ids](/mcp/units-and-ids/) for how they're written, and [What a call answers](/mcp/what-a-call-answers/) for the short `project` summary most answers carry.
+
+## `open_project`
+
+Opens a project and shows its window, as [double-clicking a file](/projects/open-a-project/) does. It takes a `.framejob` package, or any movie, sound file or picture. A movie, sound file or picture [becomes a new untitled project](/projects/start-a-project/) with its size and frame rate, and the file as the first clip on track 1.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `path` | string | Yes | The file to open, as an absolute path or one starting with `~`. |
+| `project` | string | No | Accepted, and makes no difference, because this call doesn't act on an open project. |
+
+It answers the opened project's `project` summary, with `missing_media` in that summary when a file has gone. If the file is already open, Frame Job brings that project forward and answers `already_open: true` with its summary. That includes a movie already open as an untitled project.
+
+It's refused when:
+
+- nothing exists at `path`
+- the file can't be read, or doesn't open as a Frame Job project
+- you're opening the same file in a window and that open hasn't finished after 30 seconds. Call it again once the window is up.
+
+A tool call never asks a question, so a file that would normally bring up the [ffmpeg offer](/projects/ffmpeg-conversion/) is treated as if you'd declined it.
+
+## `new_project`
+
+Makes a blank 1920×1080, 30 fps project and shows its window, as [**File ▸ New Project**](/projects/start-a-project/#start-a-blank-project) does. Change its size and rate afterwards with [`set_canvas`](/mcp/tools-tracks-and-markers/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `path` | string | No | Where to save it straight away, such as `~/Movies/Cut.framejob`. `.framejob` is added when it's missing. Without a path the project stays an untitled draft until `save_project`. |
+| `project` | string | No | Accepted, and makes no difference, because this call doesn't act on an open project. |
+
+It answers the new project's `project` summary, and `saved`, the full path, when you gave one.
+
+A path another open project holds is refused and nothing is created. `close_project` closes that project first. A path a window is still opening is refused the same way. A file on disk that no open project holds is replaced.
+
+## `new_project_from_range`
+
+Opens a stretch of the top-level timeline as a new project, moved to start at 0, as [**File ▸ New Project from Range…**](/projects/new-project-from-range/) does with the in/out range. The project you take it from doesn't change and gets no undo step.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `from` | integer | Yes | Where the range starts on the timeline, in ticks. It's rounded to a frame, and a negative time is taken as 0. |
+| `to` | integer | Yes | Where the range ends on the timeline, in ticks. The frame at `to` isn't kept. It must be after `from`. |
+| `path` | string | No | Where to save the new project first. `.framejob` is added when it's missing, and nothing may exist there yet. Without it the project opens untitled, with unsaved changes, named "*name* (range)". |
+| `project` | string | No | The project to take the range from. Leave it out for the frontmost one. |
+
+What's kept follows the sheet:
+
+- A clip across an edge is cut there, on every track, as [`split`](/mcp/tools-cut-and-delete/) would cut it. Locked tracks are cut too.
+- A transition across an edge becomes a hard start or end.
+- Markers inside the range are kept and moved with it.
+- Media nothing kept plays is left out.
+- Each kept file's caches come along, so nothing is analysed again, and so do the graphics the kept clips draw, with every font and picture. [What comes with it](/projects/new-project-from-range/#what-comes-with-it) has the list.
+- Media files are never copied. The new project points at the same files.
+
+It answers `project`, the new project's summary, `carried` with the `files`, `bytes` and `seconds` that came along, and `saved`, the path, when you gave one. The new project opens in front, so later calls with no `project` reach it. Name it by its path once it has one.
+
+It's refused:
+
+- while a nest is open. Call `set_scope` with no arguments first.
+- when `to` isn't after `from`, once both are on the frame grid
+- for a path another open project holds, or where anything already exists
+- for a nest clip across either edge, because a nest clip has no in point and would replay from its start
+- when nothing plays in the range
+- when an edge would leave a transition inside the range too long for what's left of its clip. Move that edge further from the transition.
+
+The [Assistant](/assistant/what-it-will-not-do/) asks you first when the call names a `path`.
+
+## `save_project`
+
+Saves the project, as [**File ▸ Save**](/projects/save-and-revert/#save-a-project) does, and answers only once the package is on disk.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `path` | string | The first time | Where to write the `.framejob` package. `.framejob` is added when it's missing. Giving a path always writes there, as Save As does, unless it's the project's own file, which is a plain save. |
+| `project` | string | No | The project to save. Leave it out for the frontmost one. |
+
+A project needs a `path` the first time, whether it came from `new_project` with no path or from a movie opened as a project. After that, leave it out and the project is written back to its own file.
+
+It answers `saved`, the full path, and the `project` summary.
+
+It's refused when a project that has never been saved has no `path`, and for a path another open project holds. `close_project` closes that one first. A path a window is still opening is refused the same way. A file on disk that no open project holds is replaced. A save that takes more than 120 seconds answers that it timed out.
+
+The [Assistant](/assistant/what-it-will-not-do/) asks you first.
+
+## `close_project`
+
+Closes a project and its window, as [**File ▸ Close**](/projects/save-and-revert/#close-a-project) (<kbd>⌘W</kbd>) does. It never writes the package, so call `save_project` first to keep your changes.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `discard` | boolean | No | Close even with unsaved changes, losing them. Default `false`. |
+| `project` | string | No | The project to close. Leave it out for the frontmost one. |
+
+It answers `ok: true`, `closed` (the project's name), `path` (null for a blank project never saved) and `discarded_changes`, which says whether unsaved changes went with it. A later call naming that path is refused, because it's no longer open.
+
+It's refused when the window has a sheet open, whatever `discard` says, and when `get_project` reports `unsaved_changes` and `discard` isn't `true`.
+
+The [Assistant](/assistant/what-it-will-not-do/) can't call this tool, because closing the project would close its own conversation.
+
+## `get_project`
+
+Answers the whole project as JSON, plus what the app holds outside it: the playhead, the selection and the in/out range. Read it first, because every other tool names things by the ids it reports. [Read the project: get_project](/mcp/get-project/) goes through it in full.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `project` | string | No | The project to read. Leave it out for the frontmost one. |
+
+The answer's `project` key is the project itself: `canvas`, `media`, `tracks`, `clips`, `markers`, `nests` and `next_id`. Beside it are `path`, `name`, `unsaved_changes`, `duration`, `playhead`, `selection` and `scope`, then `in_out_range` and `missing_media` when there's something to report, `graphics`, and a `note`. [What it answers](/mcp/get-project/#what-it-answers) explains each one.
+
+While a nest is open, `project` is that nest seen as a project. See [Editing inside a nest](/mcp/nests/).
+
+## `undo`
+
+Undoes one step, as [**Edit ▸ Undo**](/getting-started/undo-and-saving/#undo-and-redo) (<kbd>⌘Z</kbd>) does. Every tool that edits makes exactly one step, so one `undo` walks back exactly one call. The history is the project's, so a step you made by hand counts as well.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `project` | string | No | The project to undo in. Leave it out for the frontmost one. |
+
+It answers `ok: true`, `undone` (the name of the step), `can_undo`, `can_redo` and the `project` summary.
+
+It's refused when there's nothing to undo. The tools on [Tools: playhead, range and selection](/mcp/tools-view-state/) make no step, so they can't be undone, and neither can a change to a graphic's files. See [Undo rules](/graphics/agents-and-graphics/#undo-rules).
+
+## `redo`
+
+Redoes one undone step, as [**Edit ▸ Redo**](/getting-started/undo-and-saving/#undo-and-redo) (<kbd>⇧⌘Z</kbd>) does. Any new edit clears what there was to redo, as it does in the app.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `project` | string | No | The project to redo in. Leave it out for the frontmost one. |
+
+It answers `ok: true`, `redone` (the name of the step), `can_undo`, `can_redo` and the `project` summary.
+
+It's refused when there's nothing to redo.
+
+## Related
+
+- [Read the project: get_project](/mcp/get-project/)
+- [Tools: playhead, range and selection](/mcp/tools-view-state/)
+- [Tools: media](/mcp/tools-media/)
+- [A typical session](/mcp/typical-session/)
+- [Save, revert and close](/projects/save-and-revert/)
+- [New Project from Range](/projects/new-project-from-range/)

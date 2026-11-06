@@ -77,6 +77,9 @@ in §6).
   reason, pointing at Clip ▸ Remove Filler Words…, which shows what is uploaded and what it costs.
   **Amended 2026-11-02, by CJ-52**: `new_project_from_range` is ask-first when it names `path`.
   **Amended 2026-11-03, by VR-36**: `make_vertical_version` is ask-first only with `path`.
+  **Amended 2026-11-04, by AI-21**: `new_project`, `render_frame` and `render_graphic` are
+  ask-first only with `path`; the question names the file the tool will write, and a call that
+  can only be refused on its path is not asked about.
 - **AI-8 — The key is the person's own, and is R6-5 and R6-12's key in everything but the
   vendor.** It lives in `SecretStore` under `anthropic-key`; the one override is
   `ANTHROPIC_API_KEY`, read only as R6-5 amended says. It is never a tool argument, a launch
@@ -233,3 +236,24 @@ in §6).
   `FrameJobAssistantAutoCompact`; `ReelcutAssistantAutoCompactTokens` is now
   `FrameJobAssistantAutoCompactTokens`; `ReelcutAssistantClearToolResults` is now
   `FrameJobAssistantClearToolResults`.
+- **AI-21 — The ask-first question names the file the tool will write, covers every path the
+  model chose, and is not put for a call that can only be refused on its path** (docs bugs c1,
+  #461, #462, #494; amends AI-7). (a) `new_project`, `render_frame` and `render_graphic` are
+  ask-first with `path`, on AI-7's own criterion: each writes "where the model chose". Without
+  `path` they run unasked: an untitled draft, and two temporary files. (b) `write_graphic`,
+  `import_graphic_font`, `import_graphic_asset` and `import_graphic` stay unasked, on G-47 (i)'s
+  reason: they write only inside the project's `graphics/`. (c) The question names the file the
+  tool will write, through the handler's own code (`destinationURL`, `captionDestination`,
+  `namedFrameDestination`, `exportDestination`), so a replaced or added extension is what is
+  named and REPLACES is said of that file; when the other arguments cannot be resolved it keeps
+  the given path and still asks. (d) No question for a call that can only be refused on its
+  path, and the tool's own refusal answers: no path where the tool needs one (`export`,
+  `export_captions`, `export_graphic`, and `save_project` and `consolidate_media` on a
+  never-saved project), a `path` that is not a string, a path another open project holds
+  (`refuseHeldPath`, the handler's own check), and a taken path on a `refusesTaken` row
+  (`new_project_from_range`, `make_vertical_version`). A `null` `path` is no path, so an
+  `askOnlyWith` row runs unasked. (e) Any other refusal may still follow a question (a bad
+  argument, a folder that does not exist, an empty `path`), the question staying true of what
+  the call would write. (f) MCP callers are unchanged. (g) `render_frame`'s question also names
+  any `<path>.<scope>.json` it will replace (`alsoReplaces`). AU-108 (d) is untouched: a stem is
+  replaced without asking.

@@ -1,0 +1,85 @@
+---
+title: "Slip and roll"
+description: "Change which footage a clip shows, or move the cut between two clips, without moving anything else on the timeline."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Slip and roll are for fine-tuning once your clips are where they belong. A slip changes which part of the file a clip shows. A roll moves the cut between two clips. Neither moves any other clip.
+
+<AtAGlance
+  keys={['⌥⇧-drag body', '⌥⇧-drag edge']}
+  where="The timeline"
+  tools={['slip', 'roll', 'trim_start', 'trim_end']}
+/>
+
+## Slip a clip
+
+Hold <kbd>⌥⇧</kbd> and drag the body of a clip. The clip stays where it is at the same length, and the footage slides underneath it. Drag right to show later footage and left to show earlier footage.
+
+The whole drag is one undo step, named Slip. It doesn't change the selection, so you can slip a clip without selecting it.
+
+- A slip stops when the clip reaches either end of its file, and keeps what it reached. It doesn't turn into a trim. If there's no footage to slide into, the drag changes nothing.
+- It moves in whole frames and never snaps, because the timeline's snap points mean nothing inside the footage.
+- The footage moves at the clip's speed. At ×2, dragging one frame slides the footage two frames.
+- A [freeze frame](/speed/freeze-frame/) slips too, which changes the frame it holds. It stops one frame short of the end of its file.
+- A linked sound clip on an unlocked track slips with its picture, so the two stay in sync. They move by the smaller of the two distances they each have room for.
+
+Only clips that play a file have footage to slide. The drag does nothing on text, a shape, a picture, a graphic or a nest.
+
+## Roll a cut
+
+Hold <kbd>⌥⇧</kbd> and drag a clip's edge, the outer 7 points of the clip. The cut moves: one clip gets longer and the other gets shorter by the same amount, and the outer edges of the pair stay where they are.
+
+| Edge you drag | Cut that moves |
+| --- | --- |
+| The clip's start | The cut with the clip before it |
+| The clip's end | The cut with the clip after it |
+
+The whole drag is one undo step, named Roll.
+
+- A roll [snaps](/timeline/snapping/) like a trim. Hold <kbd>⌘</kbd> during the drag to stop snapping.
+- Each clip keeps at least one frame.
+- A clip that plays a file can't grow past what the file has. Text, shapes and pictures have no such limit.
+- A roll needs two clips that touch exactly. With a gap at that edge there's no cut to move, and with an overlap there's a [transition](/motion/transition-settings/), whose length you set in its own section. Either way the drag does nothing.
+- A clip 21 points wide or less on screen has no edges to grab, and the drag slips it instead. [Zoom in](/timeline/zoom-and-scroll/) first.
+
+When you roll a picture's cut, a linked sound clip rolls with it, as long as it starts at the same point, it touches a clip before it, and its track is unlocked.
+
+## Move a sound clip's edge alone
+
+A [detached sound clip](/audio/detach-and-attach/) that's still linked to its picture can move an edge on its own. This is how a [J-cut or L-cut](/audio/j-and-l-cuts/) is made. These move only the sound's edge and leave the picture where it is:
+
+- Drag the sound clip's edge.
+- Select it and press <kbd>W</kbd> or <kbd>E</kbd> to [trim it to the playhead](/editing/trimming/).
+- Hold <kbd>⌥⇧</kbd> and drag the sound clip's edge to roll its cut.
+
+It works in that direction only. Trimming or rolling the picture's edge also moves the sound's edge when the two line up, and a slip always takes both.
+
+## What happens to actions and timed words
+
+A slip leaves [actions](/motion/how-edits-move-actions/) where they are, because only the footage inside the clip moves.
+
+A roll leaves each clip's actions at the same distance from that clip's start. So on the clip after the cut, the actions move with the cut along the timeline. On the clip before it, they stay put, and if that clip gets shorter it can end before an action does.
+
+Timed caption words are the exception. They stay on the speech they time, so a roll doesn't shift them against the sound. A [graphic](/graphics/size-and-timing/) after the cut stays in step too: its **In** moves with the cut.
+
+## Good to know
+
+- Neither gesture works on a locked track. The drag does nothing. A linked clip on a locked track stays put while the clip you drag moves.
+- On a clip with a [speed ramp](/speed/edit-a-ramped-clip/), the actions stay where they are and the limits come from the ramp, so a cut stops rolling where the clip would no longer fit its file.
+
+## With an agent
+
+[`slip`](/mcp/tools-move-and-trim/#slip) takes a clip and how far to slide, and a positive distance shows later footage. Where the drag does nothing on text, a shape, a picture, a graphic or a nest, the tool gives an error.
+
+[`roll`](/mcp/tools-move-and-trim/#roll) takes the clip to the right of the cut and the time the cut moves to. If no clip on the track ends where that clip begins, it gives an error saying so.
+
+With `alone`, `roll` moves a picture's cut and leaves a lined-up linked sound on an unlocked track where it is. No gesture can do that. [`trim_start`](/mcp/tools-move-and-trim/#trim_start) and [`trim_end`](/mcp/tools-move-and-trim/#trim_end) take `alone` too, to move one clip's edge without its partner's. See [Tools: moving and trimming](/mcp/tools-move-and-trim/).
+
+## Related
+
+- [Trim clips](/editing/trimming/)
+- [J-cuts and L-cuts](/audio/j-and-l-cuts/)
+- [Snapping](/timeline/snapping/)
+- [How edits move actions](/motion/how-edits-move-actions/)

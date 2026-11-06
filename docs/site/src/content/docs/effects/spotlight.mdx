@@ -1,0 +1,102 @@
+---
+title: Spotlight
+description: Dim a clip outside a rectangle or ellipse to point at one part of the picture, and magnify what's inside.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A spotlight dims a clip everywhere outside a rectangle or ellipse, so the eye goes to one part of the picture, such as a button in a screen recording. It can also magnify what's inside. Any clip that draws can have one, text and shapes included.
+
+<AtAGlance where="Clip tab ▸ Picture ▸ Spotlight" tools="set_video" />
+
+## Spotlight a region
+
+<Steps>
+
+1. Select the clip and open the **Clip** tab's [**Picture**](/canvas/picture-tab/) sub-tab.
+
+2. Open the **Spotlight** section and tick **Spotlight a region**. You get a 480 × 270 rectangle at the centre of the picture.
+
+3. Set **Center X**, **Center Y**, **Width** and **Height** to [place it](#place-the-spotlight).
+
+4. Adjust the other [rows](#the-controls) until it looks right.
+
+</Steps>
+
+There's no handle for a spotlight on the canvas, so the rows are the only way to place it. It's easier to see the region while you do if you raise **Dim** and lower **Feather** for a moment.
+
+Untick the box, or choose **Reset** in the section's header, to take the spotlight off. Doing that forgets its settings, so ticking the box again starts from the defaults.
+
+While the section is closed, its header shows `off`, `rectangle` or `ellipse`.
+
+## The controls
+
+The rows are greyed out until the box is ticked.
+
+| Row | What it does | Default | Range | Quick picks |
+| --- | --- | --- | --- | --- |
+| **Shape** | **Rectangle** or **Ellipse**. | Rectangle | | |
+| **Center X**, **Center Y** | Where the middle of the region sits, measured from the centre of the clip's picture. | 0 px, 0 px | −20,000 to 20,000 px | |
+| **Width**, **Height** | The size of the region. | 480 × 270 px | 1 to 20,000 px | **Width** 240, 480, 720, 960. **Height** 135, 270, 405, 540 |
+| **Feather** | How many pixels the edge softens over. 0 is a hard edge. | 40 px | 0–200 px | 0, 10, 20, 40, 80 |
+| **Dim** | How much darker everything outside the region goes. 0 % changes nothing and 100 % is black. | 60 % | 0–100 % | 0, 30, 60, 80, 100 |
+| **Zoom** | How much to [magnify](#magnify-the-region) what's inside. 1.00× is no zoom. | 1.00× | 1.00–2.00× | 1, 1.2, 1.5, 2 |
+
+## Place the spotlight
+
+The centre and size are in the clip's own pixels, measured from the centre of its cropped picture. A positive **Center X** moves the region right and a positive **Center Y** moves it down.
+
+Because they belong to the picture, the spotlight stays on the same part of it when you move, scale or rotate the clip. They also don't depend on the canvas, so the default 480 × 270 covers less of a 4K clip than of a 1080p one.
+
+The region can sit partly or wholly off the clip.
+
+## What gets dimmed
+
+:::caution
+A spotlight dims this clip only. Clips behind it and the canvas around it stay as they are, so to darken the whole frame the clip has to fill it.
+:::
+
+The dim only changes colour. Dimmed parts of the clip stay as solid as they were, so nothing behind shows through, and transparent parts stay transparent.
+
+It comes after every colour stage, so the clip's grade and filters don't act on it.
+
+## Magnify the region
+
+**Zoom** enlarges what's inside the region about its centre. It works with **Dim** at 0 % too, which gives you a magnifier with no darkening.
+
+The magnification eases off towards the edge of the region so the picture doesn't tear there. That edge is always wide enough for the zoom to fade out smoothly, so it can be softer than **Feather** makes the edge of the light.
+
+The enlarged picture comes from the same frame, so it gets softer as **Zoom** rises.
+
+## Animate a spotlight
+
+Every number ramps in an [action](/motion/actions/), so a spotlight can slide from one part of the picture to another, grow, or brighten as it goes.
+
+Two controls switch rather than ramp:
+
+- **Shape** changes at the action's end, and the row shows "at end". The numbers keep ramping.
+- Ticking or unticking **Spotlight a region** with an action selected makes the spotlight appear or disappear at the action's end.
+
+To fade a spotlight in, tick it on the clip with **Dim** at 0 %, add an action, and raise **Dim** in the action.
+
+## Good to know
+
+- A spotlight lasts as long as the clip. To point at something for a few seconds, [split](/editing/splitting/) the clip around that moment and put the spotlight on the middle piece.
+- With several clips selected, the rows show the first clip's spotlight, and any edit gives every selected clip all of those values.
+- On a [matte track](/canvas/matte-tracks/), a clip's spotlight shapes the cut it makes. **Alpha** and **Inverted Alpha** read only transparency, so **Dim** changes nothing there.
+- A clip's [reflection](/effects/reflection/) shows its spotlight too, mirrored.
+- A [nest](/editing/nests/) clip shows the Spotlight section, but a spotlight on it has no effect. Put it on the clips inside.
+- An [adjustment clip](/color/adjustment-clips/) has no **Picture** sub-tab, and a spotlight pasted onto one does nothing.
+
+## With an agent
+
+An agent sets `spotlight` with `set_video`, as an object of `shape` (`rect` or `ellipse`), `x`, `y`, `width`, `height`, `feather`, `dim` and `zoom`, and `null` takes the spotlight off. It isn't held to the fields' limits for placing a spotlight: it can set any centre, any size above 0 and any `feather` of 0 or more. `dim` runs from 0 to 1 rather than as a percentage, and `zoom` from 1 to 2. See [Tools: picture and grade](/mcp/tools-set-video/#spotlight).
+
+## Related
+
+- [Obscure](/effects/obscure/)
+- [Zoom to Region](/motion/zoom-to-region/)
+- [Reflection](/effects/reflection/)
+- [The Picture tab](/canvas/picture-tab/)
+- [What an action can animate](/motion/what-can-animate/)

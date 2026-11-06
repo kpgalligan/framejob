@@ -1,0 +1,107 @@
+---
+title: Track compressor and limiter
+description: Compress and limit a track's whole sound, or everything in a nest together, and know where the preview differs from the export.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A track can have its own compressor and limiter, acting on the sound of every clip on it together. Use them to even out a whole voice-over, or to hold a music bed under a ceiling, without setting each clip. This page covers a track's. A clip has its own [compressor](/audio/compressor/) and [limiter](/audio/limiter/).
+
+<AtAGlance
+  menu="Track ▸ Mix…"
+  where={['The sliders switch in the track header', "Mix… in the track's right-click menu"]}
+  tools="set_track"
+/>
+
+## Turn on a track's compressor or limiter
+
+<Steps>
+
+1. Open the [Track Mix panel](/audio/track-volume-and-pan/#open-the-track-mix-panel) for the track.
+
+2. Tick **Compressor** or **Limit peaks**, below **Pan**. Each turns on at its defaults, and its rows stop being greyed out.
+
+3. Adjust the rows.
+
+</Steps>
+
+Unticking throws the settings away, so ticking again starts from the defaults. **Reset** at the foot of the panel turns both off, and resets the track's volume and pan too.
+
+The header's sliders switch stays lit while either is on.
+
+## Where they sit
+
+Both act on the track's whole sound: every clip on it, after each clip's own processing, its volume, fades, crossfades and ducking, and after the track's volume and pan. The compressor runs first, then the limiter.
+
+A track's compressor and limiter hear the track after its fader. That's the difference from a clip's compressor, which hears the clip before its volume. Turning the track down turns down what reaches them, so a compressor at −20 dB over a track at −6 dB compresses less.
+
+## Compressor settings
+
+| Control | What it does | Range | Default | Quick picks |
+| --- | --- | --- | --- | --- |
+| **Compressor** | Turns the track's compressor on. | on, off | off | |
+| **Threshold** | The level above which it starts turning the track down. | −60 to 0 dB | −18 dB | −30, −24, −18, −12, −6 |
+| **Ratio** | How strongly it turns down sound above the threshold. | 1 to 20 :1 | 3:1 | 1.5, 2, 3, 4, 8, 20 |
+| **Attack** | How quickly it reacts. | 0 to 200 ms | 10 ms | 1, 5, 10, 30, 100 ms |
+| **Release** | How quickly it lets go. | 10 to 2000 ms | 200 ms | 50, 100, 200, 500, 1000 ms |
+| **Makeup** | Gain added afterwards. | 0 to 24 dB | 0 dB | 0, 3, 6, 12 |
+
+## Limiter settings
+
+| Control | What it does | Range | Default | Quick picks |
+| --- | --- | --- | --- | --- |
+| **Limit peaks** | Turns the track's limiter on. | on, off | off | |
+| **Ceiling** | The highest true peak the track may hand the mix. | −24 to 0 dBTP | −1 dBTP | −1, −2, −3, −6 |
+| **Release** | How quickly the level recovers after a peak. | 1 to 1000 ms | 100 ms | 50, 100, 200, 500 ms |
+
+Each control is a slider and a field. A number typed outside the range goes to the nearest end of it.
+
+## Use a track as a nest's bus
+
+A bus is one path that several sounds share. A [nest's](/editing/nests/) whole mix plays through the track its nest clip sits on, so a compressor or limiter on that track acts on everything inside the nest together. Put a voice's clips in a nest and compress them as one, whatever tracks they're on inside it.
+
+A nest's own tracks have no compressor or limiter. Inside an open nest, both sections are greyed out, and their tooltip says "A nest's mix plays through the dynamics of the track that holds it." **Volume**, **Pan** and **Reset** still work there.
+
+Nesting a selection doesn't copy a compressor or limiter from the tracks it came from. The track the nest clip lands on keeps its own.
+
+## Exact in the export, approximate in the preview
+
+An export plays each track with a compressor or limiter through them on its own, before the tracks are mixed. That's exact, and a [stem](/export/stems/) of that track includes them. The [master limiter](/export/loudness/) still runs over the mix afterwards.
+
+The preview can only approximate this. Where a track's clips overlap, such as a crossfade or a nest's tracks, the preview plays the track's sound in more than one piece and runs the compressor and limiter on each piece separately. So the pieces can add up past a track limiter's ceiling while you edit, even though the export holds it.
+
+While any track has a compressor or limiter and the preview plays at normal speed, the [Loudness Meter](/audio/loudness-meter/) says so in its footer: "The mix as the preview plays it, with track compressors and limiters approximate, before the export's loudness and master limiter."
+
+:::tip
+Judge a track limiter's ceiling on the export, not on the preview's meters.
+:::
+
+## What hears them
+
+| Hears them | Doesn't hear them |
+| --- | --- |
+| The preview, approximately | [Normalize](/audio/normalize/) |
+| The [level meter](/audio/level-meter/) and the [Loudness Meter](/audio/loudness-meter/), approximately | The [Loudness readout](/audio/volume/#read-the-level) |
+| Every export and stem, exactly | [Enhance Voice](/audio/enhance-voice/) and [Match Audio](/audio/match-audio/) |
+| | A [scrub](/audio/scrub-audio/) |
+
+Normalize, the Loudness readout, Enhance Voice and Match Audio work on the clip itself, before the track.
+
+## Good to know
+
+- A track's compressor and limiter are one setting for the whole track, and can't change over time. A track has no EQ or other effects.
+- Each change is one undo step. Turning one on or off, a drag or a typed value is named "Track Compressor" or "Track Limiter", and **Reset** is named "Reset Track Mix".
+- A track with a limiter plays 3.3 ms later in the preview, and Frame Job places it 3.3 ms earlier to match, so it stays in sync.
+
+## With an agent
+
+`set_track` sets both, through its `compressor` and `limiter` arguments. Each takes the whole setting at once, so any value you leave out goes to its default, and `null` turns it off. As in the panel, a nest's own tracks can't have them. See [Tools: tracks, markers and canvas](/mcp/tools-tracks-and-markers/#a-tracks-compressor-and-limiter).
+
+## Related
+
+- [Track volume and pan](/audio/track-volume-and-pan/)
+- [Compressor](/audio/compressor/)
+- [Limiter](/audio/limiter/)
+- [The Loudness Meter](/audio/loudness-meter/)
+- [Export loudness](/export/loudness/)

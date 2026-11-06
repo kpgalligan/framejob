@@ -406,9 +406,9 @@ do {
     expect(&problems, "box title", box.title, "Record shortcuts")
     expect(&problems, "box off by default", box.state == .on, false)
     expect(&problems, "note", panel.recordShortcutsNote.stringValue,
-           "Records each shortcut you press with ⌘ or ⌃, or ⌥ with an arrow, Delete, Return, "
-               + "Tab or Esc, and when you type, never what you type. Nothing is recorded while "
-               + "an app holds secure input.")
+           "Records each shortcut you press with ⌘ or ⌃, or ⌥ with an arrow, Delete, Forward "
+               + "Delete, Return, Enter, Tab or Esc, and when you type, never what you type. "
+               + "Nothing is recorded while an app holds secure input.")
     expect(&problems, "note sentence", RecorderPanelController.recordShortcutsSentence,
            panel.recordShortcutsNote.stringValue)
     expect(&problems, "note font size", panel.recordShortcutsNote.font?.pointSize ?? 0, 11.0)

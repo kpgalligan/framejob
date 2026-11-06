@@ -1,0 +1,126 @@
+---
+title: "Read the project: get_project"
+description: "What get_project returns: the project's contents and ids, the playhead and selection, its graphics, a file's Camera Log, and the report while a nest is open."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+`get_project` returns the whole project as JSON, the same document every edit changes. Read it first, because every other tool names things by the ids it reports.
+
+<AtAGlance tools="get_project" />
+
+## Read the project
+
+The only argument is `project`, the path of the open project to read. Leave it out for the frontmost one. The call changes nothing.
+
+Three things hold for everything it returns:
+
+- Times are ticks, 600,000 to the second.
+- Clip, track, marker and media ids share one number series, so an id means one thing on its own.
+- `tracks[0]` is the back of the layer stack, the bottom lane of the timeline.
+
+See [Units and ids](/mcp/units-and-ids/).
+
+## What it answers
+
+| Key | What it holds |
+| --- | --- |
+| `project` | The project itself. See [below](#what-project-holds). |
+| `path` | Where the project is saved. Before its first save, a project opened from a movie, sound file or picture reports that file, and any other project reports `null`. |
+| `name` | The project's name, as its window shows it. |
+| `unsaved_changes` | `true` when there's something to save. |
+| `duration` | The timeline's length in ticks. |
+| `playhead` | The playhead, in ticks. |
+| `selection` | The ids of the selected clips, lowest first. |
+| `in_out_range` | `start` and `end` in ticks. Only there when a range is set. |
+| `scope` | The id of the [open nest](#the-report-while-a-nest-is-open), or `null` at the timeline. |
+| `missing_media` | The ids of media whose file has moved. Only there when one has. `relink_media` points one at its new place. |
+| `graphics` | The project's [graphic modules](#the-graphics-summary). |
+| `note` | A reminder of the rules above. With a nest open, it also says what's different. |
+
+`playhead`, `selection` and `in_out_range` are the app's own state. They aren't saved with the project, and setting them isn't an undo step.
+
+## What `project` holds
+
+| Key | What it holds |
+| --- | --- |
+| `canvas` | The picture's settings. See the next table. |
+| `media` | Every file in the project, whether or not a clip uses it. |
+| `tracks` | The timeline's tracks, back to front. |
+| `clips` | The timeline's clips. |
+| `markers` | The timeline's markers. |
+| `nests` | Every nest, each with its own `id`, `name`, `width`, `height`, `tracks` and `clips`. |
+| `next_id` | The id the next new thing will take. |
+| `version` | The project file's version. |
+
+| `canvas` key | What it holds |
+| --- | --- |
+| `width`, `height` | The canvas size in pixels. |
+| `fps` | The frame rate as `[num, den]`, so 29.97 fps is `[30000, 1001]`. |
+| `background` | The canvas background. |
+| `fit_new_clips` | Whether a new clip is scaled to fit when its source is bigger than the canvas. |
+| `timecode_frames` | Whether timecode reads `HH:MM:SS:FF` rather than `HH:MM:SS.mmm`. |
+| `output` | `hlg` in an [HDR project](/hdr/dynamic-range/). Left out in an SDR project. |
+| `blending` | `linear` with [linear-light blending](/hdr/blending/) on. Left out otherwise. |
+
+A media entry has `id`, `path`, `kind`, `duration`, `width`, `height`, `fps`, `has_video`, `has_audio` and `has_alpha`, and sometimes more: `original` for a copy, `color` for [its colour setting](#read-a-files-camera-log), `speech` for saved speech spans and `cursor` for a recording's cursor file.
+
+A clip has `id`, `track`, `start`, `duration`, `source`, `enabled`, `speed` and `actions`. What it shows sits in `video`, `audio`, `text`, `shape` or `graphic`. `source.kind` says what kind of clip it is, and a nest clip's `source.project` is the id of the nest it shows.
+
+## The graphics summary
+
+`graphics` is a list with one entry for each module in the project's graphics folder, in name order:
+
+| Key | What it holds |
+| --- | --- |
+| `name` | The module's name. |
+| `revision` | The module's revision. It changes when the text does. |
+| `ok` | `true` when the module compiles. |
+| `clips` | The ids of the clips drawn by it, on the timeline and in every nest. |
+
+`ok: false` means the module doesn't compile. Fix it before exporting, because `export` won't start while a graphic clip's module doesn't compile. See [Graphics with an agent](/graphics/agents-and-graphics/).
+
+The list is empty in a project with no modules, and in a project that has no window.
+
+## Read a file's Camera Log
+
+A file's colour setting is in `color` on its media entry. A file with no setting has no `color`, and each key below appears only when it's set.
+
+| Key | What it holds |
+| --- | --- |
+| `log` | The curve: `apple_log`, `apple_log2`, `slog3`, `vlog`, `canon_log2` or `canon_log3`. |
+| `gamut` | The gamut: `bt2020`, `apple_wide_gamut`, `s_gamut3_cine`, `s_gamut3`, `v_gamut` or `cinema_gamut`. |
+| `lut` | The media id of a [LUT](/hdr/log-luts/) used as the conversion, in place of `log`. |
+| `detected` | `true` when Frame Job read the setting from the file at import. |
+| `pq` | An HDR10 file's peak: `file` is what import read, in cd/m², `from` is where it read it (`max_cll` or `mastering_display`), and `peak` is an override. An empty `pq` still marks the file as HDR10. |
+
+`detected: true` is how to tell a setting the file declared from one a person or an agent chose. Setting the Camera Log with `set_media_color` replaces it and drops `detected`. See [Camera Log](/hdr/camera-log/).
+
+## The report while a nest is open
+
+While `set_scope` has a nest open, `get_project` reports the nest as if it were the project, so the ids you read are the ones the next edit can name.
+
+- `project.tracks` and `project.clips` are the nest's own.
+- `project.canvas` has the nest's fixed size. Its other settings are the project's.
+- `project.markers` is empty, because a nest has no markers.
+- `project.media` and `project.nests` are still the whole project's, but the open nest's own row under `nests` has no tracks or clips, because they're at the top level here.
+- `duration`, `playhead`, `selection` and `in_out_range` are the nest's, measured from its own zero.
+
+Two more keys say where you are:
+
+| Key | What it holds |
+| --- | --- |
+| `scope_clip` | The nest clip it was entered through. |
+| `scope_path` | The trail of nests from the timeline, one `{nest, clip, name}` for each level. |
+
+`scope` is the nest's id, the same number an edit's `scope` argument takes. At the timeline `scope` is `null`, and the two keys above aren't there.
+
+Every edit now lands inside the nest, unless the call has a `scope` of its own or is one of the [document edits](/mcp/nests/#document-edits-while-a-nest-is-open). `render_frame` follows the same view and draws the nest at its own size. Opening a nest is a change of view, not an undo step. See [Editing inside a nest](/mcp/nests/).
+
+## Related
+
+- [Tools: projects and history](/mcp/tools-projects/)
+- [Units and ids](/mcp/units-and-ids/)
+- [Check the picture: render_frame](/mcp/render-frame/)
+- [Editing inside a nest](/mcp/nests/)
+- [A typical session](/mcp/typical-session/)

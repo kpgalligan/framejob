@@ -29,7 +29,8 @@ extension VideoPane {
         let snapshot = binding.snapshot
         return binding.videoClips.contains { clip in
             guard binding.video(clip).look?.kind == .lut,
-                let media = clip.source.mediaID, snapshot.media(media)?.color != nil
+                let media = clip.source.mediaID,
+                snapshot.media(media)?.color.flatMap(InputConversion.choose(input:)) != nil
             else { return false }
             return true
         }

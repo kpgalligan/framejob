@@ -51,7 +51,8 @@ final class EditorWindowController: NSWindowController {
     /// document meta), so the dirty flag has to read out here in words: under
     /// `ProjectDocument.autosavesInPlace` AppKit never sets
     /// `NSWindow.isDocumentEdited`, so there is no close-button dot and this
-    /// suffix is the only dirty indicator the window has. Static so
+    /// suffix is the dirty indicator the app writes itself, beside the
+    /// "— Edited" AppKit adds to the title bar. Static so
     /// `EditorViewController` can refresh it after a `set_canvas` without
     /// reaching into this controller's internals.
     ///

@@ -1,0 +1,104 @@
+---
+title: "Speed at a glance"
+description: "The ways to change a clip's time in Frame Job, which clips each one works on, and the rate and sound limits that apply."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Frame Job can play a video or audio clip faster or slower, change its speed over time, play it backwards and hold one of its frames. This page shows which tool fits the job and what limits apply to all of them.
+
+<AtAGlance
+  menu={['Clip ▸ Speed…', 'Clip ▸ Speed Ramp…', 'Clip ▸ Retime Range…']}
+  keys="⌥-drag"
+  where="Clip tab ▸ Clip sub-tab ▸ Speed section"
+  tools={['set_speed', 'rate_stretch', 'add_speed_ramp', 'retime_range']}
+/>
+
+## Pick the right tool
+
+| You want to | Use | What happens on the timeline |
+| --- | --- | --- |
+| Play a clip at one new speed | [Clip ▸ Speed…](/speed/change-speed/) or **Rate** in the [Speed section](/speed/speed-section/) | The clip's start stays and its length changes. Later clips don't move. |
+| Make a clip last an exact length | [Fit to](/speed/fit-to-duration/) | The rate changes so the clip plays in the length you type. |
+| Stretch a clip by eye | [Rate stretch](/speed/rate-stretch/), <kbd>⌥</kbd>-dragging its end edge | The clip gets longer or shorter and still plays the same source. |
+| Speed up and slow down inside a clip | A [speed ramp](/speed/speed-ramps/) | The clip keeps its place and length, and plays more or less of its file. |
+| Speed up or slow down a stretch of the whole timeline | [Retime Range](/speed/retime-range/) | Every unlocked track changes together, and what follows moves up or back. |
+| Speed up the typing in a screen recording | [Speed Up Typing](/recording/speed-up-typing/) | Only the stretches of typing change. |
+| Play a clip backwards | [Reverse](/speed/reverse/) | Nothing on the timeline moves. |
+| Hold one frame still | [Freeze Frame](/speed/freeze-frame/) | A still clip fills a gap opened at the playhead. |
+
+A rate is a multiple of normal speed: ×1 is normal, ×2 is twice as fast and half as long, and ×0.5 is half speed.
+
+Sound follows the [Keep pitch](/speed/keep-pitch/) setting, which is on for a new clip.
+
+## Which clips take speed
+
+Speed works on **media clips**, meaning clips of a video or audio file. Other clips have no source to speed up. Retime Range is the one exception.
+
+| Clip | Speed…, Fit to, rate stretch, Speed Ramp…, Reverse and Freeze Frame | Retime Range… |
+| --- | --- | --- |
+| A video or audio file | Yes, but Freeze Frame needs a picture | Yes |
+| A still image, a freeze frame, text, a shape or an adjustment clip | No | Stretched or squeezed with the range |
+| A graphic | No. Its timing comes from its module and its **Length**. | Stretched or squeezed, and it keeps its **Length** |
+| A nest | No | Frame Job won't retime a range with a nest in it. Move the range off the nest, or retime inside it. |
+| A caption page with timed words | No | Frame Job won't retime a range with one in it. Move the range off it. |
+
+When a selection mixes clip kinds, each command treats it differently:
+
+- **Clip ▸ Speed…** is available when the selection holds at least one media clip. It opens on those clips and skips the rest. With none selected it's dimmed.
+- **Clip ▸ Speed Ramp…** is available only with exactly one media clip selected.
+- The **Speed** section appears only when every selected clip is a media clip.
+- With several clips selected, the **Timing** section, which holds **Reverse**, also appears only when every one is a media clip.
+- <kbd>⌥</kbd>-dragging the end edge of any other clip is an ordinary trim.
+
+### Linked clips
+
+After [Detach Audio](/audio/detach-and-attach/), a picture and its sound are linked. Frame Job won't change a linked clip's rate or direction, or give it a Speed action, until you attach it again. The foot of the inspector shows the reason, for example "clip 4 is linked to clip 7: Attach Audio before changing its speed or direction". A rate stretch on a linked clip doesn't move and shows no reason.
+
+**Keep pitch** isn't a rate, so you can still change it on a linked clip.
+
+## Rate range
+
+A clip can play anywhere from ×0.1 to ×1000. What happens when you ask for more depends on where you ask.
+
+| Where | A rate past a limit |
+| --- | --- |
+| The **Speed**, **Speed Ramp** and **Retime Range** sheets | The field won't take it. Each sheet prints ×0.1 – ×1000 beside its buttons. |
+| **Rate** in the Speed section | It's set to the nearest limit. |
+| **Fit to** | The rate stops at the limit, so the clip ends up a different length from the one you typed. |
+| A rate stretch | The clip stops following the drag at the last length inside the limits. |
+
+## Limits at a glance
+
+| Limit | Value |
+| --- | --- |
+| Slowest rate | ×0.1 |
+| Fastest rate | ×1000 |
+| Fastest rate that still has sound | ×12, with Keep pitch on or off |
+| Freeze frame length when none is given | 2 s |
+
+What else to expect:
+
+- **Above ×12** the picture plays and the sound is left out of the preview and the export. Frame Job asks before an edit takes a clip with sound past ×12. See [Sound at high speed](/speed/sound-at-high-speed/).
+- **On a ramped clip**, one rate above ×12 anywhere in the ramp silences the whole clip.
+- **A speed ramp** never changes the clip's start or length. Frame Job won't make an edit that would play the clip past the end of its file.
+- **Clip ▸ Speed Ramp…** works on one clip at a time, and offers the **Ease In Out** and **Linear** curves and four hold values.
+- **Rendered sound.** A ramp is silent in the preview until its sound has been rendered. So is a clip at any constant speed but ×1 with Keep pitch off. See [Keep pitch](/speed/keep-pitch/#tape-pitch-is-rendered-in-the-background) and [Sound on a ramp](/speed/ramp-audio/).
+- **After a steep slow-down** with Keep pitch on, a ramp's sound can lag the picture by up to about 24 ms.
+- **A reversed clip** shows a slate until its backwards copy has been rendered.
+- **Synchronize Audio** doesn't take clips that are reversed, ramped, or more than 0.2% away from ×1. See [Synchronize Audio](/audio/synchronize-audio/).
+
+## With an agent
+
+`set_speed`, `add_speed_ramp` and a speed in `set_action_end` bring a rate past a limit to that limit. `retime_range` is the exception: it won't take a rate outside ×0.1 to ×1000. `set_speed`, `add_speed_ramp` and `retime_range` don't accept a rate of zero or less.
+
+Asking for a speed on anything but a media clip is an error, "clip 12 is not a media clip", so the agent can correct the call.
+
+`add_speed_ramp` can also use any action curve and any hold from 0 to 0.9, which is more than the sheet offers. See [Tools: speed and time](/mcp/tools-speed/).
+
+## Related
+
+- [Limits](/reference/limits/)
+- [Sound at high speed](/speed/sound-at-high-speed/)
+- [When an edit is refused](/getting-started/refused-edits/)
+- [Captions follow a speed change](/speed/captions-and-speed/)

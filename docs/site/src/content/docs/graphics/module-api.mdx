@@ -1,0 +1,333 @@
+---
+title: "The module API"
+description: "The helpers every graphic module can call, what each one takes and returns, and where to open the full graphics reference."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A graphic is drawn by a small JavaScript module, and every module can call a standard library of helpers for animating values, blending colours, measuring text and following paths. This page is for you if you're writing or changing a module: it names each helper with what it's for, and points you to the full reference. You don't need it to use a graphic.
+
+<AtAGlance
+  menu="Help ▸ Graphics Reference"
+  where="API.md and API.d.ts in a project's graphics folder"
+  tools="graphic_reference"
+/>
+
+All of these are already there when your module runs, so there's nothing to import. The examples use the arguments of `render(frame, props, ctx)`: `frame` is the frame being drawn, `props` holds the values set in the inspector, and `ctx` holds the size, frame rate and progress. [Write a graphic module](/graphics/write-a-module/) explains them.
+
+## The graphics reference
+
+Choose **Help ▸ Graphics Reference** to open the whole API in your default Markdown app, with or without a project open. It covers a module's shape, `ctx`, the schema's types, the standard library, fonts, the sandbox, the limits and the worked examples. The menu item is dimmed only if the reference file is missing from the app.
+
+Frame Job also keeps two files beside your modules once a project has a graphics folder:
+
+| File | What it is |
+| --- | --- |
+| `API.md` | The same reference. |
+| `API.d.ts` | Type definitions for the whole API, for an editor or an agent working in the folder. |
+
+Frame Job doesn't make a graphics folder only to hold them. Don't edit them, because Frame Job puts its own text back over any change.
+
+An agent reads the same reference with `graphic_reference`, which needs no project open. See [Tools: graphics](/mcp/tools-graphics/).
+
+## Find a helper
+
+| To | Use |
+| --- | --- |
+| Write the root `<svg>` element | [`svg`](#svg) |
+| Move a number from one value to another | [`interpolate`](#interpolate) |
+| Shape that movement | [`Easing`](#easing) |
+| Move with bounce and settle | [`spring`](#spring) |
+| Blend colours | [`interpolateColors`](#interpolatecolors) |
+| Get a repeatable random number | [`random`](#random) |
+| Add smooth, organic drift | [`noise2D` and `noise3D`](#noise) |
+| Measure a path, follow it, or draw it on | [`getLength`, `getPointAtLength` and `evolvePath`](#path-helpers) |
+| Measure text | [`measureText`](#measuretext) |
+| Break text into lines | [`wrapText`](#wraptext) |
+| Size text to a width | [`fitText`](#fittext) |
+| Write lines of text as markup | [`textLines`](#textlines) |
+| Make a prop safe to put in markup | [`escapeXml`](#escapexml) |
+| Group a number's thousands | [`formatNumber`](#formatnumber) |
+| Draw a picture from the project | [`asset`](#asset) |
+
+## Start the frame
+
+### `svg()`
+
+`svg(ctx, body, {background})` writes the root element with the right `width`, `height` and `viewBox`, around whatever markup you pass as `body`.
+
+```js
+const plain = svg(ctx, `<circle cx="100" cy="100" r="50" fill="#fff"/>`);
+const onBlack = svg(ctx, "", { background: "#000000" });
+```
+
+`background` is optional and paints the whole frame in a colour. Leave it out and the frame stays clear behind what you draw. `body` goes in exactly as you wrote it, so a prop inside it needs [`escapeXml`](#escapexml).
+
+## Animate values
+
+### `interpolate()`
+
+`interpolate(value, input, output, options)` maps a value through matching ranges. It's the helper most animation starts from.
+
+```js
+const x = interpolate(frame, [0, 30], [0, 400], { clamp: true });
+const pulse = interpolate(frame, [0, 15, 30], [1, 1.2, 1], { easing: Easing.inOutSine });
+```
+
+`input` and `output` need two or more points each, and the same number of them, or the helper throws. Keep `input` ascending.
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| `easing` | A curve from [`Easing`](#easing), applied inside each pair of points. | Straight line |
+| `clamp` | With `true`, the result stops at the first and last `output` values. | `false` |
+| `extrapolateLeft` | What happens before the first `input` point: `"extend"`, `"clamp"` or `"identity"`. | `"extend"`, or `"clamp"` when `clamp` is `true` |
+| `extrapolateRight` | The same after the last `input` point. | `"extend"`, or `"clamp"` when `clamp` is `true` |
+
+Outside `input`, `"extend"` carries on along the end segment, so `interpolate(40, [0, 30], [0, 400])` gives about 533. `"identity"` returns `value` unchanged. Either `extrapolate` option wins over `clamp` on its own side.
+
+### `Easing`
+
+`Easing` holds ready-made curves to pass to `interpolate`. You can also call one directly: each takes `t` from 0 to 1 and is exact at 0 and 1.
+
+- `Easing.linear`
+- `Easing.bezier(x1, y1, x2, y2)`, which makes a curve of your own
+- `in`, `out` and `inOut` of `quad`, `cubic`, `quart`, `expo`, `sine`, `back` and `elastic`, spelled `Easing.inQuad`, `Easing.outCubic`, `Easing.inOutBack` and so on
+
+```js
+const eased = Easing.outCubic(0.5);
+const custom = Easing.bezier(0.25, 0.1, 0.25, 1)(0.5);
+const y = interpolate(frame, [0, 20], [300, 0], { easing: Easing.outBack, clamp: true });
+```
+
+The `back` and `elastic` curves go past the end of their range on the way. `clamp` doesn't stop that, because it only holds the value once `input` runs out.
+
+### `spring()`
+
+`spring()` gives a physical spring from one value to another.
+
+```js
+const scale = spring({ frame, fps: ctx.fps, damping: 14 });
+const late = spring({ frame: frame - 12, fps: ctx.fps, stiffness: 180, from: 0.5, to: 1 });
+```
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| `frame` | The frame to read the spring at. | Needed |
+| `fps` | The frame rate. Pass `ctx.fps`. | Needed |
+| `stiffness` | How hard the spring pulls towards `to`. | 100 |
+| `damping` | How quickly the movement dies away. | 10 |
+| `mass` | How heavy the thing moving is. | 1 |
+| `from` | Where it starts. | 0 |
+| `to` | Where it settles. | 1 |
+
+A spring starts at frame 0 and sits at `from` before that, so `frame - 12` starts it 12 frames late. It overshoots unless it's damped: on the defaults it reaches about 1.16 on its way to 1, and with the default stiffness and mass a `damping` of 20 or more stops the overshoot. The same frame always gives the same value.
+
+### `interpolateColors()`
+
+`interpolateColors(value, input, colors)` blends colours in OKLab, a colour space built so that a blend looks even. It returns `#rrggbb`, or `#rrggbbaa` when any of the colours isn't fully opaque.
+
+```js
+const fill = interpolateColors(frame, [0, 60], ["#ff5a36", "#3666ff"]);
+const glass = interpolateColors(ctx.progress, [0, 1], ["rgba(255, 255, 255, 0)", "#ffffff"]);
+const sky = interpolateColors(ctx.progress, [0, 1], ["hsl(200, 80%, 30%)", "skyblue"]);
+```
+
+`input` works as it does in `interpolate`, with two or more points and one colour for each. Outside `input` the result always holds at the end colours.
+
+It takes the same colours a `color` prop takes:
+
+| Form | Notes |
+| --- | --- |
+| `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa` | |
+| `rgb()`, `rgba()` | Channels 0 to 255 or a percentage, alpha 0 to 1 or a percentage. |
+| `hsl()`, `hsla()` | Hue in degrees, saturation and lightness as percentages. |
+| A name | Any of the 147 CSS colour names, or `transparent`. |
+
+A value out of range, such as `rgb(300, 0, 0)`, throws rather than being clamped.
+
+## Add variation
+
+### `random()`
+
+`random(seed)` returns a number from 0 up to, but not including, 1. It depends only on the seed, which is a number or a string, so the same seed gives the same number on every frame and in every export.
+
+```js
+const jitter = random(`dot-${frame}`) * 10;
+const hue = Math.floor(random(42) * 360);
+```
+
+Put the frame in the seed for a value that changes, as `jitter` does, and leave it out for one that stays. The seed is read as text, so `42` and `"42"` give the same number.
+
+`Math.random` isn't available in a graphic. Calling it throws "Math.random is not available; use random(seed)".
+
+### Noise
+
+`noise2D(seed, x, y)` and `noise3D(seed, x, y, z)` give simplex noise for organic motion: a value between −1 and 1 that changes smoothly as its inputs do. The seed works as it does for `random`.
+
+```js
+const drift = noise2D("wave", frame / 60, 0) * 40;
+const wobble = noise3D(7, 0.5, 0.5, ctx.time) * 20;
+```
+
+For smooth drift, use `noise3D` with time as the third axis.
+
+## Path helpers
+
+These three take `d`, ordinary SVG path data. Every command works, in its absolute and relative forms: `M L H V C S Q T A Z`.
+
+| Helper | What it returns |
+| --- | --- |
+| `getLength(d)` | The path's length. Curves and arcs are measured in short straight pieces, so the answer can be a few hundredths of a percent short. |
+| `getPointAtLength(d, length)` | `{x, y, angle}`: the point that far along, and the way the path is heading there in degrees, ready for `rotate()`. A `length` outside the path stops at its nearest end. |
+| `evolvePath(progress, d)` | `{strokeDasharray, strokeDashoffset}` for a `progress` from 0 to 1. Put both on the `<path>` and it's drawn from its start up to that fraction. |
+
+```js
+const d = `M 200 ${ctx.height / 2} C 600 100 1000 900 1400 ${ctx.height / 2}`;
+const total = getLength(d);
+const tip = getPointAtLength(d, total * ctx.progress);
+const dash = evolvePath(ctx.progress, d);
+const line = `<path d="${d}" fill="none" stroke="#ffffff" stroke-width="8"
+  stroke-dasharray="${dash.strokeDasharray}" stroke-dashoffset="${dash.strokeDashoffset}"/>
+  <circle cx="${tip.x}" cy="${tip.y}" r="12" fill="#ffcc00"/>`;
+```
+
+`evolvePath` keeps `progress` between 0 and 1, and a closed outline closes at 1. A path of several pieces, with more than one `M`, draws them all at once, each from its own start and at the same speed, the longest finishing at 1. To draw pieces one after another, give each its own `<path>`.
+
+A path has to start with a move, `M` or `m`. One that can't be read throws, naming where reading stopped, for example `getLength: cannot parse the path at character 6: "X 5 5"`. It's never a silent zero, though an empty `d` measures 0. A number too large to do arithmetic with, such as `1e999`, throws the same error, so you never get `Infinity` or `NaN` back.
+
+Frame Job remembers the paths a graphic measures, so the same `d` costs almost nothing on later calls and frames. It holds up to 32 paths, and about 50,000 characters and measured pieces between them, where a curve is 64 pieces. Past either limit it forgets them all and measures again when asked. With paths that large, take every length and point you need from one before turning to the next.
+
+## Work with text
+
+The text helpers measure with the same fonts the graphic draws with: the ones bundled with Frame Job and any in the project, never the system's. [Fonts and pictures in graphics](/graphics/fonts-and-pictures/) lists them.
+
+### `measureText()`
+
+`measureText(text, font)` measures text. `font` is an object, and all four text helpers read it the same way:
+
+| Key | What it does | Default |
+| --- | --- | --- |
+| `family` | The font family. | `"Montserrat"` |
+| `size` | The size in pixels, above 0. | 16 |
+| `weight` | The weight, 1 to 1000. | 400 |
+| `style` | `"normal"`, `"italic"` or `"oblique"`. | `"normal"` |
+| `letterSpacing` | Extra space between letters. | 0 |
+| `xmlSpace` | `"default"` collapses runs of spaces, as SVG draws them. `"preserve"` counts them, as `xml:space="preserve"` draws them. | `"default"` |
+
+It returns `{width, ascent, descent, lineHeight, inkX, inkWidth}`. `width` is the advance, which is where the next word would start. `inkX` and `inkWidth` describe the glyphs actually drawn.
+
+```js
+const m = measureText("Hello", { family: "Montserrat", size: 64, weight: 800 });
+const boxWidth = m.width + 80;
+const gap = measureText("a  b", { family: "sans-serif", size: 48, xmlSpace: "preserve" });
+```
+
+A family that isn't installed throws, naming the families that are. Any `xmlSpace` other than those two throws too. Text that's only spaces measures zero either way.
+
+### `wrapText()`
+
+`wrapText(text, maxWidth, font)` breaks text into lines that each fit `maxWidth`, and returns them as a list. A word longer than the width breaks by characters.
+
+```js
+const lines = wrapText("A title long enough to need two lines", 600,
+  { family: "Source Sans 3", size: 64, weight: 700 });
+```
+
+Line breaks in the text count as spaces, so split on them first if you want to keep them.
+
+### `fitText()`
+
+`fitText(text, maxWidth, font, {min, max})` returns the largest whole font size at which the text fits on one line. `min` defaults to 8 and `max` to 400, and the `size` in `font` is ignored.
+
+```js
+const size = fitText("BREAKING", ctx.width - 200, { family: "Anton" }, { max: 300 });
+```
+
+It never goes outside `min` and `max`, so text too long to fit at `min` still comes back as `min` and runs over. Empty text returns `max`.
+
+### `textLines()`
+
+`textLines(lines, {x, y, lineHeight, anchor, fill, font})` writes a `<text>` element with one `<tspan>` per line.
+
+```js
+const font = { family: "Source Sans 3", size: 48, weight: 600 };
+const body = textLines(wrapText("Two short lines of text", 400, font),
+  { x: 100, y: 200, anchor: "start", fill: "#ffffff", font });
+```
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| `x`, `y` | Where the first line goes. | 0 |
+| `lineHeight` | The distance between lines. | 1.2 × the size |
+| `anchor` | `"start"`, `"middle"` or `"end"`. | `"start"` |
+| `fill` | The text colour. | Not written |
+| `font` | The same `font` object as `measureText`. | |
+
+It does the fiddly parts for you. It quotes the family, leaving a generic such as `sans-serif` bare as it has to be. It escapes each line, so don't pass lines through `escapeXml` first. It also writes `font-style`, `letter-spacing` and `xml:space` to match the font `wrapText` broke the lines with, so what's drawn is what was measured.
+
+## Prepare values
+
+### `escapeXml()`
+
+`escapeXml(s)` escapes `&`, `<`, `>`, `"` and `'`, so a prop is safe to write into markup. Put every prop you write into markup through it. Without it, a title like "Tom & Jerry" stops the frame with an error that starts "the SVG did not parse".
+
+```js
+const safe = escapeXml("Tom & Jerry <live>");
+```
+
+The exception is text you pass to [`textLines`](#textlines), which escapes it already. Escaping twice puts `&amp;` on screen.
+
+### `formatNumber()`
+
+`formatNumber(n, {decimals, separator})` groups thousands, because a graphic has no `Intl`. `decimals` defaults to 0 and `separator` to a comma.
+
+```js
+const label = formatNumber(1234567.891, { decimals: 2 });
+const plain = formatNumber(Math.round(interpolate(frame, [0, 60], [0, 5000], { clamp: true })));
+```
+
+`label` here is `1,234,567.89`. The number is rounded to `decimals`, a minus sign is kept, and `NaN` or `Infinity` comes back as that word.
+
+## Draw a picture
+
+### `asset()`
+
+`asset(name)` returns the `href` of a file in the project's `graphics/assets/` folder, for an `<image>` element.
+
+```js
+const logo = `<image href="${asset("logo.png")}" x="40" y="40" width="200" height="200"/>`;
+```
+
+A name that isn't in the folder gives a warning naming the files that are, and the image doesn't draw. [Fonts and pictures in graphics](/graphics/fonts-and-pictures/) covers adding pictures and how they're named.
+
+## Idioms
+
+The reference ends with six complete modules, each showing a common move. You can copy any of them into a graphic and it works as written. Find them under **Idioms** in **Help ▸ Graphics Reference**.
+
+| Idiom | What it shows | The key line |
+| --- | --- | --- |
+| A slide-in | Text sliding in with `interpolate` and `Easing`. | `interpolate(frame, [0, 18], [-ctx.width / 2, ctx.width / 2], { easing: Easing.outCubic, clamp: true })` |
+| A staggered list | Rows springing in one after another. | `spring({ frame: frame - i * 6, fps: ctx.fps, damping: 16 })` |
+| A counter | A number counting up. | `formatNumber(Math.round(value)) + props.suffix` |
+| Fit and wrap a title | A title sized and wrapped to the frame. | `fitText(props.title, maxWidth * 2, base, { min: 48, max: 220 })`, then `wrapText` and `textLines` |
+| A draw-on stroke | A line drawing itself. | `evolvePath(drawn, d)` |
+| Follow a path | An arrowhead following a curve. | `getPointAtLength(d, getLength(d) * drawn)`, then `rotate(${tip.angle})` |
+
+All six work out their positions and sizes from `ctx`, so the same module draws at any size. The exception is the `min` and `max` in Fit and wrap a title, which are fixed sizes. A slide-in and A staggered list scale everything by this unit, which also keeps a portrait canvas from drawing too big:
+
+```js
+const u = Math.min(ctx.width, ctx.height) / 1080;
+```
+
+## Good to know
+
+- A helper that throws stops that frame, and the clip draws the [error card](/graphics/edit-a-module/#the-error-card) in place of the graphic, or an export stops. The Source section of [the Graphic sub-tab](/graphics/graphic-tab/) shows what the clip's first frame reported, with its line and column.
+- `import` isn't available. A module that tries it stops with an error ending "imports are not available in a graphic; the standard library is global".
+
+## Related
+
+- [Write a graphic module](/graphics/write-a-module/)
+- [Edit a module](/graphics/edit-a-module/)
+- [Fonts and pictures in graphics](/graphics/fonts-and-pictures/)
+- [Graphics with an agent](/graphics/agents-and-graphics/)
+- [Tools: graphics](/mcp/tools-graphics/)

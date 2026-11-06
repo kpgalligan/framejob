@@ -1,0 +1,126 @@
+---
+title: Crop
+description: Trim a picture's edges by dragging handles on the canvas or by typing an exact number of pixels.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Crop cuts pixels off the edges of a video clip, image clip or freeze frame. Drag the edges on the canvas when you're working by eye, or type the amounts when you need them exact.
+
+<AtAGlance
+  keys="C"
+  where={['Double-click a clip in the preview', 'Clip tab ▸ Picture ▸ Crop']}
+  tools="set_video"
+/>
+
+## Crop mode
+
+Crop mode turns the handles on the canvas into crop edges.
+
+<Steps>
+
+1. Select the clip, with the playhead somewhere it's showing.
+
+2. Press <kbd>C</kbd>, double-click the clip in the preview, or choose **Crop on Canvas** in the Crop section.
+
+3. Drag the [crop handles](#crop-handles).
+
+4. Press <kbd>Return</kbd> to [leave crop mode](#leaving-crop-mode).
+
+</Steps>
+
+<kbd>C</kbd> beeps when no selected clip is showing at the playhead, because there's nothing on the canvas to crop. It beeps on a text, shape or graphic clip too, because crop mode opens only on a video clip, image clip or freeze frame, and so does a double-click on a shape or graphic. Double-clicking a text clip opens its text editor instead. A [matte track](#good-to-know) is the exception.
+
+Going in and out of crop mode isn't an edit, so it adds nothing to undo.
+
+## Crop handles
+
+In crop mode the eight square handles become crop edges and the rotation grip goes away. A corner handle moves two edges, and a side handle moves one.
+
+The area you're cutting away shows as a faint white shape, inside a dashed outline of the uncropped frame.
+
+- A drag changes the crop and nothing else. The clip's position stays put, and the picture doesn't shift.
+- A crop drag doesn't snap.
+- At least one source pixel always remains in each direction, however far you drag.
+- Press <kbd>Esc</kbd> during a drag to cancel it. The crop goes back to where it was, with no undo step.
+- Each finished drag is one undo step.
+
+Dragging inside the box still moves the clip, as it does outside crop mode. With several clips selected, the handles belong to the front-most one and crop only that clip.
+
+## Leaving crop mode
+
+Your crop stays when you leave. Any of these leaves crop mode:
+
+| Do this | Good to know |
+| --- | --- |
+| Press <kbd>Return</kbd> or the keypad's <kbd>Enter</kbd> | Works wherever the focus is, except while you're typing in a field. Caps Lock makes no difference. |
+| Press <kbd>Esc</kbd> | Works wherever the focus is, except while you're typing in a field. Caps Lock makes no difference. During a drag, the first <kbd>Esc</kbd> cancels the drag and the next one leaves the mode. With an action selected, the first <kbd>Esc</kbd> leaves crop mode and the next one deselects the action. |
+| Press <kbd>C</kbd> or choose **Crop on Canvas** | <kbd>C</kbd> works wherever the focus is, except while you're typing in a field. |
+| Click empty canvas | This also clears the selection, unless you hold <kbd>⇧</kbd>. |
+
+Going into crop mode doesn't move the focus, so these keys work however you came in.
+
+Clicking a video clip, image clip or freeze frame that isn't selected doesn't leave crop mode. That clip becomes the selection, and the crop handles move to it. Clicking a text, shape or graphic clip leaves crop mode, because it can't be cropped, unless it's on a [matte track](/canvas/matte-tracks/).
+
+With several clips selected, crop mode ends if the clip you click isn't the front-most selected clip afterwards. That includes a <kbd>⇧</kbd>-click that takes a clip out of the selection, or adds one behind the front-most.
+
+Crop mode also ends if nothing selected is left on the canvas, for example when you clear the selection in the timeline. It ends too if the front-most selected clip stops being one it can open on, for example when you select a text clip in the timeline, or the playhead reaches a selected shape in front of the clip you were cropping.
+
+## The Crop section
+
+The **Crop** section on the [Picture tab](/canvas/picture-tab/) has the same four edges as fields, for when you want an exact number. It shows only for video clips, image clips and freeze frames.
+
+| Field | What it does | Default | Range |
+| --- | --- | --- | --- |
+| **Left** | Source pixels cut from the left edge | 0 px | 0 to 20,000 px |
+| **Top** | Source pixels cut from the top edge | 0 px | 0 to 20,000 px |
+| **Right** | Source pixels cut from the right edge | 0 px | 0 to 20,000 px |
+| **Bottom** | Source pixels cut from the bottom edge | 0 px | 0 to 20,000 px |
+
+These are typed fields, with no slider. Each change is one undo step. **Crop on Canvas** under them goes in and out of crop mode.
+
+Closed, the section's summary reads `none`, or the four amounts in field order, such as `100·0·100·0`. **Reset** appears in the section's header while there's a crop, and takes all four edges back to 0.
+
+Left and Right together must stay under the picture's width, and Top and Bottom under its height. Outside an action, if a number would use up the whole picture, Frame Job shows an error and keeps the crop you had.
+
+:::caution
+With several clips selected, editing one field gives every clip all four of the first clip's amounts, not only the edge you changed. Crop clips of different sizes one at a time.
+:::
+
+## How a crop works
+
+A crop removes edges in place. The picture you keep stays exactly where it was on the canvas, so cropping the left edge opens a gap on the left rather than sliding the picture over.
+
+The amounts are in the source's own pixels, not canvas pixels, so they stay correct when you scale the clip later. Cutting 100 px from a clip at 50 % takes 50 canvas pixels off it, and the same 100 px at 200 % takes 200.
+
+Position, scale and rotation go on measuring from the centre of the uncropped picture. A crop doesn't recentre what's left, so move the clip if you want that.
+
+- [Fit to Canvas and Fill Canvas](/canvas/transform/#fit-and-fill) measure the uncropped picture too.
+- [Corner radius](/canvas/corner-radius/) and the [shadow](/effects/shadow/) follow the cropped edge.
+- [Reset in Transform](/canvas/transform/#reset) leaves the crop alone.
+
+## Animate a crop
+
+A crop can change over time. With an [action](/motion/actions/) selected on a single clip, a crop handle or a field sets the crop at the action's end, and the edges move there along the action's curve. See [Set what an action animates to](/motion/edit-an-action/).
+
+While you're editing an action, the section's **Reset** is hidden. **Clear** appears there once the action sets a crop, and takes the crop out of that action.
+
+## Good to know
+
+- Crop mode has no menu item. It's <kbd>C</kbd>, a double-click, or the **Crop on Canvas** button.
+- On a [matte track](/canvas/matte-tracks/), crop shapes the matte, so <kbd>C</kbd> still opens crop mode on a text, shape or graphic clip there, and a double-click does on a shape or graphic. Those clips have no Crop section, so there are no fields and no **Reset**. To take that crop off, undo or drag the handles back.
+- [Paste Attributes](/editing/paste-attributes/) or an agent's `set_video` can put a crop on a text, shape or graphic clip on any track. The crop draws, and no field shows it.
+- Crop mode doesn't open on a nest clip, so <kbd>C</kbd> and a double-click beep on it, unless it's on a matte track.
+- A clip on a [locked track](/timeline/hide-and-lock-tracks/) shows no crop handles.
+
+## With an agent
+
+`set_video` sets a crop with `crop`, which holds `l`, `t`, `r` and `b`, each 0 or more, in source pixels. `l` plus `r` must stay under the source's width and `t` plus `b` under its height, or the call gets an error and the crop stays as it was. See [Tools: picture and grade](/mcp/tools-set-video/#crop-and-corners).
+
+## Related
+
+- [Move, scale and rotate](/canvas/move-scale-rotate/)
+- [Position, scale, rotation and opacity](/canvas/transform/)
+- [Corner radius](/canvas/corner-radius/)
+- [The Picture tab](/canvas/picture-tab/)

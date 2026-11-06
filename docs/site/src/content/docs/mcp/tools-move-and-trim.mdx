@@ -1,0 +1,150 @@
+---
+title: "Tools: moving and trimming"
+description: The agent tools that move clips, trim their edges, slip their source, roll a cut and switch a clip's picture or sound, with every argument and refusal.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These tools change where a clip sits and what it shows. They name clips by id, so read them from `get_project` first.
+
+<AtAGlance tools={['move_clip', 'trim_start', 'trim_end', 'slip', 'roll', 'set_enabled']} />
+
+## What the tools share
+
+Each one is one undo step. It answers `ok: true` and the `project` summary. See [What a call answers](/mcp/what-a-call-answers/).
+
+**Held to the limits.** Most of these hold a time to what the clip's source allows and do as much as they can. Read the clip back to see where it landed. When the limits leave nothing to do, the answer says "*Step* made no change", and no undo step is made.
+
+**Times** are ticks, 600,000 per second, rounded to the project's frame grid. See [Units and ids](/mcp/units-and-ids/).
+
+**`project`** is the path of an open project as `get_project` reports it. Without it the call goes to the frontmost project.
+
+**`scope`** is a nest id. With it, the call's ids and times are looked up inside that nest. Without it, the call goes wherever the app is looking. See [Editing inside a nest](/mcp/nests/).
+
+**Linked pairs.** After [`detach_audio`](/mcp/tools-audio/#detach_audio), a picture and its sound move together. The partner comes along only when it's on an unlocked track. A lock on a named clip's own track doesn't stop these tools.
+
+**A boolean** may also be sent as `"true"`, `"1"`, `"false"` or `"0"`.
+
+## `move_clip`
+
+Shifts clips along the timeline, and optionally onto another track, as [dragging a clip](/editing/move-clips/) does.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | Yes | The clip ids. At least one. |
+| `delta` | integer | Yes | How far to shift, in ticks. Negative moves earlier. |
+| `track` | integer | No | The destination track for the first clip. The first clip is the one on the back-most track, then the earliest. Leave it out to stay on the current tracks. |
+| `scope` | integer | No | The nest the clips are in. |
+| `project` | string | No | The project to act on. |
+
+Several clips keep their relative track offsets, so a selection spanning two tracks lands two tracks apart.
+
+Starts stop at 0. It's the earliest clip that stops there, linked partners included, and the rest keep their distance from it.
+
+A linked pair moves together in time, but only the clips you name change track. So you can drop a sound half onto a track of its own while its picture stays.
+
+It's refused:
+
+- when the destination breaks the overlap rule: a clip may overlap at most one neighbour on each side, and each overlap may be at most half of the shorter clip
+- when a clip would land off either end of the track list
+
+A clip that gains an overlap with the clip before it, and has no transition, gains a `cross_dissolve`. The undo step is called "Move Clip".
+
+## `trim_start`
+
+Moves a clip's start, as [dragging its left edge](/editing/trimming/) or pressing <kbd>W</kbd> does. The content stays in place: the source's in point advances by the same amount, so nothing after the new start shifts.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip id. |
+| `to` | integer | Yes | The new start, in ticks. |
+| `alone` | boolean | No | `true` moves this clip's edge without its linked partner's, which makes a [J-cut or L-cut](/audio/j-and-l-cuts/). The timeline does this for a dragged sound. Default `false`. |
+| `scope` | integer | No | The nest the clip is in. |
+| `project` | string | No | The project to act on. |
+
+It stops at the source's own beginning and one frame short of the clip's end, because a clip is at least one frame long.
+
+On a linked pair, the other half's start follows when it was the same as this clip's.
+
+Timed words stay on the speech they time, and a graphic's own clock moves with the edge. Actions stay where they are in the clip. See [What a trim keeps](/editing/trimming/#what-a-trim-keeps).
+
+On a clip with a [speed ramp](/speed/edit-a-ramped-clip/), the ramp stays where it is in the clip, so what plays after the new start can change. The start is held where the clip still fits its media.
+
+It's refused when the new start would break the [overlap rule](#move_clip). The undo step is called "Trim Start".
+
+## `trim_end`
+
+Moves a clip's end, as [dragging its right edge](/editing/trimming/) or pressing <kbd>E</kbd> does.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip id. |
+| `to` | integer | Yes | The new end, in ticks. |
+| `alone` | boolean | No | `true` moves this clip's edge without its linked partner's, which makes a [J-cut or L-cut](/audio/j-and-l-cuts/). Default `false`. |
+| `scope` | integer | No | The nest the clip is in. |
+| `project` | string | No | The project to act on. |
+
+It stops at the last frame the source has left after the in point, and one frame after the clip's start.
+
+On a linked pair, the other half's end follows when it was the same as this clip's.
+
+It's refused when the new end would break the [overlap rule](#move_clip). The undo step is called "Trim End".
+
+## `slip`
+
+Slides the source under a fixed clip, as [<kbd>⌥⇧</kbd>-dragging a clip's body](/editing/slip-and-roll/#slip-a-clip) does. What the clip shows changes, and where it sits doesn't, so nothing downstream moves.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip id. |
+| `delta` | integer | Yes | How far to slide the source, in timeline ticks. The source moves by `delta` times the clip's speed. Positive shows later material. |
+| `scope` | integer | No | The nest the clip is in. |
+| `project` | string | No | The project to act on. |
+
+The slide stops so the window stays inside the media. A [freeze frame](/speed/freeze-frame/) moves the frame it holds instead, and stops one frame short of the file's end.
+
+A linked partner on an unlocked track slips too, by whichever of the two can move less, so the sound stays on its picture. Actions don't move.
+
+Only a clip of a video or audio file, or a freeze frame, can slip. Any other, such as a text clip or a picture, is an error. The undo step is called "Slip".
+
+## `roll`
+
+Moves a hard cut between two clips, as [<kbd>⌥⇧</kbd>-dragging a clip's edge](/editing/slip-and-roll/#roll-a-cut) does. This clip's start and the end of the clip before it both become `to`. One grows by exactly what the other loses, and the pair's outer edges and total length don't move.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip to the right of the cut. |
+| `to` | integer | Yes | Where the cut moves to, in ticks. |
+| `alone` | boolean | No | `true` moves this cut without rolling the linked partner's. Default `false`. |
+| `scope` | integer | No | The nest the clip is in. |
+| `project` | string | No | The project to act on. |
+
+The clip before is the one on the same track that ends exactly at this clip's start.
+
+The cut stops so each clip keeps a frame and neither asks for source it doesn't have. On a [speed ramp](/speed/edit-a-ramped-clip/) it's held where the clip still fits its media.
+
+The linked half of a pair rolls its own cut too, when it starts at the same time and has a hard cut of its own there.
+
+It's refused when no clip on the track ends where this one begins, with "no clip on track … ends where clip … begins". That covers a gap and an overlap. An overlap is a transition, so use [`set_transition_duration`](/mcp/tools-transitions/) to change its length. The undo step is called "Roll".
+
+## `set_enabled`
+
+Turns one clip's picture or sound on or off, the two halves [**Clip ▸ Detach Audio**](/editing/enable-picture-and-sound/) flips. A half that's off adds nothing to the picture or the mix, and the clip stays where it is.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip id. |
+| `video` | boolean | No | Show this clip's picture. Left out, it stays as it is. |
+| `audio` | boolean | No | Play this clip's sound. Left out, it stays as it is. |
+| `scope` | integer | No | The nest the clip is in. |
+| `project` | string | No | The project to act on. |
+
+It's refused when neither `video` nor `audio` is given. A value the clip already has changes nothing. The undo step is called "Clip Enabled".
+
+## Related
+
+- [Tools: cutting and deleting](/mcp/tools-cut-and-delete/)
+- [Tools: copying and nesting](/mcp/tools-copy-and-nest/)
+- [Tools: speed and time](/mcp/tools-speed/)
+- [Tools: transitions](/mcp/tools-transitions/)
+- [Units and ids](/mcp/units-and-ids/)

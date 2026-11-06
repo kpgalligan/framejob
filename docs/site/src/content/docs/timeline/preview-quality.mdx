@@ -1,0 +1,47 @@
+---
+title: "Preview Quality"
+description: Draw the preview at half or a quarter of the canvas size so a heavy project that lags or stutters plays more smoothly, without changing what you export.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Preview Quality draws the preview smaller and scales it back up to fit, so a heavy project that lags or looks choppy runs more smoothly. It never changes an export. Frame Job has no proxy files or optimised media, so this is the setting to try first.
+
+<AtAGlance menu="View ▸ Preview Quality" />
+
+## Full, Half, Quarter
+
+Choose **View ▸ Preview Quality ▸ Full**, **Half** or **Quarter**. The menu checks the current choice. The preview redraws straight away, paused or playing.
+
+| Choice | Draws the preview at | 1920 × 1080 canvas |
+| --- | --- | --- |
+| **Full** (default) | The canvas size | 1920 × 1080 |
+| **Half** | Half the width and height | 960 × 540 |
+| **Quarter** | A quarter of the width and height | 480 × 270 |
+
+The choice is remembered between launches, for every project. There's no keyboard shortcut, and no agent tool sets it. The [Preview Window](/timeline/preview-window/) shows the same picture, so it draws at the same quality.
+
+## What it changes
+
+Quality only affects the preview. It never changes an export, a [saved frame](/export/save-frame/) or a frame an agent renders.
+
+A lower choice saves the work of drawing each pixel of the picture. Decoding your footage, drawing shadows and playing the sound cost the same at every choice, so a project held back by those won't speed up as much.
+
+Frame Job doesn't make proxies, optimised media or a render cache for video. It always plays your original files. If 4K footage still stutters or drops frames at **Quarter**, decoding is what's slow, so transcode it to an easier codec, such as ProRes, before you import it.
+
+## Good to know
+
+The picture always keeps the canvas's exact shape, so that handles stay in the right place on it. On an awkward canvas size that means the preview can draw a little larger than the fraction, never smaller:
+
+| Canvas | Half | Quarter |
+| --- | --- | --- |
+| 999 × 666 | 501 × 334 | 252 × 168 |
+| 1001 × 667 | 1001 × 667 | 1001 × 667 |
+
+A canvas whose sides share no common factor, like 1001 × 667, can't be scaled down evenly, so it draws at full size at every choice.
+
+## Related
+
+- [The preview](/timeline/preview/)
+- [The Preview Window](/timeline/preview-window/)
+- [Play, pause and shuttle](/timeline/playback/)

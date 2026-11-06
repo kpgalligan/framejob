@@ -38,7 +38,7 @@ pub(crate) struct Described {
 }
 
 impl Project {
-    /// A text clip at `at` on `track`: the Title preset, centered, five
+    /// A text clip at `at` on `track`: the default title, centered, five
     /// seconds by default, with `text` merged over it as a `set_text`
     /// patch (spec §6, §4.3).
     ///

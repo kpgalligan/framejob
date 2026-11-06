@@ -69,8 +69,15 @@ extension AgentServer {
                     + "and size it. A WebM or Matroska file is copied into a .mov first: the "
                     + "result's path is the copy and its original is the file you named, which "
                     + "the media is named after. A file the opt-in ffmpeg step converts is "
-                    + "recorded the same way.",
-                ["path": ["type": "string", "description": "Absolute or ~ path to the file."]],
+                    + "recorded the same way. A folder imports the media files directly inside "
+                    + "it, in Finder order, and answers imported and skipped instead of one media "
+                    + "id; hidden files, subfolders and packages are left out.",
+                [
+                    "path": [
+                        "type": "string",
+                        "description": "Absolute or ~ path to the file, or to a folder.",
+                    ]
+                ],
                 required: ["path"]),
         ]
         // import_captions is `AgentCatalog+Captions.swift`'s, spliced in HERE
@@ -133,7 +140,8 @@ extension AgentServer {
                 ]),
             opTool(
                 "set_media_color",
-                "Sets how a video file's camera log footage is converted to Rec. 709 — the "
+                "Sets how a video file's camera log footage is converted to the project's "
+                    + "colour, Rec. 709 or HLG in an HDR project — the "
                     + "Media tab's Camera Log popup. Every clip of the file, and its reverse, "
                     + "follows it; it is converted before the chroma key and every grade, and "
                     + "Show Ungraded keeps it. color is {log, gamut?}: log apple_log (gamut "

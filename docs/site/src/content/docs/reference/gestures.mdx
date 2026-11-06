@@ -1,0 +1,254 @@
+---
+title: "Gestures with no menu item"
+description: Every mouse and trackpad gesture on the timeline, the preview canvas and the Color tab, with the modifier keys that change what it does.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Much of Frame Job's editing is direct: you drag, click and pinch rather than choose a command. This page lists those gestures by where you make them, with the modifier keys that change them.
+
+<AtAGlance
+  where={['The timeline', 'The preview canvas', 'The Media tab', 'Clip tab ▸ Color']}
+  tools={['set_selection', 'set_playhead', 'move_clip', 'duplicate', 'add_track', 'trim_start', 'trim_end', 'rate_stretch', 'slip', 'roll', 'set_audio', 'add_action', 'set_action', 'set_action_end', 'set_clip', 'set_scope', 'close_gap', 'set_marker', 'move_track', 'set_track', 'add_clip', 'insert_clip', 'overwrite_clip', 'import_media', 'open_project', 'set_video', 'set_shape', 'set_text']}
+/>
+
+On the timeline and the canvas, every drag that changes the project is one undo step, and **Edit ▸ Undo** names it. A click that doesn't move anything adds no step.
+
+## Selecting on the timeline
+
+| Gesture | Where | What it does |
+| --- | --- | --- |
+| Click | A clip | Selects it alone. Clicking a clip that's already in a multi-selection keeps the selection, so you can drag it. |
+| <kbd>⇧</kbd>-click | A clip | Adds it to the selection, or removes it. |
+| Click | An empty lane, or above or below the lanes | Deselects everything. |
+| Drag | An empty lane, or above or below the lanes | Draws a marquee that selects every clip it touches. |
+| <kbd>⇧</kbd>-drag | The same places | Draws a marquee that adds to the selection. |
+| <kbd>⌥</kbd>-click | A track header | Selects every clip on that track. |
+
+A marquee skips clips on locked tracks, but a click can still select one. See [Select clips](/timeline/selecting-clips/).
+
+## Moving clips
+
+| Gesture | Where | What it does |
+| --- | --- | --- |
+| Drag | A clip | Moves the selected clips, in time and to other tracks. A selection across several tracks keeps its spacing. |
+| Drag | Past the top or bottom track | Puts the clips on a new track: a new front track above the top, a new back track below the bottom. Clips on more than one track can only make a new back track. |
+| <kbd>⌥</kbd>-drag | A clip | Duplicates the clips where you drop them. The whole selection is copied when the clip is in it. A drop with [no room there](/editing/duplicate-clips/#drag-a-copy) makes no copy. |
+
+The earliest clip stops at the start of the timeline, and the others keep their offsets. A clip's linked partner, such as its [detached sound](/audio/detach-and-attach/), moves by the same time. Drag that sound to another track and only the sound changes track.
+
+Dragging a clip onto its neighbour on the same track makes a Cross Dissolve across the overlap, within the [overlap rule](/editing/how-edits-work/#the-overlap-rule).
+
+During a drag the clip skips positions the project won't allow and waits at the last allowed place. Only the drop counts. If the drop can't go where you let go, a ghost of the clip animates back to where it belongs. See [Move clips](/editing/move-clips/).
+
+## Trim, stretch, slip and roll
+
+| Gesture | Where | What it does |
+| --- | --- | --- |
+| Drag | A clip's edge | [Trims](/editing/trimming/) that edge. |
+| <kbd>⌥</kbd>-drag | A clip's end edge | [Rate stretch](/speed/rate-stretch/): changes the speed so the clip fills the new length. |
+| <kbd>⌥⇧</kbd>-drag | A clip's body | [Slip](/editing/slip-and-roll/): moves the source under the clip while the clip stays. |
+| <kbd>⌥⇧</kbd>-drag | A clip's edge | [Roll](/editing/slip-and-roll/): moves the cut between this clip and the clip touching it. |
+
+**Trim.** The edge zone is 7 pt wide, and the pointer turns into the resize cursor over it. A clip 21 pt wide or less is all body, so zoom in to trim it. A trim keeps at least one frame and stays within the source file. Dragging the edge of a clip's detached sound moves the sound alone and leaves its picture, which makes a [J-cut or L-cut](/audio/j-and-l-cuts/).
+
+**Rate stretch** works only on a clip that plays a media file. On any other clip, and on a start edge, <kbd>⌥</kbd> trims as usual. Nothing happens past the speed limits of ×0.1 and ×1000, or under one frame, and Frame Job won't stretch a linked clip.
+
+**Slip** never snaps, moves a frame at a time and doesn't change the selection. A linked partner on an unlocked track slips with the clip.
+
+**Roll** does nothing where no clip touches that edge, so not over a gap or a transition. Each clip keeps at least one frame, and a roll snaps as a trim does.
+
+Clips on a locked track can't be dragged, trimmed, slipped or rolled.
+
+## Fades and the volume line
+
+| Gesture | Where | What it does |
+| --- | --- | --- |
+| Drag | A fade handle | Sets that clip's audio [fade](/audio/fades/) in or out. |
+| Drag | The [volume line](/audio/volume-line/) on a clip | Changes the level at that point, in dB, shown beside the pointer. |
+| <kbd>⌥</kbd>-click or <kbd>⌥</kbd>-drag | The volume line | Adds a volume point there as an action, then sets its level. |
+
+A fade handle is the small square at the top corner of a clip's audio area. It lands on whole frames, can't go past the clip's length and doesn't snap to clip edges. It doesn't work on a locked track.
+
+The volume line grabs within 3 pt and drags up and down only. Its scale runs from +30.1 dB at the top to −60 dB, and the very bottom is silence, shown as −∞ dB. Inside or after an action that animates volume, the drag edits that action's end. Anywhere else it edits the clip's volume.
+
+Adding a point beeps inside an action that also changes something else, and less than a frame after the previous action's end.
+
+Pressing on the line with <kbd>⇧</kbd> held, or double-clicking it, acts on the clip instead, so selecting, slipping and renaming still work there.
+
+## Action bands
+
+| Gesture | Where | What it does |
+| --- | --- | --- |
+| Click | An action band | Selects the clip and that action, and moves the playhead to the action's end. The Clip tab then edits the action's end values. |
+| Drag | An action band | Moves the action in time, on whole frames. It stops at the next action and at the clip's own length. |
+| Drag | The edge of a band, its outer 5 pt | Changes the action's start or length, keeping at least one frame. |
+
+<kbd>⎋</kbd> deselects the action. A band 15 pt wide or less has no edge zones and is all body.
+
+While you drag, a dashed ghost marks the old place and a readout shows the new times and offset, or the change in length in frames. An action with no length has no band on the timeline. On a locked track, a click on a band selects only the clip, and the band won't drag.
+
+The action lane in the Clip tab moves and resizes bands the same way, and its **Clip** chip deselects the action. There, an action with no length can be selected but not dragged. See [Action bands and the action lane](/motion/action-lane/).
+
+## Double-clicks
+
+| Gesture | Where | What it does |
+| --- | --- | --- |
+| Double-click | A clip | Renames it in place. |
+| Double-click | A nest clip | Goes inside the nest. To rename a nest clip, use <kbd>⇧⌘R</kbd>. |
+| Double-click | An empty part of a lane | [Closes that gap](/editing/close-gaps/). It beeps when there's no gap. It doesn't work above or below the lanes, where no track is named. |
+| Click | The breadcrumb in the corner, while a nest is open | Comes back out by one level. |
+
+## The ruler and markers
+
+| Gesture | Where | What it does |
+| --- | --- | --- |
+| Click or drag | The ruler | Moves the playhead and pauses, playing the sound under it in short grains. |
+| Drag | A marker | Moves it. |
+| Double-click | A marker | Renames it. <kbd>⎋</kbd> keeps the old name, and an empty name changes nothing. |
+
+The ruler is the only way to [hear a scrub](/audio/scrub-audio/). The transport keys move the playhead in silence.
+
+A marker grabs within 6 pt of its line and snaps. It can't land on another marker's time, so a drop there leaves it at the last time it could take. See [Markers](/timeline/markers/).
+
+## Track headers
+
+| Gesture | What it does |
+| --- | --- |
+| Drag a header | Moves the track up or down the stack. |
+| Double-click a header | Renames the track. |
+| <kbd>⌥</kbd>-click a header | Selects every clip on the track. |
+| Click the eye | Hide Video. |
+| Click the speaker | Mute Audio. |
+| Click the lock | Lock Track. |
+| Click the headphones | Solo. |
+| Click the sliders | Opens the track's [mix panel](/audio/track-volume-and-pan/). The sliders are lit when the track's volume or pan isn't at its default, or the track has a compressor or limiter. |
+
+Right-clicking a header gives you a menu. See [Buttons and context menus](/reference/context-menus/).
+
+## Snapping
+
+While [snapping](/timeline/snapping/) is on (<kbd>N</kbd>), moving, trimming, stretching and rolling clips, dragging a marker and scrubbing the ruler snap to clip edges, markers, the start and end of the timeline, the playhead and the in and out points. They snap within 8 points on screen at every zoom, and a guide line shows the snap, except on the ruler. A slip doesn't snap. Every edit lands on the frame grid either way.
+
+Hold <kbd>⌘</kbd> while you drag to turn snapping off for that drag, even if you press it partway through. **View ▸ Snapping** stays as it was.
+
+## Zoom and scroll
+
+| Gesture | Where | What it does |
+| --- | --- | --- |
+| Pinch, or <kbd>⌥</kbd> or <kbd>⌘</kbd> with the scroll wheel | Anywhere on the timeline | Zooms around the pointer, keeping the time under it in place. |
+| Scroll | Anywhere on the timeline | Scrolls. The track headers stay at the left and the ruler stays at the top. |
+
+The zoom runs from 0.35 to 4,000 points per second, and the default is 42. During playback the timeline scrolls itself to keep the playhead in view.
+
+The timeline's zoom has no menu item or shortcut except <kbd>⇧Z</kbd>, which fits the whole project. The timeline bar has its own zoom controls. See [Zoom and scroll the timeline](/timeline/zoom-and-scroll/).
+
+## Dragging media in
+
+| Drag | Drop on | What it does |
+| --- | --- | --- |
+| A row from the Media tab | A track | Places the clip at the drop point. A drop that breaks the [overlap rule](/editing/how-edits-work/#the-overlap-rule) doesn't go in, and a smaller overlap makes a Cross Dissolve. |
+| <kbd>⌥</kbd> and a Media row | A track | [Insert](/editing/insert-and-overwrite/): makes room by pushing later clips along. |
+| <kbd>⇧⌥</kbd> and a Media row | A track | [Overwrite](/editing/insert-and-overwrite/): replaces what's in the way. |
+| A Media row | The preview canvas | Places the clip on a new top track at the playhead. |
+| Files from the Finder | The Media tab | Adds them to the project. |
+| Files from the Finder | Anywhere else in the window | Opens each one as its own document, the same as dropping it on the Dock icon. |
+| Files from the Finder | The Welcome window | Opens each one as its own document. |
+
+Only the modifier keys you hold at the drop count.
+
+A LUT row in the Media tab doesn't drag. Apply a LUT with **Clip ▸ Look ▸** or the Color tab. A drag between two open projects does nothing.
+
+## Canvas: selecting and moving
+
+| Gesture | What it does |
+| --- | --- |
+| Click a clip | Selects the front-most visible clip there. |
+| <kbd>⇧</kbd>-click a clip | Adds it to the selection, or removes it. |
+| Click empty canvas | Deselects everything and leaves crop mode. With <kbd>⇧</kbd>, it keeps the selection. |
+| Drag a clip | Moves the selected clips by the same amount. |
+
+A press on a selected clip's handle takes the handle, even with another clip under it. Clips on locked tracks don't move and can't be clicked, and neither can clips on hidden tracks.
+
+A drag [snaps](/canvas/canvas-snapping/) to the canvas centre, edges and thirds and to other layers' edges and centres, within 8 points at any zoom, with guide lines. <kbd>N</kbd> turns this off, and holding <kbd>⌘</kbd> suspends it, even partway through a drag.
+
+When an action is selected, a drag sets the value at that action's end, not the clip's own value.
+
+To place a clip by the pixel, type its [position](/canvas/transform/#position), or [nudge it with the arrow keys](/canvas/move-scale-rotate/#nudge-with-the-arrow-keys).
+
+## Canvas: scale, rotate and crop
+
+| Gesture | What it does |
+| --- | --- |
+| Drag a corner or side handle | Scales, with the opposite handle pinned. Video, image, freeze frame and graphic clips always scale uniformly. |
+| <kbd>⌥</kbd> while you drag a handle | Scales around the centre. |
+| Drag the rotation handle | Rotates about the clip's uncropped centre. |
+| <kbd>⇧</kbd> while you rotate | Snaps to 15° steps. |
+| Drag a crop handle, in crop mode | Crops, without shifting what's left. A ghost shows the uncropped picture. |
+| Double-click a video clip, image clip or freeze frame | Turns on [crop mode](/canvas/crop/). A shape, graphic or nest clip beeps, unless it's on a [matte track](/canvas/crop/#good-to-know). |
+
+A drag keeps scale between 0.01 and 10. A crop always leaves at least one source pixel.
+
+Shapes and text have handles of their own:
+
+- **On a shape,** <kbd>⇧</kbd> on a corner handle frees the aspect ratio, and a side handle changes only the width or the height. A drag keeps the box between 4 and 20,000 pixels.
+- **On a text clip,** the left and right handles set the wrap width. The corners and the top and bottom handles scale the text uniformly.
+
+See [Move, scale and rotate](/canvas/move-scale-rotate/).
+
+## Canvas: endpoints, regions and text
+
+| Gesture | What it does |
+| --- | --- |
+| Drag a line or arrow endpoint | Moves that end of the [shape](/text-and-shapes/lines-and-arrows/). The box doesn't change. |
+| Drag an [obscure](/effects/obscure/) region's centre grip | Moves that region. |
+| Drag one of its eight handles | Resizes the region. <kbd>⌥</kbd> resizes it around its centre. |
+| Double-click a text clip | [Edits the text in place](/text-and-shapes/edit-text-on-canvas/), with the text selected and in the clip's own font. |
+
+Each side of a region stays between 1 and 20,000 source pixels. The grips show only with exactly one unlocked clip selected, outside crop mode. A drag inside the region but away from the grips still moves the clip.
+
+The text editor stays upright on a rotated clip.
+
+## Canvas: zoom and pan
+
+| Gesture | What it does |
+| --- | --- |
+| Pinch, or <kbd>⌥</kbd> or <kbd>⌘</kbd> with the scroll wheel | Steps the canvas zoom through **Fit**, **50%**, **100%** and **200%**. |
+| Scroll | Pans a canvas that's larger than the preview. It does nothing while the canvas fits. |
+| Hold <kbd>Space</kbd> and drag | Pans a zoomed canvas that's larger than the preview. A tap of <kbd>Space</kbd> still plays and pauses. |
+
+See [Zoom and pan the preview](/canvas/zoom-and-pan/).
+
+## Color tab controls
+
+Hold <kbd>⌥</kbd> while you drag a wheel, a strip or a curve point to move at a tenth of the speed.
+
+| Control | Gesture | What it does |
+| --- | --- | --- |
+| [Wheel](/color/wheels/) or strip | Double-click | Resets it. |
+| Strip under a wheel | Press the knob | Grabs it. |
+| Strip under a wheel | Press elsewhere | Jumps there. With <kbd>⌥</kbd>, it drags from the current value without jumping. |
+| [Curve](/color/curves/) | Click or double-click an empty part of the plot | Adds a point and drags it. |
+| Curve | <kbd>⇧</kbd> while you drag | Keeps the point on one axis, the one it moved most along after 4 pt of travel. |
+| Curve | Double-click a point | Removes it. |
+| Selected curve point | <kbd>⌫</kbd> or <kbd>⌦</kbd> | Removes it. |
+| Selected curve point | The arrow keys | Nudge it. A tone curve steps by 0.01, or 0.1 with <kbd>⇧</kbd>. A hue curve steps 1° across, or 10° with <kbd>⇧</kbd>. |
+| Selected curve point | <kbd>⎋</kbd> | Deselects it. |
+| [Qualifier](/color/qualifiers/) strip | Drag a knob | Sets that edge of the range. |
+| Qualifier strip | Drag a square | Sets the softness. |
+| Qualifier strip | Drag the body | Moves the whole range. Hue wraps around. |
+| Qualifier strip | Double-click | Resets it. |
+| [Vectorscope](/color/vectorscope/) | Click a zoom cell | Changes its zoom, on the first click even when the window isn't active. |
+
+A curve holds up to 16 points and at least two, and it beeps past either limit. A point stays between its neighbours. Hovering over the plot shows the input and output at the pointer. To reset a whole curve, use the **Reset** item for its channel in the channel strip's menu. See [Buttons and context menus](/reference/context-menus/).
+
+A qualifier range that's switched off doesn't respond to a press.
+
+## Related
+
+- [Keyboard shortcuts](/reference/keyboard-shortcuts/)
+- [Buttons and context menus](/reference/context-menus/)
+- [Select clips](/timeline/selecting-clips/)
+- [Move, scale and rotate](/canvas/move-scale-rotate/)
+- [How edits work](/editing/how-edits-work/)
+- [When an edit is refused](/getting-started/refused-edits/)

@@ -1,0 +1,110 @@
+---
+title: "Audio stems"
+description: Write each track's sound as its own file beside the mix, for mixing or mastering in another editor.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+An audio export can also write each track's sound as its own file beside the mix. These files are stems. Use them to mix or master the project in another editor.
+
+<AtAGlance
+  menu="File ▸ Export…"
+  keys="⌘E"
+  where="Export sheet ▸ Stems"
+  tools={['export', 'export_status']}
+/>
+
+## Export stems
+
+<Steps>
+
+1. Choose **File ▸ Export…**.
+
+2. In **Format:**, choose **Audio only (M4A)**, **Audio only (WAV)** or **Audio only (AIFF)**.
+
+3. In **Stems:**, choose **One per Track** or **One per Track Name**. The footnote on the sheet counts them, for example "3 stems".
+
+4. Choose **Export…** or **Add to Queue**, then name the mix in the save panel.
+
+</Steps>
+
+Frame Job writes the mix, then each stem beside it. The stems are in the same format as the mix and cover the same range.
+
+## The Stems row
+
+| Choice | What it writes |
+| --- | --- |
+| **None** | The mix alone. This is the default. |
+| **One per Track** | The mix, and one stem for each track you can hear. |
+| **One per Track Name** | The mix, and one stem for each track name. |
+
+The row sits under **Bit depth:**. On every format except the three audio-only ones it's greyed out and keeps your last choice.
+
+The sheet remembers your choice with the rest of your last export, and a [preset](/export/presets/) stores it.
+
+## Which tracks get a stem
+
+Only tracks you can hear get a stem:
+
+- A [muted track](/audio/mute-and-solo/) has no stem.
+- While any track is soloed, only the soloed tracks have one.
+- A track with no sound on it, only pictures or nothing, has none.
+
+With **One per Track Name**, tracks whose names match share one file. The match ignores case and any spaces at either end, and the file is named the way the first of those tracks is spelled. A track with no name gets its own file. Name your tracks in [Add, rename and reorder tracks](/timeline/manage-tracks/).
+
+If no track can be heard, the sheet shows "stems: no track is heard, so there is no stem to write", and **Export…** and **Add to Queue** are greyed out.
+
+## Stem file names
+
+A stem is named after the mix and its track, and sits in the same folder. Exporting `Mix.wav` writes `Mix - Dialogue.wav` and `Mix - Music.wav`.
+
+| Case | The stem's name |
+| --- | --- |
+| A track with no name | Its header's label: `Mix - Track 3.wav` |
+| A `/` or `:` in a track name | Written as `-` |
+| A name an earlier stem already has, ignoring case | Its track's label follows: `Mix - vo (Track 2).wav` |
+| That name is taken too | A count follows the label: `Mix - vo (Track 2, 2).wav` |
+
+No two stems share a file.
+
+## Overwriting and clean-up
+
+:::caution
+An existing file at a stem's name is replaced without asking. The save panel asks only about the mix.
+:::
+
+There's one exception. If a stem's file would be one of the project's own media files, the export stops before writing any stem and says so:
+
+> The stem “Mix - Dialogue.wav” would replace media this project uses; export under another name.
+
+The stems are written one after another after the mix, and the progress bar counts them. When it's done, the line reads "Exported “Mix.wav” and 3 stems.", and its loudness figures are the mix's. A row in the [Export Queue](/export/export-queue/) ends its first sentence the same way.
+
+Cancelling, or a failure part-way, removes the mix and every stem already written. A file the job hadn't yet replaced stays.
+
+## Stems are pre-master
+
+The master is the export's last stage, where the loudness target and the master limiter work on the whole mix. Each stem holds its tracks' sound exactly as the mix plays it, but from before that stage:
+
+- It keeps the clips' and tracks' volume, pan, fades, ducking and effects, and a track's own [compressor and limiter](/audio/track-dynamics/).
+- It gets no [loudness target](/export/loudness/), and the [master limiter](/export/loudness/#the-master-limiter) doesn't touch it.
+
+So the stems added together are the mix, to within rounding, wherever the master neither raised the level nor limited a peak.
+
+A stem can peak higher than the mix. It's clipped only at full scale.
+
+## Good to know
+
+A stem has no [chapters](/export/chapters/), even in an M4A file. Only the mix carries them.
+
+## With an agent
+
+`export` takes `stems`: `tracks` for **One per Track**, or `names` for **One per Track Name**. It works on `audio_m4a`, `audio_wav` and `audio_aiff` only. On any other format, or when no track can be heard, `export` returns an error and writes nothing. When the job is done, `export_status` lists each stem's name, tracks and path. See [Export: start, then poll](/mcp/export/#stems).
+
+## Related
+
+- [Audio-only exports](/export/audio-only/)
+- [Export loudness](/export/loudness/)
+- [Export bit depth](/export/bit-depth/)
+- [Mute and solo tracks](/audio/mute-and-solo/)
+- [Export: start, then poll](/mcp/export/)

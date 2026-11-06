@@ -1,0 +1,106 @@
+---
+title: "Split at Shot Changes"
+description: "Cut a finished edit, a download or a stream recording into one clip per shot, with the cuts found on your Mac."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Split at Shot Changes takes a clip that already has cuts in it, such as a finished edit, a downloaded clip or a stream recording, and cuts it at each one, giving you one clip per shot.
+
+<AtAGlance
+  menu="Clip ▸ Split at Shot Changes"
+  tools={['split_at_shots', 'get_media_analysis']}
+  needs="Nothing. The cuts are found on your Mac, with no key and no upload."
+/>
+
+## Split a clip at its shot changes
+
+<Steps>
+
+1. Select one or more clips that show a video file's picture.
+
+2. Choose **Clip ▸ Split at Shot Changes**. It has no shortcut.
+
+3. If Frame Job hasn't looked at this footage yet, wait for the [Analyzing sheet](#while-the-cuts-are-found) to finish.
+
+</Steps>
+
+Each selected clip is cut at every hard cut inside the part of the file it plays. All the cuts are one undo step, named Split at Shot Changes.
+
+The command is greyed out until a selected clip shows a video file's picture. Anything else in the selection is left alone: text, an image, a freeze frame, an audio file, a nest, or a clip with its [picture turned off](/editing/enable-picture-and-sound/).
+
+If the footage holds no shot change inside any selected clip, Frame Job beeps and nothing changes.
+
+## While the cuts are found
+
+When the footage has already been read, the split lands at once. Otherwise the **Analyzing** sheet appears, with one row per file:
+
+| A file's row reads | What it means |
+| --- | --- |
+| Waiting | Its first frame hasn't been read yet. |
+| A percentage, with a bar | How much has been read. |
+| Done | Its cuts have been found. |
+
+The split lands as soon as every file is done. Editing commands are off while the sheet is up.
+
+**Stop** closes the sheet and changes nothing. Frame Job saves what it has found every 30 seconds or so, and that stays in the cache, so a long file doesn't start from nothing next time.
+
+If the project changes anyway while the sheet is up, for example through an agent, nothing is split, and the inspector says to choose the command again.
+
+## What counts as a hard cut
+
+A hard cut is a change from one picture to another between two frames. Frame Job compares each frame's colours with those of the frames before it. It's a plain measurement of the picture, with no machine learning, so the same footage always gives the same cuts.
+
+- A gradual dissolve isn't a cut.
+- A single flash frame isn't a cut, because the picture after it matches the one before.
+- A dissolve between flat-coloured pictures, such as slides or title cards, can be found as one cut.
+- Two shots with very similar colours can be missed, because the comparison looks at colour rather than at what's in the frame.
+- Of two cuts within 12 frames of each other in the file, only the stronger is found.
+
+## Found on this Mac and cached
+
+Shot changes are found on your Mac. Nothing is sent anywhere and you don't need a key.
+
+The results are kept in the project's cache, so a second split of the same footage starts at once. See [On-device media analysis](/projects/media-analysis/).
+
+## Where the cuts land
+
+Each cut lands on the project's frame grid, worked out through the clip's speed, [speed ramp](/speed/speed-ramps/) and [reversal](/speed/reverse/). In a project whose frame rate differs from the file's, that's the nearest project frame.
+
+A cut within one frame of either end of a clip isn't made, so you won't get a piece one frame long at a clip's edge.
+
+Each cut is an ordinary [split](/editing/splitting/), so actions, word timings and graphics divide the same way.
+
+## Locked tracks and linked sound
+
+A selected clip on a locked track is still cut. Its linked sound is cut with it when the sound's track is unlocked, as with [Split](/editing/splitting/#linked-sound).
+
+## The clip ceiling
+
+A project holds up to 4,096 clips, counting the clips inside nests. If the splits would pass that, nothing is split at all, and the inspector says how many clips the command would add and how many more would fit. The count includes each linked clip the splits also cut.
+
+## When it can't run
+
+Frame Job beeps and gives the reason at the foot of the inspector:
+
+| What happened | What to do |
+| --- | --- |
+| A file is missing or can't be read | [Relink it](/projects/relink-media/), then choose the command again. |
+| The analysis of a file failed | The message names the file and the reason. Nothing is split. |
+| The analysis is no longer in the project's cache | Choose the command again, and Frame Job reads the file again. |
+
+## With an agent
+
+`split_at_shots` works on the clips it's given, and lists any it can't cut under `skipped`. Without a list, it takes every clip of a video file on an unlocked track, so a clip on a locked track is cut only when it's named. It shows no sheet. It waits up to 60 seconds for the cuts, and if they aren't ready it stops without splitting and keeps what it has saved so far, so calling it again carries on.
+
+With no cut inside any clip, it reports that no clips were added and leaves no undo step. See [Tools: cutting and deleting](/mcp/tools-cut-and-delete/#split_at_shots).
+
+[`get_media_analysis`](/mcp/tools-analysis/#get_media_analysis), with the kind `shots`, reads a file's cuts without splitting anything. See [Tools: reading analysis](/mcp/tools-analysis/).
+
+## Related
+
+- [Split clips](/editing/splitting/)
+- [On-device media analysis](/projects/media-analysis/)
+- [Select clips](/timeline/selecting-clips/)
+- [Delete, Ripple Delete and Lift](/editing/delete-clips/)

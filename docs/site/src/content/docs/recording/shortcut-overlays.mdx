@@ -1,0 +1,106 @@
+---
+title: "Shortcut overlays"
+description: "Show your keystrokes on screen: each keyboard shortcut you pressed while recording appears as animated keycaps at the moment you pressed it."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Shortcut overlays show a viewer what you pressed. Each keyboard shortcut in a screen recording appears as keycaps on screen at the moment you pressed it, so nobody has to guess how you did that. Only shortcuts appear. Ordinary typing doesn't, because Frame Job never records what you type.
+
+<AtAGlance
+  menu="Clip ▸ Add Shortcut Overlays"
+  where="Show shortcuts, under When it lands: in the recorder panel"
+  tools="add_shortcut_overlays"
+  needs="A recording made with Record shortcuts on, which needs macOS's Input Monitoring permission. No key: it runs on your Mac."
+/>
+
+## Add the overlays
+
+<Steps>
+
+1. Make the recording with [Record shortcuts](/recording/record-shortcuts/) on. It records your shortcuts and when you type, never what you typed.
+
+2. Select one or more clips of the recording. The menu item is available when every selected clip is a movie with a [cursor file](/recording/cursor-files/) and no sheet is up. It works inside an open [nest](/editing/nests/) too.
+
+3. Choose **Clip ▸ Add Shortcut Overlays**.
+
+</Steps>
+
+There's no sheet. Frame Job reads the cursor files, with the item dimmed while it does, and places one **Keyboard keys** graphic clip per shortcut on a [Shortcuts track](#the-shortcuts-track). Each sits at the bottom of the picture in the dark theme and shows for 1.5 s.
+
+The whole change is one undo step, **Add Shortcut Overlays**. If some shortcuts couldn't be shown, or nothing could be added, a [sheet says so](#what-the-sheet-tells-you).
+
+## What an overlay shows
+
+The keycaps pop in one after another, each is pressed in turn, and the group fades out at the end of the clip. ⌘, ⇧, ⌥, ⌃ and the arrow keys are drawn as symbols, a single character as its capital, and a named key such as `return` or `f5` as its word.
+
+## How overlays are timed
+
+**Where it starts.** An overlay starts on the frame where the press plays, following the clip's speed and any speed ramp. Only the part of a clip that plays counts, so a shortcut in a part you've trimmed away gets no overlay.
+
+**How long it lasts.** Each overlay lasts 1.5 s, and never less than the keycaps need to press in turn and fade out. That minimum is (10 × keycaps + 25) frames at the project's frame rate:
+
+| Keycaps | Minimum at 30 fps | Minimum at 60 fps |
+| --- | --- | --- |
+| 2 | 45 frames, 1.5 s | 45 frames, 0.75 s, so the overlay lasts 1.5 s |
+| 3 | 55 frames, about 1.83 s | 55 frames, about 0.92 s, so the overlay lasts 1.5 s |
+| 4 | 65 frames, about 2.17 s | 65 frames, about 1.08 s, so the overlay lasts 1.5 s |
+
+**When you repeat a shortcut.** Pressing the same shortcut again before its overlay ends doesn't make a second overlay. The first stays up until at least 1.5 s after the last press and carries a label under the keycaps: "×2", "×3" and so on.
+
+**When shortcuts come close together.** Overlays never overlap. A different shortcut pressed while one is showing takes over as soon as the first has had its minimum, and the first ends there. If that would show the new shortcut more than half a second late, it's left out, and a sheet says how many were.
+
+## The Shortcuts track
+
+Overlays go on the front-most track named **Shortcuts** when that track is usable, and otherwise on a new **Shortcuts** track at the front. To be usable, the track must:
+
+- be in front of every selected clip's track
+- be [unlocked and shown](/timeline/hide-and-lock-tracks/)
+- not be a [matte](/canvas/matte-tracks/)
+- have nothing on it from the first overlay's start to the last overlay's end
+
+Inside an open nest, the track and the overlays go in the nest.
+
+## Change an overlay
+
+Each overlay is an ordinary graphic clip. Move, trim or delete it on the timeline, and change its keys, label, theme, position or accent colour in its [Graphic sub-tab](/graphics/graphic-tab/). To change them all at once, select them first.
+
+The overlays are drawn by the project's own copy of the bundled [Keyboard keys template](/graphics/templates/). Frame Job writes that copy into the project's graphics the first time something is placed, and reuses it after. If you've [edited that copy](/graphics/edit-a-module/), it leaves your version alone and writes a fresh one beside it for new overlays.
+
+Undo takes the clips away but not the copy, which stays in the project's graphics for next time.
+
+## What the sheet tells you
+
+An informational sheet comes up when something didn't go as asked. Only the "too close" sheet comes with a change to the project.
+
+| The sheet says | What it means |
+| --- | --- |
+| "No shortcut was recorded in the selected clips' played windows, so nothing was added." | The part of the recording that plays holds no shortcut. Check that the recording was made with **Record shortcuts** on. |
+| "1 shortcut came too close to show." | The overlays were added, without that many. With more it reads "3 shortcuts came too close to show." |
+| "Clip 12 plays reversed; Add Shortcut Overlays places only clips that play forward." | Overlays only work on clips that play forward. Take the clip out of the selection, or untick [Reverse](/speed/reverse/). |
+| "Media 3's cursor file … is missing…" | The file has moved or gone. Use **Locate…** in the Media tab's **Cursor** section to point at it. See [Cursor files](/recording/cursor-files/). |
+| "The cursor file … could not be read…" | Frame Job couldn't read the file, and the sentence gives the reason. |
+| "The project changed while the cursor files were read, so no overlay was added. Choose Clip ▸ Add Shortcut Overlays again." | You edited the project, or opened or left a nest, while the files were being read. Nothing was added. |
+
+## Show shortcuts when a recording lands
+
+**Show shortcuts**, under **When it lands:** in the [recorder panel](/recording/recorder-panel/), adds the overlays by itself on a finished screen recording, at the bottom in the dark theme. See [Polish when a recording lands](/recording/when-it-lands/).
+
+## Good to know
+
+- Add the overlays before you run [Speed Up Typing](/recording/speed-up-typing/). It keeps each overlay on a Shortcuts track at normal speed.
+- Running the command again on the same clips doesn't replace the overlays. The Shortcuts track isn't free any more, so you get a second Shortcuts track with the same overlays on it. Undo first if you want to start over.
+
+## With an agent
+
+`add_shortcut_overlays` places the same overlays. An agent can also choose how long each one shows, from 0.5 to 10 s, put them at the centre or top of the picture, use the light theme, and limit them to a stretch of the timeline. See [`add_shortcut_overlays`](/mcp/tools-recording/#add_shortcut_overlays).
+
+## Related
+
+- [Record shortcuts](/recording/record-shortcuts/)
+- [Polish when a recording lands](/recording/when-it-lands/)
+- [Auto Zoom](/recording/auto-zoom/)
+- [Speed Up Typing](/recording/speed-up-typing/)
+- [Bundled templates](/graphics/templates/)
+- [The Graphic sub-tab](/graphics/graphic-tab/)

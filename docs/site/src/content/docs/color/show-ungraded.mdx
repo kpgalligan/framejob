@@ -1,0 +1,52 @@
+---
+title: "Show Ungraded"
+description: "Switch the preview to the picture with no grade on it, for a quick before and after, without changing the project."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Show Ungraded is a before and after switch. It bypasses every grade at once and shows the preview as if no clip were graded, so you can check what your grade is doing against the picture you started from.
+
+<AtAGlance menu="View ▸ Show Ungraded" keys="⌃⌘U" tools="render_frame" />
+
+## Compare with the ungraded picture
+
+Press <kbd>⌃⌘U</kbd>, or choose **View ▸ Show Ungraded**. Press it again to go back to the graded picture. The menu item has a checkmark while it's on, and it's always available.
+
+While it's on, every clip's **Light**, **Color**, **Wheels**, **Curves** and **Look** are set to neutral in this window's preview and the [Preview Window](/timeline/preview-window/). That includes nested clips, clips in a [matte](/canvas/matte-tracks/) and [adjustment clips](/color/adjustment-clips/), so the grade an adjustment clip puts on everything behind it goes too.
+
+The project doesn't change. It isn't an edit, and it makes no undo step.
+
+It's all or nothing. There's no split-screen or wipe comparison, and no switch that bypasses one clip's grade.
+
+[Scopes](/color/scopes/) read the preview's frame, so they follow the switch and measure the ungraded picture.
+
+## The Ungraded tag
+
+An **Ungraded** tag shows in the preview's top-left corner while the switch is on, so you can't mistake the plain picture for your grade. See [Preview tags](/timeline/preview/#preview-tags).
+
+## What it leaves on
+
+Show Ungraded only takes away the grade. These aren't part of the grade, so they stay on:
+
+- A [camera-log conversion](/hdr/camera-log/) on the media. It's how the file is read, so turning it off wouldn't give you the true source.
+- [Filters](/effects/filters/).
+- The [chroma key](/effects/chroma-key/).
+- Placement, and everything else about a clip, such as its opacity and blend mode.
+
+## Grade view tools are never saved
+
+Show Ungraded, [Show Selection](/color/show-selection/) and the [scopes](/color/scopes/) only change how this window shows the picture. Each belongs to the window, each is off in a new window, and nothing about them is saved.
+
+None of them reaches an export or **Save Frame…**, which always use the graded picture. The thumbnails in the [Look](/color/looks/) gallery ignore Show Ungraded too.
+
+## With an agent
+
+Pass `ungraded: true` to `render_frame` to draw a frame as if no clip were graded. It's false by default, and the tool's reply says the frame has every grade removed. The tool works the same whether the View menu switch is on or off, and it leaves the switch alone. See [Check the picture: render_frame](/mcp/render-frame/#ungraded).
+
+## Related
+
+- [Scopes](/color/scopes/)
+- [Show Selection](/color/show-selection/)
+- [The Color tab](/color/color-tab/)
+- [Show SDR Version](/hdr/show-sdr-version/)

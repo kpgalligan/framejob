@@ -61,21 +61,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// its moov atom into it yet. Quit without asking and they are left with a
     /// truncated movie that Finder cannot tell from a finished one.
     ///
-    /// **Scoped to the QUEUE, deliberately, and the scope is the fix's whole
-    /// argument.** Quitting during a sheet export truncates its file exactly
-    /// the same way — the progress sheets go up through `presentAsSheet`,
-    /// which is window-modal, so Quit stays live behind them — and that has
-    /// been true since M1. What phase 7's queue changed is not the outcome but
-    /// the ODDS: it is the first long write in this app with nothing on
-    /// screen, its window is documented as stopping nothing when it closes,
-    /// and `enqueueExport` deliberately does not pause playback, so the person
-    /// goes back to editing and forgets. A sheet is a person watching a bar
-    /// move; ⌘Q there is a deliberate act with the evidence in front of them.
-    /// Covering the sheets too would mean a registry of running `Exporter`s
-    /// that nothing else wants, and asking `attachedSheet` instead would
-    /// prompt about "an export being written" over the export SETTINGS card,
-    /// which is a lie. Left undone on purpose; if a registry ever arrives for
-    /// another reason, this is the second caller.
+    /// **An Export… progress sheet is refused outright, before the queue is
+    /// asked** (spec §11 #477). A sheet's write truncates its file at quit
+    /// exactly as a queued one does, and a sheet can be out of sight — its
+    /// window minimised, or Frame Job hidden — with the person no longer
+    /// watching the bar. So while any sheet writes this answers
+    /// `.terminateCancel` with no alert, whether the sheet is on screen or not,
+    /// as the recording branch does, and
+    /// `ExportProgressSheetController.revealWriting()` first brings the sheet
+    /// back: a hidden app is unhidden and a minimised window comes out of the
+    /// Dock. Cancel the export or let
+    /// it finish, then quit. The sheets keep their own registry of the ones
+    /// writing; asking `attachedSheet` instead would prompt over the export
+    /// SETTINGS card, which writes nothing. The queue's alert below is
+    /// unchanged and is asked after.
     ///
     /// Answering `.terminateLater` rather than cancelling and quitting at once
     /// is what makes "Quit Anyway" mean what it says: `cancelAll()` only ASKS
@@ -106,6 +105,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             RecorderPanelController.shared.revealControls()
             return .terminateCancel
         }
+        // An Export… progress sheet writing (spec §11 #477): cancel, stop nothing, bring it back.
+        if ExportProgressSheetController.revealWriting() { return .terminateCancel }
         let queue = ExportQueueController.shared
         guard !queue.isIdle else { return .terminateNow }
 
@@ -188,12 +189,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         if item.action == #selector(newRecording(_:)) {
-            // File ▸ New Recording… reads Stop Recording while one runs — the
-            // same item, retitled from live state (road map 3, R1c). The state read is the
-            // RECORDER's, so the title also covers a recording the
-            // `record_screen` tool started; `AppDelegate+Recording.swift`
+            // File ▸ New Recording… reads Stop Recording while one starts or
+            // runs — the same item, retitled from live state (road map 3,
+            // R1c), by the rule `newRecording` acts on (#478): the panel's
+            // phase, then the RECORDER, so the title also covers a recording
+            // the `record_screen` tool started; `AppDelegate+Recording.swift`
             // routes the stop to whichever door owns it.
-            item.title = ScreenRecorder.shared.isRecording ? "Stop Recording" : "New Recording…"
+            item.title = Self.newRecordingStops ? "Stop Recording" : "New Recording…"
         }
         if item.action == #selector(pauseOrResumeRecording(_:)) {
             // File ▸ Pause Recording (#98) reads the RECORDER, as the retitle

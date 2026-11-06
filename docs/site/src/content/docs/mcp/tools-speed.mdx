@@ -1,0 +1,246 @@
+---
+title: "Tools: speed and time"
+description: "The agent tools that change a clip's speed, ramp it, retime a stretch of the timeline, play a clip backwards and hold a frame, with their arguments, answers and limits."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These tools change how time passes in a clip: its rate, a ramp between rates, a whole stretch of the timeline played faster or slower, the direction it plays, and a held frame.
+
+<AtAGlance tools={['set_speed', 'rate_stretch', 'add_speed_ramp', 'retime_range', 'set_reversed', 'freeze_frame']} />
+
+## Pick a tool
+
+| You want to | Use |
+| --- | --- |
+| Play one clip at a rate, or fit it to a length | [`set_speed`](#set_speed) |
+| Make a clip end at a time by changing its speed | [`rate_stretch`](#rate_stretch) |
+| Ease a clip from one rate to another | [`add_speed_ramp`](#add_speed_ramp) |
+| Play a stretch of the whole timeline faster or slower | [`retime_range`](#retime_range) |
+| Play a clip backwards | [`set_reversed`](#set_reversed) |
+| Hold one frame | [`freeze_frame`](#freeze_frame) |
+
+## What these tools share
+
+- **Times** are in ticks, 600,000 to the second, and are rounded to the project's frame grid. See [Units and ids](/mcp/units-and-ids/).
+- **One call is one undo step.**
+- **The answer** is `ok: true`, the ids of anything created, and a `project` summary. A call that changes nothing says so and leaves no undo step. See [What a call answers](/mcp/what-a-call-answers/).
+- **Rates** run from ×0.1 to ×1000, where 1 is normal speed. See each tool for what it does with a rate outside that.
+
+### Above ×12 the sound is left out
+
+A clip playing above ×12 is silent in the preview and the export, with or without keep pitch. A person is asked first. A tool call never asks: the edit lands, and the answer gains two keys. See [Sound at high speed](/speed/sound-at-high-speed/).
+
+| Key | What it holds |
+| --- | --- |
+| `audio_left_out` | The ids of the clips this edit took past ×12. |
+| `audio_note` | A sentence saying those clips are now silent. |
+
+Only a clip with its sound on, using a file that has sound, counts, and only when this edit took it over the line. A clip already above ×12 isn't reported again. On a ramped clip, the fastest rate in the ramp is the one that counts.
+
+### Captions move with the speech
+
+`set_speed`, `rate_stretch` and `add_speed_ramp` re-time captions on a Captions track that lie wholly inside a clip with sound, in the same undo step, whose name gains "and Re-time Captions". See [Captions follow a speed change](/speed/captions-and-speed/).
+
+| Key | What it holds |
+| --- | --- |
+| `captions_retimed` | The caption clips that moved. |
+| `captions_removed` | The caption clips whose speech the clip no longer plays. |
+
+### Linked clips
+
+A clip linked to its [detached sound](/audio/detach-and-attach/) can't change speed or direction, because the other half would have to change with it. `set_speed`, `rate_stretch`, `add_speed_ramp`, `set_reversed` and `retime_range` all stop with "clip 12 is linked to clip 13: Attach Audio before changing its speed or direction". Call [`attach_audio`](/mcp/tools-audio/#attach_audio) first.
+
+## `set_speed`
+
+Changes a clip's playback rate, or fits it to a length. The clip keeps its start and its length follows the rate, so a faster clip can leave a gap after it. Later clips don't move.
+
+It mirrors **Clip ▸ Speed…**. See [Change a clip's speed](/speed/change-speed/). With `duration` it mirrors **Fit to** in the Speed section. See [Fit a clip to a length](/speed/fit-to-duration/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip to change. |
+| `rate` | number | One of `rate` or `duration` | 1 is normal, 2 twice as fast and half as long, 0.5 slow motion. From 0.1 to 1000. |
+| `duration` | integer, ticks | One of `rate` or `duration` | The length to fit the clip to, instead of a rate. |
+| `keep_pitch` | boolean | No | Keep the sound's pitch at the new speed. Left out, the clip's setting stays. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+A rate outside ×0.1 to ×1000 is brought inside that range, not turned down. That goes for the rate a `duration` needs too, so a clip can end up a different length from the one you asked for. The new length lands on the frame grid and never runs past what the file holds at that rate. Actions keep their place, as fractions of the clip's length.
+
+On a clip with a speed ramp, every rate in the ramp scales together, so it keeps its shape. The scale stops where any of its rates would pass the limits, so the clip's rate can stop short of the one you asked for. See [Edit a ramped clip](/speed/edit-a-ramped-clip/).
+
+**Answers** the usual keys, with `audio_left_out` and `audio_note`, and `captions_retimed` and `captions_removed`, when they apply. The undo step is named Speed.
+
+**Won't run** when:
+
+- Both or neither of `rate` and `duration` are given, which is an error. So `keep_pitch` can't be sent alone.
+- The clip isn't a video or audio file clip. Text, shapes, images, stills, graphics and nests are errors.
+- `rate` or `duration` is zero or negative, which is an error. A `duration` that rounds to zero on the frame grid counts as zero.
+- The clip is [linked](#linked-clips).
+- A slowed clip would run into the next clip by more than the [overlap rule](/speed/change-speed/#a-slowed-clip-overlapping-the-next) allows. An overlap the rule allows gets a transition.
+
+## `rate_stretch`
+
+Makes a clip end at a new time by changing its speed instead of trimming it. Everything the clip shows still plays, faster or slower.
+
+It mirrors <kbd>⌥</kbd>-dragging a clip's end edge. See [Rate stretch](/speed/rate-stretch/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip to stretch. |
+| `to_end` | integer, ticks | Yes | The clip's new end on the timeline. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+Actions keep their place, as fractions of the clip's length. A speed ramp on the clip scales with it and keeps its shape.
+
+**Answers** the usual keys, with `audio_left_out` and `audio_note`, and `captions_retimed` and `captions_removed`, when they apply. The undo step is named Rate Stretch.
+
+**Changes nothing** when the new length would be under one frame, or the stretch would take any rate past ×0.1 or ×1000. Unlike a drag, it doesn't stop at the last length that worked.
+
+**Won't run** when:
+
+- The clip isn't a video or audio file clip. A text, shape, image or freeze clip has no source to stretch, which is an error.
+- The clip is [linked](#linked-clips).
+- The stretch would run into the next clip by more than the overlap rule allows.
+
+## `add_speed_ramp`
+
+Makes a speed ramp preset on a clip in one step, out of ordinary Speed actions. The clip keeps its start and length, and plays more or less of its source.
+
+It mirrors **Clip ▸ Speed Ramp…**, but it isn't tied to the in/out range. See [Make a speed ramp](/speed/make-a-ramp/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip to ramp. |
+| `shape` | string | Yes | `ramp_up`, `ramp_down`, `speed_dip` or `speed_burst`. |
+| `rate` | number | Yes | The rate to ramp to, from 0.1 to 1000. Outside that it's brought inside. Zero or less is an error. |
+| `from` | integer, ticks | No | Where the span starts, measured from the clip's own start. Give it with `to`. |
+| `to` | integer, ticks | No | Where the span ends, in clip time. Give it with `from`. With neither, the span is the whole clip. |
+| `curve` | string | No | How each new action eases: `linear`, `ease_in`, `ease_out` or `ease_in_out`. Default `ease_in_out`. |
+| `hold` | number | No | `speed_dip` and `speed_burst` only: how much of the span the hold at `rate` takes, from 0 to 0.9. Outside that it's brought inside. Default 0.5. 0 makes the two ramps meet. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+The base rate is the rate the clip plays at `from` before the edit. After an earlier Speed action, that's the action's end rate.
+
+| `shape` | What it makes | `rate` must be |
+| --- | --- | --- |
+| `ramp_up` | One action over the span, from the base rate to `rate`, which then holds. | Above the base rate |
+| `ramp_down` | The same, slowing down. | Below the base rate |
+| `speed_burst` | Two actions: up to `rate` at the start of the span and back to the base rate at its end, holding `rate` between them. | Above the base rate |
+| `speed_dip` | The same two, slowing down and coming back. | Below the base rate |
+
+**Answers** `clip`, `new_actions` with the new actions' ids, and `audio_left_out`, `audio_note`, `captions_retimed` and `captions_removed` when they apply. The undo step is named for the shape, such as Speed Dip.
+
+**Errors** come first, and name the argument:
+
+- The clip isn't a video or audio file clip.
+- Only one of `from` and `to` is given, `to` isn't after `from`, or `from` is negative.
+- `hold` is given with `ramp_up` or `ramp_down`.
+
+**Won't run** in these cases, checked in this order. Each message says why:
+
+| What stops it | What to do |
+| --- | --- |
+| The span runs past the clip's end. | Shorten the span. |
+| The span overlaps an action on the clip, including one that would sit inside a dip's or burst's hold. The message names it, and it's never replaced. | Pick a clear span, or move or remove the action. |
+| A dip or burst span is under two frames. | Widen the span. |
+| `rate` is on the wrong side of the base rate. The message gives the base rate. | Change `rate` or `shape`. |
+| The clip is [linked](#linked-clips). | Call `attach_audio` first. |
+| The clip would read past the end of its media. The message names the largest rate that fits, or says none does. | Use that rate, or shorten the span. |
+
+## `retime_range`
+
+Plays a stretch of the timeline faster or slower on every unlocked track, and moves everything after it up or back to stay in step.
+
+It mirrors **Clip ▸ Retime Range…**, but it takes its own times and doesn't read the in/out range. See [Retime Range](/speed/retime-range/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `from` | integer, ticks | Yes | Where the range starts. |
+| `to` | integer, ticks | Yes | Where the range ends. It must be after `from` once both are on the frame grid. |
+| `rate` | number | Yes | 2 is twice as fast and the range half as long, 0.5 half speed. From 0.1 to 1000. |
+| `keep_pitch` | boolean | No | Keep the sound's pitch at the new speed for every video and audio file clip in the range. Left out, each stays as it is. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+Each clip across `from` or `to` is cut there, as [`split`](/mcp/tools-cut-and-delete/#split) cuts it. Each video or audio file clip inside plays at its own rate times `rate`, and a speed ramp scales whole. Text, shapes, stills, images, graphics and adjustment clips inside are stretched or squeezed the same way. Actions keep their place. Markers inside move with the picture, markers after it move with the rest, and a linked partner of a moved clip moves with it.
+
+Inside a nest, the nest's own tracks are retimed and no marker moves. Unlike `set_speed`, `rate_stretch` and `add_speed_ramp`, it doesn't re-time captions on a Captions track, and it stops at a caption page with timed words. A `rate` of 1 changes nothing.
+
+**Answers** `new_clips`, the pieces the cuts made, and `audio_left_out` and `audio_note` when a clip crosses ×12. The undo step is named Retime Range.
+
+**Errors:** `to` isn't after `from`, or `rate` is missing, zero or negative.
+
+**Won't run** in these cases, and nothing changes. A clip only has to overlap the range to count.
+
+| What stops it | What to do |
+| --- | --- |
+| `rate` is outside ×0.1 to ×1000. This one isn't brought inside the range. | Pick a rate inside it. |
+| The range is under two frames. | Widen the range. |
+| A locked track has a clip that ends after `from`. | Unlock the track, or move `from` past that clip. |
+| The range touches a nest clip. | Move the range off it, or retime inside the nest. |
+| The range touches a caption page with timed words. | Move the range off it. |
+| The range touches a [linked](#linked-clips) clip. | Call `attach_audio` first. |
+| A transition touches the range. | Move the range off it, or remove the transition. |
+| Two markers would land on one time. | Move one of them first. |
+| A clip would play past ×0.1 or ×1000. The message names the clip and the rate. | Pick a gentler rate, or set the clip's own speed first. |
+| A clip would last under one frame. The message names it. | Pick a gentler rate. |
+
+## `set_reversed`
+
+Plays a clip back to front, or forward again. It isn't a toggle: you say which way it plays.
+
+It mirrors the **Reverse** checkbox in the Clip tab's Timing section. See [Reverse a clip](/speed/reverse/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip to change. |
+| `reversed` | boolean | Yes | True plays it backwards, false forwards again. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+Nothing on the timeline moves. The clip keeps its start, its length and its in point, and the in point is measured in the direction the clip plays, so reversing a trimmed clip shows the other end of the file.
+
+:::caution
+A clip plays backwards from a rendered copy of its file. In a project with a window, the Reversing sheet appears to make the copy the first time. Until the copy exists the clip shows a [slate](/speed/reverse/#the-slate), and an export writes the slate. A project open with no window shows no sheet and starts no render, so its reversed clips stay on the slate until the project is opened in a window.
+:::
+
+**Answers** the usual `ok` and `project`. The undo step is named Reverse. A clip already playing that way changes nothing.
+
+**Won't run** when the clip isn't a video or audio file clip, which is an error, or when it's [linked](#linked-clips).
+
+## `freeze_frame`
+
+Holds one frame. The clip is split at the moment, a gap opens across every unlocked track, and a still of that exact frame fills it, so the rest of the cut stays in step.
+
+It mirrors **Clip ▸ Freeze Frame** (<kbd>⇧⌘F</kbd>), but it can hold any moment of a clip without moving the playhead, for any length. See [Freeze frame](/speed/freeze-frame/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip to freeze. |
+| `at` | integer, ticks | No | The moment to hold, on the timeline. Left out, the playhead. |
+| `duration` | integer, ticks | No | How long to hold, at least one frame. Default 2 s, which is 1200000. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+The still takes the clip's picture settings as they stand at that moment. It has no sound, no actions and no entrance or exit motion. Markers at or after `at` move with the gap. At a clip's very start or end there's nothing to split, and the still goes in without a cut. To change the frame a freeze holds afterwards, use [`slip`](/mcp/tools-move-and-trim/#slip) on it.
+
+**Answers** `new_clips`, which holds the still, and the clip's second piece when there was a split. The undo step is named Freeze Frame.
+
+**Won't run** when:
+
+- The clip isn't a clip of a video file, which is an error. A clip of an audio-only file, text, a shape, an image, a graphic, a nest or another still can't be frozen. A clip of a video file with its picture switched off can, and the still shows the picture.
+- The clip doesn't cover `at`, which is an error.
+- `duration` comes to under one frame on the frame grid, which is an error.
+- The still would break the overlap rule. This happens inside a [transition](/motion/transitions/) and on a [locked track](/timeline/hide-and-lock-tracks/), whose clips can't move out of the still's way.
+
+## Related
+
+- [Speed at a glance](/speed/overview/)
+- [Tools: animation](/mcp/tools-animation/)
+- [Tools: cutting and deleting](/mcp/tools-cut-and-delete/)
+- [Tools: captions and transcripts](/mcp/tools-captions/)
+- [Units and ids](/mcp/units-and-ids/)

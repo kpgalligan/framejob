@@ -1,0 +1,83 @@
+---
+title: Reflection
+description: Hang a mirrored copy of a clip below itself, and set how strong, how tall and how far away it is and how it fades.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A reflection hangs a mirrored copy of a clip under its bottom edge, fading out as it goes, like an object standing on a glossy shelf. Any clip that draws can have one, text and shapes included.
+
+<AtAGlance where="Clip tab ▸ Picture ▸ Reflection" tools="set_video" />
+
+## Add a reflection
+
+<Steps>
+
+1. Select the clip and open the **Clip** tab's [**Picture**](/canvas/picture-tab/) sub-tab.
+
+2. Open the **Reflection** section and tick **Mirror the layer below itself**.
+
+3. Adjust the [rows](#shape-the-reflection) until it looks right.
+
+</Steps>
+
+Untick the box, or choose **Reset** in the section's header, to take the reflection off. Doing that forgets its settings, so ticking the box again starts from the defaults.
+
+While the section is closed, its header shows `off` or the reflection's **Opacity**.
+
+:::note
+The reflection hangs below the clip, so a clip that fills the frame has its reflection off the bottom of the canvas. Scale the clip down or move it up to make room.
+:::
+
+## Shape the reflection
+
+The rows are greyed out until the box is ticked.
+
+| Row | What it does | Default | Range | Quick picks |
+| --- | --- | --- | --- | --- |
+| **Opacity** | How strong the reflection is where it touches the clip. | 35 % | 0–100 % | 0, 20, 35, 50, 75 |
+| **Height** | How much of the clip is mirrored, as a share of its cropped height. | 50 % | 0–100 % | 25, 50, 75, 100 |
+| **Gap** | The space between the clip and its reflection, in the clip's own pixels. | 0 px | 0–200 px | 0, 4, 8, 16, 32 |
+| **Falloff** | How far the reflection fades on its way down. | 100 % | 0–100 % | 0, 25, 50, 75, 100 |
+
+**Height** is a share rather than a size in pixels, so the reflection keeps its proportions when you scale the clip. **Gap** scales with the clip too.
+
+**Falloff** fades the reflection in a straight line from its top to the bottom of its **Height**. At 0 % it doesn't fade at all, at 50 % it ends at half its **Opacity**, and at 100 % it reaches transparent exactly at the bottom.
+
+At 0 % **Opacity** or 0 % **Height**, nothing is drawn.
+
+## What the reflection shows
+
+The reflection is a mirror of the clip, not of the frame around it.
+
+- It carries what the clip draws, including its crop, rounded corners, grade, filters and spotlight.
+- It meets what's behind it with the clip's own [blend mode](/canvas/blend-modes/), and the clip's opacity fades it too.
+- It rotates with the clip.
+- The clip always draws over its own reflection.
+- It never shows clips on tracks in front, even ones sitting over the clip.
+- It casts no shadow of its own.
+
+## Animate a reflection
+
+All four numbers ramp in an [action](/motion/actions/). The tick box doesn't: ticking or unticking it with an action selected makes the reflection appear or disappear at the action's end.
+
+To fade a reflection in, tick it on the clip with **Opacity** at 0 %, add an action, and raise **Opacity** in the action.
+
+## Good to know
+
+- With several clips selected, the rows show the first clip's reflection, and any edit gives every selected clip all four of those values.
+- On a [matte track](/canvas/matte-tracks/), a clip's reflection has no effect. It's kept, and applies again when the track stops being a matte.
+- A [nest](/editing/nests/) clip shows the Reflection section, but a reflection on it has no effect. Put it on the clips inside.
+- An [adjustment clip](/color/adjustment-clips/) has no **Picture** sub-tab, and a reflection pasted onto one does nothing.
+
+## With an agent
+
+An agent sets `reflection` with `set_video`, as an object of `opacity`, `height`, `gap` and `falloff`, and `null` takes the reflection off. `opacity`, `height` and `falloff` run from 0 to 1 rather than as percentages. `gap` isn't held to the field's 200 px limit, so it can be any number of 0 or more. See [Tools: picture and grade](/mcp/tools-set-video/#reflection).
+
+## Related
+
+- [Shadow](/effects/shadow/)
+- [Spotlight](/effects/spotlight/)
+- [The Picture tab](/canvas/picture-tab/)
+- [What an action can animate](/motion/what-can-animate/)

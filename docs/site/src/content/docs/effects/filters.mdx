@@ -1,0 +1,154 @@
+---
+title: Filters
+description: Stack up to four filters on a clip, from Blur and Pixelate to Sepia and Vignette, set how strong each one is, and animate them.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Filters change how a clip looks: soften it, break it into blocks, turn it black and white, darken its corners. A clip can carry up to four at once, and any clip that draws can have them, text, shapes and graphics included.
+
+<AtAGlance
+  where="Clip tab ▸ Picture ▸ Filters"
+  tools={['set_video', 'set_action_end', 'paste_attributes']}
+/>
+
+## Add a filter
+
+<Steps>
+
+1. Select the clip and open the **Clip** tab's [**Picture**](/canvas/picture-tab/) sub-tab.
+
+2. Open the **Filters** section. On a clip with none it reads "No filters on this clip."
+
+3. Choose **Add Filter**. A Blur at 50 % joins the end of the stack.
+
+4. Pick the filter you want in the row's popup that reads **Blur**, and set its **Amount**.
+
+</Steps>
+
+Changing a filter's kind keeps its **Amount**. A clip can hold four, as the "4 at most" beside **Add Filter** says, and the button greys out at that point.
+
+Each change is one undo step. While the section is closed, its header shows `none`, the filter's name, or a count such as `3 filters`.
+
+## The seven filters
+
+| Filter | What it does | At 100 % |
+| --- | --- | --- |
+| **Blur** | Softens the picture. | A radius of 24 pixels |
+| **Sharpen** | Crisps up edges and fine detail with an unsharp mask. | A gain of 2 |
+| **Pixelate** | Breaks the picture into square blocks. The clip's edge and rounded corners stay clean. | Blocks 64 pixels across |
+| **Sepia** | Gives the picture a warm old-photo tone. | The full tone |
+| **Noir** | Turns the picture black and white and adds contrast. Taking **Saturation** to its lowest only removes the colour. | Fully black and white |
+| **Vignette** | Darkens towards the edges in an ellipse fitted to the clip's cropped shape. The darkening starts a little under halfway from the centre to the corners. | Black corners |
+| **Invert** | Turns the picture into its negative. | The full negative |
+
+Blur and Pixelate are measured in the clip's own pixels. Scale a clip up and the effect grows with it, and the same **Amount** looks finer on a 4K clip than on a 1080p one.
+
+## Set how strong a filter is
+
+**Amount** runs from 0 to 100 %, with quick picks at 0, 25, 50, 75 and 100. At 0 the filter stays on the clip and does nothing. Sepia, Noir and Invert mix from the original picture towards their full effect as the number rises.
+
+## Stack and reorder filters
+
+Each filter's row starts with a number popup, which is its place in the stack. Pick a different number to move the filter. You can't drag rows. A move is one undo step.
+
+The place doesn't decide everything, because Frame Job always works through a stack in this order:
+
+1. Pixelate, whatever its place.
+2. The **Color** section of the [Color tab](/color/color-tab/): **Brightness**, **Contrast**, **Saturation** and **Hue**.
+3. Blur and Sharpen, whatever their places.
+4. The rest of the Color tab: **Light**, **Wheels**, **Curves** and **Look**.
+5. Sepia, Noir, Vignette and Invert, in the order of their places.
+
+So the order only changes the picture among Sepia, Noir, Vignette and Invert. Noir then Sepia gives a warm black and white, while Sepia then Noir gives a plain one. Moving a Blur above or below a Sepia changes nothing.
+
+Filters of the same kind combine:
+
+| In one stack | You get |
+| --- | --- |
+| Two Blurs | One wider blur. Two at 100 % reach a radius of about 34 pixels, and four reach 48. |
+| Two Sharpens | The sum of the two. |
+| Two Pixelates | The coarser of the two. |
+
+## Remove a filter
+
+Choose **Remove** in the filter's row. **Reset** in the section's header takes off the whole stack, and it's there only while no action is selected.
+
+## Animate a filter
+
+An [action](/motion/actions/) can ramp a filter's **Amount**, for example a blur that builds across a clip.
+
+<Steps>
+
+1. Add the filter and set **Amount** to where the ramp should start.
+
+2. Add an action on the clip and keep it selected.
+
+3. Set **Amount** to where the ramp should end.
+
+</Steps>
+
+With an action selected, each control does something different:
+
+| You change | What happens |
+| --- | --- |
+| **Amount** | It ramps across the action. |
+| The filter's kind | It switches at the action's end, and the row shows "at end". The other filters keep ramping. |
+| The filter's place | It moves at the action's end. |
+| **Add Filter** or **Remove** | It changes the clip itself rather than the action, so it isn't animated. |
+
+:::caution
+Adding or removing a filter while an action already animates the stack leaves the two stacks different lengths. The action stops ramping them and the filters switch at its end instead. To get the ramp back, select the action, choose **Clear** in the section's header, then set the clip's amounts and the action's again.
+:::
+
+See [Set what an action animates to](/motion/edit-an-action/) for how the rows behave in an action.
+
+## Filters on an adjustment clip
+
+An [adjustment clip](/color/adjustment-clips/) has no **Picture** sub-tab, so it can't take a filter from the inspector. It gets one through [Paste Attributes](/editing/paste-attributes/) instead.
+
+<Steps>
+
+1. Put Sepia, Noir, Vignette or Invert on an ordinary clip and press <kbd>⌘C</kbd>.
+
+2. Select the adjustment clip.
+
+3. Press <kbd>⌥⌘V</kbd>, or choose **Edit ▸ Paste Attributes**.
+
+</Steps>
+
+The filter then applies to everything behind the adjustment clip for as long as it lasts, and to nothing on a track in front.
+
+Blur, Sharpen and Pixelate can't go on an adjustment clip, because it has no picture of its own to sample. Pasting from a clip that has one stops with an error naming the clip and the filter, and changes nothing.
+
+:::caution
+Paste Attributes replaces the target's picture settings, not only its filters. Pasting onto an adjustment clip overwrites its grade and its Strength with the copied clip's, so paste first and grade afterwards.
+:::
+
+## Good to know
+
+- There's no video noise reduction or film grain, and Frame Job doesn't load third-party effects such as OFX plugins. [Noise reduction](/audio/noise-reduction/) is for sound.
+- A filter covers the whole picture for the whole clip. To blur or pixelate one region, such as a face, use [Obscure](/effects/obscure/).
+- For a colour treatment, such as a warm or a film look, use [Looks](/color/looks/).
+- Frame Job has no store or library of effects, stickers or stock footage. What comes with it is these filters, the looks and the [bundled graphic templates](/graphics/templates/). Bring your own [pictures](/text-and-shapes/image-clips/) for the rest.
+- Frame Job can't stabilise shaky footage.
+- With several clips selected, the rows show the first clip's stack, and any edit gives every selected clip that whole stack.
+- A [nest](/editing/nests/) clip shows the Filters section, but a filter on it has no effect. Put filters on the clips inside the nest.
+- On a [matte track](/canvas/matte-tracks/), a clip's filters shape the cut it makes. **Alpha** and **Inverted Alpha** read only transparency, so Sharpen, Sepia, Noir, Vignette and Invert change nothing there.
+- A clip's [reflection](/effects/reflection/) shows its filters too.
+
+## With an agent
+
+An agent sets a clip's filters with `set_video`, as a list of kinds and amounts, with each amount from 0 to 1. The list replaces the old one whole, so it sends every filter it wants to keep, and an empty list clears the stack. A fifth filter is an error, and nothing changes. It can put Sepia, Noir, Vignette or Invert straight onto an adjustment clip, with no paste. See [Tools: picture and grade](/mcp/tools-set-video/#filters).
+
+With `set_action_end`, an agent can give an action a list of a different length, which switches at the action's end rather than ramping. See [Tools: animation](/mcp/tools-animation/#set_action_end).
+
+## Related
+
+- [Obscure](/effects/obscure/)
+- [The Color tab](/color/color-tab/)
+- [Adjustment clips](/color/adjustment-clips/)
+- [Paste Attributes](/editing/paste-attributes/)
+- [The Picture tab](/canvas/picture-tab/)
+- [What an action can animate](/motion/what-can-animate/)

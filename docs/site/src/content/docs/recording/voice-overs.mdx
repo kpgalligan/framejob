@@ -1,0 +1,90 @@
+---
+title: "Record a voice-over"
+description: "Record narration from your microphone with no picture, at the playhead of the project you're editing or as a new project."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A voice-over is the microphone alone, with no picture. Use it to record narration over your edit: it lands at the playhead, on a new track of its own.
+
+<AtAGlance
+  menu="File ▸ New Recording…"
+  keys="⌥⌘N"
+  where="New Recording panel ▸ Source ▸ Microphone Only"
+  tools="record_screen"
+  needs="The Microphone permission. Screen Recording isn't needed."
+/>
+
+## Record a voice-over
+
+<Steps>
+
+1. Move the playhead to where the narration should start.
+
+2. Choose **File ▸ New Recording…**, and set **Source** to **Microphone Only**.
+
+3. Choose your microphone in **Microphone**.
+
+4. Check **Record Into**: the project to land in, or **New Project**.
+
+5. Press **Record**. Frame Job checks the Microphone permission, then counts down from 3.
+
+6. Speak. The panel stays up while you do.
+
+7. Press **Stop**. The button reads **Stopping…** and then **Adding…**, and the voice-over lands. The panel stays up, back on **Record**, ready for another take.
+
+</Steps>
+
+With **Microphone** set to **Off**, **Record** starts nothing and the panel says "Microphone Only records the microphone alone — choose a microphone first."
+
+The controls that only make sense for a picture grey out, keeping their values for next time: **System Audio**, **Show Clicks**, **Size**, **Include Frame Job windows**, **Record the camera too**, **Cursor**, **Record shortcuts** and the **When it lands:** boxes. The note under **Size** reads "no picture — the microphone alone". **Rate** stays live, because it sets the frame rate of a new project.
+
+Frame Job keeps **Microphone Only** in **Source** until you quit, then goes back to your display.
+
+## While it records
+
+Nothing on screen is being filmed, so the panel stays up:
+
+- Its rows are locked.
+- The [level meter](/recording/system-audio-and-microphone/#check-your-level) stays live.
+- The footnote at the bottom left shows ● and the elapsed time, or ❚❚ and the time held still while paused.
+- **Record** reads **Stop**, and a **Pause** button stands beside it, reading **Resume** while paused.
+
+The countdown and the [menu-bar item](/recording/menu-bar-item/) work as they do for a screen recording, so you can also pause and stop from the menu bar, or from **File ▸ Pause Recording** and **File ▸ Stop Recording** (<kbd>⌥⌘N</kbd>).
+
+**Close** takes the panel away and the voice-over carries on. To bring the panel back, click **New Recording…** on the [Welcome window](/projects/welcome-window/). <kbd>⌥⌘N</kbd> won't do it, because it stops the recording.
+
+## Where a voice-over lands
+
+**In an open project,** each [stretch](/recording/pause-and-stop/#paused-recordings-are-stretches) between pauses is its own file, and they land end to end from the playhead on one new track at the back, named **Microphone**. It's all one undo step, **Add Recording**. If a [nest](/editing/inside-a-nest/) is open, they land inside it.
+
+A voice-over always gets a new track. It never goes on an existing one, even one already named **Microphone**.
+
+**As a new project,** the first file is the project itself, audio only at 1920×1080 and the frame rate in **Rate**. Later files follow it on its one track, as one undo step named **Add Recording Segments**.
+
+Either way they're ordinary audio clips, with everything in the [Sound tab](/audio/sound-tab/). To clean your voice up as it lands, tick [**Enhance the microphone when it lands**](/recording/when-it-lands/).
+
+## The files
+
+Each stretch is an `.m4a` file in `~/Movies/Frame Job Recordings/`, named by the moment it began, for example `Voice-over 2026-10-02 at 09.15.04.m4a`. See [Recording files and formats](/recording/files-and-formats/).
+
+## Good to know
+
+- Frame Job can't make a voice from text. There's no text-to-speech, so a voice-over is always a recording.
+- If the microphone stops on its own, for example because it's unplugged, the voice-over ends there. What was recorded lands, and the note reads "The microphone stopped recording on its own: … The voice-over ends where it stopped."
+- A file too short to fill one frame stays in the [Media tab](/projects/media-tab/) without a clip, and a note says so. If that's every file, no **Microphone** track is added.
+- A project already at its track limit can't take the new track. The files stay on disk and the note names them. See [Limits](/reference/limits/).
+
+## With an agent
+
+`record_screen` records a voice-over too. An agent gets your Mac's default microphone rather than a chosen one, and there's no countdown. Of the screen settings, it can pass only `rate`, which sets a new project's frame rate. See [Record with record_screen](/mcp/record-screen/).
+
+## Related
+
+- [System audio and the microphone](/recording/system-audio-and-microphone/)
+- [Start, pause and stop](/recording/pause-and-stop/)
+- [Where a recording lands](/recording/where-it-lands/)
+- [Polish when a recording lands](/recording/when-it-lands/)
+- [The Sound tab](/audio/sound-tab/)
+- [Recording permissions](/recording/permissions/)

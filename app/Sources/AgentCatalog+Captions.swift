@@ -69,18 +69,19 @@ extension AgentServer {
         return [
             tool(
                 "import_captions",
-                "Reads a SubRip (.srt) caption file and lays it out as TEXT CLIPS, one per cue, "
-                    + "on a new track of its own — File ▸ Import Captions…. They are ordinary "
-                    + "text clips in the Caption preset, so they render in the preview, in "
-                    + "render_frame and in an export (burn-in) with no further step, and any of "
-                    + "them can be retimed with move_clip or restyled with set_text. Times snap "
-                    + "to the frame grid; a cue that overlapped the next one is shortened to "
-                    + "meet it. The result reports how many cues landed and, under skipped, "
-                    + "every entry the file was too malformed to read, with its line number.",
+                "Reads a SubRip (.srt) or WebVTT (.vtt) caption file and lays it out as "
+                    + "TEXT CLIPS, one per cue, on a new track of its own — File ▸ Import "
+                    + "Captions…. They are ordinary text clips in the Caption preset, so they "
+                    + "render in the preview, in render_frame and in an export (burn-in) with "
+                    + "no further step, and any of them can be retimed with move_clip or "
+                    + "restyled with set_text. Times snap to the frame grid; a cue that "
+                    + "overlapped the next one is shortened to meet it. The result reports how "
+                    + "many cues landed and, under skipped, every entry the file was too "
+                    + "malformed to read, with its line number.",
                 [
                     "path": [
                         "type": "string",
-                        "description": "Absolute or ~ path to the .srt file.",
+                        "description": "Absolute or ~ path to the .srt or .vtt file.",
                     ],
                     "track": [
                         "type": "integer",
@@ -141,8 +142,8 @@ extension AgentServer {
                     + "change of speaker, a gap of 0.25 s or more, a word ending . ? ! or …, "
                     + "3 s on screen, and one_word's single word; a lone word too wide "
                     + "shrinks to 80% before it wraps. Pages stay within their own clip and "
-                    + "abut the next page where the gap is under 0.25 s, else hold 0.5 s "
-                    + "after the last word. Each placed page is a text clip in the style's "
+                    + "hold 0.5 s after the last word, or abut the next page where that "
+                    + "starts sooner. Each placed page is a text clip in the style's "
                     + "face, case and word_style carrying its words' timings, so the word "
                     + "being said is drawn as the style says. The result carries the cues "
                     + "themselves in TICKS whether or not they were placed — with a word "
@@ -179,8 +180,10 @@ extension AgentServer {
                 [
                     "clips": [
                         "type": "array", "items": ["type": "integer"], "minItems": 1,
-                        "description": "Transcribe only these clips — the sheet's scope. Omit "
-                            + "for every clip in the project that has recorded sound. Only a "
+                        "description": "Transcribe only these clips — the sheet's scope; a muted "
+                            + "clip you name is read. Omit for every clip the open timeline or "
+                            + "nest plays out loud: a clip with recorded sound that is muted, on a muted or "
+                            + "soloed-out track, or turned down to nothing is left out. Only a "
                             + "clip playing a movie or sound file can be transcribed, and not "
                             + "one played in REVERSE, whose words would come out backwards; a "
                             + "clip you name that cannot be is reported under skipped.",
@@ -292,7 +295,7 @@ extension AgentServer {
                     + "The source is the media's cached transcript when it has a current one "
                     + "(engine assemblyai: made earlier by transcribe with engine assemblyai), "
                     + "else this Mac's own speech recogniser run over the clip (engine apple), "
-                    + "which takes seconds per minute of speech; what it heard is cached per "
+                    + "which takes about 0.7 s per minute of speech on an M2 Max; what it heard is cached per "
                     + "media and language, so a later call inside an earlier run's span answers "
                     + "from the cache, and an engine apple answer's cached says which it was. "
                     + "An engine apple word's start is where its sound begins, read from the "
@@ -345,8 +348,9 @@ extension AgentServer {
                 "Writes one text track out as a subtitle file — File ▸ Export Captions…. Every "
                     + "text clip on the track becomes one cue at the time it sits at, in the "
                     + "order they play. THE TRACK IS NEVER GUESSED: the default is the single "
-                    + "track whose clips are ALL text clips, and with none or with more than "
-                    + "one the call is refused and the candidates listed by id and name — "
+                    + "track whose clips are ALL text clips, and with none the call is refused, and "
+                    + "with more than one it is refused with the candidates listed by id and "
+                    + "name — "
                     + "writing the wrong track and reporting success is the failure this rule "
                     + "prevents. WebVTT escapes &, < and > where SubRip does not, so on text "
                     + "containing none of the three the two files differ only by the WEBVTT "

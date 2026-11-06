@@ -1,0 +1,143 @@
+---
+title: "Tools: transitions"
+description: Make a transition at a hard cut from an agent, change its kind, length and easing, crossfade the sound, or remove it.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A [transition](/motion/transitions/) plays across the overlap between a clip and the clip before it on the same track, and it belongs to the later clip. Its length is that overlap. These tools make the overlap, choose the transition, and set how it eases and sounds.
+
+<AtAGlance
+  tools={['add_transition', 'set_transition', 'set_transition_duration', 'set_transition_style']}
+  menu="Clip ▸ Transition ▸"
+  where="Clip tab ▸ Clip sub-tab ▸ Transition"
+/>
+
+Start with `add_transition` at a hard cut. Use `set_transition` and `set_transition_duration` on clips that already overlap.
+
+Every time here is in ticks, 600,000 to the second. See [Units and ids](/mcp/units-and-ids/). `ripple` and `audio` take `true` or `false`, or those words or `"1"` and `"0"` as strings.
+
+The kinds are `cross_dissolve`, `fade_black`, `fade_white`, `push_left`, `push_right`, `push_up`, `push_down`, `wipe`, `slide`, `zoom`, `wipe_left`, `wipe_up` and `wipe_down`. See [Transition styles](/motion/transition-styles/).
+
+An adjustment clip can't take a transition or overlap another clip, so these tools refuse one, and `set_transition` with `kind: null` is the only call that goes through. Fade it with opacity instead. See [Adjustment clips](/color/adjustment-clips/).
+
+## `add_transition`
+
+Makes an overlap at the hard cut before a clip and puts a transition on it. It mirrors **Clip ▸ Transition ▸** on a clip that butts up against the one before it. See [Add or remove a transition](/motion/add-a-transition/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The incoming clip's id. |
+| `duration` | integer | Yes | The overlap you want. It can land shorter, but it's never refused for being too long. |
+| `kind` | string | No | The transition. Left out, it's the clip's stored kind, else `cross_dissolve`. It can't be `null`: `set_transition` clears one. |
+| `align` | string | No | Which side the overlap comes out of: `center`, the default, `before` or `after`. Ignored with `ripple`. |
+| `ripple` | boolean or string | No | `true` makes the overlap by sliding the incoming clip and everything after it left, for two clips with no footage beyond the cut. The default is `false`. |
+| `scope` | integer | No | A nest id, to edit inside that nest. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. Leave it out for the frontmost one. |
+
+```json
+{ "clip": 15, "duration": 600000, "kind": "fade_black" }
+```
+
+**How the overlap is made.** It's built from material the two clips already have: the source before the incoming clip's in point, and after the outgoing clip's out point. Nothing else on the timeline moves, and the pair's outer edges stay where they were.
+
+| `align` | Where the overlap comes from |
+| --- | --- |
+| `center` | Half from each side. An odd frame goes to the incoming clip, and a side with nothing to give passes its share to the other. |
+| `before` | All from the incoming clip's head. |
+| `after` | All from the outgoing clip's tail. |
+
+`duration` rounds to the nearest frame. It's then held to each side's spare material, to the neighbours on the track and to the [overlap rules](/motion/transitions/#the-overlap-rules), so a request too long for the media lands shorter. A nest clip has no spare head, and its tail ends at the nest's own length.
+
+A stored transition keeps its curve and crossfade. A new one eases at both ends and crossfades its sound. The incoming clip's actions move with its new first frame, so a zoom stays on the source frame it was drawn over.
+
+**With `ripple: true`.** This is the sheet's **Shift Clips Left** button, for when neither clip has footage beyond the cut. No material is read and `align` is ignored. The incoming clip and every clip at or after the cut, on every unlocked track, slide left by `duration`, so the timeline gets that much shorter and every clip keeps its in and out points.
+
+- The shift is capped at half the shorter of the two clips.
+- It's also limited to the largest whole-frame shift that leaves every moved track within the overlap rules.
+- A clip on another track pushed into its neighbour gets a `cross_dissolve`.
+- Markers don't move.
+
+**What it answers.** `ok` and the `project` summary.
+
+**When it refuses.**
+
+- A `duration` that isn't positive once it's rounded to the frame grid is an error.
+- A clip not at a hard cut is an error naming which of three: it's the first clip on its track, there's a gap before it, or it already overlaps a clip. For that last one, use `set_transition` or `set_transition_duration`.
+- A cut with no room: nothing is left once the request is held to the two clips' spare material, their neighbours and the overlap rules. The sentence suggests `ripple: true`.
+- A track that already breaks the overlap rules is refused before any shortening.
+- With `ripple`: an incoming clip on a locked track, or clips with no room to overlap by shifting.
+
+## `set_transition`
+
+Sets the transition into a clip, or removes it. It mirrors the **Kind** pop-up in the Clip tab's **Transition** section. See [The Transition section](/motion/transition-settings/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip's id. |
+| `kind` | string or null | Yes | The transition, or `null` to remove it. |
+| `scope` | integer | No | A nest id, to edit inside that nest. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. Leave it out for the frontmost one. |
+
+The transition's length is the clip's overlap with the one before it, so a clip with no overlap ignores it until it has one. Make an overlap with `move_clip` or `set_transition_duration`. Changing the kind keeps the transition's curve and crossfade. A new one eases at both ends and crossfades its sound.
+
+**What it answers.** `ok` and the `project` summary.
+
+**When it refuses.** A missing `kind`, or a value that isn't one of the thirteen or `null`, is an error listing them.
+
+## `set_transition_duration`
+
+Makes a transition last `duration` by moving the clip, so its overlap with the clip before it equals that. It mirrors the **Duration** field in the Clip tab's **Transition** section. See [The Transition section](/motion/transition-settings/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip's id. |
+| `duration` | integer | Yes | The overlap length, rounded to the frame grid. |
+| `scope` | integer | No | A nest id, to edit inside that nest. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. Leave it out for the frontmost one. |
+
+**What it answers.** `ok` and the `project` summary.
+
+**When it refuses.**
+
+- On a track's first clip, which has nothing to overlap.
+- Past half the shorter clip, snapped down. The sentence names that limit in ticks.
+- A `duration` that isn't positive once it's rounded to the frame grid is an error. To clear a transition, use `set_transition` with `kind: null`.
+
+## `set_transition_style`
+
+Sets how a transition is eased, whether it crossfades the two clips' sound, and the crossfade's shape. It mirrors the **Curve** pop-up, the **Crossfade Audio** checkbox and the **Crossfade Shape** pop-up in the Clip tab's **Transition** section. See [The Transition section](/motion/transition-settings/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip's id. |
+| `curve` | string | No | How the transition's progress is eased: `linear`, `ease_in`, `ease_out` or `ease_in_out`. |
+| `audio` | boolean or string | No | Crossfades the two clips' sound across the overlap. |
+| `audio_shape` | string | No | The crossfade's curve. See the table below. |
+| `scope` | integer | No | A nest id, to edit inside that nest. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. Leave it out for the frontmost one. |
+
+| `audio_shape` | The curve, over the eased progress p |
+| --- | --- |
+| `plus_3db` | The default, constant power: sine in, cosine out. It holds the level across two unrelated takes, where a straight-line pair dips 3 dB. |
+| `linear` | p in, 1 − p out. |
+| `s_curve` | A slow start and a slow finish. |
+| `minus_3db` | A slow start, rising fastest at the end. |
+
+The outgoing clip takes the shape of 1 − p.
+
+A key you leave out keeps what's there, so changing the curve never touches the crossfade, and the other way round.
+
+The tool writes onto any clip but an adjustment clip, with or without an overlap. A stored transition on a clip with no overlap isn't drawn until there is one. A clip with no transition at all gets a `cross_dissolve` with the style applied.
+
+**What it answers.** `ok` and the `project` summary.
+
+**When it refuses.** With none of the three keys, the call is an error naming them.
+
+## Related
+
+- [Transitions](/motion/transitions/)
+- [Transition styles](/motion/transition-styles/)
+- [Add or remove a transition](/motion/add-a-transition/)
+- [Crossfades](/audio/crossfades/)
+- [Tools: moving and trimming](/mcp/tools-move-and-trim/)

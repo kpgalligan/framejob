@@ -1,0 +1,88 @@
+---
+title: New Project from Range
+description: Keep one stretch of your timeline as a new project of its own, with its graphics and everything already measured, and leave the original as it is.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+New Project from Range opens a new project holding exactly the timeline's in/out range, moved to start at 0. Use it to lift a section out of a long edit to work on by itself, such as a short from a full episode. To make it vertical, run [Make Vertical Version](/framing/make-vertical-version/) in the new project. The project you made it from doesn't change. If you only want a file of that section, [export the range](/export/range/) instead.
+
+<AtAGlance menu="File ▸ New Project from Range…" tools="new_project_from_range" />
+
+## Make a project from a range
+
+<Steps>
+
+1. Set the [in/out range](/timeline/in-out-range/) with **Mark ▸ Set In** (<kbd>I</kbd>) and **Mark ▸ Set Out** (<kbd>O</kbd>).
+
+2. Choose **File ▸ New Project from Range…**.
+
+</Steps>
+
+The new project opens in its own window straight away. There's no sheet to fill in, and the command has no key.
+
+The item is dimmed when no range is set, while a [nest](/editing/nests/) is open, and while a sheet is on the window.
+
+## What is kept
+
+- **Clips across an edge** are cut there, the same way [Split](/editing/splitting/) cuts them. This happens on every track, locked or not, and a linked pair stays linked.
+- **Clips wholly inside the range** are kept. Everything outside it goes.
+- **A transition across an edge** becomes a hard start or end. The piece beyond the edge is dropped, and at the In edge the incoming piece starts with no transition.
+- **Markers inside the range** are kept, on the same moments of the edit. A marker exactly on the Out frame isn't kept.
+- **Tracks and the canvas** stay as they are, including any track that ends up empty and any lock.
+- **Media no kept clip plays** is left out, unless a kept clip's look or a kept file's colour setting still uses it as a [LUT](/color/luts/), or a kept clip's **Hide While Silent** follows it. Nests no kept clip reaches are left out too.
+
+## What comes with it
+
+The new project brings what's already been measured, so nothing is measured again when it opens. For each media file it keeps:
+
+- filmstrips, waveforms and loudness
+- voice detection and sound-matching features
+- transcripts read on this Mac
+- [analyses](/projects/media-analysis/), such as shots, faces, people and salient regions, masks and sound events
+- the backwards render of a [reversed clip](/speed/reverse/)
+
+Media files themselves are never copied. The new project points at the same files as the original.
+
+[Speed ramp](/speed/speed-ramps/), [isolated voice](/audio/voice-isolation/) and [voice effect](/audio/voice-effects/) renders don't come along. They're made again when needed.
+
+### Cloud transcripts
+
+A transcript from [AssemblyAI](/captions/assemblyai-transcription/) goes to the new project only once AssemblyAI has been told to delete its copy. One still waiting for that delete stays in the original project.
+
+### Graphics
+
+The graphics the kept clips draw come along, and so does every font and picture of the project's graphics, whether a kept clip uses it or not. A graphic's kept versions don't.
+
+## The new project's name and undo
+
+The new project opens untitled with unsaved changes, named after its parent with " (range)" added, such as "Interview (range)". Closing it asks whether to save.
+
+It starts at the range. There's no undo step back to the whole timeline, and the original project gets no undo step either, because nothing happened to it.
+
+## When Frame Job won't do it
+
+If the range can't be kept, the command beeps and shows why at the foot of the inspector, and no project opens.
+
+| The message says | What to do |
+| --- | --- |
+| "Clip *N* is a nest across the range's edge; a nest clip has no in point, so a cut there would replay it from its start. Move the edge, or open the nest and unnest it." | Do one of those. A nest clip can't be cut at an edge. |
+| "Nothing plays between … and … ticks." | The range holds no clips. Move it over something. |
+| "Keeping … to … ticks would leave clips *A* and *B* overlapping by … ticks, more than half of the shorter piece (… ticks); move an edge further from their transition." | An edge would cut a clip too short for a transition inside the range. Move the edge. |
+
+These messages give times in ticks, 600,000 to the second, so 1,200,000 ticks is 2 seconds into the timeline.
+
+The command also beeps when In and Out are on the same frame, because the range is empty.
+
+## With an agent
+
+[`new_project_from_range`](/mcp/tools-projects/#new_project_from_range) takes the range as times on the top-level timeline, so it doesn't need the in/out range set, and it won't run while a nest is open. It can also save the new project at a path first, adding `.framejob` if the path lacks it, as long as nothing exists there and no other open project holds it. The [Assistant](/assistant/what-it-will-not-do/) asks you before it does that. It returns the new project and how much came along with it. See [Tools: projects and history](/mcp/tools-projects/).
+
+## Related
+
+- [The in/out range](/timeline/in-out-range/)
+- [Split clips](/editing/splitting/)
+- [Save, revert and close](/projects/save-and-revert/)
+- [Export a range](/export/range/)
+- [Consolidate Media](/projects/consolidate-media/)

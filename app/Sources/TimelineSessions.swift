@@ -117,9 +117,10 @@ struct TimelineSnapper {
 /// the bars the user drags are the core's own answer and a tick the core
 /// refuses simply leaves the last good frame on screen (spec §7.6).
 ///
-/// ⌥ duplicates. `duplicate` mints its copies inside the core, so the ids to
-/// move are learned once at mouse-down by applying `duplicate` to the
-/// current handle PURELY (`TimelineView.onProbe`) — a question, not an edit.
+/// ⌥ duplicates, and nothing else decides that: a tick is one `duplicate`
+/// naming the drop's `delta` and `track` where a plain drag's is a `move_clip`,
+/// so the overlap rule is asked once, at the landing, and a drop it refuses
+/// springs back rather than turning into a move (spec §11 #465).
 struct ClipDragSession {
     /// Every dragged clip, the anchor first is not required — `anchor` names
     /// it explicitly.
@@ -135,15 +136,10 @@ struct ClipDragSession {
     let spanStart: Ticks
     let trackCount: Int
     let duplicating: Bool
-    /// Ids `duplicate` will mint, in the same order as `clips` sorted by
-    /// start; empty when the probe failed and the drag falls back to a move.
-    let copies: [UInt32]
-    /// How far `duplicate` pushed the copies past the originals, so the move
-    /// that follows lands them under the pointer and not past the span.
-    let copyShift: Ticks
     /// Ids `add_track` will mint for a drop above the top lane / below the
-    /// bottom one, probed with the same op PREFIX the drop will use so the
-    /// core mints them in the same order. nil disables that end.
+    /// bottom one, probed with `add_track` alone, the op that comes first in
+    /// the drop's list, so the core mints them in the same order. nil
+    /// disables that end.
     let newTrackTop: UInt32?
     let newTrackBottom: UInt32?
 
@@ -163,30 +159,68 @@ struct ClipDragSession {
     /// a drop above the top lane, 0 (the back) for one below the bottom.
     var newTrackIndex: Int { row < 0 ? trackCount : 0 }
 
+    /// The track this drop would make: nil unless it is past an end of the
+    /// stack and that end was probed.
+    var createdTrack: UInt32? {
+        guard needsNewTrack else { return nil }
+        return row < 0 ? newTrackTop : newTrackBottom
+    }
+
     /// The anchor's proposed start — what the refusal check compares against
     /// once the core has had its say.
     var proposedStart: Ticks { anchorStart + delta }
 
     /// The ops for the current drag state, as ONE undo step.
     ///
-    /// Order matters and is the order the probes assumed: `duplicate` first
-    /// (so its copies take the low ids), then `add_track`, then the move.
-    /// `destination` is the id of an EXISTING track to land on, or nil to
-    /// leave every clip where it is vertically.
+    /// Order matters and is the order the probes assumed: `add_track` first,
+    /// so it mints the id they learned, then the one op that places the
+    /// clips. `destination` is the id of an EXISTING track to land on, or nil
+    /// to leave every clip where it is vertically.
     func ops(destination: UInt32?) -> [ReelOp] {
         var ops: [ReelOp] = []
-        let moved = duplicating && !copies.isEmpty ? copies : clips
-        let shift = duplicating && !copies.isEmpty ? delta - copyShift : delta
-        if duplicating, !copies.isEmpty {
-            ops.append(.duplicate(clips: clips))
-        }
         var target = destination
-        if needsNewTrack, let created = row < 0 ? newTrackTop : newTrackBottom {
+        if let created = createdTrack {
             ops.append(.addTrack(index: newTrackIndex))
             target = created
         }
-        ops.append(.moveClip(clips: moved, delta: shift, track: target))
+        ops.append(
+            duplicating
+                ? .duplicate(clips: clips, delta: delta, track: target)
+                : .moveClip(clips: clips, delta: delta, track: target))
         return ops
+    }
+
+    /// Whether the drop landed where the core's rule puts it, read back from
+    /// `now`, the project after the drop, against `base`, the gesture's
+    /// (spec §11 #465). The rule is `move_clips`' and `duplicate_clips`':
+    /// the named clip on the back-most track, then the earliest, lands on
+    /// `destination` and every named clip shifts by the same number of
+    /// tracks, none when `destination` is nil, each `delta` later. Track
+    /// indices are read in `now`, after any `add_track`, as the core reads
+    /// them. Every named clip, or on ⌥ a copy the base did not have, must
+    /// sit at its expected start on its expected track.
+    func landed(base: ProjectSnapshot, now: ProjectSnapshot, destination: UInt32?) -> Bool {
+        let selected = base.clips.filter { clips.contains($0.id) }
+        let keyed = selected.compactMap { c in
+            now.trackIndex(of: c.track).map { (index: $0, start: c.start, id: c.id) }
+        }
+        guard !selected.isEmpty, keyed.count == selected.count,
+              let back = keyed.min(by: { ($0.index, $0.start, $0.id) < ($1.index, $1.start, $1.id) })
+        else { return false }
+        var shift = 0
+        if let destination {
+            guard let index = now.trackIndex(of: destination) else { return false }
+            shift = index - back.index
+        }
+        let known = Set(base.clips.map { $0.id })
+        let pool = duplicating
+            ? now.clips.filter { !known.contains($0.id) }
+            : now.clips.filter { clips.contains($0.id) }
+        return keyed.allSatisfy { c in
+            let to = c.index + shift
+            guard now.tracks.indices.contains(to) else { return false }
+            return pool.contains { $0.start == c.start + delta && $0.track == now.tracks[to].id }
+        }
     }
 
     /// Advances the drag. `time` is the time under the pointer and `row` the

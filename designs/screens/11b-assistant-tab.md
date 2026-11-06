@@ -41,7 +41,7 @@ reads "Ask about or edit this project…" with a blue "Send" button beside it; t
 field is one line tall and grows a line at a time to five as ⇧Return adds lines,
 then scrolls, and the transcript above it is one text that can be selected across
 entries; and
-while the assistant asks before writing a file, a row above the field reads "The
+while the assistant asks before it saves or writes to a path it chose, a row above the field reads "The
 assistant asks first:" with the tool and the path, and "Allow" and "Deny" buttons.
 While that question waits, a small dot in the accent colour sits just right of the
 word Assistant in the tab strip, whichever tab is showing.

@@ -1,0 +1,65 @@
+---
+title: Duplicate clips
+description: Put copies of the selected clips straight after them with one key, or drag copies to exactly where you want them.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Duplicate makes copies of clips without going through the clipboard. Press a key to put them right after the originals, or hold ⌥ and drag them where you want them.
+
+<AtAGlance
+  menu="Edit ▸ Duplicate"
+  keys={['⌘D', '⌥-drag']}
+  where="The Duplicate button in the timeline bar"
+  tools={['duplicate']}
+/>
+
+## Duplicate the selection
+
+Select one or more clips and press <kbd>⌘D</kbd>. **Edit ▸ Duplicate** and the timeline bar's **Duplicate** button do the same. With nothing selected, the menu item is greyed out and the button beeps.
+
+The button sits in the [timeline bar](/getting-started/editor-window/#timeline-bar) with the other one-click clip tools, which split, trim, ripple delete and add markers, text and shapes.
+
+Each copy goes on the same track as its original, starting right after the selection's span. A selection of several clips keeps its internal timing: if it runs from 10 s to 14 s, every copy starts 4 s later than its original.
+
+The copies are one undo step, called Duplicate.
+
+## Drag a copy
+
+To place copies somewhere else, hold <kbd>⌥</kbd> as you press on a clip, then drag. The copies follow the pointer and the originals stay where they are.
+
+- If the clip you press is part of the selection, the whole selection is copied. If it isn't, only that clip is.
+- The copies snap and change tracks as a [move](/editing/move-clips/) does. Drop past the top or bottom of the stack to make a new track for them.
+- The copies need room only where they land, so a clip with another right after it copies like any other.
+- A spot the timeline can't take is skipped. The copies stay at the last spot along the drag that worked. If you let go on such a spot, a ghost animates back to them, and if no spot worked, it animates back to the clip you pressed and no copy is made.
+- The whole drag is one undo step, called Duplicate Clips.
+
+Hold only <kbd>⌥</kbd>. <kbd>⌥⇧</kbd> on a clip is a [slip](/editing/slip-and-roll/), not a copy.
+
+## What a copy keeps
+
+A copy is the whole clip: its source, trim, speed, name, label, picture and sound settings, and actions. From then on it's a clip of its own, so changing one doesn't change the other.
+
+- **Linked clips.** If a clip has a [detached sound](/audio/detach-and-attach/), its partner is copied too and the two copies are linked to each other. A partner on a locked track isn't copied. Drag the picture to another track and the sound's copy stays on the sound's track, moved by the same time. It needs room there too, so a picture dragged straight up with no change in time can't land: its sound's copy would sit on the sound.
+- **Nest clips.** A copy of a nest clip made with Duplicate or ⌥-drag shows the same nest as the original, so an edit inside one shows in both. See [Shared and independent nest copies](/editing/nest-copies/).
+
+## When Duplicate won't work
+
+Copies follow the same [overlap rule](/editing/how-edits-work/#the-overlap-rule) as any other placement, and Frame Job doesn't push later clips out of the way.
+
+- A copy may overlap the clip after it by up to half of the shorter clip. The overlap gets a Cross Dissolve, as any new overlap does. See [Transitions](/motion/transitions/).
+- A longer overlap stops the duplicate. Frame Job beeps, nothing changes, and the reason appears at the foot of the inspector. See [When an edit is refused](/getting-started/refused-edits/).
+- An adjustment clip can't overlap anything, so a copy of one needs clear space.
+
+To duplicate into a tight edit, ⌥-drag the copy to a free spot, open room first, or use **Edit ▸ Copy** and **Edit ▸ Paste**. A paste that has no room goes on a new track.
+
+## With an agent
+
+`duplicate` takes the clips to copy and puts the copies straight after them, as <kbd>⌘D</kbd> does. Give it `delta` and `track` and it lands them where an ⌥-drag would, in one step. It also works inside a nest. See [Tools: copying and nesting](/mcp/tools-copy-and-nest/#duplicate).
+
+## Related
+
+- [Copy, cut and paste](/editing/copy-and-paste/)
+- [Move clips](/editing/move-clips/)
+- [How edits work](/editing/how-edits-work/)
+- [Shared and independent nest copies](/editing/nest-copies/)

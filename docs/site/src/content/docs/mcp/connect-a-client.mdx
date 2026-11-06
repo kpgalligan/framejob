@@ -1,0 +1,107 @@
+---
+title: Connect a client
+description: Add Frame Job to Claude Code with one copied command, or point Claude Desktop or any other stdio MCP client at the bundled helper.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+An MCP client connects to Frame Job through `framejob-mcp`, a helper inside the app. You register the helper once, and Frame Job's tools are there whenever the client runs.
+
+<AtAGlance
+  menu="Frame Job ▸ Settings…"
+  keys="⌘,"
+  where="The MCP section, at the top of Settings"
+  needs="An MCP client that starts a stdio server, such as Claude Code or Claude Desktop."
+/>
+
+## Connect Claude Code
+
+<Steps>
+
+1. Choose **Frame Job ▸ Settings…** (<kbd>⌘,</kbd>). The **MCP** section is at the top.
+
+2. Choose **Copy MCP Command**. The section reads "Copied. Paste it into Terminal and press Return."
+
+3. Paste the command into Terminal and press <kbd>Return</kbd>.
+
+</Steps>
+
+For a copy of Frame Job in `/Applications`, the command is:
+
+```sh
+claude mcp add --scope user framejob -- '/Applications/Frame Job.app/Contents/Helpers/framejob-mcp'
+```
+
+`--scope user` makes Frame Job's tools available in every Claude Code project.
+
+Frame Job doesn't have to be open. Claude Code can start and list the tools with the app closed, and the first tool call [opens it in the background](/mcp/overview/#opening-on-the-first-tool-call).
+
+You don't add an API key to Frame Job for this. Your client [brings its own model](/mcp/overview/#an-mcp-client-or-the-assistant).
+
+## Claude Desktop and other stdio clients
+
+Any MCP client that starts a stdio server, one it talks to over standard input and output, can use the same helper, by its path. Copy MCP Command writes the Claude Code command only, so for anything else you enter the path by hand.
+
+That goes for coding agents and editors such as Cursor, VS Code and Codex too. Whatever a client's settings file is called, `mcp.json` or anything else, the entry is the same: its command is the helper's full path, with no arguments. The path has spaces, so quote it on a command line.
+
+For Claude Desktop, add it to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "framejob": {
+      "command": "/Applications/Frame Job.app/Contents/Helpers/framejob-mcp"
+    }
+  }
+}
+```
+
+If your copy of Frame Job lives somewhere else, use [the path Settings shows](#the-helper-path-in-settings). A client that can speak HTTP over a Unix socket can skip the helper and [connect directly](/mcp/helper-and-socket/#streamable-http-over-the-socket).
+
+## Check that it works
+
+Ask your agent to call `get_project`. With a project open, it answers with that project. With none open, it answers "No project is open. Call open_project or new_project first.", which still shows the agent reached Frame Job. If Frame Job was closed, this call opens it in the background first.
+
+From there, follow [A typical session](/mcp/typical-session/). If the call fails, see [An agent can't reach Frame Job](/reference/troubleshooting/#an-agent-cant-reach-frame-job).
+
+## The MCP section in Settings
+
+**MCP** is the first of the sections in Settings. From top to bottom it holds two short paragraphs on how a client reaches Frame Job, the helper's path, **Copy MCP Command** and a status line.
+
+### The helper path in Settings
+
+The section shows the full path of `framejob-mcp` inside the copy of Frame Job you're running, ending `Contents/Helpers/framejob-mcp`. You can select it and copy it.
+
+### Copy MCP Command
+
+**Copy MCP Command** puts the Claude Code command for this copy of Frame Job on the clipboard, with the path filled in and quoted for the shell. It always names the helper inside the copy you opened Settings from, so a copy in `~/Applications` or a build folder registers itself.
+
+The path doesn't follow the app. If you move Frame Job, copy the command again and register the new path.
+
+The button isn't an edit, so no agent tool does the same thing.
+
+### The missing helper warning
+
+If the helper is missing from this copy of Frame Job, or can't be run, **Copy MCP Command** is dimmed and the status line reads "framejob-mcp is missing from this copy of Frame Job."
+
+Frame Job checks each time Settings opens. If the helper disappears while the window is open, pressing the button copies nothing and shows the same line.
+
+## Testing a second copy
+
+This is for testing, not everyday use. Setting the environment variable `RC_AGENT_SOCKET` to a path moves the socket there, so a test copy of Frame Job stays apart from your everyday one. Set it for both Frame Job and `framejob-mcp`.
+
+Setting it for the helper alone is often enough. When a tool call finds nothing at that path, the helper launches the copy it belongs to and passes the path on. See [A custom socket path](/mcp/helper-and-socket/#a-custom-socket-path) for the rules.
+
+To start a test copy yourself, run its executable from Terminal with the variable set:
+
+```sh
+RC_AGENT_SOCKET="$HOME/framejob-test/agent.sock" '/path/to/Frame Job.app/Contents/MacOS/Frame Job'
+```
+
+## Related
+
+- [How an agent reaches Frame Job](/mcp/overview/)
+- [The helper and the socket](/mcp/helper-and-socket/)
+- [A typical session](/mcp/typical-session/)
+- [Settings](/reference/settings/)

@@ -9,7 +9,9 @@ extension AgentServer {
     // MARK: - Importing
 
     /// `import_media` — File ▸ Add Media… and every Finder drop
-    /// (`ProjectDocument.importMedia`): probe the file, then `add_media`.
+    /// (`ProjectDocument.importMedia`): probe the file, then `add_media`. A
+    /// folder is the Media tab's folder drop (`importMediaFolder`, spec §11
+    /// #497).
     /// With `set_video {look: {kind: "lut", media}}` after it, it mirrors the
     /// Look section's Import LUT… (`EditorViewController.importLUT`, GR-8).
     ///
@@ -31,6 +33,7 @@ extension AgentServer {
             throw ToolError(message: "No file at \(url.path)")
         }
         let document = try onMain { try self.target(a) }
+        if MediaFolder.isFolder(url) { return try importMediaFolder(url, document) }
         let descriptor = try probe(url)
         return try onMain {
             let expected = document.project.snapshot.nextId
@@ -38,27 +41,8 @@ extension AgentServer {
                 document, "Add Media", [.addMedia(descriptor: descriptor)])
             let added = ProjectSnapshot.addedMedia(from: before, to: document.project.snapshot)
             document.generateCaches()
-            var result: [String: Any] = [
-                "ok": true,
-                "media": Int(added.first ?? expected),
-                // The DESCRIPTOR's path, not the argument's: an ffmpeg-assisted
-                // import rewraps the file and the model stores the conversion,
-                // so echoing what was asked for would answer `.mkv` about an
-                // entry that is really a `.mov`. The rule generalises — the
-                // answer must describe what landed in the project.
-                "path": descriptor.path,
-                "kind": descriptor.kind.rawValue,
-                "duration": descriptor.duration,
-                "width": descriptor.width,
-                "height": descriptor.height,
-                "fps": [descriptor.fps.num, descriptor.fps.den],
-                "has_video": descriptor.hasVideo,
-                "has_audio": descriptor.hasAudio,
-                "has_alpha": descriptor.hasAlpha,
-            ]
-            // A copy's or an ffmpeg conversion's original (spec §11 #228-O,
-            // #233): the file the caller named, which the media is named after.
-            if let original = descriptor.original { result["original"] = original.path }
+            var result = Self.descriptorFields(descriptor, media: Int(added.first ?? expected))
+            result["ok"] = true
             result["note"] =
                 descriptor.kind == .lut
                 ? "The LUT is in the project's media list. It is never placed as a clip: apply it "
@@ -90,7 +74,7 @@ extension AgentServer {
     /// asks the conversion question (spec §11 MC-5), so it passes
     /// `mayAsk: false`, and a refusal ffmpeg could have helped names the
     /// setting (`neverAsksSentence`).
-    private func probe(_ url: URL) throws -> MediaDescriptor {
+    func probe(_ url: URL) throws -> MediaDescriptor {
         guard !Thread.isMainThread else {
             throw ToolError(message: "Probing cannot run on the main thread.")
         }
@@ -121,12 +105,16 @@ extension AgentServer {
     /// (spec §11 MC-5); nil otherwise. Both refusals that would have gone on
     /// to the ffmpeg step count: AVFoundation's (`ImportError`) and, for a
     /// WebM or Matroska file, a codec the built-in copy cannot carry
-    /// (`ContainerRewrapError.unsupported`, spec §11 #216-R).
+    /// (`ContainerRewrapError.unsupported`, spec §11 #216-R). A folder, or a
+    /// link to one, is neither: ffmpeg could not convert it under any policy.
     static func neverAsksSentence(for error: any Error, url: URL) -> String? {
         let invites =
             (error as? MediaImporter.ImportError)?.invitesFFmpeg
             ?? (error as? ContainerRewrapError)?.invitesFFmpeg ?? false
-        guard invites, !MediaImporter.isImage(url), FFmpegRewrap.policy == .ask,
+        let isFolder =
+            (try? url.resolvingSymlinksInPath().resourceValues(forKeys: [.isDirectoryKey]))?
+            .isDirectory == true
+        guard invites, !isFolder, !MediaImporter.isImage(url), FFmpegRewrap.policy == .ask,
             FFmpegRewrap.tools() != nil
         else { return nil }
         return "An installed ffmpeg could convert it, but a tool call never asks "
@@ -139,9 +127,9 @@ extension AgentServer {
     /// `import_captions` — File ▸ Import Captions… (`CaptionImporter`, which
     /// also carries the reasoning for why a caption is a text clip).
     ///
-    /// Runs on the main thread like every other op tool: parsing an SRT is
-    /// reading a text file, not probing a movie, so there is nothing to wait
-    /// for and nothing to keep off main.
+    /// Runs on the main thread like every other op tool: parsing a caption
+    /// file is reading a text file, not probing a movie, so there is nothing
+    /// to wait for and nothing to keep off main.
     ///
     /// The result reports what was SKIPPED as well as what landed — a
     /// caption file with three malformed entries would otherwise import
@@ -448,16 +436,7 @@ extension AgentServer {
         let descriptor = MediaImporter.relinkProbe(try probe(url), current: media)  // CU-38 (a)
         let bookmark = descriptor.path == url.path ? given ?? descriptor.bookmark
             : descriptor.bookmark
-        var fields: [String: Any] = [
-            "media": Int(media.id), "path": descriptor.path,
-            "kind": descriptor.kind.rawValue, "duration": descriptor.duration,
-            "width": descriptor.width, "height": descriptor.height,
-            "fps": [descriptor.fps.num, descriptor.fps.den],
-            "has_video": descriptor.hasVideo, "has_audio": descriptor.hasAudio,
-            "has_alpha": descriptor.hasAlpha,
-        ]
-        // The new original, when the file was copied or converted (#228-O, #233).
-        if let original = descriptor.original { fields["original"] = original.path }
+        let fields = Self.descriptorFields(descriptor, media: Int(media.id))
         return try onMain {
             let result = try self.editResult(
                 document, "Relink Media",

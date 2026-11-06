@@ -1,0 +1,68 @@
+---
+title: "Lines and arrows"
+description: "Aim a line or arrow by dragging its ends on the canvas, and put a head on either end."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A line or arrow has two ends you can place by hand. Use them to point at a button, underline a word or connect two things on screen.
+
+<AtAGlance
+  where={['Drag a round end handle on the canvas', 'Clip tab ▸ Shape ▸ Arrowheads']}
+  tools="set_shape"
+/>
+
+To add one, see [Shape clips](/text-and-shapes/shape-clips/#add-a-shape-clip).
+
+## Drag an endpoint
+
+<Steps>
+
+1. Select the line or arrow, with the playhead over it.
+
+2. Drag the round handle at either end.
+
+</Steps>
+
+Only that end moves. The other end stays where it is, and so does the shape's box. The drag is one undo step, "Move Endpoint". Press <kbd>Esc</kbd> during the drag to put the end back, with no undo step.
+
+A new line or arrow runs from the bottom-left corner of its box to the top-right corner. The start is the bottom-left end, and the end is the top-right one.
+
+## How the box limits an end
+
+An end lives inside the shape's box, so it stops at the box's edge however far you drag. To take an end further, make the box bigger first, with the square handles or with **Width** and **Height** in the [Shape section](/text-and-shapes/shape-settings/#set-the-size).
+
+An end is kept as a place in the box, not a place on the canvas. When you resize the box, the line stretches with it and each end keeps its place. Rotating the box with the rotation grip turns the line.
+
+The edge is also the easy way to get a level line. Drag both ends past the same edge of the box and they stop exactly in line. Nothing draws outside the box, though, so a line along its edge shows only half its stroke.
+
+The square handles and the rotation grip work on a line's box as they do on any shape. See [Resize with the handles](/text-and-shapes/shape-clips/#resize-with-the-handles).
+
+:::note
+When an end sits on a corner of the box, its round handle covers the square one there and takes the click. On a new line that's the bottom-left and top-right corners, so use one of the other two corners or a side handle to resize.
+:::
+
+## Set its arrowheads
+
+Tick **Arrowhead at start**, **Arrowhead at end** or both in the **Arrowheads** section of the **Shape** sub-tab. A head shows only when **Kind** is **Arrow**, so a Line keeps its boxes ticked but draws no head. The rows are covered on [Shape fill, stroke and size](/text-and-shapes/shape-settings/#add-arrowheads).
+
+A head's tip sits exactly on the end, and the line stops at the head's base. A head's length and its width are each four times the stroke's width, so a 6 px stroke gives a head 24 px long and 24 px wide. It takes the stroke's colour.
+
+## Good to know
+
+- An end can only be placed on the canvas. There's no field for it in the inspector.
+- An end doesn't snap to the canvas, its centre or other clips.
+- An [action](/motion/actions/) can't move an end. With an action selected, dragging an end still changes the clip itself. An action can move, scale, rotate or fade the whole line through [Transform](/canvas/transform/).
+- With several clips selected, only the front-most selected clip shows handles.
+- A clip on a [locked track](/timeline/hide-and-lock-tracks/) shows no handles.
+
+## With an agent
+
+An agent can place both ends exactly and set both heads in one `set_shape` call, with `from`, `to`, `arrow_start` and `arrow_end`. An end is two numbers measured across the box, where `[0, 0]` is the top-left corner and `[1, 1]` the bottom-right, so a new line runs from `[0, 1]` to `[1, 0]`. See [Tools: text, shapes and clip names](/mcp/tools-clip-properties/#set_shape).
+
+## Related
+
+- [Shape clips](/text-and-shapes/shape-clips/)
+- [Shape fill, stroke and size](/text-and-shapes/shape-settings/)
+- [Move, scale and rotate](/canvas/move-scale-rotate/)

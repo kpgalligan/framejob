@@ -1,0 +1,81 @@
+---
+title: Play, pause and shuttle
+description: Play the timeline with Space, shuttle it at up to four times speed with J, K and L, and step it frame by frame.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Play the timeline to watch your edit. It all runs from the keyboard: <kbd>Space</kbd> plays and pauses, <kbd>J</kbd>, <kbd>K</kbd> and <kbd>L</kbd> shuttle forwards or backwards at up to four times speed, and the arrow keys step to the frame you want.
+
+<AtAGlance
+  keys={['Space', 'J', 'K', 'L', '←', '→', '⇧←', '⇧→']}
+  where="The Play and Pause button in the toolbar"
+  tools="set_playhead"
+/>
+
+## Play and pause
+
+Press <kbd>Space</kbd>, or the Play button among the toolbar's transport buttons. The button shows Play or Pause to match, and it stays in the same spot. There's no menu item for it.
+
+<kbd>Space</kbd> works from wherever the focus is in the window, with a few exceptions:
+
+| Where you are | What <kbd>Space</kbd> does |
+| --- | --- |
+| Typing in a text field, the Text tab's text area, the canvas text editor or the Media tab's search field | Types a space. Typing ends with <kbd>Return</kbd>, <kbd>Tab</kbd> or a click outside the field, and <kbd>Space</kbd> plays straight after. |
+| On the preview canvas | Plays or pauses when you let go, because the press gets ready to [pan](/canvas/zoom-and-pan/). If you panned while holding it, letting go does nothing. |
+| On a button, pop-up or segmented control focused with Full Keyboard Access | Presses that control. |
+| With a sheet open | Doesn't play or pause. |
+
+<kbd>⇧Space</kbd> plays and pauses too. Any other modifier leaves the key alone. Holding <kbd>Space</kbd> down doesn't toggle playback over and over.
+
+## J, K and L
+
+<kbd>L</kbd> plays forward, <kbd>J</kbd> plays in reverse and <kbd>K</kbd> pauses.
+
+| Press | What happens |
+| --- | --- |
+| <kbd>L</kbd> or <kbd>J</kbd> while stopped | Plays at ×1 in that direction. |
+| The same key again | Steps up from ×1 to ×2 to ×4. At ×4 it stays at ×4. |
+| The opposite key | Goes straight to ×1 in that direction. |
+| <kbd>K</kbd> | Pauses. |
+
+These keys also work from the [Transcript tab](/captions/transcript-keys/) and the [Preview Window](/timeline/preview-window/). They don't work while you're typing in a field or while a sheet is open.
+
+## Step frames
+
+<kbd>←</kbd> and <kbd>→</kbd> pause playback and move the playhead one frame. With <kbd>⇧</kbd>, they move ten. This is the way to place a cut exactly.
+
+Stepping is silent, unlike a [scrub on the ruler](/timeline/ruler-and-playhead/#scrub-on-the-ruler). In the [Transcript tab](/captions/transcript-keys/), these keys move by word instead.
+
+To go further in one press, see [Jump around the timeline](/timeline/move-the-playhead/).
+
+## At the end
+
+Playback stops at the end of the timeline, and the playhead stays there. Press <kbd>Home</kbd> to [go back to the start](/timeline/move-the-playhead/). With [Loop](/timeline/loop/) on, playback goes round instead.
+
+An empty timeline has nothing to play, so Play, <kbd>J</kbd> and <kbd>L</kbd> beep.
+
+## After an edit
+
+You can edit while the timeline plays. What you notice depends on what you changed.
+
+### Look-only edits
+
+A change that only alters how something looks, such as a clip's position, a colour or some text, redraws the frame in place. Playback isn't interrupted.
+
+### Structural edits
+
+A move, a trim, a new clip or anything else that changes the timeline's shape makes Frame Job rebuild what the preview plays, in the background. So does a change to the sound, such as volume, pan or the compressor. It keeps your place and keeps playing at the same speed. While you drag, the rebuild waits until you pause briefly.
+
+### Failed rebuild
+
+If a rebuild fails, Frame Job shows the error and the previous version of the timeline keeps playing.
+
+## Related
+
+- [Loop playback](/timeline/loop/)
+- [The ruler and playhead](/timeline/ruler-and-playhead/)
+- [Jump around the timeline](/timeline/move-the-playhead/)
+- [The Preview Window](/timeline/preview-window/)
+- [Preview Quality](/timeline/preview-quality/)
+- [Keyboard shortcuts](/reference/keyboard-shortcuts/)

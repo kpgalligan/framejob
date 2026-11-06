@@ -1,0 +1,133 @@
+---
+title: How tool calls behave
+description: What to expect while an agent works in Frame Job. Calls run one at a time, wait for your drag, never put up a question, make one undo step each, and show in the window at once.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A tool call is one request from an AI agent connected to Frame Job, such as splitting a clip or reading the project. Every call follows the same rules, whichever client sends it. This page says what an agent can rely on, and what you'll see if you work in the window while it does.
+
+<AtAGlance
+  menu={['Edit ▸ Undo', 'Edit ▸ Redo']}
+  keys={['⌘Z', '⇧⌘Z']}
+  tools={['undo', 'redo', 'close_project', 'import_media', 'relink_media', 'open_project', 'record_screen', 'get_media_analysis', 'split_at_shots', 'switch_by_speaker', 'reframe_clip', 'make_vertical_version']}
+/>
+
+## Edits show live
+
+An agent's edit goes through the same place your own clicks go. It shows in the window at once, marks the document as edited, and can be undone with <kbd>⌘Z</kbd> like anything you did yourself. Frame Job doesn't need to be the active app for any of this.
+
+## One call at a time
+
+Frame Job runs one tool call at a time, across every connected client and the [Assistant](/assistant/chat/). A call that arrives while another is running waits its turn. It doesn't fail.
+
+So a long call holds up the ones behind it. The usual long calls are `record_screen`, which runs for as long as it records, `transcribe`, and an analysis call, which can wait up to [60 seconds](#analysis-tools-wait-60-seconds-then-resume). `export` isn't one of them: it answers straight away and works in the background. See [Export: start, then poll](/mcp/export/).
+
+A question the Assistant is waiting for you to answer doesn't hold up an MCP client, or the Assistant in another window. It's asked before the call joins the queue.
+
+While a long call runs, a client's request for the tool list can't reach Frame Job either. [`framejob-mcp`](/mcp/helper-and-socket/) waits 5 seconds, then answers from its own copy of the list.
+
+## Calls wait for your drag
+
+A call made while you're dragging a clip, a canvas handle or an inspector slider, in any open project, waits until you let go of the mouse. It then runs as its own undo step, after the drag's.
+
+There's no time limit on this wait. The call, and every call queued behind it, waits for as long as you hold the mouse button down.
+
+## A tool call never asks
+
+A tool call never puts up an alert or asks for a permission, so a call can't get stuck behind a question nobody can see. Where the app would stop and ask you, the call comes back with a message instead.
+
+| In the window, Frame Job… | A tool call… |
+| --- | --- |
+| Offers to convert a file with ffmpeg | Treats the offer as declined |
+| Prompts for a system permission | Is refused, saying where to give it |
+| Asks whether to save a project you're closing | Is refused unless it passes `discard: true` |
+| Asks before removing a track that holds clips | Is refused, naming `with_clips: true` |
+| Asks before a speed past ×12 drops the sound | Goes ahead, and the answer lists the clips under `audio_left_out` with an `audio_note` |
+
+An edit that fails comes back as a message too. The beep or alert sheet you'd get in the window never appears. See [What a call answers](/mcp/what-a-call-answers/).
+
+Anything that needs a question answered or a permission given has to be done by a person first. The rule belongs to the call, not to the app: `import_media`, `relink_media`, `open_project` and `record_screen` never ask, but if you add a file yourself while one of them runs, you still get the question.
+
+:::note
+This is the rule for clients connected over MCP. The [Assistant](/assistant/what-it-will-not-do/) works under rules of its own, and asks you in its tab before it calls certain tools.
+:::
+
+### The ffmpeg offer is declined
+
+An agent's import never shows the ffmpeg question. Unless you've chosen to convert automatically, the file is refused with the reason. If ffmpeg is installed, the message also says how to get past it. See [Convert files with ffmpeg](/projects/ffmpeg-conversion/#with-an-agent).
+
+### System grants are refused, never requested
+
+`record_screen` never asks for the Screen Recording, Microphone, Camera or Input Monitoring grant, and never opens the picker or System Settings. A missing grant is refused, and the message names the System Settings pane. If macOS hasn't asked about the microphone or camera yet, the message says to press **Record** in **File ▸ New Recording…** once, so that a person can give the grant from the recorder panel. See [Recording permissions](/recording/permissions/).
+
+A Frame Job started from a terminal runs under the terminal's grants, not the app's. The refusal then also names the launching process and the way out: relaunch with `open -a "Frame Job"`, or give the terminal the grant.
+
+### Closing a project refuses rather than asks
+
+`close_project` won't close a project with unsaved changes, and nothing is written:
+
+> Interview has unsaved changes, so close_project left it open: save_project saves them, or close_project with discard: true closes it and loses them.
+
+Nor will it close a window with a sheet open, even with `discard: true`:
+
+> Interview has a sheet open on its window, so close_project left it open: finish or cancel the sheet first.
+
+## Which project a call acts on
+
+Every tool takes an optional `project`: the path of an open project, as `get_project` reports it. Leave it out and the call goes to the frontmost open project, by window order, whether or not Frame Job is the active app.
+
+| Situation | What happens |
+| --- | --- |
+| The path is an open project's | The call acts on it. `~` is expanded, and different spellings of one path match. |
+| The path names no open project | "No open project is at *path*. get_project reports the open project's path; open_project opens another." |
+| `project` is left out and no project is open | "No project is open. Call open_project or new_project first." |
+
+A movie opened as a project is addressed by the movie's path. A project that has never been saved and didn't come from a file has no path, so `get_project` reports `null` and only the frontmost-project rule can reach it.
+
+The Assistant's calls are held to its own window's project. A `project` naming any other is refused.
+
+To edit inside a nest, most tools that edit also take `scope`. See [Editing inside a nest](/mcp/nests/).
+
+## One call, one undo step
+
+Every tool that edits the project makes exactly one undo step, however many clips it touched. So `undo` takes back exactly one call, and the step's name in the **Edit** menu is the name the tool gives it, such as "Split at Shot Changes".
+
+`undo` and `redo` walk the same history as <kbd>⌘Z</kbd> and <kbd>⇧⌘Z</kbd>, so they take back the last step whoever made it. Each answers the step's name, `can_undo`, `can_redo` and the project summary, and it's an error when there's nothing to walk back. Any new edit clears the redo history.
+
+Some tools make no step:
+
+- **View state:** `set_playhead`, `set_range`, `set_selection` and `set_scope` change what the window shows, not the project.
+- **Reads:** a tool that only answers, such as `get_project` or `detect_silence`, changes nothing. So does a call that made no change, which is [safe to retry](/mcp/what-a-call-answers/#a-no-change-answer).
+- **File writes in the graphics folder:** `write_graphic`, `import_graphic_font`, `import_graphic_asset`, `delete_graphic`, `restore_graphic` and `import_graphic` can't be undone, and each tool says so. See [Tools: graphics](/mcp/tools-graphics/).
+
+## Analysis tools wait 60 seconds, then resume
+
+Some tools need Frame Job to analyse a file first, on your Mac. A call waits at most 60 seconds for that, and the others wait behind it. What was analysed is kept in the project's cache, so calling again carries on from there and a part already analysed answers at once.
+
+What happens at 60 seconds depends on the tool:
+
+| Tool | Past 60 seconds |
+| --- | --- |
+| `get_media_analysis` | Refused, saying how much was covered: "The faces analysis of media 12 covered 41.0 s of the window's 120.0 s in the 60 s a call waits; what it covered is kept — call again to continue." |
+| `split_at_shots` | Refused: "The shots analysis of media 12 did not finish in the 60 s a call waits; what it covered is kept — call split_at_shots again to continue." Nothing is split. |
+| `switch_by_speaker` | The same, for the faces analysis. It only waits when one microphone is shared by two or more cameras. |
+| `reframe_clip`, `make_vertical_version` | Not refused. The call answers `ok: true`, an `analyzing` object and a `note`, makes no edit, and the analysis carries on without it. Call again to apply. |
+
+`analyzing` holds `media`, the ids still being analysed, and `covered`, the share done from 0 to 1.
+
+`analyze_cutout` works differently. It waits for as many seconds as its `wait` says, from 0 to 60, and answers the state it reached. It's never refused for time.
+
+Keep `get_media_analysis` answers small on long media. An answer over 512 KiB is refused, naming the largest `to` that fits, so read faces and subjects in `from` and `to` windows of about 2 minutes. See [Tools: reading analysis](/mcp/tools-analysis/).
+
+## Calls and Background render
+
+An MCP call counts as activity when it edits a project or moves a playhead, so it stops [Background render](/graphics/playback-and-memory/#what-stops-background-render), which starts again after its usual wait. A call that only reads, such as `get_project`, doesn't count.
+
+## Related
+
+- [What a call answers](/mcp/what-a-call-answers/)
+- [Units and ids](/mcp/units-and-ids/)
+- [Patches](/mcp/patches/)
+- [Editing inside a nest](/mcp/nests/)
+- [Undo and saving](/getting-started/undo-and-saving/)

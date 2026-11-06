@@ -1,0 +1,199 @@
+---
+title: "Tools: copying and nesting"
+description: "The agent tools that duplicate and paste clips, copy one clip's settings onto others, and group clips into a nest, with their arguments, answers and limits."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These tools make more of what's already on the timeline. They copy clips, copy one clip's settings onto others, and group clips into one clip or take that group apart.
+
+<AtAGlance tools={['duplicate', 'paste', 'paste_attributes', 'nest', 'unnest']} />
+
+## Pick a tool
+
+| You want to | Use |
+| --- | --- |
+| Copy clips, straight after the originals or anywhere else | [`duplicate`](#duplicate) |
+| Place clips from a payload at a time, in this project or another | [`paste`](#paste) |
+| Copy one clip's settings onto other clips | [`paste_attributes`](#paste_attributes) |
+| Group clips into one clip | [`nest`](#nest) |
+| Take a group apart again | [`unnest`](#unnest) |
+
+## What these tools share
+
+- **Times** are in ticks, 600,000 to the second, and are rounded to the project's frame grid. See [Units and ids](/mcp/units-and-ids/).
+- **One call is one undo step**, however many clips it touches.
+- **The answer** is `ok: true`, the ids of anything created, such as `new_clips`, and a `project` summary. A call that changes nothing says so and leaves no undo step. See [What a call answers](/mcp/what-a-call-answers/).
+
+## The payload
+
+`paste` and `paste_attributes` both take a `payload`, an object in the form **Edit ▸ Copy** puts on the clipboard. No tool reads the clipboard, so an agent builds its own from what `get_project` lists:
+
+```json
+{
+  "clips": [],
+  "media": [],
+  "nests": []
+}
+```
+
+| Key | Required | What it holds |
+| --- | --- | --- |
+| `clips` | Yes, at least one | Clip objects as `get_project` lists them, each with its `track` changed as below. |
+| `media` | When a clip uses a file | The media rows those clips use, as `get_project` lists them. |
+| `nests` | When a clip shows a nest | The nests those clips show, and any nest inside them, as `get_project` lists them. |
+
+Two things differ from what `get_project` gives you:
+
+- **A clip's `track` is a depth, not a track id.** 0 is the front-most lane, 1 the lane behind it, and so on, because a track id means nothing in another project.
+- **Ids are only used inside the payload**, to tie clips to their media and nests. Everything that lands gets a fresh id, so a payload can be pasted again and again, into any project.
+
+Keys Frame Job doesn't know are ignored. A payload that isn't an object, or has no clips, is an error.
+
+## `duplicate`
+
+Copies clips, keeping a selection's internal timing. Left to itself it puts them on their own tracks, straight after the span the originals cover. `delta` and `track` put them anywhere else.
+
+It mirrors **Edit ▸ Duplicate** (<kbd>⌘D</kbd>) and, with `delta` and `track`, an <kbd>⌥</kbd>-drag. See [Duplicate clips](/editing/duplicate-clips/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | Yes | The clips to copy, at least one. |
+| `delta` | integer, ticks | No | How far from their originals the copies land. Negative is earlier, and the earliest copy stops at 0. Left out, one span later. |
+| `track` | integer | No | The track id for the back-most, earliest clip you name. The other clips you name keep their distance from it in the stack. Left out, each copy stays on its original's track. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+A clip's linked partner on an unlocked track is copied too, and the two copies are linked to each other. Only the clips you name change track, so the partner's copy keeps its original's track and moves by the same time. A copy of a nest clip shows the same nest as the original. See [Shared and independent nest copies](/editing/nest-copies/).
+
+**Answers** `new_clips`, the copies.
+
+**Won't run** when a copy would break the [overlap rule](/getting-started/refused-edits/) where it lands, a partner's copy included, or when a clip you name would land past either end of the track list. Later clips aren't pushed out of the way. An overlap the rule allows gets a Cross Dissolve. An unknown clip or track id, or an empty list, is an error.
+
+## `paste`
+
+Places a [payload](#the-payload)'s clips on the timeline. The earliest clip lands exactly at `at`, and the others keep their distance from it, so a copied arrangement pastes back intact.
+
+It mirrors **Edit ▸ Paste** (<kbd>⌘V</kbd>), without touching the clipboard. See [Copy, cut and paste](/editing/copy-and-paste/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `payload` | object | Yes | The clips to place. See [The payload](#the-payload). |
+| `at` | integer, ticks | No | Where the earliest clip lands. Left out, the playhead. |
+| `track` | integer | No | The track id where depth 0 lands, and the other depths follow behind it. Left out, the front-most track. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+What Frame Job does to make the clips fit:
+
+- **Media** is matched to this project by path. A row the project already has is reused, and one it lacks is added. Only files the pasted clips use come across.
+- **Nests** are always copied, never matched, so editing one copy afterwards leaves the other alone. Copy writes the nests its clips show, with every nest inside them, and no `nests` key when they show none.
+- **Times** are rounded to this project's frame grid.
+- **Missing tracks** are added at the back.
+- **No room:** a clip that would break the overlap rule on its track goes on a new track in front instead of being dropped. A smaller overlap the rule allows gets a Cross Dissolve.
+- **Links:** a linked pair in the payload lands as a linked pair. A clip whose partner isn't in the payload loses its link.
+
+**Answers** `new_clips`, and `new_tracks` and `new_media` when any were added.
+
+**Won't run** in these cases, and a paste lands whole or not at all:
+
+- The payload isn't an object, has no clips, or holds a clip that isn't in the form `get_project` lists.
+- A clip uses a file or shows a nest the payload doesn't carry, or a media row has an empty path.
+- A value is out of range. The message names the clip by its id in the payload.
+- `track` doesn't exist in this project.
+- A clip's depth is past the 64-track limit, or the paste would pass 64 tracks or 4,096 clips.
+- It would put an [adjustment clip](/color/adjustment-clips/) inside a nest.
+
+## `paste_attributes`
+
+Copies one clip's settings onto other clips. It reads only the payload's earliest clip: the one with the earliest start, then the front-most, then the lower id. Never assume that's the first clip in the array.
+
+It mirrors **Edit ▸ Paste Attributes** (<kbd>⌥⌘V</kbd>) and, with `groups` set to `["graphic"]` and `skip_missing` on, **Edit ▸ Paste Graphic Properties**. See [Paste Attributes](/editing/paste-attributes/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | Yes | The clips to change, at least one. |
+| `payload` | object | Yes | Holds the clip to copy from. See [The payload](#the-payload). |
+| `groups` | array of strings | No | Which groups travel: `video`, `audio`, `text`, `shape`, `graphic`. Left out, each of the first four that both clips have, and never `graphic`. An empty list is an error. |
+| `skip_missing` | boolean | No | Only with `groups`. On, a group the payload's clip lacks is dropped, and a clip that can't take a group is skipped for it. Default off. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+Each group replaces the target's whole group, and nothing is merged:
+
+| Group | What travels | What the target keeps |
+| --- | --- | --- |
+| `video` | Every picture setting, position and scale included. | An adjustment clip keeps its own [qualifier](/color/qualifiers/) when the copied clip isn't an adjustment clip. A picture clip takes no qualifier. |
+| `audio` | Every sound setting, mute and keep pitch included. | Nothing. |
+| `text` | Every text setting. | Its words and their timings. |
+| `shape` | Every shape setting. | Its kind, width, height, and `from` and `to` points. |
+| `graphic` | The graphic's properties, whole, onto clips drawn by the same graphic. | Its name, size, in point and length, and any property an action on that clip animates that the copied clip lacks. |
+
+Speed, whether the picture and sound are on, actions, the transition, the clip's name and its label never travel. A [look](/color/luts/) brings its `.cube` file by path when the payload's `media` carries it, and a look whose file isn't there comes across as no look.
+
+**Answers** the usual `ok` and `project`, and `new_media` when a look's `.cube` file was added.
+
+**Won't run** in these cases, and no clip changes:
+
+- `groups` is empty or names something else.
+- Without `skip_missing`, a named group is one the copied clip lacks, or a target lacks. The message names the group or the clip.
+- Without `skip_missing`, `graphic` meets a clip drawn by another graphic. The message names both.
+- A copied value is one the inspector wouldn't accept on that clip. See [When a paste stops](/editing/paste-attributes/#when-a-paste-stops).
+
+When the paste would leave every clip as it was, the answer is "Paste Attributes made no change".
+
+## `nest`
+
+Collapses clips into one clip that stands for the group. From then on the group moves, trims, fades and transforms as one thing.
+
+It mirrors **Clip ▸ Nest** (<kbd>⌘G</kbd>). See [Nests](/editing/nests/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | Yes | The clips to group, at least one. |
+| `name` | string | No | What to call the group. Left out or blank, `Nest <n>`. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+The clips move whole, keeping their ids, settings, actions, transitions, relative times and stacking, with the earliest starting at 0 inside the nest. A linked partner on an unlocked track goes in with its clip. The nest clip lands on the front-most track the clips were on, and runs from the earliest start to the latest end. If those tracks include a [matte track](/canvas/matte-tracks/), it lands on the front-most track that isn't one, or the front-most track when all of them are.
+
+The nest's canvas is fixed at the project's current size, so a later [`set_canvas`](/mcp/tools-tracks-and-markers/#set_canvas) can't re-lay out what's inside.
+
+**Answers** `new_clips`, which is the nest clip, and `new_tracks`, the nest's own tracks. `get_project` lists the group under `nests`, and the nest clip's `source.project` gives its id, which is what `scope` takes.
+
+**Won't run** when:
+
+- The clips include an [adjustment clip](/color/adjustment-clips/), which can't go inside a nest.
+- The nest clip would overlap something unselected by more than the [overlap rule](/getting-started/refused-edits/) allows. An overlap the rule allows gets a Cross Dissolve.
+- It would pass 64 tracks, counting the nest's own, or eight levels of nesting.
+
+`clips` holding only a clip that's already a nest changes nothing. An empty list or an unknown clip id is an error.
+
+## `unnest`
+
+Opens a nest clip: its contents return to the timeline and the nest clip goes.
+
+It mirrors **Clip ▸ Un-nest** (<kbd>⇧⌘G</kbd>). See [Un-nest](/editing/nests/#un-nest).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The nest clip to open. |
+| `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
+| `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
+
+It's the inverse of `nest`, apart from the ids, which are all fresh. Clips land at the nest clip's start plus their own, on tracks counted back from the nest clip's own, and missing tracks are added behind it. A clip the overlap rule won't allow goes on a new track in front instead of being dropped.
+
+A nest clip trimmed shorter than its contents gives all of them back, because trimming a nest hides what's inside and doesn't cut it. When another clip still shows the same nest, the nest stays for that clip.
+
+**Answers** `new_clips`, the returned clips, and `new_tracks` when any were added.
+
+**Won't run** on a clip that isn't a nest, which is an error.
+
+## Related
+
+- [Tools: moving and trimming](/mcp/tools-move-and-trim/)
+- [Tools: cutting and deleting](/mcp/tools-cut-and-delete/)
+- [Editing inside a nest](/mcp/nests/)
+- [Read the project: get_project](/mcp/get-project/)
+- [Copy, cut and paste](/editing/copy-and-paste/)
+- [Nests](/editing/nests/)

@@ -118,8 +118,8 @@ impl Default for AudioProps {
 
 /// A fade's or a crossfade's gain curve over its progress u in 0..1 (spec
 /// §11 AU-114, AU-115): `linear` is `u`, `s_curve` `(1 − cos πu)/2`,
-/// `plus_3db` `sin(uπ/2)` (fast start) and `minus_3db` `1 − cos(uπ/2)`
-/// (slow start). The formulas are `audio_shape.rs`'s.
+/// `plus_3db` `sin(uπ/2)` (fastest near silence) and `minus_3db`
+/// `1 − cos(uπ/2)` (fastest near full level). The formulas are `audio_shape.rs`'s.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FadeShape {

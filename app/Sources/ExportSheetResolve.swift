@@ -460,11 +460,12 @@ extension ExportSheetController {
             widthField.integerValue = settings.width
             heightField.integerValue = settings.height
         }
-        summaryLabel.textColor = DS.textMuted
-        summaryLabel.stringValue = summary(for: settings)
+        let refusal = writeRefusal(for: settings)
+        summaryLabel.textColor = refusal == nil ? DS.textMuted : DS.textStrong
+        summaryLabel.stringValue = refusal ?? summary(for: settings)
         footnote.stringValue = footnoteText(for: settings)
         footnote.toolTip = footnote.stringValue
-        exportButton?.isEnabled = settings.duration > 0
+        exportButton?.isEnabled = settings.duration > 0 && refusal == nil
     }
 
     /// Re-titles the tier rows with the rate each would ask for at the size

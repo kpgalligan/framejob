@@ -1,0 +1,155 @@
+---
+title: Reverse a clip
+description: Play a clip back to front, picture and sound, and deal with the backwards copy Frame Job renders to do it.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+Reverse plays a clip back to front, picture and sound together. The Mac's playback can't run video backwards, so the first time you reverse a file, Frame Job renders a backwards copy of it and the clip plays from that.
+
+<AtAGlance
+  where="Clip tab ▸ Clip sub-tab ▸ Timing"
+  tools="set_reversed"
+/>
+
+<Shot
+  name="10-clip-clip-tab.inspector"
+  alt="The Clip tab on its Clip sub-tab, with the Timing section open: In, Out and Duration, then an unticked Reverse checkbox, Reversed frames reading a dash, and a dimmed Render Reverse button."
+/>
+
+## Reverse a clip
+
+<Steps>
+
+1. Select the clip, or several clips.
+
+2. In the inspector, go to the **Clip** tab and its **Clip** sub-tab, and open **Timing** if it's closed.
+
+3. Tick **Reverse**.
+
+</Steps>
+
+If the file has no backwards copy yet, the [Reversing sheet](#the-reversing-sheet) appears while Frame Job makes one. When it closes, the clip plays backwards. If a copy already exists, the clip plays backwards straight away.
+
+Untick **Reverse** to play the clip forwards again. Each change is one undo step, called **Reverse**.
+
+## Where Reverse lives
+
+Reverse is for clips of a video or audio file. Text, shapes, graphics, adjustment clips, nests, pictures and freeze frames have no Reverse rows.
+
+With one clip selected, **Timing** shows [In, Out and Duration](/editing/timing-section/) above the Reverse rows. With several clips of video or audio files selected, it shows only the Reverse rows, and the section's summary is their total length.
+
+| Row | What it does |
+| --- | --- |
+| **Reverse** | Plays the clip back to front, or forwards again. |
+| **Reversed frames** | Shows the state of the [backwards copy](#reversed-frames). |
+| **Render Reverse** | Starts a stopped or failed render [again](#render-reverse). |
+
+With several clips selected, **Reverse** applies to all of them as one undo step. If they disagree, the row is tagged `mixed` and the box shows the first clip's state. Clicking it then sets every clip the same way.
+
+## Reversed frames
+
+This row tells you where the backwards copy has got to.
+
+| It reads | What it means |
+| --- | --- |
+| — | The clip isn't reversed. |
+| Rendering… | The copy is being made, or is about to be. |
+| Rendered | The copy exists and the clip plays from it. |
+| Not rendered | The render was cancelled or failed. **Render Reverse** is available. |
+| Media missing | The clip's file is missing or has no length. |
+
+Across several clips, the row shows the state that needs attention first: Not rendered, then Rendering…, Media missing, Rendered.
+
+## The Reversing sheet
+
+The sheet appears when a reversed clip needs a copy that doesn't exist, unless that file's render was cancelled or failed. Ticking **Reverse** is the usual reason. Opening a project whose package has lost its `cache` folder is another.
+
+It shows a progress bar, the line "Rendering a reversed copy of “name”…" or "Rendering reversed copies of 3 files…", and the name of the file being worked on. When it finishes, the sheet closes and the clip plays backwards.
+
+Editing commands are unavailable while the sheet is up. If an agent reverses another clip in the meantime, that clip's render starts when the sheet closes.
+
+### Cancel the render
+
+Choose **Cancel**. The sheet reads "Stopping…" until the render has stopped, then says:
+
+> Stopped. Clips that are still reversed show a slate until their frames are rendered — press Render Reverse in the Timing section of the Clip tab to try again.
+
+Choose **Close** to carry on. Files that had already finished are kept, and the clip stays reversed.
+
+### When a file can't be reversed
+
+The sheet says how many files failed, for example "2 files could not be reversed. Those clips show a slate rather than play forwards." Below that it names the first file and the reason. Choose **Close** to carry on. Files that rendered are kept.
+
+## The slate
+
+Until a clip's copy exists, it shows a slate instead of playing forwards: a dark plate with diagonal stripes, in the clip's place on the canvas. The clip plays no sound either. A clip with no picture stays silent and draws nothing.
+
+:::caution
+An export made while a clip shows a slate writes the slate. Finish the render first.
+:::
+
+## Render Reverse
+
+Nothing restarts a stopped render by itself. **Render Reverse** is how you try again, and it's available only when **Reversed frames** reads Not rendered.
+
+Each press renders one file, shared by every reversed clip of that file. If several files are waiting, press it once for each file until no selected clip reads Not rendered.
+
+Unticking **Reverse** on every clip of a file and ticking it again also starts a new render.
+
+## The clip stays in place
+
+Reversing never moves a clip. It keeps its start, its length and its in point.
+
+The in point is counted in the direction the clip plays, so reversing a trimmed clip shows the other end of the file. Take a 10 s file trimmed to its first 3 s. Reversed, the clip plays the file's last 3 s, from 10 s back to 7 s. To play a different part, [slip](/editing/slip-and-roll/) the clip.
+
+## Reverse with speed and ramps
+
+Reverse works with [Speed](/speed/change-speed/), [Fit to](/speed/fit-to-duration/), the [⌥ rate stretch](/speed/rate-stretch/) and [speed ramps](/speed/speed-ramps/). The in point and the ramp both count in the direction the clip plays, so a reversed ramped clip ramps through the file backwards.
+
+## The backwards copy
+
+Frame Job renders one copy per file. It's kept in the [project package](/reference/framejob-package/)'s `cache` folder with the other things Frame Job can rebuild, and every reversed clip of that file shares it. The same file can play forwards on one clip and backwards on another.
+
+The copy stays after you untick **Reverse**, so ticking it again doesn't render anything. [New Project from Range](/projects/new-project-from-range/) brings the copies its clips play along with it.
+
+The copy belongs to one version of the file, in one place. If the file changes or moves, or you [relink](/projects/relink-media/) the clip to another file, Frame Job renders a new copy and removes the old one.
+
+## Depth and colour
+
+The copy is rendered at 10 bits, at the source's exact size, with the colour information from the source file, so an HDR or log clip still looks right when reversed. See [Precision and bit depth](/hdr/precision/).
+
+It's written as HEVC Main 10. A source with an odd width or height takes ProRes 422 instead, which makes a file several times larger.
+
+:::caution
+The copy doesn't keep an alpha channel. A reversed ProRes 4444 clip loses its transparency.
+:::
+
+## Good to know
+
+### Still images
+
+A picture on the timeline looks the same backwards, so it has no Reverse rows and nothing to render. The same goes for a [freeze frame](/speed/freeze-frame/).
+
+### Linked clips
+
+Frame Job won't reverse a clip linked to its detached sound. The foot of the inspector says which clips are linked. Choose **Clip ▸ Attach Audio** (<kbd>⇧⌥⌘D</kbd>) first. See [Detach and Attach Audio](/audio/detach-and-attach/). With several clips selected, the others still reverse.
+
+### Commands that need a forward clip
+
+- [Generate Captions](/captions/what-can-be-transcribed/) skips a reversed clip, because its words would come out backwards.
+- [Auto Zoom](/recording/auto-zoom/), [Add Shortcut Overlays](/recording/shortcut-overlays/) and [Speed Up Typing](/recording/speed-up-typing/) won't work on one.
+
+## With an agent
+
+`set_reversed` takes the clip and `reversed`, true or false, so it says which way to play and isn't a toggle. The Reversing sheet appears in the project's window, as it does when you tick **Reverse**, and the clip shows the [slate](#the-slate) until the copy exists. See [`set_reversed`](/mcp/tools-speed/#set_reversed).
+
+## Related
+
+- [Freeze frame](/speed/freeze-frame/)
+- [Speed at a glance](/speed/overview/)
+- [Speed ramps](/speed/speed-ramps/)
+- [Slip and roll](/editing/slip-and-roll/)
+- [Precision and bit depth](/hdr/precision/)

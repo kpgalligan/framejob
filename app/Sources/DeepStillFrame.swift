@@ -7,8 +7,10 @@ import ImageIO
 /// asks through `DeepVideoFrame.reads` when its caller's format keeps depth
 /// (`render_frame` and File ▸ Save Frame… as PNG or HEIC), and the reader it
 /// then reads the frame through instead of `AVAssetImageGenerator`, whose
-/// image is 16-bit only when every video track of the composition is deep.
-/// `read` also reads a frame showing a deep VP9 track (issue batch B103, PR-12).
+/// image is 16-bit only when the lowest track that has video is deep (PR-14).
+/// `read` also reads a frame showing a deep VP9 track (issue batch B103,
+/// PR-12), and one the generator answers 8-bit while it shows a deep source
+/// (PR-14).
 /// GIF and APNG never ask: ImageIO writes both at 8 bits a component.
 ///
 /// It asks the RECIPE, not the project: a deep still elsewhere on the

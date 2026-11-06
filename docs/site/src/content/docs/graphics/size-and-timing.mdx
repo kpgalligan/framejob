@@ -1,0 +1,94 @@
+---
+title: "Graphic size and timing"
+description: Set the size a graphic draws at, fit it to the canvas, and control how its own animation runs when the clip gets longer, shorter or split.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A graphic is drawn fresh at a size you choose, and it has an animation timeline of its own. The **Size** and **Timeline** sections of the **Graphic** sub-tab set both, so you can make a graphic sharp at any size and decide whether its outro follows the end of the clip.
+
+<AtAGlance
+  where={['Clip tab ▸ Graphic ▸ Size', 'Clip tab ▸ Graphic ▸ Timeline']}
+  tools={['set_graphic', 'add_graphic_clip', 'set_video', 'trim_start', 'trim_end', 'roll']}
+/>
+
+## Width and Height
+
+**Width** and **Height** are the size the graphic draws at, in whole pixels from 1 to 8192 a side. The graphic's code lays itself out at that size, so text and shapes stay sharp.
+
+The **Size** section starts collapsed, and its header shows the size, for example `1920 × 1080`. With several graphic clips selected, a change applies to all of them, and a row shows mixed when they differ.
+
+A new graphic takes the size its [module](/graphics/what-is-a-graphic/), the code that draws it, asks for, or the canvas's size if it doesn't ask.
+
+The graphic is drawn at this size and then placed on the canvas like any other layer. Scaling the clip in the [Picture](/canvas/picture-tab/) sub-tab scales that finished picture. To make a graphic bigger and keep it crisp, raise **Width** and **Height** rather than the scale.
+
+Changing the [canvas size](/projects/canvas-size/) never changes a graphic's size. [Make Vertical Version](/graphics/vertical-graphics/) is the one exception.
+
+## Fit to Canvas
+
+**Fit to Canvas** in the **Size** section sets the size to the canvas's, then centres the clip at scale 1. It works on every selected graphic clip, as one undo step called Fit Graphic to Canvas.
+
+A graphic can't be larger than 8192 pixels a side, so on a bigger canvas Frame Job tells you why and leaves the clip as it was.
+
+## The graphic's own timeline
+
+A graphic counts its own frames from its first frame, separately from the project's timeline. The **Timeline** section shows where the clip sits on that count. It appears only when one clip is selected, it starts collapsed, and its header shows the length.
+
+| Row | What it shows | What you can do |
+| --- | --- | --- |
+| **In** | The graphic frame the clip's first frame shows. | Nothing directly. Trimming the front, rolling the cut before the clip and splitting all move it. |
+| **Length** | How long the graphic's own timeline runs. | Type a timecode to pin it. |
+| **Follow Clip** | Whether the graphic's timeline ends when the clip ends. | Tick or untick it. |
+
+### Follow Clip
+
+**Follow Clip** is on for a new clip. The graphic's timeline ends with the clip, so when you lengthen the clip its outro moves to the new end. Most graphics want this.
+
+Unticking **Follow Clip** pins **Length** at its current value. Ticking it again hands the length back to the clip.
+
+### Length
+
+Typing in **Length** pins it, which unticks **Follow Clip**, and is one undo step called Graphic Length. A pinned graphic keeps its pace however long the clip gets, so the animation doesn't stretch and its outro stays at the same point.
+
+The value snaps to a frame and can't be less than one frame. Typing the value the field already shows changes nothing, so untick **Follow Clip** to pin the length as it stands.
+
+### Length shorter or longer than the clip
+
+When **Length** is pinned shorter than the clip, the graphic keeps counting frames past it, but its progress stays at the end. What you see depends on how the graphic is written:
+
+- An animation driven by progress holds its end state.
+- An animation driven by frame numbers keeps going.
+
+When **Length** is pinned longer than the clip, the clip ends before the graphic's timeline does, so a late outro never plays.
+
+## Trim a graphic like footage
+
+Trimming a graphic clip cuts into its animation, as trimming a video cuts into its footage. [Trim](/editing/trimming/) and [roll](/editing/slip-and-roll/) work as they do on any clip.
+
+| Edit | What happens |
+| --- | --- |
+| Trim the start, or roll the cut before the clip | **In** moves, so the animation starts further in. **Length** stays the same, so the outro keeps its timing. |
+| Trim the end, **Follow Clip** on | The graphic's timeline ends at the clip's new end. |
+| Trim the end, **Length** pinned | **Length** doesn't change. Shortening the clip can cut off the outro. |
+| Drag the start earlier | A graphic has no source to run out of, so the start can go back as far as the track allows. **In** moves back and stops at 0. |
+| [Split](/editing/splitting/) the clip | The second half's **In** moves, so it carries on where the first half left off. Both halves pin **Length** to the original's, which unticks **Follow Clip** on both and keeps the outro at the same point. |
+| [Retime Range](/speed/retime-range/) | The clip stretches or squeezes like a title. A pinned **Length** stays as it was. |
+
+## Good to know
+
+- Actions can't animate size or timing. With an action selected, the **Size** and **Timeline** sections show ⊘ and always change the clip. See [What an action can animate](/motion/what-can-animate/).
+- Adding a [transition](/motion/add-a-transition/) that gives a graphic clip extra frames at its head moves **In** back by the same amount, so the picture stays in step. Where **In** is shorter than the extension it stops at 0, and the graphic's first frame lands on the clip's new first frame.
+- Changing the [project frame rate](/projects/frame-rate/) moves a graphic's own timeline onto the new frames. **In** and a pinned **Length** snap to the nearest frame. A graphic that counts in seconds keeps its pace, and one that counts frames runs faster at a higher rate.
+
+## With an agent
+
+An agent sets the size and the length with [`set_graphic`](/mcp/tools-graphics/#set_graphic), and can give a size to [`add_graphic_clip`](/mcp/tools-graphics/#add_graphic_clip) as it places the clip. A `length` of null is **Follow Clip**. To do what **Fit to Canvas** does, it sets the size with `set_graphic`, then the position and scale with [`set_video`](/mcp/tools-set-video/#set_video).
+
+No tool sets **In** directly. It moves with [`trim_start`](/mcp/tools-move-and-trim/#trim_start), [`roll`](/mcp/tools-move-and-trim/#roll) and splits, as it does in the app. See [Tools: graphics](/mcp/tools-graphics/#set_graphic).
+
+## Related
+
+- [The Graphic sub-tab](/graphics/graphic-tab/)
+- [Animate graphic properties](/graphics/animate-properties/)
+- [Graphics in a vertical version](/graphics/vertical-graphics/)
+- [Trim clips](/editing/trimming/)

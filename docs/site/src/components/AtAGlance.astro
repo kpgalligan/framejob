@@ -1,0 +1,72 @@
+---
+// The facts a reader wants before the prose: where a feature is, its keys, what it needs.
+// Every prop is optional, and a row appears only when its prop is given.
+interface Props {
+  /** Menu paths, as the app prints them: `Clip ▸ Split`. */
+  menu?: string | string[];
+  /** Keys, as the app prints them: `⌘T`. */
+  keys?: string | string[];
+  /** Where else it lives: an inspector tab and section, the toolbar, a right-click menu. */
+  where?: string | string[];
+  /** The agent tools that do the same thing. */
+  tools?: string | string[];
+  /** What it needs beyond the app: a key, a permission, a model. */
+  needs?: string | string[];
+}
+
+const list = (value?: string | string[]) => (value === undefined ? [] : [value].flat());
+const { menu, keys, where, tools, needs } = Astro.props;
+---
+
+<dl class="fj-glance not-content">
+  {list(menu).length > 0 && (
+    <>
+      <dt>Menu</dt>
+      <dd>
+        {list(menu).map((item) => (
+          <strong>{item}</strong>
+        ))}
+      </dd>
+    </>
+  )}
+  {list(keys).length > 0 && (
+    <>
+      <dt>Keys</dt>
+      <dd>
+        {list(keys).map((item) => (
+          <kbd>{item}</kbd>
+        ))}
+      </dd>
+    </>
+  )}
+  {list(where).length > 0 && (
+    <>
+      <dt>Where</dt>
+      <dd>
+        {list(where).map((item) => (
+          <span>{item}</span>
+        ))}
+      </dd>
+    </>
+  )}
+  {list(needs).length > 0 && (
+    <>
+      <dt>Needs</dt>
+      <dd>
+        {list(needs).map((item) => (
+          <span>{item}</span>
+        ))}
+      </dd>
+    </>
+  )}
+  {list(tools).length > 0 && (
+    <>
+      <dt>Agent tools</dt>
+      <dd>
+        {list(tools).map((item) => (
+          <code>{item}</code>
+        ))}
+      </dd>
+    </>
+  )}
+</dl>

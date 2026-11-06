@@ -1,0 +1,233 @@
+---
+title: "Check the picture: render_frame"
+description: "Render one frame of the finished timeline so an agent can see its work, choose the file it writes, draw grade and HDR variants, and measure the scopes."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+`render_frame` draws one frame of the finished timeline, so an agent can see what it has done. It's drawn the same way an export draws it, so the picture is what the file will contain at that moment, not a preview of it.
+
+It isn't a screenshot of the window, so it needs no Screen Recording permission, and it doesn't matter what's covering the app. No tool captures the window itself.
+
+<AtAGlance
+  menu="File ▸ Save Frame…"
+  keys="⌥⌘E"
+  tools="render_frame"
+/>
+
+## Render a frame
+
+With no arguments it draws the frame under the playhead at the canvas's size and writes a PNG to a temporary file.
+
+```json
+{ "t": 1200000, "path": "/tmp/shot.png", "max_width": 960 }
+```
+
+The picture comes back two ways: as an image the model can see, and as a file on disk. The text beside it says what was drawn and ends by naming the file:
+
+```
+Frame at 1200000 ticks of a 1920×1080 px canvas, rendered at 960×540 px. Written to /tmp/shot.png.
+```
+
+It uses the same writer as [**File ▸ Save Frame…**](/export/save-frame/), so a PNG from either one is identical, byte for byte.
+
+With a [nest](/mcp/nests/) open, it draws that nest at its own size, from its own zero, without the nest clip's position, scale or opacity. It takes no `scope`, so open the nest with [`set_scope`](/mcp/tools-view-state/#set_scope) to look inside.
+
+| Argument | Type | Required | What it does | Default |
+| --- | --- | --- | --- | --- |
+| [`t`](#t) | integer | No | The moment to render, in ticks. | The playhead |
+| [`path`](#path) | string | No | Where to write the file. | A temporary file |
+| [`format`](#format) | string | No | `png`, `jpeg` or `heic`. | From the path, else `png` |
+| [`max_width`](#max_width) | integer | No | Caps the width in pixels, 16 to 8192. | The canvas's width |
+| [`burn_in_timecode`](#burn_in_timecode) | boolean | No | Draws the project timecode over the picture. | `false` |
+| [`ungraded`](#ungraded) | boolean | No | Draws every clip as if it weren't graded. | `false` |
+| [`selection`](#selection) | integer | No | Draws what an adjustment clip's qualifier selects. | None |
+| [`sdr_version`](#sdr_version) | boolean | No | Draws an HDR project's SDR version. | `false` |
+| [`waveform`](#waveform-parade-and-histogram) | boolean | No | Also measures the waveform. | `false` |
+| [`parade`](#waveform-parade-and-histogram) | boolean | No | Also measures the RGB parade. | `false` |
+| [`histogram`](#waveform-parade-and-histogram) | boolean | No | Also measures the histogram. | `false` |
+| [`vectorscope`](#vectorscope-and-vectorscope_zoom) | boolean | No | Also measures the vectorscope. | `false` |
+| [`vectorscope_zoom`](#vectorscope-and-vectorscope_zoom) | integer | No | 1, 2 or 4. Needs `vectorscope`. | 1 |
+| `project` | string | No | The path of the open project to act on. | The frontmost project |
+
+## Choose the moment and the file
+
+### `t`
+
+The moment to render, in ticks, 600,000 to the second. It's rounded to the project's frame grid. Leave it out for the playhead. A time before zero draws the first frame, and a time past the end returns an [error](#when-it-wont-render).
+
+With a nest open, `t` and the playhead are the nest's own time.
+
+### `path`
+
+Where to write the file, for example `~/Desktop/shot.png`. The folder must already exist, because Frame Job won't create one. An empty `path` is an error.
+
+Leave it out for a temporary file. Either way, the last sentence of the text names the file written.
+
+### `format`
+
+The kind of file to write.
+
+| `format` | What you get |
+| --- | --- |
+| `png` | Lossless, keeping the canvas's transparency. |
+| `jpeg` | Quality 0.9. JPEG has no transparency, so a transparent canvas is flattened onto black, and the text always says so. |
+| `heic` | Quality 0.9, keeping the canvas's transparency. |
+
+With no `format`, the path's extension decides: `.jpg` and `.jpeg` both mean JPEG, and `.heic` means HEIC. Any other path writes a PNG.
+
+An explicit `format` wins, and the path's extension is replaced rather than added to, so `{"path": "shot.jpg", "format": "png"}` writes `shot.png`. Only an extension Frame Job knows is replaced: `Talk v1.2` becomes `Talk v1.2.png`, not `Talk v1.png`. A JPEG always ends `.jpg`, so `shot.jpeg` is written as `shot.jpg`.
+
+`jpg` also works as a `format`, and capitals don't matter.
+
+### `max_width`
+
+Caps the image's width in pixels, from 16 to 8192. The picture keeps its shape and is never made larger than the canvas. Leave it out for the canvas's own size.
+
+A smaller frame is quicker to send and to look at. The [scopes](#measure-the-frame) measure the frame as written, so their counts cover fewer pixels too.
+
+## Change what's drawn
+
+These four draw something other than the plain picture. The view switches in the window never reach this tool or an export, so an agent asks here.
+
+### `burn_in_timecode`
+
+Draws the project timecode over the picture, on top of everything, as the export sheet's **Burn in timecode** does. It's the project's own timecode, in the toolbar's spelling. An export from the in/out range shows project time too, so the number always matches the timeline. See [Burn in timecode](/export/burn-in-timecode/).
+
+### `ungraded`
+
+Draws every clip as if it weren't graded: Light, Color, wheels and curves neutral, and no look. It's the picture **View ▸ Show Ungraded** gives. See [Show Ungraded](/color/show-ungraded/).
+
+### `selection`
+
+Takes an adjustment clip's id and draws what its qualifier selects, in place of grading. It's the picture **View ▸ Show Selection** gives.
+
+- White is fully graded, and black is untouched.
+- It's the blurred selection when the qualifier has a blur, and it's multiplied by any matte cutting the clip.
+- The clip's strength isn't applied.
+- Every layer in front of the clip is left out.
+- Where the clip isn't on the frame, the picture is black.
+
+Frame Job won't do this for any other kind of clip. See [Qualifiers](/color/qualifiers/).
+
+### `sdr_version`
+
+Draws an [HDR project's](/hdr/dynamic-range/) SDR version, the picture **View ▸ Show SDR Version** gives. White titles come back near white, and highlights above reference white roll off. It's what the SDR exports and JPEG frames hold.
+
+In an SDR project it changes nothing, and the frame comes out identical. See [Show SDR Version](/hdr/show-sdr-version/).
+
+## Measure the frame
+
+Each scope argument measures the rendered frame through the same analyser as the [**View ▸ Scopes**](/color/scopes/) panel, so the two can't count differently. The text gives the headline figures, and a JSON file beside the image holds the counts, named after it: `shot.png` gets `shot.png.waveform.json`.
+
+The scopes read the frame as it was drawn, so `max_width`, `burn_in_timecode`, `ungraded` and `selection` all change what they count.
+
+If the measurement can't run, the call comes back as an error, but the image is already written and the error names it: "Wrote …, but its waveform could not be measured: the GPU pass did not run."
+
+### `waveform`, `parade` and `histogram`
+
+- **`waveform`** measures luma. The text gives the share of pixels clipping high and low.
+- **`parade`** measures R′, G′ and B′ the way the waveform measures luma. The text gives the share clipping high and low for each channel.
+- **`histogram`** counts R′, G′, B′ and Y′ at 256 levels. The text gives the share clipping high and low, read from Y′.
+
+For example: "Waveform: highlights clipped in 0.4 % of pixels, shadows in 0.0 %; its 256 × 256 counts are in …". A pixel clips high at level 255 and low at level 0.
+
+| JSON key | `waveform` | `parade` | `histogram` |
+| --- | --- | --- | --- |
+| `width`, `height` | The frame measured | The frame measured | The frame measured |
+| `levels` | 256 | 256 | 256 |
+| `columns` | 256 | 256 | |
+| `counts` | 256 column bins, each 256 levels | The same, under `red`, `green` and `blue` | |
+| `red`, `green`, `blue`, `luma` | | | 256 counts each |
+| `clipped_high`, `clipped_low` | Pixels clipping | Pixels clipping, by channel | Pixels clipping, by Y′ |
+| `marks_high`, `marks_low` | The column bins where at least 0.5 % of the column clips | The same, by channel | |
+| `highlights`, `shadows` | Percentages | | Percentages |
+
+### `vectorscope` and `vectorscope_zoom`
+
+`vectorscope` measures Rec. 709 Cb and Cr of the encoded values in 256 × 256 bins centred on neutral, bin 128. The text gives the share of pixels that are neutral.
+
+`vectorscope_zoom` is 1, 2 or 4, like the 1×, 2× and 4× cells on a [vectorscope](/color/vectorscope/) slot, and it needs `vectorscope: true`. Zooming spreads a near-grey picture over more bins. At 2 and 4, a pixel off the plot isn't counted, and the text also gives the share that lie off it.
+
+| JSON key | What it holds |
+| --- | --- |
+| `width`, `height` | The frame measured. |
+| `bins`, `centre` | 256 and 128. |
+| `matrix`, `values` | `Rec. 709` and `encoded`. |
+| `counts` | 256 arrays by Cr bin, each indexed by Cb bin. |
+| `neutral` | Pixels in the neutral bin. |
+| `zoom` | The zoom. |
+| `off_plot` | Pixels left off the plot. Always 0 at 1. |
+| `targets` | The six 75 % colour targets, `R`, `Mg`, `B`, `Cy`, `G` and `Yl`, each `[cb, cr]` in bins at this zoom, or `null` off the plot. |
+| `skin_line_degrees` | The skin line's angle. |
+
+## Read what the answer says
+
+The text always starts with the frame's time and sizes and ends with "Written to …". Anything else worth saying sits between the two.
+
+### Graphic problems in the answer
+
+When a [graphic](/graphics/agents-and-graphics/) in the frame had a problem, the answer names it, with its frame and what went wrong:
+
+- `Graphic "lower-third" failed at frame 12: …`
+- `Graphic "lower-third" warned at frame 12: …`
+- `Graphic "lower-third" does not compile: …`
+
+A failed graphic draws its error card in the picture.
+
+### Waiting for cutout masks
+
+A clip with [Remove Background](/effects/remove-background/) waits up to 30 s for the masks the frame needs. Frame Job starts making them as soon as the cutout is set, on your Mac.
+
+Past 30 s the clip is drawn whole, and the answer says so: "Clip 12 is drawn uncut: its person masks were not ready within 30 s." For a picture with its subject set to foreground, it says "its foreground masks".
+
+So after setting a cutout, read that sentence before trusting the frame. [`analyze_cutout`](/mcp/tools-analysis/#analyze_cutout) can wait for the masks first.
+
+### A cursor that can't be drawn
+
+A screen recording's cursor is drawn from its cursor file. When the file can't be read, the clip draws without one and the answer says "The cursor of media 5 is not drawn: …".
+
+## Frames from an HDR project
+
+In an [HDR project](/hdr/dynamic-range/), the frame depends on the format:
+
+| What you ask for | What you get |
+| --- | --- |
+| `png` | 16-bit, labelled BT.2100 HLG |
+| `heic` | 10-bit, labelled BT.2100 HLG |
+| `jpeg` | The project's SDR version, labelled BT.709 |
+| Any format with `sdr_version` | The project's SDR version, labelled BT.709 |
+
+Scopes read the picture drawn. On the HLG picture they read the HLG signal, and on the SDR version they read as an SDR project's do.
+
+On the HLG signal:
+
+- Each scope's JSON adds `signal: "hlg"`.
+- The waveform, parade and histogram JSON add `scale`: `unit` (`cd/m²`), `ticks` (each with `percent`, `level` and `nits`), `reference_white_percent` (75) and `clip_percent` (100).
+- Luma takes Rec. 2020's weights, and the vectorscope takes Rec. 2020's matrix and targets.
+- The text says so. The waveform's reads "reference white at 75 %, 203 cd/m², and 100 % at 1,000 cd/m²".
+
+See [Scopes in an HDR project](/hdr/hdr-scopes/) and [Export HDR](/hdr/export-hdr/).
+
+## When it won't render
+
+Nothing is drawn in these cases, and the answer says why.
+
+| It says | What to do |
+| --- | --- |
+| "No frame at … Either the time is past the end of the timeline, the media is missing, or the timeline is empty." | Check `duration` and `missing_media` in [`get_project`](/mcp/get-project/). |
+| "There is no folder at … to write into." | Create the folder, or choose another `path`. |
+| "path must name a file to write — omit it for a temporary one." | The `path` was empty. |
+| "format must be one of png, jpeg, heic (got …)." | Use one of the three. |
+| "max_width must be 16…8192 px (got …)." | Use a width in range. |
+| "selection must name an adjustment clip of this project; clip … is not one." | Pass an adjustment clip's id. An adjustment clip can't be inside a nest, so close any open nest first. |
+| "vectorscope_zoom must be 1, 2 or 4 (got …)." | Use one of the three. |
+| "vectorscope_zoom needs vectorscope: true." | Add `vectorscope: true`. |
+
+## Related
+
+- [Save Frame](/export/save-frame/)
+- [Tools: rendering and export](/mcp/tools-render-and-export/)
+- [Export: start, then poll](/mcp/export/)
+- [Scopes](/color/scopes/)
+- [A typical session](/mcp/typical-session/)

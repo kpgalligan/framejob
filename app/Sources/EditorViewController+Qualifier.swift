@@ -139,7 +139,7 @@ final class QualifierPickView: CanvasPickOverlay {
     init(clips: [UInt32], behind: UInt32) {
         self.clips = clips
         self.behind = behind
-        super.init(hint: "Click to pick the colour to qualify · Esc to cancel")
+        super.init(hint: "Click to pick the color to qualify · Esc to cancel")
     }
 
     @available(*, unavailable)

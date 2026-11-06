@@ -1,0 +1,81 @@
+---
+title: J-cuts and L-cuts
+description: Let a shot's sound start before its picture, or run on under the next shot, by trimming the sound half of a linked pair.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A J-cut brings in the next shot's sound before its picture. An L-cut lets a shot's sound run on under the next shot. Both soften a cut, and in Frame Job both come from trimming the sound half of a [detached clip](/audio/detach-and-attach/). Either one is also called a split edit.
+
+A multicam show with separate microphones doesn't need them. The [Program track](/multicam/switch-by-speaker/#the-program-track) Switch by Speaker writes has its sound off, so the picture cuts while the microphones run on.
+
+<AtAGlance
+  keys={['W', 'E']}
+  where={["Timeline: drag a detached sound clip's edge", 'Timeline: ⌥⇧-drag an edge to roll']}
+  tools={['trim_start', 'trim_end', 'roll']}
+/>
+
+## Make a J-cut
+
+<Steps>
+
+1. Select the later shot and press <kbd>⌥⌘D</kbd> to [detach its audio](/audio/detach-and-attach/#detach-audio).
+
+2. If the shot before it is detached too, drag this sound to a track of its own. See [Keep the sound off its neighbour](#keep-the-sound-off-its-neighbour).
+
+3. Drag the sound clip's start edge to the left.
+
+</Steps>
+
+The sound now begins before its picture. The picture stays where it is.
+
+## Make an L-cut
+
+<Steps>
+
+1. Select the earlier shot and press <kbd>⌥⌘D</kbd>.
+
+2. If the next shot's sound is on the track the sound went to, drag this sound to a track of its own.
+
+3. Drag the sound clip's end edge to the right.
+
+</Steps>
+
+The sound now runs on after its picture has ended.
+
+## Keep the sound off its neighbour
+
+When two neighbouring shots are both detached, their sounds sit side by side on one track. Lengthening one into the other overlaps them, and an overlap on a track is a [cross dissolve](/audio/crossfades/), not a split edit. On a track of its own, the sound overlaps nothing.
+
+## How far the sound can go
+
+A trim can only reveal what's in the file. The sound stops at the first or last frame of its media, and at the start of the timeline. Choose a shot with spare sound before its in point for a J-cut, or after its out point for an L-cut.
+
+The sound has to keep at least one frame. If it runs into another clip on its track, Frame Job allows an overlap of up to half the shorter clip and won't go further.
+
+## Trim and roll a sound clip alone
+
+The half you grab decides what moves. An edit on the sound moves only the sound. An edit on the picture also moves the sound when their edges line up. A lead you've already made isn't lined up, so trimming that picture's start leaves the sound alone.
+
+Dragging is what lengthens a sound. <kbd>W</kbd> and <kbd>E</kbd> [trim to the playhead](/editing/trimming/#trim-to-the-playhead), so they only shorten it, and they do it to the sound alone. To roll the cut between two sound clips on one track, hold <kbd>⌥⇧</kbd> and drag the edge between them. A sound on a track of its own has no cut to roll.
+
+See [Move a sound clip's edge alone](/editing/slip-and-roll/#move-a-sound-clips-edge-alone).
+
+## Good to know
+
+- Moving either half keeps the lead. When a drag would take the sound past the start of the timeline, both clips stop together.
+- A ripple edit that would push a leading sound past the start of the timeline doesn't happen.
+- Frame Job won't [attach](/audio/detach-and-attach/#attach-audio) a pair that no longer covers the same time. Trim the two to the same start and end first.
+- [Slip](/editing/slip-and-roll/#slip-a-clip) takes both halves, unless the other half is on a locked track.
+
+## With an agent
+
+In the app, a trim on a sound moves it alone. An agent has to ask for that: pass `alone: true` to `trim_start`, `trim_end` or `roll` on the sound. Without it, a trim on a sound whose edge lines up with its picture moves both. See [Tools: moving and trimming](/mcp/tools-move-and-trim/#trim_start).
+
+## Related
+
+- [Detach and Attach Audio](/audio/detach-and-attach/)
+- [Trim clips](/editing/trimming/)
+- [Slip and roll](/editing/slip-and-roll/)
+- [Crossfades](/audio/crossfades/)

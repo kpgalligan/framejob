@@ -1,0 +1,114 @@
+---
+title: "Zoom to Region"
+description: "Zoom in on part of a screen recording by drawing a rectangle on the picture, pan to another spot, then pull back out with Zoom Back."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Zoom to Region is the screencast zoom: draw a rectangle on the picture, and the clip zooms until that rectangle fills the frame. The zoom is an ordinary [action](/motion/actions/), so you can retime it, change its curve or remove it like any other.
+
+<AtAGlance
+  keys="Z"
+  where={['Clip tab ▸ action lane ▸ zoom-in magnifier (Zoom to Region)', 'Clip tab ▸ action lane ▸ zoom-out magnifier (Zoom Back)']}
+  tools="add_zoom_action"
+/>
+
+## Draw a zoom
+
+<Steps>
+
+1. Select one clip and put the playhead where the zoom should start.
+
+2. Press <kbd>Z</kbd>, or click the zoom-in magnifier in the [action lane](/motion/action-lane/). The pointer becomes a crosshair and a hint appears on the canvas.
+
+3. Drag a rectangle over the canvas. It can start outside the picture, which helps when you want to catch the edge of the frame.
+
+4. Release the mouse.
+
+</Steps>
+
+Frame Job adds a 1-second **Ease In Out** action at the playhead, shown as **In Out** in the lane's Curve pop-up. Its end state is the scale and position that bring the rectangle to the canvas, allowing for the clip's rotation and crop at that moment. It's one undo step, Zoom to Region.
+
+The new action is selected, so you can go straight on to change its length or curve in the lane's [detail row](/motion/action-lane/#detail-row), or adjust where it ends with the [Clip tab's fields or the canvas](/motion/edit-an-action/).
+
+The clip stays zoomed after the action ends, until a later action changes it. [Zoom Back](#zoom-back) is the way to pull out again.
+
+## The canvas hint and outline
+
+While the mode is on, a hint at the top of the canvas reads "Drag a rectangle to zoom to it · ⇧ fills · Esc to cancel".
+
+As you drag, you see two outlines: the rectangle you're drawing, and a dimmer dashed one showing exactly what the canvas will show once the zoom lands. They differ when your rectangle isn't the shape of the canvas.
+
+## Fit or fill
+
+| To | Do this | Result |
+| --- | --- | --- |
+| Fit | Drag | The whole rectangle is shown. This is the default. |
+| Fill | Hold <kbd>⇧</kbd> while dragging | The rectangle fills the canvas, and whatever doesn't match the canvas shape is cropped. |
+
+Frame Job reads <kbd>⇧</kbd> at every step of the drag, so you can change your mind before you let go, and the dashed outline follows.
+
+A zoom changes a clip's scale and position, never its angle. On a rotated clip, fit and fill both allow for the rotation, and the dashed outline shows the result.
+
+## Zoom Back
+
+Zoom Back pulls the clip back out after a zoom.
+
+<Steps>
+
+1. Move the playhead past the end of the zoom, to where the pull-back should start. After Zoom to Region the playhead is still at the zoom's start, and a new action there would overlap it.
+
+2. Click the zoom-out magnifier in the action lane.
+
+</Steps>
+
+Frame Job adds a 1-second **Ease In Out** action at the playhead whose end state is the clip's own scale, x and y, the values it has outside any action, whatever earlier actions did. There's no rectangle to draw and no key for it. The new action is selected, and it's one undo step, Zoom Back.
+
+Like <kbd>Z</kbd>, it beeps when there's no clip it can work on. See [Which clip can be zoomed](#which-clip-can-be-zoomed).
+
+## Which clip can be zoomed
+
+<kbd>Z</kbd> and Zoom Back need exactly one selected clip that's in the picture at the playhead and isn't on a locked track. Otherwise they beep. So they won't work with several clips selected, with the playhead off the clip or on a sound-only clip. On a nest clip the zoom moves everything inside it.
+
+The action also has to fit. Frame Job won't add a zoom that would overlap another action on the clip or run past the clip's end. It beeps and gives the reason at the foot of the inspector. If you'd drawn a rectangle the mode closes too, so press <kbd>Z</kbd> to try again. Near the end of a clip, move the playhead back first. If another action is in the way, shorten it or move the playhead clear of it.
+
+## Leaving the mode
+
+Press <kbd>Esc</kbd>, press <kbd>Z</kbd> again, or click the zoom-in magnifier again. The mode also closes by itself when the selection changes or the playhead leaves the clip, and turning on another canvas tool, such as an eyedropper, ends it.
+
+Once focus has left the canvas, for example after a click in the inspector, <kbd>Esc</kbd> no longer reaches the mode, and <kbd>Z</kbd> is the way out.
+
+A rectangle under 6 canvas pixels wide or high, or a click with no drag, beeps and leaves the mode on so you can draw again.
+
+## The scale limit
+
+The zoom stops at 1,000%, the largest scale a layer can take. The rectangle stays centred even then, but it doesn't reach the size you asked for. On a 1920-wide canvas, for example, a rectangle narrower than 192 pixels of the source picture can't fill the width.
+
+## With a During preset
+
+On a clip with a During [motion preset](/motion/during-presets/), a second hint appears under the first: "This clip has During motion — the zoom is solved without it". The zoom is worked out as if the preset weren't there, and the preset keeps moving the clip under the zoom, so the rectangle won't sit exactly in place.
+
+The hint follows the clip, so it appears or goes if a During preset is added or cleared while the mode is on.
+
+## Auto Zoom
+
+To zoom a screen recording at every click at once, use **Clip ▸ Auto Zoom…**. It plans these same zoom actions from the recording's cursor file. See [Auto Zoom](/recording/auto-zoom/).
+
+## Good to know
+
+- You draw on the picture as it is at the playhead, with earlier actions applied, so you can draw a tighter zoom on a clip that's already zoomed.
+- To pan to another spot while zoomed in, move the playhead past the zoom and draw a new rectangle there, or [add an action](/motion/add-an-action/) and drag the clip to where it should end up.
+- The rotation and crop are read at the start of the zoom. If you then animate either of them in the same action, the rectangle drifts across the action's span.
+
+## With an agent
+
+An agent gives the rectangle as numbers with `add_zoom_action` instead of drawing it, and can set the zoom's length and curve in the same call. A `region` of `null` is a Zoom Back, and it has to be sent, so a forgotten rectangle can't turn into one. On a clip with no picture the call fails. See [`add_zoom_action`](/mcp/tools-animation/#add_zoom_action).
+
+## Related
+
+- [Add an action](/motion/add-an-action/)
+- [Set what an action animates to](/motion/edit-an-action/)
+- [Move, resize or remove an action](/motion/change-an-action/)
+- [Action bands and the action lane](/motion/action-lane/)
+- [Auto Zoom](/recording/auto-zoom/)

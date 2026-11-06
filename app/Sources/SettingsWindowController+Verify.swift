@@ -48,9 +48,9 @@ extension SettingsWindowController {
         }
     }
 
-    /// The cheapest authenticated call there is, against whatever key would
-    /// be used for a real run: what is in the FIELD when somebody has typed
-    /// one and not saved it yet, and the resolved credential otherwise.
+    /// The cheapest authenticated call there is, against the key in the FIELD
+    /// when somebody has typed one and not saved it (a run uses it only once
+    /// saved), and otherwise the resolved credential a run would use.
     @objc func verifyClicked(_ sender: Any?) {
         verifying = nil
         guard let credential = effectiveCredential(storedCredential: store().read()) else {

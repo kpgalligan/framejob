@@ -51,6 +51,8 @@ final class PreviewCanvasView: NSView {
     /// Esc mid-drag: the press's state back, no undo step (spec §11 CI-16).
     var onLiveCancel: (() -> Void)?
     var onEdit: ((String, [ReelOp]) -> Void)?
+    /// A gesture CI-19 refused: the beep and the inspector's strip.
+    var onRefuse: ((ReelRefusal) -> Void)?
     /// An edit from a sheet's completion — outside an AppKit event — which
     /// the document groups itself.
     var onGroupedEdit: ((String, [ReelOp]) -> Void)?
@@ -89,6 +91,8 @@ final class PreviewCanvasView: NSView {
     /// on each live tick and by `canvasPlayheadMoved` as playback enters a span —
     /// and a session's start state was read from the target it began with.
     var gestureTarget = CanvasEditTarget.base
+    /// The press CI-19 refused, until its release (`continueRefusedGesture`).
+    var refusedGesture: CanvasRefusedGesture?
     /// Echoes `EditorViewController.snappingEnabled` (the N toggle).
     var snappingEnabled = true
     /// View ▸ Show Subjects (spec §11 VR-13): nil while off.
@@ -117,8 +121,8 @@ final class PreviewCanvasView: NSView {
     private var snapper = CanvasSnapper(xs: [], ys: [], threshold: 0, enabled: false)
     private var cachedBoxes: [CanvasLayerBox]?
     private var pinchAccumulator: CGFloat = 0
-    private var spaceHeld = false
-    private var spaceDidPan = false
+    var spaceHeld = false
+    var spaceDidPan = false
     private(set) var textEditor: CanvasTextView?
     private(set) var editingClip: UInt32?
 
@@ -168,7 +172,7 @@ final class PreviewCanvasView: NSView {
         self.selection = selection
         self.playhead = playhead
         cachedBoxes = nil
-        if cropMode, primaryBox == nil { setCropMode(false) }
+        if cropMode, primaryBox == nil || primaryRefusesCrop { setCropMode(false) }
         if let editing = editingClip, snapshot.clip(editing) == nil { cancelTextEditing() }
         layoutCanvas()
         overlay.needsDisplay = true
@@ -182,6 +186,7 @@ final class PreviewCanvasView: NSView {
         playhead = time
         cachedBoxes = nil
         guard !selection.isEmpty || cropMode else { return }
+        if cropMode, primaryRefusesCrop { setCropMode(false) }
         overlay.needsDisplay = true
     }
 
@@ -416,10 +421,11 @@ final class PreviewCanvasView: NSView {
     // MARK: - Crop mode
 
     /// C, or a double-click on a clip with pixels (spec §4.2). Refuses with
-    /// no selection rather than entering a mode with no box in it.
+    /// no selection rather than entering a mode with no box in it, and on a
+    /// clip the mode doesn't open on (spec §11 K-7).
     @discardableResult
     func setCropMode(_ on: Bool) -> Bool {
-        let allowed = on && primaryBox != nil
+        let allowed = on && primaryBox != nil && !primaryRefusesCrop
         if on && !allowed { return false }
         guard cropMode != allowed else { return true }
         cropMode = allowed
@@ -496,6 +502,7 @@ final class PreviewCanvasView: NSView {
             overlay.needsDisplay = true
             return
         }
+        if continueRefusedGesture() { return }
         // ⌘ suppresses snapping while the drag is in flight, not only at the
         // press; the candidate list the gesture fetched is kept.
         snapper = CanvasSnapper(
@@ -516,11 +523,11 @@ final class PreviewCanvasView: NSView {
         } else if var session = rotating {
             session.update(point: canvasPoint, snapping: flags.contains(.shift))
             rotating = session
-            onLiveUpdate?([session.op(to: gestureTarget)])
+            onLiveUpdate?(session.ops(to: gestureTarget))
         } else if var session = cropping {
             session.update(point: canvasPoint)
             cropping = session
-            onLiveUpdate?([session.op(to: gestureTarget)])
+            onLiveUpdate?(session.ops(to: gestureTarget))
         } else if var session = endpointDrag {
             guard let box = box(for: session.clip) else { return }
             session.update(unit: box.endpointUnit(canvasPoint))
@@ -535,6 +542,7 @@ final class PreviewCanvasView: NSView {
     /// Mouse-up. Closes the live edit as ONE undo step (§7.6); a gesture that
     /// changed nothing registers none, because `endLiveEdit` compares handles.
     func endGesture(at point: CGPoint, flags: NSEvent.ModifierFlags) {
+        refusedGesture = nil
         if panning != nil {
             panning = nil
         } else if moving != nil {
@@ -560,8 +568,8 @@ final class PreviewCanvasView: NSView {
         window?.invalidateCursorRects(for: overlay)
     }
 
-    /// Double-click: a text clip opens its inline editor, anything with pixels
-    /// enters crop mode (spec §4.2).
+    /// Double-click: a text clip opens its inline editor, and a clip crop mode
+    /// opens on enters it (spec §4.2, §11 K-7). Anything else beeps.
     private func doubleClicked(_ id: UInt32) {
         guard let clip = snapshot.clip(id) else { return }
         if clip.text != nil, case .text = clip.source {
@@ -573,9 +581,10 @@ final class PreviewCanvasView: NSView {
     }
 
     private func beginMove(anchor: UInt32, at point: CGPoint, flags: NSEvent.ModifierFlags) {
+        if refusesHeld(.move, clip: anchor) { return }
         let ids = selection.contains(anchor) ? selection : [anchor]
         var bases: [UInt32: CGPoint] = [:]
-        gestureTarget = editTarget
+        gestureTarget = heldTarget(.move)
         for id in ids {
             guard let clip = snapshot.clip(id),
                   snapshot.track(clip.track)?.locked != true
@@ -592,7 +601,8 @@ final class PreviewCanvasView: NSView {
 
     private func beginScale(_ id: UInt32, handle: CanvasHandle) {
         guard let box = box(for: id), let clip = snapshot.clip(id) else { return }
-        let route = editTarget.forScale(of: clip)
+        if refusesHeld(CanvasEditTarget.scaleGesture(clip: clip, handle: handle), clip: id) { return }
+        let route = heldTarget(.scale).forScale(of: clip)
         gestureTarget = route
         let start = route.start(of: clip, in: project)
         let base = start.video
@@ -617,7 +627,8 @@ final class PreviewCanvasView: NSView {
 
     private func beginRotate(_ id: UInt32, at point: CGPoint) {
         guard let clip = snapshot.clip(id) else { return }
-        gestureTarget = editTarget
+        if refusesHeld(.rotate, clip: id) { return }
+        gestureTarget = heldTarget(.rotate)
         let base = gestureTarget.start(of: clip, in: project).video
         let anchor = canvasAnchor(of: clip, in: snapshot.canvas, video: base)
         rotating = CanvasRotateSession(
@@ -629,7 +640,8 @@ final class PreviewCanvasView: NSView {
 
     private func beginCrop(_ id: UInt32, handle: CanvasHandle) {
         guard let box = box(for: id), let clip = snapshot.clip(id) else { return }
-        gestureTarget = editTarget
+        if refusesHeld(.crop, clip: id) { return }
+        gestureTarget = heldTarget(.crop)
         let base = gestureTarget.start(of: clip, in: project).video
         cropping = CanvasCropSession(
             clip: id, handle: handle, base: base, sourceSize: box.sourceSize,
@@ -655,73 +667,23 @@ final class PreviewCanvasView: NSView {
 
     // MARK: - Keyboard
 
-    /// The keys the canvas owns while it holds first responder. Everything
-    /// else returns false and walks the responder chain to
-    /// `EditorViewController.keyDown` (the bare-key transport map).
-    func handleKey(_ event: NSEvent) -> Bool {
-        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        guard flags.subtracting(.shift).isEmpty else { return false }
-        switch event.keyCode {
-        case 53:  // Esc
-            if cancelGesture() { return true }
-            guard cropMode else { return false }
-            setCropMode(false)
-            return true
-        case 36, 76:  // Return, keypad Enter
-            guard cropMode else { return false }
-            setCropMode(false)
-            return true
-        case 49:  // Space — armed for panning; the tap is settled on key-up.
-            guard !event.isARepeat else { return true }
-            spaceHeld = true
-            spaceDidPan = false
-            return true
-        default:
-            break
-        }
-        let step = flags.contains(.shift) ? Self.nudgeStepLarge : Self.nudgeStep
-        switch event.keyCode {
-        case 123: return nudge(dx: -step, dy: 0)
-        case 124: return nudge(dx: step, dy: 0)
-        case 125: return nudge(dx: 0, dy: step)
-        case 126: return nudge(dx: 0, dy: -step)
-        default: return false
-        }
-    }
-
-    /// Focus left the canvas with Space still down (the inline text editor
-    /// taking over, a click in the timeline). Without this the pan stays armed
-    /// and the next canvas click drags the whole canvas instead of a clip.
-    func releaseSpace() {
-        spaceHeld = false
-        spaceDidPan = false
-    }
-
-    func handleKeyUp(_ event: NSEvent) -> Bool {
-        guard event.keyCode == 49 else { return false }
-        spaceHeld = false
-        // A Space that never panned is the transport's, and the editor never
-        // saw the key-down because this view swallowed it.
-        if !spaceDidPan { onSpaceTapped?() }
-        spaceDidPan = false
-        return true
-    }
-
     /// Arrow-key nudge (spec §4.2). One op per clip and one undo step, the
     /// same shape a move drag commits.
     @discardableResult
     func nudge(dx: CGFloat, dy: CGFloat) -> Bool {
+        guard primaryBox != nil else { return false }
+        if let id = primaryBox?.id, let refusal = heldRefusal(.move, clip: id) { onRefuse?(refusal); return true }
+        let target = heldTarget(.move)
         var ops: [ReelOp] = []
         for id in selection.sorted() {
             guard let clip = snapshot.clip(id), snapshot.track(clip.track)?.locked != true
             else { continue }
-            let props = editTarget.start(of: clip, in: project).video
-            ops.append(
-                editTarget.op(
-                    video: VideoPatch(
-                        x: canvasRound(props.x + Double(dx)),
-                        y: canvasRound(props.y + Double(dy))),
-                    clip: id))
+            let props = target.start(of: clip, in: project).video
+            ops += target.ops(
+                video: VideoPatch(
+                    x: canvasRound(props.x + Double(dx)),
+                    y: canvasRound(props.y + Double(dy))),
+                clip: id)
         }
         guard !ops.isEmpty else { return false }
         onEdit?("Nudge", ops)
@@ -731,10 +693,8 @@ final class PreviewCanvasView: NSView {
     /// Esc during a drag: abandons the session without committing. The live
     /// edit still has to be closed, or the document keeps its gesture base
     /// forever and the next edit merges into it.
-    private func cancelGesture() -> Bool {
-        guard moving != nil || scaling != nil || rotating != nil || cropping != nil
-            || endpointDrag != nil || obscureDrag != nil
-        else { return false }
+    func cancelGesture() -> Bool {
+        guard isGestureLive else { return false }
         moving = nil
         scaling = nil
         rotating = nil

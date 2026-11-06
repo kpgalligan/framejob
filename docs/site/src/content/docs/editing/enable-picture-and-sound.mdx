@@ -1,0 +1,52 @@
+---
+title: Turn a clip's picture or sound off
+description: What it means when one half of a clip is switched off, which commands do it, and how the clip then looks on the timeline.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A clip has two halves, its picture and its sound, and each can be switched off while the clip stays where it is. A switched-off half adds nothing to the picture or the mix, and it comes back when the half is switched on again.
+
+<AtAGlance
+  menu={['Clip ▸ Detach Audio', 'Clip ▸ Attach Audio']}
+  keys={['⌥⌘D', '⇧⌥⌘D']}
+  tools="set_enabled"
+/>
+
+## Turn a half off
+
+There's no switch for this in the inspector. Commands flip the halves as part of what they do:
+
+| Command | What it switches |
+| --- | --- |
+| [**Clip ▸ Detach Audio**](/audio/detach-and-attach/) | Turns the clip's sound off and adds a sound-only copy on the track below, with its picture off. |
+| [**Clip ▸ Attach Audio**](/audio/detach-and-attach/) | Merges a detached pair back into one clip with its sound on. |
+| [**Clip ▸ Switch by Speaker…**](/multicam/switch-by-speaker/) | Can turn off the picture of the camera clips it replaces, and their sound when **Mute the cameras' own sound** is ticked. |
+
+To silence a clip's sound by hand, use **Mute** on the [Sound tab](/audio/sound-tab/). To hide its picture, set its [opacity](/canvas/transform/) to 0 or [hide the track](/timeline/hide-and-lock-tracks/).
+
+## How the clip looks
+
+| Switched off | On the timeline |
+| --- | --- |
+| The picture of a movie clip | It reads as an audio clip, with the audio tint and symbol, and has no filmstrip. |
+| The sound | It has no waveform. |
+| Both | It's dimmed, like a clip on a hidden track. |
+
+A clip with its sound off has no **Sound** tab in the inspector, because there's nothing there to adjust. Its **Picture** tab stays, even with the picture off.
+
+## Good to know
+
+- A clip with its sound off can't be transcribed, and **Remove Silences** doesn't count it as audible.
+- Copies keep the switches of the clip they came from.
+- [Paste Attributes](/editing/paste-attributes/) leaves the target's switches alone.
+
+## With an agent
+
+`set_enabled` switches either half of any clip directly, which no command in the app does on its own. Give it `video`, `audio` or both, as true or false, and a half you leave out stays as it is. See [Tools: moving and trimming](/mcp/tools-move-and-trim/#set_enabled).
+
+## Related
+
+- [Detach and Attach Audio](/audio/detach-and-attach/)
+- [Reading a clip on the timeline](/timeline/reading-a-clip/)
+- [Mute and solo tracks](/audio/mute-and-solo/)

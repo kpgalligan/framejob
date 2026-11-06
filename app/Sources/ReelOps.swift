@@ -191,11 +191,11 @@ extension ReelOp {
         return ReelOp(name: "add_clip", args: a.values)
     }
 
-    /// A text clip; `duration` defaults to 5 s and `text` to the Title
-    /// preset in the core.
+    /// A text clip; `duration` defaults to 5 s and `text` to the default
+    /// title in the core.
     ///
     /// The op's `text` argument is a `set_text` PATCH, not a string — the
-    /// core merges it over the Title preset — so the whole of `TextPatch`
+    /// core merges it over the default title — so the whole of `TextPatch`
     /// is reachable at creation and the caller's words go in under
     /// `content`. Passing a bare string is what the core answers
     /// `text patch must be a json object` to.
@@ -214,7 +214,7 @@ extension ReelOp {
     /// number or a list where the patch belongs is refused by the CORE, in
     /// the words that name the group (`text patch must be a json object, not
     /// 5`), rather than by a cast on this side that knows less. nil means the
-    /// key is ABSENT, which is what gives the core's own Title preset — and
+    /// key is ABSENT, which is what gives the core's own default title — and
     /// it is why the typed factory above maps rather than passing its
     /// optional straight in: an `Optional<[String: Any]>.none` widened to
     /// `Any?` becomes a non-nil `Any` wrapping a nil, and the key would be
@@ -660,10 +660,14 @@ extension ReelOp {
         return ReelOp(name: "attach_audio", args: a.values)
     }
 
-    /// Copies placed after the originals' span on the same tracks.
-    static func duplicate(clips: [UInt32]) -> ReelOp {
+    /// Copies placed after the originals' span on the same tracks, or by
+    /// `delta` and to `track`, which `moveClip` reads the same way (spec §11
+    /// #465).
+    static func duplicate(clips: [UInt32], delta: Ticks? = nil, track: UInt32? = nil) -> ReelOp {
         var a = OpArgs()
         a.put("clips", clips)
+        a.put("delta", delta)
+        a.put("track", track)
         return ReelOp(name: "duplicate", args: a.values)
     }
 
@@ -688,7 +692,8 @@ extension ReelOp {
     /// landing exactly at `at` and the rest keeping their offsets from it.
     ///
     /// `payload` is what Copy wrote to the pasteboard —
-    /// `{"clips": [...], "media": [...]}` — and
+    /// `{"clips": [...], "media": [...], "nests": [...]}`, `nests` only when
+    /// a clip shows one — and
     /// `EditorViewController+Clipboard.swift` is the only place that builds
     /// one. **A payload clip's `track` is a DEPTH from the front of the stack**
     /// (0 = front-most), not a track id: the ids in it belong to whichever
@@ -1214,7 +1219,8 @@ extension ReelOp {
     /// too, because a preset is anchored to the clip's two ends and an
     /// action is a ramp between two states.
     ///
-    /// `off` is `"group.key"` paths the core writes as `null` after the
+    /// `off` is `"group.key"` paths (and `audio.eq.<slot>`, AU-88, and
+    /// `video.qualifier.<range>`, GR-36) the core writes as `null` after the
     /// merge — the property keyed OFF at the end (spec §11 CI-14) — and is
     /// written only when non-empty, so every call without it is the JSON it
     /// always was. A null in `patch` stays a REMOVAL (`clearOps`, agents).
@@ -1237,8 +1243,9 @@ extension ReelOp {
     /// LIFTED out of the patch into `off`, so the end state holds the
     /// property off rather than losing the key (spec §11 CI-14). Removal
     /// keeps its one spelling: `InspectorBinding.clearOps`' raw nulls. A
-    /// null slot inside `audio.eq` lifts to `audio.eq.<slot>` (AU-88).
-    /// `graphic`'s one value is its `props` map, so the lift never touches
+    /// null slot inside `audio.eq` lifts to `audio.eq.<slot>` (AU-88), and a
+    /// null range inside `video.qualifier` to `video.qualifier.<range>`
+    /// (GR-36). `graphic`'s one value is its `props` map, so the lift never touches
     /// it; `schema` is the module's current revision, which a graphic end
     /// needs (spec §11 G-34 (c), (l)).
     static func setActionEnd(
@@ -1259,6 +1266,14 @@ extension ReelOp {
                     eq[slot] = nil
                 }
                 fields["eq"] = eq
+            }
+            // So is a qualifier range turned off (GR-36).
+            if group == "video", var qualifier = fields["qualifier"] as? [String: Any] {
+                for (range, value) in qualifier where value is NSNull {
+                    off.append("video.qualifier.\(range)")
+                    qualifier[range] = nil
+                }
+                fields["qualifier"] = qualifier
             }
             groups[group] = fields
         }

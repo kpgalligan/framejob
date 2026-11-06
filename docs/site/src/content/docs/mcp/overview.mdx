@@ -1,0 +1,103 @@
+---
+title: How an agent reaches Frame Job
+description: What an AI agent can do in Frame Job over MCP, how it connects, what happens when Frame Job is closed, and who is allowed in.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Frame Job serves its whole editor as MCP tools, so an AI agent such as Claude Code can open projects, cut, style, check its work frame by frame and export, as you do in the window. MCP, the Model Context Protocol, is the open standard that gives an AI agent tools it can call.
+
+<AtAGlance
+  where="Frame Job ▸ Settings… ▸ MCP"
+  needs="An MCP client, such as Claude Code."
+/>
+
+## The whole editor as tools
+
+A shipped Frame Job publishes 125 tools. Every edit you can make in the window has one, and the rest cover what sits around an edit: opening and saving projects, moving the playhead, reading the project, rendering a frame, exporting. [All tools](/mcp/tools/) lists them.
+
+An agent's edit goes through the same place your own clicks go. It shows in the window at once, marks the project as edited, and is one undo step you can take back with <kbd>⌘Z</kbd>.
+
+A tool checks what it's given before it does anything. If it gets an argument it doesn't take, it stops, names that argument and lists what it does take, so a model can read the reply and correct itself. [How tool calls behave](/mcp/tool-calls/) has the rest.
+
+To connect a client, see [Connect a client](/mcp/connect-a-client/).
+
+## The framejob-mcp helper
+
+Most MCP clients start a small server of their own and talk to it over standard input and output. For them, the app carries one:
+
+```
+Frame Job.app/Contents/Helpers/framejob-mcp
+```
+
+It's called `framejob-mcp`, and it's the way a client such as Claude Code connects. There's no runtime to install. The client starts the helper, and the helper reaches Frame Job over a [local socket](/mcp/helper-and-socket/#the-local-agent-socket), a private connection point that exists only on your Mac.
+
+The helper does three things beyond passing messages along: it answers a client that's starting up, it [lists the tools when Frame Job can't](#the-tool-list-with-frame-job-closed), and it [opens Frame Job on the first tool call](#opening-on-the-first-tool-call).
+
+Register it at its path inside the app. Anywhere else it can't open Frame Job or list the tools while Frame Job is closed. See [The helper stays in the bundle](/mcp/helper-and-socket/#the-helper-stays-in-the-bundle).
+
+## The tool list with Frame Job closed
+
+Starting an MCP client never opens the video editor. The helper answers the client's first messages itself, so a session starts with nothing on screen, and asking for the tool list never launches Frame Job either.
+
+When a client asks for the tool list, the helper asks the running app first. It falls back to a copy of the list stored in the app when:
+
+- Frame Job isn't running.
+- Frame Job doesn't answer within 5 seconds, for example because another client's long call is holding it.
+
+So a client always sees every tool, and if the stored list turns out to differ from the running app's, [the helper says so](/mcp/helper-and-socket/#tool-list-changes).
+
+## Opening on the first tool call
+
+If a tool call finds Frame Job not running, the helper launches its own copy of the app in the background and waits for it. The app doesn't come to the front. Once it's listening, the call runs as usual.
+
+- The helper waits up to 60 seconds. See [The launch wait](/mcp/helper-and-socket/#the-launch-wait), and [Failed launches](/mcp/helper-and-socket/#failed-launches) for what happens when that runs out.
+- Several clients calling at once start only one copy.
+- This also happens if you quit Frame Job in the middle of a session: the next tool call opens it again.
+
+## Who can connect
+
+Only programs running under your own account can connect, and any of them can while Frame Job is running. There's no password or per-client approval, and no network port, so there's no remote access: nothing on another machine can reach it.
+
+The permissions on the socket (`0600`) and its folder (`0700`) are the whole of this protection, so Frame Job is strict about them. If they're wrong it doesn't open the socket at all. See [The socket's folder and permissions](/mcp/helper-and-socket/#the-sockets-folder-and-permissions).
+
+## An MCP client or the Assistant
+
+Both call the same tools. The [Assistant](/assistant/what-it-can-do/) is a tab in the editor window, works on that window's project and runs on your own Anthropic key. An MCP client runs outside Frame Job and brings its own model, so you don't add an API key to Frame Job to use one. You pay for its model wherever you pay for that client, and the Assistant's [spend figures](/assistant/cost/) don't count it.
+
+## Assistant rules do not bind an MCP client
+
+The [Assistant](/assistant/what-it-will-not-do/) inside Frame Job works under rules of its own. It can't call some tools, and it asks you before it calls others. Those rules belong to the Assistant, not to the tools. A client connected over MCP calls every tool directly, and nothing asks you first.
+
+| Tool | The Assistant | An MCP client |
+| --- | --- | --- |
+| `record_screen`, `close_project`, `transcribe_for_fillers` | Can't call it | Calls it directly |
+| `transcribe` with the AssemblyAI engine | Can't call it | Calls it directly |
+| `export`, `export_captions`, `save_project`, `consolidate_media`, `export_graphic` | Asks you first | Calls it directly |
+| `new_project_from_range`, `make_vertical_version`, `new_project`, `render_frame`, `render_graphic` when the call names a path | Asks you first | Calls it directly |
+
+So a connected agent can spend your AssemblyAI credit, or replace a file with an export, without a question from Frame Job. Any check on that has to come from your MCP client.
+
+## Settings has no tool
+
+No MCP tool reads or writes anything in [Settings](/reference/settings/). An agent can't set a key, the Assistant's model, the AssemblyAI region or Background render, and no tool reports their values. Only a person sets those, in **Frame Job ▸ Settings…** (<kbd>⌘,</kbd>).
+
+An agent's cloud tools do use what's saved there. `transcribe` with the AssemblyAI engine and `transcribe_for_fillers` send with your key and region, so you have to set the key first. Without one they stop with "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription." The key never appears in a result, but `transcribe` does name the server a run's requests went to, and that server shows the region.
+
+## Headless and scripted use
+
+Frame Job has no headless mode and no command-line tool of its own. It's a Mac app that runs in your logged-in session, so it can't run on a server or in CI without one. A project a tool opens or makes gets a window, even with Frame Job in the background.
+
+You don't need a model to drive it, though. For a batch job, a script can call the same tools in a fixed order by [posting to the socket](/mcp/helper-and-socket/#call-a-tool-from-a-script).
+
+## Good to know
+
+- Calls run one at a time, across every connected client and the Assistant, so a long call holds the next one until it ends.
+- A tool call never asks you anything. Anything that needs a question answered or a system permission granted has to be done by a person first. See [How tool calls behave](/mcp/tool-calls/).
+
+## Related
+
+- [Connect a client](/mcp/connect-a-client/)
+- [The helper and the socket](/mcp/helper-and-socket/)
+- [A typical session](/mcp/typical-session/)
+- [All tools](/mcp/tools/)

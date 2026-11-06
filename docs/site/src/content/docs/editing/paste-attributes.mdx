@@ -1,0 +1,105 @@
+---
+title: Paste Attributes
+description: Copy one clip's look and sound settings onto any number of other clips in a single step.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Paste Attributes makes other clips look and sound like the one you copied. Set up one clip, then give the same settings to the rest in one undo step.
+
+<AtAGlance
+  menu="Edit ▸ Paste Attributes"
+  keys="⌥⌘V"
+  tools="paste_attributes"
+/>
+
+## Paste a clip's attributes
+
+<Steps>
+
+1. Select the clip that has the settings you want and press <kbd>⌘C</kbd>.
+
+2. Select the clips that should take them.
+
+3. Press <kbd>⌥⌘V</kbd>, or choose **Edit ▸ Paste Attributes**.
+
+</Steps>
+
+The item is available when Frame Job clips are on the clipboard and something is selected. If nothing would change, Frame Job beeps. The paste is one undo step, called Paste Attributes.
+
+If you copied several clips, only one of them counts: the one that starts earliest. At the same start it's the one on the front-most track.
+
+## What travels
+
+Settings travel in four groups, and a group is only copied when both clips have it. A movie's settings pasted onto a text clip bring its picture settings and leave the text styling alone, and its sound settings go nowhere.
+
+Each group replaces the target's whole group, so it isn't a merge. A shadow on the target disappears if the copied clip had none.
+
+| Group | What travels | What the target keeps |
+| --- | --- | --- |
+| **Video** | Everything about the picture: position, scale, rotation, opacity, crop, corner radius, blend mode, shadow, reflection, filters, spotlight, obscure regions, chroma key, Remove Background, Text Behind Subject, Hide While Silent, motion presets, motion blur, the grade and its look, and the [drawn cursor's](/recording/cursor-settings/) settings | Nothing, apart from an adjustment clip's [qualifier](#adjustment-clips-and-qualifiers) |
+| **Audio** | Everything about the sound: volume, Mute, fades and their shapes, pan, Mix to mono, channels, Keep pitch, ducking, noise reduction, voice isolation, EQ, hum removal, gate, de-esser, leveller, compressor, limiter and voice effects | Nothing |
+| **Text** | Font, size, colours, alignment, spacing, case, outline, backdrop, text box width, reveal animation and word caption style | Its own words and their timings |
+| **Shape** | Fill, stroke, gradient, corner radius and arrowheads | Its kind, its size and the end points of a line |
+
+:::caution
+The Video group includes position and scale. Pasting onto a clip you've already placed moves it to where the copied clip sits.
+:::
+
+A look's `.cube` file comes along too, so a grade pasted from another project keeps its LUT.
+
+## What stays on the target
+
+Paste Attributes copies how a clip looks and sounds, not what makes it that clip. The target keeps:
+
+- its place on the timeline and its length
+- its speed, including a [speed ramp](/speed/speed-ramps/)
+- its [actions](/motion/how-edits-move-actions/), so nothing animated travels
+- its transition
+- its name and label
+- which halves are [switched on](/editing/enable-picture-and-sound/)
+
+Graphic properties don't travel either. Use [Paste Graphic Properties](/graphics/copy-properties/) for those.
+
+## Adjustment clips and qualifiers
+
+A qualifier belongs to an [adjustment clip](/color/adjustment-clips/), so it follows the kind of clip:
+
+| Pasting | The qualifier |
+| --- | --- |
+| Onto an ordinary clip | Is dropped |
+| From an ordinary clip onto an adjustment clip | Stays as the adjustment clip had it |
+| From one adjustment clip onto another | Is copied |
+
+See [Copy a grade](/color/copy-a-grade/) for moving a grade between clips.
+
+## When a paste stops
+
+Some picture settings can't land on some kinds of clip. When one can't, Frame Job shows an error saying why and changes nothing, even on the other selected clips.
+
+| The target | Can't take |
+| --- | --- |
+| An adjustment clip | Blur, sharpen or pixelate filters, a blend mode, Remove Background, Text Behind Subject, motion blur |
+| A nest clip | A blend mode, Remove Background, Text Behind Subject, motion blur, Hide While Silent |
+| A text, shape or graphic clip | Remove Background |
+| A movie clip or freeze frame | Remove Background with its subject set to Foreground, which only an image clip can take |
+| Any clip except a text or adjustment clip | A crop that would leave nothing of it, such as one copied from a much larger source |
+
+To get past one, take the setting off the copied clip, copy it again and paste, or select only the clips that can take it.
+
+## With an agent
+
+`paste_attributes` can do two things the menu item can't.
+
+- **Choose the groups.** `groups` names which ones travel, out of `video`, `audio`, `text`, `shape` and `graphic`, so `["audio"]` pastes the sound alone and leaves the picture settings. Left out, it behaves as the menu item does, and `graphic` only travels when it's named. An empty list won't run.
+- **Skip what doesn't fit.** A named group that either side lacks normally stops the paste with an error. With `skip_missing` on, a group the copied clip lacks is dropped and a clip that can't take a group is skipped, so a mixed selection goes through. It's off by default, and only applies with `groups`.
+
+See [Tools: copying and nesting](/mcp/tools-copy-and-nest/#paste_attributes).
+
+## Related
+
+- [Copy, cut and paste](/editing/copy-and-paste/)
+- [Copy a grade](/color/copy-a-grade/)
+- [Paste Graphic Properties](/graphics/copy-properties/)
+- [How edits move actions](/motion/how-edits-move-actions/)

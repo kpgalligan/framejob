@@ -1,0 +1,69 @@
+---
+title: "The cursor in a recording"
+description: "Choose whether the pointer is kept out of a screen recording for Frame Job to draw, or drawn into the movie by macOS, and how clicks are shown."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A screen recording can keep the pointer out of the movie, so Frame Job draws it on the clip and you can restyle it later, or have macOS draw it into the picture for good. You choose before you record, because the choice is part of the movie.
+
+<AtAGlance
+  menu="File ▸ New Recording…"
+  keys="⌥⌘N"
+  where={['New Recording panel ▸ Cursor', 'New Recording panel ▸ Show Clicks']}
+  tools="record_screen"
+/>
+
+## Choose Separate or In the picture
+
+Set **Cursor** on the [recorder panel](/recording/recorder-panel/).
+
+| | **Separate** | **In the picture** |
+| --- | --- | --- |
+| The pointer | Kept out of the movie. Frame Job draws it on the clip. | Drawn into the movie by macOS. |
+| Restyle it later | Yes, in the clip's **Cursor** section. | No. It can't be changed or removed. |
+| **Show Clicks** | Click ripples, drawn by Frame Job. | A ring drawn into the movie. |
+| The **Cursor** section | Appears on the clip. | Doesn't appear. |
+| Cursor file | Written | Written |
+
+**Separate** is the default for every screen source: displays, windows and picked windows. Your choice is remembered, and once you've made one it holds for every source.
+
+Both write a [cursor file](/recording/cursor-files/) beside the movie, so [Auto Zoom](/recording/auto-zoom/), [shortcut overlays](/recording/shortcut-overlays/) and [Speed Up Typing](/recording/speed-up-typing/) work either way.
+
+With **Separate**, the pointer appears wherever Frame Job draws the clip, in the preview and in every export. The movie file on its own has no pointer, so opened in another app it shows none.
+
+**Cursor** is greyed out, keeping its value, with **Camera** or **Microphone Only** as the source, and while a recording is under way.
+
+## Show clicks
+
+**Show Clicks** marks each mouse click. It's off by default, and greyed out with **Camera** or **Microphone Only**.
+
+- **With In the picture**, macOS draws a ring around each click into the movie. It can't be removed afterwards.
+- **With Separate**, nothing is drawn into the movie. Frame Job draws the ripples from the cursor file, and you can edit them afterwards.
+
+## What a Separate recording lands with
+
+The clip gets a **Cursor** section on the Clip tab's **Picture** sub-tab, with Frame Job's arrow following the path the pointer took. See [Style the recorded cursor](/recording/cursor-settings/) for what you can change there.
+
+With **Show Clicks** on as well, the clips land with **Clicks** set to **Ripple**, in the same undo step as the recording. In a new project where that's the only other change, the undo step is called **Cursor Clicks**. Undoing it takes the ripples off and keeps the pointer.
+
+Nothing else is set. To smooth the pointer's path and hide it when it's idle, choose **Polish** in the same section.
+
+## What an In the picture recording lands with
+
+The pointer is in the movie and the cursor file says so, so the clip shows no **Cursor** section and nothing is drawn twice.
+
+## Good to know
+
+If a **Separate** stretch's cursor file couldn't be written, that stretch has no pointer at all: it isn't in the movie and there's nothing to draw it from. It gets no ripples either. The panel's note says so, with "The pointer is not in the movie either: it was recorded Separate."
+
+## With an agent
+
+`record_screen` takes `cursor`, either `separate` or `in_picture`, and leaving it out means `separate`. Its `show_clicks` is `false` unless the agent sets it. Neither can be used with a voice-over or a camera on its own. See [Record with record_screen](/mcp/record-screen/#pointer-and-keys).
+
+## Related
+
+- [Style the recorded cursor](/recording/cursor-settings/)
+- [Cursor files](/recording/cursor-files/)
+- [The recorder panel](/recording/recorder-panel/)
+- [Record with record_screen](/mcp/record-screen/)

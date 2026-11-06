@@ -1,0 +1,99 @@
+---
+title: "Animate sound with actions"
+description: Change a clip's sound over time with actions, from a pan sweep to an EQ that opens up, and what can't be animated.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+An [action](/motion/actions/) can change a clip's sound as it plays: a pan sweeps across, an EQ band rises, the isolated voice fades in. What you hear in the preview is what an export writes.
+
+<AtAGlance
+  menu="Clip ▸ Add Action"
+  keys="⌥⌘K"
+  where="Clip tab ▸ Sound, with an action selected"
+  tools={['add_action', 'set_action_end']}
+/>
+
+## Animate a sound setting
+
+<Steps>
+
+1. Select the clip, move the playhead to where the change should start, and [add an action](/motion/add-an-action/) with <kbd>⌥⌘K</kbd>. The new action lasts 1 second and is already selected.
+
+2. Open the [Sound tab](/audio/sound-tab/).
+
+3. Set the controls to how they should be when the action ends.
+
+4. To make the change take longer, [drag the end of the action's band](/motion/change-an-action/).
+
+</Steps>
+
+To come back to an action later, [select it](/motion/select-an-action/) first. Otherwise the Sound tab changes the clip's own settings.
+
+For the level alone, it's quicker to <kbd>⌥</kbd>-click the [volume line](/audio/volume-line/#add-a-point).
+
+## What an action can animate
+
+With an action selected, these write that action's end state instead of the clip's own settings:
+
+- **Volume**, **Mute** and the fade lengths
+- **Pan** and **Mix to mono**
+- **Channels**
+- the **EQ** and **Hum**
+- **Amount** in Voice Isolation
+- **Noise Reduction**
+- the **Gate**, the **Leveller** and the **De-esser**
+- the **Compressor** and the **Limiter**
+
+## Numbers glide, switches jump
+
+Numbers move smoothly across the action's span. Switches hold their start value and change at the action's end, with no glide, as at a cut between two clips.
+
+These are the switches:
+
+- **Mute**, **Mix to mono** and **EQ** Bypass
+- turning a section or an EQ slot on or off
+- **Channels**
+- a pass filter's slope
+- **Hum**'s mains and harmonics
+- the **Leveller**'s Response
+
+Unticking a section or an EQ slot with an action selected turns it off at the action's end.
+
+A number only glides while its section is on at both ends of the action. A section an action turns on arrives at its end values when the action ends. Voice Isolation's **Amount** and Noise Reduction's **Remove noise** are the exceptions. Each is one amount, and 0 is its off, so it glides up from 0 or down to it.
+
+## What can't be animated
+
+These always change the clip's own settings, even with an action selected:
+
+- **Ducking**
+- **Keep pitch**
+- the fade shapes, **In shape** and **Out shape**
+- the **Voice Effect**
+- a nest clip's **Mix to mono**
+
+A row like this shows ⊘ in front of its label while an action is selected. See [What an action can animate](/motion/what-can-animate/).
+
+A voice effect is made from the clip's own Voice Isolation **Amount**, not an animated one.
+
+[Normalize](/audio/normalize/), [Enhance Voice](/audio/enhance-voice/) and [Match Audio](/audio/match-audio/) also write the clip's own settings with an action selected. The **Normalize** button carries a small boxed "clip" tag to show this.
+
+## Processing turned on by an action
+
+A clip gets whatever preparation its sound needs when an action asks for it, even if the clip's own setting is off:
+
+- The isolated voice is made when an action raises **Amount**, on a clip whose own Voice Isolation is off.
+- The Gate, the Leveller and the De-esser measure the clip's loudness when an action turns them on.
+- A Limiter or Noise Reduction turned on by an action is set up for the clip's whole track, as one set on the clip itself is, so the sound's timing doesn't shift at the moment it comes on.
+
+## With an agent
+
+`set_audio` only reaches a clip's own settings. To animate, an agent uses `add_action` and then `set_action_end`. See [Tools: animation](/mcp/tools-animation/#set_action_end).
+
+## Related
+
+- [Actions](/motion/actions/)
+- [The volume line](/audio/volume-line/)
+- [Set what an action animates to](/motion/edit-an-action/)
+- [The Sound tab](/audio/sound-tab/)

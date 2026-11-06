@@ -1,0 +1,101 @@
+---
+title: Hide While Silent
+description: Fade a clip out in the pauses of someone's speech and back in before they talk again.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Hide While Silent fades a clip out in the pauses of someone's speech and back in before they talk again. Use it on a camera over a screen recording, so the presenter is there while they're talking and out of the way when they aren't.
+
+<AtAGlance
+  where="Clip tab ▸ Picture ▸ Hide While Silent"
+  tools={['set_video', 'set_media_speech']}
+  needs="Nothing. Frame Job finds the speech on your Mac, with no key and no upload."
+/>
+
+## Turn it on
+
+<Steps>
+
+1. Select the clip that should come and go, such as the camera.
+
+2. In the Clip tab's **Picture** sub-tab, open the **Hide While Silent** section. It's closed until you open it.
+
+3. Tick **Hide while silent**.
+
+</Steps>
+
+The clip now follows the first file in [**Speech from**](#choose-which-file-to-follow), with the default [timing](#adjust-the-timing). The fade shows in the preview and in every export.
+
+The section's header reads **off**, **on** or the name of the file the clip follows. With several clips selected, ticking the box turns it on for each clip that's off, all following the same file.
+
+To turn it off, untick the box or choose **Reset** in the section's header.
+
+The checkbox is greyed in two cases, and its tooltip says which:
+
+| Tooltip | What it means |
+| --- | --- |
+| "No clip with sound plays under the selection." | Nothing with sound plays at the same time as the clip, so there's no speech to follow. |
+| "… speech has not been detected yet, so a clip cannot hide while it is silent. Try again in a moment." | Frame Job is still working through the file, which often happens straight after an import. |
+
+## Choose which file to follow
+
+**Speech from** lists the files with sound that play at the same time as the clip, on any track, one row each. The clip's own file is there too if it has sound. It's greyed until **Hide while silent** is on.
+
+Files with no picture, such as a microphone recording, come first, then the file that plays alongside the clip for longest. A file you've already chosen stays in the list even if it no longer plays with the clip.
+
+If you pick a file whose speech Frame Job hasn't found yet, nothing changes and a note in the section says why.
+
+## Adjust the timing
+
+| Control | What it does | Default | Range | Quick picks |
+| --- | --- | --- | --- | --- |
+| **Pre-roll** | How long before each run of words the clip is fully back. | 0.2 s | 0 to 5 s | 0, 0.1, 0.2, 0.5 |
+| **Hold** | How long the clip stays after each run of words. | 1.5 s | 0 to 5 s | 0.5, 1, 1.5, 3 |
+| **Fade** | How long the clip takes to fade out and in. At 0 it's a straight cut. | 0.3 s | 0 to 5 s | 0, 0.15, 0.3, 0.5 |
+
+**Fade** comes on top of the other two. The clip starts to fade out when **Hold** ends, and it finishes fading in **Pre-roll** before the first word.
+
+That means short pauses never hide the clip. A pause no longer than **Pre-roll** plus **Hold** leaves it on screen, which is 1.7 s at the defaults. The clip only fades all the way out in a pause of at least **Pre-roll** plus **Hold** plus two **Fades**, which is 2.3 s. Anything in between is a partial dip.
+
+Each change is one undo step, called Hide While Silent. These rows belong to the clip, even with an [action](/motion/actions/) selected.
+
+## See it on the timeline
+
+A teal line runs across the picture part of the clip. Where it's at the top, the clip shows. Where it's at the bottom, the clip is hidden. The clip has to be [tall enough](/timeline/track-height/) to show the line.
+
+Inside an open [nest](/editing/nests/), the line of a clip that follows a file outside the nest stays flat at the top, though the clip still fades. See [Reading a clip on the timeline](/timeline/reading-a-clip/).
+
+## When the followed file stops playing
+
+Where the file doesn't play at all, the clip shows. There's no fade at that edge, so a hidden clip comes straight back when the file's clip ends. The clip also shows wherever the file has no saved speech.
+
+With [nests](/editing/nests/), Frame Job reads the file in the nearest place that plays it at that moment: the clip's own timeline, then each enclosing nest outward. So when a camera is inside a nest and the microphone isn't, the microphone outside is followed.
+
+## The fade stays out of Opacity
+
+The fade only touches the picture Frame Job draws. The clip's own **Opacity** in the [Transform section](/canvas/transform/) keeps its value. A clip at 50 % Opacity peaks at 50 % and fades from there.
+
+An [action](/motion/actions/) can't animate Hide While Silent, though it can still animate the clip's Opacity.
+
+## Good to know
+
+- **Where the speech comes from.** It's the same as [Duck by Speech](/audio/duck-by-speech/): the runs of words Frame Job finds in the file on this Mac when it's added. The first time a file is followed, those runs are saved in the project in the same undo step.
+- **Only what plays counts.** Speech in a part of the file you've trimmed or cut away doesn't bring the clip back. A muted clip of the file still counts, because the speech is read from the file, not the mix.
+- **Nest clips.** A nest clip has no picture of its own, so the section isn't offered for it, or for a selection that includes one. Set it on the clips inside.
+- **Removing the file.** [Removing the followed file](/projects/remove-media/) from the project turns Hide While Silent off on every clip that followed it.
+- **Copying.** A pasted clip keeps Hide While Silent only when the file it follows comes along too, and Frame Job brings that file with it. [Paste Attributes](/editing/paste-attributes/) works the same way.
+
+## With an agent
+
+`set_video` can point a clip at any file in the project that has sound, not only one playing alongside it. It fails on a file with no sound, on a file whose speech hasn't been found yet, and on a nest clip. `set_media_speech` saves runs of speech you supply for a file, in place of the ones Frame Job found.
+
+`get_project` reads the clip's own opacity, without the fade, and `set_action_end` doesn't accept Hide While Silent. See [Tools: picture and grade](/mcp/tools-set-video/#hide_silent) and [Tools: media](/mcp/tools-media/#set_media_speech).
+
+## Related
+
+- [Record a camera beside the screen](/recording/camera-beside-the-screen/)
+- [Duck by Speech](/audio/duck-by-speech/)
+- [Reading a clip on the timeline](/timeline/reading-a-clip/)
+- [Position, scale, rotation and opacity](/canvas/transform/)

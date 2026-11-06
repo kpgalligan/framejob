@@ -1,0 +1,85 @@
+---
+title: "Show video inside a graphic"
+description: "Use a graphic as a matte so your footage plays through the shape it draws, and animate that shape like any other graphic."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A graphic can't read a video's pixels, but it can shape one. Make the graphic's track a matte and the video behind it shows only where the graphic draws, or, inverted, only where it doesn't.
+
+<AtAGlance
+  menu="Track ▸ Matte"
+  tools={['set_track']}
+/>
+
+## Show video inside a graphic
+
+<Steps>
+
+1. Put the video on a track, and the graphic on the track directly above it. See [Insert a graphic](/graphics/insert-a-graphic/).
+
+2. Line the graphic clip up with the stretch of video you want cut. Where the matte track has no clip, the video shows uncut.
+
+3. Select the graphic clip.
+
+4. Choose **Track ▸ Matte ▸ Alpha**.
+
+</Steps>
+
+The graphic itself is no longer drawn. What it shows now decides where the video can be seen. To go back, choose **Track ▸ Matte ▸ Off**.
+
+## Choose a mode
+
+| Mode | The video shows where the graphic is |
+| --- | --- |
+| **Alpha** | Opaque |
+| **Inverted Alpha** | Transparent |
+| **Luma** | Bright |
+| **Inverted Luma** | Dark |
+
+**Off** makes it an ordinary track again.
+
+## Write a module for a matte
+
+A matte module is written and called exactly like any other, and the cut follows each frame as it animates. Fill the window in white so it works in every mode.
+
+This one opens a rounded window with a spring:
+
+```js
+export const meta = { name: "Window", durationInFrames: 90 };
+export const schema = { radius: { type: "number", default: 24, min: 0, max: 200 } };
+
+export function render(frame, props, ctx) {
+  const t = spring({ frame, fps: ctx.fps, damping: 18 });
+  const w = ctx.width * 0.6 * t;
+  const h = ctx.height * 0.6 * t;
+  return svg(ctx, `<rect x="${(ctx.width - w) / 2}" y="${(ctx.height - h) / 2}"
+    width="${w}" height="${h}" rx="${props.radius}" fill="#ffffff"/>`);
+}
+```
+
+Its **radius** property appears on the [Graphic sub-tab](/graphics/graphic-tab/) as usual, and you can [animate it](/graphics/animate-properties/). See [Write a graphic module](/graphics/write-a-module/).
+
+## What the clip's settings still do
+
+The graphic clip's position, scale, rotation, opacity and actions still shape the window, so you can move or fade it with the same controls as any clip.
+
+Its blend mode, drop shadow and reflection do nothing. They're kept, and they apply again if the track stops being a matte.
+
+The video's own drop shadow follows the cut-out shape.
+
+## Good to know
+
+Only the track directly behind the matte is cut, so tracks further back and the canvas show through the hole. [Matte tracks](/canvas/matte-tracks/) has the whole story, including what happens with two matte tracks in a row and how a matte looks on the timeline.
+
+## With an agent
+
+[`set_track`](/mcp/tools-tracks-and-markers/#set_track) sets a track's `matte` to `alpha`, `alpha_inverted`, `luma` or `luma_inverted`, and `none` turns it off. See [Tools: tracks, markers and canvas](/mcp/tools-tracks-and-markers/#track-mattes).
+
+## Related
+
+- [Matte tracks](/canvas/matte-tracks/)
+- [Mattes inside nests](/canvas/mattes-in-nests/)
+- [What a graphic is](/graphics/what-is-a-graphic/)
+- [Edit a module](/graphics/edit-a-module/)

@@ -28,6 +28,7 @@ extension ExportSheetController {
             let speed = EncoderSpeed(rawValue: raw)
         else { return }
         encoderSpeedChoice = speed
+        presetEdited()
         resolveCard()
     }
 

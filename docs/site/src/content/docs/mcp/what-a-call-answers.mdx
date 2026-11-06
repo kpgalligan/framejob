@@ -1,0 +1,150 @@
+---
+title: What a call answers
+description: How to read a tool's answer. A landed edit, a call that changed nothing, a refusal, an error, what a cloud tool says with no key, and which tools never touch the network.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A call tells you what happened in its answer, in words a model can act on. An edit lands, changes nothing, is refused, or is an error, and each reads differently.
+
+<AtAGlance
+  tools={['transcribe', 'transcribe_for_fillers', 'get_media_analysis', 'get_transcript', 'get_timeline_transcript', 'detect_fillers', 'detect_silence', 'split_at_shots', 'analyze_cutout']}
+  needs="Your AssemblyAI key, only for a tool that sends to AssemblyAI."
+/>
+
+## Answers come back as tool results
+
+Every answer comes back as the tool's result, so a model can read it and correct itself. A refused or invalid call is an ordinary tool result with `isError: true`, and its text is the message. It isn't a transport or JSON-RPC error. A call that changed nothing is marked the same way, and its message says the project is already in that state.
+
+JSON-RPC errors are for the protocol itself. An MCP method the server doesn't know gets "method not found", and a `tools/call` with no tool name is an error too. A tool name that doesn't exist is an ordinary result: "Unknown tool: *name*".
+
+| The answer | `isError` | Undo step | What to do |
+| --- | --- | --- | --- |
+| [A landed edit](#a-landed-edit) | false | One | Read the ids and carry on |
+| [No change](#a-no-change-answer) | true | None | Nothing. The project already says that. |
+| [A refusal](#a-refusal) | true | None | Act on the reason, then call again |
+| [An error](#an-error) | true | None | Fix the argument it names, then call again |
+
+## A landed edit
+
+An edit that landed answers `ok: true`, the ids it created, anything the tool adds of its own, and a short `project` summary. A model doesn't need to read the whole project back to see what it did.
+
+```json
+{
+  "ok": true,
+  "new_clips": [42],
+  "project": {
+    "name": "Interview",
+    "path": "/Volumes/Work/Interview.framejob",
+    "width": 1920,
+    "height": 1080,
+    "fps": [30, 1],
+    "duration": 1800000,
+    "playhead": 600000,
+    "tracks": 3,
+    "clips": 7,
+    "markers": 2,
+    "media": 4,
+    "selection": [],
+    "unsaved_changes": true
+  }
+}
+```
+
+The ids appear only when the edit created something:
+
+| Key | What it lists |
+| --- | --- |
+| `new_clips` | Clips the edit created, inside any nest too |
+| `new_tracks` | Tracks the edit created, inside any nest too |
+| `new_markers` | Markers the edit created |
+| `new_media` | Media the edit added |
+| `new_actions` | Actions, from the tools that add them, such as `add_action` |
+
+The summary holds:
+
+| Key | What it is |
+| --- | --- |
+| `name`, `path` | The project's name and its path, which is `null` for a project with no file yet |
+| `width`, `height`, `fps` | The canvas. `fps` is `[numerator, denominator]`. |
+| `duration`, `playhead` | Both in [ticks](/mcp/units-and-ids/#times-in-ticks) |
+| `tracks`, `clips`, `markers`, `media` | How many of each, counted on the top-level timeline |
+| `selection` | The ids of the selected clips |
+| `unsaved_changes` | Whether the project has changes to save |
+| `missing_media` | The ids of media whose file is gone. It only appears when there are some, and `relink_media` points one at its new place. |
+
+An edit made inside a nest also answers `scope`, the nest it landed in. See [Editing inside a nest](/mcp/nests/). A speed edit that takes a clip past ×12 adds `audio_left_out` and `audio_note`.
+
+Every edit is exactly [one undo step](/mcp/tool-calls/#one-call-one-undo-step), however many clips it touched.
+
+## A no-change answer
+
+> Video Properties made no change: the project is already in that state.
+
+This means nothing was wrong. The project already says what you asked, so no undo step was made and it's safe to retry. The message opens with the name the step would have had in the **Edit** menu.
+
+## A refusal
+
+> Remove Track was refused at remove_track: track 3 still holds clip 12; pass with_clips: true to remove the track and its clips
+
+A rule declined the edit. The message reads *step* was refused at *edit*: *reason*. The reason names what you can act on:
+
+- a track that's locked
+- the clips still using a media file
+- how far two clips would overlap
+- the argument that lets the call through, such as `with_clips: true` or `ripple: true`
+
+The project is untouched and no undo step is made, so you can fix the cause and call again.
+
+## An error
+
+An argument Frame Job can't use is an error, and it's marked and treated like a refusal: nothing changes and no undo step is made. The message names the argument.
+
+| What went wrong | Example |
+| --- | --- |
+| An id nothing has | `No clip has id 17. get_project lists the clips.` |
+| A required argument left out | `Missing required argument: clip (an id)` |
+| An argument the tool doesn't take | `trim_start does not take speed. It takes alone, clip, to, project and scope.` |
+| A bad key or value in a patch | `unknown key "gate.knee" in an audio patch` |
+
+A message starting "internal error:" means something went wrong inside Frame Job. The project is unchanged.
+
+[Patches](/mcp/patches/#patch-refusals-name-the-path) has more of these, and [Units and ids](/mcp/units-and-ids/) gives the rules they come from.
+
+## Keyed tools with no key
+
+Two tools can send to AssemblyAI, and both use the key and region saved in **Frame Job ▸ Settings… ▸ Transcription**. A person has to set the key first, because [no tool can set or read it](/captions/assemblyai-key/#only-a-person-sets-the-key).
+
+A tool needs the key only at the moment it would send. Without one it refuses there, before anything is uploaded:
+
+> No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription.
+
+| Tool | Needs the key | Doesn't need the key |
+| --- | --- | --- |
+| `transcribe` | With `engine: "assemblyai"` when a file has no usable transcript, or with `refresh: true` | The default `apple` engine, or when every file already has a current transcript in the project |
+| `transcribe_for_fillers` | When it has to upload the file | When the file already has a transcript made with filler words |
+
+No tool needs an Anthropic key. That key is only for the [Assistant](/assistant/set-up/) inside Frame Job.
+
+## Tools that never reach the network
+
+These tools read what's on your Mac. They never make a network request, upload anything or need a key, whatever you pass them.
+
+| Tool | What it reads |
+| --- | --- |
+| `get_media_analysis` | Analysis made on your Mac and kept in the project's cache |
+| `split_at_shots` | The same analysis, for shot changes |
+| `analyze_cutout` | Masks made on your Mac |
+| `detect_silence` | The cached waveform and voice detection |
+| `detect_fillers` | An AssemblyAI transcript already in the project. A file with no such transcript is listed under `needs_transcript`. |
+| `get_transcript` | A cached transcript, or your Mac's own speech recogniser |
+| `get_timeline_transcript` | A cached transcript, or your Mac's own speech recogniser |
+
+## Related
+
+- [How tool calls behave](/mcp/tool-calls/)
+- [Patches](/mcp/patches/)
+- [Units and ids](/mcp/units-and-ids/)
+- [Tools: captions and transcripts](/mcp/tools-captions/)
+- [Your AssemblyAI key](/captions/assemblyai-key/)
+- [When an edit is refused](/getting-started/refused-edits/)

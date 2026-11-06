@@ -1,0 +1,261 @@
+---
+title: Write a graphic module
+description: Write your own motion graphic as one JavaScript file, with its name, its properties, the SVG it draws for each frame and the limits it runs under.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A graphic is drawn by a module: one JavaScript file whose `render` function returns an SVG picture for each frame. Write your own when the [bundled templates](/graphics/templates/) don't draw what you need. This page covers the shape of that file and the rules it runs under. [The module API](/graphics/module-api/) lists the helpers it can call, and **Help ▸ Graphics Reference** opens the whole reference. If you'd rather not write code, [an agent can write the module](/graphics/agents-and-graphics/).
+
+<AtAGlance
+  menu={['Help ▸ Graphics Reference', 'Insert ▸ Graphic…']}
+  where={['graphics/API.md and graphics/API.d.ts in your project', 'Clip tab ▸ Graphic ▸ Source']}
+  tools={['graphic_reference', 'write_graphic', 'render_graphic']}
+/>
+
+## Try your first module
+
+<Steps>
+
+1. Save the example under [The module](#the-module) as `lower-third.js`, anywhere you like.
+
+2. Choose **Insert ▸ Graphic…**, then **From File…**, and pick the file. Frame Job copies it into the project's `graphics` folder and places a clip at the playhead.
+
+3. Select the clip and open **Clip tab ▸ Graphic ▸ Source**. Choose **Open in Editor**, change something and save. The clip redraws. See [Edit a module](/graphics/edit-a-module/).
+
+</Steps>
+
+A file name is lowercase letters, digits and `-`, starts with a letter or a digit, and is at most 63 characters before `.js`. **From File…** makes a valid name from whatever you pick. If the module doesn't compile, the copy stays in the folder and no clip is placed.
+
+## The module
+
+A module is one file of plain JavaScript, not TypeScript or JSX. It exports `render`, and optionally `meta` and `schema`. To write in TypeScript, compile to a single `.js` file first. [`API.d.ts`](/graphics/edit-a-module/#apimd-and-apidts) has the types for your editor.
+
+```js
+export const meta = {
+  name: "Lower third",        // shown in the inspector
+  durationInFrames: 150,      // optional: the default length of a new clip
+};
+
+export const schema = {
+  title:    { type: "string",  default: "Jane Doe", label: "Title" },
+  subtitle: { type: "string",  default: "Director of Photography" },
+  accent:   { type: "color",   default: "#ff5a36" },
+  size:     { type: "number",  default: 64, min: 12, max: 200, step: 1 },
+  boxed:    { type: "boolean", default: true },
+  align:    { type: "enum",    default: "left", options: ["left", "center", "right"] },
+};
+
+export function render(frame, props, ctx) {
+  const x = interpolate(frame, [0, 20], [-600, 96], { easing: Easing.outCubic, clamp: true });
+  const fade = interpolate(frame, [ctx.durationInFrames - 15, ctx.durationInFrames - 1], [1, 0],
+    { clamp: true });
+  const y = ctx.height - 200;
+  return svg(ctx, `
+    <g opacity="${fade}">
+      ${props.boxed ? `<rect x="${x}" y="${y - 90}" width="700" height="150" fill="#101014"/>` : ""}
+      <rect x="${x}" y="${y - 90}" width="12" height="150" fill="${props.accent}"/>
+      <text x="${x + 40}" y="${y}" font-family="Montserrat" font-weight="800"
+            font-size="${props.size}" fill="#ffffff">${escapeXml(props.title)}</text>
+    </g>`);
+}
+```
+
+| Export | Required | What it is |
+| --- | --- | --- |
+| `render(frame, props, ctx)` | Yes | Returns the frame's SVG, as a string that starts with `<svg`. Use `svg(ctx, body)` to write the root element. |
+| `meta` | No | Describes the graphic. Without it, it's `{}`. |
+| `schema` | No | Declares the properties. Without it, it's `{}`. |
+
+`frame` is a whole number, counted from the graphic's first frame. A new clip starts at frame 0. Trim its front, or split it, and the later clip starts at a later frame, so the graphic carries on instead of restarting.
+
+Work out each frame from `frame` alone. Frames aren't drawn in order and a module can be loaded more than once, so a variable at the top level can't carry anything from one frame to the next. Keep the top level for constants.
+
+`props` holds the clip's property values, and `ctx` says where the frame falls.
+
+The module is the only source of code. `svg`, `interpolate`, `escapeXml` and the rest of the standard library are already global, so there's nothing to import. See [The module API](/graphics/module-api/).
+
+## `meta`
+
+Every key is optional.
+
+| Key | What it does |
+| --- | --- |
+| `name` | The title shown in the inspector and the Insert Graphic sheet. Without it, the sheet makes a title from the file name. |
+| `durationInFrames` | The length of a new clip. Without it, a new clip is 5 seconds. |
+| `width`, `height` | The size it draws at instead of the canvas, a whole number from 1 to 8192. Insert, `add_graphic_clip`, `render_graphic` and `export_graphic` all read them. |
+| `category` | The list it's filed under in the Insert Graphic sheet. Absent or blank means **Other**. A module in your project is listed under **This Project** whatever this says. |
+| `description` | One line shown under the sheet's preview. |
+
+A `durationInFrames`, `width` or `height` that isn't a whole number in range stops the graphic being placed, and the message names the key.
+
+## `ctx`
+
+`render` receives `ctx` on every frame.
+
+| Key | What it is |
+| --- | --- |
+| `fps` | The project's frame rate, for example `30` or `29.97002997` |
+| `time` | `frame / fps`, in seconds |
+| `durationInFrames` | The graphic's length in frames. That's the clip's length plus anything trimmed from its front, unless the [Timeline section](/graphics/size-and-timing/) sets its own. |
+| `progress` | `frame / max(1, durationInFrames - 1)`, held between 0 and 1. A clip that runs past the graphic's length stays at 1. |
+| `width`, `height` | The graphic's size in pixels |
+| `canvas` | `{width, height}`, the project's canvas, inside a nest too |
+
+## Resolution-independent drawing
+
+Write every coordinate against `ctx.width` and `ctx.height`, and one graphic draws at any size or shape.
+
+A unit based on the short side is the safest way to size things:
+
+```js
+const u = Math.min(ctx.width, ctx.height) / 1080;
+```
+
+On a landscape canvas that's the same as `ctx.height / 1080`, and it stops a portrait canvas drawing 1.78 times too big. See [Graphics in a vertical version](/graphics/vertical-graphics/).
+
+## The schema
+
+The schema declares a module's properties. Each entry becomes a row in the [Properties section](/graphics/properties/) and a value in `props`.
+
+| Rule | Limit |
+| --- | --- |
+| Keys in a schema | At most 64 |
+| A key's spelling | Letters, digits and `_`, starting with a letter or `_`, at most 32 characters |
+| Required in every entry | A `type`, and a `default` of that type |
+| Optional in every entry | `label` (the row's name, else the key), `help` (its tooltip), and `animate: false` |
+
+`animate: false` means an action never animates that property. See [Animate graphic properties](/graphics/animate-properties/).
+
+A schema that breaks a rule doesn't compile, and the error says which rule. For example, `schema.accent.default "bluish" is not a color`.
+
+## Prop types
+
+| `type` | Value | Extra keys | Row in the inspector |
+| --- | --- | --- | --- |
+| `string` | Text, at most 4,096 characters | `multiline: true` | A one-line field, or a text area with `multiline` |
+| `number` | A finite number | `min`, `max`, `step` | A slider with a value when it has both `min` and `max`, otherwise a value field |
+| `boolean` | `true` or `false` | | A checkbox |
+| `color` | A CSS colour string | | A colour control |
+| `enum` | One of its `options` | `options`, 1 to 32 strings | A pop-up |
+| `asset` | A file name in `graphics/assets/`, or `null` or `""` for no image | `kind: "image"`, which is optional | A pop-up listing the project's pictures, with **None** first |
+
+- **`number`.** A `step` under 1 shows two decimal places, and a `step` of 1 or more shows whole numbers. With no `step`, two places show only when the default, `min` or `max` has a fraction.
+- **`color`.** Write it as `"#ff5a36"`, `"rgb(255, 90, 54)"`, `"hsl(11, 100%, 61%)"` or a name such as `"tomato"`. A default that isn't a colour doesn't compile. `props` receives the default as you wrote it, not normalised.
+- **`asset`.** A value of `""` stored on a clip reaches `render` as `null`, but a `default` of `""` reaches it as `""`, so test for an empty value before drawing. Pass a name to [`asset()`](/graphics/module-api/) to draw it.
+
+## Tolerant props
+
+`props` always has every key in the schema, so `render` never has to check for a missing one.
+
+A stored value replaces the default only when it fits the type. This matters when you change a schema after clips already hold values. A value that doesn't fit is a warning, not a failure: the default is drawn and the frame still draws. For example:
+
+```text
+props.size is a string but the schema says number; the default 64 is used
+```
+
+A stored value whose key the schema no longer has is passed through to `render`, with a warning. See [Graphic properties](/graphics/properties/#stale-values) for how those leftover values show in the inspector.
+
+## The SVG the engine draws
+
+Frame Job draws the string `render` returns with resvg, an SVG renderer. It draws text with the fonts graphics can use, images in PNG, JPEG, GIF, WebP and SVG, and compressed SVGZ images. Gradients are dithered so that dark ones don't band.
+
+Anything you don't draw is transparent, so the tracks behind the clip show through. To fill the frame with a colour, pass `background` to [`svg()`](/graphics/module-api/#svg).
+
+Most of SVG works, not only shapes, paths and text:
+
+- Gradients, patterns, `<clipPath>`, `<mask>`, `<marker>`, `<use>`, `<symbol>` and `<textPath>`.
+- Filters, such as `feGaussianBlur`, `feDropShadow` and `feColorMatrix`.
+- `opacity` and `mix-blend-mode`. These work inside the graphic's own picture. To blend with the tracks behind it, use the clip's [blend mode](/canvas/blend-modes/).
+- `<style>` sheets and `style` attributes.
+
+Each frame is one still picture, so `<animate>`, `<animateTransform>` and CSS animations do nothing. Change what `render` returns instead. `<foreignObject>`, which is how HTML gets into an SVG, doesn't draw either, and neither does `<script>`. None of these gives a warning.
+
+An image must come from `graphics/assets/`, through `asset(name)`. See [Fonts and pictures in graphics](/graphics/fonts-and-pictures/).
+
+These don't stop the frame. They're warnings, and the frame draws without the part they name:
+
+| Warning | What to do |
+| --- | --- |
+| `<image> href "x" is not an asset; the assets are: …` | Use `asset(name)` with one of the names listed. |
+| `<image> data: URLs are not supported; put the file in graphics/assets/ and use asset(name)` | Add the file and refer to it by name. |
+| `asset "x" is not a PNG, JPEG, GIF, WebP or SVG(Z) image` | Replace the file with a picture. |
+| `font-family "x" is not in the font set; the set has: …` | Use a family it lists, or add the font. |
+
+A size mismatch warns too, but the picture still draws: `the SVG is 100×100 but the graphic is 1920×1080`. Using `svg(ctx, body)` for the root element avoids it.
+
+SVG that can't be read at all is an error, and starts `the SVG did not parse:`.
+
+## The sandbox
+
+A module runs in a sandbox, shut off from everything else on your Mac. A graphic can only use its `frame`, `props`, `ctx`, fonts and pictures, so the same frame with the same properties always draws the same pixels. These stop with an error:
+
+| In your module | The error |
+| --- | --- |
+| `Math.random()` | `Error: Math.random is not available; use random(seed)` |
+| `import x from "x"` | `ReferenceError: Error resolving module 'x' from 'lower-third': imports are not available in a graphic; the standard library is global` |
+| `new Function("…")` | `Error: Function is not available in a graphic; the module is the one source of code` |
+| `eval("…")` | `ReferenceError: eval is not defined` |
+
+There's also no `fetch`, no file access, no clock, no `performance`, no `WebAssembly` and no `Intl`. For numbers with thousands separators, use `formatNumber`.
+
+It isn't a browser or Node either. There's no `document`, `window`, `<canvas>` or WebGL, and no `setTimeout` or `requestAnimationFrame`. There's no `console`, so `console.log` stops the frame with `ReferenceError: console is not defined`. See [Debug a module](/graphics/edit-a-module/#debug-a-module) for what to do instead. `render` can't be `async`, because nothing waits for a promise.
+
+You can't install an npm package or import one. Code you paste or bundle into the one file does run, as long as it needs nothing listed here and its top level fits [the time budget](#the-time-budget).
+
+To feed a graphic data, such as a chart's numbers, pass it in a `string` prop and parse it in `render`, or write it into the module.
+
+`Date` is frozen. `Date.now()` is always `946684800000`, and `new Date()` is always 1 January 2000 at 00:00 UTC. See [Graphics in exports](/graphics/graphics-in-exports/).
+
+## Modern JavaScript
+
+Modern syntax works: template literals, `??`, `?.`, `**`, destructuring, `Array.prototype.at`, `replaceAll` and `findLast`.
+
+## The time budget
+
+A runaway graphic reports an error instead of hanging Frame Job, because every call has a deadline.
+
+| Where | Budget |
+| --- | --- |
+| Each frame in the preview | 250 ms |
+| Each frame in an export | 2 s |
+| The module's top level (the code outside `render`), when it compiles | 250 ms |
+
+Over the budget, you get an error such as:
+
+```text
+over the 250 ms budget at frame 12 (InternalError: interrupted)
+```
+
+When that error gives a line and column, they're where the function begins, not the statement that ran long.
+
+## Limits
+
+Each module runs in an engine of its own, with these limits:
+
+| Limit | Amount | Past it |
+| --- | --- | --- |
+| Heap | 64 MiB | An error with a line and column |
+| Stack | 1 MiB | An error with a line and column |
+| A graphic's side | 8192 pixels | Frame Job won't draw it |
+| The SVG `render` returns | 8 MiB (8,388,608 bytes) | `render returned 9000000 bytes at frame 12; the SVG may be at most 8388608 bytes` |
+
+`render` must return a string that starts with `<svg`. Anything else is an error:
+
+| What happened | The error |
+| --- | --- |
+| No `return` | ``render returned undefined at frame 12 — did you forget `return`?`` |
+| A string that isn't SVG | `render returned a string that does not start with <svg at frame 12: …` |
+| No `render` exported | ``the module exports no `render` function`` |
+
+A frame that fails draws a red error card on the clip, and stops an export. See [Edit a module](/graphics/edit-a-module/) for where errors and warnings show.
+
+## Related
+
+- [What a graphic is](/graphics/what-is-a-graphic/)
+- [The module API](/graphics/module-api/)
+- [Edit a module](/graphics/edit-a-module/)
+- [Graphic properties](/graphics/properties/)
+- [Fonts and pictures in graphics](/graphics/fonts-and-pictures/)
+- [Graphics with an agent](/graphics/agents-and-graphics/)

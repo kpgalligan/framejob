@@ -1,0 +1,94 @@
+---
+title: "Save Frame"
+description: "Save the frame under the playhead as a PNG, JPEG or HEIC, drawn at full size the way an export draws it."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Save Frame writes the frame under the playhead to a still image: a thumbnail, a poster frame or a picture for a document.
+
+<AtAGlance menu="File ▸ Save Frame…" keys="⌥⌘E" tools="render_frame" />
+
+## Save a frame
+
+<Steps>
+
+1. Move the playhead to the frame.
+
+2. Choose **File ▸ Save Frame…** or press <kbd>⌥⌘E</kbd>. It's greyed out while the timeline is empty.
+
+3. Pick a **Format:** and a place. The save panel suggests the project's name and the timecode, with `-` in place of `:`, such as `Board 00-00-12-05.png`.
+
+4. Choose **Save**.
+
+</Steps>
+
+The frame is the one the playhead was on when you opened the panel. When the save works, nothing else appears. The file is where you put it.
+
+If it doesn't work, an alert says why:
+
+| The alert says | What it means |
+| --- | --- |
+| "There is no frame at the playhead. The time is past the end of the timeline, the timeline is empty, or the media is missing." | Frame Job couldn't draw a frame at that time. |
+| "Could not write PNG to … The file could not be created there — check that the folder exists and that Frame Job is allowed to write into it." | The folder is missing, or Frame Job can't write into it. |
+| "Could not write HEIC to … This Mac's image encoders do not offer that format." | This Mac has no encoder for the format. |
+
+## PNG, JPEG or HEIC
+
+| **Format:** | File | Transparency | Depth | Compression |
+| --- | --- | --- | --- | --- |
+| **PNG** | `.png` | Kept | 8-bit, or 16-bit for a [deep frame](#deep-and-hdr-frames) | Lossless |
+| **JPEG** | `.jpg` | None. A transparent canvas is flattened onto black. | Always 8-bit | 90 % quality |
+| **HEIC** | `.heic` | Kept | 8-bit, or 10-bit for a deep frame | 90 % quality |
+
+The popup opens on **PNG** every time and doesn't remember your last choice. A line under it says what the chosen format does with transparency, such as "PNG keeps the canvas's alpha channel." or "JPEG has no alpha channel: a transparent canvas is flattened onto black."
+
+Choosing a format changes the extension in the file name and keeps a name you've typed. Only `.png`, `.jpg`, `.jpeg` and `.heic` count as extensions, so `Board v1.2` keeps its `.2` and becomes `Board v1.2.jpg`.
+
+## Drawn the way an export draws it
+
+The frame is drawn the way an [export](/export/what-an-export-includes/) draws it, at the canvas's full size.
+
+Preview Quality, Show Ungraded, Show SDR Version and Show Selection never change it. It never carries a timecode burn-in, even if you use one on your exports.
+
+## Inside a nest
+
+With a [nest](/editing/nests/) open, the saved frame is the picture the canvas is showing: the nest's own, at the nest's size and the nest's time. The timecode in the suggested name is the nest's too. Save Frame is greyed out in an empty nest, however full the timeline is.
+
+This is the opposite of an export, which always writes the whole timeline.
+
+## Deep and HDR frames
+
+Most frames are saved at 8 bits a channel and labelled BT.709. These are saved with more:
+
+- **A deep frame.** A frame showing a still deeper than 8 bits, or a 10-bit VP9, HEVC or ProRes clip, is saved as a 16-bit PNG or a 10-bit HEIC, still labelled BT.709, on any track. A frame is saved deep too when the lowest track with video on it holds a 10-bit HEVC or ProRes clip, anywhere along the timeline.
+- **An [HDR project](/hdr/dynamic-range/).** Every PNG and HEIC keeps the HLG picture, as a 16-bit PNG or a 10-bit HEIC labelled BT.2100 HLG.
+
+JPEG is always 8-bit. In an HDR project a JPEG is the project's [SDR version](/hdr/show-sdr-version/), labelled BT.709.
+
+See [Precision and bit depth](/hdr/precision/) for how depth runs through the rest of the app.
+
+## Waiting for masks
+
+A clip with [Remove Background](/effects/remove-background/) waits up to 30 seconds for that frame's masks, which are made on this Mac. Past that, the frame is saved with the clip whole, and a sheet titled "Saved without Remove Background" names the clip's file, for example "speech.mov drawn whole: the person masks were not ready within 30 seconds."
+
+Save the frame again once the clip's **Status** row shows the masks are done. An export never does this: it [waits as long as the masks take](/export/what-an-export-includes/#waiting-for-what-it-needs).
+
+## Good to know
+
+A graphic that fails draws its error card in the saved frame, and a clip whose cursor file can't be read is drawn without its cursor. Save Frame doesn't warn you about either, so look at the picture.
+
+## The same still for an agent
+
+`render_frame` writes the same bytes as Save Frame for the same frame and format. It returns the picture itself as well as a file, and with no path it writes a temporary file and names it. The format comes from `format` if you pass it, otherwise from the path's extension, otherwise PNG.
+
+It also reports what Save Frame keeps quiet: when a graphic in the frame warned or failed it names the graphic, its frame and the message, and it names a cursor file it couldn't read. Like Save Frame, it waits 30 seconds for masks and says which clip it drew whole. An agent can ask for more than the menu offers, such as a timecode burn-in, an ungraded picture or scope measurements. See [Check the picture: render_frame](/mcp/render-frame/).
+
+## Related
+
+- [Transparent exports](/export/transparency/)
+- [What an export includes](/export/what-an-export-includes/)
+- [Precision and bit depth](/hdr/precision/)
+- [Export HDR](/hdr/export-hdr/)
+- [Check the picture: render_frame](/mcp/render-frame/)

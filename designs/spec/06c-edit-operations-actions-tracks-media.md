@@ -219,8 +219,10 @@ The rules every op shares are §6a; the clip ops are §6b.
   `text` and `key` a top-level key of it — writes a `null` at each AFTER the merge, which keys that
   optional property OFF at the end (§5.4, §11 CI-14), and `audio.eq.<slot>` — `high_pass`,
   `low_shelf`, `band_1`, `band_2`, `band_3`, `high_shelf` or `low_pass` — writes it at that slot
-  of the end's `eq`, one EQ slot keyed off (§11 AU-88), the only three-part path (an unknown slot
-  is an **error** naming the seven, any other deeper path the `"group.key"` one); a malformed
+  of the end's `eq`, one EQ slot keyed off (§11 AU-88), and `video.qualifier.<range>` — `hue`,
+  `saturation` or `luma` — at that range of the end's `qualifier` (§11 GR-36), the only three-part
+  paths (an unknown slot is an **error** naming the seven, an unknown range one naming the three,
+  any other deeper path the `"group.key"` one); a malformed
   path, `video.motion`, `video.cutout` (format 39, §11 CO-20: `video.cutout cannot be keyed off
   at an action's end; set_video {cutout: null} removes it`), `video.hide_silent` (format 43,
   §11 CO-92: `video.hide_silent is not an animation target`, as a `patch` naming it — a `null`
@@ -311,6 +313,8 @@ The rules every op shares are §6a; the clip ops are §6b.
 - **`remove_empty_tracks`** —
 - **`add_marker {at, name?, chapter?, color?}` · `set_marker {marker, time?, name?, chapter?,
   color?}` · `remove_marker {marker}`** — Markers snap to frames; two markers may not share a time.
+  An `add_marker` or a `set_marker` `time` on a tick another marker holds is refused, naming it
+  (`marker 4 is already at 600000 ticks; two markers may not share a frame`, §11 #472).
   Default color `red`.
 - **`set_canvas {width?, height?, fps?, background?, rescale_clips?, fit_new_clips?,
   timecode_frames?, output?, blending?}`** — `rescale_clips` multiplies every clip's `x`, `y`, `scale` by the size

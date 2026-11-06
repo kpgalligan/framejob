@@ -1,0 +1,44 @@
+---
+title: "Nudge clips"
+description: Move the selected clips one or ten frames at a time from the keyboard.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A nudge moves the selected clips by an exact number of frames, for the small corrections that are hard to make with a drag.
+
+<AtAGlance keys={[',', '.', '⇧,', '⇧.']} tools="move_clip" />
+
+## Nudge the selection
+
+| Keys | Moves the selection |
+| --- | --- |
+| <kbd>,</kbd> | One frame earlier |
+| <kbd>.</kbd> | One frame later |
+| <kbd>⇧,</kbd> | Ten frames earlier |
+| <kbd>⇧.</kbd> | Ten frames later |
+
+On a US keyboard, <kbd>⇧,</kbd> and <kbd>⇧.</kbd> are the keys that type `<` and `>`.
+
+Each press is one undo step, Nudge Clips. These keys have no <kbd>⌘</kbd>, so while a text field has the focus they type into it instead. See [Keys and typing](/getting-started/keys-and-typing/).
+
+## Good to know
+
+A nudge is an ordinary [move](/editing/move-clips/), with the same rules:
+
+- It beeps with nothing selected.
+- A nudge that would break the [overlap rule](/editing/how-edits-work/#the-overlap-rule) beeps and changes nothing, and the reason appears at the foot of the inspector. A nudge that lands on a small enough overlap makes a Cross Dissolve.
+- The earliest clip stops at the start of the timeline, so <kbd>⇧,</kbd> on a clip three frames from the start moves it three frames. A clip already at the start beeps.
+- A linked partner on an unlocked track moves with its clip.
+
+Unlike a drag, a nudge moves a selected clip on a [locked track](/timeline/hide-and-lock-tracks/). It doesn't snap, and it never changes a clip's track.
+
+## With an agent
+
+An agent nudges with `move_clip`, giving the shift as a time. See [Tools: moving and trimming](/mcp/tools-move-and-trim/#move_clip).
+
+## Related
+
+- [Move clips](/editing/move-clips/)
+- [Select clips](/timeline/selecting-clips/)
+- [How edits work](/editing/how-edits-work/)

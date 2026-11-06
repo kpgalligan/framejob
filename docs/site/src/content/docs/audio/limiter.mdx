@@ -1,0 +1,80 @@
+---
+title: Limiter
+description: Hold a clip's peaks under a ceiling, so a quiet recording can be turned up without its loudest moments clipping.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+The limiter holds a clip's peaks under a ceiling, so a quiet recording can be turned up without its loudest moments clipping. This page covers a clip's limiter. A track has one of its own, on [Track compressor and limiter](/audio/track-dynamics/), and an export has a master limiter, on [Export loudness](/export/loudness/).
+
+<AtAGlance where="Clip tab ▸ Sound ▸ Limiter" tools="set_audio" />
+
+## Limit peaks
+
+<Steps>
+
+1. Select the clip and open the **Sound** sub-tab of the Clip tab. The **Limiter** section starts closed, so open it.
+
+2. Tick **Limit peaks**. It turns on with a [ceiling](#ceiling) of −1 dBTP and a [release](#release) of 100 ms.
+
+3. Turn the clip's volume up as far as you need. The ceiling holds.
+
+</Steps>
+
+It's a true-peak limiter, which is why its ceiling is in dBTP, decibels of true peak. It looks between the samples, where a peak can sit higher than any sample, and it looks a little ahead, so it turns the sound down smoothly just before a peak and not after it.
+
+The section's header shows the ceiling, such as "−1.0 dBTP", or "off". **Reset** appears there once the limiter has settings, and turns it off. Unticking **Limit peaks** also throws away its settings, so ticking it again starts from the defaults.
+
+[Normalize](/audio/normalize/) in Loudness mode turns the limiter on for you when a clip needs it, and [Enhance Voice](/audio/enhance-voice/) always does.
+
+## Ceiling
+
+The highest true peak the clip may reach, from −24 to 0 dBTP. The default is −1 dBTP, and the quick picks are −1, −2, −3 and −6.
+
+The ceiling is where the clip's peaks land after its Volume slider, so turning the volume up makes the limiter work harder and doesn't push the clip past the ceiling. Fades and ducking only turn a clip down, so they never take it over either.
+
+## Release
+
+How quickly the level recovers after a peak, from 1 to 1000 ms. The default is 100 ms, and the quick picks are 50, 100, 200 and 500. The time isn't rounded to frames.
+
+A number typed outside either range goes to the nearest end of it.
+
+## What it doesn't hold
+
+Each clip's limiter holds that clip alone. All of these can go past the ceiling:
+
+- Two limited clips that overlap, in a transition or on two tracks.
+- A clip whose volume an [action](/audio/animate-sound/) raises above its own Volume setting.
+- A clip inside a nest, when the nest's volume is above 100 %.
+- A clip on a track whose [volume](/audio/track-volume-and-pan/) is above 0 dB.
+- The first moments after a hard cut from a louder clip on the same track, while the level settles.
+
+In an export, the [master limiter](/export/loudness/#the-master-limiter) holds the whole mix at its own ceiling, whichever of these happens. A [stem](/export/stems/) doesn't go through it. The preview has no master limiter, so they can sound louder while you edit than they do in the file.
+
+## Latency compensation
+
+Looking ahead delays the sound by 3.3 ms. Frame Job makes up for this on its own: on a track with a limited clip, it starts every clip 3.3 ms early, and the delay brings each one back onto its frame. There's nothing to set.
+
+That has two small side effects on such a track. A clip that starts within the first 3.3 ms of the timeline loses up to that much of its start, and the last 3.3 ms of the track aren't heard. [Noise Reduction](/audio/noise-reduction/) has the same effect, with its own delay.
+
+## Change the limiter over time
+
+With an [action](/audio/animate-sound/) selected, the controls write the action's end. **Ceiling** and **Release** move smoothly across the action, and turning the limiter on or off changes at the action's end, with no glide. A limiter turned on by an action only limits from the action's end, but its [delay](#latency-compensation) applies to the clip's whole track from the start, as one set on the clip itself does.
+
+## Good to know
+
+- The limiter is last in the clip's chain, after the [**Mix**](/audio/pan-and-mono/) section. [How audio works](/audio/how-audio-works/#the-fixed-signal-order) has the whole order.
+- On a nest clip the limiter has no effect. Open the nest with <kbd>⌘↓</kbd> and set it on the clips inside.
+
+## With an agent
+
+`set_audio` sets the same controls through its `limiter` argument. `{}` turns the limiter on at its defaults, and `null` turns it off. A value outside its range is an error that changes nothing. See [Tools: clip sound](/mcp/tools-set-audio/#compressor-and-limiter).
+
+## Related
+
+- [Normalize](/audio/normalize/)
+- [Compressor](/audio/compressor/)
+- [Track compressor and limiter](/audio/track-dynamics/)
+- [Export loudness](/export/loudness/)
+- [Noise Reduction](/audio/noise-reduction/)

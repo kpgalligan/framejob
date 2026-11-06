@@ -427,9 +427,9 @@ impl Default for Chroma {
 /// user staring at a control that does nothing.
 pub const MAX_FILTERS: usize = 4;
 
-/// One image filter and how much of it (M3). Order matters: filters are
-/// applied in the order they appear in `video.filters`, so blur-then-sepia
-/// and sepia-then-blur are different pictures.
+/// One image filter and how much of it (M3). Sepia, noir, vignette and
+/// invert apply in the order they appear in `video.filters`; blur, sharpen
+/// and pixelate always apply first, wherever they sit (`Compositor.metal`).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Filter {
@@ -468,8 +468,9 @@ pub enum FilterKind {
 
 /// A mirrored copy of the layer drawn below it, fading out (M3).
 ///
-/// `height` and `falloff` are fractions rather than pixels so a reflection
-/// survives a scale change: half the layer, however big the layer is.
+/// `height` is a fraction rather than pixels so a reflection survives a
+/// scale change: half the layer, however big the layer is. `falloff` is how
+/// far it fades across that height (0 not at all, 1 transparent at its end).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Reflection {

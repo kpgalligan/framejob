@@ -1,0 +1,129 @@
+---
+title: "Where a recording lands"
+description: "Where a finished recording goes, into an open project at the playhead or as a new project of its own, what undo takes back, and when the panel comes back."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+When you stop, Frame Job adds the recording to your work without asking anything: into the project you chose, at its playhead, or as a new project. A recording is ordinary media from then on, so you can cut, move and delete its clips like any others.
+
+<AtAGlance
+  menu="File ▸ New Recording…"
+  keys="⌥⌘N"
+  where="New Recording panel ▸ Record Into"
+  tools={['record_screen', 'undo']}
+/>
+
+## Choose where it goes
+
+Before you press Record, set **Record Into** on the [recorder panel](/recording/recorder-panel/). It lists **New Project** and every open project. It follows whichever project is in front until you pick a row yourself, and it's fixed once you press Record, so switching windows during a recording doesn't change where it goes.
+
+While the files are written and imported, the panel's button reads **Stopping…** and then **Adding…**.
+
+## Into an open project
+
+The recording goes in at the chosen project's playhead, in whatever is open there. If you're working inside a [nest](/editing/nests/), it lands inside the nest.
+
+| What was recorded | Where it lands |
+| --- | --- |
+| The picture, from a screen or a camera on its own | On the front track, when all of it fits there. Otherwise all of it goes on a new track in front of everything. |
+| The microphone | On a new back track named **Microphone**. |
+| A [camera beside the screen](/recording/camera-beside-the-screen/) | On a new track named **Camera**, in front of everything, in the panel's **Layout**. |
+| A [voice-over](/recording/voice-overs/) | On a new back track named **Microphone**, from the playhead. |
+
+A recording's picture is never split across two tracks. An existing Microphone track is never reused: each recording makes its own.
+
+The microphone file and the movie don't start at quite the same moment, so Frame Job measures how far apart they began and places the microphone clip to match. When that would start it before the beginning of the timeline, or on top of the stretch before it, its head is trimmed instead.
+
+Every clip that landed is selected afterwards, microphone and camera clips included.
+
+## Land a paused recording
+
+Each [pause](/recording/pause-and-stop/) ends a file, so a paused recording is several files, one for each stretch. They land as one clip per stretch, back to back on one track. They touch, they never overlap, and no transition joins them. Each stretch's microphone file goes on the Microphone track, lined up with its own picture.
+
+At an uneven project frame rate, such as 24.981 fps, a gap of less than a frame can remain between two stretches.
+
+## Undo a landing
+
+Everything that lands in an open project is one undo step, **Add Recording**. **Edit ▸ Undo Add Recording** removes the clips and their media entries and leaves the files on disk, as undoing **Add Media…** does.
+
+Anything set up in [When it lands](/recording/when-it-lands/) runs after the landing as its own undo steps, so those come off first.
+
+## As a new project
+
+With **Record Into** set to **New Project**, the recording opens in a new, untitled project named after its file, such as `Screen Recording 2026-09-10 at 14.03.22`. That's the name Save offers.
+
+The canvas takes the movie's size and the frame rate you chose in **Rate**, while the media keeps the file's own frame rate. Two sources differ:
+
+- A [camera on its own](/recording/record-a-camera/) sets the canvas to the file's size at the camera format's frame rate.
+- A voice-over has no picture, so the canvas is 1920×1080 at **Rate**, and later stretches follow the first on its one track.
+
+The project is unsaved, and it asks before it closes.
+
+The first stretch's picture is the project itself, so it has no undo step. Everything else that landed with it is one step, named for what it holds:
+
+| What landed beside the first picture | Undo step |
+| --- | --- |
+| A microphone | **Add Microphone** |
+| A camera | **Add Camera** |
+| A camera and a microphone | **Add Camera and Microphone** |
+| Later stretches, with or without a microphone or camera | **Add Recording Segments** |
+| Only [click ripples](/recording/cursor/#show-clicks) | **Cursor Clicks** |
+| Nothing | No step |
+
+Undoing that step keeps the first picture, leaves the files on disk, and leaves the project unsaved.
+
+## If you're dragging when it ends
+
+If you're in the middle of a drag in the chosen project when the recording ends, the landing waits for the drag to finish, for up to 20 seconds. After that it gives up, and the panel's note reads "The recording was saved at … but could not be added: A drag was still in progress after 20 s." The files are on disk either way, and you can bring them in with [**Add Media…**](/projects/import-media/).
+
+## If the chosen project closed
+
+If the project you chose closes while you're recording, the recording opens as a new project instead, and the panel's note says "The document you chose was closed, so the recording opened as a new project."
+
+## When the panel comes back
+
+A recording that lands cleanly doesn't bring the panel back. Once it has landed, press <kbd>⌥⌘N</kbd> to open it. While a recording runs, the same keys stop it.
+
+The panel returns on its own, with a note, only if it was on screen when the recording began and there's something to report. The note can hold several of these at once.
+
+| The note says | What happened |
+| --- | --- |
+| "Stopped from the system's screen-recording indicator; the recording was added." | You stopped it from macOS's own indicator, not from Frame Job. |
+| "The system stopped the recording (the display slept or went away); what was captured was added." | The display slept or went away. See [When a recording stops on its own](/recording/when-a-recording-stops/). |
+| "The camera stopped on its own. What was captured was added." | A camera recording ended because the camera stopped. The first sentence can give the camera's own reason instead. |
+| "A segment was left out. … Its files are kept at …" | One stretch's movie couldn't be read, for example an empty file from a pause right after a resume. The other stretches landed. |
+| "The left-out segment's microphone, …, was added to the project without its picture." | That stretch's microphone file was readable, so it's on the Microphone track where the picture would have been. The next picture starts after that gap. |
+| A sentence about the microphone | It stopped or failed. The picture still landed. |
+| A sentence about a [camera beside the screen](/recording/camera-beside-the-screen/) | It stopped or failed. The screen recording still landed. |
+| "The camera ran at … fps, not its …, in the … s it was given to settle; the recording began anyway." | The camera didn't reach its format's frame rate before the recording began. "The camera delivered no steady frames…" is the same note when it sent none. |
+| A sentence about resuming | Resuming after a [pause](/recording/pause-and-stop/) failed, and the sentence says why. |
+| "… is too short for a frame (… ms) and was added to the media list without a clip." | The file is in the Media tab, with nothing on the timeline. |
+| "… was added to the media list without a clip: …" | The file couldn't be placed, and the sentence says why. |
+| "The cursor file for … was not written: …" | That stretch has no [cursor file](/recording/cursor-files/). |
+| "The recording did not finish writing within 10 s." | The files didn't close within 10 seconds of the stop. The note names the files kept on disk. |
+| "The recording was saved at … but could not be added: …" | Nothing landed. The note names every file, which are all on disk. |
+
+## Good to know
+
+- A project already at its limit of 64 tracks can't take a recording that needs a new track. The picture and the microphone land together or not at all, so if the picture would fit and the microphone wouldn't, nothing lands. The files stay on disk and the note names them.
+- A recording fails outright only when no movie could be read at all, or when the capture failed while the movie was being written. Its note names every file on disk.
+- When a stretch is left out, its camera file stays on disk and is named with its kept files, but it isn't added to the project.
+- In a new project, a left-out first stretch's microphone goes to the Media tab with no clip, because the first readable picture starts the project at 0.
+
+## With an agent
+
+`record_screen` lands a recording the same way, with two differences:
+
+- With no project open, it always opens a new project. Whenever a recording opens as a new project, including when the chosen project closed, the answer says `landed: new_project`, and later calls reach that project with `project` set to the recording's path.
+- With `place: false` it adds the recording to the Media tab with no clip, which the panel can't, and the note says to place it with [`add_clip`](/mcp/tools-adding-clips/#add_clip). A new project's picture is on the timeline whatever `place` says. `camera_layout` and the [steps after landing](/recording/when-it-lands/#with-an-agent) can't be used with it.
+
+See [Record with record_screen](/mcp/record-screen/).
+
+## Related
+
+- [The recorder panel](/recording/recorder-panel/)
+- [Start, pause and stop](/recording/pause-and-stop/)
+- [Polish when a recording lands](/recording/when-it-lands/)
+- [Recording files and formats](/recording/files-and-formats/)
+- [When a recording stops on its own](/recording/when-a-recording-stops/)

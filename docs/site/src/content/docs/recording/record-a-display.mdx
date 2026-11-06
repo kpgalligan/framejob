@@ -1,0 +1,90 @@
+---
+title: Record a display
+description: Record everything on one display, choose its size and frame rate, and decide whether Frame Job's own windows appear in the picture.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Record a display when you want everything on one screen in the movie: a demo that moves between apps, or a tutorial with menus and dialogs.
+
+<AtAGlance
+  menu="File ▸ New Recording…"
+  keys="⌥⌘N"
+  where="New Recording panel ▸ Source"
+  tools="record_screen"
+  needs="The Screen Recording permission."
+/>
+
+## Record a display
+
+<Steps>
+
+1. Open the [recorder panel](/recording/recorder-panel/) with <kbd>⌥⌘N</kbd>.
+
+2. Choose the display by name in **Source**. There's one row for each connected display, and the panel starts on the display you used last, or the main display.
+
+3. Set [**Size**](#choose-a-size) and [**Rate**](#choose-a-frame-rate), and anything else you want, such as the [microphone](/recording/system-audio-and-microphone/).
+
+4. Press **Record**. After a 3, 2, 1 countdown recording starts and the panel [leaves the screen](#where-the-panel-goes-while-you-record). The first time, macOS asks for the Screen Recording permission instead, and you relaunch Frame Job after turning it on. See [Recording permissions](/recording/permissions/#screen-recording).
+
+5. Stop with the [menu-bar item](/recording/menu-bar-item/) or <kbd>⌥⌘N</kbd>.
+
+</Steps>
+
+The recording lands in the project you chose in **Record Into**. See [Where a recording lands](/recording/where-it-lands/).
+
+## Choose a size
+
+**Size** sets how many pixels the movie holds.
+
+| Size | What you get |
+| --- | --- |
+| **Nominal (points)** | The display's point size. This is the default. |
+| **Best (pixels)** | Every pixel: the point size times the display's scale, which is twice the points on a Retina display. |
+
+The note under the row shows both for the chosen display, for example `1728×1117 points · 3456×2234 pixels`.
+
+Choose **Best (pixels)** when small text has to stay sharp, and **Nominal (points)** for a smaller picture. An odd width or height is rounded up to an even number when the movie is encoded.
+
+## Choose a frame rate
+
+**Rate** is **30 fps** or **60 fps**, and starts on 60 fps. It does two things:
+
+- It's the most frames per second the file may hold.
+- It's the frame rate of a new project made from the recording.
+
+It's a ceiling, not a promise. macOS delivers a new frame only when something on screen changes, so a mostly still screen gives a file with a low, fractional frame rate. That's the file doing its job and not a fault.
+
+**Rate** greys out for **Camera**, which records at its format's rate. It stays live for **Microphone Only**, where it sets a new project's frame rate.
+
+## Include Frame Job windows
+
+Frame Job's own windows, such as the editor and the preview, are left out of a display recording. Tick **Include Frame Job windows** to put them in the picture, for example when you're recording a Frame Job tutorial. It's off by default.
+
+- The recorder panel is never in the picture, even with the box ticked.
+- Frame Job's own sound stays out either way, so you can play the timeline during a recording and it won't end up in the file.
+- The box also decides whether Frame Job's windows appear in the [window picker](/recording/record-a-window/#which-windows-the-picker-lists).
+
+## Where the panel goes while you record
+
+The panel leaves the screen once a display or window recording starts, and the [menu-bar item](/recording/menu-bar-item/) becomes your controls.
+
+While the panel is away, <kbd>⌥⌘N</kbd> stops the recording rather than showing the panel, and the Welcome window's **New Recording…** button beeps.
+
+After the recording lands, the panel comes back only if it was up when the recording began and there's a note to show you, such as a problem with the microphone. Otherwise it stays away until you open it again.
+
+The panel stays up for **Camera** and **Microphone Only**, which film nothing on screen.
+
+## With an agent
+
+An agent picks a display by number, with 0, the main display, as the default, and it can't name a display and a window at once. It sets the rest with `size` (`nominal` or `best`), `rate` (30 or 60) and `include_framejob_windows`, which is off by default. See [Record with `record_screen`](/mcp/record-screen/).
+
+## Related
+
+- [The recorder panel](/recording/recorder-panel/)
+- [Record a window](/recording/record-a-window/)
+- [Start, pause and stop](/recording/pause-and-stop/)
+- [System audio and the microphone](/recording/system-audio-and-microphone/)
+- [Record a camera beside the screen](/recording/camera-beside-the-screen/)
+- [The cursor in a recording](/recording/cursor/)

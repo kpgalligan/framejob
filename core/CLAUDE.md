@@ -621,6 +621,7 @@ governs a module now.
   `roll`: the partner whose same edge coincided follows unless `alone`);
   `linked_rate_refusal` (speed, direction and speed-naming actions refused;
   its sentence `linked_rate_sentence`, which `retime_range` shares);
+  `is_linked_picture`, the half `duckers` skips (spec §11 AU-157);
   and the one op, `attach_audio`. The shift's half is `edit_time.rs`'s
   `shifted`.
 - `edit_commit.rs` — the placement commit protocol: replacements preserve
@@ -832,8 +833,8 @@ governs a module now.
   `check_cutout_end` (a patch's
   `video.cutout` naming `subject` or `quality`, a `null` included, refused,
   `subject` first), and `off` (spec §11 CI-14), the one way to STORE a
-  `null` — `check_off` (paths `group.key`, `audio.eq.<slot>` the only
-  three-part one, AU-88; it refuses what `patch` refuses, and `merge_group`'s
+  `null` — `check_off` (paths `group.key`, `audio.eq.<slot>` (AU-88) and
+  `video.qualifier.<range>` (GR-36) the only three-part ones; it refuses what `patch` refuses, and `merge_group`'s
   read of a `null` for an unknown or a required key) and `key_off` (written
   after the merge and the prune; a non-object group slot is replaced by `{}`,
   never indexed). `END_PATCH` is `edit_action_graphic.rs`'s too.
@@ -1063,10 +1064,11 @@ governs a module now.
 - `recipe.rs` · `recipe_layer.rs` · `recipe_options.rs` · `recipe_selection.rs` ·
   `recipe_text.rs` — `frame_recipe(t)`: the layer list at one instant. `RecipeLayer`
   (`recipe_layer.rs`, re-exported by
-  `recipe.rs`) is the twenty-nine keys of a layer written in ONE place (`cursor`
+  `recipe.rs`) is the thirty keys of a layer written in ONE place (`cursor`
   the twenty-seventh, `recipe_cursor.rs`'s, CU-32; `cutout` the twenty-eighth,
   its own `Project::layer_cutout`, CO-21; `blur` the twenty-ninth,
-  `recipe_blur.rs`'s, CU-114)
+  `recipe_blur.rs`'s, CU-114; `nest` the thirtieth, `Project::layer_nest`,
+  the outermost nest clip's moved placement, #476)
   (`RecipeLayer.init(from:)` on the Swift side defaults a missing key
   silently, so a copied skeleton drifts with no diagnostic). `RecipeOptions`
   (`recipe_options.rs`, a pure move out of `recipe.rs` in grading-2 G2-0, re-exported by it) is
@@ -1178,7 +1180,8 @@ governs a module now.
   `rotation`, `opacity`, `x`, `y` from the clip time, its duration, the
   source size and the container's canvas. **Its only callers are
   `recipe.rs`'s `moved` (which `layer` and the routed dissolve's `placement`
-  read) and `frame_of`**: every edit path — `evaluate_clip`,
+  read) and `nest_moved` (which `frame_of` and the layer's `nest` key
+  read)**: every edit path — `evaluate_clip`,
   `clip_state`, `get_project`, splitting, zooming, freezing, the audio plan
   — reads the clip un-moved. It never trusts the file (a non-positive
   duration or period is inactive, amounts clamp) and short-circuits to

@@ -1,0 +1,97 @@
+---
+title: Motion blur
+description: Blur a moving clip along its path, the way a camera's shutter would, and see where the blur applies and where a clip stays sharp.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Motion blur streaks a moving clip along the way it moved during each frame, as a camera's shutter would. It takes the hard steps out of a fast zoom, pan or slide.
+
+<AtAGlance
+  where="Clip tab ▸ Picture sub-tab ▸ Transform ▸ Motion Blur"
+  tools={['set_video', 'set_action_end']}
+/>
+
+## Add motion blur
+
+<Steps>
+
+1. Select a clip that moves.
+
+2. On the Clip tab's **Picture** sub-tab, open **Transform**.
+
+3. Raise **Motion Blur** above 0%.
+
+</Steps>
+
+**Motion Blur** runs from 0 to 100%, with quick picks at 0, 25, 50 and 100. It's off by default.
+
+The number is the share of one frame the shutter stays open for. 50% is a film camera's 180° shutter, so it's a good place to start. At 100% the clip streaks along everything it moved in that frame.
+
+The blur shows when the clip moves:
+
+- A zoom or pan in an [action](/motion/actions/).
+- A [motion preset](/motion/motion-presets/).
+- The [nest](/editing/nests/) it sits in moving.
+
+A clip's [recorded cursor](/recording/cursor-settings/) streaks along its own path too, even when the clip stands still. The cursor's click ripples stay sharp.
+
+The Transform section's **Reset** puts **Motion Blur** back to 0% with the section's other rows.
+
+[Auto Zoom](/recording/auto-zoom/) has a **Motion blur** box of its own. Ticked, it sets 50% on the clips it zooms, unless they already have a blur.
+
+## How it is drawn
+
+The blur is the same in the preview, in [Save Frame](/export/save-frame/), in every export and in a frame an agent renders. Each frame draws the clip 16 times at its positions across the shutter and averages them. The shutter is centred on the frame.
+
+A clip that doesn't move in a frame draws exactly as it does with the blur off, so a clip that moves for only part of its length blurs only while it moves.
+
+## Ramp the blur in and out
+
+**Motion Blur** can change inside an action, so a blur can build up and fall away.
+
+<Steps>
+
+1. [Select the action](/motion/select-an-action/).
+
+2. Set **Motion Blur**. With an action selected, the row sets the value the action ends on.
+
+</Steps>
+
+The blur moves from where it stood when the action began to the new value, along the action's curve. See [Set what an action animates to](/motion/edit-an-action/).
+
+## With blend modes
+
+A clip with a [blend mode](/canvas/blend-modes/) blends its averaged picture once. A screened clip, for example, screens its blurred picture over what's under it.
+
+## Where it stays sharp
+
+These draw sharp whatever **Motion Blur** says, and the row keeps its value:
+
+- A clip in a [transition](/motion/transitions/), for the frames of the overlap, and every clip inside a nest clip that's in one.
+- A clip on a [matte track](/canvas/matte-tracks/), and the clips a matte cuts.
+- A clip cut by [Text Behind Subject](/effects/text-behind-subject/), and the copy of the person it draws.
+- A clip with a [drop shadow](/effects/shadow/).
+- A nest clip itself. The blur goes on the clips inside it. See [Nests and adjustment clips](#nests-and-adjustment-clips).
+
+## Nests and adjustment clips
+
+A nest clip can't take motion blur, so the row is greyed for it, and for any selection with a nest clip in it. Set the blur on the clips inside the nest instead. They blur when the nest moves.
+
+An [adjustment clip](/color/adjustment-clips/) has no picture to move. It has no **Picture** sub-tab, so there's no row to set.
+
+## With an agent
+
+An agent sets the blur with `motion_blur` in `set_video`, from 0 to 1. 0 is off and the default, and 0.5 is the row's 50%. `set_action_end` sets the value an action ends on, and `render_frame` draws the blur as an export would.
+
+On a nest clip or an adjustment clip, a value above 0 stops with an error and 0 always goes through. A nest clip's error reads "clip N shows a nest and cannot take motion blur: set it on the clips inside". See [Tools: picture and grade](/mcp/tools-set-video/#motion_blur).
+
+## Related
+
+- [Motion presets](/motion/motion-presets/)
+- [During presets](/motion/during-presets/)
+- [Actions](/motion/actions/)
+- [Style the recorded cursor](/recording/cursor-settings/)
+- [Auto Zoom](/recording/auto-zoom/)
+- [Tools: picture and grade](/mcp/tools-set-video/)

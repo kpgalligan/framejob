@@ -1,0 +1,48 @@
+---
+title: Export frame rate
+description: Export at the project's own frame rate, or at a fixed rate from 23.976 to 60 fps.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The **Frame rate** popup sets how many frames a second the exported file has, without changing the project.
+
+<AtAGlance
+  menu="File ▸ Export…"
+  keys="⌘E"
+  where="Export sheet ▸ Frame rate"
+  tools="export"
+/>
+
+## Choose a frame rate
+
+Open the export sheet and pick a row in **Frame rate**. The readout under the controls shows the rate the file will have.
+
+**Project rate** is the default. It's the document's [frame rate](/projects/frame-rate/), or the format's own rate for Animated GIF (12.5 fps) and Animated PNG (25 fps).
+
+The fixed rows, in the popup's order, are **24 fps**, **23.976 fps**, **25 fps**, **30 fps**, **29.97 fps**, **50 fps** and **60 fps**.
+
+Frame Job draws the same timeline at the new rate, so the export runs for the same length of time and only the number of frames changes.
+
+## What else the rate changes
+
+- **The range.** The start and length of the export are snapped to the export's frame grid, which moves each by less than a frame. See [Export a range](/export/range/).
+- **The bit rate.** On **Format default** the video rate rises in step with the frame rate. The [Quality](/export/quality/) tiers rise by half above 30.5 fps, and each tier's title shows the new number.
+- **The time an AV1 or VP9 export takes.** The estimate in the readout counts frames, so it follows the rate.
+
+## Good to know
+
+- **Frame rate** is greyed out for the [audio-only formats](/export/audio-only/), which have no frames.
+- A fixed rate you export with is remembered with the rest of the sheet, and every document's sheet opens on it. Check it before you export a project with a different rate. Choose **Project rate** to go back. See [The export sheet](/export/export-sheet/).
+- A preset stores the rate you chose. **Project rate** stays **Project rate**, so it follows each document.
+
+## With an agent
+
+An agent can't set the frame rate. Its `export` uses the document's rate, or the format's own rate for GIF and APNG. See [Export: start, then poll](/mcp/export/).
+
+## Related
+
+- [Project frame rate](/projects/frame-rate/)
+- [Export size](/export/size/)
+- [Export quality](/export/quality/)
+- [Export a range](/export/range/)

@@ -1,0 +1,115 @@
+---
+title: "Export loudness"
+description: Normalise a whole mix to a loudness target, and read what every export reports about its sound.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Streaming services, podcast hosts and broadcasters each ask for a certain loudness. **Loudness:** on the export sheet makes the whole mix land on that target, and every export tells you what its sound measured, whether you normalised it or not.
+
+<AtAGlance
+  menu="File ▸ Export…"
+  keys="⌘E"
+  where="Export sheet ▸ Loudness"
+  tools={['export', 'export_status']}
+/>
+
+## Hit a loudness target
+
+<Steps>
+
+1. Choose **File ▸ Export…**.
+
+2. In **Loudness:**, choose a target. The footnote on the sheet shows it, for example "−14 LUFS".
+
+3. Choose **Export…** or **Add to Queue**.
+
+4. When the file is done, read [the loudness line](#what-the-loudness-line-means) to see what it measured.
+
+</Steps>
+
+## The Loudness popup
+
+The target is the integrated loudness of the whole mix: one figure for the file from start to end, in LUFS, measured to ITU-R BS.1770-4.
+
+| Choice | What it's for |
+| --- | --- |
+| **Off** | No normalisation. The export still goes through the master limiter, measures its sound and reports it. |
+| **−14 LUFS (streaming)** | Where the main streaming services normalise. |
+| **−16 LUFS** | The usual target for stereo podcasts. |
+| **−23 LUFS (broadcast)** | EBU R 128 broadcast delivery. |
+| **Custom…** | Any target you type in the field beside the popup, from −70 to 0 LUFS, to one decimal place. |
+
+The popup works on every format with sound, ProRes included. It's greyed out for Animated GIF and Animated PNG, which have no sound.
+
+With **Custom…**, the field starts from the target you had chosen, or −14 after **Off**. While it's empty, the sheet says "Type a loudness target in LUFS, or pick one from the list." and **Export…** is greyed out.
+
+The sheet remembers your choice with the rest of your last export, and a [preset](/export/presets/) stores it.
+
+## How normalisation works
+
+The export measures the real mix first, then applies **one gain** to everything. Levels inside the timeline keep their relationship to each other, so a quiet line stays quieter than a loud one.
+
+The progress line reads "Measuring loudness…" during this pass. It fills the first tenth of the progress bar on a movie export, and the first half on an audio-only one.
+
+The gain is worked out through the master limiter, so the file lands on the target even when its loudest peaks would pass the ceiling. Those peaks are turned down, not the whole mix.
+
+The gain can be at most +40 dB, so a target more than 40 dB above the mix lands quieter than you asked. It's rounded to 0.01 dB, so two exports of one project get the same gain.
+
+## The master limiter
+
+Every export with sound goes through a true-peak limiter, normalised or not. True peak is the highest the sound really reaches, including between samples, and dBTP is its unit. The limiter keeps the file's true peak at or under **−1 dBTP**. A mix that would pass that is limited instead of clipped, whether the cause is loud clips, a crossfade between two loud clips, a nest turned up or an action that raises a clip's volume.
+
+- Sound under the ceiling passes through untouched, sample for sample.
+- The limiter holds the sound back 3.3 ms to see each peak coming, and releases over 100 ms. The export takes that delay back, so the sound stays exactly in sync with the picture.
+- You can't turn it off, and the sheet fixes the ceiling at −1 dBTP.
+
+:::note
+The preview has no master limiter, so a mix that passes −1 dBTP sounds louder while you edit than it does in the file.
+:::
+
+## Track compressors in the export
+
+A track's own [compressor and limiter](/audio/track-dynamics/) run before the master, on that track's sound alone, exactly as you set them. The export plays each such track on its own through them and mixes the tracks afterwards.
+
+The measurement for a loudness target hears them too, so the file still lands on the target. A [stem](/export/stems/) of that track includes them.
+
+The master is only the loudness gain and the limiter. There's no master compressor or EQ. To compress the whole mix, [nest](/editing/nests/) everything onto one track and give that track a compressor.
+
+## What the loudness line means
+
+Every export of a file with sound reports what that sound measured, on the [finish line](/export/progress-and-report/#the-finish-report) and in its [Export Queue](/export/export-queue/) row.
+
+| Line | What it means |
+| --- | --- |
+| `Peak −1.0 dBTP · −14.0 LUFS` | The true peak and integrated loudness of the file. |
+| `Peak … · loudness not measurable` | The sound is too short or too quiet to have a loudness. It needs at least 0.4 s. |
+| `Silent` | The sound is digital silence. |
+| `… · peaks limited by 8.6 dB` | The master limiter turned the loudest peak down by that much to hold the ceiling. It appears from 0.05 dB. |
+| `Peak not measurable (a non-finite sample in the mix)` | A source file holds a sample that isn't a number, so no gain is applied. |
+
+A large "peaks limited by" figure on music can be audible. Turn the clips down, or ask for a lower target.
+
+## Good to know
+
+- Sound with no loudness to measure gets no gain, so a target has no effect on digital silence or on sound that's too short or too quiet.
+- If the sound can't be measured at all, the file is written without normalisation and the line has no figures. A timeline with no sound at all has none either.
+- The figures describe the mix. Stems aren't measured, and they get no target or master limiter.
+
+## With an agent
+
+`export` takes the target as `loudness_lufs`, any value from −70 to 0, and ignores it on `gif` and `apng`.
+
+An agent can also choose a different ceiling for the master limiter with `peak_dbtp`, which the sheet doesn't offer. It runs from −20 to 0 dBTP, is −1 when left out, and works with or without a target. 0 dBTP is the loosest, and there's no way to turn the limiter off.
+
+`export_status` returns the line's figures as numbers in `loudness`, and `capped_by_gain` says when the +40 dB limit decided the gain. See [The loudness report](/mcp/export/#the-loudness-report).
+
+## Related
+
+- [Normalize](/audio/normalize/)
+- [The Loudness Meter](/audio/loudness-meter/)
+- [Track compressor and limiter](/audio/track-dynamics/)
+- [Audio stems](/export/stems/)
+- [Audio-only exports](/export/audio-only/)
+- [Export: start, then poll](/mcp/export/)

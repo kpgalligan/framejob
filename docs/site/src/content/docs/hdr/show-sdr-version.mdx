@@ -1,0 +1,64 @@
+---
+title: "Show SDR Version"
+description: "Preview an HDR project as its SDR version, the picture 8-bit formats, JPEG frames and the SDR export get, without changing anything."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+An HDR project also has an SDR version: the picture it writes to formats that can't carry HDR. Show SDR Version puts that picture in the preview, so you can check it before you export.
+
+<AtAGlance
+  menu="View ▸ Show SDR Version"
+  where="The SDR Version tag at the preview's top left"
+  tools="render_frame"
+/>
+
+## Show the SDR version
+
+Choose **View ▸ Show SDR Version**. A checkmark shows it's on, and choosing it again turns it off. It has no keyboard shortcut, and it's always available.
+
+The preview then shows the picture these outputs get:
+
+- The 8-bit formats: H.264, HEVC, HEVC with Alpha, VP9 with Alpha (WebM), Animated GIF and Animated PNG.
+- JPEG frames from [Save Frame](/export/save-frame/).
+- The **SDR version** choice on the [formats that carry HDR](/hdr/export-hdr/#which-formats-carry-hdr).
+
+While it's on, the [scopes](/hdr/hdr-scopes/) read the SDR version too.
+
+In an SDR project the picture already is the SDR version, so no pixel changes.
+
+## The tag
+
+A tag reading "SDR Version" sits in the preview's top-left corner while the view is on. It comes after the **Ungraded** and **Selection** tags when those are on. It shows in an SDR project too.
+
+You can still click and drag on the canvas through the tag.
+
+## It belongs to the window
+
+Show SDR Version is a way of looking, not an edit. It reaches the [preview](/timeline/preview/) and the [Preview Window](/timeline/preview-window/) (**View ▸ Preview Window**, <kbd>⇧⌘P</kbd>), and never an export or a saved frame.
+
+It isn't remembered either, so a new window starts with it off.
+
+## What the SDR version is
+
+The SDR version brings the HLG master back to Rec. 709 with a fixed tone map.
+
+- The picture comes back as it was, up to a little below HDR reference white, the level ordinary white sits at.
+- A soft roll-off starts there, so a white title stays white, at about 248 of 255.
+- Highlights above reference white are rolled off, and reach full white at 1,000 cd/m².
+
+The tone map has no settings, and there's no trim pass. Both pictures come from one grade, so changing the grade to suit the SDR version changes the HDR picture too.
+
+A [gain-map photo](/hdr/how-sources-are-read/#gain-map-photos) comes from its HDR picture toned down here, not from the ordinary picture stored in it.
+
+## With an agent
+
+`render_frame` draws any frame as the SDR version when the call passes `sdr_version: true`. The default is `false`. The menu item itself never reaches the tool, so it makes no difference whether it's on. An SDR project's frame comes out identical either way, because it's already its own SDR version. See [Check the picture: render_frame](/mcp/render-frame/#sdr_version).
+
+## Related
+
+- [A project's dynamic range](/hdr/dynamic-range/)
+- [Export HDR](/hdr/export-hdr/)
+- [Scopes in an HDR project](/hdr/hdr-scopes/)
+- [Show Ungraded](/color/show-ungraded/)
+- [Save Frame](/export/save-frame/)

@@ -1,0 +1,149 @@
+---
+title: "What Frame Job remembers"
+description: "Which view choices, pane sizes, sheets and panels reopen the way you left them, what starts fresh in each window, and where those choices are kept."
+---
+
+Frame Job remembers some of your choices between launches, so the next window or sheet opens the way you left it. These are your choices on this Mac, not part of a project, so none of them travels with a `.framejob` package. The [Settings](/reference/settings/) window has its own page.
+
+## View choices
+
+The last choice you made, in any window, is what the next window opens with. These apply to every project.
+
+| Choice | Where | Options | Default |
+| --- | --- | --- | --- |
+| Snapping | **View ▸ Snapping**, <kbd>N</kbd>, or **Snap** in the timeline bar | On, off | On |
+| Safe area guides | **View ▸ Safe Areas**, or **Safe** in the toolbar | On, off | Off |
+| Inspector | **View ▸ Hide Inspector** (<kbd>⌥⌘I</kbd>), which reads **Show Inspector** while hidden | Shown, hidden | Shown |
+| Timeline track height | **View ▸ Timeline Track Height ▸**, or **S**, **M** and **L** in the timeline bar | Small, Medium, Large | Medium |
+| Preview quality | **View ▸ Preview Quality ▸** | Full, Half, Quarter | Full |
+
+Preview quality changes only how sharply the preview is drawn while you work. Export and saved frames always render at full size. See [Preview Quality](/timeline/preview-quality/).
+
+Holding <kbd>⌘</kbd> while you drag turns snapping off for that drag only, and changes nothing that's remembered.
+
+## Pane sizes
+
+Drag the divider above the timeline, or the one left of the inspector, and new windows open at that size.
+
+| Pane | Range | Default |
+| --- | --- | --- |
+| Inspector width | 280 to 440 pt | 304 pt |
+| Timeline height | 140 pt up to 60% of the height under the toolbar | 300 pt |
+
+The canvas stays at least 380 pt wide, and the area above the timeline at least 220 pt tall.
+
+Only dragging a divider saves a size. Resizing the window, or hiding and showing the inspector, changes neither saved size, and the inspector's width isn't saved while it's hidden. Dragging the divider of a hidden inspector back out shows it, and the choice is remembered as Shown.
+
+## Preview Window frame
+
+**View ▸ Preview Window** (<kbd>⇧⌘P</kbd>) opens where the last one was left, on a second display for example. There's one saved frame for every project.
+
+With two projects' previews open at once, the second opens on top of the first, and only one of them saves where it's moved. Whether the window is open isn't remembered. See [The Preview Window](/timeline/preview-window/).
+
+## Sheets
+
+These reopen on what you chose last time. Any sheet not listed here opens on its defaults every time.
+
+| Where | What's remembered | When it's saved |
+| --- | --- | --- |
+| **File ▸ Generate Captions…** | **Engine:** (On this Mac or AssemblyAI), **Style:**, and the **Slide the pill**, **Fill words as spoken** and **Dim in pauses** boxes | As you change each one |
+| **File ▸ Export…** | The last settings you exported with, except **Dynamic Range** | When you press **Export…** or **Add to Queue** |
+| **Clip ▸ Auto Zoom…** | **Zoom:**, **Arrive:**, **Stay:**, **Follow the cursor while zoomed**, **Replace existing zooms** and **Motion blur** | When you press **Zoom** |
+| **Clip ▸ Follow Subject…** | **Follow:** and **Where Empty:** | When you press **Follow** |
+| **File ▸ Make Vertical Version…** | **Follow:** and **Where Empty:**, shared with Follow Subject | When you press **Make** |
+| **Clip ▸ Speed Up Typing…** | **Rate:**, **Shortest stretch:** and **Keep pitch** | When you press **Apply** |
+| **Clip ▸ Switch by Speaker…** | **Minimum shot:**, **Cut:**, **Crosstalk:** and **Ignore bleed:** | When you press **Switch** |
+| The **Normalize** row of the [Volume section](/audio/normalize/) | Its mode, **Peak** or **Loudness**, and its target in LUFS | As you change each one |
+| The Document tab's **Canvas** section | **Resize clips proportionally**, used with your next [canvas-size](/projects/canvas-size/) change | As you tick it |
+
+Where a choice is saved on a press, cancelling the sheet saves nothing.
+
+The first time you export, the sheet opens on **H.264 (MP4)** at **Document size**. Named export presets are kept in a file, so they're on [Where Frame Job keeps its files](/reference/file-locations/).
+
+**Follow:** can read differently in the two sheets that share it. If Make Vertical Version last used **Speaker**, it opens on **Speaker** again, and Follow Subject, which has no such choice, opens on **Subject**.
+
+**Resize clips proportionally** is a preference, not an edit, so undo doesn't reach it.
+
+No agent tool reads any of these. An agent's call uses the values it passes, or the tool's own defaults.
+
+## Recorder panel
+
+**File ▸ New Recording…** (<kbd>⌥⌘N</kbd>) reopens on your last choices, each saved as you change it.
+
+| Group | What's remembered |
+| --- | --- |
+| Source | The display in **Source:**, **Include Frame Job windows** |
+| Camera | **Camera:** and **Format:**, **Record the camera too**, **Layout:**, **Remove the camera's background when it lands** |
+| Sound | **Microphone:**, **Enhance the microphone when it lands**, **System Audio:** |
+| Pointer and keys | **Cursor:**, **Show Clicks:**, **Record shortcuts** |
+| When it lands | **Zoom in on clicks**, **Show shortcuts**, **Speed up typing** |
+| Picture | **Rate:**, **Size:** |
+
+Until you change them, **Record the camera too**, **Remove the camera's background when it lands**, **Enhance the microphone when it lands**, **Record shortcuts** and **Speed up typing** are off, **Zoom in on clicks** and **Show shortcuts** are on, **Layout:** is **Corner**, and **Cursor:** follows the default for the source.
+
+A few things don't last between launches:
+
+- **Record Into:** is never remembered.
+- A picked window, **Microphone Only** and **Camera** as the **Source:** row last for the session only. The camera you chose is remembered, even though the row isn't.
+
+See [The recorder panel](/recording/recorder-panel/).
+
+## Inspector sections
+
+Whether each inspector section is collapsed or expanded is remembered, section by section, in every window. Only a click on a section's header is remembered.
+
+A section you've never clicked opens in its default state. Transform, a text or shape's main section, a graphic's Properties, and the sections of the Media and Document tabs start open, and most others start closed. If that would leave a Clip tab with every section shut, the first one you've never clicked opens. See [The inspector](/getting-started/inspector/).
+
+## Permission questions
+
+macOS shows its Screen Recording prompt only once, so Frame Job remembers that it has already asked. A later press of **Record** without the permission opens the Screen Recording pane of System Settings instead of the prompt. Input Monitoring, which **Record shortcuts** needs, is remembered the same way. See [Recording permissions](/recording/permissions/).
+
+## Convert on import
+
+When macOS can't open a file and Frame Job offers to repackage or convert it, ticking **Do this automatically from now on** in that alert remembers your answer:
+
+- Ticked with **Convert** or **Repackage**, such files are converted from then on without asking.
+- Ticked with **Cancel**, they're never converted, and the import fails.
+
+There's no button to forget the answer. To be asked again, run this in Terminal while Frame Job is closed:
+
+```sh
+defaults delete com.kgalligan.FrameJob RCFFmpegImport
+```
+
+See [Convert files with ffmpeg](/projects/ffmpeg-conversion/).
+
+## Update checks
+
+The downloaded copy of Frame Job remembers your answer to whether it should check for updates automatically, and when it last checked. See [Updates](/getting-started/updates/).
+
+## What is not remembered
+
+**View ▸ Preview Window**, **Show Ungraded**, **Show Selection**, **Show SDR Version**, **Show Subjects**, **Scopes** and **Loudness Meter** all start off in each new window. None of them changes an export.
+
+Nothing about the scopes is kept: a new window starts with Waveform over Vectorscope. The Loudness Meter starts off and empty.
+
+Timeline zoom, Loop, the playhead, the selection and the in/out range aren't remembered between launches.
+
+Some rows in the sheets above are never remembered, even though the rows around them are:
+
+- **Zoom:** in Follow Subject and Make Vertical Version
+- **Make a copy** in Make Vertical Version
+- **Zoom on typing** in Auto Zoom
+- **Record Into:** in the recorder panel
+- **Dynamic Range** in Export
+- **Minimum shot:** in Switch by Speaker when the cameras share one microphone
+
+**Clip ▸ Match Audio…** remembers none of its choices.
+
+## Where these are kept
+
+All of these live in macOS's preferences for Frame Job, the `com.kgalligan.FrameJob` domain. So do the model, the region, the compaction and clearing settings, and **Background render** from the Settings window. Your API keys are never stored there.
+
+## Related
+
+- [Settings](/reference/settings/)
+- [The recorder panel](/recording/recorder-panel/)
+- [Export presets](/export/presets/)
+- [Where Frame Job keeps its files](/reference/file-locations/)
+- [Undo and saving](/getting-started/undo-and-saving/)

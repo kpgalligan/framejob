@@ -69,17 +69,15 @@
 //!    inert once nothing plays it, so they travel; a duck is not about this
 //!    clip's sound at all, it is an instruction to lower everything ELSE.
 //!    [`Project::duckers`] collects every clip carrying one with no test of
-//!    `enabled.audio`, of a mute, or of a solo — a duck is a fact about the
-//!    timeline, gathered before any voice is assigned — so a copy that kept
+//!    a mute or of a solo, and of `enabled.audio` only on a linked picture
+//!    half (spec §11 AU-157) — a duck is a fact about the timeline, gathered
+//!    before any voice is assigned — so a copy that kept
 //!    it would be a ducker on no track, ducking the whole mix INCLUDING the
 //!    clip it was copied from, which the `others` filter cannot exclude
 //!    because the copy is a voice nowhere. A picture command would halve
 //!    the level of the very clip it is standing behind, and no rendered
-//!    frame could see it. Clearing it on the copy is the narrow fix and the
-//!    one this op is entitled to make. The wide one — teaching `duckers`
-//!    that a clip nobody can hear does not duck — would also change how
-//!    `detach_audio` has sounded since M2, which is a shipped feature and
-//!    its own change to measure.
+//!    frame could see it. Clearing it on the copy is the fix, and `duckers`
+//!    cannot make it: the copy is not linked.
 //! 3. **Its transition.** A `transition_in` describes an overlap on the
 //!    ORIGINAL track (`detach_audio`'s stated reason). The copy is alone on
 //!    a new track, so it has no predecessor and nothing to dissolve from.

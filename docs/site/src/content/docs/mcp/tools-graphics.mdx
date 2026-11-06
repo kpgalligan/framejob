@@ -1,0 +1,264 @@
+---
+title: "Tools: graphics"
+description: "The agent tools that read the graphics API, write and check a module, list and insert graphics, and place and change graphic clips."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+These tools let an agent write a motion graphic, look at it without placing it, and put it on the timeline. [Graphics with an agent](/graphics/agents-and-graphics/) tells that story from the top. This page is the reference for each tool.
+
+<AtAGlance
+  tools={['graphic_reference', 'write_graphic', 'get_graphic', 'render_graphic', 'list_graphics', 'insert_graphic', 'add_graphic_clip', 'set_graphic']}
+  needs="A client connected over MCP, or the Assistant tab."
+/>
+
+A graphic's code is a **module**, the file `graphics/<name>.js` inside the project, and `name` in these tools is that file's name without `.js`. Fonts, pictures, renames, deletes and packages are on [Tools: graphic fonts, pictures and packages](/mcp/tools-graphic-files/).
+
+Every tool here also takes `project`, the path of an open project. Without it the call goes to the frontmost project. See [How tool calls behave](/mcp/tool-calls/). Times are in ticks, 600,000 a second, and are rounded to the project's frame grid. See [Units and ids](/mcp/units-and-ids/).
+
+## Write, place, change and check
+
+A graphic made by an agent usually goes through these steps.
+
+<Steps>
+
+1. Read the API once with [`graphic_reference`](#graphic_reference).
+
+2. Write the module with [`write_graphic`](#write_graphic). It returns the result of compiling that exact text. If it failed, fix the source and write it again.
+
+3. Look at it with [`render_graphic`](#render_graphic), which draws frames with no clip on the timeline.
+
+4. Place it with [`add_graphic_clip`](#add_graphic_clip), giving the track, the time and any values it should draw with. [`insert_graphic`](#insert_graphic) places a graphic at the playhead instead, as the Insert Graphic sheet does.
+
+5. Change it with [`set_graphic`](#set_graphic). To animate a property, add an action with `add_action` and say what the property ends at with `set_action_end`. See [Animate graphic properties](/graphics/animate-properties/).
+
+6. Check a frame of the finished timeline with [`render_frame`](/mcp/tools-render-and-export/#render_frame).
+
+</Steps>
+
+## `graphic_reference`
+
+Returns the whole graphics API as Markdown, for a model to read once before it writes a graphic. It covers a module's shape, `ctx`, the schema's types, the standard library, fonts, the sandbox, the limits and worked examples.
+
+It's the same file as **Help ▸ Graphics Reference**. See [The module API](/graphics/module-api/).
+
+It takes no argument of its own, and it's the one tool on this page that needs no project open. A `project`, when given, must still name an open one.
+
+## `write_graphic`
+
+Writes a module's JavaScript into the project, compiles it and returns the result for that text. The folder `graphics/` is made if it isn't there yet. A person does the same by saving the file in an editor. See [Edit a module](/graphics/edit-a-module/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `name` | string | Yes | The module's name: lowercase letters, digits and `-`, starting with a letter or a digit, at most 63 characters. |
+| `source` | string | Yes | The whole module's JavaScript. It exports `render`, and optionally `meta` and `schema`. |
+
+It returns:
+
+| Key | What it holds |
+| --- | --- |
+| `name`, `path`, `revision` | The module, its file, and the SHA-256 of its text. |
+| `ok` | Whether the text compiled. |
+| `meta`, `schema` | What the module declares. Both are empty when `ok` is false. |
+| `diagnostics` | A list of `{level, message, line, column, frame}`. With `ok` false, they say where it went wrong. With `ok` true, they're the module's top-level warnings, such as `asset()` outside `render` naming a file the folder doesn't hold. |
+| `clips` | The ids of the clips drawn by this module. They redraw with the new text at once. |
+| `kept` | The revisions of the module's kept versions, newest first. |
+| `note` | A reminder that the write can't be undone and that the text it replaced is kept. |
+
+A module that doesn't compile isn't an error. The call succeeds with `ok` false, and the file stays in the folder as written, so fix the source and write it again. The call itself fails for a name that isn't a module name, or a file that can't be written.
+
+A write can't be undone and doesn't mark the project edited, but the text it replaced is kept, up to the last 10 for each module. [`restore_graphic`](/mcp/tools-graphic-files/#restore_graphic) brings one back.
+
+## `get_graphic`
+
+Reads one module, or the whole graphics folder. The module's half is what the [**Source** section](/graphics/graphic-tab/#source) of the Graphic sub-tab shows a person.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `name` | string | No | The module to read. Leave it out to read the folder. |
+
+With `name`, it returns `name`, `source`, `path`, `revision`, `ok`, `meta`, `schema`, `diagnostics`, `clips` and `kept`, with the same meanings as [`write_graphic`](#write_graphic). A name the folder doesn't hold gives an error that lists what it does hold.
+
+Without `name`, it returns:
+
+| Key | What it holds |
+| --- | --- |
+| `folder` | The folder's full path. It's given even before the folder exists. |
+| `folder_exists` | False until the first write makes the folder. |
+| `modules` | Every module, as `{name, revision, ok, clips}`. |
+| `families` | The font families the project's graphics can draw with. |
+| `assets` | The pictures in `graphics/assets/`. |
+| `warnings` | What Frame Job skipped or couldn't watch when it read the folder, in plain sentences. |
+| `history` | `{name, kept}` for every name with kept versions, deleted modules included. |
+
+A module saved a moment ago from outside can read `ok` false with one diagnostic saying the app hasn't compiled it yet. Call again.
+
+## `render_graphic`
+
+Draws a module without a clip, to look at it before placing it. There's no control for this in the app, because a person looks at the preview instead.
+
+### Render graphic options
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `name` | string | Yes | The module to draw. |
+| `frames` | array of integers | No | The frames to draw, 1 to 16 of them, in the order given. Not with `frame`. |
+| `frame` | integer | No | One frame to draw, 0 or more. Not with `frames`. With neither, frame 0 is drawn. |
+| `props` | object | No | The values to draw with, keyed by the schema's names. A key left out draws with the schema's default. |
+| `width` | integer | No | The width to draw at, 1 to 8192 pixels. Default: `meta.width`, else the canvas. |
+| `height` | integer | No | The height to draw at, 1 to 8192 pixels. Default: `meta.height`, else the canvas. |
+| `format` | string | No | `png` (the default) for a contact sheet, or `svg` for one frame's text. |
+| `max_width` | integer | No | The widest the sheet may be, 64 to 8192 pixels. The default is 2048. 8192 keeps a 1920-wide graphic's two cells at full size. |
+| `background` | string | No | What the sheet is painted on: `transparent` (the default), `checker`, or a hex colour as `#rgb`, `#rrggbb` or `#rrggbbaa`, in either case. |
+| `path` | string | No | Where to write the sheet. It's always a `.png`, and its folder must exist. Leave it out for a temporary file. |
+
+`max_width`, `background` and `path` belong to the sheet, and `svg` won't take them.
+
+Each frame is drawn as a clip would draw it. The frame rate is the project's, `durationInFrames` is the module's `meta` value or else 5 seconds, and a frame at or past that length is still drawn, with `progress` at 1, as a longer clip draws it.
+
+### The contact sheet
+
+The `png` format returns an image the model can see, a text block, and a file on disk. The frames sit on a near-square grid, top left first, and each frame's number is printed in a dark strip under its cell. Sixteen frames make a 4 by 4 grid.
+
+- Only the cells scale down to fit `max_width`, never the 8-pixel gaps or the 24-pixel labels. Cells are never scaled up, and the sheet is never more than 8192 pixels tall.
+- `checker` paints 16-pixel grey squares, which shows up a graphic's transparent areas.
+- A frame that fails draws its error card in its cell. The sheet still comes back, and the text adds a sentence with the error and where it is. A frame that only warned adds a sentence too.
+- The text says the frames, each cell's size and scale, the grid, the sheet's size and the background, and ends "Written to `<path>`."
+
+A sheet draws at most 134,217,728 pixels of frames, counted as frames × width × height. That's two frames at 8192 × 8192, or sixteen at 3840 × 2160. Past that the call fails before any frame is drawn, so ask for fewer frames or a smaller size.
+
+### One frame as SVG
+
+With `format: "svg"`, it returns `name`, `frame`, `ok`, `svg` (the frame's SVG text), `diagnostics`, and `ctx`, the values the frame was drawn with: `fps`, `time`, `durationInFrames`, `progress`, `width`, `height` and `canvas`.
+
+It draws one frame and writes no file. A frame that fails isn't an error here either: `ok` is false, `svg` is null and `diagnostics` say why.
+
+### When it won't run
+
+`render_graphic` won't run when:
+
+- The module isn't in the folder, or doesn't compile. The error lists what the folder holds, or gives the first compile error.
+- Both `frame` and `frames` are given, or `frames` doesn't hold 1 to 16 whole numbers of 0 or more.
+- `format` is `svg` with more than one frame, or with `path`, `background` or `max_width`.
+- `max_width`, `width`, `height` or `background` is out of range, or the folder of `path` doesn't exist.
+- A `meta` value it would use isn't a whole number in range. The error names the key.
+
+## `list_graphics`
+
+Lists the graphics **Insert ▸ Graphic…** offers, in the sheet's order. See [Insert a graphic](/graphics/insert-a-graphic/).
+
+It takes no argument of its own. It returns `categories`, a list of `{name, graphics}`, and each graphic is:
+
+| Key | What it holds |
+| --- | --- |
+| `name` | What [`insert_graphic`](#insert_graphic) takes. |
+| `title` | The module's `meta.name`, else its name made into a title. Two **This Project** graphics with one title show as "title — name". |
+| `description` | The module's `meta.description`, or null. |
+| `category` | The module's own category. |
+| `from` | `template` or `project`, which is what `insert_graphic` takes as `from`. |
+| `ok` | False for a module that doesn't compile. It's still listed. |
+
+**This Project** comes first when the project's `graphics/` holds a module, and lists every module there, whatever its own category. The bundled templates follow by category, A to Z, each module's `meta.category` or else **Other**, which is always last. Within a category, graphics sort by title.
+
+## `insert_graphic`
+
+Places a graphic at the playhead, as the **Insert** button in **Insert ▸ Graphic…** does. See [Insert a graphic](/graphics/insert-a-graphic/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `name` | string | Yes | The graphic's name as `list_graphics` gives it. |
+| `from` | string | Yes | `template` for one of the bundled templates, `project` for a module already in the project's `graphics/`. |
+
+The clip goes on the front track when it fits there, otherwise on a new track above everything, at the module's `meta` length and size, else 5 seconds and the canvas's size. It's one undo step, **Insert Graphic**. With a nest open, it lands inside the nest.
+
+A template is first copied into `graphics/` under a free name such as `lower-third` or `lower-third-2`. That copy can't be undone, so undoing the insert takes the clip away and leaves the module. A project module is placed as it is, with no copy.
+
+It returns what [any edit returns](/mcp/what-a-call-answers/), and `name` says which module the clip is drawn by.
+
+It won't place anything when:
+
+- `name` isn't a template or a module of the project. The error lists what there is.
+- The module doesn't compile. The error gives the first problem, and a template's copy stays in `graphics/`.
+- A `meta` value it would use isn't a whole number in range.
+- The canvas is wider or taller than 8192 pixels and the module gives no size.
+
+## `add_graphic_clip`
+
+Places a clip drawn by a module already in `graphics/`, on a track and at a time you choose. Use it when you need more say than `insert_graphic` gives. **Insert ▸ Graphic…** is a template's write followed by this. See [Place a clip](/graphics/agents-and-graphics/#place-a-clip).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `track` | integer | Yes | The track's id. `get_project` lists them. |
+| `at` | integer | Yes | The start, in ticks. |
+| `name` | string | Yes | The module. |
+| `duration` | integer | No | The length, in ticks, at least one frame. Default: the module's `meta.durationInFrames` at the project's frame rate, else 5 seconds. |
+| `width` | integer | No | The width the module draws at, 1 to 8192 pixels. Default: `meta.width`, else the canvas. |
+| `height` | integer | No | The height the module draws at, 1 to 8192 pixels. Default: `meta.height`, else the canvas. |
+| `props` | object | No | The values to draw with, keyed by the schema's names, at most 64. A key left out draws with the schema's default. |
+| `scope` | integer | No | A nest's id, to add the clip inside that nest. See [Editing inside a nest](/mcp/nests/). |
+
+Like a shape, the clip has no source of its own. Use [`set_graphic`](#set_graphic) to change what it's drawn from, and `set_video` to place it in the picture.
+
+Each key of `props` is checked against the module's schema as the file reads now. A key the schema lacks, a wrong type or a value out of range gives an error naming its dotted path. A colour is stored as lowercase hex, and a null is dropped.
+
+It returns what any edit returns, with the new clip in `new_clips`, and it's one undo step, **Add Graphic**.
+
+It won't place the clip when:
+
+- The module isn't in the folder, or doesn't compile. The error lists what the folder holds, or gives the first compile error.
+- A `meta` value it would use isn't a whole number in range.
+- The canvas is wider or taller than 8192 pixels and no size was given.
+- The clip would overlap another one on the track, as for any clip.
+
+## `set_graphic`
+
+Changes what graphic clips are drawn from: the module, the size, the graphic's own length and its properties. It's the same as editing **Properties**, **Size** and **Timeline** in the [Graphic sub-tab](/graphics/graphic-tab/). See [Graphic properties](/graphics/properties/) and [Graphic size and timing](/graphics/size-and-timing/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | Yes | The clip ids, at least one. |
+| `patch` | object | Yes | The keys to change, below. |
+| `scope` | integer | No | A nest's id, to edit inside that nest. |
+
+| Patch key | What it does |
+| --- | --- |
+| `name` | Draws the clips from another module, which must be in the folder and compile. |
+| `width`, `height` | The size the module draws at, 1 to 8192 pixels. |
+| `length` | The graphic's own timeline, in ticks. It snaps to a frame and is at least one frame. Null ends it with the clip, which is **Follow Clip**. |
+| `props` | The base values, merged key by key, at most 64 on a clip. A null removes its key. |
+
+A null for a property that an action on the clip animates doesn't remove it. It sets the schema's default, so the animation keeps its start. To animate a property, use `add_action` and then `set_action_end`.
+
+A patch with `props` or `name` is checked against a schema: the one of the module the patch names, otherwise the one module every clip is drawn by.
+
+It returns what any edit returns, and it's one undo step, **Graphic Properties**. A patch that changes nothing makes no undo step, and that includes a colour re-sent in another spelling.
+
+It won't run when:
+
+- One of the clips isn't a graphic. Nothing changes on the others either.
+- `props` is sent with no `name` to clips drawn by two different modules. Set them one module at a time.
+- The patch has `in`, which moves with trims, rolls and splits, or any other key it doesn't know.
+- A value fails its check. The error names it, and a property by its dotted path.
+
+## Editing the folder with your own file tools
+
+An agent can also edit the graphics folder directly, and Frame Job sees a change within a moment. Ask `get_graphic` with no `name` for the folder's path.
+
+| What | Where |
+| --- | --- |
+| Modules | `<name>.js` |
+| Fonts | `fonts/`, as `.ttf` or `.otf` |
+| Pictures | `assets/` |
+
+`history/`, `API.md` and `API.d.ts` are Frame Job's own, so leave them alone. `history/` holds the kept versions that `restore_graphic` reads, and `API.md` and `API.d.ts` are the reference and its types.
+
+A module's text is kept when Frame Job sees it replaced while the project is open, and that includes a save from an outside editor. See [Edit a module](/graphics/edit-a-module/) for how changes are picked up.
+
+## Related
+
+- [Graphics with an agent](/graphics/agents-and-graphics/)
+- [Write a graphic module](/graphics/write-a-module/)
+- [Tools: graphic fonts, pictures and packages](/mcp/tools-graphic-files/)
+- [Tools: rendering and export](/mcp/tools-render-and-export/)
+- [Patches](/mcp/patches/)

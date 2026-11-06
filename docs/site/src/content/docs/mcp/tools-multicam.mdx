@@ -1,0 +1,210 @@
+---
+title: "Tools: multicam"
+description: The agent tools that copy pieces of a clip to another track, re-pick a shot from another camera and cut a Program track by who is talking, with every argument, answer and refusal.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These three tools cut between synced cameras: `copy_pieces` copies stretches of a clip onto another track at the same times, `switch_angle` re-picks one shot from another camera, and `switch_by_speaker` cuts a whole Program track from who is talking.
+
+<AtAGlance
+  menu={['Clip ▸ Switch Angle ▸', 'Clip ▸ Switch by Speaker…']}
+  tools={['copy_pieces', 'switch_angle', 'switch_by_speaker']}
+  needs="Nothing to set up. When there's only one microphone, faces are read on your Mac, with no key and no upload."
+/>
+
+Times are in ticks, 600,000 a second, and are rounded to the project's frame grid. See [Units and ids](/mcp/units-and-ids/). [Set up several cameras](/multicam/set-up/) says how the tracks should be laid out first.
+
+## `copy_pieces`
+
+Copies pieces of a clip onto another track at the same project times. It has no menu item of its own: it's what [**Clip ▸ Switch Angle ▸**](/multicam/switch-angle/) and [**Clip ▸ Switch by Speaker…**](/multicam/switch-by-speaker/) write with. An agent can cut a whole program with one `copy_pieces` per camera clip. See [Copy pieces to another track](/multicam/copy-pieces/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip to copy pieces of. |
+| `track` | integer | Yes | The track the pieces land on. It must be free over every range. |
+| `ranges` | array of `[from, to]` pairs | Yes | The stretches to copy, in project times, inside the clip and not overlapping. At least one pair. |
+| `video` | boolean | No | Sets each piece's picture on or off. Default: the clip's own setting. |
+| `audio` | boolean | No | Sets each piece's sound on or off. Default: the clip's own setting. |
+| `scope` | integer | No | A nest's id, to edit inside that nest, where the times and tracks are the nest's. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | The open project to act on, by path. Leave it out for the frontmost one. |
+
+Each piece is exactly what two splits at its range's ends would leave in the middle: the same source frames at the same times, with speed, a ramp, reversal, a graphic's own timeline, timed words and actions cut as a split cuts them. So a piece of a synced camera shows that camera's own frame at every time. Pieces get new ids, no transition and no link.
+
+This call copies the stretches from 0 to 2 s and from 5 to 7 s of clip 5 onto track 3:
+
+```json
+{ "clip": 5, "track": 3, "ranges": [[0, 1200000], [3000000, 4200000]] }
+```
+
+Each range's ends snap to the frame grid, a pair written backwards is the same range, and a range that's empty on the grid is skipped. Ranges may touch. If every range is empty, nothing changes.
+
+It answers `ok: true`, `new_clips` (the pieces) and the `project` summary. It's one undo step, **Copy Pieces**.
+
+An unknown clip or track stops the call, and so does an empty `ranges`. Then it's refused, with nothing changed, in this order:
+
+1. The clip is a nest clip, because a piece of it would replay the nest from its first frame.
+2. A range is outside the clip.
+3. Two ranges overlap.
+4. The destination track is locked.
+5. The destination track holds a clip over a range. The sentence names that clip and its ends.
+
+A copy that would take the project past 4,096 clips also fails.
+
+## `switch_angle`
+
+Re-picks one shot from another camera, as [**Clip ▸ Switch Angle ▸**](/multicam/switch-angle/) does.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The shot to re-pick: a clip on the program track. |
+| `angle` | integer | Yes | The id of the track to re-pick it from. |
+| `project` | string | No | The open project to act on, by path. Leave it out for the frontmost one. |
+
+An angle is a track whose video clips cover the shot's whole span. A clip with its picture off, or on a hidden track, still counts. The menu lists at most nine angles, and the tool can name any track.
+
+The shot is deleted and the angle copied over the same span, one piece per angle clip the span crosses, each with the shot's picture and sound settings. Where two angle clips overlap, the later one takes over at its own start. The clips either side are trimmed back to their old edges, so a dissolve on either edge is formed again with its kind, curve and sound shape.
+
+The shot's grade, punch-in, actions and other settings don't carry over.
+
+It takes no `scope`. It works in the nest `set_scope` has open.
+
+| Key | What it holds |
+| --- | --- |
+| `ok` | `true`. |
+| `step` | **Switch Angle**, or **Switch Angle (transition removed)** when a dissolve couldn't be formed again against a short piece and was dropped. |
+| `pieces` | The new clip ids, in time order. |
+| `transitions_removed` | How many dissolves were dropped, from 0 to 2. |
+| `project` | The summary. |
+
+It's one undo step, named as `step` says. An unknown clip or track stops the call. It's refused, with nothing changed, when:
+
+- the angle is the shot's own track
+- the shot's track is locked
+- the shot is linked to its detached sound
+- the angle doesn't cover the shot. The sentence names the first tick with nothing to show.
+- an edge is held short of where it needs to go, for example by a speed ramp. The sentence names the clip and the tick it reached.
+- one of the edits that make up the re-pick can't be made. The sentence is that edit's own.
+
+## `switch_by_speaker`
+
+Cuts a Program track from synced cameras, showing whoever talks on each microphone, as [**Clip ▸ Switch by Speaker…**](/multicam/switch-by-speaker/) does. Run [`sync_audio`](/mcp/tools-audio/#sync_audio) first, because it trusts where the clips sit. Then select the clips with [`set_selection`](/mcp/tools-view-state/#set_selection), because it reads the selected clips.
+
+It takes no `scope`. It works in the nest `set_scope` has open.
+
+### Switch by Speaker options
+
+Every argument is optional. [Switch by Speaker settings](/multicam/switch-settings/) explains the ones the sheet shows.
+
+| Argument | Type | What it does |
+| --- | --- | --- |
+| `speakers` | array of `{mic, angle}` | Who is who: one object per person, both track ids. A camera's detached sound may be a `mic`. One `mic` named for two or more cameras is [faces mode](#faces-mode). Default: the pairing the selection implies. |
+| `wide` | integer or null | The wide camera, which opens the cut and shows during crosstalk, or null for none. While nobody talks the current shot holds. It must be one of the cameras. Default: the one camera no speaker uses, when exactly one is left. With one microphone and no `speakers`, every camera is a speaker, so there's none. |
+| `from` | integer | The range's start, in ticks. Give it with `to`. |
+| `to` | integer | The range's end, after `from`. Give it with `from`. |
+| `min_shot` | number | Seconds. A shorter shot merges into a neighbour. 0.5 to 30. Default 2, or 3 in faces mode. |
+| `min_turn` | number | Seconds. A shorter turn, such as a reply, starts no shot. 0.2 to 10. Default 1. The sheet doesn't show it. |
+| `lead` | number | Seconds a cut comes before the new speaker's first word. 0 to 1. Default 0.2. |
+| `crosstalk` | string | What a second or more of crosstalk shows: `wide`, or `hold` to stay on the current speaker. Default `wide`. |
+| `bleed_db` | number | How many dB below a speaker's own level counts as the other person's voice bleeding in, never a turn. 3 to 40. Default 15. |
+| `dominance_db` | number | How many dB one active microphone must lead every other to count alone. 0 to 30. Default 8. The sheet doesn't show it. |
+| `wide_after` | number or null | Seconds. Once one person has held the screen this long, cut to the wide for `min_shot`. 2 to 600. Default null, which is off. |
+| `mute_cameras` | boolean | Turns the cameras' own sound off inside the range. Default: on when no microphone is a camera. |
+| `track` | integer | Replaces the shots on this track, an earlier Program track, instead of adding one. It must be unlocked, in front of the cameras, hold no selected clip, and hold only pieces of the cameras over the range. |
+| `apply` | boolean | `false` answers without editing. See [Preview with `apply: false`](#preview-with-apply-false). Default `true`. |
+| `project` | string | The open project to act on, by path. Leave it out for the frontmost one. |
+
+A number outside its range stops the call and says the range, where the sheet would pull it back in.
+
+This call plans a cut with longer shots that stays on the current speaker during crosstalk, without editing anything:
+
+```json
+{ "min_shot": 3, "crosstalk": "hold", "apply": false }
+```
+
+### What it reads
+
+- **The cameras:** a camera is a track holding a selected clip with a picture.
+- **The microphones:** by default these are the tracks holding a selected sound-only clip. With none, each camera with sound is its own microphone. Microphones are paired with cameras front to back, and a track you name in `speakers` still needs a selected clip with its sound on.
+- **The range:** `from` and `to`, else the In–Out range, else the extent of the selected camera clips.
+
+It reads each microphone's loudness and speech, which Frame Job measures when a file is added. Then it cuts a shot `lead` before each new speaker's turn, holds through short replies and silence, shows the wide during crosstalk, and merges shots under `min_shot`.
+
+### What it writes
+
+It's one undo step, **Switch by Speaker**:
+
+- a new track named **Program** directly in front of the front-most camera, or with `track`, that track cleared over the range
+- one [`copy_pieces`](#copy_pieces) for each camera clip a shot crosses, picture on and sound off
+- the camera tracks hidden, or, when a camera track holds clips outside the range or a clip without a picture, its clips split at the range's ends with their pictures off inside
+- with `mute_cameras`, the cameras' own sound off inside the range, never on a microphone's track
+
+Nothing outside the range changes, and the microphones are never edited. A selected clip that gets split keeps both halves selected.
+
+### What it answers
+
+| Key | What it holds |
+| --- | --- |
+| `ok` | `true`. |
+| `applied` | Whether the project was edited. |
+| `step` | **Switch by Speaker**. Only when applied. |
+| `track` | The Program track's id. Null when not applied and no `track` was named. |
+| `shots` | Each shot's `angle`, `start` and `end`. |
+| `ops` | How many edits it makes. |
+| `added` | How many clips it adds. |
+| `speakers` | The pairing used, each `mic` and `angle`. |
+| `wide` | The wide camera, or null. |
+| `mute_cameras` | The value used. |
+| `mode` | `microphones` or `faces`. |
+| `note` | Faces mode only: "Faces guess who is talking; check the cuts." |
+| `project` | The summary. |
+
+### Preview with `apply: false`
+
+Pass `apply: false` to see the planned shots without editing the project. The answer has the same keys, with `applied` false and no `step`. It's the same work as a real run, so it stops for the same reasons.
+
+### Faces mode
+
+When one microphone is shared by two or more cameras, their faces decide who talks. This is the default when the selection holds exactly one microphone, and you also get it by naming one `mic` for two or more cameras. See [Cut from faces with one microphone](/multicam/one-microphone/).
+
+While the microphone hears speech, each camera's on-device face analysis says whose mouth moves most, going by the largest face in the picture. A camera wins with 1.5 times the next camera's movement and more than a small minimum, and otherwise it counts as crosstalk.
+
+- A named `wide` takes no part in deciding who talks. If you name it without `speakers`, that camera stops being a speaker when it shares a microphone.
+- `min_shot` defaults to 3.
+- `mode` says `faces`, and `note` says the cuts are a guess, so check them.
+
+Where **Clip ▸ Switch by Speaker…** would show its **Analyzing** sheet, the tool finds the faces it still needs and waits up to 60 s. Past that it's refused, and what it covered is kept. Call it again to continue.
+
+### Switch by Speaker refusals
+
+Nothing changes when a call is refused. It stops first on a value it can't read, such as an unknown track, a `wide` that isn't a camera, only one of `from` and `to`, or a `to` not after `from`.
+
+These are checked together, and the sentence names every one that applies:
+
+- fewer than two cameras, or more than nine
+- a speaker without a microphone or without a camera
+- one microphone for two speakers, outside faces mode
+- a microphone still being analysed, or with no speech in the range
+- speech detection isn't available on this Mac
+- a camera whose faces are still being found, or that shows no face whose mouth can be read
+- a stretch no camera covers
+
+These each stop the call on their own:
+
+- a faces analysis that failed, was stopped, or didn't finish within the wait
+- the project or the open nest changed during the wait
+- more clips than the project may hold. Raise `min_shot` to make fewer shots.
+- a `track` that can't take the shots: it's locked, it holds a selected clip, it isn't in front of the cameras, it has nothing in the range, or it holds a clip that isn't a piece of a camera
+- a camera clip linked by **Detach Audio**. Use [Attach Audio](/audio/detach-and-attach/) first.
+
+## Related
+
+- [Set up several cameras](/multicam/set-up/)
+- [Switch Angle](/multicam/switch-angle/)
+- [Switch by Speaker](/multicam/switch-by-speaker/)
+- [Switch by Speaker settings](/multicam/switch-settings/)
+- [Cut from faces with one microphone](/multicam/one-microphone/)
+- [Copy pieces to another track (agents)](/multicam/copy-pieces/)
+- [Tools: audio](/mcp/tools-audio/)
+- [Tools: playhead, range and selection](/mcp/tools-view-state/)
+- [Tools: framing and vertical](/mcp/tools-framing/)

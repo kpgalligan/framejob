@@ -1,0 +1,224 @@
+---
+title: "Editing inside a nest"
+description: "Open a nest with set_scope or name one on a single call with scope, and see what follows the open nest and what won't work inside one."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A [nest](/editing/nests/) is a group of clips collapsed into one clip, and it has its own tracks, clips and clock. An agent can work inside one in two ways: open it, as you would, or name it on a single call.
+
+<AtAGlance
+  menu={['Clip ▸ Open Nest', 'Clip ▸ Close Nest']}
+  keys={['⌘↓', '⌘↑']}
+  where="Double-click a nest clip"
+  tools="set_scope"
+/>
+
+## Choose how to get in
+
+| | Open it with `set_scope` | Name it with `scope` |
+| --- | --- | --- |
+| What it is | A change of view, like double-clicking the nest clip | An argument on one edit tool |
+| How long it lasts | Until `set_scope` with no arguments | That one call |
+| What it reaches | A nest a clip shows, at any depth | Any nest in the project, shown or not |
+| Who it affects | Every later call, and what the window shows | Only that call. The window stays where it is |
+| When to use it | You want to look: `get_project`, `render_frame`, or a tool that takes no `scope` | You want one edit, from wherever you are |
+
+Editing doesn't need the nest open. Opening it is how you see what an edit did.
+
+## Open and close a nest with `set_scope`
+
+`set_scope` does what double-clicking a nest clip does, or **Clip ▸ Open Nest** (<kbd>⌘↓</kbd>). Called with no arguments it comes back out, as **Clip ▸ Close Nest** (<kbd>⌘↑</kbd>) does, but all the way to the timeline in one call.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | No | The nest clip to open. Works at any depth, and is the precise choice. |
+| `nest` | integer | No | The nest to open, by id. A clip on the timeline has to show it. |
+| `project` | string | No | The path of the open project to act on. Leave it out for the frontmost one. |
+
+Give `clip` or `nest`, never both. Giving neither means the timeline.
+
+**`clip` is the one to prefer.** Two clips can show one nest, and each measures the times inside from its own start, so only the clip says which of them you mean. It finds the clip in the timeline or in any nest, and the call means the same thing wherever you are now, so there's no need to step down one level at a time.
+
+**`nest` looks at the timeline only.** Where two timeline clips show the nest, the earliest is entered, and a tie goes to the lower id. A nest that's shown only from inside another nest can't be reached this way. Name its nest clip with `clip`, or send the edit with `scope`, which needs no view at all.
+
+### While a nest is open
+
+- [`get_project`](/mcp/get-project/#the-report-while-a-nest-is-open) reports the nest as if it were the project, and [`render_frame`](/mcp/render-frame/) draws it at its own size.
+- Every edit lands inside the nest, unless the call has a `scope` of its own or is one of the [document edits](#document-edits-while-a-nest-is-open).
+- The playhead, the selection and the range all belong to the nest. Times you send and read are measured from the nest's own zero.
+
+`set_scope` moves the view and edits nothing, so it adds no undo step. The playhead moves with it so the frame under it stays the same, as it does [for you](/editing/inside-a-nest/#where-the-playhead-goes). Every change of nest clears the in and out range. Going in clears the selection, and coming out selects the nest clip you went in through.
+
+If an edit or an undo takes away the nest that's open, Frame Job falls back to the nearest level that still exists.
+
+### What it returns
+
+| Key | What it holds |
+| --- | --- |
+| `ok` | `true`. |
+| `scope` | The open nest's id, the number an edit's `scope` takes. `null` at the timeline. |
+| `scope_clip` | The nest clip it was entered through. |
+| `scope_path` | The trail from the timeline, one `{nest, clip, name}` for each level. |
+| `playhead` | The playhead, in the nest's own time. |
+| `project` | The project summary. |
+
+`scope_clip` and `scope_path` appear only while a nest is open. `get_project` reports the same three keys.
+
+### When a nest won't open
+
+| It says | Why |
+| --- | --- |
+| "Pass nest or clip, not both…" | Both arguments were given. |
+| "No clip has id 17, in this timeline or in any of its nests…" | No clip anywhere has that id. |
+| "Clip 17 does not show a nest, so there is nothing to open inside it…" | The clip exists but isn't a nest clip. Its `source.kind` isn't `nest`. |
+| "no nest with id 4…" | The project has no such nest. |
+| "No clip on the timeline shows nest 4, so the view cannot reach it in one step…" | The nest is shown only from inside another nest, or by no clip at all. |
+
+## The `scope` argument
+
+Every edit tool takes an optional `scope`, a nest id, so one call edits inside that nest from wherever the window is looking. It's the same edit and still one undo step.
+
+```json
+{ "clips": [41], "at": 1200000, "scope": 4 }
+```
+
+Sent to `split`, that cuts clip 41 inside nest 4, at 2 s on the nest's own clock.
+
+To find the id, read `nests` in `get_project`, or the `source.project` of the nest clip that shows it.
+
+With `scope`:
+
+- Every clip, track and action id is looked up in that nest, not on the timeline.
+- Every time is the nest's own, measured from its zero. To turn a timeline time into a nest time, subtract the nest clip's start. A nest has no speed, so nothing else changes it.
+- Media ids don't change, because a nest shares the project's media.
+- It outranks any nest that's open. To edit the timeline while a nest is open you can't name the timeline, so call `set_scope` with no arguments first.
+
+Leave `scope` out, or send `null`, to edit whatever is open: the timeline, or the nest `set_scope` entered.
+
+The answer carries `scope`, the nest the edit landed in, so you can tell it from an edit on the timeline. Clips and tracks the edit made are listed in `new_clips` and `new_tracks` wherever they landed. The `project` summary in the same answer counts the timeline's tracks and clips, so it doesn't move when an edit lands in a nest.
+
+### When a `scope` isn't accepted
+
+A `scope` is checked before any other argument, because it decides what the rest of the call means.
+
+| It says | Why |
+| --- | --- |
+| "no nest with id 4. get_project lists them under nests, and a nest clip's source.project names the one it shows." | The project has no such nest. |
+| "scope must be a nest id, not …" | The value isn't a whole number that could be an id. A negative number, a fraction, a true or false and a number written as a string all fail. |
+| "No clip has id 17 inside nest 4…" | The id isn't in that nest. The sentence goes on to say how to get back: drop the `scope`, or, when the nest is only open, call `set_scope` with no arguments. Tracks work the same way. |
+| "detect_silence does not take scope. It takes …" | The tool isn't an edit tool. See [below](#tools-that-follow-the-open-nest). |
+
+## Tools that follow the open nest
+
+Tools that aren't plain edits take no `scope`, and a call that gives them one returns an error naming the argument. They work in whatever nest `set_scope` has open, and on the timeline otherwise, so open the nest first to measure or place inside it.
+
+| What it does | Tools |
+| --- | --- |
+| Measure and read | `detect_silence`, `detect_fillers`, `get_timeline_transcript`, `get_media_analysis`, `get_cursor_events` |
+| Sound | `normalize_clip`, `enhance_voice`, `match_audio`, `sync_audio` |
+| Captions and words | `transcribe`, `transcribe_for_fillers`, `import_captions`, `export_captions`, `relay_captions` |
+| Picture and timing | `split_at_shots`, `analyze_cutout`, `auto_zoom`, `add_shortcut_overlays`, `speed_up_typing`, `switch_angle`, `switch_by_speaker` |
+| Adding things | `insert_graphic`, which places its clip in the nest, and `record_screen`, which does the same |
+| View state | `set_playhead`, `set_range`, `set_selection` |
+
+A tool that takes a while reads the project first and checks it again before it edits. If the project or the open nest changed meanwhile, it stops and changes nothing, and says to call it again.
+
+Three tools work on the top-level timeline only. With a nest open they stop with an error that tells you to call `set_scope` with no nest first:
+
+- `text_behind_subject`
+- `new_project_from_range`
+- `make_vertical_version`
+
+`rename_graphic` won't run with a nest open either, because it renames the module for every clip in the project. Call `set_scope` with no arguments, then rename.
+
+`export` and `save_project` ignore the open nest. `export` writes from the timeline, never the nest, and `save_project` saves the whole project.
+
+## `protected_nests` in `detect_silence`
+
+[Remove Silences](/cleanup/remove-silences/) never cuts into a nest, so a quiet stretch that runs across one is left alone. `detect_silence` names those nest clips under `protected_nests`, because there may be dead air inside them.
+
+<Steps>
+
+1. Call `detect_silence`. Read `protected_nests`, a list of nest clip ids.
+
+2. Call `set_scope` with `clip` set to one of those ids.
+
+3. Call `detect_silence` again. It now measures inside the nest, and its times are the nest's own.
+
+4. Pass the ranges to `ripple_delete_ranges`, which lands in the open nest. Like any edit tool it also takes `scope`.
+
+5. Call `set_scope` with no arguments to come back out.
+
+</Steps>
+
+## What doesn't work inside a nest
+
+Some edits are about the whole project, so a nest has nothing for them to change. What happens depends on whether the nest was named with `scope` or is only open.
+
+| Edit | With `scope` | With the nest only open |
+| --- | --- | --- |
+| `add_marker` | Not allowed | Not allowed |
+| `set_marker` with a `time` | Not allowed | Not allowed |
+| `set_marker` without a `time` | Not allowed | Lands on the project |
+| `remove_marker` | Not allowed | Lands on the project |
+| `set_canvas` | Not allowed | Lands on the project |
+| `add_media`, `relink_media`, `remove_media` | Not allowed | Land on the project |
+| `set_media_color`, `set_media_speech`, `set_media_cursor` | Not allowed | Land on the project |
+| `add_adjustment_clip` | Not allowed | Not allowed |
+| `set_track` with `compressor` or `limiter` | Not allowed | Not allowed |
+
+### Edit tools that won't take a `scope`
+
+Eleven tools have no meaning inside a nest. Give one a `scope` and it returns an error naming the tool, for example "add_marker has no meaning inside nest 4".
+
+| Tools | Why |
+| --- | --- |
+| `add_marker`, `set_marker`, `remove_marker` | A nest has no markers. Markers are project time, and they become chapters in the exported file. |
+| `set_canvas` | The frame rate and background are the project's, and a nest's size was fixed when it was made. |
+| `add_media`, `relink_media`, `remove_media`, `set_media_color`, `set_media_speech`, `set_media_cursor` | A nest shares the project's one media list. |
+| `add_adjustment_clip` | An [adjustment clip](/color/adjustment-clips/) grades what's behind it on the timeline only. This one won't work with a nest open either. |
+
+`set_track` works inside a nest, except that a track's `compressor` and `limiter` aren't allowed, with or without `scope`: a track's dynamics run on the timeline's own mix. A nest's whole sound goes through the track holding its nest clip, so set them there. Volume, pan and the rest of `set_track` mean the same inside a nest as outside.
+
+### Document edits while a nest is open
+
+When a nest is only open, and the call has no `scope`, nine of those tools apply to the whole project, because that's what they're about. It's the same as you choosing **File ▸ Add Media…** with a nest open.
+
+Those are `set_marker` without a `time`, `remove_marker`, `set_canvas`, `add_media`, `relink_media`, `remove_media`, `set_media_color`, `set_media_speech` and `set_media_cursor`.
+
+The answer lists what went to the project under `document_ops`, and leaves `scope` out because nothing landed in the nest:
+
+```json
+{ "ok": true, "document_ops": ["set_canvas"], "project": { … } }
+```
+
+`add_media` is the exception: it lands on the project all the same, but its own answer has no `document_ops`. `import_media` adds to the project in the same way, with a nest open or not, and its answer has none either.
+
+### Markers while a nest is open
+
+`add_marker`, and `set_marker` with a `time`, return an error while a nest is open, whatever time you send. A marker sits at project time, and every tick in the call is measured from the nest's own zero, so the marker would land somewhere else on the timeline. It's the reason **Mark ▸ Add Marker** is greyed out in there.
+
+Leave the nest with `set_scope` and no arguments, then send the time in project ticks. A marker's name, chapter setting and colour mean the same in either place, so `set_marker` still changes those. See [Markers](/timeline/markers/#good-to-know).
+
+### Document-wide limits inside a nest
+
+An edit can be valid inside the nest and still fail for the project's sake, because these limits count every nest and the timeline together:
+
+| Limit | Counted over |
+| --- | --- |
+| 4,096 clips | The timeline and every nest |
+| 64 tracks | The timeline and every nest |
+| 8 levels of nesting | The deepest chain of nests |
+
+So read the answer rather than assuming the edit landed. The error names the limit, for example "too many tracks: 65 (max 64)".
+
+## Related
+
+- [Nests](/editing/nests/)
+- [Work inside a nest](/editing/inside-a-nest/)
+- [Tools: copying and nesting](/mcp/tools-copy-and-nest/)
+- [Read the project: get_project](/mcp/get-project/)
+- [Check the picture: render_frame](/mcp/render-frame/)
+- [What a call answers](/mcp/what-a-call-answers/)

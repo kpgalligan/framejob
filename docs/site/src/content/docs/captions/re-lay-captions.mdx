@@ -1,0 +1,92 @@
+---
+title: Re-lay captions for a canvas
+description: Page word captions again after a canvas size change, keeping every word you corrected, and find out why a track was left as it was.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+[Word captions](/captions/word-caption-styles/#word-caption-pages) are split into pages that fit the canvas they were made on, so a narrower canvas can leave them too wide. Re-lay Captions splits them into pages again for the new width, from the words they already hold.
+
+<AtAGlance menu="File ▸ Re-lay Captions for This Canvas" tools="relay_captions" />
+
+## Re-lay Captions for This Canvas
+
+<Steps>
+
+1. [Change the canvas size](/projects/canvas-size/) on the Document tab.
+
+2. Choose **File ▸ Re-lay Captions for This Canvas**. It has no keyboard shortcut and no options.
+
+3. If a sheet appears, read which tracks were [kept as placed](#tracks-kept-as-placed) and why.
+
+</Steps>
+
+Frame Job looks at every track named **Captions** or **Captions N** that holds only text clips. A track whose pages are all in one of the five [word styles](/captions/word-caption-styles/), with the same [looks](/captions/word-caption-looks/), is paged again from the words its pages hold. Nothing is transcribed again, so nothing is uploaded or billed.
+
+The whole re-lay is one undo step, **Re-lay Captions**.
+
+## What a re-lay keeps
+
+Every correction you typed is kept, because the new pages are made from the words on the old ones.
+
+Each page is paged again inside its own clip, and the new pages take the old track's place:
+
+- A page you split, trimmed or moved keeps its words where they are.
+- Pages are never merged across clips. A re-lay can split a page that's too wide for the new canvas, but a wider canvas won't join short pages together.
+- Words cut off by a trim stay cut off.
+- The new pages go on a track with the same name, in the same place in the track stack, hidden and locked if the old one was.
+
+The new pages are drawn fresh from the style, so any other change you made to a page goes. That includes a colour, an outline, a size, a position, or an unticked **UPPERCASE**.
+
+## Tracks kept as placed
+
+A track that can't be re-laid stays exactly as it was. A sheet after the edit names each one and why, under a first line that reads "Re-laid 2 caption tracks for this canvas." or "No caption track was re-laid."
+
+Each track gets a line like this:
+
+> Caption track "Captions 2" is kept as placed: it holds a page with no word timings.
+
+| The reason | What it means |
+| --- | --- |
+| it is a matte track | The track is a [matte track](/canvas/matte-tracks/). |
+| it holds a page with no word timings | It's a [Subtitles](/captions/subtitles/) or imported track, or a page lost its timing because you [changed its number of words](/captions/edit-captions/). |
+| it holds a page none of whose words starts inside it | A trim or split left a page with no word that begins on it. |
+| it holds a page in a style Frame Job does not make | You changed a page's font, or an agent changed its word style. |
+| its pages are in more than one style | Pages on the track differ in style or looks, for example after you moved some from another track. |
+| *N* captions is more than this project has room for | The new pages would take the project past its limit of 4,096 clips. The sentence says how many more would fit. |
+
+No sheet appears when every track was re-laid.
+
+To re-wrap a Subtitles track, or a track that lost its timing, generate it again on the new canvas. See [Restyle a caption track](/captions/restyle-captions/).
+
+## When it is available, and inside a nest
+
+The item is greyed out when:
+
+- there's no caption track it can re-lay
+- a sheet is open
+- a recording is running
+
+So if every caption track is ruled out by a reason in the table above, other than the project's clip limit, the item is greyed out and no sheet tells you why.
+
+Inside a [nest](/editing/nests/), it works on the nest's tracks at the nest's size.
+
+**File ▸ Make Vertical Version…** does the same for the vertical copy. See [What Make Vertical changes](/framing/vertical-what-changes/).
+
+## Good to know
+
+- A track with any other name isn't looked at, and the sheet doesn't mention it. Neither is a track that holds a clip other than text.
+- The item doesn't check whether the canvas changed. Choosing it on the same canvas pages the track again, which still drops the hand changes listed in [What a re-lay keeps](#what-a-re-lay-keeps). Undo brings them back.
+
+## With an agent
+
+`relay_captions` does the same in the timeline or nest that's open, usually after `set_canvas` changes the size. It takes no arguments, and its result lists the tracks it re-laid and each kept track with its reason. When nothing can be re-laid, the call fails with those reasons, so an agent can tell you why the menu item is greyed out. See [`relay_captions`](/mcp/tools-captions/#relay_captions).
+
+## Related
+
+- [Canvas size](/projects/canvas-size/)
+- [Word caption styles](/captions/word-caption-styles/)
+- [Restyle a caption track](/captions/restyle-captions/)
+- [Edit captions](/captions/edit-captions/)
+- [What Make Vertical changes](/framing/vertical-what-changes/)

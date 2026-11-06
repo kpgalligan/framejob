@@ -1,0 +1,209 @@
+---
+title: "Tools: graphic fonts, pictures and packages"
+description: "The agent tools that add fonts and pictures to a project's graphics, rename, delete and restore modules, and export and import .fjgraphic packages."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These tools look after the files around a graphic: the fonts and pictures it draws with, the module files themselves, and the `.fjgraphic` packages that carry a graphic from one project to another.
+
+<AtAGlance
+  tools={['import_graphic_font', 'import_graphic_asset', 'delete_graphic', 'rename_graphic', 'restore_graphic', 'export_graphic', 'import_graphic']}
+  needs="A client connected over MCP, or the Assistant tab."
+/>
+
+Writing a module and placing it on the timeline are on [Tools: graphics](/mcp/tools-graphics/).
+
+Every tool here also takes `project`, the path of an open project. Without it the call goes to the frontmost project. See [How tool calls behave](/mcp/tool-calls/). None of them takes `scope`.
+
+## What can and cannot be undone
+
+The files in `graphics/` live beside the project, not in its undo history. A change to the clips on the timeline is an ordinary undo step.
+
+| Tool | Undo step? | Marks the project edited? |
+| --- | --- | --- |
+| `write_graphic`, `restore_graphic`, `delete_graphic` | No | No |
+| `import_graphic_font`, `import_graphic_asset`, `import_graphic` | No | No |
+| `add_graphic_clip`, `insert_graphic`, `set_graphic` | Yes | Yes |
+| `rename_graphic` | Yes, as one step, for the clips that follow the new name | Only through those clips |
+| `export_graphic` | No, it edits nothing | No |
+
+Because a file write can't be undone, Frame Job keeps the last 10 versions of each module. A version is kept whenever Frame Job sees a module replaced while the project is open, whether by `write_graphic`, a save from an outside editor or a restore, and when `delete_graphic` removes one. [`restore_graphic`](#restore_graphic) brings one back. `insert_graphic`'s copy of a template can't be undone either, even though the clip it places can.
+
+Fonts and pictures aren't kept this way. Importing over a file of the same name replaces it for good.
+
+## Fonts and pictures together
+
+A module draws with two kinds of file besides its code. [`import_graphic_font`](#import_graphic_font) adds a font and [`import_graphic_asset`](#import_graphic_asset) adds a picture.
+
+Both take the `path` of a file on this Mac, with `~` expanded, and copy it into the project. The folders are made if they aren't there. Graphics can use the file as soon as the call returns, and a file already at that name is replaced. A `path` that names no file gives an error.
+
+Each result tells the agent what to write in the module: the exact family names for a font, the name for `asset()` for a picture. See [Fonts and pictures in graphics](/graphics/fonts-and-pictures/).
+
+## `import_graphic_font`
+
+Copies a `.ttf` or `.otf` file into the project's `graphics/fonts/` and returns the family names to use. It mirrors **File ▸ Add Font to Graphics…**. See [Add a font](/graphics/fonts-and-pictures/#add-a-font).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `path` | string | Yes | The font file to copy. |
+
+It returns:
+
+| Key | What it holds |
+| --- | --- |
+| `families` | The family names read from this file. These are the exact strings a `font-family` must say, and they can differ from what other apps show. |
+| `library_families` | Every family the project's graphics can now draw with. |
+| `path`, `name` | Where the copy landed, and the file's name. |
+| `replaced` | True when a file of the same name was replaced. |
+| `note` | A reminder that this can't be undone. |
+
+It won't copy a file that isn't `.ttf` or `.otf`, one it can't read, or one that loads no typeface. The last gives the graphics engine's own reason.
+
+## `import_graphic_asset`
+
+Copies a PNG, JPEG, GIF, WebP, SVG or SVGZ picture into the project's `graphics/assets/`, where a module draws it with `<image href="${asset(name)}">`. It mirrors **File ▸ Add Image to Graphics…**. See [Add a picture](/graphics/fonts-and-pictures/#add-a-picture).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `path` | string | Yes | The picture to copy. |
+| `name` | string | No | The name to file it under, which is what `asset(name)` says. Its extension must be `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg` or `.svgz`. Default: the file's own name. |
+
+It returns `name`, `path`, `replaced`, `bytes`, `assets` (every picture the folder now holds), a `note` that this can't be undone, and `renamed_from` when the name had to change.
+
+`asset(name)` can't use a name that starts with `.` or `#`, holds any of `:`, `"`, `'`, `<`, `>` or `&` or a control character, or runs past 247 bytes. Frame Job files such a picture under a legal name instead. `name` says which, and `renamed_from` says what was asked. A renamed copy never replaces a file. It takes `-2`, `-3` and so on. See [Picture names](/graphics/fonts-and-pictures/#picture-names).
+
+It won't copy:
+
+- A `name` that doesn't end in one of those seven extensions. With no `name`, that's the file's own name.
+- An empty file.
+- Anything when `name` is empty or holds a `/`.
+
+## `delete_graphic`
+
+Deletes a module no clip draws, keeping its text so it can come back. It mirrors **File ▸ Delete Graphic…**. See [Delete Graphic](/graphics/manage-graphics/#delete-graphic).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `name` | string | Yes | The module to delete. |
+
+It returns `ok`, `name`, `revision` (the deleted code's), `kept` and a note. The deleted code joins the module's other kept versions, `get_graphic` with no `name` lists it under `history`, and [`restore_graphic`](#restore_graphic) brings it back. Fonts and pictures are left alone.
+
+It won't delete when:
+
+- The folder doesn't hold the module. The error lists what it does hold.
+- A clip is still drawn by it, on the timeline or inside a nest. The error names them, for example "clips 4 and 9 on the timeline and clip 12 in nest 7". Delete those clips, or point them at another module with `set_graphic`, first.
+- Its text can't be kept. The file stays where it is.
+
+## `rename_graphic`
+
+Renames a module, and every clip drawn by it follows, on the timeline and inside every nest. It mirrors **File ▸ Rename Graphic…**. See [Rename Graphic](/graphics/manage-graphics/#rename-graphic).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `name` | string | Yes | The module to rename. |
+| `to` | string | Yes | The new name: lowercase letters, digits and `-`, starting with a letter or a digit, at most 63 characters. |
+
+It returns `ok`, `name` (the new name), `renamed_from`, `clips` (the ids that followed), `revision`, `kept` and a note.
+
+The clips' change is one undo step, **Rename Graphic**. Undo renames the file back with the clips, and redo moves both forward again. A module no clip draws makes no undo step, so to go back, rename it again.
+
+The module's kept versions move with it. When `to` is a deleted module's name, with no file but kept versions, the two sets join under `to`. Past 10, the oldest versions, the deleted module's, are dropped for good.
+
+It won't rename when:
+
+- The folder doesn't hold the module.
+- `to` isn't a module name.
+- `graphics/<to>.js` already exists.
+- A clip already names `to` with no file behind it, a clip left by a deleted module. Delete that clip or point it at another module first.
+- A nest is open, because a rename reaches every clip in the project. `set_scope` with no arguments comes back out.
+
+## `restore_graphic`
+
+Writes a kept version of a module back, compiles it and returns what [`write_graphic`](/mcp/tools-graphics/#write_graphic) returns. It works for a module `delete_graphic` removed. It mirrors **File ▸ Restore Graphic Version…**, which always restores the newest. See [Restore Graphic Version](/graphics/manage-graphics/#restore-graphic-version).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `name` | string | Yes | The module, present or deleted. |
+| `revision` | string | No | The kept revision to put back, one of `kept` as `get_graphic` lists them. Default: the newest kept. |
+
+It returns `name`, `path`, `revision`, `ok`, `meta`, `schema`, `diagnostics`, `clips`, then `restored`, the revision put back, `kept`, what's kept now, and a note.
+
+The text it replaced is kept in turn, so restoring twice returns you to where you were.
+
+It won't restore when:
+
+- The module has no kept version.
+- `revision` isn't one of its kept revisions. The error lists them.
+- The kept file was changed outside Frame Job, so it no longer holds that revision. Nothing is written, and the error lists the module's other kept revisions.
+
+## `export_graphic`
+
+Writes one graphic as a `.fjgraphic` package: a zip of a manifest, the module, and only the project fonts and pictures it was seen to use. It mirrors **Export…** in **Insert ▸ Graphic…**. See [Share a graphic](/graphics/share-a-graphic/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `name` | string | Yes | The graphic's name as `list_graphics` gives it. |
+| `from` | string | Yes | `template` for a bundled template, `project` for a module in the project's `graphics/`. |
+| `path` | string | Yes | Where to write it. `.fjgraphic` is added when the path lacks it, and its folder must exist. An existing file is replaced. |
+
+To find out what a graphic uses, Frame Job draws it:
+
+1. Every frame up to 900 with the default properties. A longer graphic gets 900 evenly spaced frames.
+2. Then each `enum` option other than the default, and each boolean's opposite, over up to 30 frames each. It tries at most 32 of these.
+
+It packs the project fonts and pictures the engine drew, measured, fell back to or resolved. A bundled font is never packed. String and asset properties are only tried at their defaults, so a picture chosen by another value of one won't be found. See [What a package packs](/graphics/share-a-graphic/#what-a-package-packs).
+
+It returns:
+
+| Key | What it holds |
+| --- | --- |
+| `path` | The file written. |
+| `files` | The package's entries, `manifest.json` first. |
+| `frames` | How many frames were drawn. |
+| `failed_frames` | How many of those threw and were skipped. |
+
+It writes nothing for an unknown name, a module that doesn't compile, or a folder that doesn't exist. It changes nothing in the project and makes no undo step.
+
+In the [Assistant tab](/assistant/what-it-will-not-do/), Frame Job asks you before it runs, naming the file it would write or replace.
+
+## `import_graphic`
+
+Copies a `.fjgraphic` package into the project's `graphics/`: its module, fonts and pictures, under the names the package gives. It does what opening a package from the Finder or **From File…** in **Insert ▸ Graphic…** does, but there's no sheet to confirm it. It places no clip. Use `insert_graphic` with `from: "project"` for that. See [Share a graphic](/graphics/share-a-graphic/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `path` | string | Yes | The `.fjgraphic` file to import. `~` is expanded. |
+
+The package is checked first: a stored zip whose entries match its manifest by path, size and SHA-256, in a format this app reads, with each font loading and each picture under a name `asset(name)` can use. A package that fails gives an error beginning "`<file>` cannot be imported:", and nothing is written. See [Package checks](/graphics/share-a-graphic/#package-checks).
+
+Each file then goes in without replacing anything:
+
+| If the name in the project | A module or font | A picture |
+| --- | --- | --- |
+| Is free | Is written | Is written |
+| Holds the same bytes | Is reused | Is reused |
+| Holds something else | Takes `-2`, `-3` and so on | Stops the whole import |
+
+A picture can't take a new name, because the module reaches it by name. A name that differs only in case counts as taken. If a write fails part-way, what was written is removed.
+
+It returns:
+
+| Key | What it holds |
+| --- | --- |
+| `name` | The module, as named in this project. |
+| `renamed_from` | What the package called it, when the name changed. |
+| `title` | The graphic's title. |
+| `module` | `written` or `reused`. |
+| `fonts` | A list of `{name, renamed_from, action}`, with `renamed_from` only when it changed. |
+| `assets` | A list of `{name, action}`. |
+| `note` | A reminder that this can't be undone. |
+
+It can't be undone.
+
+## Related
+
+- [Tools: graphics](/mcp/tools-graphics/)
+- [Graphics with an agent](/graphics/agents-and-graphics/)
+- [Rename, delete and restore graphics](/graphics/manage-graphics/)
+- [Share a graphic](/graphics/share-a-graphic/)

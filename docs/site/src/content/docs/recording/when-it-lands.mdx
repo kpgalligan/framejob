@@ -1,0 +1,139 @@
+---
+title: "Polish when a recording lands"
+description: "Tick boxes on the recorder panel to remove the camera's background, clean up the sound, zoom in on clicks, show shortcuts and speed up typing as soon as a recording lands."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+The boxes on the recorder panel run the clean-up you'd otherwise do by hand. The recording [lands](/recording/where-it-lands/) exactly as it would without them, and then each ticked box runs its command on what landed, each as its own undo step.
+
+<AtAGlance
+  menu="File ▸ New Recording…"
+  keys="⌥⌘N"
+  where="New Recording panel ▸ When it lands:"
+  tools={['record_screen', 'enhance_voice', 'auto_zoom', 'add_shortcut_overlays', 'speed_up_typing']}
+  needs="Show shortcuts and Speed up typing need Record shortcuts, which needs macOS's Input Monitoring permission."
+/>
+
+<Shot
+  name="16-recorder-panel.panel"
+  alt="The New Recording panel. Under the Layout row, Remove the camera's background when it lands is greyed out. Under Microphone, Enhance the microphone when it lands is greyed out. Under When it lands, Zoom in on clicks is ticked, Show shortcuts is ticked and greyed out, and Speed up typing is unticked and greyed out."
+/>
+
+## Choose what runs
+
+Tick the boxes on the panel before you press Record.
+
+| Box | Runs | On | Default | Available when |
+| --- | --- | --- | --- | --- |
+| **Remove the camera's background when it lands** | **Clip ▸ Remove Background** | The camera's clips | Off | **Record the camera too** is ticked beside a display or a window |
+| **Enhance the microphone when it lands** | **Clip ▸ Enhance Voice** | The microphone's clips | Off | A microphone is chosen, on any source |
+| **Zoom in on clicks** | **Clip ▸ Auto Zoom…** | The screen clips | On | The source is a display or a window |
+| **Show shortcuts** | **Clip ▸ Add Shortcut Overlays** | The screen clips | On | The source is a display or a window, with **Record shortcuts** ticked |
+| **Speed up typing** | **Clip ▸ Speed Up Typing…** | The screen clips | Off | The source is a display or a window, with **Record shortcuts** ticked |
+
+A greyed box keeps its value for next time, and every box is greyed while a recording is under way. The panel remembers all five between uses.
+
+The screen clips are the clips of each stretch's movie that has a [cursor file](/recording/cursor-files/). No other clip is touched, and a voice-over or a camera on its own has none.
+
+:::note
+**Zoom in on clicks** is on from the start, so a display or window recording lands with zooms unless you untick it. **Show shortcuts** is on too, but it does nothing until you tick [Record shortcuts](/recording/record-shortcuts/), which is off.
+:::
+
+## The order they run in
+
+The steps always run in this order, whichever you tick:
+
+1. **Remove Background**, straight after the landing.
+2. **Enhance Voice**, once the sound has been analysed.
+3. **Auto Zoom**.
+4. **Add Shortcut Overlays**.
+5. **Speed Up Typing**, once the speech has been detected.
+
+Each is its own undo step, named as in this list, and they all come after the landing's. **Edit ▸ Undo** takes them off one at a time, last first, and keeps the recording.
+
+The order matters. Zooms are planned on whole clips before the speed-up splits them, and the speed-up leaves each overlay at its pace.
+
+Each command uses the settings its own menu command would, and only Enhance Voice shows a sheet. Nothing asks you a question.
+
+## Remove the camera's background
+
+**Remove the camera's background when it lands** runs [Remove Background](/effects/remove-background/) on the camera's clips straight after the landing, with nothing to wait for. If no camera clip landed, it does nothing and says nothing. [Record a camera beside the screen](/recording/camera-beside-the-screen/#remove-the-cameras-background) has the rest.
+
+## Enhance the microphone
+
+**Enhance the microphone when it lands** runs [Enhance Voice](/audio/enhance-voice/) on each stretch's microphone file, or on a voice-over's files. It never touches the picture, a camera or the system audio.
+
+Enhance Voice needs the sound's loudness and speech analysed first, so it waits for that after the files land. It then runs under the **Measuring Sound** sheet, at the target loudness of the [Normalize](/audio/normalize/) row, and its settings appear in the clip's [Sound tab](/audio/sound-tab/).
+
+Choosing **Cancel** on the sheet leaves the clips as they landed.
+
+**Edit ▸ Undo Enhance Voice** takes the processing off and keeps the recording. The next undo is **Remove Background** if that ran, then the landing's own step: **Add Recording** in an open project, and in a new project a step such as **Add Microphone**, or nothing when the recording is a single file.
+
+If a second recording lands in the same project while the first is still waiting, its clips join the wait and the wait starts again.
+
+## Zoom in on clicks
+
+**Zoom in on clicks** runs [Auto Zoom](/recording/auto-zoom/) with the values the Auto Zoom sheet last used. **Zoom on typing** is turned on when the recording has typing, and off when it hasn't.
+
+## Show shortcuts
+
+**Show shortcuts** runs [Add Shortcut Overlays](/recording/shortcut-overlays/) with its usual settings: at the bottom of the picture, in the dark theme.
+
+## Speed up typing
+
+**Speed up typing** runs [Speed Up Typing](/recording/speed-up-typing/) with the values its sheet last used. It waits until the speech has been detected, so typing you talk over keeps its pace.
+
+A speed-up that would leave a clip silent above ×12 is never applied here, because the panel can't ask you first. The foot of the inspector says so instead. Choose **Clip ▸ Speed Up Typing…** yourself to be asked. See [Sound at high speed](/speed/sound-at-high-speed/).
+
+## What the steps wait for
+
+Enhance Voice, Auto Zoom, Add Shortcut Overlays and Speed Up Typing each hold off while:
+
+- you're dragging in the project
+- a sheet is up on its window
+- you're inside a different nest from the one the recording landed in
+
+They carry on by themselves once that's over. Each waits for up to 5 minutes. The clock starts at the landing or when the step before it ran. For the first step after Enhance Voice, it starts when Enhance Voice stops waiting.
+
+## When a step can't run
+
+A problem shows at the foot of the [inspector](/getting-started/inspector/), with no beep and no sheet. A step with nothing to do says nothing at all: a recording with no cursor file, a recording with no microphone clip, or no click, shortcut or typing stretch long enough changes nothing and shows no message.
+
+| The inspector says | What happened | What runs next |
+| --- | --- | --- |
+| "Enhance Voice did not run on the recording: its microphone was not ready to measure within 5 minutes. Select its clip and choose Clip ▸ Enhance Voice." | The sound wasn't analysed in time, or the project stayed busy. | The other steps |
+| "Nothing could be enhanced. …" | There was nothing to measure, for example a silent microphone. The sentence gives the reason. | The other steps |
+| "… did not run on the recording: the project was busy for 5 minutes. Select its clips and choose Clip ▸ …" | You were dragging, a sheet was up, or you were in another nest for the whole wait. | Nothing. Run the rest yourself. |
+| "Speed Up Typing did not run on the recording: its speech was not detected within 5 minutes. Select its clips and choose Clip ▸ Speed Up Typing…." | Speech detection didn't finish in time, or the project stayed busy. | It's the last step. |
+| "Clip … now plays above ×12, so its audio is left out: it is silent in the preview and the export." | The speed-up would take that clip past ×12, so Frame Job didn't make it. Nothing changed: the clip, which can be on another track, keeps its speed and its sound. Choose **Clip ▸ Speed Up Typing…** to be asked. | It's the last step. |
+| Any other sentence | The command wouldn't run. This is the sentence it would show from its own menu item. | The next step |
+
+A cursor file that can't be read is reported the same way, and none of the steps that use it runs after that.
+
+## With an agent
+
+`record_screen` can run the same steps, through its `camera_cutout`, `enhance`, `auto_zoom`, `shortcut_overlays` and `speed_up_typing` arguments, with some differences:
+
+- Every step is off unless the agent asks for it, **Zoom in on clicks** included.
+- Every step needs the recording placed on the timeline, so none works with `place: false`.
+- `enhance` needs `microphone: true` or a voice-over.
+- `shortcut_overlays` and `speed_up_typing` need `keys: "shortcuts"`.
+- `auto_zoom`, `shortcut_overlays` and `speed_up_typing` can't be used with a voice-over or a camera on its own.
+- Enhance Voice runs at −16 LUFS, not at the Normalize row's target. The agent can call [`enhance_voice`](/mcp/tools-audio/#enhance_voice) afterwards for another target.
+- The other steps use the tools' own defaults, never the values a sheet remembers.
+- A speed-up that leaves a clip silent above ×12 is applied, and the agent is told.
+
+The call's answer holds each step's own answer, or a sentence under `enhance_error`, `auto_zoom_error` and so on when the step couldn't run. See [Record with record_screen](/mcp/record-screen/#run-steps-after-it-lands).
+
+## Related
+
+- [Where a recording lands](/recording/where-it-lands/)
+- [Record a camera beside the screen](/recording/camera-beside-the-screen/)
+- [Remove Background](/effects/remove-background/)
+- [Enhance Voice](/audio/enhance-voice/)
+- [Auto Zoom](/recording/auto-zoom/)
+- [Record shortcuts](/recording/record-shortcuts/)
+- [Shortcut overlays](/recording/shortcut-overlays/)
+- [Speed Up Typing](/recording/speed-up-typing/)

@@ -1,0 +1,79 @@
+---
+title: "Crossfades"
+description: "Fade one clip's sound into the next across a transition, choose the shape of the fade, and crossfade clips that have no picture."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+When two clips on a track overlap with a transition, the transition can fade the outgoing sound out and the incoming sound in, so the cut isn't heard as a jump.
+
+<AtAGlance
+  where="Clip tab ▸ Clip sub-tab ▸ Transition section"
+  tools="set_transition_style"
+/>
+
+## Crossfade audio
+
+A new transition already crossfades its sound, at the **+3 dB** shape, so most of the time there's nothing to do. Open the section to turn the crossfade off, or to change its shape.
+
+<Steps>
+
+1. Select the later of the two overlapping clips, on its own. The **Transition** section only appears for a single clip that overlaps the clip before it.
+
+2. In the Clip tab, choose the **Clip** sub-tab and open **Transition**.
+
+3. Tick or untick **Crossfade Audio**.
+
+</Steps>
+
+| **Crossfade Audio** | What you hear across the overlap |
+| --- | --- |
+| On | The outgoing sound fades out and the incoming sound fades in. If only one of the two clips has sound, that clip still fades. |
+| Off | Both clips play at their own level for the whole overlap, mixed together. |
+
+The fade follows the transition's **Curve**, so an eased transition eases its sound too. A new transition is **Ease In Out**. **Curve** and **Crossfade Audio** are separate settings, and changing one leaves the other alone.
+
+To change the overlap's length, use the **Duration** row. See [The Transition section](/motion/transition-settings/).
+
+## Choose a crossfade shape
+
+**Crossfade Shape** sets the curve of the fade. It's available while **Crossfade Audio** is on, and the default is **+3 dB**. The incoming clip follows the shape, and the outgoing clip follows it in reverse.
+
+| **Crossfade Shape** | What it does | Each clip's level halfway through the fade |
+| --- | --- | --- |
+| **Linear** | A straight-line pair. It dips 3 dB in the middle of two unrelated takes, but suits two parts of the same sound. | About −6 dB |
+| **S-Curve** | A fade that does most of its changing in the middle of the overlap and moves slowly at both ends. | About −6 dB |
+| **+3 dB** | Constant power, which holds the level steady across two unrelated takes. | About −3 dB |
+| **−3 dB** | A slow start. The incoming sound rises late and the outgoing sound falls early, so the middle of the overlap is the quietest of the four. | About −11 dB |
+
+## Audio-only transitions
+
+Two overlapping clips with no picture get the same **Transition** section, on the same sub-tab. Only their sound changes. **Crossfade Audio**, **Crossfade Shape** and **Curve** control the fade, **Duration** sets its length, and **Kind** has no visible effect.
+
+Whenever an edit makes a clip overlap the one before it, Frame Job adds a transition, for audio clips as for any other. So overlapping two music clips crossfades them straight away. See [Add or remove a transition](/motion/add-a-transition/) for the other ways to make one.
+
+## Crossfade after Detach Audio
+
+[Detach Audio](/audio/detach-and-attach/) moves a clip's sound to its own clip on the track below and switches it off on the picture clip, so **Crossfade Audio** on the transition between two picture clips no longer fades that sound. The fade belongs to the detached audio clips instead.
+
+Detach both clips of an overlap and their audio clips overlap on that track, which gives them a transition of their own that crossfades them. Audio clips that don't overlap yet get one as soon as you overlap them. Select the later audio clip to change it.
+
+## Good to know
+
+- The crossfade multiplies whatever else is happening to the sound. Mute, solo, ducking, volume and a clip's own fades still apply on top.
+- With **Kind** set to **None**, an overlap has no transition of its own. It plays as a linear cross dissolve with no sound crossfade, and the section shows **Linear** and **Crossfade Audio** off. Changing either of them gives the overlap a transition with exactly the values shown.
+- Choosing another style from **Clip ▸ Transition** on a clip that already has a transition keeps its curve and its crossfade.
+- A transition on a nest clip fades all the sound inside the nest. A crossfade between clips inside the nest still happens too, and you hear both.
+- Each clip's [limiter](/audio/limiter/) holds that clip alone, so two limited clips can add up past the ceiling during an overlap. An export's master limiter catches this, but the preview has none, so it can sound louder while you edit. A [track compressor or limiter](/audio/track-dynamics/) is also approximate in the preview where clips overlap.
+
+## With an agent
+
+`set_transition_style` sets the crossfade with `audio` (true or false) and its shape with `audio_shape`: `plus_3db`, `linear`, `s_curve` or `minus_3db`. A key you leave out keeps what's there. See [Tools: transitions](/mcp/tools-transitions/#set_transition_style).
+
+## Related
+
+- [The Transition section](/motion/transition-settings/)
+- [Audio fades](/audio/fades/)
+- [Detach and Attach Audio](/audio/detach-and-attach/)
+- [J-cuts and L-cuts](/audio/j-and-l-cuts/)

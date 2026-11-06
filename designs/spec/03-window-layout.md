@@ -64,7 +64,9 @@ mix before the export's loudness and master limiter), then View ▸ Scopes' 248 
 persists.
 
 Inspector and timeline are `NSSplitView` panes; sizes persist in
-`UserDefaults`. There is no left panel: the media library is an inspector
+`UserDefaults`. The inspector's divider clamps at 280 pt and never hides it:
+⌥⌘I is the only way to collapse it, and a drag that brings a hidden inspector
+back clears the remembered hide. There is no left panel: the media library is an inspector
 tab, so the canvas gets the width. Below about 1080 pt wide,
 narrow the inspector before anything else. The window has a welcome sibling
 (`WelcomeWindowController`, as in Rasterize) offering Open Video…, New

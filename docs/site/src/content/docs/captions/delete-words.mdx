@@ -1,0 +1,139 @@
+---
+title: "Cut by deleting words"
+description: Edit video by editing text. Select words in the Transcript tab and delete them, taking the picture and sound under them out of the timeline and closing the gap.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Editing a spoken video can work like editing text. Select words in the Transcript tab, press <kbd>⌫</kbd>, and the words and everything under them come out of the timeline, with the gap closed.
+
+<AtAGlance
+  menu={['Edit ▸ Delete', 'Edit ▸ Ripple Delete']}
+  keys={['⌫', '⌦', '⌘⌫']}
+  where="Inspector ▸ Transcript"
+  tools={['get_timeline_transcript', 'get_transcript', 'ripple_delete_ranges', 'set_range']}
+  needs="Words in the Transcript tab, read on this Mac or from an AssemblyAI transcript. Cutting them uploads nothing."
+/>
+
+## Delete words
+
+<Steps>
+
+1. Choose **View ▸ Transcript** (<kbd>⌃⌘T</kbd>). The Transcript tab opens and its text takes the keyboard. The first time you look, the tab has to [read the file](/captions/transcript-words/), so the words can take a moment to appear.
+
+2. [Select the words](#select-words) you want gone.
+
+3. Look at what's shaded on the timeline. That's exactly what will go. To hear it first, turn on [Loop](/timeline/loop/), which plays the shaded range.
+
+4. Press <kbd>⌫</kbd>.
+
+</Steps>
+
+The words and the sound under them come out of every unlocked track and the gap closes, as one undo step named **Delete Words**. The range clears and the playhead lands where the cut was.
+
+<kbd>⌦</kbd>, <kbd>⌘⌫</kbd>, **Edit ▸ Delete** and **Edit ▸ Ripple Delete** all do the same thing here. On the timeline, <kbd>⌫</kbd> [leaves a gap](/editing/delete-clips/). In the transcript it closes the gap, the way deleting text does.
+
+Deleting words one at a time gives the same result as deleting them together, unless a pause of more than a second lies between them. See [where a word cut falls](#where-a-word-cut-falls).
+
+:::caution
+These keys cut words only while the transcript text has the keyboard. If it doesn't, <kbd>⌫</kbd> does what it does on the timeline: with no clip selected, it lifts the shaded range and leaves a gap. Choose **View ▸ Transcript** first to give the text the keyboard. A click on a word would replace your selection.
+:::
+
+## Select words
+
+| To | Do this |
+| --- | --- |
+| Select one word | Click it. The playhead moves to it too. |
+| Select a run of words | Drag across them. The text scrolls as you go, and a drag selects words only, never a pause. |
+| Extend the selection | <kbd>⇧</kbd>-click a word, or press <kbd>⇧</kbd> with an arrow. Neither moves the playhead. |
+| Select every word | Press <kbd>⌘A</kbd>. |
+| Clear the selection | Press <kbd>⎋</kbd>. |
+
+[Transcript keys](/captions/transcript-keys/) has every key the text takes.
+
+## The selection becomes the range
+
+Whatever you select becomes the timeline's [in/out range](/timeline/in-out-range/), replacing any range you had, so the timeline shades exactly what will go. With the range set you can [loop](/timeline/loop/) or [export](/export/range/) only those words.
+
+The selection can grow as it does this. It widens over any word the cut would cut into, so what's highlighted is what the cut takes. The range lands on the nearest whole frames.
+
+<kbd>⎋</kbd> clears the selection and the range with it. It clears only a range the selection set: if you've changed the range since, with <kbd>I</kbd>, <kbd>O</kbd> or an agent, the transcript leaves it alone.
+
+## Where a word cut falls
+
+A cut runs from where the first word starts to where the next word you keep starts. The pause before the cut stays, and the pause after it goes.
+
+- **A long pause after the words.** The cut goes no more than one second past the end of the last deleted word, and the rest of the pause stays.
+- **Frames.** Both ends land on whole frames, and the end never passes the start of a word that stays.
+- **The last word on the timeline.** With no word after it, the cut ends where the word ends.
+- **A clip not read yet.** The cut stops at the start of a clip whose words haven't been read.
+
+## Where a word starts
+
+When words are [read on this Mac](/captions/transcript-words/), the recogniser puts each word's start early, often well inside the pause before it. So the tab moves each start to where its sound begins. There's nothing for you to do, and this is how it works:
+
+1. It finds where the voice model, the one [Remove Silences](/cleanup/remove-silences/) uses, first hears speech after the recogniser's start.
+2. It then looks for the first hundredth of a second loud enough to be the word: at least −40 dBFS, and 12 dB above the pause's own background noise. The search starts no more than about 0.1 s before the speech, so a click earlier in the pause isn't taken for the word. If nothing is that loud, the start stays where the voice model heard speech.
+
+A word after a pause therefore starts on its sound, so a cut that ends at that word neither keeps a slice of the pause nor takes the start of the word you keep.
+
+Both steps use what the project measures when it opens a file. Until the voice model has heard a file, the starts are the recogniser's own. The tab moves them as soon as it has, and keeps your selection.
+
+Words from an [AssemblyAI transcript](/captions/assemblyai-transcription/), and where any word ends, are left as transcribed.
+
+## How exact a word cut is
+
+Word edges come from the transcript itself, so in fast speech a cut can take the very end of the word before it, or leave a sliver of the word you deleted. Play the shaded range with [Loop](/timeline/loop/) before you delete, and undo if the cut sounds wrong.
+
+## Overlapping words on other tracks
+
+If a word on another track starts before your selection and runs into it, say two people talking at once, the tab adds that word to the selection first, along with any words between. You see everything the cut takes before you press <kbd>⌫</kbd>.
+
+A word on another track that starts inside your last selected word isn't added. It's the next word you keep, so the cut ends at its start, and the rest of the deleted word after that point can stay in.
+
+Only the words the tab shows are added. With **Words from** set to one track, the cut still goes through the other unlocked tracks, and any words it takes there are ones you can't see.
+
+## Words that can't be cut
+
+Some words are shown faint, because a cut at them would break something. Hold the pointer over one to read why.
+
+| Where the word is | What the tab says |
+| --- | --- |
+| Inside a [nest](/editing/nests/) | "Inside nest *name*: open it (⌘↓) to cut its words." |
+| Under a [transition](/motion/transitions/) | "Under a transition: a cut here would leave one clip's tail under its neighbour." |
+| On a locked track | "Track *name* is locked: a cut would leave these words in place and move everything after them." |
+
+A nest or track with no name is given by its number. With a nest open, the tab shows only what's inside it, and a word there is no longer faint for being in that nest.
+
+You can still click a faint word to move the playhead there, but a selection that holds one can't be deleted. A clip with a [speed ramp](/speed/make-a-ramp/) isn't faint: its words can be cut.
+
+## When the tab won't cut
+
+In these cases the tab beeps, keeps your selection and shows the reason at the foot of the inspector, after the word "Refused:". The message stays until the project changes or you click it.
+
+| Why | What it says |
+| --- | --- |
+| A selected word is [faint](#words-that-cant-be-cut). | That word's own reason. |
+| A locked track has words inside the cut, even a track **Words from** is hiding. A locked track never moves, so its words would fall out of step. | "Track Music is locked and has words in this cut: unlock it to cut here." |
+| The cut would pass the project's limit of 4,096 clips while it's being made. Every clip the cut crosses is split first, so a project near the limit can pass it for a moment even if the cut ends with fewer. | "This cut would make 4097 clips; a project holds at most 4096. Lock a track that needs no cut, such as a music bed, or cut less." |
+
+Closing the gap can also fail for a reason of its own, such as a linked clip that would have to start before the start of the timeline. That reason shows in the same place.
+
+## Good to know
+
+- The cut goes through everything on every unlocked track, including music, captions and tracks you've muted or hidden. A locked track with no words in the cut stays whole and doesn't move, which is the way to keep a music bed in one piece.
+- Markers don't move, as with every [ripple delete](/editing/delete-clips/).
+
+## With an agent
+
+`get_timeline_transcript` reads the same words, up to 2,000 at a time, and says which can't be cut and why. Each word carries `cut_start` and `cut_end`, the range the tab would cut it by. One `ripple_delete_ranges` call from the first word's `cut_start` to the last word's `cut_end` cuts a run, and `set_range` can shade it first. `get_transcript` reads one clip's words. Neither reading tool uploads anything. If the voice model hasn't heard a file yet, the answer has a note saying its starts are still early, so ask again once it has. See [`get_timeline_transcript`](/mcp/tools-captions/#get_timeline_transcript), [`get_transcript`](/mcp/tools-captions/#get_transcript) and [`ripple_delete_ranges`](/mcp/tools-cut-and-delete/#ripple_delete_ranges).
+
+## Related
+
+- [Shorten a pause](/captions/shorten-pauses/)
+- [Transcript keys](/captions/transcript-keys/)
+- [The Transcript tab](/captions/transcript-tab/)
+- [Where the transcript's words come from](/captions/transcript-words/)
+- [How a clean-up cut works](/cleanup/how-cleanup-cuts-work/)
+- [Remove Filler Words](/cleanup/remove-filler-words/)

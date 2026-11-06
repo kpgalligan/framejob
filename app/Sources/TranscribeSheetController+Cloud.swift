@@ -219,8 +219,10 @@ extension TranscribeSheetController {
             ? "Current cached transcripts will be used without an API key or network request."
             : Self.hint(
                 for: .assemblyai, region: AssemblyAIConfiguration.region(defaults: defaults))
-        summaryLabel.stringValue = estimate
-            .map { CloudEstimate.describe($0, fps: snapshot.canvas.fps) } ?? "Nothing to transcribe"
+        // `CloudEstimate.describe` has an empty sentence of its own; the card's comes first.
+        summaryLabel.stringValue = jobs.isEmpty
+            ? emptySummary
+            : estimate.map { CloudEstimate.describe($0, fps: snapshot.canvas.fps) } ?? emptySummary
         // The WHY, where a person can reach it without it pushing the card
         // apart: one line per file that is not already transcribed, plus the
         // dated rate (R6-13 puts a held file's price on its own line).
@@ -262,7 +264,7 @@ extension TranscribeSheetController {
         {
             notes.append(cap)
         }
-        if jobs.isEmpty {
+        if jobs.isEmpty, !unheardScope {
             notes.append(
                 "Only a clip whose media has sound can be transcribed, and never one played in "
                     + "reverse.")

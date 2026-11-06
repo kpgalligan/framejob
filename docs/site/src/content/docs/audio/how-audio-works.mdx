@@ -1,0 +1,119 @@
+---
+title: "How audio works"
+description: Where sound lives in a project, the order it passes through a clip's settings, what a nest and a track do to it, and which tool to reach for.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Every clip with sound is mixed by its own settings and then by its track's. This page is the map: where sound lives, the order it's processed in, and which page covers each job.
+
+<AtAGlance
+  where={['The timeline', 'Clip tab ▸ Sound', 'The track header']}
+  tools={['set_audio', 'set_track']}
+/>
+
+## One kind of track for all sound
+
+Frame Job has no separate audio tracks. Any track can hold a clip with sound:
+
+- a video file
+- an audio-only file, such as a voice-over, music or a recorder's take
+- a microphone recording
+- a clip split off with [Detach Audio](/audio/detach-and-attach/)
+- a [nest](/editing/nests/) that holds sound
+
+Frame Job has no library of stock music or sound effects, so bring your own files with [**File ▸ Add Media…**](/projects/import-media/).
+
+Each clip has its own processing on the [Sound tab](/audio/sound-tab/). Each track can be [muted or soloed](/audio/mute-and-solo/) and has its own [volume and pan](/audio/track-volume-and-pan/), [compressor and limiter](/audio/track-dynamics/).
+
+The preview and the export use the same mix, so what you hear while editing is what gets written. There are two exceptions:
+
+- The exported mix also passes through a master limiter the preview doesn't have, which holds its peaks at or under −1 dBTP unless an agent asks for another ceiling. See [Export loudness](/export/loudness/).
+- A track's compressor and limiter are exact in an export and approximate in the preview. See [Track compressor and limiter](/audio/track-dynamics/).
+
+## Clip waveforms
+
+A clip with sound shows its waveform in the timeline, below the filmstrip when it has both. The waveform is the file's own level, so moving the **Volume** slider doesn't redraw it. The [volume line](/audio/volume-line/) over it shows what you actually hear. A nest clip draws no waveform, because it has no file of its own.
+
+The waveform is drawn faded when the clip is muted, when its track is muted, or when another track's solo silences it. A track holding only sound clips is drawn as a shorter lane than a track with pictures. [Reading a clip on the timeline](/timeline/reading-a-clip/) covers everything a clip draws.
+
+## The fixed signal order
+
+Sound passes through a clip's settings in one fixed order. You can't rearrange it. The order matters because each stage hears what the one before it left: the compressor's threshold, for example, is read against sound the noise reducer has already cleaned.
+
+1. [Voice Isolation](/audio/voice-isolation/)
+2. [Voice Effect](/audio/voice-effects/)
+3. [Channels](/audio/channels/)
+4. [EQ](/audio/eq/)
+5. [Hum](/audio/hum-removal/)
+6. [Noise Reduction](/audio/noise-reduction/)
+7. [Gate](/audio/gate/)
+8. [Leveller](/audio/leveller/)
+9. [De-esser](/audio/de-esser/)
+10. [Compressor](/audio/compressor/)
+11. [Mix](/audio/pan-and-mono/): Mix to mono, then Pan
+12. [Limiter](/audio/limiter/)
+13. [Volume](/audio/volume/), [fades](/audio/fades/) and [ducking](/audio/ducking/)
+
+The last step works like a fader. Those three are the first sections on the Sound tab, because they're what you reach for most, but they're applied last. The other sections read down the tab in signal order.
+
+The limiter takes the clip's **Volume** into account, so its ceiling holds at the level you set, even though Volume comes after it in the list.
+
+## Sound on a nest
+
+A nest clip has the same Sound tab, but most of the controls don't reach the clips inside it.
+
+| On a nest clip | What it does |
+| --- | --- |
+| **Volume**, **Mute** and the fades | Scale everything inside. Turning a nest down turns all of it down, and muting it silences all of it. |
+| **Mix to mono** | Folds the nest's whole mix. Pans on the tracks inside it no longer apply. |
+| **Ducking** | Lowers everything for the nest's whole length, the clips inside it included. See [Ducking](/audio/ducking/#good-to-know). |
+| Pan, Channels, EQ, Hum, Gate, Leveller, De-esser, Compressor, Voice Isolation, Voice Effect, Noise Reduction and Limiter | Nothing. Open the nest with <kbd>⌘↓</kbd> and set them on the clips inside. |
+
+A nest clip draws no [volume line](/audio/volume-line/), and [Normalize](/audio/normalize/) and [Enhance Voice](/audio/enhance-voice/) pass over it, because its level lives in the clips inside. Alone in the selection it leaves both buttons disabled. Beside an ordinary clip, the ordinary clip is processed and the nest is skipped.
+
+## What a track adds
+
+A track acts as a bus, one shared channel for all its clips. Its volume, compressor and limiter work on everything on it, after each clip's own settings. Its pan works on everything on it too, right before each clip's Limiter, so a limited clip still holds its ceiling.
+
+A clip inside a nest plays through its own track in the nest and then through the track the nest clip sits on. Track volumes and pans multiply along the way, so a clip panned left on a track panned left leans further left. A nest's own tracks have no compressor or limiter, only volume and pan.
+
+There's no separate mixer window. A track's volume, pan, compressor and limiter are in its [Track Mix panel](/audio/track-volume-and-pan/), one track at a time. A track has no EQ or noise reduction of its own. Those belong to each clip, and [Paste Attributes](/editing/paste-attributes/) copies one clip's sound settings to others.
+
+Frame Job doesn't load third-party Audio Unit or VST plug-ins.
+
+## Sound analysis after import
+
+Frame Job analyses each file's sound on your Mac after import, with no key and no upload: first its waveform, then its loudness, then what Synchronize Audio matches on, and then where its speech is. Until that finishes:
+
+- The clip has no waveform yet.
+- The **Loudness** readout says "measuring…".
+- [Normalize](/audio/normalize/) and [Enhance Voice](/audio/enhance-voice/) skip the clip.
+- [Match Audio](/audio/match-audio/) skips it, and if that leaves nothing to match, it says the clip "is still being analysed".
+- [Synchronize Audio](/audio/synchronize-audio/) stops and says the clip "is still being analysed".
+
+Try again in a moment. Nothing needs starting by hand.
+
+## Find the right tool
+
+| To | Use |
+| --- | --- |
+| Set how loud a clip plays | [Clip volume](/audio/volume/) |
+| Change the level over time | [The volume line](/audio/volume-line/) or [actions](/audio/animate-sound/) |
+| Bring clips to one loudness | [Normalize](/audio/normalize/) |
+| Clean up a voice recording in one step | [Enhance Voice](/audio/enhance-voice/) |
+| Make one clip sound like another | [Match Audio](/audio/match-audio/) |
+| Drop the music under a voice | [Ducking](/audio/ducking/) or [Duck by Speech](/audio/duck-by-speech/) |
+| Line up a camera and a separate recorder | [Synchronize Audio](/audio/synchronize-audio/) |
+| Move sound to its own clip, or make a J-cut | [Detach and Attach Audio](/audio/detach-and-attach/), [J-cuts and L-cuts](/audio/j-and-l-cuts/) |
+| Give many clips the same treatment | [Paste Attributes](/editing/paste-attributes/) copies the whole sound setup in one step |
+| Cut out dead air | [Remove Silences](/cleanup/remove-silences/) |
+| Check a mix by ear and by number | [The level meter](/audio/level-meter/) and [the Loudness Meter](/audio/loudness-meter/) |
+
+## Related
+
+- [The Sound tab](/audio/sound-tab/)
+- [Clip volume](/audio/volume/)
+- [Track volume and pan](/audio/track-volume-and-pan/)
+- [Export loudness](/export/loudness/)
+- [Audio-only exports](/export/audio-only/)

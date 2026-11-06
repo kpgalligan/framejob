@@ -125,7 +125,8 @@ detail there.
   The typed `setActionEnd` LIFTS every top-level null out of its patch into
   `off` (spec §11 CI-14: a typed `.some(nil)` is a switch turned OFF, kept
   at the end), and a null slot inside `audio.eq` into `audio.eq.<slot>`
-  (AU-88); `setActionEndRaw`'s nulls stay removals, which is what
+  (AU-88), and a null range inside `video.qualifier` into
+  `video.qualifier.<range>` (GR-36); `setActionEndRaw`'s nulls stay removals, which is what
   `clearOps` and every agent call send, and it writes `off` only when non-empty and `schema` only when non-nil
   (the agent door fills it for a graphic end from the module's current
   revision, spec §11 G-34).
@@ -498,6 +499,11 @@ detail there.
   `AppSupport.ensureDirectory` is the ONE creator of that folder and of any
   folder under it: `0700` at each level it makes, an existing folder left
   alone (#108).
+- `MediaFolder.swift`: a folder handed to an import door (spec §11 #497):
+  `isFolder`, `isMedia`, `list` (the media files directly inside, in Finder
+  order; hidden files left out; every other visible item named as skipped)
+  and `expand`. `ProjectDocument.importMedia` and
+  `AgentServer+MediaFolder.swift` (`import_media` on a folder) share it.
 - `AnalysisStamp.swift` · `AnalysisStore.swift` · `AnalysisLane.swift` ·
   `AnalysisFrames.swift` · `AnalysisFrames+InputPass.swift` ·
   `AnalysisShots.swift` · `AnalysisMasks.swift` · `AnalysisMasks+Image.swift` ·
@@ -1120,8 +1126,10 @@ detail there.
   container before the window.
   `+Rules` holds TX-11's editability (nest, transition wall, locked track,
   in that order) and the same-speech note (≥ 5 s overlap, LCS ≥ 0.6 of the
-  shorter side). `window`, `overlapping`, `page` (2,000 words, `next_from`
-  on a frame floor) and `frameFloor` are TX-13's. `TranscriptFill` is one
+  shorter side). `sameSpeech` is the tool's sentence and `sameSpeechShown`
+  the tab's, by name (TX-36); `NoWords.row` is the tab's row. `window`,
+  `overlapping`, `page` (2,000 words, `next_from` on a frame floor) and
+  `frameFloor` are TX-13's. `TranscriptFill` is one
   per document, keyed by `recipeKey` and dropped when the document closes.
   Owners `want`, `release` and `wait`; one serial `.userInitiated` queue
   reads each media whole through `TranscriptReader.recognize` into
@@ -1351,7 +1359,10 @@ the key map behind it.
   drag), and `savePaneSize`: the timeline height and inspector width are saved
   only from a person's drag of their divider, never a window resize, a
   restore or Hide Inspector (#327; since macOS 12 every resize notification
-  carries `NSSplitViewDividerIndex`, so that key cannot tell them apart).
+  carries `NSSplitViewDividerIndex`, so that key cannot tell them apart); a
+  drag that shows the inspector clears `inspectorCollapsedKey`.
+  `adjustInspector` is ⌥⌘I's `adjustSubviews`, which brings a shown
+  inspector back inside 280–440 pt.
 - `EditorViewController+Timeline` / `+Canvas` / `+Inspector` / `+Toolbar` —
   installing the three panes and the toolbar (transport · timecode — view ·
   Export, nothing else). `+Timeline` holds the delete family, including ⌫
@@ -1392,8 +1403,11 @@ the key map behind it.
   `private(set)` `liveEditBase`. `timelineLiveUpdated`/`timelineLiveEnded`
   are also the inspector's live closures (the Clip tab lane's band drags),
   and `timelineLiveEnded` adds the caption re-time as one more live tick
-  before its crossing test; `+Actions`' `removeSelectedActionCommand`
-  appends the plan too.
+  before its crossing test; `timelineDragUpdated` is the clip drag's tick:
+  a list of more than one op is tried through `SwitchAngle.Trial` and
+  dropped whole on a refusal, so a refused drop past the lanes leaves no
+  empty track; `+Actions`' `removeSelectedActionCommand` appends the plan
+  too.
 - `+AddClips` (Add Text / Add Shape: the front track, else a new one;
   `addGeneratedClip` is internal and takes `grouped:` — `performGroupedEdit`
   when the edit lands outside the menu's event, as a panel's completion does;
@@ -1502,7 +1516,9 @@ the key map behind it.
   (spec §9). Menu items are nil-target selectors down the responder chain.
   `AppDelegate.swift` binds the agent socket at launch, then calls
   `ProjectDocumentController.complainUnlessShared()`, and releases the
-  socket at quit. Copy MCP Command is Settings' MCP pane's (`MCPSettingsPane.swift`,
+  socket at quit; at quit it refuses while an Export… progress sheet
+  writes, after `ExportProgressSheetController.revealWriting()` brings it
+  back (spec §11 #477). Copy MCP Command is Settings' MCP pane's (`MCPSettingsPane.swift`,
   spec §11 MC-7); there is no Tools menu.
   `main.swift` calls `CodecLibraries.probeIfAsked()` straight after
   `DecoderSupport.enable()` (it prints the bundled encoders' versions and
@@ -1544,7 +1560,9 @@ the key map behind it.
   (`tools/proof/text_focus_probe.swift`).
   `EditorKey.isBare` is the bare-key map's modifier rule (⇧ ⇪ always;
   `.numericPad`/`.function` on function-key scalars; never ⌘ ⌥ ⌃), read by
-  `handleEditorKey` (#61).
+  `handleEditorKey` (#61). `CanvasKey.isPlain` is the canvas keys' modifier
+  rule (⇧ ⇪ and the keypad and fn flags) and `CanvasFocus` hands the keys
+  back on a press outside the canvas (K-5).
 
 **Timeline.**
 - `TimelineView.swift` (frozen) · `TimelineLayout.swift` (every ticks ↔
@@ -1652,8 +1670,9 @@ the key map behind it.
   `enabled.video` (the Detach switch) is on, so a detached clip reads as audio.
 
 **Canvas.**
-- `PreviewCanvasView.swift` (frozen, 1124 lines) · `CanvasSessions.swift`
-  · `PreviewCanvasView+TextEditFrame.swift` · `+TextEditKeys` — the picture at
+- `PreviewCanvasView.swift` (frozen, 1073 lines) · `CanvasSessions.swift`
+  · `PreviewCanvasView+TextEditFrame.swift` · `+TextEditKeys`
+  · `PreviewCanvasView+Keys.swift` — the picture at
   document size and the handle gestures. All coordinate mapping goes through
   `viewToCanvas` / `canvasToView`, and every handle maps through
   `AVPlayerLayer.videoRect`, which is the aspect of the BUFFER — the reason
@@ -1671,7 +1690,9 @@ the key map behind it.
   outside an AppKit event). Its `textCommitOp` is the one op both canvas
   commits send (Return or blur, and the sheet's Apply), through
   `TextPatch.contentEdit`, so a timed page whose count changes lands
-  untimed (W-2).
+  untimed (W-2). `+Keys` is the canvas's keys: `handleKey`, `handleKeyUp`,
+  `handleCropKey` (Esc, Return, keypad Enter leave crop mode from
+  `handleEditorKey` too, K-6) and `primaryRefusesCrop`, K-7.
 - `PreviewCanvasView+Obscure.swift` — the selected clip's obscure regions on
   the canvas (spec §11 CI-16): outline, centre and eight resize grips drawn
   through the layer's transform; hit test after the layer's own handles
@@ -1702,7 +1723,16 @@ the key map behind it.
   text clip's width), and every `begin*` and the nudge start from
   `start(of:in:)` — one `clip_state` at the action's end, decoded through
   `InspectorBinding.decode`. A shape's box scale is `.base` whole
-  (`forScale(of:)`): `set_shape` has no action form.
+  (`forScale(of:)`): `set_shape` has no action form. With no action
+  selected a single clip's gesture goes to its first-frame cut when the cut
+  holds a key it writes, and a cut also writes the base (`heldTarget`, spec
+  §11 CI-17); past a finished action that is not a cut and holds a key the
+  gesture writes (a text clip's side handle writes only its width), a
+  gesture whose clip is the whole selection refuses, on its first drag tick
+  (a nudge at once), naming the action's lane number, through `onRefuse` →
+  `canvasRefused` (spec §11 CI-19).
+- `CanvasLayerBox.swift` — a pure move out of `CanvasSessions.swift`; a nest
+  clip's one box from the recipe's `nest`, hit on the pictures inside it.
 
 **Inspector.**
 - `InspectorTab.swift` — `InspectorTab` (Clip, Media, Document, Transcript,
@@ -1842,7 +1872,8 @@ the key map behind it.
   walk to reach it before the controls whose label ink and layer border it
   sets; hovered while keyed it draws × and a click removes the row's keys —
   `InspectorRowTag` ("at end", "now …"), `InspectorClipTag` (Normalize's boxed
-  "clip" while an action is selected, #102), and the binding's mark
+  "clip" while an action is selected, #102, and the list add and remove
+  buttons, CI-18), and the binding's mark
   queries, `selectedActionNumber`, `actionID(number:)` and `clearOps`, the
   ONE `set_action_end` of nulls (a `graphic.props.<key>` path nested one level deeper); `paths` read
   `set_graphic` (`graphic.props.<key>`, and `graphic.<key>` for width/height/length, so those rows
@@ -1941,7 +1972,8 @@ the key map behind it.
   with the Motion Blur row (`video.motion_blur` %, after Blend, greyed by `motionBlurApplies`
   on nest and adjustment clips, spec §11 CU-118 (b));
   +`Transition`,
-  +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
+  +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Filters` — the
+  Filters section, a pure move; +`Speed` — the
   Speed section, Fit to and the "Audio is silent above ×12" note, #190;
   inside an action Rate writes the selected action's `end.speed`
   (`rateRead`, `rateOps`, read through `InspectorBinding.speed(_:)`, which is
@@ -2213,7 +2245,7 @@ the key map behind it.
   the Camera Log section reads.
 
 **Playback and rendering.**
-- `Playback.swift` (+`Meter`, +`PreviewQuality`, +`Step`, +`Scope`, +`Prefetch`) — one
+- `Playback.swift` (+`Meter`, +`PreviewQuality`, +`Step`, +`Scope`, +`Prefetch`, +`Loop`) — one
   `AVPlayer` over the plan's composition; the transport, JKL, the rate KVO; `+Meter` is the level meter, moved out under
   the size rule; `+Scope` also holds `seekFinished()` and `report(_:)`
   (hdr H-3's pure move); `+PreviewQuality` holds `previewComposition`,
@@ -2221,7 +2253,13 @@ the key map behind it.
   player's item through the internal `currentItem` (road map "creator-jobs"
   SW0's toll; `player` stays private). `recompose()` re-colours the player's copy of the
   composition without a rebuild (`previewComposition(…, sdrVersion:)`, the
-  way Preview Quality does): View ▸ Show SDR Version, spec §11 HD-14. **Only a seek someone ASKED for reports a time**:
+  way Preview Quality does): View ▸ Show SDR Version, spec §11 HD-14.
+  `+Loop` holds `loopEnd` (nil for a loop starting at or past the item's end,
+  which stops there) and `itemPlayedToEnd()`: while `loopEnd` is set and the
+  transport is not reversing, `actionAtItemEnd` is `.none`
+  (`syncItemEndAction`), and the periodic observer or the item-end
+  notification wraps it, the notification alone for a loop running past the
+  item (#466). **Only a seek someone ASKED for reports a time**:
   `seek(to:)` is that door, and Playback's own RESTORES — the rebuild's item
   swap and re-seek, the paused refresh's round trip — go through `startSeek`
   silently and report once, only if they come to rest off the last reported
@@ -2993,7 +3031,8 @@ the key map behind it.
   (`ExportWriter` REPLACED `AVAssetExportSession` so chapters, bitrate and
   size have one path) and the one-frame offline render (the generator, or
   `DeepStillFrame.read`'s reader for a frame showing a deep still, §11 PR-9,
-  or a deep VP9 track, §11 PR-12). An export is TWO
+  or a deep VP9 track, §11 PR-12, or re-read when the generator answers 8
+  bits for a frame showing a deeper source, §11 PR-14). An export is TWO
   passes wherever the file holds sound: a measurement build of its own in
   32-bit float (its 10 ms steps kept by `StepLoudnessMeter`, AU-28), then
   the write from the same float decode, normalised or not, through
@@ -3069,7 +3108,9 @@ the key map behind it.
   `render_frame` and Save Frame… as PNG or HEIC): `reads` is PR-9's deep still
   or `shows`, a recipe `track` layer whose composition segment at the frame
   time reads a VP9 file whose `vpcC` bitDepth is above 8 (`isDeep`), spec §11
-  PR-12.
+  PR-12. `showsDeepSource` is PR-14's wider test (`isDeepSource`: a VP9
+  `vpcC`, an HEVC `hvcC` or ProRes), asked after the generator answers an
+  8-bit image.
 - `FrameWriter.swift` — a `CGImage` and a format in, a URL out, no panel:
   Save Frame and `render_frame` both call `writeFrame`, so their PNGs are
   byte-identical by construction; `writeFrame` labels a rendered frame BT.709
@@ -3202,10 +3243,10 @@ free.
   `relay_captions` is in `AgentServer+VerticalVersion.swift`, on main, with no
   `scope` key; its row in `AgentCatalog+Framing.swift` after
   `make_vertical_version`'s.
-- `CaptionImporter.swift` (SubRip grammar) · `CaptionExporter.swift` (`.srt` /
-  `.vtt` from one all-text track, never guessed; a popup built from
-  `NSMenuItem`s carrying `representedObject`, because `addItem(withTitle:)`
-  REMOVES a same-titled row).
+- `CaptionImporter.swift` (SubRip grammar, and WebVTT's header, blocks and time
+  tags) · `CaptionExporter.swift` (`.srt` / `.vtt` from one all-text track,
+  never guessed; a popup built from `NSMenuItem`s carrying `representedObject`,
+  because `addItem(withTitle:)` REMOVES a same-titled row).
 - `CloudTranscriber.swift` (+`Report`, +`Media`) — `TranscriptionEngine` (`apple` |
   `assemblyai`, persisted under `FrameJobCaptionEngine`) and the cloud engine
   over the SAME `Transcriber.Job` / `Outcome` / `CancelToken`. `run` is its
@@ -4342,10 +4383,12 @@ free.
   (`record_screen`; `close_project`; `transcribe` only with
   `engine: "assemblyai"`; every dev tool, from `AgentServer.devToolNames`) and ask-first (`export`,
   `export_captions`, `save_project`, `consolidate_media`, `export_graphic`,
-  and `new_project_from_range` only with `path` — `AssistantToolRow.askOnlyWith`,
+  and `new_project_from_range`, `make_vertical_version`, `new_project`,
+  `render_frame` and `render_graphic` only with `path` — `AssistantToolRow.askOnlyWith`,
   after which the question is nil and the lane runs the call unasked,
-  CJ-52), a reason on every row; the refusal sentence, the question (main only: the path the call
-  writes, tilde-expanded, and whether a file is already there — "REPLACES")
+  CJ-52), a reason on every row; the refusal sentence, the question (main only: the file the call
+  will write, through the handler's own destination, and whether something is already
+  there — "REPLACES"; nil for a call that can only be refused on its path, AI-21)
   and the assistant's catalog, which drops only an unconditional withheld row.
 - `AssistantSession.swift` · `AssistantHelperInput.swift` — one window's
   assistant conversation (road map

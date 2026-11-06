@@ -79,6 +79,27 @@ extension Exporter {
         contentType(for: settings)?.preferredFilenameExtension
             ?? settings.container.lowercased()
     }
+
+    // MARK: - The rules a resolved export can only fail on
+
+    /// What would stop these settings, told before anything is queued or any
+    /// file is touched (spec §11 #470): the image rows' frame limit, and on
+    /// every other row G-33's same-shape rule against the size the composition
+    /// will render at. `export` refuses the call with it and the sheet shows
+    /// it. The writers keep their own checks for `Exporter.export`'s direct
+    /// callers. nil with no plan, which `Exporter.export` refuses itself.
+    static func settingsRefusal(_ settings: ExportSettings, project: ReelProject) -> ExportError? {
+        if settings.isImageSequence {
+            return ImageSequenceWriter.frameCapRefusal(settings, project: project)
+        }
+        guard settings.alpha, let canvas = project.plan?.renderSizeCG else { return nil }
+        do {
+            try ExportWriter.checkAlphaSurvivesTheSize(settings, canvas: canvas)
+            return nil
+        } catch {
+            return (error as? ExportError) ?? .failed(error.localizedDescription)
+        }
+    }
 }
 
 // MARK: - Audio-only settings

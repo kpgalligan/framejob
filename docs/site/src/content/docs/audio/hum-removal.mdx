@@ -1,0 +1,57 @@
+---
+title: "Hum removal"
+description: "Notch out mains hum at 50 or 60 Hz and its harmonics, and leave the voice between them alone."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Hum removal cuts the low electrical hum that mains power can leave on a recording. It places a narrow notch at the mains frequency and at each of its multiples, and leaves the sound between the notches alone.
+
+<AtAGlance where="Clip tab ▸ Sound ▸ Hum" tools="set_audio" />
+
+## Remove hum
+
+<Steps>
+
+1. Select a clip with sound, and open the **Hum** section of the [Sound tab](/audio/sound-tab/).
+
+2. Tick **Remove hum**. It starts at 60 Hz, 30 dB deep, with 4 harmonics.
+
+3. Set **Mains** to the frequency where the recording was made: 50 Hz in most of the world, 60 Hz in most of the Americas and parts of Asia.
+
+4. If you can still hear the hum, raise **Depth** or **Harmonics**.
+
+</Steps>
+
+The other controls are greyed out until **Remove hum** is ticked. **Reset** in the section's header turns hum removal off.
+
+## The controls
+
+| Control | What it does | Range | Default |
+| --- | --- | --- | --- |
+| **Remove hum** | Turns hum removal on. | On or off | Off |
+| **Mains** | The mains frequency where the recording was made. | 50 Hz or 60 Hz | 60 Hz |
+| **Depth** | How far each notch turns the hum down. Quick picks: 12, 24, 30 and 48 dB. | 6 to 60 dB | 30 dB |
+| **Harmonics** | How many notches: the mains frequency and its multiples. Quick picks: 1, 2, 4 and 8. | 1 to 8 | 4 |
+
+At 60 Hz with 4 harmonics, the notches sit at 60, 120, 180 and 240 Hz.
+
+Each notch is about a tenth of the mains frequency wide, whatever its depth, so a notch at 60 Hz is about 6 Hz wide.
+
+## Good to know
+
+- Hum removal runs after the [EQ](/audio/eq/). Its notches appear in the EQ section's drawn curve, but the EQ's **Bypass** doesn't turn them off.
+- Hum removal only reaches the mains frequency and its multiples. For hiss, fans or other steady noise, use [Noise Reduction](/audio/noise-reduction/), which comes after it.
+- With an [action](/audio/animate-sound/) selected, these controls set where the action ends. **Depth** glides across the action. **Mains**, **Harmonics** and turning hum removal on or off change at the action's end, with no glide.
+- Hum removal set on a [nest](/editing/nests/) clip has no effect. Open the nest with <kbd>⌘↓</kbd> and set it on the clips inside.
+
+## With an agent
+
+`set_audio` sets the same controls through `hum`, with `frequency`, `depth_db` and `harmonics`. An empty `hum` turns it on at the defaults and `null` turns it off. See [Tools: clip sound](/mcp/tools-set-audio/#hum-removal).
+
+## Related
+
+- [EQ](/audio/eq/)
+- [Noise Reduction](/audio/noise-reduction/)
+- [How audio works](/audio/how-audio-works/)

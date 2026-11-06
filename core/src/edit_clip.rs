@@ -233,51 +233,60 @@ impl Project {
             delta = -earliest;
         }
 
-        let index_delta = match track {
-            None => 0i64,
-            Some(destination) => {
-                let destination_index = self.require_track_index(destination)? as i64;
-                // The anchor is the FIRST clip of the selection in the
-                // order the timeline draws — back-most track, then earliest
-                // — and the whole selection moves by its offset, which is
-                // what keeps a two-track selection two tracks apart.
-                let mut keyed: Vec<(usize, Ticks, u32)> = Vec::new();
-                for clip in &selection {
-                    keyed.push((self.require_track_index(clip.track)?, clip.start, clip.id));
-                }
-                let anchor = keyed.iter().min().map(|k| k.0).unwrap_or(0) as i64;
-                destination_index - anchor
-            }
-        };
+        let index_delta = self.track_index_delta(&selection, track)?;
 
         let mut candidates: Vec<Clip> = Vec::new();
         for clip in &closure {
             let mut moved = (*clip).clone();
             moved.start = moved.start.saturating_add(delta).max(0);
-            let named = selection.iter().any(|c| c.id == clip.id);
-            if index_delta != 0 && named {
-                let from = self.require_track_index(clip.track)? as i64;
-                let to = from.saturating_add(index_delta);
-                // A selection dragged off either end of the track list is a
-                // refusal and not a clamp — clamping would silently stack
-                // two clips on one track — and it says so in `move_track`'s
-                // own words for the same mistake.
-                let Some(destination) = usize::try_from(to)
-                    .ok()
-                    .and_then(|index| self.tracks.get(index))
-                else {
-                    return Ok(Outcome::Refused(format!(
-                        "clip {} would land on track index {to}, which is out of range (0..{})",
-                        clip.id,
-                        self.tracks.len()
-                    )));
-                };
-                moved.track = destination.id;
+            if selection.iter().any(|c| c.id == clip.id) {
+                match self.landing_track(clip, index_delta)? {
+                    Ok(landed) => moved.track = landed,
+                    Err(why) => return Ok(Outcome::Refused(why)),
+                }
             }
             candidates.push(moved);
         }
 
         self.commit_replacements(candidates)
+    }
+
+    /// How many track indices a selection headed for `track` shifts by: 0
+    /// with no destination. The anchor is the FIRST of `anchors` in the
+    /// order the timeline draws — back-most track, then earliest — and the
+    /// whole selection moves by its offset, which is what keeps a two-track
+    /// selection two tracks apart. `Err` for an unknown track.
+    fn track_index_delta(&self, anchors: &[&Clip], track: Option<u32>) -> Result<i64, String> {
+        let Some(destination) = track else {
+            return Ok(0);
+        };
+        let destination_index = self.require_track_index(destination)? as i64;
+        let mut keyed: Vec<(usize, Ticks, u32)> = Vec::new();
+        for clip in anchors {
+            keyed.push((self.require_track_index(clip.track)?, clip.start, clip.id));
+        }
+        let anchor = keyed.iter().min().map(|k| k.0).unwrap_or(0) as i64;
+        Ok(destination_index - anchor)
+    }
+
+    /// The track `clip` lands on `index_delta` indices along: the outer
+    /// `Err` an unknown track, the inner one the refusal's sentence. A
+    /// selection dragged off either end of the track list is a refusal and
+    /// not a clamp — clamping would silently stack two clips on one track —
+    /// and it says so in `move_track`'s own words for the same mistake.
+    fn landing_track(&self, clip: &Clip, index_delta: i64) -> Result<Result<u32, String>, String> {
+        let from = self.require_track_index(clip.track)? as i64;
+        let to = from.saturating_add(index_delta);
+        let landed = usize::try_from(to)
+            .ok()
+            .and_then(|index| self.tracks.get(index));
+        Ok(landed.map(|track| track.id).ok_or_else(|| {
+            format!(
+                "clip {} would land on track index {to}, which is out of range (0..{})",
+                clip.id,
+                self.tracks.len()
+            )
+        }))
     }
 
     /// The named clips, deduplicated, in the order given. `Err` on an
@@ -354,37 +363,65 @@ impl Project {
         self.finish(next)
     }
 
-    /// Copies the named clips immediately after their own span, on their
-    /// own tracks (spec §6): the copies start one span-length later, so a
-    /// multi-clip selection keeps its internal timing exactly.
+    /// Copies the named clips (spec §6). With no `delta` the copies start
+    /// one span-length later, immediately after their own span; `delta`
+    /// lands them that far from their originals, snapped and clamped at 0
+    /// over the closure as [`Project::move_clips`] clamps, so a multi-clip
+    /// selection keeps its internal timing exactly either way. With no
+    /// `track` each copy stays on its original's track; `track` shifts the
+    /// copies of the NAMED clips as `move_clips` shifts them, anchored on
+    /// them alone, and a linked partner's copy keeps its original's track
+    /// and moves by the one time delta (spec §11 #465, AU-91).
     ///
     /// Clips and their actions get fresh ids, and a linked partner is
     /// copied too, the copies linked to each other (spec §11 AU-96).
-    /// Refuses when the copies would break the overlap rule.
-    pub fn duplicate_clips(&self, clips: &[u32]) -> Result<Outcome, String> {
-        let selection: Vec<Clip> = self
+    /// Refuses when a named clip's copy would leave the track list, or when
+    /// the copies, the partner's included, would break the overlap rule at
+    /// the landing, which is the only place it is asked. `Err` for an
+    /// unknown track.
+    pub fn duplicate_clips(
+        &self,
+        clips: &[u32],
+        delta: Option<Ticks>,
+        track: Option<u32>,
+    ) -> Result<Outcome, String> {
+        let selection = self.selected_clips(clips)?;
+        let closure: Vec<Clip> = self
             .selected_clips(&self.with_links(clips)?)?
             .into_iter()
             .cloned()
             .collect::<Vec<Clip>>();
-        if selection.is_empty() {
+        if closure.is_empty() {
             return Ok(Outcome::Identity);
         }
-        let span_start = selection.iter().map(|c| c.start).min().unwrap_or(0);
-        let span_end = selection.iter().map(clip_end).max().unwrap_or(0);
-        let delta = span_end.saturating_sub(span_start);
-        if delta <= 0 {
-            return Ok(Outcome::Identity);
-        }
+        let span_start = closure.iter().map(|c| c.start).min().unwrap_or(0);
+        let delta = match delta {
+            Some(delta) => self.snapped(delta).max(-span_start),
+            None => {
+                let span_end = closure.iter().map(clip_end).max().unwrap_or(0);
+                let span = span_end.saturating_sub(span_start);
+                if span <= 0 {
+                    return Ok(Outcome::Identity);
+                }
+                span
+            }
+        };
+        let index_delta = self.track_index_delta(&selection, track)?;
 
         let mut next = self.clone();
         let mut copies: Vec<Clip> = Vec::new();
         let mut fresh: HashMap<u32, u32> = HashMap::new();
-        for clip in &selection {
+        for clip in &closure {
             let mut copy = clip.clone();
             next.remint(&mut copy);
             fresh.insert(clip.id, copy.id);
-            copy.start = clip.start.saturating_add(delta);
+            copy.start = clip.start.saturating_add(delta).max(0);
+            if selection.iter().any(|c| c.id == clip.id) {
+                match self.landing_track(clip, index_delta)? {
+                    Ok(landed) => copy.track = landed,
+                    Err(why) => return Ok(Outcome::Refused(why)),
+                }
+            }
             copies.push(copy);
         }
         relink_copies(&mut copies, &fresh);

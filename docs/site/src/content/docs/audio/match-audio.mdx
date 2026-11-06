@@ -1,0 +1,106 @@
+---
+title: "Match Audio"
+description: "Give several clips the loudness and speech tone of one of them, so takes from different microphones or rooms sit together, in one undo step."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Match Audio makes selected clips sound like one of them, the reference. It sets each other clip's loudness and speech tone in one undo step, which helps when two takes came from different microphones or rooms.
+
+<AtAGlance
+  menu="Clip ▸ Match Audio…"
+  tools="match_audio"
+  needs="Nothing. Speech detection runs on your Mac, with no key and no upload."
+/>
+
+## Match clips to a reference
+
+<Steps>
+
+1. Select the clips, including the one that already sounds right. You need at least two clips that could play sound. A nest clip or a clip with no sound doesn't count, and with fewer than two the menu item is greyed out.
+
+2. Choose **Clip ▸ Match Audio…**.
+
+3. In **Match to:**, choose the reference.
+
+4. Leave **Loudness** and **EQ** ticked, or untick the one you don't want. **Match** is greyed out with both off.
+
+5. Choose **Match**.
+
+</Steps>
+
+The Measuring Sound sheet stays up while each clip is measured, which takes a moment on a long clip. It counts "Clip 1 of 3…" as it goes. Nothing changes until every clip is measured, and **Cancel** leaves everything as it is.
+
+When it finishes, the change is one undo step called "Match Audio". The results are ordinary settings in the [Volume](/audio/volume/), [Limiter](/audio/limiter/) and [EQ](/audio/eq/) sections, so you can adjust them afterwards.
+
+The sheet opens with both boxes ticked and the first clip chosen every time. It doesn't remember your last choice.
+
+## Choose the reference
+
+**Match to:** lists the clips in timeline order, by start time and then by track, and the first is chosen. Each row reads `name — track — m:ss (clip id)`, for example `Interview — Track 1 — 0:42 (clip 12)`, so you can tell two clips with the same name apart.
+
+The reference itself isn't changed. Frame Job measures it once as it sounds in the timeline: through its own settings, its limiter and its volume, but without its fades, ducking or Mute. Its loudness at that point is the target for the other clips.
+
+## What Loudness sets
+
+**Loudness** runs [Normalize](/audio/normalize/) in Loudness mode on each other clip, with the reference's loudness as the target. It sets the clip's volume, measured through the clip's settings as they'll be after the match. When the clip's peaks would pass −1 dBTP at that loudness, it also sets the clip's limiter at that ceiling.
+
+A clip so quiet that it needs more than the volume's ceiling of 32× stops there and ends up quieter than the reference.
+
+Loudness doesn't need speech, so you can use it on music by unticking **EQ**.
+
+## What EQ sets
+
+**EQ** gives each other clip the tone of the reference's voice. Frame Job compares the average spectrum of each clip's speech with the reference's, in 23 third-octave bands from 79 Hz to 12.7 kHz. Only speech counts. Frame Job uses the speech saved for [Duck by Speech](/audio/duck-by-speech/) if the clip has any, and otherwise what speech detection found in the file. A clip needs about a second of speech.
+
+Each clip is measured with its EQ's shelves and bands off. The difference, less the overall level, is then fitted with the EQ's low shelf, three bands and high shelf:
+
+- Each gain stays within ±12 dB.
+- Each band's Q stays between 0.5 and 4.
+- A band is only used where the difference is at least 0.5 dB.
+
+Those five parts replace the clip's own. Its high-pass, low-pass and [hum removal](/audio/hum-removal/) stay as they were, and **Bypass** is turned off.
+
+## What stays the same
+
+Match Audio changes only the volume, limiter and EQ. Every other section, the fades, ducking, pan and Mute are left alone.
+
+Choosing **Match** again with the same choice changes nothing. Frame Job beeps and adds no undo step.
+
+## When a clip can't be matched
+
+A clip that can't be matched is skipped, and the others are still matched. No message names a skipped clip, so if one sounds unchanged, check it against the list below.
+
+If the reference can't be used, or nothing can be matched, Frame Job beeps, changes nothing and puts the reason at the foot of the inspector. When the reference is the problem, the message starts "The reference, clip 12,". When every clip fails, it starts "Nothing could be matched." and gives each clip's reason.
+
+| The reason says | What it means | What to do |
+| --- | --- | --- |
+| "is still being analysed — its loudness has not been measured yet" | Frame Job hasn't finished with the file, which often happens straight after an import. | Try again in a moment. |
+| "is still being analysed — its speech has not been detected yet" | The same, for speech. This only applies with **EQ** on. | Try again in a moment, or untick **EQ**. |
+| "plays no sound in this timeline" | Nothing from this clip reaches the mix. | Choose another clip. |
+| "plays for under 0.4 s" | The clip is too short to have a loudness. | Choose a longer clip, or trim this one longer. |
+| "is under −70 LUFS" | There's no sound to match. | Choose another clip. |
+| "has under 1 s of speech" | The part that plays has too little speech to measure a tone. | Untick **EQ**, or choose a clip with more speech. |
+| "has under 12 third-octave bands within 50 dB of its loudest" | The reference's sound is too narrow to match a tone to. | Choose another reference, or untick **EQ**. |
+| "shares under 12 third-octave bands with the reference" | This clip and the reference have too little of the spectrum in common. | Match this clip again with **EQ** unticked. |
+
+If the project changes while the clips are being measured, nothing is applied. Frame Job beeps, and the foot of the inspector says "the project changed while its sound was being measured, so nothing changed. Choose Match Audio again."
+
+## Good to know
+
+- Match Audio matches the average tone of speech. It doesn't match the room, reverb, noise or dynamics. For those, see [Voice Isolation](/audio/voice-isolation/), [Noise Reduction](/audio/noise-reduction/) and the [Compressor](/audio/compressor/).
+- You match to a clip, not to a track or a whole mix. To bring clips to a loudness you choose rather than to one another, use [Normalize](/audio/normalize/).
+- Like Normalize, it changes each clip's own settings even with an [action](/audio/animate-sound/) selected. The action itself stays as it was.
+- With a [nest](/editing/nests/) open, it works on the clips inside the nest.
+
+## With an agent
+
+`match_audio` takes the reference and the clips directly, with no sheet. Unlike the menu, it reports what happened to each clip: the settings it changed, the loudness figures, how closely the EQ fits, and each skipped clip with its reason. The call can take seconds on a long clip. A nest can't be matched or used as the reference, the call fails if Loudness and EQ are both off, and a second identical call reports "Match Audio made no change". See [Tools: audio](/mcp/tools-audio/#match_audio).
+
+## Related
+
+- [Normalize](/audio/normalize/)
+- [Enhance Voice](/audio/enhance-voice/)
+- [EQ](/audio/eq/)
+- [Limiter](/audio/limiter/)

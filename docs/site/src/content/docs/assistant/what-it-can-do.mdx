@@ -1,0 +1,173 @@
+---
+title: "What the Assistant can do"
+description: "What you can ask the Assistant for, job by job, how it checks its work, and where its limits are."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The Assistant edits the project in its own window. You ask in plain words, it makes the edits one at a time, and each one lands where you can see it. Almost all of them [can be undone](#each-edit-is-an-undo-step). This page goes through what you can ask for, job by job, and where the limits are.
+
+<AtAGlance
+  menu="View ▸ Assistant"
+  keys="⌃⌘A"
+  where="Inspector ▸ Assistant tab"
+  tools={['get_project', 'render_frame', 'undo', 'redo']}
+  needs="Your own Anthropic API key"
+/>
+
+## The same tools as MCP
+
+The Assistant works by calling tools, one for each job. They're the same tools an outside AI agent uses when it connects to Frame Job [over MCP](/mcp/overview/), so anything here is something an agent can do too. There are a few exceptions, listed in [What it won't do](/assistant/what-it-will-not-do/), and some tools that write files [ask you first](/assistant/what-it-will-not-do/#tools-it-asks-about-first).
+
+Four tools are always at hand: reading the project, rendering a frame, undo and redo. It finds every other tool by searching for what it wants to do, so you never need to name one. A tool kept from it outright doesn't turn up in that search at all.
+
+Each job below lists its tools, because those are the names you'll see in the [tool call lines](/assistant/conversation/#tool-call-lines). [All tools](/mcp/tools/) describes each one.
+
+## What you can ask for
+
+Ask in your own words, for example "put a title over the first five seconds". You don't need to know which job a request falls under. See [Chat with the Assistant](/assistant/chat/) for how to send one.
+
+### Projects and navigation
+
+It can open, create and save projects, move the playhead, set the in and out range, change the selection, and enter or leave a nest. It can also make a [new project from a range](/projects/new-project-from-range/) or a [vertical version](/framing/make-vertical-version/).
+
+Saving asks first. Making a blank new project, a new project from a range or a vertical version asks first when it names where to save. Moving the playhead, setting the range and changing the selection aren't edits, so they make no undo step.
+
+A project it opens or creates gets a window of its own, and the Assistant stays with the project it started in.
+
+<AtAGlance tools={['open_project', 'new_project', 'new_project_from_range', 'make_vertical_version', 'save_project', 'set_playhead', 'set_range', 'set_selection', 'set_scope']} />
+
+### Tracks, markers and the canvas
+
+It can add, remove and reorder tracks, remove the empty ones, rename a track, hide, mute, solo or lock one, and set its [matte](/canvas/matte-tracks/) and [mix](/audio/track-volume-and-pan/). It can add, move, rename and remove [markers](/timeline/markers/), make one a chapter, and set its colour, which you can't do yourself. It can change the canvas's [size](/projects/canvas-size/), [frame rate](/projects/frame-rate/) and [background](/projects/background-and-timecode/).
+
+<AtAGlance tools={['add_track', 'remove_track', 'move_track', 'set_track', 'remove_empty_tracks', 'add_marker', 'set_marker', 'remove_marker', 'set_canvas']} />
+
+### Media
+
+It can [import](/projects/import-media/), [relink](/projects/relink-media/) and [remove](/projects/remove-media/) media, [copy it into the project](/projects/consolidate-media/) and set a file's [Camera Log](/hdr/camera-log/). Copying into the project asks first.
+
+It can also save where a file's speech is, read the [on-device analysis](/projects/media-analysis/) of a file, and attach or read a recording's [cursor file](/recording/cursor-files/).
+
+<AtAGlance tools={['import_media', 'add_media', 'relink_media', 'remove_media', 'set_media_color', 'set_media_speech', 'consolidate_media', 'get_media_analysis', 'set_media_cursor', 'get_cursor_events']} />
+
+### Placing clips
+
+It can place media, [text](/text-and-shapes/text-clips/), [shapes](/text-and-shapes/shape-clips/), [backgrounds](/canvas/backgrounds/), [adjustment clips](/color/adjustment-clips/) and [graphics](/graphics/insert-a-graphic/). It can [insert and overwrite](/editing/insert-and-overwrite/), paste and duplicate, and put [text behind a subject](/effects/text-behind-subject/).
+
+<AtAGlance tools={['add_clip', 'add_text_clip', 'add_shape_clip', 'add_adjustment_clip', 'add_background', 'add_blurred_background', 'text_behind_subject', 'insert_clip', 'overwrite_clip', 'paste', 'duplicate', 'insert_graphic']} />
+
+### Editing clips
+
+It can [move](/editing/move-clips/), [trim](/editing/trimming/), [split](/editing/splitting/), [slip and roll](/editing/slip-and-roll/), [rate-stretch](/speed/rate-stretch/), [ripple-delete and lift](/editing/delete-clips/), [insert time and close gaps](/editing/close-gaps/). It can [detach audio and attach it again](/audio/detach-and-attach/) and make [J-cuts and L-cuts](/audio/j-and-l-cuts/).
+
+For several cameras or long recordings it can [split at shot changes](/editing/split-at-shot-changes/), [copy pieces to another track](/multicam/copy-pieces/), [switch a shot's angle](/multicam/switch-angle/) and [switch by speaker](/multicam/switch-by-speaker/).
+
+<AtAGlance tools={['move_clip', 'trim_start', 'trim_end', 'rate_stretch', 'slip', 'roll', 'split', 'delete', 'ripple_delete', 'ripple_delete_range', 'ripple_delete_ranges', 'lift_range', 'insert_time', 'close_gap', 'detach_audio', 'attach_audio', 'split_at_shots', 'copy_pieces', 'switch_angle', 'switch_by_speaker']} />
+
+### Nests
+
+It can [nest clips](/editing/nests/) or take a nest apart. An edit lands in whichever timeline the window is showing, unless the Assistant names a nest, and it can [open a nest](/editing/inside-a-nest/#open-a-nest) as you do. Markers belong to the timeline, never to a nest.
+
+<AtAGlance tools={['nest', 'unnest']} />
+
+### Speed
+
+It can [set a clip's speed](/speed/change-speed/), [reverse a clip](/speed/reverse/), [freeze a frame](/speed/freeze-frame/), add [speed ramps](/speed/make-a-ramp/), [retime a range](/speed/retime-range/) and [speed up the typing](/recording/speed-up-typing/) in a screen recording.
+
+<AtAGlance tools={['set_speed', 'set_reversed', 'freeze_frame', 'add_speed_ramp', 'retime_range', 'speed_up_typing']} />
+
+### Look and sound
+
+It can change how a clip looks and sounds: position, scale, crop, colour, filters, volume, fades, text and its style, and shapes. It can rename or label a clip, turn its picture or sound off, and [paste attributes](/editing/paste-attributes/).
+
+It can also work with [transitions](/motion/transitions/), [actions](/motion/actions/) and [zooms](/motion/zoom-to-region/), including [Auto Zoom](/recording/auto-zoom/), and with [Remove Background](/effects/remove-background/), [camera layouts](/framing/camera-layouts/) and [reframing](/framing/reframe-clip/).
+
+<AtAGlance tools={['set_video', 'set_audio', 'set_text', 'set_shape', 'set_clip', 'set_enabled', 'paste_attributes', 'analyze_cutout', 'add_transition', 'set_transition', 'set_transition_duration', 'set_transition_style', 'add_action', 'add_zoom_action', 'auto_zoom', 'switch_layout', 'reframe_clip', 'set_action', 'set_action_end', 'remove_action']} />
+
+### Captions and words
+
+It can [import captions](/captions/import-captions/), [transcribe on this Mac](/captions/on-device-transcription/), read a clip's or the whole timeline's timed words, [re-lay word captions](/captions/re-lay-captions/) for the canvas, and [export captions](/captions/export-captions/).
+
+Transcribing runs on this Mac only, because the Assistant can't send audio to the cloud. Exporting captions asks first.
+
+<AtAGlance tools={['import_captions', 'transcribe', 'get_transcript', 'get_timeline_transcript', 'relay_captions', 'export_captions']} />
+
+### Audio clean-up
+
+It can find [silences](/cleanup/remove-silences/) and [filler words](/cleanup/remove-filler-words/) and [cut them](#cut-words-by-asking), [normalise](/audio/normalize/) loudness, [enhance a voice](/audio/enhance-voice/), [match one clip's sound to another](/audio/match-audio/) and [synchronise audio](/audio/synchronize-audio/).
+
+<AtAGlance tools={['detect_silence', 'detect_fillers', 'normalize_clip', 'enhance_voice', 'match_audio', 'sync_audio']} />
+
+### Graphics
+
+It can write, change, place, render, rename, delete, restore, export and import graphics, import their fonts and pictures, and add [shortcut overlays](/recording/shortcut-overlays/). Exporting a graphic asks first. See [Graphics with an agent](/graphics/agents-and-graphics/#the-assistant).
+
+<AtAGlance tools={['add_graphic_clip', 'set_graphic', 'write_graphic', 'get_graphic', 'graphic_reference', 'render_graphic', 'import_graphic_font', 'import_graphic_asset', 'delete_graphic', 'rename_graphic', 'restore_graphic', 'list_graphics', 'insert_graphic', 'export_graphic', 'import_graphic', 'add_shortcut_overlays']} />
+
+### Export
+
+It can [export](/export/export-sheet/), check how an export is going, or cancel it. Exporting asks first, because it writes a movie and replaces any file already there.
+
+<AtAGlance tools={['export', 'export_status', 'cancel_export']} />
+
+## Cut words by asking
+
+You can ask the Assistant to take out filler words, silences or a false start, for example "cut the false start at the beginning of this clip." It cuts each request as one undo step, labelled **Undo Ripple Delete** rather than with the sheet's name.
+
+Its filler search reads only media that already has a cloud transcript made with filler words, and it can't upload audio to make one. In other media the search finds nothing, and it reports which media has no such transcript. To start the paid transcription, press **Transcribe** in the [Remove Filler Words](/cleanup/remove-filler-words/) sheet yourself.
+
+It removes a false start only when you ask, because deciding what counts as one is a judgement of meaning. It reads the words and their times, says which it will cut, then cuts them. The words come from a transcript the file already has or from this Mac's own speech recogniser, so no audio is uploaded. There's no menu command for this.
+
+See [Cut false starts](/cleanup/false-starts/).
+
+## It looks at rendered frames
+
+The Assistant checks its work by rendering a frame of the finished timeline, drawn the way an export draws it. It's told to look before and after a visual edit. It renders at the playhead unless it picks a time, and it's told to keep the image small.
+
+Rendering writes a temporary picture file [without asking](/assistant/what-it-will-not-do/#file-writes-that-do-not-ask). Rendering to a path it chose [asks first](/assistant/what-it-will-not-do/#what-each-question-reads).
+
+:::note
+The frames it renders go to Anthropic, along with your messages and the project's details. See [Assistant privacy](/assistant/privacy/).
+:::
+
+Earlier renders don't survive compaction, so it renders again when it needs to look. See [Long conversations](/assistant/context-and-compaction/).
+
+## Each edit is an undo step
+
+Every edit the Assistant makes is its own undo step on the project, the same as your own, and **Edit ▸ Undo** names it after the edit. A turn isn't grouped, so a turn that made ten edits takes ten undos.
+
+Graphics files are the exception. Writing, restoring, deleting or importing a graphic, and importing a font or picture for one, change files in the project and make no undo step. See [Undo rules](/graphics/agents-and-graphics/#undo-rules).
+
+To take back its last change, press <kbd>⌘Z</kbd> outside the message field. You can also ask the Assistant to undo or redo.
+
+## How it behaves
+
+- **Short replies.** A reply is a sentence or two, and it doesn't repeat what the tool lines already show.
+- **Captions only on request.** It writes or restyles a caption only when you ask.
+- **Medium effort, thinking on.** The model always runs with these two Anthropic settings, and Frame Job's Settings has no control for them. The faint [working notes](/assistant/conversation/#working-notes) are its thinking updates.
+
+## Only its own window's project
+
+The Assistant acts only on the project in its own window, and each window has its own conversation. A tool call that names another project doesn't run, and the transcript shows a `failed:` line: `The assistant edits its own window's project, …; … is a different project.`
+
+If its project has closed, a tool call fails with "The assistant's project is no longer open."
+
+## Limits
+
+- It works only on the project in its own window, and each window has its own conversation.
+- It needs your own Anthropic API key. There's no Frame Job account. See [Set up the Assistant](/assistant/set-up/).
+- It can't record, close its window's project, or send audio to the cloud transcriber.
+- A tool call that arrives during a drag waits until you release the mouse. See [While you are dragging](/assistant/stop-a-turn/#while-you-are-dragging).
+- **Stop** doesn't cancel an export that's already been queued. See [Stop a turn](/assistant/stop-a-turn/).
+- With [compaction](/assistant/context-and-compaction/) off, a long conversation eventually fails until you **Clear** it.
+- Changing the key or the model ends every window's conversation.
+
+## Related
+
+- [Chat with the Assistant](/assistant/chat/)
+- [Read the conversation](/assistant/conversation/)
+- [What it won't do and what it asks first](/assistant/what-it-will-not-do/)
+- [Cut false starts](/cleanup/false-starts/)
+- [Assistant privacy](/assistant/privacy/)
+- [All tools](/mcp/tools/)

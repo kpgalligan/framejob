@@ -326,28 +326,28 @@ func rowL4() {
             + "Record button (File ▸ New Recording…)."),
         ("transcribe", ["engine": "assemblyai"],
          "transcribe with engine \"assemblyai\" is not available to the assistant: Audio "
-            + "leaves the machine only by name, with the price in front of the person (spec "
-            + "§11 R6-2). Use File ▸ Generate Captions…, which shows what is uploaded and what "
-            + "it costs."),
+            + "leaves the machine only by name, with the price in front of the person. Use "
+            + "File ▸ Generate Captions… instead."),
         ("transcribe_for_fillers", ["media": 1],
          "transcribe_for_fillers is not available to the assistant: Audio leaves the machine "
-            + "only by name, with the price in front of the person (spec §11 R6-2). Use Clip ▸ "
-            + "Remove Filler Words…, which shows what is uploaded and what it costs."),
+            + "only by name, with the price in front of the person. Use Clip ▸ Remove Filler "
+            + "Words… instead."),
         ("snapshot_ui", [:],
-         "snapshot_ui is not available to the assistant: a developer tool (spec §11 V-1): "
-            + "Distribution has none, and the assistant sees one catalog in both builds."),
+         "snapshot_ui is not available to the assistant: a developer tool: Distribution has "
+            + "none, and the assistant sees one catalog in both builds."),
         ("close_project", [:],
          "close_project is not available to the assistant: Closing a project closes the "
-            + "window this conversation lives in (AI-5); the person closes it with File ▸ "
-            + "Close (⌘W)."),
+            + "window this conversation lives in; the person closes it with File ▸ Close "
+            + "(⌘W)."),
     ]
     var ok = true
     var details: [String] = []
     for (tool, arguments, expected) in cases {
         let result = wait(submit(tool, arguments, d, hook))
-        let same = isError(result) && text(result) == expected
+        // The helper's transcript line keeps 200 characters of a tool's answer.
+        let same = isError(result) && text(result) == expected && text(result).count <= 200
         ok = ok && same
-        details.append("\(tool): refused as written \(same)")
+        details.append("\(tool): refused as written in \(text(result).count) characters \(same)")
     }
     let served = wait(serve("snapshot_ui", [:]), 60)
     let notLane = served != nil && !text(served).contains("is not available to the assistant")

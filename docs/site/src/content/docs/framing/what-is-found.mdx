@@ -1,0 +1,72 @@
+---
+title: "Subjects in the picture"
+description: "What Frame Job finds in a clip's picture on this Mac, what it doesn't know about the people in it, and when a file gets analysed."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Frame Job can find who and what is in a clip's picture: faces, people and the parts the eye goes to first. Its framing tools use this to keep a subject in shot on a canvas of a different shape.
+
+<AtAGlance
+  menu={['Clip ▸ Follow Subject…', 'File ▸ Make Vertical Version…', 'View ▸ Show Subjects']}
+  tools={['get_media_analysis', 'reframe_clip', 'make_vertical_version']}
+  needs="Nothing. Apple's Vision framework does this on your Mac, with no key and no upload."
+/>
+
+## What is found
+
+Frame Job samples the picture ten times a second of the file's own time, so a clip you've slowed down or sped up doesn't change what's found. It keeps three things from each sample.
+
+### Faces
+
+Each face's box, how it's turned, and how open the mouth is. Faces in a sample are listed from left to right. An agent reads them with `get_media_analysis`, kind `faces`. See [Faces](/projects/media-analysis/#faces) under media analysis.
+
+### People
+
+Each person's head and shoulders, as a box. A person's box can stand in for their face while the face can't be found. An agent reads people with `get_media_analysis`, kind `subjects`.
+
+### Salient regions
+
+The parts of the picture the eye goes to first, as boxes. In a talking-head shot that's usually the speaker, and on a slide it's often the text. An agent reads them with kind `subjects`, beside the people. See [People and salient regions](/projects/media-analysis/#people-and-salient-regions) under media analysis.
+
+[Show Subjects](/framing/show-subjects/) draws all three over the preview, so you can see what Frame Job has to work with.
+
+## Boxes, not people
+
+Each sample stands alone. A box has no name, and nothing records that a box in one sample is the same person as a box in the next. Frame Job never puts a name to a face, and it doesn't recognise anyone.
+
+[Follow Subject](/framing/follow-subject/#which-subject-it-follows) works out who's who for itself each time, from how the boxes overlap from one sample to the next. That reasoning isn't kept, and it stops at a shot change. Someone who leaves the shot for more than a second and comes back counts as someone new.
+
+## When a file is analysed
+
+Importing a file doesn't look for any of this. It's found when something asks for it:
+
+- **Clip ▸ Follow Subject…**
+- **File ▸ Make Vertical Version…**
+- [**Clip ▸ Switch by Speaker…**](/multicam/one-microphone/), when it cuts from faces
+- An agent, with `get_media_analysis`, `reframe_clip`, `make_vertical_version` or `switch_by_speaker`
+
+Follow Subject, Make Vertical Version and `reframe_clip` ask only for the part of the file each clip plays, plus a second either side. **View ▸ Show Subjects** never asks, so turning it on costs nothing.
+
+Analysis runs in the background and saves what it has found every 30 seconds, so stopping it keeps what's been saved. Asking again continues from there, and a part that's already been analysed isn't read again. What's found is kept in the project's cache. A change to the file, or a macOS update, means it's analysed again.
+
+[On-device media analysis](/projects/media-analysis/#analysis-happens-on-demand) covers this in full, along with everything else Frame Job analyses on your Mac, including [the Analyzing sheet](/projects/media-analysis/#the-analyzing-sheet) and [how background jobs run](/projects/media-analysis/#analysis-runs-in-the-background).
+
+## What uses it
+
+| Feature | What it uses |
+| --- | --- |
+| [Follow Subject](/framing/follow-subject/) | Faces, people and salient regions, to frame the selected clips |
+| [Make Vertical Version](/framing/make-vertical-version/) | The same, to frame a whole timeline on a tall or square canvas |
+| [Follow the speaker in a vertical](/framing/follow-speaker/) | Faces and how open each mouth is, to match each microphone to a face |
+| [Cut from faces with one microphone](/multicam/one-microphone/) | Faces and how open each mouth is, to tell who's talking |
+| [Show Subjects](/framing/show-subjects/) | All three, drawn over the preview |
+
+An agent can frame a clip with the same analysis. See [Reframe a clip (agents)](/framing/reframe-clip/).
+
+## Related
+
+- [Show Subjects](/framing/show-subjects/)
+- [Follow Subject](/framing/follow-subject/)
+- [Make Vertical Version](/framing/make-vertical-version/)
+- [On-device media analysis](/projects/media-analysis/)

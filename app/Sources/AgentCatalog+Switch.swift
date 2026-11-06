@@ -92,7 +92,8 @@ extension AgentServer {
                     + "new track \"Program\" directly in front of the front-most angle (or, with "
                     + "track, that track cleared over the range), one copy_pieces per angle clip "
                     + "a shot crosses (picture on, sound off), the angle tracks hidden — or, "
-                    + "when an angle track holds clips outside the range, its clips split at the "
+                    + "when an angle track holds clips outside the range or a clip without a "
+                    + "picture, its clips split at the "
                     + "range's ends with their pictures off inside — and, with mute_cameras, the "
                     + "cameras' own sound off inside the range (never on a microphone's track). "
                     + "Nothing outside the range changes and the microphones are never edited. "
@@ -143,7 +144,8 @@ extension AgentServer {
                     ],
                     "wide": [
                         "type": ["integer", "null"],
-                        "description": "The angle shown when nobody or everybody talks; null for "
+                        "description": "The wide angle, which opens the cut and shows during "
+                            + "crosstalk (while nobody talks the current shot holds); null for "
                             + "none. Default: the one angle no speaker uses, when exactly one is "
                             + "left; none in the faces mode. Named without speakers, a speaker on "
                             + "it who shares a microphone takes no part.",

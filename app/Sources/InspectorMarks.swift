@@ -252,7 +252,8 @@ final class InspectorRowTag: NSTextField, OptionControl {
 
 /// The handoff's boxed mono 9 "clip" tag after a lone ⊘ button in an
 /// animatable section — Normalize, which writes the clip whatever action is
-/// selected (#102). Shown while an action is selected, CI-7's ⊘ condition.
+/// selected (#102), and the list add and remove buttons of Filters and
+/// Obscure (CI-18). Shown while an action is selected, CI-7's ⊘ condition.
 /// Its own view: `OptionButtonControl` is shared chrome and is not forked.
 final class InspectorClipTag: NSView, OptionControl {
     static let text = "clip"
@@ -299,13 +300,15 @@ final class InspectorClipTag: NSView, OptionControl {
 // MARK: - The mark queries
 
 extension InspectorBinding {
-    /// The `"group.key"` paths a list of ops writes: `set_video`, `set_audio`
-    /// and `set_text` by their patch's keys, `set_graphic` and an end's
+    /// The `"group.key"` paths a list of ops writes: `set_video`, `set_audio`,
+    /// `set_text` and `set_shape` by their patch's keys, `set_graphic` and an end's
     /// `graphic` by `graphicPaths`, `set_action_end` by each group of its
     /// patch, and `set_speed` by `speed`, the end's top-level rate key (spec
     /// §11 SR-21 (c)); every other op (a trim, a reverse) writes none.
     static func paths(of ops: [ReelOp]) -> [String] {
-        let groups = ["set_video": "video", "set_audio": "audio", "set_text": "text"]
+        let groups = [
+            "set_video": "video", "set_audio": "audio", "set_text": "text", "set_shape": "shape",
+        ]
         var found = Set<String>()
         for op in ops {
             if op.name == "set_speed" {

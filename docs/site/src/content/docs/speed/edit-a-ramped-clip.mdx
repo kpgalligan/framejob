@@ -1,0 +1,100 @@
+---
+title: Edit a ramped clip
+description: What a speed change, trim, split or freeze frame does to a clip with a speed ramp, and why Frame Job sometimes won't make the edit.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Once a clip has a [speed ramp](/speed/speed-ramps/), your ordinary edits still work on it. This page says what each one does to the ramp, and what stops an edit that would break it.
+
+<AtAGlance
+  menu="Clip ▸ Speed…"
+  where={['Clip tab ▸ Clip ▸ Speed section', '⌥-drag a clip\'s end edge', 'The action lane']}
+  tools={['set_speed', 'rate_stretch', 'set_action']}
+/>
+
+## Scale a whole ramp
+
+These all change a ramped clip's speed by scaling the whole ramp by one factor:
+
+- **Clip ▸ Speed…**
+- **Rate** in the [Speed section](/speed/speed-section/), with no action selected
+- **Fit to** in the Speed section
+- The ⌥ [rate stretch](/speed/rate-stretch/) on the clip's end edge
+- [Retime Range](/speed/retime-range/), for the part of the clip inside the range
+
+The clip's own rate, every end rate and the length of every Speed action scale together, so the ramp keeps its shape and the clip still plays the same stretch of its file. The clip itself gets shorter or longer. A ramp from ×1 to ×2 scaled by ×2 becomes a ramp from ×2 to ×4, in half the time. With a ramped clip selected, the Speed sheet's readout ends "Each speed ramp keeps its shape: the rates it names scale with the base rate."
+
+No rate in a clip can go below ×0.1 or above ×1000, and what happens at those limits depends on how you made the change:
+
+| You used | At a limit |
+| --- | --- |
+| **Speed…**, **Rate** or **Fit to** | Scaling stops at the limit, so the clip's rate can end up short of the rate you asked for. |
+| The ⌥ rate stretch | The clip stops following the drag at the last length inside the limits. |
+| Retime Range | Frame Job won't make the edit, and the reason names the clip and the rate. |
+
+To change one rate inside the ramp instead, select its action. **Rate** then sets that action's end rate. See [Build a ramp by hand](/speed/build-a-ramp/).
+
+## Edits follow the ramp
+
+Trims, slips, rolls, splits, freeze frames and transitions all read the ramp, so each cut or held frame is the frame the ramp actually plays at that moment.
+
+| Edit | What it does on a ramped clip |
+| --- | --- |
+| [Trim](/editing/trimming/) the start | The frame under the edge stays put. The Speed actions stay the same distance from the clip's start, so what plays after the new start can change. The edge stops where the clip would otherwise play past the end of its file. |
+| Trim the end | The Speed actions don't move. How far you can pull the end out depends on the rate the clip reaches, not on its own rate. |
+| [Roll](/editing/slip-and-roll/) | The later clip's start behaves as a start trim, and the earlier clip's end as an end trim. |
+| [Slip](/editing/slip-and-roll/) | The source moves at the clip's own rate, and the Speed actions stay where they are. It stops so the clip never plays past the end of its file. |
+| [Split](#split-inside-a-speed-action) | The two halves meet at the frame the ramp plays at the cut, and the second half starts at the rate playing there. |
+| [Freeze frame](/speed/freeze-frame/) | The still holds the frame the ramp plays at that moment. |
+| [Transition](/motion/add-a-transition/) | The overlap follows the ramp. The earlier clip carries on past its old end, and the extra footage before the later clip's start plays at that clip's own rate. The later clip still ends on the same frame of its file. |
+| [Detach Audio](/audio/detach-and-attach/) | The separate audio clip gets the same ramp. |
+
+[**Edit ▸ Paste Attributes**](/editing/paste-attributes/) never copies a speed or a ramp.
+
+Transcribing a ramped clip places each word where the ramp plays it. Captions already on the timeline [follow a later change to the ramp](/speed/captions-and-speed/).
+
+## Split inside a Speed action
+
+Splitting partway through a Speed action keeps the picture continuous at the cut, with no repeated or skipped frame. The action becomes two, one on each half. The first ends at whatever rate makes the picture meet at the cut, and the second keeps the original end rate.
+
+The action's curve matters here:
+
+- With **Out** or **In Out**, the rate can jump at the cut.
+- With **In** or **In Out**, the second half can end on a different frame of the file than the unsplit clip did. If it would then play past the end of the file, its end rate is lowered to the largest that fits.
+
+## Filmstrip and waveform
+
+A ramped clip's filmstrip and waveform follow the ramp, so what you see at a point on the timeline is what plays there. A stretch at a high rate shows more of the file in the same space.
+
+## An action past the clip's end
+
+After a trim, or after a ramp is scaled, a Speed action can lie partly or wholly past the clip's end. It stays on the clip. While any of its band shows, you can still change its curve, move it earlier or shorten it, and being past the end stops only a change that takes it further past. An action wholly past the end has no band you can reach.
+
+Its end rate still counts for the [×12 rule](/speed/sound-at-high-speed/), even though that part never plays. If a clip is silent though it never seems to pass ×12, look for an action like this.
+
+## When a ramp edit can't be made
+
+A ramped clip keeps its place and its length on the timeline, so a ramp can't play past the end of the clip's file. Frame Job won't make an edit that would, and the reason says what would fit: the largest rate, or the latest clip end. [Never past the end of the file](/speed/speed-ramps/#never-past-the-end-of-the-file) lists what each edit names.
+
+**Clip ▸ Speed Ramp…** has a few more conditions, such as a span that overlaps another action. See [When Apply is unavailable](/speed/make-a-ramp/#when-apply-is-unavailable).
+
+A clip with [detached sound](/audio/detach-and-attach/) is linked to its audio, so no speed or ramp edit will change it. The reason says to use Attach Audio first.
+
+Whatever stops the edit, nothing changes. Frame Job beeps, makes no undo step, and shows the reason:
+
+- **At the foot of the inspector**, after the word "Refused:". It stays until the project changes or you click it. See [When an edit is refused](/getting-started/refused-edits/).
+- **In the Speed Ramp sheet's readout**, as you adjust the sheet, so nothing has been applied and there's no beep. **Apply** is dimmed until the preset fits.
+
+Dragging is different. There's no beep and no reason. An action's band stays at the last place that worked, and a [rate stretch](/speed/rate-stretch/) of a linked clip doesn't move at all.
+
+A reason can give a time in ticks, the unit Frame Job counts time in. There are 600,000 ticks in a second, so 1,200,000 ticks is 2 seconds.
+
+## Related
+
+- [Speed ramps](/speed/speed-ramps/)
+- [Make a speed ramp](/speed/make-a-ramp/)
+- [Build a ramp by hand](/speed/build-a-ramp/)
+- [Sound on a ramp](/speed/ramp-audio/)
+- [Captions follow a speed change](/speed/captions-and-speed/)
+- [When an edit is refused](/getting-started/refused-edits/)

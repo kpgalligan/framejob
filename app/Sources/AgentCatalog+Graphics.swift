@@ -79,7 +79,8 @@ extension AgentServer {
                     + "diagnostics [{level, message, line, column, frame}]. A module that does "
                     + "not compile is an answer, not an error: ok is false and the diagnostics "
                     + "say where; fix the source and write it again. With ok true, diagnostics "
-                    + "are the module's top-level warnings (e.g. asset() outside render). "
+                    + "are the module's top-level warnings (e.g. asset() naming a file not in "
+                    + "graphics/assets/). "
                     + "clips lists the clips "
                     + "drawn by it, which redraw with the new text at once. A file write is "
                     + "not undoable and does not mark the project edited, but the text it "
@@ -224,10 +225,11 @@ extension AgentServer {
                     + "module draws it with <image href=\"${asset(name)}\">; answers every "
                     + "asset the folder now holds. Anything else, and an empty file, is "
                     + "refused. A file of the same name is replaced (replaced is true). A name "
-                    + "asset(name) cannot use (a leading . or #, any of / : \" ' < > &, a control "
+                    + "asset(name) cannot use (a leading . or #, any of : \" ' < > &, a control "
                     + "character, more than 247 bytes) is filed under a legal one — name says "
                     + "which, renamed_from what was asked; a renamed copy never replaces, it "
-                    + "takes -2, -3 and so on. Not undoable. Mirrors File ▸ Add Image to Graphics…",
+                    + "takes -2, -3 and so on. A name holding / is refused. Not undoable. "
+                    + "Mirrors File ▸ Add Image to Graphics…",
                 [
                     "path": [
                         "type": "string",

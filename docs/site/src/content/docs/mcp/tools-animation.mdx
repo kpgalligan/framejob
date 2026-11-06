@@ -1,0 +1,240 @@
+---
+title: "Tools: animation"
+description: Add actions to a clip from an agent, set what they animate to, zoom to a region, and move, re-curve or remove them.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+An [action](/motion/actions/) is a span on a clip over which its properties ease from what they are to an end state. These tools add one, say what it ends at, change its timing and take it away.
+
+<AtAGlance
+  tools={['add_action', 'add_zoom_action', 'set_action', 'set_action_end', 'remove_action']}
+  menu="Clip ▸ Add Action"
+  keys="⌥⌘K"
+  where="Clip tab ▸ action lane"
+/>
+
+The usual order is two calls. First, `add_action` with these arguments:
+
+```json
+{ "clip": 12, "at": 600000, "duration": 1200000 }
+```
+
+Then `set_action_end`, with the id it answered in `new_actions`:
+
+```json
+{ "clip": 12, "action": 40, "patch": { "video": { "scale": 1.4 } } }
+```
+
+Every time here is in ticks, 600,000 to the second, and is rounded to the project's frame grid. See [Units and ids](/mcp/units-and-ids/). An action's times are clip time, measured from the clip's own start, not the timeline's. `get_project` lists each clip's actions and their ids.
+
+For a speed ramp in one step, see [`add_speed_ramp`](/mcp/tools-speed/#add_speed_ramp).
+
+## `add_action`
+
+Adds an action to a clip. Its end state starts empty, so nothing changes until `set_action_end` fills it in. It mirrors **Clip ▸ Add Action** (<kbd>⌥⌘K</kbd>) and the **+** button in the Clip tab's action lane. See [Add an action](/motion/add-an-action/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip's id. |
+| `at` | integer | Yes | Where the action starts, in clip time. |
+| `duration` | integer | No | How long it runs. The default is 1 s (600,000). |
+| `scope` | integer | No | A nest id, to edit inside that nest. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. Leave it out for the frontmost one. |
+
+**What it answers.** `ok`, `clip`, `new_actions` (a list holding the new action's id) and the `project` summary. A new action's curve is `linear`. Use `set_action` to change it.
+
+**When it refuses.**
+
+- It would overlap another action on the clip, or run past the clip's end. Both sentences give the times involved.
+- A negative `at` or a `duration` that isn't positive is an error.
+
+## `add_zoom_action`
+
+Adds an action that zooms the picture to a rectangle, the screencast zoom, or back out to the clip's own framing. It mirrors the canvas's Z mode and the **Zoom to Region** and **Zoom Back** buttons in the Clip tab's action lane. See [Zoom to Region](/motion/zoom-to-region/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip's id. |
+| `at` | integer | Yes | Where the zoom starts, in clip time. |
+| `region` | object or null | Yes | The rectangle to zoom to, as `{x, y, width, height}`. `null` zooms back to the clip's own scale and position. |
+| `duration` | integer | No | How long it runs. The default is 1 s (600,000). |
+| `fit` | string | No | `fit`, the default, shows the whole region. `fill` covers the whole canvas, cropping whatever the region's shape doesn't match. |
+| `curve` | string | No | How the zoom eases: `linear`, `ease_in`, `ease_out` or `ease_in_out`. The default is `ease_in_out`. |
+| `scope` | integer | No | A nest id, to edit inside that nest. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. Leave it out for the frontmost one. |
+
+```json
+{ "clip": 12, "at": 0, "region": { "x": -320, "y": 180, "width": 640, "height": 360 } }
+```
+
+`region` is in source pixels. `x` and `y` are its centre, measured from the centre of the clip's cropped picture, and `width` and `height` are its size. All four are required, and the key itself is required, so a forgotten rectangle can't turn into a zoom back.
+
+Over the action, the clip's `scale`, `x` and `y` ease to the values that bring the region to the canvas, measured through the clip's rotation. Rotation and crop are read as they are at `at`. The scale is held to the largest a clip can take, with the position worked out from that, so a region too small to fill the canvas still lands centred.
+
+**What it answers.** As `add_action`. The action is an ordinary one, so `set_action_end` can add to what it animates.
+
+**When it refuses.**
+
+- It would overlap another action or run past the clip's end, as `add_action`.
+- A clip with no picture is an error: "clip 7 has no video properties".
+- A `width` or `height` that isn't above 0, or a member the region doesn't have, is an error naming it.
+
+## `set_action`
+
+Moves an action, changes its length or changes its easing curve. It mirrors the selected action's start, length and curve controls in the Clip tab's action lane, and dragging a band. See [Move, resize or remove an action](/motion/change-an-action/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip's id. |
+| `action` | integer | Yes | The action's id. |
+| `start` | integer | No | The new start, in clip time. |
+| `duration` | integer | No | The new length. |
+| `curve` | string | No | How the values ease: `linear`, `ease_in`, `ease_out` or `ease_in_out`. |
+| `scope` | integer | No | A nest id, to edit inside that nest. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. Leave it out for the frontmost one. |
+
+Give at least one of `start`, `duration` and `curve`. Any you leave out keep their value.
+
+**What it answers.** `ok` and the `project` summary. When the action's end names a speed, captions on a Captions track wholly inside a clip with sound are re-timed in the same step: `captions_retimed` lists them, and `captions_removed` lists those whose speech it no longer plays. See [Captions follow a speed change](/speed/captions-and-speed/).
+
+**When it refuses.**
+
+- It would overlap another action on the clip.
+- It would end past the clip's end and later than it ended before. An action a trim left past the clip's end can still be re-curved, moved earlier or shortened.
+- On a Speed action, it would make the clip read past the end of its media. The sentence names the latest clip end that fits.
+- On a Speed action of a linked clip, it would change the clip's speed: "clip 7 is linked to clip 8: Attach Audio before changing its speed or direction".
+- With none of the three arguments, the call answers "set_action needs start, duration or curve."
+
+## `set_action_end`
+
+Sets what an action animates to. It mirrors every inspector field you change while an action is selected. See [Set what an action animates to](/motion/edit-an-action/) and [What an action can animate](/motion/what-can-animate/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip's id. |
+| `action` | integer | Yes | The action's id. |
+| `patch` | object | Yes | The end state, with `video`, `audio`, `text` and `graphic` groups and a top-level `speed`. |
+| `off` | array of strings | No | `"group.key"` paths to switch off at the end. See [Switching off at an end](#switching-off-at-an-end). |
+| `scope` | integer | No | A nest id, to edit inside that nest. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. Leave it out for the frontmost one. |
+
+```json
+{ "clip": 12, "action": 40, "patch": { "video": { "opacity": 0 }, "audio": { "volume": 0.2 } } }
+```
+
+The patch merges into the end state key by key, at every depth, so a one-key `shadow` keeps the rest of it. A key set to `null` is removed from the end state, so that property stops being animated, and a group set to `null` removes the whole group.
+
+The `video`, `audio` and `text` groups take the same keys as [`set_video`](/mcp/tools-set-video/), [`set_audio`](/mcp/tools-set-audio/) and [`set_text`](/mcp/tools-clip-properties/). A colour is four numbers here too, and it ramps in OKLab with straight alpha. So do the chroma key's three numbers. `cursor.click_color` is a CSS colour, not four numbers, so it switches when the action ends.
+
+A bad key or value is refused by its path with the group in it, such as `video.filters[1].kind`. Values aren't range-checked, though: an animation can aim past what a stored property could hold.
+
+**Sound.** These `audio` keys animate: `muted`, `pan`, `mono`, `channels`, `eq`, `hum`, `noise_reduction`, `gate`, `leveller`, `de_esser`, `compressor`, `limiter` and `isolation`, beside `volume` and the fades.
+
+- Numbers ramp.
+- A switch changes when the action ends: a group or an EQ slot turned on, `muted`, `mono`, `channels`, an EQ slope, hum's frequency and harmonics, and the leveller's response.
+- `isolation` ramps from 0 on a clip with none.
+- `duck`, `keep_pitch`, the fade shapes and `voice` are stored but never animate.
+
+See [Animate sound with actions](/audio/animate-sound/).
+
+**What it answers.** `ok` and the `project` summary. With `speed` in the patch it can add the keys listed under [Speed in an action](#speed-in-an-action).
+
+**When it refuses.** These keys are errors, a `null` included:
+
+| Key | Why, and what to do instead |
+| --- | --- |
+| `video.motion` | It's a preset tied to the clip's two ends. Set it with `set_video`. |
+| `video.hide_silent` | It isn't an animation target. Set it with `set_video`. |
+| `text.words` | Word times belong to speech. Set them with `set_text`. |
+| `video.cutout.subject`, `video.cutout.quality` | They hold for the whole clip. Set them with `set_video`. A cutout's `edge`, `feather` and `background` do animate. |
+| Any `shape` key | Shapes can't be animated, so `shape` isn't a group here. |
+
+### Animating graphic props
+
+A graphic clip's props are a fourth group: `graphic: {props: {<key>: <value>}}`, keyed by what its module declares. It mirrors the Graphic sub-tab's **Properties** with an action selected. See [Animate graphic properties](/graphics/animate-properties/).
+
+```json
+{ "clip": 18, "action": 44, "patch": { "graphic": { "props": { "accent": "#ff5500", "count": 96 } } } }
+```
+
+- A value is checked as `set_graphic` checks it, minimum and maximum included, against the module as the project's graphics folder holds it now.
+- A number ramps along the curve and arrives with decimals, so 64 to 129 is 96.5 halfway. A module that needs a whole number rounds it.
+- A colour blends in OKLab, with straight alpha.
+- A string, a boolean and an enum switch to the end's value when the action ends.
+- An image prop switches when the action ends. `""` names no image there.
+- A prop the clip holds no value for starts from the module's current default, written into the clip in the same undo step.
+- `graphic.props.<key>: null` removes that prop from the end, and `graphic: null` removes the whole group.
+
+`get_project` shows `kinds` beside `props`. Frame Job writes that and ignores any you send, so an end you read back can be sent again.
+
+**When it refuses.**
+
+- A prop its module marks `animate: false` is refused. Set it with `set_graphic`.
+- `name`, `width`, `height`, `in` and `length` are refused: an action animates `graphic.props` only.
+- While the module is missing or doesn't compile, a value is refused, and `get_graphic` says why. A `null` still removes.
+- On a clip that isn't a graphic: "clip 7 is not a graphic clip".
+
+### Speed in an action
+
+`speed`, a number beside the groups, is a media clip's rate. The clip ramps to it along the curve, from the rate it's playing at when the action starts, and holds it after. It keeps its start and length, and plays more or less of its source. It mirrors the Speed section's **Rate** with an action selected. See [Build a ramp by hand](/speed/build-a-ramp/).
+
+```json
+{ "clip": 12, "action": 40, "patch": { "speed": 3 } }
+```
+
+The rate is clamped to ×0.1–×1000, and `speed: null` removes it.
+
+Above ×12 the clip's audio is left out, and the call that takes it there answers with `audio_left_out` (the clip ids) and `audio_note`. Captions on a Captions track wholly inside a clip with sound are re-timed in the same step: `captions_retimed` lists them, and `captions_removed` lists those whose speech it no longer plays.
+
+**When it refuses.**
+
+- An end rate that would read past the end of the clip's media. The sentence names the largest end rate that fits, or, when none down to ×0.1 does, the latest clip end that fits at ×0.1.
+- `speed: null` when the clip would then read past the end of its media. The sentence names the latest clip end that fits.
+- A value that isn't a number or `null`, or a clip that isn't a media clip.
+- A rate on a linked clip: "clip 7 is linked to clip 8: Attach Audio before changing its speed or direction".
+
+### Switching off at an end
+
+`off` turns an optional property off at the end of the action. The path is stored as a `null` in the end state, where a `null` in `patch` removes the key instead. So `off` means "this shadow goes away by the end", and a `null` in `patch` means "stop animating the shadow".
+
+```json
+{ "clip": 12, "action": 40, "patch": {}, "off": ["video.shadow", "audio.eq.band_2"] }
+```
+
+- A path is `"group.key"`, with a group of `video`, `audio` or `text` and one of its top-level keys, such as `video.shadow`, `text.width` or `audio.limiter`.
+- Two deeper paths exist. `audio.eq.<slot>` switches that EQ slot off: the slots are `high_pass`, `low_shelf`, `band_1`, `band_2`, `band_3`, `high_shelf` and `low_pass`. `video.qualifier.<range>` switches that qualifier range off: the ranges are `hue`, `saturation` and `luma`.
+- Only optional keys can go off. A required key such as `video.opacity` is refused.
+- `video.qualifier` on its own is refused too, and so are its `invert` and `blur`, which aren't ranges. A range set to `null` in `patch` only leaves the end state.
+- A path can't also be named in `patch`.
+- `graphic` paths are refused: name the value a prop ends at in `patch`.
+- `video.cutout` is refused: `set_video` with `{cutout: null}` removes a cutout.
+- `video.motion`, `video.hide_silent` and `text.words` are refused here too.
+
+## `remove_action`
+
+Removes an action. The clip keeps its base properties. It mirrors the action lane's trash button and <kbd>⌫</kbd> with an action selected. See [Move, resize or remove an action](/motion/change-an-action/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip's id. |
+| `action` | integer | Yes | The action's id. |
+| `scope` | integer | No | A nest id, to edit inside that nest. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. Leave it out for the frontmost one. |
+
+**What it answers.** `ok` and the `project` summary. When the action named a speed, captions are re-timed in the same step, with `captions_retimed` and `captions_removed` as for `set_action`.
+
+**When it refuses.**
+
+- Removing a Speed action when the clip would then read past the end of its media. The sentence names the latest clip end that fits.
+- Removing a Speed action from a linked clip: "clip 7 is linked to clip 8: Attach Audio before changing its speed or direction".
+- An action id the clip doesn't have is an error.
+
+## Related
+
+- [Actions](/motion/actions/)
+- [Patches](/mcp/patches/)
+- [Tools: speed and time](/mcp/tools-speed/)
+- [Tools: graphics](/mcp/tools-graphics/)
+- [Zoom to Region](/motion/zoom-to-region/)
+- [Animate a grade](/color/animate-a-grade/)

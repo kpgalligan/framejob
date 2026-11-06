@@ -1,0 +1,153 @@
+---
+title: "Switch by Speaker"
+description: Cut a whole Program track automatically from a conversation, showing whoever is talking on each microphone, as one undo step.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+Switch by Speaker cuts a whole program for you from a conversation. It listens to each person's microphone and writes a new track that shows whoever is talking.
+
+<AtAGlance
+  menu="Clip ▸ Switch by Speaker…"
+  tools="switch_by_speaker"
+  needs="Nothing. It reads each microphone's loudness and speech detection, made on your Mac at import, with no key and no upload."
+/>
+
+## Cut a conversation
+
+<Steps>
+
+1. [Synchronize the recordings](#synchronize-first) with **Clip ▸ Synchronize Audio**.
+
+2. Select every camera's clips and every microphone's clips. <kbd>⇧</kbd>-click each clip to add it, or <kbd>⇧</kbd>-drag a band across them. See [Select clips](/timeline/selecting-clips/).
+
+3. Choose **Clip ▸ Switch by Speaker…**. It has no keyboard shortcut, and it sits right after Synchronize Audio in the **Clip** menu.
+
+4. Check the [speaker rows](#speaker-rows) and adjust the [settings](/multicam/switch-settings/) if you need to. The [summary](#the-summary) at the foot of the sheet updates as you do.
+
+5. Choose **Switch** or press Return. **Cancel** or <kbd>Esc</kbd> leaves everything as it was.
+
+</Steps>
+
+<Shot
+  name="15h-switch-by-speaker-sheet.sheet"
+  alt="The Switch by Speaker sheet. Two speaker rows pair the Camera microphone with the Camera track and the Screen microphone with the Screen track. Below them are Wide set to None, Minimum shot 2 s, Cut 0.2 s before speech, Crosstalk shows Wide, Ignore bleed 15 dB, two unticked boxes, and the summary 1 shot: 1 on Camera. Adds 1 clip."
+/>
+
+Afterwards, [fix single shots](#fix-the-result) by hand. Switch by Speaker works inside an open [nest](/editing/nests/) too, on the nest's own tracks.
+
+## Synchronize first
+
+Switch by Speaker trusts where the clips sit. It doesn't check that they're in sync, so run [Synchronize Audio](/audio/synchronize-audio/) before it.
+
+A camera [slipped](/editing/slip-and-roll/) or dragged afterwards puts its shots out of step with the voices.
+
+## When it is offered
+
+**Clip ▸ Switch by Speaker…** is available when:
+
+- the selection holds clips with a picture on two or more tracks, each of which is a camera
+- at least one selected clip has its sound on, from a file that has sound
+- no sheet is open on the window
+
+Sound you've split off with **Clip ▸ Detach Audio** never makes its track a camera. The sheet handles up to nine cameras. The command is still offered with more, but the summary then says so and **Switch** stays dimmed.
+
+## Speaker rows
+
+Each person gets a row, reading **Speaker 1:**, then a microphone pop-up, the word "on", and the camera that shows them. A camera that is its own microphone stays paired with itself, and the rest are paired front to back to start with. See [Microphones](/multicam/set-up/#microphones) for how the microphones are chosen.
+
+Each person needs their own microphone and a camera. A pop-up offers **None** only where the selection left that row with nothing to pair. Leave it on **None** and the summary says what's missing.
+
+Change the rows when the front-to-back guess puts someone on the wrong camera. The microphones listed come from your selection, and the cameras from the tracks holding your selected pictures.
+
+With exactly one microphone and two or more cameras, the rows are replaced by a different layout. See [Cut from faces with one microphone](/multicam/one-microphone/).
+
+## The range
+
+The cut covers the [In–Out range](/timeline/in-out-range/) when one is set, otherwise the whole length of the selected camera clips.
+
+Only the selected clips of a microphone's track are listened to. A camera track offers all its clips with a picture, selected or not, so an unselected clip on a camera track can still supply shots.
+
+## The summary
+
+The line under the controls says what **Switch** will do, for example "22 shots: 8 on Cam A, 14 on Cam B. Adds 23 clips." Cameras appear in the order they first show.
+
+When Switch can't go ahead, every reason replaces that line, one per line, and **Switch** stays dimmed. The sheet works this out again at every change, so change any control to check again.
+
+| The summary says | What it means |
+| --- | --- |
+| "The microphone on track … is still being analysed…" | Frame Job hasn't finished measuring that file's loudness or detecting its speech, which can happen straight after an import. Give it a moment, then change any control to check again. |
+| "The microphone on track … has no speech between … and …, so it never says who is talking." | That microphone hears no speech in the range. Check you've paired the right track, or shorten the range. |
+| "No angle has a picture between … and …." | No camera covers that stretch of the range. Set an In–Out range that avoids it, or fill the gap. |
+| "The speaker on track … has no microphone." | A row has no microphone that's selected and sounding. |
+| "The microphone on track … has no angle to show its speaker." | A row has no camera. |
+| "Track … is the microphone for 2 speakers; each person needs their own microphone." | One microphone is on two rows. See [Good to know](#good-to-know) for when that's allowed. |
+| "Switch by Speaker takes at most nine angles…" | More than nine tracks hold a selected picture. Select fewer. |
+| "Switch by Speaker would add … clips to …; the most is 4096 — raise the minimum shot." | A project holds at most 4,096 clips. Raise [**Minimum shot**](/multicam/switch-settings/#minimum-shot) for fewer, longer shots. |
+| "Speech detection is unavailable on this Mac, so Switch by Speaker cannot tell who is talking." | The on-device speech model can't run here, so the command can't work. |
+| "The project's audio plan could not be read. Try again in a moment." | Frame Job couldn't read the project's sound just then. |
+
+An "angle" in these lines is a camera. The track number is Frame Job's own number for the track, not its position on the timeline. With one shared microphone, [two more lines](/multicam/one-microphone/#the-sheet-in-this-mode) can appear.
+
+**Switch** checks everything once more when you press it. If it can't go ahead at that moment, the reason shows in the summary and the sheet stays open.
+
+## How it chooses the shots
+
+- A cut lands a moment before each new speaker's first word. [**Cut**](/multicam/switch-settings/#cut-before-speech) sets how long.
+- Silence holds the current shot, and so does a reply under a second long.
+- A pause under half a second between one person's words doesn't end their turn.
+- The cut opens on the [Wide](/multicam/switch-settings/#wide), the camera you've chosen for your wide shot, when there is one, otherwise on the first speaker's camera. With no Wide and nobody taking a turn, the range is one shot on the front-most camera.
+- When two people talk at once, [**Crosstalk**](/multicam/switch-settings/#crosstalk-shows) decides what shows.
+- Where a shot's camera has nothing to show, that stretch goes to the Wide, else the camera before it, else the front-most camera that covers it.
+- A shot under [**Minimum shot**](/multicam/switch-settings/#minimum-shot) merges into a neighbour.
+
+## Linked cameras
+
+A camera clip still linked to its detached sound can't be switched. The sheet says so and names the clip, ending "Attach Audio first". Choose [**Clip ▸ Attach Audio**](/audio/detach-and-attach/) to put the two back together, then try again.
+
+Only a linked camera clip crossing the range stops the cut.
+
+## One undo step
+
+**Switch** writes all of this as one undo step, **Switch by Speaker**. The selection stays. A selected clip cut at the range's ends brings its new half into the selection.
+
+### The Program track
+
+Switch adds a track named **Program** directly in front of the front-most camera. It holds a piece of the chosen camera for each shot, in sync, with the picture on and the sound off.
+
+To write over an earlier Program track instead, use [**Write to**](/multicam/switch-settings/#write-to).
+
+### Cameras hidden
+
+Switch hides the camera tracks so only the program shows.
+
+A camera track that holds anything outside the range, or any clip without a picture, isn't hidden. Its clips are cut at the range's ends and their pictures are switched off inside the range only.
+
+### What stays untouched
+
+Nothing outside the range changes. The microphones aren't edited, so what you hear stays the same, apart from any camera sound you chose to [mute](/multicam/switch-settings/#mute-the-cameras-own-sound).
+
+## Fix the result
+
+- To show a different camera for one shot, select the shot and use [Switch Angle](/multicam/switch-angle/).
+- To move a cut, [roll](/editing/slip-and-roll/) it.
+- To try other settings, choose **Switch by Speaker…** again while the clips are still selected, and pick the old track under **Write to**. Or undo and start over.
+
+## Good to know
+
+- One microphone on two rows stops the cut when other rows have their own microphones. If you point every row at one microphone, Frame Job reads faces instead, and the summary starts with its [warning](/multicam/one-microphone/#faces-only-guess).
+- Switch by Speaker doesn't remember your pairing. The speaker rows open fresh each time.
+
+## With an agent
+
+[`switch_by_speaker`](/mcp/tools-multicam/#switch_by_speaker) takes the sheet's values and a few it doesn't show. An agent can name the range directly, which takes priority over the In–Out range, and pair people by hand. It can also ask for the shots without editing anything, and set the shortest turn that cuts and how far one microphone must lead to count alone. See [Switch by Speaker from an agent](/multicam/copy-pieces/#switch-by-speaker-from-an-agent).
+
+## Related
+
+- [Switch by Speaker settings](/multicam/switch-settings/)
+- [Cut from faces with one microphone](/multicam/one-microphone/)
+- [Set up several cameras](/multicam/set-up/)
+- [Synchronize Audio](/audio/synchronize-audio/)
+- [Switch Angle](/multicam/switch-angle/)

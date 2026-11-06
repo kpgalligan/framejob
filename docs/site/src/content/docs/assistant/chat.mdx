@@ -1,0 +1,136 @@
+---
+title: Chat with the Assistant
+description: Open the Assistant tab, ask for what you want in plain words, and manage the conversation that goes with each window.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+The Assistant is a conversation with Claude, built into the inspector of every editor window. You ask in plain words, and it reads and edits that window's project.
+
+<AtAGlance
+  menu="View ▸ Assistant"
+  keys="⌃⌘A"
+  where="Inspector ▸ Assistant tab"
+  needs="Your own Anthropic API key. Without one, the tab says how to add it."
+/>
+
+## The Assistant tab
+
+You might ask:
+
+- "trim the pauses out of the interview"
+- "put a title over the first five seconds"
+- "what is under the playhead?"
+
+The Assistant uses the same tools an agent uses over MCP, less a few held back from it, so its edits are ordinary edits. You watch each change land, and each one is its own undo step. See [What the Assistant can do](/assistant/what-it-can-do/).
+
+It's the fifth inspector tab, after **Clip**, **Media**, **Document** and **Transcript**. Before your first message, [save your key](/assistant/set-up/).
+
+## Open the Assistant
+
+Choose **View ▸ Assistant** (<kbd>⌃⌘A</kbd>). Frame Job shows the inspector if it was hidden, switches to the Assistant tab and puts the cursor in the message field.
+
+It isn't a toggle. Pressed while the tab is already showing, it only puts the cursor back in the field.
+
+The command stays enabled with no key, so the tab can [say what's needed](/assistant/set-up/#the-no-key-prompt). There's no message field to put the cursor in until then.
+
+## The tab's layout
+
+From top to bottom:
+
+| Part | What it shows |
+| --- | --- |
+| **Context** | How full the conversation is, with [**Clear**](#clear-the-conversation) (↺) at its right end. See [Long conversations](/assistant/context-and-compaction/). |
+| **Spend** | What this conversation has cost so far, as Frame Job estimates it. See [What it costs](/assistant/cost/). |
+| The transcript | Your messages, the replies and each tool call. See [Read the conversation](/assistant/conversation/). |
+| The ask-first row | Shows only while the Assistant is waiting for your permission. See [What it won't do and what it asks first](/assistant/what-it-will-not-do/). |
+| The message field and **Send** | Where you type. |
+
+## The tab stays put
+
+The Assistant's own edits change the selection without moving you off the tab, so you can read along as it works.
+
+Clicking a clip in the timeline or on the canvas still switches to the **Clip** tab. A marquee on the timeline doesn't.
+
+## Send a message
+
+<Steps>
+
+1. Click in the message field, which reads "Ask about or edit this project…", and type what you want.
+
+2. Press <kbd>↩</kbd> or click **Send**.
+
+</Steps>
+
+The field empties once the message is taken, and the reply arrives in the transcript. Everything the Assistant does between your message and the end of its reply is called a turn.
+
+The field starts one line high, grows to five lines as you type, and scrolls past that. Spaces and blank lines at either end are dropped, and a message of nothing else does nothing.
+
+You can type your next message while the Assistant works, but you can't send it until the turn ends.
+
+## Message field keys
+
+| Key | In the message field |
+| --- | --- |
+| <kbd>↩</kbd> or keypad Enter | Sends the message and gives the keys back to the editor, so <kbd>Space</kbd> plays while the Assistant works. While it's working or waiting for your answer, this beeps instead and the field keeps the keys. |
+| <kbd>⇧↩</kbd>, <kbd>⌘↩</kbd>, <kbd>⌥↩</kbd> or <kbd>⌃↩</kbd> | Starts a new line |
+| <kbd>Tab</kbd> or <kbd>⇧Tab</kbd> | Gives the keys back to the editor and never types a tab. With macOS Full Keyboard Access on, moves to the next or previous control. |
+| <kbd>⌘Z</kbd> and <kbd>⇧⌘Z</kbd> | Undo and redo your typing |
+
+Clicking **Send** gives the keys back the same way <kbd>↩</kbd> does, and so does clicking anywhere else in the window below its title bar. See [Keys and typing](/getting-started/keys-and-typing/#start-and-finish-typing).
+
+Your typing never lands on the project's undo stack, and sending a message drops the field's own undo history. While the keys are in the field, <kbd>⌘Z</kbd> only undoes typing. Outside the field, it takes back the Assistant's last edit.
+
+<kbd>↩</kbd> never answers a question and never stops a turn. While an input method is composing, <kbd>↩</kbd> belongs to it.
+
+## If a message cannot be sent
+
+If the conversation can't start, the reason appears in red in the transcript and your text stays in the field. Your message isn't added to the transcript, so you can send it again once the cause is fixed.
+
+The usual causes are [a missing key](/assistant/set-up/#the-no-key-prompt) and [a helper that won't start](/assistant/set-up/#if-the-helper-is-missing).
+
+## Send becomes Stop
+
+The button reads **Send**, with the tooltip "Send the message". While a turn is running or waiting on you, it reads **Stop**, with the tooltip "Stop the turn".
+
+**Stop** is a click. It has no shortcut. See [Stop a turn](/assistant/stop-a-turn/).
+
+## What each message carries
+
+Each message starts with a short block describing your window at the moment you sent it, so "this clip" and "the selected titles" mean what you'd expect. The block holds:
+
+- the project's name, and its path, or a note that it's never been saved
+- the nest open in the window, if there is one, or that the timeline is open
+- the playhead's position
+- the ids of the selected clips
+
+You don't see the block in the transcript, but it goes to Anthropic with your message. See [Assistant privacy](/assistant/privacy/).
+
+It isn't updated during the turn. The Assistant is told to read the project again after its own edits.
+
+## One conversation per window
+
+Each editor window has its own conversation, about that window's project. Closing the window ends the conversation and [declines](/assistant/what-it-will-not-do/#declining) any question waiting for your answer.
+
+Conversations aren't saved with the project, so reopening it starts with an empty transcript.
+
+The Assistant can't close its own window. You do that with **File ▸ Close** (<kbd>⌘W</kbd>).
+
+## Clear the conversation
+
+Click **Clear** (↺, "Clear the conversation") at the right end of **Context**. It ends the conversation and empties the transcript, and your next message starts a fresh one.
+
+- **Spend** goes back to "Nothing yet".
+- The context meter keeps the model's window size, so after a conversation it reads "0 of … tokens · 0%", with that size in place of the dots, until the next response.
+- Clear asks for no confirmation. It ends a running turn and declines a waiting question.
+
+The project is untouched. Edits already made stay, each still its own undo step.
+
+## Related
+
+- [Set up the Assistant](/assistant/set-up/)
+- [Read the conversation](/assistant/conversation/)
+- [What the Assistant can do](/assistant/what-it-can-do/)
+- [What it won't do and what it asks first](/assistant/what-it-will-not-do/)
+- [Stop a turn](/assistant/stop-a-turn/)

@@ -1,0 +1,150 @@
+---
+title: "Supported file formats"
+description: "Check which movies, sound files, pictures and LUTs Frame Job can bring in, what happens to transparency, rotation and odd frame rates, and which way in takes which file."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+This page lists what Frame Job can bring in, and which way in takes which file. For what it can write, see [Choose a format](/export/formats/).
+
+<AtAGlance
+  menu={['File ▸ Add Media…', 'File ▸ Open…', 'File ▸ Import Captions…']}
+  keys={['⇧⌘I', '⌘O']}
+  where="Drag to the Media tab"
+  tools={['import_media', 'import_captions']}
+/>
+
+## What Frame Job reads
+
+| Kind | Files |
+| --- | --- |
+| [Movies](#movies) | MOV, MP4, M4V and other containers macOS plays |
+| [WebM and Matroska](#webm-and-matroska) | `.webm` and `.mkv` |
+| [Sound](#sound) | M4A, MP3, WAV and AIFF, plus CAF, FLAC and other formats macOS plays |
+| [Pictures](#pictures) | PNG, JPEG and HEIC, plus TIFF, GIF, BMP, HEIF, WebP and AVIF |
+| [LUTs](#luts) | `.cube` 3D LUTs |
+
+Some of these only come in by a drop on the Media tab. See [Which way in](#which-way-in).
+
+## Movies
+
+Frame Job reads MOV, MP4, M4V and the other containers macOS plays. What matters is the video inside:
+
+| Video | What Frame Job does |
+| --- | --- |
+| H.264, HEVC, ProRes, MJPEG, MPEG-4 | Reads it. |
+| VP9 in MP4 | Reads Profile 0 and Profile 2, using the decoder that comes with macOS. Profiles 1 and 3 don't import. |
+| AV1 | Reads it on an M3 or later Mac, because it needs a hardware decoder. |
+| VP8 | Doesn't import. |
+
+Before it adds a video, Frame Job decodes its first frame, so a file nothing on this Mac can decode is left out rather than added. An alert names the codec. See [Codecs this Mac can't decode](/projects/import-media/#codecs-this-mac-cant-decode).
+
+The check gives up after 30 seconds, which usually means a stalled network volume. See [Import errors](/projects/import-media/#import-errors).
+
+If macOS can't open the file at all and you have ffmpeg installed, Frame Job can [repackage or convert it](/projects/ffmpeg-conversion/) on import.
+
+### Movies with alpha
+
+Frame Job detects transparency when you import a movie. It recognises ProRes 4444, ProRes 4444 XQ and QuickTime Animation, and any track flagged as containing alpha, such as HEVC with alpha.
+
+A **VP9 with Alpha (WebM)** file keeps its picture and loses its transparency when you bring it back in. To make a transparent clip you can re-import, export ProRes 4444 or HEVC with Alpha.
+
+### Camera raw and MXF
+
+Frame Job reads what macOS decodes, and it has no raw controls of its own, such as ISO, white balance or debayer settings. Blackmagic RAW, R3D and ARRIRAW don't import, so transcode them to ProRes first.
+
+macOS can't open an MXF file. With your own ffmpeg, Frame Job can [repackage or convert](/projects/ffmpeg-conversion/) one, but a codec it can't copy, such as DNxHD or DNxHR, becomes 8-bit H.264. For 10-bit or log footage, transcode to ProRes yourself instead.
+
+### Portrait and rotated movies
+
+A movie imports at its display size, through the file's own rotation. A portrait phone clip comes in as 1080 × 1920, not as 1920 × 1080 lying on its side.
+
+### Variable and unusual frame rates
+
+Frame Job takes the rate macOS reports for the video track. A variable-rate file gets a single rate this way too.
+
+A rate within 0.01 fps of a standard one becomes exactly that rate: 23.976, 24, 25, 29.97, 30, 48, 50, 59.94 or 60 fps. Anything else keeps three decimals, so a 47.3 fps screen recording isn't called 48.
+
+If the file reports no rate, Frame Job works it out from the shortest frame. With nothing to go on, it uses 30 fps.
+
+## WebM and Matroska
+
+macOS can't open these, so Frame Job copies the streams unchanged into a QuickTime movie, with no re-encoding. It reads `.webm` and `.mkv` files with VP9, AV1, H.264 or HEVC video and Opus, Vorbis or AAC sound.
+
+Add or open one as you would any other movie. A file is recognised by its header, not its name, and the first video track and first audio track are the ones copied. See [WebM and Matroska files](/projects/webm-and-matroska/).
+
+## Sound
+
+M4A (AAC and ALAC), MP3, WAV and AIFF come in every way. Other formats macOS plays, such as CAF and FLAC, come in only by a drop on the Media tab.
+
+### Any sample rate
+
+Sound at any rate other than 48 kHz, 96 kHz included, plays from a hidden 48 kHz copy, so it stays aligned with its place on the timeline. This is automatic. The copies live in the temporary folder, outside the project, and are made again whenever they're needed.
+
+### MP3 gapless start
+
+Some MP3s begin with a short stretch of encoder delay that isn't part of the recording. When macOS leaves it in, Frame Job skips it at any sample rate, so the sound starts on time. Playback, the waveform, transcription, sync and a reversed clip all skip the same amount.
+
+This applies to MP3 files. An MP3 track inside a `.mov`, `.mp4` or `.m4a` isn't trimmed.
+
+## Pictures
+
+PNG, JPEG and HEIC come in every way. TIFF, GIF, BMP, HEIF, WebP and AVIF come in only by a drop on the Media tab, or as a background through **Clip ▸ Add Background ▸ Image…**.
+
+A picture imports as a still with no length of its own, so a clip of it can run any duration. Its transparency and EXIF orientation are honoured.
+
+Only a GIF's first image is read, so an animated GIF imports as a still.
+
+### Deep and HDR stills
+
+| The still is | What Frame Job does |
+| --- | --- |
+| Deeper than 8 bits a component, such as a 16-bit PNG or TIFF or a 10-bit HEIC | Draws it at 16-bit float, so its levels reach the picture. See [Precision and bit depth](/hdr/precision/). |
+| Labelled HLG or PQ | Reads it as HDR, the way a video of the same kind is, not as SDR. PNG and HEIC keep their colour space and depth. Display P3, BT.709 and BT.2020 primaries are recognised. See [How sources are read](/hdr/how-sources-are-read/#hdr-stills). |
+| Carrying an HDR gain map (ISO 21496-1 or Apple's), as an iPhone HDR photo does | Shows its full HDR in an HLG project. An SDR project and every thumbnail draw the base picture. |
+
+A frame showing a deep still is saved deep as PNG or HEIC, never as JPEG. See [Save Frame](/export/save-frame/). Animated GIF and Animated PNG exports stay 8-bit.
+
+## LUTs
+
+Frame Job reads `.cube` 3D LUTs, which you apply as a clip's [look](/color/luts/) or as a file's [Camera Log](/hdr/log-luts/).
+
+- 3D only. A 1D LUT won't import.
+- `LUT_3D_SIZE` from 2 to 65.
+- At most 32 MiB.
+
+A `.cube` is imported, not opened. **File ▸ Open…** doesn't take one, and one dropped on the window or the Dock isn't imported. Use **File ▸ Add Media…**, a drop on the Media tab or **Import LUT…** in a clip's **Look** section.
+
+## Caption files
+
+An `.srt` or a `.vtt` isn't media. Bring it in with **File ▸ Import Captions…**. See [Import captions](/captions/import-captions/). A WebVTT file's header and any `NOTE`, `STYLE` or `REGION` blocks are left out without a message. See [Good to know](/captions/import-captions/#good-to-know).
+
+## Timelines from other editors
+
+Frame Job doesn't read or write an XML, EDL, AAF or OTIO timeline, so there's no conform. Bring your footage in as files. To hand finished work to another application, export a master such as [ProRes](/export/prores/).
+
+## Which way in
+
+The **Add Media…** and **File ▸ Open…** panels list fewer types than a drop on the Media tab takes.
+
+| Files | **File ▸ Add Media…** | **File ▸ Open…** | A drop on the Media tab |
+| --- | --- | --- | --- |
+| Movies | Yes | Yes | Yes |
+| M4A, MP3, WAV and AIFF | Yes | Yes | Yes |
+| PNG, JPEG and HEIC | Yes | Yes | Yes |
+| `.cube` LUTs | Yes | No | Yes |
+| TIFF, GIF, BMP, HEIF, WebP and AVIF | No | No | Yes |
+| CAF, FLAC and other sound macOS plays | No | No | Yes |
+
+A drop on the Media tab has no type filter, so any file is tried, and an agent's import takes the same files. **File ▸ Add Media…** and a drop on the Media tab add to the open project, and **File ▸ Open…** makes a new untitled project around the file. See [Import media](/projects/import-media/) and [Drop files to open them](/projects/open-a-project/#drop-files-to-open-them).
+
+In the Finder, **Open With ▸ Frame Job** is offered for movies, M4A, MP3, WAV, AIFF, PNG, JPEG and HEIC files. Frame Job doesn't make itself the default app for any of them.
+
+## Related
+
+- [Import media](/projects/import-media/)
+- [WebM and Matroska files](/projects/webm-and-matroska/)
+- [Convert files with ffmpeg](/projects/ffmpeg-conversion/)
+- [How sources are read](/hdr/how-sources-are-read/)
+- [Choose a format](/export/formats/)
+- [Limits](/reference/limits/)

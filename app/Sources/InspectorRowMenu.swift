@@ -9,8 +9,8 @@ import AppKit
 /// hover: a window that is not key tracks none, and a right-click there must
 /// offer the same items.
 ///
-/// A field's or a popup's own right-click keeps its own menu, because neither
-/// forwards it; the gutter, the label, a slider, a checkbox, the tags and the
+/// A field keeps its own menu, because it does not forward the right-click;
+/// the gutter, the label, a slider, a checkbox, a popup, the tags and the
 /// trailing spacer reach this one.
 final class InspectorRowView: NSStackView {
     let gutter: InspectorMarkGutter

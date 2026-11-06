@@ -1,0 +1,81 @@
+---
+title: Ducking
+description: Lower the other clips while this one plays, so background music drops under a voice-over and comes back up after it.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Ducking lowers the other clips while this one plays. The usual use is a voice-over: turn ducking on for the voice, and the music drops under it. It does the job of auto-ducking or a sidechain.
+
+<AtAGlance where="Clip tab ▸ Sound ▸ Ducking" tools="set_audio" />
+
+## Duck the music under a voice-over
+
+Set ducking on the clip you want to hear, not on the clip that should get quieter.
+
+<Steps>
+
+1. Select the voice clip and open the **Sound** sub-tab of the Clip tab.
+
+2. Open the **Ducking** section and tick **Duck other audio**.
+
+3. Set **Level** to how loud the music should be under the voice.
+
+</Steps>
+
+Ticking the box starts from the defaults: down to 20 %, over 0.5 s, and back up over 1 s. Unticking it, or choosing **Reset** in the section's header, turns ducking off and forgets the settings. The header shows the level, such as "20%", or "off".
+
+## The controls
+
+| Control | What it does | Default | Range |
+| --- | --- | --- | --- |
+| **Duck other audio** | Turns ducking on for this clip. | Off | |
+| **Duck by** | What the ducking follows. See [Choose what it follows](#choose-what-it-follows). | Clip Length | Clip Length, Speech |
+| **Level** | How loud the other clips are while this one plays. Quick picks: 0, 10, 20, 30 and 50 %. | 20 % | 0–100 % |
+| **Attack** | How long the other clips take to fall to Level, starting from this clip's first frame. Quick picks: 0.1, 0.25, 0.5 and 1 s. | 0.5 s | 0–5 s |
+| **Release** | How long they take to come back up, starting after this clip ends. Quick picks: 0.25, 0.5, 1 and 2 s. | 1 s | 0–5 s |
+| **Pre-roll**, **Hold** | Only for Duck by Speech. See [Duck by Speech](/audio/duck-by-speech/#set-pre-roll-and-hold). | 0.5 s each | 0–5 s |
+
+Every control but **Duck other audio** is greyed out until ducking is on. With several clips selected, changing one gives every selected clip all the first clip's ducking settings. See [Edit several clips at once](/audio/sound-tab/#edit-several-clips-at-once).
+
+**Level** multiplies whatever the other clips are already doing, so at 20 % a clip at half volume plays at a tenth of its full level. Their own volume, fades and actions still apply underneath.
+
+**Attack** and **Release** keep the length you type. They aren't rounded to whole frames. At 0 the level jumps instead of ramping.
+
+## Choose what it follows
+
+**Duck by** has two choices.
+
+**Clip Length** keeps the others down for as long as the clip sits on the timeline, whether or not it's making a sound. They stay lowered through the pauses, so you can see exactly when ducking applies by looking at the timeline, and nothing extra is drawn on the clip.
+
+**Speech** lowers them only while this clip's speech plays, so the music comes back up in the pauses. It works only on a clip of a file with sound, and **Duck by** stays greyed out until Frame Job has finished detecting that file's speech. A thin yellow line on the clip shows where the others go down. See [Duck by Speech](/audio/duck-by-speech/).
+
+## How the level moves
+
+The others ramp down from the ducking clip's first frame, hold at Level, and start ramping back up only once the clip has ended. So the music doesn't lift under the last words of a voice-over, and it's still coming back up after the clip has gone.
+
+If the Attack is longer than the clip, the others never reach Level, and the release starts from wherever they got to.
+
+Each ducked clip's [volume line](/audio/volume-line/) moves with this, so you can see the dip on the clips it lowers.
+
+## Good to know
+
+- **Overlapping ducking clips multiply.** Two at 50 % give 25 %.
+- **A silent ducking clip still ducks.** A clip that's muted, silenced by a solo or has its audio switched off still lowers the others. Turn ducking off to stop it. A clip with its audio switched off has no **Sound** sub-tab, so you can't do that there. An agent can use `set_audio`. The picture half of a [linked pair](/audio/detach-and-attach/) is the exception: it never ducks.
+- **Detaching moves ducking to the sound.** After [Detach Audio](/audio/detach-and-attach/) the duck is on the sound half alone: at 20 %, the voice stays at full level and the music plays at 20 %. Turn ducking off on the sound half and it's off.
+- **Inside a nest**, a ducking clip lowers the rest of the project over the part of it that plays.
+- **On a nest clip**, ducking lowers everything for the nest's whole length, and that includes the clips inside the nest. To leave one of them at full level, set ducking on that clip instead, inside the nest.
+- **The release can miss a clip that follows.** Every clip that overlaps the ducking clip is lowered. A clip that starts after it ends, inside the release, may play at full level. Frame Job can play a clip that follows in the same audio lane as the ducking clip, and a ducking clip never lowers its own lane.
+- **Ducking can't be animated.** The section is marked ⊘ inside an [action](/audio/animate-sound/), and a change there still applies to the whole clip.
+
+## With an agent
+
+An agent sets ducking with `set_audio`'s `duck`: a `level` from 0 to 1, an `attack` and a `release`, and a `mode` of `extent` for Clip Length or `speech` for Speech. Its `attack` and `release` can run past the inspector's 5 s. `{"duck": null}` turns ducking off. See [Tools: clip sound](/mcp/tools-set-audio/#ducking).
+
+## Related
+
+- [Duck by Speech](/audio/duck-by-speech/)
+- [Clip volume](/audio/volume/)
+- [The volume line](/audio/volume-line/)
+- [Nests](/editing/nests/)

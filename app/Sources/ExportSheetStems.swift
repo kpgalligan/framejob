@@ -30,6 +30,7 @@ extension ExportSheetController {
     /// A pick: the choice, then a resolve, so the footnote follows the core's echo.
     @objc func stemsChanged(_ sender: Any?) {
         stemsChoice = stemsPopup.selectedItem?.representedObject as? String
+        presetEdited()
         resolveCard()
     }
 

@@ -1,0 +1,103 @@
+---
+title: "Set up several cameras"
+description: Put each camera on its own track, line them up by their sound, name them, and get a program track ready for a show filmed with more than one camera.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Set up a show filmed with several cameras, such as a podcast with a camera on each guest or an interview with a wide and a close shot, so you can cut between them.
+
+<AtAGlance
+  menu={['Clip ▸ Synchronize Audio', 'Clip ▸ Split']}
+  keys={['⌘T']}
+  tools={['sync_audio', 'copy_pieces']}
+/>
+
+## How multicam works
+
+There's no special multicam clip. Each camera is an ordinary clip on an ordinary track, and the edit you watch is a **program track** in front of them, made of pieces of whichever camera you want at each moment.
+
+So there's no multicam sequence to build, no viewer showing every camera at once, and no switching cameras with number keys while the show plays. Let [Switch by Speaker](/multicam/switch-by-speaker/) make the first cut, then re-pick single shots with [Switch Angle](/multicam/switch-angle/).
+
+<Steps>
+
+1. Put [one camera on each track](#one-camera-per-track) and line them up.
+2. [Name the tracks](#name-the-tracks) after their cameras.
+3. Build [the program track](#the-program-track), by hand or with [Switch by Speaker](/multicam/switch-by-speaker/).
+4. Fix single shots with [Switch Angle](/multicam/switch-angle/).
+
+</Steps>
+
+## One camera per track
+
+Put each camera's recording on a track of its own, then line the recordings up in time. **Clip ▸ Synchronize Audio** does this from their sound: select the recordings and choose it. See [Synchronize Audio](/audio/synchronize-audio/).
+
+If a camera stopped and started again, or split a long take into several files, its pieces can all sit on the one track, but they can't all be lined up in one go. See [A camera in several files](/audio/synchronize-audio/#a-camera-in-several-files).
+
+Lining up doesn't merge a camera with its microphone. Each stays a clip on its own track, so [silence the sound you don't want](/audio/synchronize-audio/#after-the-clips-line-up).
+
+## Name the tracks
+
+Double-click a track's header and type the camera's name. These names are what **Clip ▸ Switch Angle ▸** lists, and what the Switch by Speaker sheet uses for its cameras and microphones.
+
+When two listed tracks share a name, Frame Job adds each one's position counted from the back, for example "Camera (2)" and "Camera (3)".
+
+## The program track
+
+[Switch by Speaker](/multicam/switch-by-speaker/) can write the whole program track for you, and it adds its own track.
+
+To build the program by hand:
+
+<Steps>
+
+1. Move the playhead to the start of a camera's clip.
+2. Select the clip and press <kbd>⌘C</kbd>, then <kbd>⌘V</kbd>. The copy lands at the playhead, in sync with the camera. A paste aims at the front track, and with a clip already there it makes a new track in front of the others. That track is your program.
+3. With the copy selected, move the playhead to a cut and choose **Clip ▸ Split** (<kbd>⌘T</kbd>). Repeat for each cut, selecting the piece the cut falls in each time.
+4. Select a shot and pick another camera from [**Clip ▸ Switch Angle ▸**](/multicam/switch-angle/).
+
+</Steps>
+
+The paste makes the track itself, so you don't need **Track ▸ New Track** (<kbd>⇧⌘N</kbd>) here. A track you added first is the front track, so the copy lands on it instead.
+
+A pasted copy keeps its sound on, so the same sound plays from the program track and the camera's track until you [mute one of them](/audio/mute-and-solo/). The pieces Switch by Speaker writes have their sound off.
+
+An agent builds the program with one `copy_pieces` call per camera. See [Copy pieces to another track](/multicam/copy-pieces/).
+
+## Shown or hidden
+
+The camera tracks stay underneath the program. Leave them shown and the program track, being in front, covers them. Or hide them with the hide switch in the track header, or **Hide Video** in the header's right-click menu. See [Hide and lock tracks](/timeline/hide-and-lock-tracks/).
+
+Either way they still work as cameras: a hidden track's clips are still listed by Switch Angle and still count for Switch by Speaker.
+
+## Edit without losing sync
+
+Once the recordings are lined up, every track has to lose the same moments.
+
+- **To take a stretch out of the show,** set an [in/out range](/timeline/in-out-range/), select nothing and press <kbd>⌘⌫</kbd>. That [cuts every unlocked track](/editing/delete-clips/#ripple-delete-a-range) and closes the hole. [Remove Silences](/cleanup/remove-silences/), [Remove Filler Words](/cleanup/remove-filler-words/) and [deleting words](/captions/delete-words/) cut the same way.
+- **Don't ripple-delete a selected shot on the program track.** Only clips that start after the hole move. The cameras and microphones running under it aren't cut, so everything later on the program [falls out of step](/editing/delete-clips/#how-a-ripple-closes-holes) with the sound.
+- **A locked track is left out of every cut,** so unlock the tracks first.
+
+## Microphones
+
+Switch by Speaker needs to know which recording hears which person. It works this out from what you've selected.
+
+| Selected | What counts as a microphone |
+| --- | --- |
+| Clips with their sound on and no picture, such as a recorder or a separate microphone file | Every track holding one |
+| No clips like that | Each camera that plays sound is its own microphone |
+| A camera's sound split off with **Clip ▸ Detach Audio** | Never chosen for you, but you can pick it in a **Microphone** pop-up |
+
+So keep each person's microphone file on a track of its own, beside the cameras, and select it with them. Only the selected clips on a microphone's track are listened to. If two people share one stereo file, one on each side, [give each side its own track](/audio/channels/#two-people-on-one-stereo-file).
+
+The sheet's **Microphone** pop-ups list every track holding a selected clip with its sound on, so you can swap in a detached camera sound or a camera's own sound there. An agent can name a detached camera sound as a microphone too.
+
+When the selection comes to exactly one microphone and two or more cameras, Switch by Speaker can't tell people apart by ear, so it decides from their faces. That includes the case where only one camera has sound. See [Cut from faces with one microphone](/multicam/one-microphone/).
+
+## Related
+
+- [Switch by Speaker](/multicam/switch-by-speaker/)
+- [Cut from faces with one microphone](/multicam/one-microphone/)
+- [Switch Angle](/multicam/switch-angle/)
+- [Synchronize Audio](/audio/synchronize-audio/)
+- [Add, rename and reorder tracks](/timeline/manage-tracks/)

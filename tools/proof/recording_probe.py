@@ -10301,7 +10301,7 @@ MUTANTS = {
         "the welcome button's action pointed at newProject:"),
     "retitle": (
         "AppDelegate.swift",
-        '            item.title = ScreenRecorder.shared.isRecording ? "Stop Recording" : "New Recording…"\n',
+        '            item.title = Self.newRecordingStops ? "Stop Recording" : "New Recording…"\n',
         "",
         "validateMenuItem's retitle line deleted — the item never reads Stop Recording"),
     "quit-guard": (

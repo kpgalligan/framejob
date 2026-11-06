@@ -18,7 +18,9 @@ import Sparkle
 ///
 /// **Sparkle's own defaults (PUB-9).** The standard controller and user driver:
 /// Sparkle asks on the second launch whether to check automatically, checks
-/// once a day when allowed, and never installs without asking.
+/// once a day when allowed, and installs only when asked, unless the person
+/// ticks Sparkle's own "Automatically download and install updates" box
+/// (`SUAllowsAutomaticUpdates` is unset).
 ///
 /// The controller is a static, because `AppDelegate` holds no stored
 /// properties (`AppDelegate+Recording.swift` says why); `startUpdater()` is

@@ -1,0 +1,152 @@
+---
+title: "Rename, delete and restore graphics"
+description: "Rename a module and every clip follows, delete one no clip uses, bring back kept code, and copy a module to change one clip's look."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+Each graphic in a project is a module, a file of code that any number of clips can share. These commands look after those files: rename one, delete one, go back to earlier code, or split a clip off onto its own copy.
+
+<AtAGlance
+  menu={['File ▸ Rename Graphic…', 'File ▸ Delete Graphic…', 'File ▸ Restore Graphic Version…']}
+  where="Clip tab ▸ Graphic ▸ Source ▸ Duplicate as New Graphic…"
+  tools={['rename_graphic', 'delete_graphic', 'restore_graphic', 'write_graphic', 'set_graphic']}
+/>
+
+The three **File** items have no keyboard shortcut. Each opens a small sheet with a **Graphic:** pop-up.
+
+## Rename Graphic
+
+Renaming a module changes its file name, and every clip drawn by it follows the new name, on the timeline and inside nests.
+
+<Steps>
+
+1. Choose **File ▸ Rename Graphic…**. The sheet opens on the selected clip's module when one clip is selected, otherwise on the first module.
+
+2. Pick the module from **Graphic:** if it's a different one. The **New name:** field starts with the chosen module's name, and changes when you pick another.
+
+3. Type the new name and choose **Rename**.
+
+</Steps>
+
+<Shot
+  name="15b-rename-graphic-sheet.sheet"
+  alt="The Rename Graphic sheet. A paragraph explains that every clip follows the new name and how to rename back. Graphic: is a pop-up reading lower-third, and New name: is a field holding the same name. Bottom left, small grey text reads lowercase letters, digits and -. Bottom right are Cancel and a dimmed Rename."
+/>
+
+A name is lowercase letters, digits and `-`, starting with a letter or a digit, and at most 63 characters. **Rename** stays dimmed until the name isn't empty and differs from the current one.
+
+The module's [kept versions](/graphics/edit-a-module/#kept-versions) move with it. If the new name belonged to a deleted module, the two sets of versions join under that name. Past 10, the oldest are dropped for good, and those are the deleted module's.
+
+The item is dimmed in a project with no graphics and while a nest is open, because a rename reaches every clip in the project. Leave the nest with <kbd>⌘↑</kbd> first.
+
+## Undo a rename
+
+When a clip uses the module, a rename is one undo step, **Rename Graphic**. **Edit ▸ Undo** puts the clips back and moves the module's file back to its old name with them, and **Edit ▸ Redo** moves both forward again.
+
+A module no clip uses makes no undo step. To go back, rename it again.
+
+Frame Job remembers the last 32 renames in a project to do this. An undo further back than that can leave a clip naming a module that has no file, and the clip draws the [error card](/graphics/edit-a-module/#the-error-card).
+
+## Delete Graphic
+
+Deleting removes a module that no clip uses. Its code is kept, so you can bring it back.
+
+<Steps>
+
+1. Delete the clips drawn by the module, or switch them to another one. See [Switch clips to another module](#switch-clips-to-another-module).
+
+2. Choose **File ▸ Delete Graphic…**. The sheet always opens on the first module in the list.
+
+3. Pick the module from **Graphic:** and choose **Delete**.
+
+</Steps>
+
+<Shot
+  name="15c-delete-graphic-sheet.sheet"
+  alt="The Delete Graphic sheet. A paragraph explains that a graphic clips still use cannot be deleted, that its code is kept so Restore Graphic Version brings it back, and that deleting is not an Undo step. Graphic: is a pop-up reading lower-third. Bottom right are Cancel and a blue Delete."
+/>
+
+**Delete** is the only confirmation. There's no second question, and deleting isn't an undo step and doesn't mark the project as edited.
+
+Clips count wherever they are, on the timeline or in a nest. Fonts and pictures are left alone. The item is dimmed in a project with no graphics.
+
+## Switch clips to another module
+
+The inspector can't point clips at a different module that already exists. **Duplicate as New Graphic…** only switches them to a new copy. To move clips to an existing module, delete the clips and [insert that module](/graphics/insert-a-graphic/) again, or ask an agent to do it.
+
+## Restore Graphic Version
+
+Restoring puts back the newest kept version of a module's code, and it works on deleted modules too.
+
+<Steps>
+
+1. Choose **File ▸ Restore Graphic Version…**. The sheet opens on the selected clip's module when one clip is selected and that module has a kept version, otherwise on the first in the list.
+
+2. Pick the module from **Graphic:**. The pop-up lists every name with a kept version, and a deleted one reads like `lower-third (deleted)`. Under it, the sheet says how many are kept, such as "3 versions kept".
+
+3. Choose **Restore**.
+
+</Steps>
+
+<Shot
+  name="15d-restore-graphic-version-sheet.sheet"
+  alt="The Restore Graphic Version sheet. A paragraph explains that it puts back the newest kept version, keeps the code it replaces, and is not an Undo step. Graphic: is a pop-up reading lower-third, with 1 version kept in small grey type under it. Bottom right are Cancel and a blue Restore."
+/>
+
+There's no list of versions to pick from. The sheet always restores the newest.
+
+The code a restore replaces is kept in its turn, and it becomes the newest. So restoring again returns to where you were, and the sheet swaps between those two rather than stepping further back. An agent can ask for any kept version.
+
+Restoring isn't an undo step and doesn't mark the project as edited. The item is dimmed when no version of any graphic is kept. For when a version is kept, see [Kept versions](/graphics/edit-a-module/#kept-versions).
+
+## Duplicate as New Graphic
+
+Clips that share a module all change when it does. This writes a copy of the module under a new name and switches the selected clips to it, so you can change one clip's look and leave the rest alone.
+
+<Steps>
+
+1. Select the clips to split off.
+
+2. In the **Source** section of the **Graphic** sub-tab, choose **Duplicate as New Graphic…**.
+
+3. Type a module name. The field suggests `<name>-copy`, or `<name>-copy-2` and so on when that's taken.
+
+4. Choose **Duplicate**.
+
+</Steps>
+
+Writing the copy can't be undone, but switching the clips can, as one step, **Duplicate Graphic**. Undo puts the clips back on the original and leaves the copy in the folder. Use [Delete Graphic](#delete-graphic) to remove it.
+
+The button is dimmed when the module file is missing. When the selected clips are drawn by different modules, **Source** doesn't offer it.
+
+## When Frame Job won't do it
+
+On success, a sheet closes without a message. When Frame Job can't do what you asked it beeps, shows the reason in the sheet in its own words, and the sheet stays open so you can change your choice or choose **Cancel**.
+
+| Item | The sheet says | What it means |
+| --- | --- | --- |
+| Rename | `graphic name "My Title" is not a module name…` | The name breaks the rule above. |
+| Rename | `graphics/title.js already exists` | Another module has that name. |
+| Rename | `The name "title" is already drawn by clip 4 on the timeline…` | Clips left behind by a deleted module still use that name. Delete those clips or switch them first. |
+| Delete | `The graphic "title" is still drawn by clips 4 and 9 on the timeline and clip 12 in nest 7…` | The sheet names every clip that uses it. Delete them or switch them to another module first. |
+| Restore | `…was changed outside Frame Job and no longer holds the revision in its name; it is not restored…` | The kept file doesn't match what Frame Job stored, so nothing is written. |
+
+**Duplicate as New Graphic…** reports the same two naming problems in an alert. Its clips stay as they were.
+
+## With an agent
+
+[`rename_graphic`](/mcp/tools-graphic-files/#rename_graphic), [`delete_graphic`](/mcp/tools-graphic-files/#delete_graphic) and [`restore_graphic`](/mcp/tools-graphic-files/#restore_graphic) do what the sheets do, and give the same reasons when they can't. `restore_graphic` can name any kept version, not only the newest.
+
+An agent duplicates a graphic with [`write_graphic`](/mcp/tools-graphics/#write_graphic) of the module's code under the new name, then [`set_graphic`](/mcp/tools-graphics/#set_graphic). `set_graphic` can also point clips at a module that already exists, which the inspector can't do. An agent can't rename a module while a nest is open either.
+
+See [Tools: graphic fonts, pictures and packages](/mcp/tools-graphic-files/) and [Tools: graphics](/mcp/tools-graphics/).
+
+## Related
+
+- [Edit a module](/graphics/edit-a-module/)
+- [The Graphic sub-tab](/graphics/graphic-tab/)
+- [Insert a graphic](/graphics/insert-a-graphic/)
+- [Share a graphic](/graphics/share-a-graphic/)

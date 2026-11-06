@@ -267,6 +267,127 @@ var end2 = state()
 end2["duration"] = document.editedProject.duration
 answer["end2"] = end2
 
+// loopend — a loop at the timeline's end (#466). Every time is relative to D: earlier rows have
+// moved clip 4, and a loop one frame short of the end wraps with or without the fix.
+let D = document.editedProject.duration
+func setRangeToEnd() {
+    editor.setPlayhead(D - second)
+    spin(0.5)
+    editor.setInPoint(nil)
+    editor.setPlayhead(D)
+    spin(0.5)
+    editor.setOutPoint(nil)
+}
+func loopendState() -> [String: Any] {
+    var row = state()
+    row["duration"] = D
+    return row
+}
+
+setRangeToEnd()
+editor.toggleLoop(nil)
+start(at: D - second)
+editor.playback.play()
+spin(8)
+answer["loopend1"] = loopendState()
+editor.playback.pause()
+spin(0.5)
+
+start(at: D - second)
+editor.playback.setRate(2)
+spin(6)
+answer["loopend2"] = loopendState()
+editor.playback.pause()
+spin(0.5)
+
+// Reverse: the loop stays on, and `.none` must not strand the transport at 0.
+start(at: second)
+editor.playback.setRate(-1)
+spin(3)
+answer["loopend3"] = loopendState()
+editor.playback.pause()
+spin(0.5)
+
+// Loop off on the way to the end.
+start(at: D - second)
+editor.playback.play()
+spin(0.3)
+editor.toggleLoop(nil)
+spin(2)
+answer["loopend4"] = loopendState()
+editor.clearInOutRange(nil)
+
+// A loop running past the item, as a range left by a shortened timeline does.
+start(at: D - second)
+editor.playback.loopRange = (start: D - second, duration: 3 * second)
+editor.playback.play()
+spin(8)
+answer["loopend5"] = loopendState()
+editor.playback.pause()
+editor.playback.loopRange = nil
+spin(0.5)
+
+// These rows press L (`setRate(1)`) while parked at the end of a loop running past the item, and
+// `setRate`'s own seek (`Playback.setRate`) wraps it to the loop's start. Parked by a seek, then by
+// playing in, which can rest off the end tick.
+start(at: D)
+editor.playback.loopRange = (start: D - second, duration: 3 * second)
+editor.playback.setRate(1)
+spin(8)
+answer["loopend9"] = loopendState()
+editor.playback.pause()
+editor.playback.loopRange = nil
+spin(0.5)
+
+start(at: D - second)
+editor.playback.play()
+spin(2)
+reports = []
+editor.playback.loopRange = (start: D - second, duration: 3 * second)
+editor.playback.setRate(1)
+spin(8)
+answer["loopend10"] = loopendState()
+editor.playback.pause()
+editor.playback.loopRange = nil
+spin(0.5)
+
+// J parked there runs back from the end and does not jump to the loop's start.
+start(at: D)
+editor.playback.loopRange = (start: D - second, duration: 3 * second)
+editor.playback.setRate(-1)
+spin(0.3)
+answer["loopend11"] = loopendState()
+editor.playback.pause()
+editor.playback.loopRange = nil
+spin(0.5)
+
+// A loop wholly past the item stops at the end; playing again stays there.
+start(at: D - second)
+editor.playback.loopRange = (start: D + second, duration: 2 * second)
+editor.playback.play()
+spin(3)
+answer["loopend6"] = loopendState()
+reports = []
+editor.playback.play()
+spin(1.5)
+answer["loopend7"] = loopendState()
+editor.playback.pause()
+editor.playback.loopRange = nil
+spin(0.5)
+
+// Loop on with playback already running.
+setRangeToEnd()
+start(at: D - second)
+editor.playback.play()
+spin(0.3)
+editor.toggleLoop(nil)
+spin(8)
+answer["loopend8"] = loopendState()
+editor.playback.pause()
+editor.clearInOutRange(nil)
+editor.toggleLoop(nil)
+spin(0.5)
+
 // short — the timeline shortened under the playhead.
 start(at: 5 * second)
 document.applyEdit("Probe", .delete(clips: [4]))

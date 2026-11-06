@@ -32,6 +32,11 @@ import AppKit
 /// pasteboard type exists for. Depth is the only thing about the source's
 /// track stack worth carrying: it is what makes a two-lane selection paste
 /// back onto two lanes.
+///
+/// **A nest travels with the clips that show it** (`payloadNests`), verbatim:
+/// a track id inside a nest stays an id, because the nest's own tracks come
+/// with it and the core re-mints them together. A payload with no nest clip
+/// has no `nests` key.
 extension EditorViewController {
     /// The private pasteboard type the payload travels under. Private on
     /// purpose: a Frame Job clip is not a flavour of anything else, and a paste
@@ -68,7 +73,8 @@ extension EditorViewController {
 
     /// The `paste` payload for the current selection: the selected clips
     /// verbatim out of `project.json` with each clip's `track` rewritten to
-    /// its depth from the front, plus the media rows those clips name.
+    /// its depth from the front, plus the nests those clips show and the
+    /// media rows all of them name.
     ///
     /// nil when the project JSON cannot be read or the selection resolved to
     /// no clips at all — both of which mean there is nothing to put on the
@@ -108,6 +114,16 @@ extension EditorViewController {
             wanted.formUnion(Self.payloadMediaIDs(clip))
         }
         guard !payloadClips.isEmpty else { return nil }
+        // The nests the clips show, and what THEIR clips name: a paste into
+        // another project needs the rows a nest looks through as much as a
+        // top-level clip's.
+        let nests = Self.payloadNests(
+            showing: payloadClips, from: root["nests"] as? [[String: Any]] ?? [])
+        for nest in nests {
+            for clip in nest["clips"] as? [[String: Any]] ?? [] {
+                wanted.formUnion(Self.payloadMediaIDs(clip))
+            }
+        }
         // A wanted row's Camera Log LUT travels with it (spec §11 GR-16), so
         // the paste lands the conversion remapped rather than dropping it.
         for id in wanted {
@@ -121,7 +137,38 @@ extension EditorViewController {
             guard let id = (entry["id"] as? NSNumber)?.uint32Value else { return false }
             return wanted.contains(id)
         }
-        return ["clips": payloadClips, "media": media]
+        var payload: [String: Any] = ["clips": payloadClips, "media": media]
+        if !nests.isEmpty { payload["nests"] = nests }
+        return payload
+    }
+
+    /// The nests `clips` show, directly or through one another, each once, in
+    /// the order they are discovered: `reachable_nests`' walk in
+    /// `core/src/edit_paste.rs`, which refuses a payload missing one. An id
+    /// `nests` does not hold is skipped, for the core to name.
+    static func payloadNests(
+        showing clips: [[String: Any]], from nests: [[String: Any]]
+    ) -> [[String: Any]] {
+        func shown(_ clips: [[String: Any]]) -> [UInt32] {
+            clips.compactMap { clip in
+                guard let source = clip["source"] as? [String: Any],
+                      source["kind"] as? String == "nest"
+                else { return nil }
+                return (source["project"] as? NSNumber)?.uint32Value
+            }
+        }
+        var found: [[String: Any]] = []
+        var seen: Set<UInt32> = []
+        var queue = shown(clips)
+        while !queue.isEmpty {
+            let id = queue.removeFirst()
+            guard seen.insert(id).inserted,
+                  let nest = nests.first(where: { ($0["id"] as? NSNumber)?.uint32Value == id })
+            else { continue }
+            found.append(nest)
+            queue += shown(nest["clips"] as? [[String: Any]] ?? [])
+        }
+        return found
     }
 
     /// The media ids one copied clip (its `project.json` object) names: its
@@ -167,12 +214,12 @@ extension EditorViewController {
 
     /// ⌘X. Copy, then exactly the edit ⌫ performs — ONE undo step, because
     /// the copy touches no model state and the delete is a single op.
-    func cutSelection() {
+    func cutSelection(to pasteboard: NSPasteboard = .general) {
         guard let document = document, !document.selection.isEmpty else {
             NSSound.beep()
             return
         }
-        guard copySelection() else { return }
+        guard copySelection(to: pasteboard) else { return }
         document.applyEdit("Cut", .delete(clips: Array(document.selection)))
     }
 
@@ -185,8 +232,8 @@ extension EditorViewController {
     /// refuses on a new track in front rather than refusing the edit, so the
     /// only beeps here are an empty pasteboard and a payload the core reports
     /// as invalid (through `applyEdit`, which presents the message).
-    func pasteClips() {
-        guard let document = document, let payload = pasteboardPayload() else {
+    func pasteClips(from pasteboard: NSPasteboard = .general) {
+        guard let document = document, let payload = pasteboardPayload(on: pasteboard) else {
             NSSound.beep()
             return
         }

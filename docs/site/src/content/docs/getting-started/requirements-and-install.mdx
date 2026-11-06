@@ -1,0 +1,68 @@
+---
+title: "Requirements and install"
+description: "What your Mac needs to run Frame Job, what it costs, where to download it, and what happens the first time you open it."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+Frame Job runs on an Apple Silicon Mac with macOS 26 or later. It's free, there's no account to make, and you can start cutting as soon as it's in your Applications folder.
+
+<AtAGlance
+  needs={['An Apple Silicon Mac', 'macOS 26 or later']}
+/>
+
+## What Frame Job needs
+
+| You need | Details |
+| --- | --- |
+| An Apple Silicon Mac | Frame Job is built for Apple Silicon alone, so an Intel Mac can't run it. There's no Windows, Linux, iPad or iPhone version. |
+| macOS 26 or later | 26.0 is the oldest system it opens on. |
+| An account | None. There's nothing to sign up for. |
+| A subscription | None. Frame Job is free and [open source](/reference/open-source/). The features that need an API key charge your own account with that service. |
+| An API key | None to edit. Only the Assistant and cloud transcription need one, and each runs on [your own key](/getting-started/ai-and-your-keys/). Everything else works without a key. |
+
+:::note
+M1 and M2 Macs have no AV1 decoder. They can export [AV1](/export/av1-and-vp9/), but Frame Job won't import an AV1 file on them. The rest of the editor isn't affected.
+:::
+
+## Download and install
+
+<Steps>
+
+1. Download the newest build: [FrameJob.dmg](https://github.com/kpgalligan/framejob/releases/latest/download/FrameJob.dmg). This link always gives you the latest release.
+
+2. Open the DMG.
+
+3. Drag Frame Job to Applications.
+
+</Steps>
+
+The download is signed and notarized, and it can [update itself](/getting-started/updates/).
+
+A copy you build yourself has no updater. To build one, see [Developing Frame Job](https://github.com/kpgalligan/framejob/blob/main/docs/developing.md).
+
+## First launch
+
+Frame Job asks you for nothing the first time it opens: no account, no key and no system permission. As with any app downloaded from the internet, macOS may ask you to confirm that you want to open it.
+
+With nothing to open, it shows the [Welcome window](/projects/welcome-window/), with **Open Video…**, **New Project**, **New Recording…** and your recent projects.
+
+<Shot
+  name="01-welcome.window"
+  alt="The Welcome window: the Frame Job mark and name, the line Open a file. Start cutting., the buttons Open Video…, New Project and New Recording…, and a line of the file types it opens."
+/>
+
+Three things come later, and only when you get to them:
+
+- **System permissions.** Screen Recording, Microphone, Camera and Input Monitoring come up only when you press **Record** in the [recorder panel](/recording/recorder-panel/), and only for what that recording uses. Frame Job never asks at launch. See [Recording permissions](/recording/permissions/).
+- **Automatic updates.** The second time you open the downloaded copy, it asks whether to check for updates automatically. See [Updates](/getting-started/updates/).
+- **API keys.** They're optional, and you set them in **Frame Job ▸ Settings…** (<kbd>⌘,</kbd>), which works with no project open. See [AI features and your own keys](/getting-started/ai-and-your-keys/).
+
+## Related
+
+- [Your first edit](/getting-started/first-edit/)
+- [The Welcome window](/projects/welcome-window/)
+- [Updates](/getting-started/updates/)
+- [AI features and your own keys](/getting-started/ai-and-your-keys/)

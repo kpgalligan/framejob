@@ -352,7 +352,7 @@ final class TranscriptTabSource {
             model = TranscriptTokens.build(shown, pauses: pauseSets)
             allWords = all
             noWords = read.noWords
-            notes = TimelineTranscript.sameSpeech(shown, instances: read.instances)
+            notes = TimelineTranscript.sameSpeechShown(shown, instances: read.instances)
         } else {
             model = .empty
             allWords = []

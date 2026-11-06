@@ -1,0 +1,70 @@
+---
+title: "Show Selection"
+description: "See in grey exactly which pixels an adjustment clip's qualifier picks, so you can tune its ranges before you judge the grade."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Show Selection replaces the preview with a grey picture of what a [qualifier](/color/qualifiers/) picks. It shows you which pixels an adjustment clip's grade reaches, so you can tune the ranges without guessing from the graded picture.
+
+<AtAGlance
+  menu="View ▸ Show Selection"
+  where="Clip tab ▸ Color ▸ Qualifier ▸ Show Selection"
+  tools="render_frame"
+  needs="An adjustment clip selected."
+/>
+
+## Turn it on
+
+Select an [adjustment clip](/color/adjustment-clips/), then tick **Show Selection** in the **Qualifier** section of the [Color tab](/color/color-tab/), or choose **View ▸ Show Selection**. Do the same again to turn it off. It's off to begin with and has no keyboard shortcut. The **Qualifier** section only appears while every selected clip is an adjustment clip.
+
+The checkbox and the menu item are the same switch, and the menu item has a checkmark while it's on. The menu item is dimmed while Show Selection is off and no adjustment clip is selected.
+
+## Read the picture
+
+| The preview shows | What it means |
+| --- | --- |
+| White | The clip's grade applies in full here. |
+| Black | The grade doesn't touch this pixel. |
+| Grey | The grade applies in part, as it does across a range's soft edge. |
+
+The picture is the selection as the clip really uses it, with a few things to keep in mind:
+
+- **Blur** and **Invert** are included, and so is any [matte](/canvas/matte-tracks/) cutting the clip.
+- The clip's **Strength** isn't applied. A clip at 50 % still draws white where it's fully selected.
+- Layers in front of the clip are left out, so a title on top doesn't hide the selection.
+- The preview is black whenever the clip isn't on the frame, such as when the playhead is outside it.
+- With no range turned on, the qualifier picks everything, so the whole frame is white. With **Invert** on as well, it's black.
+
+## The Selection tag
+
+A **Selection** tag shows in the preview's top-left corner while the switch is on. It sits beside the **Ungraded** tag, and moves into the corner when Show Ungraded is off. See [Preview tags](/timeline/preview/#preview-tags).
+
+## Which clip it shows
+
+Show Selection shows one clip at a time, the first selected adjustment clip.
+
+- Select a different adjustment clip and it moves to that one.
+- Select something else, or nothing, so that no adjustment clip is selected, and it turns off.
+
+## Preview only
+
+Show Selection changes this window's preview and the [Preview Window](/timeline/preview-window/), and nothing else. An export and **Save Frame…** never see it.
+
+It isn't an edit, so it makes no undo step and the project doesn't change. It belongs to the window and isn't saved, so a new window starts with it off. See [Grade view tools are never saved](/color/show-ungraded/#grade-view-tools-are-never-saved).
+
+## Good to know
+
+- [Scopes](/color/scopes/) read the preview's frame, so while Show Selection is on they measure the grey picture, not the graded one.
+- It can be on at the same time as [Show Ungraded](/color/show-ungraded/). The clips behind the adjustment clip then lose their grades, so the selection is worked out from their ungraded picture.
+
+## With an agent
+
+`render_frame` can draw this same grey picture for any frame. Pass an adjustment clip's id as `selection`. The tool works the same whether the View menu switch is on or off, and it leaves the switch alone. If the id isn't an adjustment clip in this project, the tool stops with an error naming `selection`. See [Check the picture: render_frame](/mcp/render-frame/#selection).
+
+## Related
+
+- [Qualifiers](/color/qualifiers/)
+- [Pick from Canvas](/color/pick-from-canvas/)
+- [Adjustment clips](/color/adjustment-clips/)
+- [Show Ungraded](/color/show-ungraded/)

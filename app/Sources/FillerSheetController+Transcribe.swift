@@ -16,12 +16,14 @@ import AppKit
 ///
 /// **The button is disabled** with no credential (the note names Settings),
 /// with no cache directory (the note says to save), with no clip that plays
-/// the media from its file, and while any run goes — except the running
-/// row's, which reads Stop and cancels it.
+/// the media from its file when the rows were built, and while any run goes
+/// — except the running row's, which reads Stop and cancels it. A file lost
+/// while the sheet is up keeps its row until a press, which uploads nothing
+/// and says the file is missing, in the row and in the note.
 extension FillerSheetController {
 
     /// The rows, made again from `input.needsTranscript`: called at open, when
-    /// a run starts and when it ends.
+    /// a run starts, when it ends, and when a press finds nothing to upload.
     func rebuildRows() {
         for view in rowsStack.arrangedSubviews {
             rowsStack.removeArrangedSubview(view)
@@ -57,9 +59,7 @@ extension FillerSheetController {
                 estimate.toolTip = CloudEstimate.rateSentence(speakers: priced.speakers)
                 runnable.insert(media)
             } else {
-                estimate.stringValue = cacheDirectory == nil
-                    ? "Save the project to transcribe it"
-                    : "No clip plays this file, so it cannot be transcribed"
+                estimate.stringValue = unrunnableSentence(media, urls: urls)
             }
             if media == runningMedia { estimate.stringValue = "Starting…" }
             let button = StickerButton(
@@ -78,6 +78,26 @@ extension FillerSheetController {
             mediaRows.append(MediaRow(media: media, name: name, estimate: estimate, button: button))
         }
         transcribeSection.isHidden = input.needsTranscript.isEmpty
+    }
+
+    /// Why a row cannot run, for its estimate line.
+    func unrunnableSentence(_ media: UInt32, urls: [UInt32: URL]) -> String {
+        if cacheDirectory == nil { return "Save the project to transcribe it" }
+        if urls[media] == nil { return "This file is missing. Relink it to transcribe it." }
+        return "No clip plays this file, so it cannot be transcribed"
+    }
+
+    /// The note for the media in scope whose files are missing: they have no
+    /// row, because `FillerDetector` gave them no job. Nil when none is.
+    func missingNote() -> String? {
+        guard let first = input.missing.first else { return nil }
+        guard input.missing.count == 1 else {
+            return "\(input.missing.count) files are missing, so their fillers cannot be found. "
+                + "Relink them, then open this sheet again."
+        }
+        let name = document?.editedProject.snapshot.media(first)?.name ?? "Media \(first)"
+        return "“\(name)” is missing, so its fillers cannot be found. Relink it, then open this "
+            + "sheet again."
     }
 
     /// Whether a key resolves, through the sheet's own store and environment.
@@ -160,11 +180,17 @@ extension FillerSheetController {
             return
         }
         let snapshot = document.editedProject.snapshot
+        let urls = document.mediaURLs()
         let jobs = FillerTranscription.jobs(
-            for: media, in: snapshot, urls: document.mediaURLs(),
-            maps: document.editedProject.sourceMap)
+            for: media, in: snapshot, urls: urls, maps: document.editedProject.sourceMap)
         guard !jobs.isEmpty else {
-            NSSound.beep()
+            // The row was built before the file went, so it says so now.
+            let name = snapshot.media(media)?.name ?? "Media \(media)"
+            lastError = urls[media] == nil
+                ? "“\(name)” is missing, so nothing was uploaded. Relink it to transcribe it."
+                : "No clip plays “\(name)”, so nothing was uploaded."
+            rebuildRows()
+            refresh()
             return
         }
         var records: [UInt32: MediaSnapshot] = [:]

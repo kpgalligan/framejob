@@ -1864,12 +1864,14 @@ imports `dist_check`.
 ```
 make gate                                   # or: python3 tools/proof/gate.py [--force] [--wait SECONDS]
 make gate GATE_ARGS=--force                 # run every step, stamps or not
-python3 tools/proof/gate.py --selftest      # H0, M1–M8, H2–H4, W0–W4 (make test)
+python3 tools/proof/gate.py --selftest      # H0, M1–M8, H2–H5, W0–W4 (make test)
 python3 tools/proof/gate.py --mutant no-tools|stamp-always|md-counted|warning-count
 ```
 
 **The steps**, serially, stopping at the first failure, each under its
-bound (running past it is a FAIL): `typecheck` (`make typecheck`, 600 s,
+bound (running past it is a FAIL): `names` (120 s) runs `name_residue.py`,
+then `docs_site_proof.py --guide` (no `docs/guide/` and no link into it);
+`typecheck` (`make typecheck`, 600 s,
 which first builds or reuses the bundled encoders, `make codecs`: a cold
 fetch and build of SVT-AV1 and libvpx is about a minute, codec-export C0) —
 passes only with no `error:` and exactly the four baseline warnings by file
@@ -1927,7 +1929,8 @@ proof, a spec file, `docs/manual-checks.md`; `archive/`, `README.md`, a
 M8 `tools/codecs/build_codecs.py` moves names, typecheck, test and app, and
 `tools/licenses/acknowledgements.py` names, test and app); H2
 a substituted tool string moves every step; H3 unequal before and after
-hashes record no pass; H4 (CONTROL) a `.secrets/` path is in no step; W0
+hashes record no pass; H4 (CONTROL) a `.secrets/` path is in no step; H5
+(CONTROL) the `names` step runs `docs_site_proof.py --guide`; W0
 (CONTROL) the four baseline warnings at other line numbers, each with its
 caret line, pass; W1 a fifth fails, named; W2 a baseline warning in another
 file fails; W3 one gone fails; W4 an `error:` fails. Each mutant fails
@@ -3161,9 +3164,22 @@ deselected action span that holds 1 s and not 0 under a structural edit
 4 s during a live drag, with `revealPlayhead`'s band read off the clip view
 (reveal·1–3), play, a structural edit mid-play and the loop wrap (play·1,
 play·2, loop·1), the end-parked refresh and playing into the end (end·1,
-end·2), and clip 4 deleted under a 5 s playhead (short·1, short·2). No row
-reads a picture, so every row is scored whatever the console state; the
-first printed line names it.
+end·2), a loop at the timeline's end (loopend·1–11, #466), and clip 4 deleted
+under a 5 s playhead (short·1, short·2). No row reads a picture, so every row
+is scored whatever the console state; the first printed line names it.
+
+The `loopend` rows go through the real `editor.toggleLoop(nil)` and name no
+fixed second: D is the document's duration where the block starts, because
+earlier rows move clip 4 and a loop one frame short of the end wraps on any
+tree. A fall is a report over 0.5 s below the one before it. "Rests on D" is
+rate 0, the document == the player tick, both within one frame of D, and "no
+report past D" holds to the same frame: the player's clock overran the end
+tick by up to 351 ticks at rest and 10070 going round at ×2 on these runs. The
+frame is 20000 ticks. `loopend·9` and `·10` press L parked at the end of a loop
+running past the item, by a seek and by playing in; `·11` presses J there. Over
+f3697497's `app/Sources`, 28/34: `loopend·1`, `·2`, `·5`, `·8`, `·9` and `·10`
+fail (1, 1, 0, 1, 0 and 0 falls, rate 0) and the rest pass. `loopend·3`, the
+reverse row, passes on both trees and is marked M. 34/34 at the fix.
 
 **20/20** at the fix, console unlocked. Made to fail over 4f18f0b's
 `app/Sources` (`git archive 4f18f0b app/Sources | tar -x -C
@@ -30067,3 +30083,349 @@ RC_PROOF_APP=release python3 tools/proof/faces_proof.py --only F5   # F5 on S-TH
 the other tracks' counts, and `audio_tracks.py` sets ffprobe's audio streams beside it. The
 recorded runs, the rows skipped and those still owed are in `designs/creator-jobs.md`'s
 "CJ7's record".
+
+## Docs-bugs batch a1 — timeline and clipboard (`docs_bugs_a1_proof.py`, `docs_bugs_a1_probe.swift`; sixteen mutants by `--mutant`; `core/tests/duplicate_destination.rs`; spec §11 #465)
+
+#464, #465, #507 and #511. **`docs_bugs_a1_proof.py`** has the app under test make its projects over
+MCP, runs the `app` rows there (D7, D8, F1–F5, Z1) and the rest through **`docs_bugs_a1_probe.swift`**,
+the app's own sources on those saved packages. The probe replaces `+[NSPasteboard
+generalPasteboard]` with a private board and exits unless `NSPasteboard.general` answers it, so
+`copy(nil)`, `cut(nil)` and `paste(nil)` never reach the owner's clipboard (row PB reads the real
+board's change count at both ends); its windows are off every display under the `.prohibited`
+policy, and its mouse events are handed straight to the timeline's content view. The script's
+docstring has every row.
+
+`--tree PATH` builds the probe from another tree, `PATH/core/target/release/libframejob_core.a`
+included; `--expect-red` is the run against the base, exiting 0 only when every row not marked
+CONTROL fails and every CONTROL passes.
+
+D15–D21 (batch ra) are #465's springback against the core's own landing rule
+(`ClipDragSession.landed`): a drop that landed never flashes and one the core refused always does,
+with a staggered two-lane selection, a refused tick after a good one, and the back clip dragged
+straight up. Their baseline is the tree at 8e007141, not the frozen base, so `--expect-red` with no
+`--only` leaves them out (`RESIDUE`); run them red on that tree's Debug app, with this probe and
+proof copied in, by `--only D15,D16,D17,D18,D19,D20,D21 --expect-red`: D15, D16, D17 and D20
+fail, the controls D18, D19 and D21 pass.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_a1_proof.py [--only N1,D5]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_a1_proof.py
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a1_proof.py --tree <a base tree> --expect-red
+python3 tools/proof/docs_bugs_a1_proof.py --mutant <name>
+```
+
+## Docs-bugs batch a2 — canvas keys and crop mode (`docs_bugs_a2_proof.py`, `docs_bugs_a2_probe.swift`; twelve mutants by `--mutant`; spec §11 K-5, K-6, K-7)
+
+#463, #474 and #475. **`docs_bugs_a2_proof.py`** has the app under test make its project over MCP,
+then runs every row but Z1 through **`docs_bugs_a2_probe.swift`**, the app's own sources on that
+package with the Compositor metallib beside the binary: a key press and a double-click can't be sent
+over MCP, and crop mode has no menu item or tool. The app is `.prohibited` and its window alpha 0, so
+nothing takes focus, and no event is posted. Keys go through `EditorWindow.sendEvent`; a press goes
+by `mouseDown(with:)` to the view `hitTest` picks, except F1 and F2, which test what `sendEvent` does
+before dispatch. A beep is not silenced: S1 to S5 may be heard. What a real keyboard sends is TL-18.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_a2_proof.py [--only N1,K3]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_a2_proof.py
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a2_proof.py --tree <a base tree> --expect-red
+python3 tools/proof/docs_bugs_a2_proof.py --mutant <name>
+```
+
+## Docs-bugs batch a3 — canvas selection and the inspector around it (`docs_bugs_a3_proof.py`, `docs_bugs_a3_probe.swift`; twenty-one mutants by `--mutant`; spec §11 CI-17, CI-18, CI-19)
+
+#469, #476, #471, #481 and #485, and batch a5's CI-19 rows. **`docs_bugs_a3_proof.py`** has the app under test make seventeen
+projects over MCP (a recording with a camera through `land_recording`), then runs every row but Z1
+through **`docs_bugs_a3_probe.swift`**, the app's own sources on those packages: a drag, a click and
+a key press can't be sent over MCP. The app is `.prohibited` and its windows alpha 0, so nothing
+takes focus. A press goes by `mouseDown(with:)` to the view `hitTest` picks; the divider drag runs
+NSSplitView's own tracking loop on this process's queue. D1's save is then rendered, and N3's
+selection captured with `snapshot_ui`, by the app under test. Its media is in
+`work/docs_bugs_a3_media/`, kept between runs. `nest-no-motion` is a core mutant: its copy gets a
+real `core/` and rebuilds the staticlib. A beep is not silenced: N8, N9 and CI-19's refusals may be
+heard. What a real hand does is TL-19…TL-23.
+
+Batch a5 (#469's second half, the owner's "Refuse and explain", spec §11 CI-19) rescored D7 and
+D11, which had pinned the base write past a finished action as CONTROLs, and added D14–D27 and V1.
+"Refused" is the strip at the inspector's foot reading the exact sentence, no undo step, and the
+base and every action's end as stored before. The refused rows are D7, D11, D14 (a corner scale),
+D15 (a nudge), D16 (a crop), D19 (the later of two zooms named), D20 (a landed camera with a later
+zoom) and D26 (a text clip's corner). The CONTROLs are D17 (a rotate past a zoom holding no
+rotation), D18 (a press that only selects stays silent), D21 (CI-17 before the zoom), D22 (the
+action selected), D23 (inside it after Esc), D24 (a shape's box), D25 (a text clip's side edge,
+width only), D27 (a ⇧-press that takes the dragged clip out of a pair) and V1 (`set_video` over
+MCP, in the fixtures' launch). A grip off the overlay's bounds, such as a zoomed box's corner, is
+pressed through the overlay's own `mouseDown(with:)`, and the row prints which door it used. The
+nine `held-*` mutants each break one CI-19 decision.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_a3_proof.py [--only D1,N3]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_a3_proof.py
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a3_proof.py --tree <a base tree> --expect-red
+python3 tools/proof/docs_bugs_a3_proof.py --mutant <name>
+```
+
+## The documentation site (`docs_site_proof.py`)
+
+The site in `docs/site/` against the tree, with no app, no build, no network and no node, so it
+runs in `make test`. `pnpm build` in `docs/site/` is what proves the site renders and its links
+land; this is what notices a menu item or an agent tool the site has never heard of. D1 every page
+has a title and a description, D2 the sidebar and the pages are one-to-one, D3 every feature in
+`src/data/features.json` names a page and an anchor it has, D4 every product tool has a heading on
+an `mcp/` page and no dev tool is named, D5 every menu item is on a reference page, D6 no page
+names something internal, D7 no page or data file holds a local path, D8 every `<Shot>` has both
+captures, D9 no page uses a banned word, D10 every tool in an `AtAGlance` and every step of a menu
+path is real, D11 `docs/guide/` (the user guide the site replaced) doesn't exist and no text file
+`git ls-files -co --exclude-standard` lists, whatever its suffix, outside `archive/`,
+`designs/adr/` and `GUIDE_ALLOWED`, links into it by a relative link or a GitHub URL of this
+repository. A binary file (a NUL byte, or not UTF-8) is not read. `GUIDE_ALLOWED` holds one file,
+`docs_site_proof.py` itself, whose selftest fixtures are such links. `--guide` runs D11 alone; it
+is the second command of `make gate`'s `names` step, whose inputs are every file, so a
+`README.md` edit runs it. The selftest's M12 makes `docs/guide/`, M13 adds a README link into it,
+M14 an app string with its GitHub URL and M15 a proof script's docstring link, each on a scratch
+root (`tools/proof/work/docs_site_guide/`) whose CONTROL holds an archive's and an ADR's links, a
+site's root-absolute link, an allowed file's and a binary file's GitHub URLs and a listed file gone
+from disk.
+
+```sh
+python3 tools/proof/docs_site_proof.py                       # the tree (make test)
+python3 tools/proof/docs_site_proof.py --pages a.mdx b.mdx   # those pages: D1, D6–D9
+python3 tools/proof/docs_site_proof.py --guide               # D11 alone (make gate's names)
+python3 tools/proof/docs_site_proof.py --selftest            # CONTROL + M1..M15
+```
+
+A new menu file is picked up by its name (`AppDelegate+*Menu*.swift`); a new tool by its catalog
+file (`AgentCatalog*.swift`). The screenshots' own rule is `docs/site/scripts/import-screens.mjs`,
+which refuses a capture that shows a local path.
+
+## What the Assistant asks and promises (`docs_bugs_c1_proof.py`)
+
+Docs bugs batch c1 (#461, #462, #494, #483, #484, #510, spec §11 AI-21). Real turns in the built app
+against `anthropic_fake.py`, with the dummy `proof-key` in a scratch `-RCSecretFolder`: the stand-in
+scripts the model's `tool_use`, and the lane, the question, Allow through the tab and the handler are
+the app's own. Files are hashed before and after. Q rows are the file the question names, N the three
+new rows, S `render_frame`'s scope files, R and H the calls that get no question, P a `null` path, I
+the two ⓘ sentences in the binary, C a reply stopped by the context window, and T the refusal whole in
+its transcript line. The docstring lists every row and marks the controls; every other row is red on
+a build from before AI-21.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_c1_proof.py [--only Q1,N1]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_c1_proof.py
+python3 tools/proof/docs_bugs_c1_proof.py --mutant <name>
+```
+
+## Docs bugs b1 — Loop at the timeline's end and ducking after Detach Audio (`docs_bugs_b1_proof.py` L1–L5, D1–D6, Z1; `playhead_echo_probe.py` `loopend·1`–`·11`; `core/tests/link_edges.rs`)
+
+#466: a loop ending at the item's end could stop there, because the item ended with `.pause` in
+force before the periodic observer heard the last tick; a run might go round once more first, so a
+row watching one pass proves nothing. `Playback.syncItemEndAction()` holds `.none` while `loopEnd`
+is set and the transport is not reversing, and the periodic observer or the item-end notification,
+whichever hears it first, wraps it (`Playback+Loop.swift`); only the notification can for a loop
+running past the item. An item that has ended posts no second end, so `play()` and `setRate` seek
+a loop parked at its end themselves: without `setRate`'s seek `loopend·10` ran to the loop's raw
+end, 4840032 against a D of 3640000. #468: Detach Audio left the duck on both halves (spec §11 AU-157).
+
+`python3 tools/proof/docs_bugs_b1_proof.py [--only L1,D3,…] [--app PATH]` makes its media under
+`work/docs-bugs-b1/` with ffmpeg and drives one launch on a scratch home; its docstring has the
+rows. The L rows take three 24 s trials each, about six minutes in all. The D rows are one document
+in order, so `--only` runs the whole chain and scores what it names.
+
+| Run | Result |
+|---|---|
+| The fix, Debug | 12/12: every L trial 4 wraps, still moving; D1 voice 1.000, music 0.200 |
+| The frozen base app | 4/12: L1 wraps 1, 1, 1; L2 1, 2, 2; L3 1, 2, 2; L5 `to` 0.0, 0.0, 0.0; D1 voice 0.200, music 0.040; D2, D3 and D5 fail; the controls L4, D4, D6 and Z1 pass |
+
+Eleven mutants, each by hand and reverted: `syncItemEndAction` always `.pause` (L1, `loopend·1`);
+`itemPlayedToEnd` returning at once (`loopend·5`; L1 and `loopend·1` pass, the periodic observer
+wrapping them); the sync ignoring the rate's sign (`loopend·3`); no `didSet` (`loopend·8`);
+`loopEnd` ignoring the item's end (`loopend·5`); `loopEnd` kept for a loop starting past the item
+(`loopend·6`, `·7`); detach keeping the duck (D2, `detach_leaves_the_duck_on_the_sound_half_alone`);
+`duckers` keeping a linked picture (D5, `a_stale_duck_on_a_picture_half_ducks_nothing`);
+`is_linked_picture` dropping `enabled.video` (`a_sound_half_switched_off_still_ducks`); `setRate`
+with no seek (`loopend·10`); `setRate`'s seek at any rate (`loopend·11`).
+
+## What is heard, what is named, what is missing (`docs_bugs_c2_proof.py`)
+
+Docs bugs batch c2 (#496, #489, #501, #502, spec §11 TX-35, TX-36). The built app with the dummy
+`proof-key` in a scratch `-RCSecretFolder`, AssemblyAI at the loopback `assemblyai_fake.py` under the
+cloud instruments' lock, so nothing is paid for. C rows are what `transcribe` reads, P what the
+Generate Captions sheet reads and says, N the Transcript tab's names, F a missing file, W the wall
+`detect_fillers` names and H the filler sheet's hint and note. What MCP cannot do (a press, a label
+past `snapshot_ui`'s 200 characters) runs in `docs_bugs_c2_probe.swift`, over packages the app saved,
+built through `swift_build.build()` and loaded with `docs_bugs_c2_beep.c`, so a press never sounds.
+The probe names only symbols the base has, so it builds over the base's sources. The docstring lists
+every row and marks the controls; every other row is red on a build from before TX-35.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_c2_proof.py [--only C1,P2]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_c2_proof.py
+python3 tools/proof/docs_bugs_c2_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_c2_proof.py --base-sources <its app/Sources>
+```
+
+## Docs bugs b2 — caption files, AVIF stills, an unreadable project.json (`docs_bugs_b2_proof.py`, `docs_bugs_b2_probe.swift`; ten mutants by `--mutant`; spec §11 #467, #498, #487)
+
+#467, #482, #498, #487 and #497's agent sentence. **`docs_bugs_b2_proof.py`** makes its own fixtures
+under `work/docs-bugs-b2/` (ffmpeg with libsvtav1, and `sips`) on a scratch `CFFIXED_USER_HOME`. The
+E, V, A and F rows run in one instance, and text is read back through `get_project`. A2 and A3 each
+launch with their own ffmpeg setting. The P rows launch an instance each and send `open_project` to a
+package the app saved, then damaged; on a Debug build lldb is attached first, so an abort stops under
+the debugger and no crash report window appears, and a Release run scores a dead instance as a
+failure. `-NSOpen` is never used, because on the fix its alert would reach the screen: that alert is
+`docs/manual-checks.md` PB-16. An attach makes `Popen.poll` answer 0, so these rows ask `ps`, and
+end the instance by its pid. F1, F2 and F4 send the folder to `relink_media` on an imported `A.mov`,
+since `import_media` imports a folder's files (#497, batch b5 below). V13 covers the WebVTT header's
+line offset: a broken cue straight after `WEBVTT` and `Kind:` in the first block is reported at its own
+line 3, and `vtt-header-line`, which drops that offset, turns it red.
+
+**`docs_bugs_b2_probe.swift`** runs what MCP cannot send: a Media tab drop through `MediaPane` on a
+private pasteboard, and `importCaptionsCommand()` and `addImageBackground(nil)` whole, `NSOpenPanel`
+and `NSAlert.runModal` replaced in its own process and its window 20,000 pt off every display. It
+names only symbols the base has, so it builds over `--base-sources`.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_b2_proof.py [--only E1,V3,P1]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_b2_proof.py
+python3 tools/proof/docs_bugs_b2_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_b2_proof.py --base-sources <its app/Sources> --expect-red
+```
+
+## Docs bugs b3 — what an export does and answers (`docs_bugs_b3_proof.py`, `docs_bugs_b3_probe.swift`; eight mutants by `--mutant`, with `log_proof.py`'s `hevc-read-always` and `vp9_alpha_export_proof.py`'s `no-shape-guard`; spec §11 #470, #486, #504, PR-14)
+
+#470, #486, #488, #493 and #504. **`docs_bugs_b3_proof.py`** makes its own fixtures under
+`work/docs-bugs-b3/` (ffmpeg with libx264, libx265 and prores_ks, and `sips`) on a scratch
+`CFFIXED_USER_HOME`. The R, S, C, D and W rows run in one instance. A cancel row polls
+`export_status` every 20 ms and cancels on the phase it wants, so the phase is measured, not timed.
+The G rows launch an instance a card, with the choice in the argument domain, so nothing persists
+and nothing presses Export….
+
+**`docs_bugs_b3_probe.swift`** reads what a layout dump cannot say: `exportButton` and `queueButton`
+on a real `ExportSheetController`, its view loaded and never shown, and `Exporter().export` called
+directly over a file. It names only symbols the base has, so it builds over `--base-sources` and B1
+and B2 are red there by behaviour. A press of Export… with a Custom size still being typed is
+`docs/manual-checks.md` SE-43.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_b3_proof.py [--only R1,C1,D1,G1]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_b3_proof.py
+python3 tools/proof/docs_bugs_b3_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_b3_proof.py --base-sources <its app/Sources> --expect-red
+```
+
+## Docs bugs a4 — menu items that promise what their edit refuses (`docs_bugs_a4_proof.py`, `docs_bugs_a4_probe.swift`; eight mutants by `--mutant`, with `recording_probe.py`'s `retitle`; spec §11 #472, #478, #495)
+
+#473, #472, #478, #490 and #495. **`docs_bugs_a4_proof.py`** drives one instance on a scratch
+`CFFIXED_USER_HOME` under `work/docs-bugs-a4/`, with `media/A.mov` and `media/toneA.m4a`. The F, M
+and T rows read a menu item's state from `perform_menu_item` with no path, which asks each item's
+validator, and perform Clip ▸ Freeze Frame, Mark ▸ Add Marker and Track ▸ Remove Track; a sheet is
+read from `snapshot_ui`'s layout dump and answered with `cancel_sheet`. The same instance makes and
+saves the probe's five packages (`new_project`, `set_canvas`, `save_project`).
+
+**`docs_bugs_a4_probe.swift`** reaches what MCP cannot: File ▸ New Recording…'s title from
+`AppDelegate.validateMenuItem` with the recorder panel's phase, `launched` and the recorder's state
+written by hand under sealed grant doors (N1–N5, `recording_probe.py`'s chrome mode's way; nothing
+records), and the Document tab's Rate popup drawn with `cacheDisplay` into a PNG and picked through
+its own `itemPicked:` (P1–P5). It names only symbols the base has, so it builds over
+`--base-sources` and N1, P1, P2 and P5 are red there by behaviour. `marker-err` is a core mutant: its
+copy gets a real `core/`. A mutant of probe rows only builds the probe over the copy's sources. A
+real ⌥⌘N while the panel reads Starting… is `docs/manual-checks.md` REC-20.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_a4_proof.py [--only F1,M1,T1,N1,P1]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_a4_proof.py
+python3 tools/proof/docs_bugs_a4_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a4_proof.py --base-sources <its app/Sources> --expect-red
+```
+
+## Docs bugs b4 — the Export sheet, its queue row and quitting (`docs_bugs_b4_proof.py`, `docs_bugs_b4_probe.swift`; nine mutants by `--mutant`; spec §11 #477)
+
+#477, #492, #500, #508 and #509. **`docs_bugs_b4_proof.py`** makes its own fixtures under
+`work/docs-bugs-b4/` (ffmpeg with libx264, and ffprobe) on a scratch `CFFIXED_USER_HOME`. One
+instance, launched with `-RCDevRampRenderHold 8`, saves the two packages the probe opens and runs
+A1/A2: an `h264` export of a speed ramp at once, `export_status` polled every 0.1 s beside whether
+the file exists.
+
+**`docs_bugs_b4_probe.swift`** runs the real controllers off-screen (activation policy
+`.prohibited`, a window 20,000 pt off every display), one process per mode, built with
+`FRAMEJOB_DEV_TOOLS` and a `default.metallib` compiled from `app/Resources/Shaders` beside it: the
+sheet's Preset popup after Speed, Bit depth and Stems move (P1–P4) and its hint (H1), a progress
+sheet's status line after Cancel (S1), a queued job's row (R1/R2), and `AppDelegate`'s
+`applicationShouldTerminate` while a progress sheet writes and after it finished (T1/T2; on
+`.terminateNow` the probe exits as a quit would, and ffprobe reads what is left). It names only
+symbols the base has, finds the sheet's labels and button by a view walk, and builds over
+`--base-sources`. PB reads the general pasteboard's change count every 0.25 s, read only, and names
+when it moved. A mutant is built into the probe from a `tree_copy.py` copy; the app under test only
+saves the packages. Quitting from ⌘Q or the Dock with the sheet minimised or Frame Job hidden is
+`docs/manual-checks.md` SE-44.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_b4_proof.py [--only A1,P1,S1,R1,T1]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_b4_proof.py
+python3 tools/proof/docs_bugs_b4_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_b4_proof.py --base-sources <its app/Sources> --expect-red
+```
+
+## Docs bugs b5 — a folder at an import door (`docs_bugs_b5_proof.py`, `docs_bugs_b5_probe.swift`; eleven mutants by `--mutant`; spec §11 #497)
+
+#497. **`docs_bugs_b5_proof.py`** makes its own fixtures under `work/docs-bugs-b5/` (ffmpeg) on a
+scratch `CFFIXED_USER_HOME`: a `Shoot` folder of two movies, a LUT, a still, a Matroska file with no
+extension, a `.txt`, a hidden movie, a subfolder, an `.rtfd` and a `.framejob`, a link to it, an
+empty folder named `Shoot.mov`, `Broken` (a movie and a text file named `.mov`), `Docs` (a `.txt`)
+and `Locked` (a movie, the folder made mode 000 once made, and given back mode 755 when the run ends
+and before the next clears the work folder). The M rows send `import_media` to one instance and read
+`imported`, `skipped`, the refusals, `undo` and `tools/list`; M6, M9 and M10 are controls on a file, a
+Matroska file and a package, and M11 is `Locked`'s refusal, `Nothing in Locked was added: it could not
+be read.` The same instance saves an empty project for the probe.
+
+**`docs_bugs_b5_probe.swift`** runs the drop MCP cannot send: `MediaPane.draggingEntered` and
+`performDragOperation` with a stub drag over a private pasteboard, on a copy of that package per row,
+with `-RCFFmpegPath /nonexistent/ffmpeg`, `NSAlert.runModal` replaced, `ProjectDocument.copyWatch` a
+counting no-op for each drop (so `Take 3`'s copy shows no progress panel) and its window 20,000 pt off
+every display. It names only symbols the base has, so it builds over `--base-sources`. D6 drops
+`Locked`: one alert in that same sentence, nothing added. D7 and D8 drop it beside `B.mov` and beside
+`Shoot`: the same one alert, and the rest of the drop still added. A Finder drag itself is
+`docs/manual-checks.md` PB-17.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_b5_proof.py [--only M1,D1]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_b5_proof.py
+python3 tools/proof/docs_bugs_b5_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_b5_proof.py --base-sources <its app/Sources> --expect-red
+```
+
+## Colour: warnings, qualifiers, titles and words (`docs_bugs_c3_proof.py`)
+
+Docs bugs batch c3 (#479, #480, #499, #512, #513, #515, spec §11 GR-36, GR-37, GR-38). The built app
+under a scratch home, no key and no network. L rows are the LUT warning, Q a qualifier range keyed off
+through `off` and the pictures either side of the action's end, P the same through the real Hue box,
+row menu and pick, R the LUT Remove button, F the filter order's words, T the Camera Log's words and H
+the pick hints. What MCP cannot send (a press, a row menu's item, an alert) runs in
+`docs_bugs_c3_probe.swift`, over packages the app saved, with no window on any display and an
+`NSAlert` read through a recorder. The probe names only symbols the base has, so it builds over the
+base's sources. The docstring lists every row and marks the controls; every other row is red on a
+build from before GR-36.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_c3_proof.py [--only L1,Q1,P1,R1]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_c3_proof.py
+python3 tools/proof/docs_bugs_c3_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_c3_proof.py --base-sources <its app/Sources>
+```
+
+## Follow Speaker's microphone and the words (`docs_bugs_c4_proof.py`)
+
+Docs bugs batch c4 (#491, #503, #505, #506, #514, #516, #517, #518, spec §11 VR-64 (b)). The built app
+under a scratch home, no key and no network, over F-TURNS with Mic A split at 80 %. V rows are the
+microphone a shot takes, through `make_vertical_version` and the sheet; G the missing module's note, B
+the nest note, R the graphic `in` refusal, K and P the shortcuts note and the microphone prompt in the
+built bundle, T each `tools/list` item, and C and W the comments and spec mirrors, read from the tree or
+through `git show` under `--base-rev`. The docstring lists every row and marks the controls; every other
+row is red on a build from before VR-64 (b)'s amendment, and `--expect-red` exits 0 only when that
+holds.
+
+```sh
+make app-debug && python3 tools/proof/docs_bugs_c4_proof.py [--only V1,G1,T7,C10]
+make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_c4_proof.py
+python3 tools/proof/docs_bugs_c4_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_c4_proof.py --base-rev <its sha> --expect-red
+```

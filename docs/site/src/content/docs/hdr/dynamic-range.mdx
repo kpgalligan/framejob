@@ -1,0 +1,118 @@
+---
+title: "A project's dynamic range"
+description: "Choose whether a project works in SDR or HDR (HLG), and see what the switch does to your footage, titles, grades, keys and qualifiers."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+A project works in SDR, ordinary video, or in HDR, which keeps highlights brighter than white. The choice sets the colour every source is converted into, and which exports can carry HDR, so choose HDR (HLG) when you want to deliver an HDR file.
+
+<AtAGlance
+  where={['Document tab ▸ Canvas ▸ Dynamic Range', 'Document tab ▸ Document ▸ Colour']}
+  tools={['set_canvas', 'get_project']}
+/>
+
+<Shot
+  name="11-document-inspector.inspector"
+  alt="The Document tab. The Document section's Colour row reads SDR — Rec. 709, and the Canvas section has a Dynamic Range popup set to SDR, above a Blending popup set to Encoded."
+/>
+
+## Choose SDR or HDR
+
+<Steps>
+
+1. Open the **Document** tab.
+
+2. In the **Canvas** section, choose from the **Dynamic Range** popup.
+
+</Steps>
+
+| Item | What the project works in | Default |
+| --- | --- | --- |
+| **SDR** | Rec. 709 | Yes |
+| **HDR (HLG)** | Rec. 2100 HLG over BT.2020 | |
+
+Switching is one undo step, **Dynamic Range**, and it changes no clip and no grade value. Choosing the item already showing changes nothing and makes no undo step.
+
+The setting belongs to the whole project, so it works the same with a [nest](/editing/nests/) open. A new project starts as SDR.
+
+## The Colour row
+
+The **Document** section at the top of the tab shows your choice in its **Colour** row. It reads "SDR — Rec. 709" or "HDR — Rec. 2100 HLG".
+
+## The HDR working space
+
+An HDR (HLG) project composes every frame in HLG-encoded BT.2020, so HDR footage keeps its range all the way through to the file.
+
+- An iPhone HDR clip keeps its highlights above white. HLG footage over BT.2020 passes through unchanged.
+- PQ footage becomes real HDR, up to 1,000 cd/m². Brighter highlights are rolled off to fit, by the file's [peak](/hdr/hdr10-peak/).
+- Footage with a built-in [Camera Log](/hdr/camera-log/) curve becomes real HDR.
+- Frames are labelled BT.2100 HLG, and the 10-bit exports are tagged HLG.
+
+In an SDR project the same HDR sources are converted to Rec. 709 instead, with their highlights rolled off. [How sources are read](/hdr/how-sources-are-read/) has the full table, HDR stills included.
+
+## SDR material in an HDR project
+
+SDR material is lifted so its white sits at HDR reference white, the level ordinary white sits at in HDR. It looks as it did, and HDR highlights rise above it.
+
+That covers BT.709 or untagged video, stills and screen recordings. Wide-gamut SDR footage is converted into BT.2020 and lifted the same way.
+
+White is fixed at 203 cd/m² (HLG 75 %). There's no setting for the reference white.
+
+## Drawn layers
+
+Everything Frame Job draws is drawn as it is in SDR, then lifted to HDR reference white. That means text, captions, burn-in timecode, shapes, SDR stills, graphics, and the background and shadow colours.
+
+So a white title sits at reference white, not in the highlights, and a white graphic matches SDR white. Text, captions, shapes and graphics stay 8-bit even though they're lifted. See [Precision and bit depth](/hdr/precision/).
+
+## Grades across a switch
+
+Switching changes no grade value. The numbers stay as you set them, and the grade then runs on the project's working colour, with BT.2020's weights in an HDR (HLG) project.
+
+A `.cube` look still reads its values as Rec. 709. In an HDR project the [Look section](/color/looks/) warns: "This project is HDR (HLG): a .cube LUT reads its values as Rec. 709."
+
+## The chroma key across a switch
+
+A [chroma key](/effects/chroma-key/) keeps keying the colour it was picked on. In an HDR (HLG) project it compares the colour an SDR project would show for each pixel, whether the layer is HLG, PQ, camera log or SDR, so it cuts the same pixels after the switch or very nearly.
+
+| The key is | Layers |
+| --- | --- |
+| Exact | HLG footage over BT.2020, PQ up to 1,000 cd/m², footage with a built-in Camera Log except at its very brightest highlights, and SDR material |
+| Close, not exact | HLG footage over P3 or BT.709 primaries, PQ highlights above 1,000 cd/m², and a key picked on a gain-map photo |
+
+Re-pick the key if an edge changes.
+
+**Pick from Canvas** works to the same rule. In an HDR project it stores the picked colour as an SDR project shows it, so a key picked there means the same thing in either dynamic range.
+
+## Qualifiers across a switch
+
+A [qualifier](/color/qualifiers/) on an adjustment clip doesn't get that treatment. Its ranges are measured on the HLG values in an HDR (HLG) project, so re-pick them after switching. [Pick from Canvas](/color/pick-from-canvas/) reads an HDR frame at its HLG values.
+
+## Exports and saved frames
+
+An HDR (HLG) project can export an HLG master, an HDR10 file or an SDR version. [Export HDR](/hdr/export-hdr/) says which formats write which.
+
+**File ▸ Save Frame…** writes a 16-bit PNG or a 10-bit HEIC labelled BT.2100 HLG, and a JPEG writes the SDR version. See [Save Frame](/export/save-frame/).
+
+To see the SDR version before you export, turn on [Show SDR Version](/hdr/show-sdr-version/). [Scopes in an HDR project](/hdr/hdr-scopes/) covers how the scopes read the picture.
+
+## Good to know
+
+- Wide-gamut SDR projects aren't offered. An SDR project always works in Rec. 709.
+- A project can't work in PQ. HDR (HLG) is the one HDR working space, and HDR10 is an [export choice](/hdr/export-hdr/#hdr10-pq).
+- There's no Dolby Vision output.
+- How layers blend is a separate choice, right below this one. See [Blending](/hdr/blending/).
+
+## With an agent
+
+`set_canvas` switches the dynamic range, with `output` set to `"sdr"` or `"hlg"`. `new_project` has no option for it, so an agent sets it after making the project. A call that passes `scope` is turned down, because the canvas belongs to the whole project. With a nest open through `set_scope`, a call without `scope` lands on the project, as the popup does. See [Tools: tracks, markers and canvas](/mcp/tools-tracks-and-markers/#set_canvas).
+
+## Related
+
+- [How sources are read](/hdr/how-sources-are-read/)
+- [Show SDR Version](/hdr/show-sdr-version/)
+- [Export HDR](/hdr/export-hdr/)
+- [Blending: encoded or linear light](/hdr/blending/)
+- [The Document tab](/projects/document-tab/)

@@ -1,0 +1,105 @@
+---
+title: "The Transition section"
+description: "Set one transition's style, easing and length in the inspector, and see what values a new transition starts with."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The **Transition** section is where you fine-tune one transition: its style, how it's eased and how long it lasts.
+
+<AtAGlance
+  where="Clip tab ▸ Clip sub-tab ▸ Transition"
+  tools={['set_transition', 'set_transition_style', 'set_transition_duration']}
+/>
+
+## Open the section
+
+Select the later clip of an overlapping pair, then look on the **Clip** sub-tab of the [Clip tab](/getting-started/inspector/). A transition belongs to the clip it leads into, so the earlier clip of the pair won't show it unless it overlaps a clip before it too.
+
+The section appears only when exactly one clip is selected and that clip overlaps the clip before it. To change several transitions at once, use [**Clip ▸ Transition ▸**](/motion/add-a-transition/#the-transition-menu).
+
+It starts closed. Its header sums it up, for example "cross dissolve · ease in out · 0.50 s", or "none" when the overlap has no stored transition.
+
+| Row | What it does | Values |
+| --- | --- | --- |
+| [**Kind**](#kind) | The style, or none | None and the thirteen [styles](/motion/transition-styles/) |
+| [**Curve**](#curve) | How the transition's progress is eased | Linear, Ease In, Ease Out, Ease In Out |
+| **Crossfade Audio** | Whether the sound crossfades. See [Crossfades](/audio/crossfades/). | On or off |
+| **Crossfade Shape** | The crossfade's curve. See [Crossfades](/audio/crossfades/). | Linear, S-Curve, +3 dB, −3 dB |
+| [**Duration**](#duration) | The length of the overlap | 0.02 to 10 s |
+
+Each change is one undo step.
+
+## Kind
+
+**Kind** lists **None**, then the thirteen styles in the same order as the **Clip ▸ Transition ▸** menu. Changing the style keeps the **Curve** and the crossfade settings.
+
+Choosing **None** removes the transition but not the overlap. See [None keeps the overlap](/motion/add-a-transition/#none-keeps-the-overlap).
+
+## Curve
+
+**Curve** changes how the transition moves through its length, not how long it lasts.
+
+| Curve | How it moves |
+| --- | --- |
+| **Linear** | At a steady rate from start to finish |
+| **Ease In** | Starts slowly and speeds up |
+| **Ease Out** | Starts quickly and slows down |
+| **Ease In Out** | Starts and ends slowly |
+
+The sound crossfade follows the same curve.
+
+The curve also moves the swap in a [Fade Through Black or White](/motion/transition-styles/#fade-through-black-and-fade-through-white). With **Linear** or **Ease In Out** the clips swap halfway through the overlap. With **Ease In** it's about 71% of the way through, and with **Ease Out** about 29%.
+
+## Duration
+
+**Duration** is the length of the overlap, in seconds. Type a value, or pick 0.25, 0.5, 1 or 2 from the arrow at the end of the field. A number outside 0.02 to 10 s is pulled to the nearer end of that range, and the result snaps to the frame grid. A value that rounds to no frames at all closes the overlap and leaves a hard cut.
+
+The overlap is the transition's length, so changing **Duration** moves the later clip to match: earlier for a longer transition, later for a shorter one. Only that clip moves.
+
+- Clips after it stay where they are, so a longer transition can open a gap after the clip.
+- A shorter transition can run the clip into the one after it, and that new overlap gets a Cross Dissolve.
+- A linked clip doesn't move with it.
+
+Frame Job won't let an overlap pass half the shorter clip, or move the clip anywhere that breaks [the overlap rules](/motion/transitions/) with its other neighbours. The message at the foot of the inspector names the limit, and nothing changes.
+
+## Alignment
+
+Alignment decides which clip's footage a new overlap at a hard cut is made from. The section has no control for it. **Clip ▸ Transition ▸** always centres a new overlap on the cut: half of it comes from each clip, an odd frame comes from the incoming clip, and a side that runs short passes its share to the other.
+
+An agent can choose the side with the `align` argument of `add_transition`:
+
+| Choice | Where the footage comes from | What stays put |
+| --- | --- | --- |
+| `center`, the default | Half from each clip | The moment of the cut |
+| `before` | All from the start of the incoming clip | The outgoing clip's last frame |
+| `after` | All from the end of the outgoing clip | The incoming clip's first frame |
+
+## Default values
+
+A transition Frame Job makes starts with **Curve** at **Ease In Out** and **Crossfade Audio** on, with **Crossfade Shape** at **+3 dB**. When you didn't choose a style, it's a Cross Dissolve.
+
+[An overlap with no stored transition](/motion/transitions/#an-overlap-with-no-stored-transition), such as one you set to **None**, draws as a linear Cross Dissolve with no crossfade. The section says so: **Kind** reads **None**, **Curve** reads **Linear** and **Crossfade Audio** is off. From there:
+
+- Changing **Curve** or **Crossfade Audio** stores a Cross Dissolve with exactly the values showing, and your one change. **Crossfade Shape** stays dimmed until **Crossfade Audio** is on.
+- Choosing a **Kind** makes a new transition with the defaults above, not the values that were showing.
+
+## Good to know
+
+Two overlapping clips with no picture get the same section. Only their sound changes, so **Kind** has no visible effect.
+
+## With an agent
+
+`set_transition_style` sets **Curve**, **Crossfade Audio** and **Crossfade Shape** through `curve`, `audio` and `audio_shape`. Anything left out stays as it is, and leaving out all three is an error. Unlike the section, it works on any clip but an adjustment clip. A clip with no transition gets a Cross Dissolve with that style.
+
+`set_transition_duration` does what **Duration** does, and it fails on the first clip of a track, which has nothing to overlap. A length that rounds to no frames is an error there, where **Duration** closes the overlap. `set_transition` sets **Kind**.
+
+See [`set_transition_style`](/mcp/tools-transitions/#set_transition_style), [`set_transition_duration`](/mcp/tools-transitions/#set_transition_duration) and [`set_transition`](/mcp/tools-transitions/#set_transition).
+
+## Related
+
+- [Transitions](/motion/transitions/)
+- [Transition styles](/motion/transition-styles/)
+- [Add or remove a transition](/motion/add-a-transition/)
+- [Crossfades](/audio/crossfades/)
+- [Tools: transitions](/mcp/tools-transitions/)

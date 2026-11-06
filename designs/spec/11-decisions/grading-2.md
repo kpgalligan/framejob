@@ -378,7 +378,8 @@ Concat is opened, at design time or build time.
     softness) only if already on. A saturation or luma range that would cross 0 or 1 is SHIFTED
     back inside with its width kept, so the pixel stays inside (pure red → saturation 0.7–1). A
     pixel with C < 0.06 turns hue off; Invert is unchanged. One undo step, "Qualifier"; Esc or a
-    selection change cancels; the hint "Click to pick the colour to qualify · Esc to cancel".
+    selection change cancels; the hint "Click to pick the color to qualify · Esc to cancel"
+    (GR-38).
   - **The Qualifier section** (owner choices 5–7), on the Color sub-tab of adjustment clips only,
     after Adjustment (Adjustment · Qualifier · Light · Color · Wheels · Curves · Look), closed
     until opened, summary "off" or the ranges on ("hue · sat · luma", plus " · inverted"), Reset

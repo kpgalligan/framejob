@@ -1,0 +1,151 @@
+---
+title: "Tools: clean-up"
+description: "The agent tools that find silences and filler words as ranges, make a filler transcript, and cut what they found."
+---
+
+These tools find what [Remove Silences](/cleanup/remove-silences/) and [Remove Filler Words](/cleanup/remove-filler-words/) would cut. The two `detect_` tools change nothing, so you can read and adjust their ranges before making the cut.
+
+Neither `detect_` tool takes `scope`. They work in whatever nest `set_scope` has open. See [Editing inside a nest](/mcp/nests/).
+
+## Cut what the tools found
+
+Pass the `ranges` from `detect_silence` or `detect_fillers` to [`ripple_delete_ranges`](/mcp/tools-cut-and-delete/#ripple_delete_ranges). That's what **Remove** does in each sheet, and it makes the whole cut one undo step.
+
+```json
+{ "ranges": [[1200000, 1500000], [3000000, 3240000]] }
+```
+
+For filler words, look at `needs_transcript` in the `detect_fillers` answer first. Any media named there needs [`transcribe_for_fillers`](#transcribe_for_fillers) before its fillers can be found, so make the transcript and call `detect_fillers` again.
+
+An agent isn't held to the ranges it was given: it can drop some or change them first. `ripple_delete_ranges` takes `scope` like any edit, so it can reach a nest without opening it. See [How a clean-up cut works](/cleanup/how-cleanup-cuts-work/).
+
+## `detect_silence`
+
+Finds the quiet stretches of the timeline and reports them, changing nothing. It's what **Clip ▸ Remove Silences…** shows you before you choose **Remove**, see [Remove Silences](/cleanup/remove-silences/).
+
+The voice model runs on your Mac, with no key and no upload.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | No | Analyse only these clips, like the sheet's **Selected clips**. At least one. Default: the current selection when it holds anything with sound, otherwise every audible clip. |
+| `mode` | string | No | `voice` judges by the voice model, falling back to level over a clip that holds no voice. `level` judges by level alone. Default: `voice`. |
+| `voice_confidence` | number | No | Voice mode only. The model's probability, 0.1 to 0.9, at or above which a moment counts as speech. Default: 0.5. The sheet doesn't offer this. |
+| `threshold_db` | number | No | Quieter than this counts as silence, in dBFS in the mix, at or below 0. Default: −40. |
+| `min_length` | integer | No | The shortest quiet run worth cutting, in ticks. Default: 300,000 (0.5 s). |
+| `padding` | integer | No | How much to leave at each end of a run, in ticks. Default: 60,000 (0.1 s). |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+`min_length` and `padding` run exactly as sent. Only the finished ranges go on the frame grid, and they snap inward, which can leave a frame of room tone rather than clip the next word. Each takes 0 to 9,000,000,000,000,000.
+
+Quiet is measured in the mix, so a clip's volume, fades, ducking, mute and another track's solo all count. In either mode, a moment the mix alone turns down to `threshold_db` or below is quiet.
+
+A moment none of the measured clips covers isn't a candidate, because a hole in the timeline isn't dead air. A nest clip is a wall: no range reaches into one.
+
+**Answers:**
+
+| Key | What it says |
+| --- | --- |
+| `ranges`, `count`, `removes` | The spans as `[from, to]` pairs in ticks, how many, and how many ticks they remove. |
+| `scope`, `clips` | `selected` or `audible`, and the clips that ran. This `scope` is about clips, not nests. |
+| `mode`, `threshold_db`, `min_length`, `padding`, `voice_confidence` | What actually ran. |
+| `judged_by_level`, `judged_by_level_clips` | The media and the clips judged by level because they hold no voice. |
+| `proposed_by_mix_clips` | Each clip a range is proposed inside only because the mix turns it down while its analysis is still running. |
+| `pending_peaks` | Media still being analysed, for either the waveform or speech. Call again shortly. |
+| `voice_pending` | Media whose speech is still being analysed. |
+| `protected_nests` | Each nest clip a quiet run of at least `min_length` crossed. There may be dead air inside. |
+| `note` | Sentences on any of the above. |
+| `project` | The [project summary](/mcp/what-a-call-answers/). |
+
+`proposed_by_mix_clips`, `pending_peaks`, `voice_pending`, `protected_nests` and `note` appear only when they have something to report. To look inside a protected nest, open it with `set_scope` and call again.
+
+**Refuses:**
+
+- `voice_confidence` in level mode, or outside its range.
+- `mode: "voice"` when the voice model can't be used. Leave `mode` out instead and it falls back to level with a note.
+- A `threshold_db` above 0.
+- A `min_length` or `padding` that's negative or too long.
+
+See [What counts as silent](/cleanup/voice-or-level/).
+
+## `detect_fillers`
+
+Finds the filler words in the timeline's speech and reports them as ranges, changing nothing. It's what **Clip ▸ Remove Filler Words…** shows you before you choose **Remove**, see [Remove Filler Words](/cleanup/remove-filler-words/).
+
+The fillers it knows are ah, er, erm, hm, hmm, huh, m, mhm, uh, uh-huh and um.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | No | Read only these clips. At least one. Default: the current selection when it holds a clip with speech from a media file, otherwise every clip. |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+It reads only a kept AssemblyAI transcript that asked for filler words, and never uses the network, so it needs no key. Making that transcript does, see [`transcribe_for_fillers`](#transcribe_for_fillers).
+
+Each run of fillers is widened outward to a 32 ms grid, never into the words beside it, then its edges snap inward to the frame grid.
+
+**Answers:**
+
+| Key | What it says |
+| --- | --- |
+| `ranges`, `count`, `removes` | The merged spans as `[from, to]` pairs in ticks, how many, and how many ticks they remove. |
+| `fillers` | Each kept run, with its `clip`, `words` and `range`. |
+| `dropped` | Each run left in, with its `clip`, `words` and `reason`. |
+| `needs_transcript` | Media with no such transcript. [`transcribe_for_fillers`](#transcribe_for_fillers) makes one. |
+| `locked` | Clips on a locked track, which weren't read, because `ripple_delete_ranges` neither cuts nor moves a locked track. |
+| `scope`, `clips` | `selected` or `all`, and the clips that ran. |
+| `skipped` | When you named `clips`, each one it couldn't read, with the reason. |
+| `note` | Sentences on any of the above, and on media whose file is missing: "Media 3 is missing its file, so its fillers cannot be found. relink_media finds it again." |
+| `project` | The project summary. |
+
+A filler is dropped whole when:
+
+- it's too short once it's on both grids
+- it overlaps a word of another clip on any unlocked track, because the cut reaches every unlocked track, not only the clips it read. Only a clip whose file has a kept AssemblyAI transcript, made with or without filler words, is checked
+- it reaches a nest clip on an unlocked track
+- it reaches an overlap between two clips on one unlocked track, with a stored transition or without one, or the area around it, as wide again as the overlap on each side
+
+## `transcribe_for_fillers`
+
+Re-transcribes one media file with AssemblyAI so its filler words can be found. It's the **Transcribe** button beside a file in **Clip ▸ Remove Filler Words…**, see [Transcripts for filler words](/cleanup/filler-transcripts/).
+
+:::caution
+This is a paid upload to AssemblyAI, even over a transcript that's current for captions. It needs your AssemblyAI key, and the built-in Assistant can't use this tool.
+:::
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `media` | integer | Yes | The media to transcribe, one of `detect_fillers`' `needs_transcript`. |
+| `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
+
+It keeps the media's previous request (its language, speaker labels and vocabulary) and adds filler words. A media with no previous request gets language detection, no speakers and no vocabulary.
+
+It writes only the media's transcript cache: no caption is placed and no undo step is made.
+
+A media that already has a transcript made with filler words makes no request and needs no key. It answers `ready: true` and an empty `uploaded`.
+
+**Answers:**
+
+| Key | What it says |
+| --- | --- |
+| `ready` | Whether `detect_fillers` can now read the media. |
+| `media` | The media id. |
+| `uploaded`, `cached` | The media uploaded, and the media answered from the cache. |
+| `audio_seconds` | The seconds of audio billed. |
+| `engine`, `language` | `assemblyai`, and the language code or `auto`. |
+| `note` | Present when there's something to say. |
+| `project` | The project summary. |
+
+**Refuses:**
+
+- A document with nowhere to keep its transcript cache. Save it first.
+- A media whose file is missing: "Media 3's file is missing, so it cannot be transcribed. Relink it first."
+- A media no clip plays from its file.
+- With no key, where it would upload: "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription."
+
+## Related
+
+- [Remove Silences](/cleanup/remove-silences/)
+- [Remove Filler Words](/cleanup/remove-filler-words/)
+- [What counts as silent](/cleanup/voice-or-level/)
+- [Transcripts for filler words](/cleanup/filler-transcripts/)
+- [How a clean-up cut works](/cleanup/how-cleanup-cuts-work/)
+- [Tools: cutting and deleting](/mcp/tools-cut-and-delete/)

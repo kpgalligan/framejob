@@ -41,6 +41,9 @@ PR-13 was recorded for #375 part 1, before its code, from the owner's choice of 
 next as #375 part 2, a deeper raster deferred to #374) and `raster_dither_proof.py`'s control on
 the unchanged product; it amends PR-5.
 
+PR-14 was recorded in docs bugs b3 (#488), before its code, from the frozen base app's measurement
+of twelve track layouts; it amends PR-4, PR-9 and PR-12.
+
 - **PR-1 — The working depth is 16-bit float, holding encoded values clamped to [0, 1] (owner,
   2026-10-09, choices 1 and 5).**
   - The render context's buffers are `kCVPixelFormatType_64RGBAHalf`.
@@ -164,6 +167,9 @@ the unchanged product; it amends PR-5.
   **Amended by HD-2** (hdr H-0): an HLG project's `render_frame` and Save Frame… frames are 16-bit
   (PNG) or 10-bit (HEIC) whatever their sources; JPEG, GIF and APNG carry the 8-bit SDR version
   (HD-5).
+  **Amended by PR-14** (docs bugs b3, #488): "any source is deeper" was not what the generator did.
+  A 10-bit HEVC or ProRes clip above an 8-bit clip came back 8-bit; such a frame is now re-read
+  through export's reader, so it is deep in `render_frame` and Save Frame… (PNG, HEIC).
 - **PR-5 — What stays 8-bit, and the frozen references (choice 6).**
   - These stay 8-bit:
     - graphics (G-7's BGRA8);
@@ -303,8 +309,9 @@ the unchanged product; it amends PR-5.
     into a 16-bit-float CGImage, and the reading cancelled on the thread that read it (G-17).
     With `max_width` below the canvas it is redrawn at the generator's size into a 16-bit-float
     context.
-  - Why not the generator: `AVAssetImageGenerator` hands back a 16-bit image only when every
-    video track of the composition is deep, measured in B97's first pass. A 10-bit carrier track
+  - Why not the generator: `AVAssetImageGenerator` hands back a 16-bit image only when the
+    lowest track that has video is deep (corrected by PR-14; this read "every video track of
+    the composition", from B97's first pass). A 10-bit carrier track
     beside an 8-bit one, or beside the stills-only placeholder, left the image 8-bit; only a
     composition whose sole video track was the carrier read 16-bit. A deep still over 8-bit
     video (S5) cannot reach that, so the carrier was dropped for the reader.
@@ -327,6 +334,8 @@ the unchanged product; it amends PR-5.
   shows a deep VP9 track (`DeepVideoFrame`), and the question is asked in `Exporter` after the
   composition is built: callers pass `keepsDepth` (`carriesDepth`), no longer `deepStill`.
   Everything else here stands.
+  **Amended by PR-14** (docs bugs b3, #488): the reader also re-reads a frame the generator answers
+  at 8 bits while it shows a 10-bit HEVC or ProRes source.
   - Measured in B97 (Release, 2026-10-14, `precision_proof.py` against the control
     `ctl-b97`, captured on the tree before any PR-9 code): S4, `ramp16.png` alone, a 16-bit PNG
     with 1,920 distinct middle-row greens (256 before), its RGB scaled to 8 bits equal to the
@@ -457,6 +466,9 @@ the unchanged product; it amends PR-5.
     7/7). A JPEG asked to keep depth (`vp9-jpeg-deep`) writes the same bytes (5,099), so JPEG's
     `carriesDepth` false is equivalent there, as PR-9's `jpeg-deep` was.
   - Amends PR-4 and PR-9.
+  **Amended by PR-14** (docs bugs b3, #488): "HEVC, ProRes" under "keep the generator byte for
+  byte" holds for a frame the generator answers deep, which is what L17 measured, each alone. A
+  frame it answers at 8 bits while it shows one of them is re-read.
 - **PR-13 — A graphic's gradients are dithered where tiny-skia rounds them to 8 bits (owner,
   2026-10-27, #375: "Both, raster first").**
   - What: every gradient paint tiny-skia draws — linear and radial, the two-stop fast path
@@ -544,3 +556,30 @@ the unchanged product; it amends PR-5.
     the 8-bit lossy codecs strip a ±7/16 dither as they strip the raster's, ProRes and the
     10-bit rows keep the float frame's levels, and what remained (8-bit PNG and JPEG stills,
     GIF, APNG) was judged not worth a new compositor pass. PR-3 and PR-4's rounding stand.
+- **PR-14 — A frame the generator answers at 8 bits while it shows a deeper source is read deep,
+  through export's reader (docs bugs b3, #488).**
+  - `render_frame` and File ▸ Save Frame… as PNG or HEIC, of a frame whose recipe at the frame
+    time names a track whose composition segment there reads a deep source, come out deep (a
+    16-bit PNG, a 10-bit HEIC) even when `AVAssetImageGenerator` hands back an 8-bit image.
+  - Measured on the frozen base app (`render_frame` as PNG, an SDR project, the 10-bit sources a
+    luma ramp, levels the distinct greens in one row; stacks back to front). Alone: HEVC 10
+    16-bit, 875 levels; ProRes 16-bit, 957. H.264 then HEVC 10: 8-bit, 256. H.264 then ProRes:
+    8-bit, 256. HEVC 8 then HEVC 10: 8-bit, 256. Swapped, HEVC 10 or ProRes under H.264: 16-bit.
+    H.264 on the bottom track at 0 s and HEVC 10 above it at 6 s, the frame at 7 s, only the
+    10-bit clip showing: 8-bit, 256. An empty bottom track under HEVC 10: 16-bit, 875. So the
+    generator's depth follows the lowest track that has video, and the levels show it is real
+    loss and not only a label.
+  - The mechanism: in `Exporter.renderFrameReported`, after `copyCGImage`, when `keepsDepth`, the
+    image's `bitsPerComponent` is 8 or less and `DeepVideoFrame.showsDeepSource` answers yes,
+    `DeepStillFrame.read` reads the frame; a nil read keeps the generator's image.
+  - `isDeepSource` is PR-12's `isDeep` (a VP9 `vpcC`), or an `hvcC` atom of at least 18 bytes
+    whose byte 17 low 3 bits (`bitDepthLumaMinus8`) are above 0, or a ProRes subtype (Proxy, LT,
+    422, HQ, 4444, 4444 XQ). AV1 stays out, as in PR-12: not decodable on the host. A reversed
+    clip counts through its 10-bit intermediate, as PR-7 says.
+  - What keeps the generator byte for byte: a frame it already answers deep never reaches the
+    test, so HEVC or ProRes alone is unchanged, and so is every frame showing no deep source: an
+    8-bit HEVC clip, H.264 alone, and a deep clip elsewhere on the timeline. `isDeep` stays VP9
+    only, so `DeepVideoFrame.reads` keeps PR-12's path, and JPEG, GIF, APNG, the eyedropper and
+    look thumbnails do not keep depth and never ask.
+  - No op, FFI, recipe, format or catalog change. No `depth` argument.
+  - Amends PR-4, PR-9 and PR-12.

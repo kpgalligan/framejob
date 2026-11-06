@@ -1,0 +1,67 @@
+---
+title: "Move clips"
+description: Drag clips along the timeline and between tracks, alone or together, and see what stops a drop.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Drag a clip to change when it plays or which track it sits on. The clip you see moving while you drag is the real edit, not a stand-in.
+
+<AtAGlance
+  where="Timeline ▸ drag a clip's body"
+  tools="move_clip"
+/>
+
+## Drag a clip
+
+Drag a clip's body left or right to move it in time, and up or down to move it to another track. A clip stops at the start of the timeline.
+
+The drag [snaps](/timeline/snapping/) to nearby edits when snapping is on. Hold <kbd>⌘</kbd> during the drag to turn snapping off for that moment.
+
+You can't start a drag on a clip on a [locked track](/timeline/hide-and-lock-tracks/).
+
+To drag a copy and leave the original, hold <kbd>⌥</kbd> as you press. See [Duplicate clips](/editing/duplicate-clips/).
+
+## Move several clips together
+
+Select the clips, then drag any one of them. They all move, and they stay the same time and the same number of tracks apart. If the earliest clip reaches the start of the timeline, it stops at 0 and the others keep their distance from it.
+
+## Move a clip to a new track
+
+Let go above the top lane to make a new track at the front, or below the bottom lane to make a new track at the back. The new track and the move are one undo step.
+
+## Clips that come along
+
+A clip's linked partner, such as its [detached sound](/audio/detach-and-attach/), moves in time by the same amount and keeps its own track. So you can drag a sound onto a track of its own and its picture stays on its track. A partner on a locked track doesn't move.
+
+## Overlaps make a transition
+
+If you drop a clip so that it overlaps the clip before it on the track, it gets a Cross Dissolve over the overlap, unless it already has a transition. The overlap has to keep to the [overlap rule](/editing/how-edits-work/#the-overlap-rule).
+
+## When a drop won't go where you let go
+
+While you drag, the clip only goes where the project allows. Over a position that would break the [overlap rule](/editing/how-edits-work/#the-overlap-rule), it waits at the last position that was allowed, and catches up when you reach one that is.
+
+If you let go over a position that isn't allowed, the clip stays at that last allowed position, and a ghost of it slides there from where you let go. If it never reached an allowed position, it's back where it started and nothing has changed. There's no beep and no message.
+
+## One undo step per drag
+
+A whole drag is one undo step, however long it lasts. **Edit ▸ Undo** (<kbd>⌘Z</kbd>) names it Move Clips. A click that doesn't move the clip adds no undo step.
+
+## Good to know
+
+- A locked clip that's part of a selection moves with the others if you start the drag on an unlocked clip.
+- Clips selected on more than one track can't make a new track at the front. Let go above the top lane and they stay at the last allowed position. Below the bottom lane works.
+- With 64 tracks in the project, there's no new track to make. A drop above or below the lanes moves the clips in time only.
+- To shift clips by an exact number of frames, [nudge them](/editing/nudge-clips/).
+
+## With an agent
+
+`move_clip` takes the clips and how far to shift them, where a negative shift moves them earlier. Give it a track to move them there as well, and leave that out to keep them on their tracks. Like a drag, it won't break the overlap rule. See [Tools: moving and trimming](/mcp/tools-move-and-trim/#move_clip).
+
+## Related
+
+- [Select clips](/timeline/selecting-clips/)
+- [Snapping](/timeline/snapping/)
+- [Nudge clips](/editing/nudge-clips/)
+- [Duplicate clips](/editing/duplicate-clips/)

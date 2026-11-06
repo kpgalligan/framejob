@@ -1,0 +1,90 @@
+---
+title: "How edits work"
+description: What an edit acts on, why clips never push each other, and the rules every timeline edit keeps.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Every edit in Frame Job acts on something you've already pointed at, and every edit keeps the same few rules. Once you know them, you can tell what a command will touch and why one sometimes won't go through.
+
+<AtAGlance
+  menu={['Mark ▸ Set In', 'Mark ▸ Set Out', 'Mark ▸ Clear Range']}
+  keys={['I', 'O', '⌥X']}
+  where="The timeline: the selection, the playhead and the range"
+  tools={['set_selection', 'set_playhead', 'set_range']}
+/>
+
+## What an edit acts on
+
+Most commands act on the selected clips. Some also use the playhead, the in and out range or the current track.
+
+| What | What it is | What uses it |
+| --- | --- | --- |
+| **The selection** | The clips outlined in coral on the timeline. See [Select clips](/timeline/selecting-clips/). | Most commands |
+| **The playhead** | The moment you're looking at. | Split, trim to the playhead, Freeze Frame, Paste, Insert and Overwrite at Playhead |
+| **The in and out range** | The stretch between the points set with <kbd>I</kbd> and <kbd>O</kbd>. <kbd>⌥X</kbd> clears both. See [The in/out range](/timeline/in-out-range/). | With nothing selected, Delete and Ripple Delete act on the range |
+| **The current track** | The track of the first selected clip, or the front-most track when nothing is selected. With a [nest](/editing/inside-a-nest/) open, it's a track inside the nest. | Close Gap, Select All on Track, Insert and Overwrite at Playhead |
+
+A selected clip's linked partner, such as its [detached sound](/audio/detach-and-attach/), shows a dashed ring. Most edits take it along, as long as its track isn't locked.
+
+## Clips never push each other
+
+A clip you drag never shoves its neighbours out of the way. A place that would need a neighbour to move isn't available, so the clip [stops short of it](/editing/move-clips/#when-a-drop-wont-go-where-you-let-go).
+
+Only the edits that are there to move other clips do so: [Ripple Delete](/editing/delete-clips/), [Close Gap](/editing/close-gaps/), [Insert](/editing/insert-and-overwrite/#insert-a-file), [inserting time](/editing/close-gaps/#insert-time), [Freeze Frame](/speed/freeze-frame/) and [Retime Range](/speed/retime-range/). They open or close time across every unlocked track. A [locked track](/timeline/hide-and-lock-tracks/) stays where it is.
+
+## The overlap rule
+
+Two clips on one track may overlap a little, and that overlap is a [transition](/motion/transitions/). The rule has three parts:
+
+- A clip can overlap at most one neighbour on each side.
+- Each overlap can be at most half the length of the shorter clip.
+- An adjustment clip can't overlap another clip at all, because it can't take a transition. Fade it with opacity instead.
+
+An edit that leaves a clip overlapping the clip before it gives that clip a Cross Dissolve over the overlap, unless it already has a transition.
+
+Moves, trims, nudges, duplicates, gap closes and nests won't break the rule. Paste and Un-nest put a clip that would break it on a new track at the front instead. The rule never stops a ripple delete: a clip it slides onto a neighbour gets a Cross Dissolve.
+
+## Times land on frames
+
+Every time you give an edit, by dragging or typing, lands on a whole frame of the project's [frame rate](/projects/frame-rate/). A moved or trimmed clip goes to the nearest frame, so you can't place a clip between two frames. A time before the start of the timeline stops at 0.
+
+The exceptions are the short audio times typed in the **Sound** sub-tab, such as a fade length or a compressor's attack, which keep the value you typed. A fade dragged by its handle on the clip still lands on a frame.
+
+A move or a ripple shifts every clip by exactly the same amount, so clips stay in step. At a frame rate that doesn't divide evenly, such as 7 fps, a shifted start can sit off the frame grid by a sliver too small to see.
+
+## One frame minimum
+
+[Trims](/editing/trimming/) and [rolls](/editing/slip-and-roll/) always leave a clip at least one frame long. The drag stops there, however far you pull.
+
+## Project limits
+
+| A project holds up to | |
+| --- | --- |
+| Clips | 4,096 |
+| Tracks | 64 |
+| Levels of nesting | 8 |
+| Markers | 1,024 |
+| Media files | 1,024 |
+
+Clips and tracks inside nests count towards the same totals as the ones on the timeline. An edit that would pass a limit doesn't happen, and the project stays as it was. See [Limits](/reference/limits/).
+
+## When an edit doesn't go through
+
+Frame Job beeps, changes nothing and adds no undo step. When a rule stopped the edit, the reason appears at the foot of the inspector. An edit that would change nothing beeps too, with no reason given. An edit Frame Job can't carry out at all, such as placing a file shorter than one frame or passing a project limit, shows an alert instead of a beep.
+
+A drag is quieter. It stays at the last position the project allows, with no beep. See [When an edit is refused](/getting-started/refused-edits/).
+
+## With an agent
+
+[`set_selection`](/mcp/tools-view-state/#set_selection), [`set_playhead`](/mcp/tools-view-state/#set_playhead) and [`set_range`](/mcp/tools-view-state/#set_range) set the selection, the playhead and the range. They aren't edits and they add no undo step. See [Tools: playhead, range and selection](/mcp/tools-view-state/).
+
+An agent's times land on frames too. A negative position on the timeline becomes 0, but a negative length is an error and nothing changes.
+
+## Related
+
+- [Core concepts](/getting-started/core-concepts/)
+- [Select clips](/timeline/selecting-clips/)
+- [When an edit is refused](/getting-started/refused-edits/)
+- [Undo and saving](/getting-started/undo-and-saving/)
+- [Hide and lock tracks](/timeline/hide-and-lock-tracks/)

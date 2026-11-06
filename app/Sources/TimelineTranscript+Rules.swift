@@ -48,13 +48,35 @@ extension TimelineTranscript {
     /// The share of the shorter side the common words must reach.
     static let sameSpeechShare = 0.6
 
-    /// One note per pair of clips of DIFFERENT media whose instances overlap
+    /// The tool's note for each pair, by id: an agent reads ids (TX-10).
+    static func sameSpeech(_ words: [Word], instances: [Instance]) -> [String] {
+        sameSpeechPairs(words, instances: instances).map { pair in
+            "Clips \(pair.a) and \(pair.b) carry the same speech. Mute one, or switch its audio "
+                + "off, to read it once."
+        }
+    }
+
+    /// The Transcript tab's note for each pair, by name with the id beside
+    /// it: a person sees names on the timeline and no id (TX-36).
+    static func sameSpeechShown(_ words: [Word], instances: [Instance]) -> [String] {
+        var names: [UInt32: String] = [:]
+        for instance in instances { names[instance.clip.id] = instance.job.name }
+        return sameSpeechPairs(words, instances: instances).map { pair in
+            "“\(names[pair.a] ?? "")” (clip \(pair.a)) and “\(names[pair.b] ?? "")” "
+                + "(clip \(pair.b)) carry the same speech. Mute one, or switch its audio off, to "
+                + "read it once."
+        }
+    }
+
+    /// Each pair of clips of DIFFERENT media whose instances overlap
     /// on the timeline for at least `sameSpeechOverlap` and whose words
     /// starting inside that overlap match: tokens `FillerWords.normalized`,
     /// empties dropped, at least one each side, a longest common subsequence
     /// of at least `sameSpeechShare` × the shorter side. Clip ids ascending.
     /// `words` are the windowed words, before `tracks` and paging.
-    static func sameSpeech(_ words: [Word], instances: [Instance]) -> [String] {
+    static func sameSpeechPairs(
+        _ words: [Word], instances: [Instance]
+    ) -> [(a: UInt32, b: UInt32)] {
         var spans: [UInt32: [(Ticks, Ticks)]] = [:]
         var mediaOf: [UInt32: UInt32] = [:]
         for instance in instances {
@@ -65,7 +87,7 @@ extension TimelineTranscript {
         var byClip: [UInt32: [Word]] = [:]
         for word in words { byClip[word.clip, default: []].append(word) }
         let ids = byClip.keys.sorted()
-        var notes: [String] = []
+        var pairs: [(a: UInt32, b: UInt32)] = []
         for (i, a) in ids.enumerated() {
             for b in ids[(i + 1)...] {
                 guard let ma = mediaOf[a], let mb = mediaOf[b], ma != mb else { continue }
@@ -87,12 +109,10 @@ extension TimelineTranscript {
                 guard Double(commonLength(left, right)) >= sameSpeechShare * Double(shorter) else {
                     continue
                 }
-                notes.append(
-                    "Clips \(a) and \(b) carry the same speech. Mute one, or switch its audio "
-                        + "off, to read it once.")
+                pairs.append((a, b))
             }
         }
-        return notes
+        return pairs
     }
 
     /// Words as TR-8's normalised tokens, empties dropped.

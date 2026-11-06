@@ -1,0 +1,47 @@
+---
+title: "Canvas snapping"
+description: "Line a clip up with the canvas and other layers as you move it, and turn the pull off for one drag."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+While you move a clip on the canvas, its box pulls into line with the canvas and with the other layers, and a guide line shows what it lined up with.
+
+<AtAGlance
+  menu="View ▸ Snapping"
+  keys={['N', '⌘-drag']}
+  where="The Snap checkbox in the timeline bar"
+/>
+
+## What snaps
+
+Only a move snaps. While you drag a clip, its box snaps to:
+
+- the canvas's edges, its centre lines and its thirds
+- the edges and centres of every other clip with a box on the canvas at the playhead, including clips on locked tracks
+
+A nest clip's box is the rectangle it's placed in, so that's what snaps, whatever it draws inside.
+
+Frame Job checks the clip's edges and its centre on each axis, and the smallest correction wins. The pull reaches 8 points on screen at any zoom, so it covers fewer canvas pixels the further you zoom in. A snap always lands on a whole canvas pixel.
+
+A turned clip snaps by the bounds of its rotated box. With several clips selected, the clip you grabbed is the one checked, and the others in the drag aren't snapped to.
+
+Scaling, rotating and cropping don't snap. <kbd>⇧</kbd> while rotating [snaps the angle](/canvas/move-scale-rotate/#snap-the-angle) instead.
+
+## Guide lines
+
+A guide line is drawn across the whole canvas on each axis that snapped, so you can see what the clip lined up with. It's only there during the drag.
+
+## Suspend for one drag
+
+Hold <kbd>⌘</kbd> during a drag to stop snapping for as long as it's down. You can hold it from the start or press it partway through, and snapping comes back when you let go of <kbd>⌘</kbd>.
+
+## Turn snapping off
+
+Press <kbd>N</kbd>, choose **View ▸ Snapping**, or use the **Snap** checkbox in the timeline bar. Snapping is on to begin with, and Frame Job remembers your choice. The canvas and the timeline share the one setting. See [Snapping](/timeline/snapping/).
+
+## Related
+
+- [Move, scale and rotate](/canvas/move-scale-rotate/)
+- [Snapping](/timeline/snapping/)
+- [Safe areas](/canvas/safe-areas/)

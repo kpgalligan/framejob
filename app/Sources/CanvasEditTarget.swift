@@ -3,6 +3,13 @@ import Foundation
 /// What a canvas gesture edits (spec §11 CI-13): the clip's BASE props, or
 /// the selected action's END state — the same choice the inspector's fields
 /// make (CI-2), so a drag, a nudge and a typed value all write one place.
+/// The one exception is a clip's first-frame CUT (CI-17): a one-frame layout
+/// action at clip time 0 holds the placement for every frame after the
+/// first, so with one clip and no action selected a gesture goes to the cut
+/// (`holding`) where a typed value still writes the base, and a gesture on a
+/// cut writes the base as well (`ops(video:clip:)`). Past any other finished
+/// action whose end holds a key the gesture writes, the same single clip's
+/// gesture refuses, naming that action (CI-19): `heldRefusal`.
 ///
 /// It reaches the canvas as a value on two channels: the refresh that already
 /// follows a selection (`EditorViewController.refreshCanvas`) and the
@@ -23,7 +30,15 @@ struct CanvasEditTarget: Equatable {
         let action: UInt32
         /// The action's end in CLIP time (`ActionSnapshot.endTime`).
         let endTime: Ticks
+        /// The action is the clip's first-frame cut (`isCut`, CI-17).
+        let cut: Bool
     }
+
+    /// The keys a gesture writes, which `holding` asks a cut about: x, y · x, y,
+    /// scale and text.width · rotation · crop. `width` is a text clip's side
+    /// handle, which writes only `text.width`; CI-19 asks it (`heldKeys`), and
+    /// `holding` never does.
+    enum Gesture { case move, scale, width, rotate, crop }
 
     /// What a gesture starts from: the end state for `selected.clip`, the
     /// base for any other clip. `text` is carried because a text clip's
@@ -44,8 +59,49 @@ struct CanvasEditTarget: Equatable {
         guard let clip = document.singleSelectedClip,
               let action = document.selectedActionSnapshot
         else { return .base }
+        let frame = document.editedProject.snapshot.canvas.fps.frameDuration
         return CanvasEditTarget(
-            selected: Selected(clip: clip.id, action: action.id, endTime: action.endTime))
+            selected: Selected(
+                clip: clip.id, action: action.id, endTime: action.endTime,
+                cut: isCut(action, frame: frame)))
+    }
+
+    /// A first-frame cut (CO-61, CO-80 (b)): a layout action at clip time 0,
+    /// at most one canvas frame long. Any longer and it is a move a person
+    /// can see, which keeps CI-13's base.
+    private static func isCut(_ action: ActionSnapshot, frame: Ticks) -> Bool {
+        action.start == 0 && action.duration <= frame && VerticalVersion.isLayoutAction(action)
+    }
+
+    /// The target a `gesture` on `clip` takes with no action selected: its
+    /// first-frame cut when the cut's end holds a key the gesture writes,
+    /// `self` otherwise (CI-17). A rotate stays on the base, because a cut
+    /// holds no `rotation`, and the base shows it on every frame.
+    func holding(_ gesture: Gesture, clip: ClipSnapshot, frame: Ticks) -> CanvasEditTarget {
+        guard selected == nil,
+              let cut = clip.actions.first(where: { Self.isCut($0, frame: frame) }),
+              Self.holds(cut.end, gesture)
+        else { return self }
+        return CanvasEditTarget(
+            selected: Selected(clip: clip.id, action: cut.id, endTime: cut.endTime, cut: true))
+    }
+
+    /// Whether an end patch names any key `gesture` writes.
+    private static func holds(_ end: ActionPatch, _ gesture: Gesture) -> Bool {
+        let video = end.video
+        switch gesture {
+        case .move:
+            return video?.x != nil || video?.y != nil
+        case .scale:
+            return video?.x != nil || video?.y != nil || video?.scale != nil
+                || end.text?.width != nil
+        case .width:
+            return end.text?.width != nil
+        case .rotate:
+            return video?.rotation != nil
+        case .crop:
+            return video?.crop != nil
+        }
     }
 
     /// The action this target writes on `clip`, nil when `clip` is written
@@ -68,6 +124,24 @@ struct CanvasEditTarget: Equatable {
         return .setActionEnd(clip: clip, action: action, patch: ActionPatch(text: patch))
     }
 
+    /// What a gesture sends: `op(video:clip:)`, and on a cut the same patch
+    /// to the base, so frame 0 and the rest stay together (CI-17). One list,
+    /// so one undo step.
+    func ops(video patch: VideoPatch, clip: UInt32) -> [ReelOp] {
+        let edit = op(video: patch, clip: clip)
+        guard onCut(clip) else { return [edit] }
+        return [edit, .setVideo(clips: [clip], patch: patch)]
+    }
+
+    /// The same for a text clip's wrap width.
+    func ops(text patch: TextPatch, clip: UInt32) -> [ReelOp] {
+        let edit = op(text: patch, clip: clip)
+        guard onCut(clip) else { return [edit] }
+        return [edit, .setText(clips: [clip], patch: patch)]
+    }
+
+    private func onCut(_ clip: UInt32) -> Bool { selected?.clip == clip && selected?.cut == true }
+
     /// `clip_state` at `clip.start + endTime` decoded through
     /// `InspectorBinding.decode` — the inspector's own read of an END state,
     /// video and text from ONE call — for `selected.clip`; the clip's base
@@ -88,6 +162,132 @@ struct CanvasEditTarget: Equatable {
     func forScale(of clip: ClipSnapshot) -> CanvasEditTarget {
         if case .shape = clip.source { return .base }
         return self
+    }
+}
+
+extension CanvasEditTarget.Gesture {
+    /// The word CI-19's sentence names the gesture by.
+    var refusalNoun: String {
+        switch self {
+        case .move: return "move"
+        case .scale, .width: return "resize"
+        case .rotate: return "rotation"
+        case .crop: return "crop"
+        }
+    }
+}
+
+/// CI-19: past a finished action, not a cut, whose end holds a key a single
+/// clip's gesture writes, the gesture refuses and names the action.
+extension CanvasEditTarget {
+    /// `.width` for a text-source clip's side handle (drivesX && !isCorner),
+    /// `.scale` otherwise.
+    static func scaleGesture(clip: ClipSnapshot, handle: CanvasHandle) -> Gesture {
+        guard clip.text != nil, case .text = clip.source, handle.drivesX, !handle.isCorner
+        else { return .scale }
+        return .width
+    }
+
+    /// The names of the keys `gesture` writes that `end` holds, in the
+    /// sentence's order; empty when none.
+    static func heldKeys(_ end: ActionPatch, _ gesture: Gesture) -> [String] {
+        let video = end.video
+        let position = video?.x != nil || video?.y != nil
+        switch gesture {
+        case .move:
+            return position ? ["position"] : []
+        case .scale:
+            return (position ? ["position"] : []) + (video?.scale != nil ? ["size"] : [])
+        case .width:
+            return end.text?.width != nil ? ["width"] : []
+        case .rotate:
+            return video?.rotation != nil ? ["rotation"] : []
+        case .crop:
+            return video?.crop != nil ? ["crop"] : []
+        }
+    }
+
+    /// The latest action, not a cut, whose end is at or before `clipTime`
+    /// and whose heldKeys are non-empty.
+    static func holder(
+        _ gesture: Gesture, clip: ClipSnapshot, at clipTime: Ticks, frame: Ticks
+    ) -> ActionSnapshot? {
+        clip.actions
+            .filter { !isCut($0, frame: frame) && $0.endTime <= clipTime }
+            .filter { !heldKeys($0.end, gesture).isEmpty }
+            .max { ($0.endTime, $0.id) < ($1.endTime, $1.id) }
+    }
+
+    /// The sentence, naming `holder` by its number on `clip`'s lane
+    /// (`ActionBands.ordered`).
+    static func heldSentence(_ gesture: Gesture, holder: ActionSnapshot, on clip: ClipSnapshot)
+        -> String
+    {
+        let n = (ActionBands.ordered(clip).firstIndex { $0.id == holder.id } ?? 0) + 1
+        let what = heldKeys(holder.end, gesture).joined(separator: " and ")
+        return "action \(n) on this clip's lane holds its \(what) at the playhead, so a "
+            + "\(gesture.refusalNoun) here would show only before it. Select action \(n) first."
+    }
+}
+
+/// A canvas drag CI-19 refused at its press: shown on its first drag tick.
+struct CanvasRefusedGesture {
+    let refusal: ReelRefusal
+    var shown: Bool
+}
+
+extension PreviewCanvasView {
+    /// nil unless CI-19 applies to clip `id`: no action selected, the
+    /// selection exactly `[id]`, its track unlocked, not a scale on a shape
+    /// (`set_shape` has no action form), and a holder at the playhead. The
+    /// refusal's `op` is `set_text` for `.width`, `set_video` otherwise.
+    func heldRefusal(_ gesture: CanvasEditTarget.Gesture, clip id: UInt32) -> ReelRefusal? {
+        guard editTarget.selected == nil, selection == [id], let clip = snapshot.clip(id),
+              snapshot.track(clip.track)?.locked != true
+        else { return nil }
+        if gesture == .scale, case .shape = clip.source { return nil }
+        guard let holder = CanvasEditTarget.holder(
+            gesture, clip: clip, at: playhead - clip.start,
+            frame: snapshot.canvas.fps.frameDuration)
+        else { return nil }
+        return ReelRefusal(
+            op: gesture == .width ? "set_text" : "set_video",
+            reason: CanvasEditTarget.heldSentence(gesture, holder: holder, on: clip))
+    }
+
+    /// A begin*'s line: sets `refusedGesture` (nil, or the refusal not yet
+    /// shown) and answers whether the gesture was refused.
+    func refusesHeld(_ gesture: CanvasEditTarget.Gesture, clip id: UInt32) -> Bool {
+        refusedGesture = heldRefusal(gesture, clip: id).map {
+            CanvasRefusedGesture(refusal: $0, shown: false)
+        }
+        return refusedGesture != nil
+    }
+
+    /// continueGesture's: true while a refused gesture is held; calls
+    /// `onRefuse` on its first tick only, so a press that only selects is
+    /// silent.
+    func continueRefusedGesture() -> Bool {
+        guard var refused = refusedGesture else { return false }
+        if !refused.shown {
+            refused.shown = true
+            refusedGesture = refused
+            onRefuse?(refused.refusal)
+        }
+        return true
+    }
+}
+
+extension PreviewCanvasView {
+    /// The target a gesture starts from and writes: `editTarget` with an
+    /// action selected or anything but one clip selected, otherwise that
+    /// clip's `holding` (CI-17). Asked at mouse-down and never written back:
+    /// `editTarget` stays the document's mode, and the selection stays as it is.
+    func heldTarget(_ gesture: CanvasEditTarget.Gesture) -> CanvasEditTarget {
+        guard editTarget.selected == nil, selection.count == 1, let id = selection.first,
+              let clip = snapshot.clip(id)
+        else { return editTarget }
+        return editTarget.holding(gesture, clip: clip, frame: snapshot.canvas.fps.frameDuration)
     }
 }
 

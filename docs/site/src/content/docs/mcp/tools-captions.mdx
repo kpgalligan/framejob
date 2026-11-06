@@ -1,0 +1,458 @@
+---
+title: "Tools: captions and transcripts"
+description: Make, import, write out and re-page captions, and read the spoken words of a clip or the whole timeline, ready to cut.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+These tools make captions and read speech. Four of them work with caption tracks, and two hand an agent the spoken words with their times, so it can cut by what was said.
+
+<AtAGlance
+  menu={['File ▸ Generate Captions…', 'File ▸ Import Captions…', 'File ▸ Export Captions…', 'File ▸ Re-lay Captions for This Canvas']}
+  where="The Transcript tab"
+  tools={['transcribe', 'import_captions', 'export_captions', 'relay_captions', 'get_transcript', 'get_timeline_transcript']}
+  needs={['A speech model on this Mac for on-device words, which a person installs', 'Your AssemblyAI key to transcribe in the cloud']}
+/>
+
+| To | Use | Changes the project |
+| --- | --- | --- |
+| Turn speech into captions | [`transcribe`](#transcribe) | Yes, one undo step, unless `place` is false |
+| Bring in an `.srt` or `.vtt` file | [`import_captions`](#import_captions) | Yes, one undo step |
+| Write a track out as `.srt` or `.vtt` | [`export_captions`](#export_captions) | No |
+| Page word captions again for a new canvas | [`relay_captions`](#relay_captions) | Yes, one undo step |
+| Read one clip's words | [`get_transcript`](#get_transcript) | No |
+| Read every word heard on the timeline | [`get_timeline_transcript`](#get_timeline_transcript) | No |
+
+All six work in the timeline, or in the nest that [`set_scope`](/mcp/nests/) has open. None of them takes a `scope` key. Times are in ticks, 600,000 to a second. See [Units and ids](/mcp/units-and-ids/). How a call reports an edit, and how it reports a problem, is on [What a call answers](/mcp/what-a-call-answers/).
+
+## `transcribe`
+
+Turns the speech in clips into captions, on this Mac or with AssemblyAI, and places them as text clips on a new track of their own at the front. It does what [**File ▸ Generate Captions…**](/captions/generate-captions/) does.
+
+The new clips are [ordinary text clips](/captions/how-captions-work/), so they draw in the preview, in `render_frame` and in an export, and they can be retimed with `move_clip` or restyled with `set_text`.
+
+**Arguments**
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | No | Transcribe only these clips, at least one, muted or not. Left out, every clip you can hear in the timeline or nest that's open: a clip with recorded sound that's muted, on a muted or soloed-out track, or turned down to nothing is left out. |
+| `engine` | string | No | `apple` (the default) on this Mac, or `assemblyai` in the cloud. See [Transcribe engines](#transcribe-engines). |
+| `language` | string | No | A language tag, such as `en-US`. On this Mac it defaults to the Mac's own language, or the nearest one installed. With AssemblyAI it defaults to `auto`, which detects the language. |
+| `style` | string | No | `subtitles` (the default), `highlight`, `pill`, `karaoke`, `build` or `one_word`. See [Caption styles and paging](#caption-styles-and-paging). |
+| `place` | boolean | No | True (the default) places the cues as one undo step. False answers the cues and changes nothing. See [Check a transcript before placing it](#check-a-transcript-before-placing-it). |
+| `replace` | boolean | No | With a word style, removes earlier caption tracks in the same undo step. See [Restyle captions](#restyle-captions). |
+| `slide` | boolean | No | The pill slides between words. See [Caption looks](#caption-looks). |
+| `fill` | boolean | No | The spoken word fills from left to right. See [Caption looks](#caption-looks). |
+| `dim` | boolean | No | The page fades in a pause. See [Caption looks](#caption-looks). |
+| `speakers` | boolean | No | AssemblyAI only. Ask who says what. Default false. See [Speakers and vocabulary](#speakers-and-vocabulary). |
+| `vocabulary` | array of strings | No | AssemblyAI only. Words and phrases to expect. See [Speakers and vocabulary](#speakers-and-vocabulary). |
+| `refresh` | boolean | No | AssemblyAI only. Ignore the kept transcript and upload again. Default false. |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. The frontmost project when left out. |
+
+Only a clip playing a movie or sound file can be transcribed, and not one played in reverse, whose words would come out backwards. A clip you name that can't be is listed under `skipped`. See [What can be transcribed](/captions/what-can-be-transcribed/).
+
+**What it answers**
+
+| Key | What it holds |
+| --- | --- |
+| `cues` | The cues, placed or not, each with `start`, `end` and `text`. With a word style each also has `words`, a list of `start`, `end` and `text` in timeline ticks, and `size` where a lone word shrank. |
+| `engine`, `language` | The engine that ran and the language it used. |
+| `clips_read` | The clips words came from. |
+| `placed` | Whether the cues were placed. |
+| `captions` | How many text clips were placed. |
+| `track_name` | The name of the new track. |
+| `trimmed` | How many cues were shortened to meet the next one, when any were. |
+| `replaced` | The ids of the tracks removed, whenever `replace` was given. |
+| `looks` | The looks that were on, whenever `slide`, `fill` or `dim` was given. |
+| `skipped` | Each clip that gave no captions and why, when there are any. |
+
+A placed run also has the ids of what it created and the `project` summary. Subtitles cues are at most two lines of 42 characters and at most 6 s, with a frame between them.
+
+An AssemblyAI run adds these:
+
+| Key | What it holds |
+| --- | --- |
+| `uploaded` | The media files sent. |
+| `cached` | The media files answered from the transcript kept in the project, with no request. |
+| `audio_seconds` | The seconds of audio billed. |
+| `speech_model_used` | Each uploaded file's `media` and `model`. |
+| `language_detected` | With `language` left out or `auto`, each uploaded file's `media`, `code` and, when AssemblyAI gave one, `confidence`. |
+| `endpoint` | The host the run's requests went to. Absent when no key is set. |
+| `note` | Anything else worth saying: a cut vocabulary, a fallback model, a delete AssemblyAI hasn't confirmed, or a transcript that couldn't be kept for reuse. |
+
+**When it refuses**
+
+Nothing changes and nothing is uploaded when:
+
+- A clip id names nothing, or `clips` is empty.
+- Nothing has recorded sound. The answer reads "Nothing in this timeline has recorded sound to transcribe…", or, for clips you named, "None of those clips can be transcribed" with the reason for each.
+- You named no clips and none you can hear can be read: "Nothing heard in this timeline can be transcribed. Name a clip in clips to transcribe it anyway."
+- `style` or `engine` isn't one of its spellings. The answer names them all.
+- `speakers`, `vocabulary` or `refresh` is given with engine `apple`. Giving one at all is enough, even as false.
+- `replace` is given with `subtitles` or with `place: false`. Giving it at all is enough, even as false.
+- `slide`, `fill` or `dim` is true with a style it doesn't show on, or with `place: false`.
+- The `language` tag is misspelt, for engine `apple`. The answer lists the tags speech recognition knows, 24 at most.
+- The language is real but its speech model isn't on this Mac, for engine `apple`. The answer lists the languages ready here, 24 at most. This is a separate answer from a misspelling, because a person has to fix it: they open **File ▸ Generate Captions…**, choose the language and press **Download**. The tool never downloads a model. See [Download a speech language](/captions/on-device-transcription/#download-a-speech-language).
+- No AssemblyAI key is set and a file needs uploading: "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription."
+- The project has nowhere to keep its transcripts, which is rare: "This document has nowhere to keep its transcript cache, so it cannot be transcribed with AssemblyAI. Save it first."
+
+Once a run starts, a clip that fails is listed under `skipped` and the others are still placed. That includes a clip whose file is over AssemblyAI's 10-hour limit, and a clip where no speech was heard. The exception is a key AssemblyAI refuses, which ends the run with nothing placed, because every later file would fail the same way. If no cues come out of the whole run, nothing is placed and the answer says why, for example "No speech was recognised in the audio that was transcribed." If the captions wouldn't fit the project's limit of 4,096 clips, none are placed and the answer says how many more would fit.
+
+If an AssemblyAI run fails after it has spent money, the answer says so: "AssemblyAI had already been billed for 1 media file (N audio seconds) before this failed." [When a file fails](/captions/assemblyai-transcription/#when-a-file-fails) lists the reasons you can see.
+
+### Transcribe engines
+
+**`apple`** is the default. Speech recognition runs on this Mac and nothing leaves it. It needs no permission and has no length limit. Each run recognises the audio again, because this engine keeps nothing for `transcribe` to reuse, and `refresh` doesn't apply.
+
+Speech models are installed per Mac, from the **Download** row in **File ▸ Generate Captions…**. `language` matches a tag such as `en-US`, a language's display name, or a bare code such as `en`, which takes the first matching language on this Mac.
+
+**`assemblyai`** sends the audio of every media file behind the clips you named to AssemblyAI, a cloud service that bills for it. It sends the whole file, not only the parts in use. The transcript is deleted from AssemblyAI once the words have been read back. See [What goes to AssemblyAI](/captions/assemblyai-privacy/).
+
+:::caution
+Don't choose `assemblyai` for somebody else's recording without their say-so. Audio leaves the Mac and the owner of the key pays for it.
+:::
+
+- **The engine is never remembered.** Left out, it's `apple`, whatever the Generate Captions sheet last chose. An agent that wants the cloud says so on every call.
+- **Each file is kept.** One transcript per media file is kept in the project package, so a second run over the same files with the same settings makes no request and lists them under `cached`. See [Reuse a transcript](/captions/assemblyai-transcription/#reuse-a-transcript).
+- **`refresh`** ignores what's kept and uploads again, and the file is billed again.
+- **The key.** A new transcription needs your AssemblyAI key. A run whose every file already has a current transcript needs no key and makes no network request, unless `refresh` is true. If AssemblyAI hasn't confirmed deleting a transcript and no key is set, `note` says so, and a later run with a key for the same account and region tries the deletion again.
+- **`language`.** `auto`, the default, detects the language and the answer reports it. Any other code goes to AssemblyAI unchecked, and one it doesn't support comes back as AssemblyAI's own sentence after the upload.
+- **The region.** It's a choice in [Settings](/captions/assemblyai-key/), and no argument sets it. `endpoint` tells you where a run's requests went.
+
+The built-in Assistant can't use this engine. A call with `engine: "assemblyai"` is withheld from it, and it points you to **File ▸ Generate Captions…**, which shows what's uploaded and what it costs. See [What it won't do and what it asks first](/assistant/what-it-will-not-do/).
+
+### Speakers and vocabulary
+
+Both need `engine: "assemblyai"`. The sheet's rows are described on [Transcribe with AssemblyAI](/captions/assemblyai-transcription/#split-the-words-by-speaker).
+
+`speakers: true` asks AssemblyAI who says what, and a change of speaker then starts a new cue. With `subtitles`, each speaker's cues take their own colour: white, yellow, cyan, then green in order of first appearance, then round again. A speaker is a label within one media file, so one person in two files can come back as two speakers.
+
+`vocabulary` tells AssemblyAI the words and phrases to expect, such as product names, people and identifiers. Terms are trimmed, repeats are dropped keeping the first spelling, and the list stops at 1,000 terms. `note` says so when it was cut.
+
+### Check a transcript before placing it
+
+`place: false` answers the cues and changes nothing, with no edit and no undo step. Use it to read a transcript before committing to it.
+
+You can't combine it with `replace` or with a look set to true, because nothing is placed. To place the captions, call again without `place`. With AssemblyAI the second call reuses the kept transcript and uploads nothing.
+
+### Caption styles and paging
+
+`style` chooses how the words look. It's the same choice as **Style** in the sheet, and the default is never what the sheet last chose. See [Word caption styles](/captions/word-caption-styles/).
+
+| `style` | What it makes |
+| --- | --- |
+| `subtitles` | Two-line cues in the Caption preset. The default. |
+| `highlight` | Montserrat Black, upper case, the word being said in yellow with a pop. |
+| `pill` | Montserrat ExtraBold, upper case, the word being said on a violet pill. |
+| `karaoke` | Montserrat ExtraBold as written, up to two lines, words turning yellow. |
+| `build` | Anton, upper case, words appearing one by one. |
+| `one_word` | Bebas Neue, one large word at a time. |
+
+Every style but `subtitles` is a word style, and makes pages rather than cues. A page is the group of words on screen at one time. Each page holds its words' timings, so the word being said is drawn as the style says.
+
+A page is filled to the width it will measure on this canvas in that style, at most 0.86 of the canvas width, not to a word count. It sits on one line, or up to two with `karaoke`. A page also closes at:
+
+- a change of speaker
+- a gap of 0.25 s or more
+- a word ending in `.`, `?`, `!` or `…`
+- 3 s on screen
+
+A lone word too wide for the canvas shrinks, down to 80 % of the style's size, before it wraps. Pages stay inside their own clip. A page holds for 0.5 s after its last word, or runs up to the next page if that starts sooner.
+
+### Caption looks
+
+`slide`, `fill` and `dim` add a look to a word style's pages, as the sheet's three boxes do. Each is false unless given, and never what the sheet last chose. See [Looks for word captions](/captions/word-caption-looks/).
+
+| Argument | The sheet's box | What it does | Works with |
+| --- | --- | --- | --- |
+| `slide` | **Slide the pill** | The pill slides from the word before to the word being said, over 0.2 s or sooner, instead of jumping. | `pill` |
+| `fill` | **Fill words as spoken** | The word being said fills from left to right as it's spoken, taking 0.6 s at most. | `highlight`, `karaoke`, `build` |
+| `dim` | **Dim in pauses** | The page fades to half its opacity in a pause of 0.25 s or more. | All five word styles |
+
+True with any other style, or with `place: false`, where it would show nothing, is refused and the answer names the argument. False is always accepted. Words from engine `apple` rarely carry a pause that long, so `dim` shows mostly with `assemblyai`.
+
+Whenever one of the three was given, a placed run lists under `looks` the ones that were on.
+
+### Restyle captions
+
+To change a word style, run `transcribe` again with `replace: true`. See [Restyle a caption track](/captions/restyle-captions/).
+
+`replace` removes, in the same undo step, every track this command could have made over these clips: a track named **Captions** or **Captions N** that holds only text clips, each of which overlaps a clip being transcribed. The answer lists those tracks under `replaced`.
+
+It needs a word style and `place` true. A style is only a display choice, so with AssemblyAI a kept transcript is reused whatever style you ask for, and restyling uploads nothing. Engine `apple` recognises the audio again.
+
+## `import_captions`
+
+Reads a SubRip (`.srt`) or WebVTT (`.vtt`) file and lays it out as text clips, one for each cue, on a new track of its own. It does what [**File ▸ Import Captions…**](/captions/import-captions/) does, and that page has what the reader copes with.
+
+They're ordinary text clips in the Caption preset, so they burn in on export with no further step. Times snap to the frame grid, and a cue that overlapped the next one is shortened to meet it.
+
+**Arguments**
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `path` | string | Yes | The absolute or `~` path to the `.srt` or `.vtt` file. |
+| `track` | integer | No | Put the captions on this existing track instead of a new one, which the menu can't do. Cues that would overlap something there are dropped, so it's safer to leave this out. |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. The frontmost project when left out. |
+
+**What it answers**
+
+| Key | What it holds |
+| --- | --- |
+| `cues` | How many cues survived. |
+| `captions` | How many text clips were made. It's smaller than `cues` when a track you named turned some away. |
+| `track_name` | The new track's name. Absent when you named a track. |
+| `trimmed` | How many cues were shortened, when any were. |
+| `skipped` | Every entry it couldn't read or place, with its line number, when there are any. |
+
+It also has the ids of what it created and the `project` summary. It's one undo step, **Import Captions**.
+
+**When it refuses**
+
+Nothing changes when there's no file at `path` ("No file at …"), when `track` names no track, when the file can't be read as text, when not one cue in it can be read, when a track you named takes none of the cues, or when it would take the project past its limit of 4,096 clips. [When a file can't be read](/captions/import-captions/#when-a-file-cant-be-read) has the sentences.
+
+## `export_captions`
+
+Writes one text track out as a subtitle file, one cue for each text clip, at the time it sits at and in the order they play. It does what [**File ▸ Export Captions…**](/captions/export-captions/) does. It edits nothing and makes no undo step.
+
+**Arguments**
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `path` | string | Yes | Where to write, for example `~/Movies/talk.srt`. The folder must exist. A trailing `.srt` or `.vtt` is replaced by the format's own. Any other extension stays as part of the name, so `chart.png` becomes `chart.png.srt`. |
+| `format` | string | No | `srt` (SubRip) or `vtt` (WebVTT). By default the path's own extension when it's one of those, otherwise `srt`. A format you name wins over the path's extension. |
+| `track` | integer | No | The track to write. Leave it out when exactly one track can be written: only text clips, with caption text on at least one. |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. The frontmost project when left out. |
+
+**What it answers**
+
+`path` (the file really written, which can differ from what you asked for), `format`, `track`, `track_name`, `cues` (how many were written) and the `project` summary.
+
+**When it refuses**
+
+The track is never guessed, because writing the wrong track and reporting success is worse than asking. Nothing is written when:
+
+- No track holds only text clips with caption text on at least one of them.
+- Several do and `track` is left out. The answer lists each candidate by id and name, front-most first. Call again with `track`.
+- `track` names no track, holds a clip that isn't text, or has no caption text on it.
+- The folder doesn't exist, or the file can't be written.
+
+The built-in Assistant asks you before it runs this tool, because it writes a file.
+
+**Round trips.** Exported and brought back with `import_captions`, every cue returns to the tick it was written from, at every ordinary frame rate. The file itself may not match one you first imported. See [Frame-exact round trips](/captions/export-captions/#frame-exact-round-trips).
+
+## `relay_captions`
+
+Pages word captions again for the current canvas, from the words their pages hold, so every correction is kept. It does what [**File ▸ Re-lay Captions for This Canvas**](/captions/re-lay-captions/) does, and it's the step to take after `set_canvas`.
+
+It looks at every track named **Captions** or **Captions N** holding only text clips, in the timeline or in the open nest at the nest's size. A track whose pages are all in one of the five word styles, with its looks, is paged again and put back at the same place in the stack, with the same name, hidden and locked as before. It's one undo step, **Re-lay Captions**.
+
+**Arguments**
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. The frontmost project when left out. |
+
+**What it answers**
+
+| Key | What it holds |
+| --- | --- |
+| `relaid` | Each track paged again: `track` (the new track), `replaced` (the old one), `name`, `style` and `pages`. |
+| `kept` | Each track left as placed: `track`, `name` and `reason`. |
+
+It also has the ids of what it created and the `project` summary.
+
+A track is kept when it's a matte track, holds a page with no word timings (Subtitles pages included), holds a page none of whose words starts inside it, holds a page in a style Frame Job doesn't make, has pages in more than one style, or wouldn't fit the project's clip limit. [Tracks kept as placed](/captions/re-lay-captions/#tracks-kept-as-placed) explains each reason.
+
+**When it refuses**
+
+With nothing it can re-lay, nothing changes and the answer begins "relay_captions found no caption track it can re-lay:", followed by each kept track and its reason, or "there is no track named Captions holding only text clips".
+
+## `get_transcript`
+
+Reads one clip's spoken words with their times on the timeline, ready for `ripple_delete_ranges`. Use it when you care about one clip. To work across the timeline, or to cut exactly where the Transcript tab would, use [`get_timeline_transcript`](#get_timeline_transcript). The Assistant uses this tool to [cut a false start](/cleanup/false-starts/). No menu item shows these words clip by clip. The nearest view is the [Transcript tab](/captions/transcript-tab/). The tool edits nothing, makes no undo step and never uploads anything.
+
+**Arguments**
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | Yes | The clip whose words to read, in its own timeline position and speed. |
+| `language` | string | No | A language tag, such as `en-US`, for this Mac's recogniser only. By default this Mac's own language, or the nearest one installed. A kept AssemblyAI transcript answers in its own language. |
+| `from` | integer | No | Where on the timeline to start, in ticks, snapped to frames. The clip's start by default. See [The from and to window](#the-from-and-to-window). |
+| `to` | integer | No | Where on the timeline to stop, in ticks, snapped to frames. The clip's end by default. Must be after `from`. |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. The frontmost project when left out. |
+
+**What it answers**
+
+| Key | What it holds |
+| --- | --- |
+| `words` | The words sorted by start, each with `text`, `start`, `end` and `filler`, and `speaker` where the transcript labelled it. |
+| `count` | How many words came back. |
+| `engine` | `assemblyai` for a kept transcript, or `apple` for this Mac's recogniser. |
+| `language` | The language of the words, when known. |
+| `fillers_reported` | Whether the transcript was made with filler words. See [Fillers in a transcript](#fillers-in-a-transcript). |
+| `cached` | With engine `apple`, whether the answer came from what was already heard. |
+| `clip`, `media` | The clip and its media file. |
+| `from`, `to` | The window read, when one was given. |
+| `note` | Anything to know: no words were heard, fillers may be missing, or word starts haven't been moved yet. |
+| `project` | The project summary. |
+
+**When it refuses**
+
+- The clip doesn't exist, or it has no words to read: "Clip 3 has no words to read: its audio is switched off." The reason can also be that it isn't a media file, plays in reverse, has no audio track, or that its file is missing.
+- The window is empty, or outside the clip.
+- The `language` tag is misspelt. The answer lists the tags speech recognition knows, 24 at most.
+- There's no kept transcript and the language's speech model isn't installed. The tool never downloads one. A person installs it from **File ▸ Generate Captions…**.
+- A read fails, or is stopped, and the answer gives the recogniser's sentence.
+
+### Where the words come from
+
+The words come from the file's current AssemblyAI transcript, kept in the project, when it has one. That transcript comes from an earlier AssemblyAI run, such as [`transcribe`](#transcribe) or the sheet. Otherwise this Mac's own speech recogniser runs over the clip. Reading never uses the network and needs no key.
+
+- **Where a word starts.** An on-device word's start is moved to where its sound begins, using the file's voice detection and waveform. The recogniser's own start is often early, inside the pause before the word. Until voice detection has finished with the file, starts are the recogniser's and `note` says so, so ask again once it has. AssemblyAI words and every word's end are as transcribed.
+- **Saved for next time.** What the recogniser heard is saved in the project for each media file and language. A later request inside a stretch it has heard comes back at once, even from another clip of the same file at another speed, and `cached` says so. It's used only while the media file and the macOS version are unchanged.
+- **Speed.** Words are placed through the clip's speed, including a speed ramp, so their times match what plays on the timeline.
+- **Language.** On-device recognition uses this Mac's language unless `language` names another.
+- **Stopping.** The Assistant's **Stop** ends a long on-device read, and nothing is saved from a stopped read.
+
+### Fillers in a transcript
+
+`filler` is true for um, uh, hmm, mhm, uh-huh, ah, huh, hm, m, er and erm, in any case and with punctuation at their edges trimmed.
+
+`fillers_reported` says whether the transcript was made with filler words at all. It's false for every on-device read, and for a kept transcript made without them. A filler can then be in the audio and missing from `words`, and `note` says so. See [Transcripts for filler words](/cleanup/filler-transcripts/).
+
+### The from and to window
+
+`from` and `to` are timeline times, and they return only the words that overlap that part of the timeline. A word crossing an edge comes back whole, with its own times.
+
+Either end can be given alone. A missing `from` is the clip's start and a missing `to` is its end. The window is held inside the clip, and the answer gives it back as `from` and `to`. An empty window, or one wholly outside the clip, is refused.
+
+With a window, the on-device recogniser hears only that part and 2 s either side. That's faster, but a windowed read can differ slightly from a read of the whole clip.
+
+## `get_timeline_transcript`
+
+Reads every word heard on the timeline, or inside the open nest, in timeline order, with nested clips included. Each word carries the range the [Transcript tab](/captions/transcript-tab/) would cut it by. It edits nothing, makes no undo step, never makes a network request and needs no key.
+
+**Arguments**
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `from` | integer | No | Where on the timeline to start, in ticks, snapped to frames. The timeline's start by default. A word across this edge comes back whole. |
+| `to` | integer | No | Where on the timeline to stop, in ticks, snapped to frames. The timeline's end by default. Must be after `from`. |
+| `tracks` | array of integers | No | Only the words playing on these timeline tracks. Every track by default. |
+| `language` | string | No | A language tag, such as `en-US`, for this Mac's recogniser only. By default this Mac's own language, or the nearest one installed. Each language is kept apart, and a kept AssemblyAI transcript answers in its own language. |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. The frontmost project when left out. |
+
+**What it answers**
+
+| Key | What it holds |
+| --- | --- |
+| `words` | Each word, ordered by start, then end, then the front track first. Its keys are below. |
+| `count` | How many words are on this page. |
+| `pauses` | Each pause. See [Cut words and pauses](#cut-words-and-pauses). |
+| `media` | Each file read, with `media`, `engine`, `language` and `fillers_reported`. |
+| `no_words` | Clips that can't be read, each with `clip`, `nest_path`, `tag` and `reason`. |
+| `notes` | Sentences to read: the same speech twice, words not transcribed with fillers, or word starts not moved yet. |
+| `from`, `to` | The window read, when one was given. |
+| `truncated`, `next_from` | Present when there's more. See [Paging](#paging). |
+| `project` | The project summary. |
+
+Each word has these keys:
+
+| Key | What it holds |
+| --- | --- |
+| `text`, `start`, `end` | The word and its timeline times. |
+| `clip`, `track`, `media` | The clip it comes from, the timeline track it plays on and its media file. A nested word's track is its nest clip's. |
+| `engine` | `assemblyai` or `apple`. |
+| `filler` | True for a [filler word](#fillers-in-a-transcript). |
+| `speaker` | The speaker, when the transcript labelled one. |
+| `editable`, `why` | Whether cutting it is safe, and why not when it isn't. |
+| `id` | The word's identity across edits. |
+| `cut_start`, `cut_end` | The range the Transcript tab cuts this word by. |
+
+**When it refuses**
+
+- `to` isn't after `from`, or the window is wholly outside the timeline.
+- A `tracks` id names no track.
+- The `language` tag is misspelt.
+- A file needs this Mac's recogniser and the language's speech model isn't installed. The tool never downloads one.
+- A read fails, or is stopped, and the answer gives the recogniser's sentence.
+
+### Heard words and editable words
+
+Words come from every clip that plays speech from a media file, clips inside nests included. A clip that's muted, soloed out or at volume 0 isn't heard and gives no words.
+
+A clip whose words can't be read is listed under `no_words` with the reason instead: its audio switched off, played in reverse, or its file missing, for example.
+
+`editable` is false, with a sentence in `why`, for a word:
+
+- inside a nest. Open the nest with `set_scope` and read again to cut words inside it. A person opens one with **Clip ▸ Open Nest**, <kbd>⌘↓</kbd>.
+- under a transition, where a cut would leave one clip's tail under its neighbour.
+- on a locked track, where a cut would leave the word in place and move everything after it.
+
+`id` names a word across edits elsewhere on the timeline. It has four parts:
+
+| Part | What it is |
+| --- | --- |
+| `nest_path` | The nest clips the word plays through. |
+| `media` | Its media file. |
+| `source` | Its start in the media's own time, in ticks, as the recogniser put it. |
+| `k` | How many earlier words have the same three, which is 0 unless one piece of the file plays twice. |
+
+### Read once per file
+
+Each file without a current AssemblyAI transcript is read whole by this Mac's recogniser the first time it's needed, at about 0.7 s per minute of speech on an M2 Max. The words are saved in the project, so a later call answers at once.
+
+Trimming a clip, adding another clip of the same file, or reading again later doesn't read the file again. The saved words are used while the file and the macOS version stay the same. The Assistant's **Stop** ends a read, unless the Transcript tab is reading that file too, and nothing is saved from a stopped read. The Transcript tab's own **Stop** leaves an agent's read running. See [Where the transcript's words come from](/captions/transcript-words/).
+
+An on-device word's start is moved to its sound as in [`get_transcript`](#where-the-words-come-from), and `notes` names any file still waiting for voice detection.
+
+### Duplicate speech
+
+When two clips of different files carry the same speech at the same time, such as a camera's sound and a separate microphone, `notes` names the pair and both sets of words stay in `words`. Mute one, or switch its audio off, to read the speech once.
+
+### Paging
+
+At most 2,000 words come back in one answer. When there's more, `truncated` is true and `next_from` says where to call again. Pass it as `from`.
+
+A word overlapping that point can come back again on the next page, with the same `id`, so match words by `id`. A pause is listed on the page that holds the word before it.
+
+### Cut words and pauses
+
+`cut_start` and `cut_end` are the range the Transcript tab cuts a word by when it alone is deleted, snapped to frames. The range runs from where the word's sound starts to where the next word's sound starts, at most 1 s past the word's end, widened over any other track's word it would cut into. See [Where a word cut falls](/captions/delete-words/#where-a-word-cut-falls).
+
+To cut a run of words:
+
+<Steps>
+
+1. Call `get_timeline_transcript` and find the words.
+
+2. Check that each word in the run has `editable` true.
+
+3. Call [`ripple_delete_ranges`](/mcp/tools-cut-and-delete/#ripple_delete_ranges) once, with one range in `ranges`, from the first word's `cut_start` to the last word's `cut_end`.
+
+4. Read the transcript again before the next cut, because everything after a cut moves. The ids still name the same words.
+
+</Steps>
+
+Each row of `pauses` is a silence over 1 s between two words of one clip, read from voice detection:
+
+| Key | What it holds |
+| --- | --- |
+| `start`, `end` | Where the silence runs. |
+| `cut_start`, `cut_end` | What the Transcript tab cuts when the pause is deleted, with 0.2 s kept at each end, snapped to frames. |
+| `clip`, `track`, `media` | Where it is. |
+| `follows`, `precedes` | The ids of the words before and after it. |
+
+To shorten a pause, call `ripple_delete_ranges` with `[[cut_start, cut_end]]` as `ranges`. Not every silence is listed. See [When a pause isn't shown](/captions/shorten-pauses/#when-a-pause-isnt-shown).
+
+## Related
+
+- [Generate Captions](/captions/generate-captions/)
+- [The Transcript tab](/captions/transcript-tab/)
+- [Cut by deleting words](/captions/delete-words/)
+- [Tools: cutting and deleting](/mcp/tools-cut-and-delete/)
+- [Tools: clean-up](/mcp/tools-clean-up/)
+- [Units and ids](/mcp/units-and-ids/)
+- [Editing inside a nest](/mcp/nests/)

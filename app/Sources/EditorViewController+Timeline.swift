@@ -36,10 +36,12 @@ extension EditorViewController {
         // One-line forwards only (app/CLAUDE.md): every body is a named
         // method on this controller.
         timeline.onSelectionChanged = { [weak self] ids in self?.timelineSelected(ids) }
+        timeline.onSelectionSwept = { [weak self] ids in self?.timelineSwept(ids) }
         timeline.onScrub = { [weak self] time in self?.timelineScrubbed(time) }
         timeline.onScrubEnded = { [weak self] in self?.scrubAudioEnded() }
         timeline.onLiveBegin = { [weak self] in self?.document?.beginLiveEdit() }
         timeline.onLiveUpdate = { [weak self] ops in self?.timelineLiveUpdated(ops) }
+        timeline.onDragUpdate = { [weak self] ops in self?.timelineDragUpdated(ops) }
         timeline.onLiveEnd = { [weak self] name in self?.timelineLiveEnded(name) }
         timeline.onEdit = { [weak self] name, ops in self?.document?.applyEdit(name, ops) }
         timeline.onGroupedEdit = { [weak self] name, ops in self?.document?.performGroupedEdit(name, ops) }
@@ -119,15 +121,25 @@ extension EditorViewController {
     // MARK: - Intents from the view
 
     /// A PICK, which is not the same thing as a selection change: the
-    /// inspector is told first and unconditionally, because clicking a clip
-    /// means "show me this one" even when it was already selected (the design
-    /// handoff's interaction list, and the reason `clipPicked()` exists rather
-    /// than the panel inferring it from `ids != lastSelection`). The guard
-    /// below still stops an unchanged selection from posting a refresh.
+    /// inspector is told unconditionally, because clicking a clip means "show
+    /// me this one" even when it was already selected (the design handoff's
+    /// interaction list, and the reason `clipPicked()` exists rather than the
+    /// panel inferring it from `ids != lastSelection`). It is told AFTER the
+    /// write, because `clipPicked()` reads the selection. `changed` still
+    /// stops an unchanged selection from posting a refresh.
     private func timelineSelected(_ ids: Set<UInt32>) {
         guard let document = document else { return }
+        let changed = document.selection != ids
+        if changed { document.selection = ids }
         if !ids.isEmpty { inspector?.clipPicked() }
-        guard document.selection != ids else { return }
+        if changed { viewStateDidChange() }
+    }
+
+    /// A marquee or ⌥-click on a track header: a selection change that is not
+    /// a click on a clip, so no pick. The Assistant and Transcript tabs stay
+    /// as they are (spec §11 AI-14, TX-20).
+    private func timelineSwept(_ ids: Set<UInt32>) {
+        guard let document = document, document.selection != ids else { return }
         document.selection = ids
         viewStateDidChange()
     }
@@ -139,8 +151,8 @@ extension EditorViewController {
     }
 
     /// Applies ops to the current handle PURELY so a gesture can learn the
-    /// ids the core is about to mint (`duplicate`, `add_track`). This is not
-    /// an edit: nothing is published, no undo step is registered, and the
+    /// id the core is about to mint (`add_track`). This is not an edit:
+    /// nothing is published, no undo step is registered, and the
     /// handle it produces is dropped. `applying` is pure (spec §5.5), which
     /// is the only reason asking is legitimate.
     private func timelineProbe(_ ops: [ReelOp]) -> ProjectSnapshot? {
@@ -190,6 +202,13 @@ extension EditorViewController {
         guard let document = document else { return [] }
         let now = document.playhead
         return selectedClips.filter { $0.contains(now) }
+    }
+
+    /// The clips under the playhead `freeze_frame` admits: a media source
+    /// with a video group (`edit_time.rs`'s two refusals, #473). A clip with
+    /// its picture turned off still has the group, and freezes.
+    private var freezableUnderPlayhead: [ClipSnapshot] {
+        clipsUnderPlayhead.filter { $0.source.hasSourceBound && $0.video != nil }
     }
 
     // MARK: - Clip commands (spec §6, the keys of §9)
@@ -265,8 +284,8 @@ extension EditorViewController {
         document.applyEdit("Ripple Delete", .rippleDelete(clips: Array(document.selection)))
     }
 
-    /// ⌘D — copies land after the originals' span; ⌥-dragging then moves
-    /// them, which is the same op with a `move_clip` behind it.
+    /// ⌘D — copies land after the originals' span; an ⌥-drag is the same op
+    /// naming where they land (`ClipDragSession`).
     func duplicateSelection() {
         guard let document = document, !document.selection.isEmpty else {
             NSSound.beep()
@@ -277,7 +296,7 @@ extension EditorViewController {
 
     /// ⇧⌘F — one still clip filling a gap opened at the playhead.
     func freezeSelection() {
-        guard let document = document, let clip = clipsUnderPlayhead.first else {
+        guard let document = document, let clip = freezableUnderPlayhead.first else {
             NSSound.beep()
             return
         }
@@ -478,13 +497,20 @@ extension EditorViewController {
             if view.window?.firstResponder is NSText { return false }
             if transcriptHoldsWords { return true }
             return hasSelection || (document.inOutRange.map { $0.end > $0.start } ?? false)
-        case #selector(trimStartToPlayhead(_:)), #selector(trimEndToPlayhead(_:)),
-            #selector(freezeFrame(_:)):
+        case #selector(trimStartToPlayhead(_:)), #selector(trimEndToPlayhead(_:)):
             return !clipsUnderPlayhead.isEmpty
+        case #selector(freezeFrame(_:)):
+            // Live only over a clip the core can freeze (#473), the clip
+            // `freezeSelection` then takes.
+            return !freezableUnderPlayhead.isEmpty
         case #selector(splitAtPlayhead(_:)):
             return !document.editedProject.snapshot.clips.isEmpty
-        case #selector(removeTrack(_:)), #selector(toggleTrackHidden(_:)),
-            #selector(toggleTrackMuted(_:)), #selector(toggleTrackLocked(_:)):
+        case #selector(removeTrack(_:)):
+            // The core refuses the last track (#490), so the question is not
+            // asked of it; a nest counts its own tracks, as the rule does.
+            return currentTrack != nil && document.editedProject.snapshot.tracks.count > 1
+        case #selector(toggleTrackHidden(_:)), #selector(toggleTrackMuted(_:)),
+            #selector(toggleTrackLocked(_:)):
             return currentTrack != nil
         case #selector(nextMarker(_:)), #selector(previousMarker(_:)):
             return !document.project.snapshot.markers.isEmpty

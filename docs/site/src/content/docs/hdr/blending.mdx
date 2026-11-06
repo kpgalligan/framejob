@@ -1,0 +1,62 @@
+---
+title: "Blending: encoded or linear light"
+description: "Choose how layers mix where they overlap, so a dissolve between saturated clips keeps its brightness and a glow adds light the way light does."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Blending sets how layers mix wherever they overlap: in opacity, dissolves, soft edges, blend modes and glows. Most projects can stay on **Encoded**. Choose **Linear light** when a dissolve between saturated clips dips dark at its midpoint.
+
+<AtAGlance where="Document tab ▸ Canvas ▸ Blending" tools="set_canvas" />
+
+## The Blending popup
+
+<Steps>
+
+1. Open the [Document tab](/projects/document-tab/).
+
+2. In the **Canvas** section, choose **Encoded** or **Linear light** from **Blending**.
+
+</Steps>
+
+Blending belongs to the whole project and works in SDR and HDR (HLG) projects alike. Every project starts on **Encoded**. The preview, saved frames and exports all follow the setting.
+
+The change is one undo step, **Blending**. Choosing the item that's already set changes nothing and adds no undo step. The popup still works with a [nest](/editing/nests/) open, because it's about the project and not the nest.
+
+## Encoded
+
+Layers blend on their encoded values: the numbers the picture is stored as, which follow a brightness curve and don't measure light directly. Most editors blend this way, and it's the default for every project.
+
+## Linear light
+
+Layers blend as light. Each layer is decoded after its grade, the layers are blended, and the result is encoded once on the way out. You'll see these differences:
+
+- A dissolve between two saturated clips keeps its brightness instead of dipping dark at the midpoint.
+- A title fading over video comes out brighter.
+- A blurred or feathered edge comes out brighter.
+- A glow adds light the way light does.
+
+In an HDR (HLG) project, "linear" means HLG's scene light: the light in the scene, before HLG's curve is applied.
+
+## What it leaves alone
+
+Blending changes no clip and no grade. Layers are graded before they blend, so a grade looks the same either way.
+
+These all read the same values on either setting:
+
+- Grades
+- The chroma key
+- [Qualifiers](/color/qualifiers/) and [Show Selection](/color/show-selection/)
+- Luma [mattes](/canvas/matte-tracks/), which cut what they cut before
+- The [scopes](/color/scopes/), which still measure the finished, encoded picture
+
+## With an agent
+
+`set_canvas` makes the same choice, with `blending` set to `encoded` or `linear`. It changes the whole project, so it won't run on a call addressed to a nest, where a person can still use the popup. See [Tools: tracks, markers and canvas](/mcp/tools-tracks-and-markers/#set_canvas).
+
+## Related
+
+- [Blend modes](/canvas/blend-modes/)
+- [A project's dynamic range](/hdr/dynamic-range/)
+- [The Document tab](/projects/document-tab/)

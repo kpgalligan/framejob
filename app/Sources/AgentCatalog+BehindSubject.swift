@@ -14,7 +14,7 @@ extension AgentServer {
                 "Puts a title behind the person in a clip of a video file or a picture, the "
                     + "mirror of Insert ▸ Text Behind Subject: one undo step \"Text Behind Subject\" that adds a track "
                     + "named \"Behind Subject\" directly above the clip's track (and above any "
-                    + "matte tracks in front of it), a text clip with the Title preset on it at "
+                    + "matte tracks in front of it), a text clip in add_text_clip's default look on it at "
                     + "at for 4 seconds or the rest of the clip if shorter, set_video "
                     + "{behind_subject: true} on the title, and — only when the clip has no "
                     + "cutout yet — set_video {cutout: {background: keep}} on the clip, so the "
@@ -44,7 +44,7 @@ extension AgentServer {
                     ],
                     "content": [
                         "type": "string",
-                        "description": "The title's text; the Title preset's when left out.",
+                        "description": "The title's text; \"Title\" when left out.",
                     ],
                 ], required: []),
         ]

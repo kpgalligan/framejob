@@ -1,0 +1,137 @@
+---
+title: Keys and typing
+description: How Frame Job's single-letter keys share the keyboard with text fields, what gives the keys back to the editor, and what Esc leaves.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Frame Job plays on <kbd>Space</kbd> and trims on <kbd>W</kbd>, so a letter means one thing on the timeline and another in a text field. The rule is short: the keys belong to the editor unless you're typing or a sheet is open.
+
+<AtAGlance
+  keys={['Space', '↩', 'Tab', '⎋']}
+  where={['The editor window', 'The Preview Window']}
+/>
+
+This page explains how the keys are shared. [Keyboard shortcuts](/reference/keyboard-shortcuts/) has the full list.
+
+## Single-letter keys
+
+These keys need no modifier and act on the editor window. They also work in the [Preview Window](/timeline/preview-window/).
+
+| Key | What it does |
+| --- | --- |
+| <kbd>Space</kbd> | Play or pause |
+| <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> | Play in reverse, pause, play forward |
+| <kbd>←</kbd> <kbd>→</kbd> | Back or forward one frame, ten with <kbd>⇧</kbd> |
+| <kbd>↑</kbd> <kbd>↓</kbd> | Previous or next edit point |
+| <kbd>Home</kbd> <kbd>End</kbd> | Start or end of the project |
+| <kbd>,</kbd> <kbd>.</kbd> | Nudge the selected clips one frame earlier or later, ten with <kbd>⇧</kbd> |
+| <kbd>I</kbd> <kbd>O</kbd> | Set In, Set Out |
+| <kbd>W</kbd> <kbd>E</kbd> | Trim the start or end to the playhead |
+| <kbd>M</kbd> | Add Marker |
+| <kbd>T</kbd> | Add a text clip at the playhead |
+| <kbd>C</kbd> | Crop mode on or off |
+| <kbd>Z</kbd> | Region mode for [Zoom to Region](/motion/zoom-to-region/) |
+| <kbd>⇧Z</kbd> | Fit Timeline |
+| <kbd>N</kbd> | Snapping on or off |
+| <kbd>⎋</kbd> | Deselect the selected action |
+
+<kbd>⇧</kbd> and Caps Lock still count as no modifier, so Caps Lock doesn't stop these keys. <kbd>⌘</kbd>, <kbd>⌥</kbd> and <kbd>⌃</kbd> always make it a different key.
+
+The single-letter keys never fire while you're typing. While a sheet is open none of them works, in either window, so the project can't change underneath the sheet. In the Preview Window they also do nothing while a field in the editor window is still being typed in.
+
+Some menu items have a single-letter key the menu doesn't show. [Keyboard shortcuts](/reference/keyboard-shortcuts/) gives those too.
+
+### When the focus changes a key
+
+A few places claim keys for themselves while they hold the focus:
+
+| Where the focus is | What changes |
+| --- | --- |
+| The preview canvas | The arrow keys [nudge a selected clip](/canvas/move-scale-rotate/#nudge-with-the-arrow-keys) that's showing at the playhead. Hold <kbd>Space</kbd> and drag to pan a zoomed canvas. A tap of <kbd>Space</kbd> still plays and pauses. The canvas has the focus from a click or drag on it until you click anywhere else in the window. |
+| The Transcript tab's text | The arrow keys select words. See [Transcript keys](/captions/transcript-keys/). |
+| A selected point on a [curve](/color/curves/) | The arrow keys move the point, <kbd>⌫</kbd> deletes it and <kbd>⎋</kbd> deselects it. |
+| A button, with macOS Full Keyboard Access on | <kbd>Space</kbd> presses the button. |
+
+Everywhere else in the window, <kbd>Space</kbd> plays and pauses.
+
+## Menu shortcuts
+
+Every shortcut with <kbd>⌘</kbd> belongs to a menu item, so it does exactly what the item does. While the item is greyed out, the shortcut does nothing. That includes every editor command while a sheet is open.
+
+## Start and finish typing
+
+A field takes the keys only when you click in it, or choose a command that opens one for typing, such as **Clip ▸ Rename…** or **View ▸ Assistant**. Nothing else moves the keyboard into a field, so you won't type into one by accident.
+
+Any of these applies what you typed and gives the keys back, so <kbd>Space</kbd> plays straight away:
+
+| Do this | Where it works |
+| --- | --- |
+| Press <kbd>↩</kbd> or keypad Enter | A one-line field. Multi-line fields have [their own rule](#multi-line-fields). |
+| Press <kbd>Tab</kbd> or <kbd>⇧Tab</kbd> | Any text, including the Assistant's message field |
+| Click outside the field | Anywhere in the window. The click still does what it would have done, after the field lets go. |
+
+<kbd>Tab</kbd> doesn't step through fields. With macOS Full Keyboard Access on, it does, and walks to the next control instead.
+
+A click on the title bar doesn't end your typing. Neither does a click on the field's own margins or on a text view's scroller, because they count as part of the field. A click on a field's [quick-pick chevron](/getting-started/inspector-fields/#use-a-quick-pick) applies what you typed, then opens its menu.
+
+While an input method is composing, <kbd>↩</kbd> and <kbd>Tab</kbd> belong to it.
+
+## Delete keys while you type
+
+These four keys act on the timeline when you're not typing. In a text field their menu items switch off, so the keys keep their usual text meaning and a slip of the finger can't delete a clip.
+
+| Key | On the timeline |
+| --- | --- |
+| <kbd>⌫</kbd> | **Delete** |
+| <kbd>⌘⌫</kbd> | **Ripple Delete** |
+| <kbd>⌘↓</kbd> | **Open Nest** |
+| <kbd>⌘↑</kbd> | **Close Nest** |
+
+## Multi-line fields
+
+Four places take more than one line: the Text sub-tab's **Content**, a graphic's multi-line text setting, the Assistant's message field and text you're [editing on the canvas](/text-and-shapes/edit-text-on-canvas/).
+
+| Key | What it does |
+| --- | --- |
+| <kbd>↩</kbd> or keypad Enter | Applies the text. In the Assistant's message field it sends the message, and beeps if the Assistant is busy. |
+| <kbd>↩</kbd> with any of <kbd>⇧</kbd>, <kbd>⌘</kbd>, <kbd>⌥</kbd> or <kbd>⌃</kbd> | Starts a new line |
+
+On the canvas, <kbd>⎋</kbd> stops editing. If the text changed, Frame Job asks whether to **Apply**, **Revert** or **Cancel**.
+
+While an input method is composing, <kbd>↩</kbd> belongs to it.
+
+## Keys in a sheet
+
+In a sheet, <kbd>↩</kbd> presses the main button and <kbd>⎋</kbd> presses **Cancel**. The [single-letter keys](#single-letter-keys) stay off until the sheet closes.
+
+## What Esc leaves
+
+<kbd>⎋</kbd> backs out of whatever is under way.
+
+| What's under way | What <kbd>⎋</kbd> does |
+| --- | --- |
+| A canvas drag: move, scale, rotate, crop, a line's endpoint or an obscure region | Puts everything back as it was before you pressed, with no undo step |
+| Crop mode | Leaves it, as <kbd>↩</kbd> and the keypad's <kbd>Enter</kbd> do, wherever the focus is, except while you're typing in a field. |
+| Region mode, from <kbd>Z</kbd> or the Obscure section's **Place on Canvas** | Leaves it |
+| The key-colour or qualifier eyedropper | Cancels it |
+| A selected curve point in the Color tab | Deselects it |
+| A selected action | Deselects it, so the Clip tab shows the clip's own values again |
+| Typing in a number field | Throws the typing away |
+| A rename field on the timeline | Closes it and keeps the old name |
+| A selection in the Transcript tab | Clears it |
+
+Region mode also ends by itself when the selection stops being the clip it started for, or the playhead leaves that clip.
+
+A canvas tool that waits for your click or drag shows a crosshair and a hint on the canvas, and only one can wait at a time. The hint says what to do:
+
+- "Click to pick the key color · Esc to cancel"
+- "Click to pick the color to qualify · Esc to cancel"
+- "Drag a rectangle to zoom to it · ⇧ fills · Esc to cancel"
+- "Drag a rectangle to obscure · Esc to cancel"
+
+## Related
+
+- [Keyboard shortcuts](/reference/keyboard-shortcuts/)
+- [Inspector fields](/getting-started/inspector-fields/)
+- [Gestures with no menu item](/reference/gestures/)

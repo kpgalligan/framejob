@@ -19,7 +19,8 @@ impl Project {
     /// on it is not lossy. The two name each other in `linked` (spec §11
     /// AU-90), and Attach Audio is the way back. Refuses, naming why, with
     /// no audio to detach (spec §11 #88), and when the new clip breaks the
-    /// overlap rule below.
+    /// overlap rule below. The duck goes with the sound: the picture half's
+    /// `audio.duck` is dropped (spec §11 AU-157).
     pub fn detach_audio(&self, clip: u32) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let why = match target.source {
@@ -70,6 +71,9 @@ impl Project {
         if let Some(slot) = next.clip_mut(clip) {
             slot.enabled.audio = false;
             slot.linked = Some(audio_clip.id);
+            if let Some(audio) = slot.audio.as_mut() {
+                audio.duck = None;
+            }
         }
         self.commit_additions(next, vec![audio_clip])
     }

@@ -1,0 +1,80 @@
+---
+title: "Close gaps and insert time"
+description: "Close an empty stretch of a track with a double-click or Close Gap, and open room on the timeline when you need it."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Closing a gap pulls everything after it back to meet what's before it, on every unlocked track, so the timeline stays in sync. Opening room does the opposite.
+
+<AtAGlance
+  menu="Clip ▸ Close Gap"
+  where="Double-click an empty stretch of a lane"
+  tools={['close_gap', 'insert_time']}
+/>
+
+## Double-click a gap
+
+Double-click an empty stretch of a track's lane. Everything after the gap, on every unlocked track, moves left by the gap's length. It's one undo step, named Close Gap.
+
+This only works on a lane. Above the first lane or below the last there's no track, so there's nothing to close.
+
+## Close the gap under the playhead
+
+Move the playhead into a gap and choose **Clip ▸ Close Gap**. It has no shortcut.
+
+It works on the current track: the selected clip's track or, with nothing selected, the front track. The result is the same as a double-click. The command is available when the timeline has clips.
+
+## What moves
+
+- A gap is the empty stretch between two clips on that track. A gap before the first clip closes back to the start of the timeline.
+- Every clip on an unlocked track that starts at or after the far side of the gap moves left. A clip on another track that spans that point stays where it is.
+- A moved clip's [linked partner](/audio/detach-and-attach/) moves too, when its track is unlocked.
+- [Markers](/timeline/markers/) don't move.
+- A clip that ends up overlapping the one before it, within the [overlap rule](/getting-started/refused-edits/), gets a Cross Dissolve.
+
+## When a gap won't close
+
+A gap closes completely or not at all. Frame Job beeps, moves nothing and gives the reason at the foot of the inspector when:
+
+| What's wrong | What to do |
+| --- | --- |
+| The playhead is on a clip, not in a gap | Move the playhead into the gap, or check the current track. |
+| No clip follows the gap on that track | There's nothing to pull back. |
+| The track is locked | [Unlock it](/timeline/hide-and-lock-tracks/). Its clips are the ones that would stay behind. |
+| Closing it would push clips into an overlap the overlap rule forbids, on any track that moves | Trim or move those clips first. |
+| A linked clip would go before the start of the timeline | Happens when a sound leads its picture, as in a [J-cut](/audio/j-and-l-cuts/). Trim the front of the sound so it leads by less. |
+
+## Insert time
+
+Inserting time opens empty room. Every clip on an unlocked track that starts at or after a point moves later by a length, and so does every marker at or after that point, unlike a ripple.
+
+Clips that span the point stay put, so nothing is cut. To open room inside a clip, [split](/editing/splitting/) it first.
+
+Inserting time has no menu item or gesture of its own. An ⌥-drop [insert](/editing/insert-and-overwrite/) and [Freeze Frame](/speed/freeze-frame/) both do it as part of their edit, and an agent can do it directly.
+
+## Open room by hand
+
+<Steps>
+
+1. Move the playhead to where the room should start.
+
+2. Press <kbd>⌥⌘A</kbd> (**Edit ▸ Select After Playhead**) to select every clip that starts at or after the playhead.
+
+3. Drag the selected clips later, or press <kbd>⇧.</kbd> to [nudge](/editing/nudge-clips/) them 10 frames at a time.
+
+</Steps>
+
+This differs from inserting time in two ways: it also moves the selected clips on locked tracks, and it leaves markers where they are. Start the drag on a clip on an unlocked track, because a clip on a locked track can't be grabbed.
+
+## With an agent
+
+[`close_gap`](/mcp/tools-cut-and-delete/#close_gap) takes a track and a time inside the gap, and stops for the same reasons as the menu item. [`insert_time`](/mcp/tools-cut-and-delete/#insert_time) takes the point to open room at and how much room to open. See [Tools: cutting and deleting](/mcp/tools-cut-and-delete/).
+
+## Related
+
+- [Delete, Ripple Delete and Lift](/editing/delete-clips/)
+- [Insert and overwrite](/editing/insert-and-overwrite/)
+- [Nudge clips](/editing/nudge-clips/)
+- [Hide and lock tracks](/timeline/hide-and-lock-tracks/)

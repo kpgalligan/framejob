@@ -1,0 +1,119 @@
+---
+title: Detach and Attach Audio
+description: Unlink a clip's sound from its picture onto a linked clip of its own, keep the two in step, and merge them back into one clip.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Detach Audio splits a clip's sound onto its own clip, so you can trim, move or process the sound apart from the picture. Attach Audio merges the two back into one clip.
+
+<AtAGlance
+  menu={['Clip ▸ Detach Audio', 'Clip ▸ Attach Audio']}
+  keys={['⌥⌘D', '⇧⌥⌘D']}
+  where="Clip tab ▸ Sound ▸ Mix"
+  tools={['detach_audio', 'attach_audio', 'set_enabled']}
+/>
+
+## Detach audio
+
+Select one or more clips and press <kbd>⌥⌘D</kbd>. **Clip ▸ Detach Audio** and the **Detach Audio** button in the [Mix section](/audio/pan-and-mono/) of the Sound sub-tab do the same. The menu item is greyed out until something is selected.
+
+Each selected clip splits in two, as one undo step named "Detach Audio":
+
+- The original clip keeps its picture, and its audio is switched off. Any ducking it had goes to the new clip.
+- A new clip appears on the track directly below. It plays only sound, from the same file, with the same in point, length and speed, and it keeps the original's audio settings and actions.
+
+If the clip is already on the bottom track, Frame Job adds a new track underneath for the sound. Otherwise the sound always goes on the next track down, so make room there first, or drag the sound to another track afterwards.
+
+The two clips are now a **linked pair**. Trim the sound on its own to make a [J-cut or L-cut](/audio/j-and-l-cuts/).
+
+This is as far as Frame Job goes towards unlinking. Moving either half still moves both, and no command breaks the link and keeps both halves. For a sound that moves freely, move the playhead to the sound's start, [copy the sound half and paste it](/editing/copy-and-paste/), and delete the linked half. The pasted copy isn't linked to anything.
+
+### When Detach Audio won't work
+
+Frame Job beeps, changes nothing and shows the reason at the foot of the inspector:
+
+| The reason says | What it means |
+| --- | --- |
+| "…media 2 has no audio track" | The clip's file has no sound. |
+| "…its audio is switched off" | The clip has already been detached, or its sound is otherwise off. |
+| "…it is not a media clip" | The clip is text, a shape, a graphic, a picture, a freeze frame, a nest or an adjustment clip. |
+| "clips 4 and 7 would overlap by…, more than half of the shorter clip…" | The track below already has a clip where the sound would land. |
+| "clip 4 would overlap more than one neighbour on one side…" | The sound would reach more than one clip on the track below. |
+| "clips 4 and 7 would overlap, and clip 7 is an adjustment clip…" | The track below has an adjustment clip where the sound would land. |
+
+Any other overlap with one clip on the track below, up to half the shorter clip, is allowed and becomes a cross dissolve between the two.
+
+With several clips selected, the ones that can be detached are, and the rest are skipped. You only see a reason when none of them could be.
+
+## See which clips are linked
+
+Each half of a linked pair shows a link symbol after its kind symbol, in the clip's name strip. Select one and the other gets a dashed ring in your Mac's accent colour, because edits to one move both. See [Reading a clip on the timeline](/timeline/reading-a-clip/#linked-clips).
+
+### A clip with its audio off
+
+A clip whose audio is off shows no waveform and no fade handles. A clip with its picture and its sound both off is drawn dimmed. The picture half of a linked pair has no Sound sub-tab, so select the sound half to change anything about the sound. See [Turn a clip's picture or sound off](/editing/enable-picture-and-sound/).
+
+Ducking lives on the sound half, so turn it on or off there. The picture half never ducks. See [Ducking](/audio/ducking/#good-to-know).
+
+## What stays in sync
+
+A linked picture and sound stay in step in time through your edits.
+
+| Edit | What happens to the pair |
+| --- | --- |
+| Move | Moving either clip moves both by the same amount. Only the clip you drag changes track, so you can drag the sound to another track and its picture stays where it is. When a move would take either clip past the start of the timeline, both stop together. |
+| [Split](/editing/splitting/) | A split through both pairs the two halves on each side of the cut. When the cut only crosses one of the clips, the other stays linked to the piece it shares more time with, and the other piece loses its link. |
+| [Duplicate](/editing/duplicate-clips/), [Nest](/editing/nests/) and [Ripple Delete](/editing/delete-clips/) | Take both clips. |
+| [Copy and paste](/editing/copy-and-paste/) | A selected picture brings its sound, so the pair pastes as a pair. A selected sound is copied on its own, and the pasted copy isn't linked to anything. |
+| Ripple edits, [Close Gap and Insert Time](/editing/close-gaps/) | Move the other half too. |
+| [Trim and roll](/editing/slip-and-roll/#move-a-sound-clips-edge-alone) | On the picture, the edit carries to the sound when their edges line up. On the sound, it moves the sound alone. |
+| [Slip](/editing/slip-and-roll/#slip-a-clip) | Slips both, as far as the one with less room allows. |
+| Delete | Deleting the picture deletes its sound too. See [Remove a clip's sound](#remove-a-clips-sound). |
+| [Speed](/speed/change-speed/) and [Reverse](/speed/reverse/) | Frame Job won't do these on a linked clip. See [Actions and speed](#actions-and-speed). |
+
+A ripple edit that would push a sound starting before its picture past the start of the timeline doesn't happen at all. The reason at the foot of the inspector says the sound "would start before 0".
+
+Locks win over links. A partner on a [locked track](/timeline/hide-and-lock-tracks/#lock-track) isn't moved, split, trimmed, slipped, duplicated, nested or deleted with its clip. **Copy** is the exception: a selected picture brings its sound even from a locked track.
+
+## Remove a clip's sound
+
+To drop a clip's sound for good, detach it, select the sound half and press <kbd>⌫</kbd>. The picture stays, silent, and its link is gone.
+
+Undo brings the sound back. Once the sound clip is gone, no control in the app turns the picture's own audio back on.
+
+## Attach audio
+
+Select either half of a pair and press <kbd>⇧⌥⌘D</kbd>, or choose **Clip ▸ Attach Audio**. The **Attach Audio** button in the Mix section does the same, but it's only there with the sound half selected, because the picture half has no Sound sub-tab.
+
+The picture's audio comes back on with the sound clip's audio settings, and the sound clip is removed. Its track stays, empty if nothing else is on it. With several pairs selected, each one merges, as one undo step named "Attach Audio".
+
+**Clip ▸ Attach Audio** is greyed out until the selection holds a linked clip. The button stays live, and beeps if the selection holds none.
+
+### When Attach Audio won't work
+
+The two halves have to match, because they're becoming one clip. They need the same start, length, in point and speed, and the same actions at the same times with the same curves. Otherwise the reason at the foot of the inspector says "clip 4's picture and clip 5's sound do not cover the same time; trim them to match before Attach Audio". This is what a J-cut or an L-cut does on purpose. Trim the two to the same start and end first, and remove or match any action you added to only one half.
+
+## Actions and speed
+
+The new sound clip gets a copy of every action, so volume actions keep working. An action that only changes the picture does nothing on the sound clip. See [How edits move actions](/motion/how-edits-move-actions/#detach-audio).
+
+A clip with a [speed ramp](/speed/speed-ramps/) keeps it: the sound clip's copy of the Speed actions gives it the same ramp, so the two stay in step.
+
+Frame Job won't change the speed or direction of either half while they're linked, because the two would have to be re-timed identically. That covers Speed, Reverse, rate stretch, [Retime Range](/speed/retime-range/), and adding, moving, changing or removing a Speed action. The reason at the foot of the inspector says "clip 4 is linked to clip 5: Attach Audio before changing its speed or direction". During a drag, such as a rate stretch, nothing moves and no reason appears. Attach, make the change, then detach again.
+
+Attaching keeps the sound's work. The picture takes the sound clip's audio settings, and each of its actions takes the audio values of the sound clip's action at the same place.
+
+## With an agent
+
+[`detach_audio`](/mcp/tools-audio/#detach_audio) and [`attach_audio`](/mcp/tools-audio/#attach_audio) do what the **Clip** menu does, for the one clip you name in `clip`. For `attach_audio`, either half will do.
+
+`set_enabled` turns a clip's picture or sound on or off directly, which no control in the app does. After a detached sound has been deleted, it's the way to switch the picture's own audio back on. See [Tools: moving and trimming](/mcp/tools-move-and-trim/#set_enabled).
+
+## Related
+
+- [J-cuts and L-cuts](/audio/j-and-l-cuts/)
+- [Pan and Mix to mono](/audio/pan-and-mono/)
+- [Turn a clip's picture or sound off](/editing/enable-picture-and-sound/)
+- [Reading a clip on the timeline](/timeline/reading-a-clip/)
+- [Edit a ramped clip](/speed/edit-a-ramped-clip/)

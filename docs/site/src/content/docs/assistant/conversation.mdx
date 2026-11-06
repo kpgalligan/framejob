@@ -1,0 +1,141 @@
+---
+title: "Read the conversation"
+description: "Follow what the Assistant is doing as it works: its replies, its tool calls, the questions it asked, and why it stopped."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The transcript in the Assistant tab shows everything that happens in a conversation: your messages, the replies, each tool call, each question, and what went wrong. Reading it tells you what the Assistant did and why it stopped.
+
+<AtAGlance
+  menu="View ▸ Assistant"
+  keys="⌃⌘A"
+  where="Inspector ▸ Assistant tab"
+  needs="Your own Anthropic API key"
+/>
+
+## What's in the transcript
+
+| You see | It looks like |
+| --- | --- |
+| Your message | Semibold |
+| The Assistant's [replies](#replies) | Regular |
+| Its [working notes](#working-notes) | Small and faint |
+| [Tool call lines](#tool-call-lines), [`failed:` lines](#failed-lines), [permission lines](#permission-lines) and [notes](#notes) | Small monospace |
+| [Errors](#errors) | Red |
+
+## Replies
+
+A reply streams in as it's written, under your message. The transcript scrolls to the newest line each time anything arrives, even if you've scrolled up to read something earlier.
+
+Replies are short on purpose. See [How it behaves](/assistant/what-it-can-do/#how-it-behaves).
+
+## Working notes
+
+Between tool calls the Assistant writes small, faint notes on what it's working through. They're its thinking updates, and they stream in as replies do. They aren't addressed to you, and there's nothing to answer.
+
+## Tool call lines
+
+A tool is one action the Assistant can take in Frame Job, such as splitting a clip. Each tool call is one line, with the tool's name and its arguments, the details it was given:
+
+```
+split (at: 1200000, clips: [12])
+```
+
+That line splits clip 12 at the timeline's two-second mark. A time shows as a large number, 600,000 to the second.
+
+Arguments are in alphabetical order, and the line shows only their first 70 characters. A call with no arguments shows the tool's name alone.
+
+The line appears when the call starts. Apart from a [permission line](#permission-lines) if it asked you first, a call that works adds nothing more to the transcript, and you see its result in the project. A call that doesn't work adds a [`failed:` line](#failed-lines). [All tools](/mcp/tools/) describes every tool.
+
+## `failed:` lines
+
+A tool call that didn't work is followed by `failed:` and the reason. The line shows the first 200 characters of what the tool said.
+
+The Assistant reads the same message in full, so it can correct itself. A `failed:` line followed by another tool call is normal, and often the next try works.
+
+| The line reads | What happened |
+| --- | --- |
+| `failed: … was refused at …: …` | Frame Job wouldn't make the edit. The line names the edit, then gives the same sentence you'd see yourself. See [When an edit is refused](/getting-started/refused-edits/). |
+| `failed: … made no change: the project is already in that state.` | The edit wouldn't have changed anything. |
+| `failed: The person declined: …` | You chose **Deny**, or the question was declined for you. The Assistant won't try that call again this turn unless you ask. |
+| `failed: Cancelled by the user.` | **Stop** cancelled the call before it started. See [Stop a turn](/assistant/stop-a-turn/). |
+| `failed: … is not available to the assistant: …` | The Assistant isn't allowed that tool. The reason names the menu item to use instead. See [What it won't do](/assistant/what-it-will-not-do/). |
+
+## Permission lines
+
+The Assistant [asks before it exports, saves or copies media](/assistant/what-it-will-not-do/#tools-it-asks-about-first). Once a question is answered, the transcript records the outcome with the question's sentence, for example `Allowed: export writes /Volumes/Work/cut.mp4`.
+
+| The line starts | What happened |
+| --- | --- |
+| `Allowed:` | You chose **Allow**. |
+| `Declined:` | You chose **Deny**. |
+| `Declined (stop):` | You chose **Stop** while the question was waiting. |
+| `Declined (close):` | The conversation ended while the question was waiting, for example because the key or the model changed. |
+| `Declined (helper):` | [The helper stopped](#if-the-helper-stops) while the question was waiting. |
+
+## Notes
+
+Frame Job writes its own small monospace notes into the transcript.
+
+| The note reads | What it means |
+| --- | --- |
+| `Cost: …` | What the turn came to, at the end of each turn. For example, `Cost: $0.0312 · Frame Job's estimate at LiteLLM prices (cached 2026-11-02)`. See [What it costs](/assistant/cost/). |
+| `Compacting the conversation (… tokens)…` | The conversation has reached your compaction threshold, and Frame Job is replacing it with a summary. See [Long conversations](/assistant/context-and-compaction/). |
+| `Compacted: … → about … tokens. Earlier renders are gone; the assistant re-renders when it needs to look.` | The summary is in place. |
+| `Compaction didn't finish (…); it will try again after the next turn.` | No summary came back, so the conversation is unchanged. |
+| `Cleared … old tool results (… tokens) from the model's view.` | Old results were dropped from what the model sees. This only happens with clearing turned on in Settings. |
+| `The model is now …; the next message starts a new conversation.` | The model changed in Settings. |
+| `The API key changed; the next message starts a new conversation.` | The key was saved or removed in Settings. |
+| `The spend ledger … could not be written: ….` | A response's cost couldn't be recorded. The note appears once per conversation, and an unrecorded response is missing from the month's total in Settings. |
+
+## Errors
+
+An error is a red line, and it says what went wrong.
+
+| The error reads | What it means |
+| --- | --- |
+| `API error status: message` | Anthropic turned the request down or it failed, for example a bad key, a rate limit or an outage. The status is Anthropic's, and it's blank when the request never reached Anthropic. |
+| "The reply was cut off at the output limit." | The response reached 32,000 [tokens](/assistant/context-and-compaction/), the small pieces of text a model counts in. Thinking counts toward that as well as the reply. |
+| "The reply was cut off because the conversation filled the model's context window." | The reply reached the end of the model's [context window](/assistant/context-and-compaction/#with-compaction-off) and stopped where it got to. |
+| "The model declined this request." | The model wouldn't do what you asked. |
+| "The assistant helper stopped. Clear the conversation to start a new one." | See [If the helper stops](#if-the-helper-stops). |
+
+If a conversation can't start, for example because the helper won't run, the reason shows as an error and your message stays in the field.
+
+A request you end with **Stop** shows no error.
+
+## Automatic retries
+
+Rate limits, outages and connection failures are retried up to three times before an error appears. Nothing shows in the transcript during a retry, so a turn can seem to pause. A bad key fails at once.
+
+## Select and copy
+
+The transcript is one block of text, so you can drag a selection across entries. <kbd>⌘C</kbd> copies it as plain text, with a line break between entries.
+
+A conversation isn't saved with the project. Copy anything you want to keep before you close the window.
+
+## If the helper stops
+
+The helper is the background program that talks to Anthropic for the Assistant. If it stops:
+
+- The transcript says "The assistant helper stopped. Clear the conversation to start a new one."
+- A question that was waiting is declined, with a `Declined (helper):` line.
+- The edits the Assistant already made stay in the project.
+
+Your next message starts a new conversation under the old transcript. The Assistant doesn't remember anything from before, and the Spend row carries on from where it was. To start clean, choose **Clear** (↺) at the top of the tab.
+
+## Good to know
+
+- A [turn](/assistant/stop-a-turn/), everything the Assistant does between your message and the end of its reply, takes at most 30 requests to Anthropic, which usually means 30 rounds of tool calls. At that point it ends with no error line, and your next message carries on from there.
+- Each window has its own transcript. **Clear** empties it, and closing the window ends it. See [Chat with the Assistant](/assistant/chat/).
+
+## Related
+
+- [Chat with the Assistant](/assistant/chat/)
+- [What the Assistant can do](/assistant/what-it-can-do/)
+- [What it won't do and what it asks first](/assistant/what-it-will-not-do/)
+- [When an edit is refused](/getting-started/refused-edits/)
+- [Stop a turn](/assistant/stop-a-turn/)
+- [Long conversations](/assistant/context-and-compaction/)
+- [What it costs](/assistant/cost/)

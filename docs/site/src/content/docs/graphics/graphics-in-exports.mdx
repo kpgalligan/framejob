@@ -1,0 +1,78 @@
+---
+title: "Graphics in exports"
+description: "What an export draws for each graphic, what stops an export when one is broken, and where a graphic's warnings show up."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+An export draws each graphic the way the preview does, so the file matches what you saw. A broken graphic never reaches the file: the export stops and tells you which one and why.
+
+<AtAGlance
+  menu={['File ▸ Export…', 'Window ▸ Export Queue']}
+  keys="⌘E"
+  tools={['export', 'export_status']}
+/>
+
+## What an export draws
+
+An export draws each graphic as its module stood when you started or queued the export, whatever you edit next. Editing a module while an export runs doesn't change that file, and a job waiting in the [Export Queue](/export/export-queue/) draws the code it was queued with.
+
+So you can carry on working on a module while an export runs. To get your new code into a file, export again.
+
+## Parallel rendering
+
+An export draws its graphics ahead on worker threads, one fewer than your Mac's active cores, so a graphics-heavy export doesn't wait on one frame at a time. The file is the same as drawing them one at a time.
+
+It isn't used for an animated GIF or APNG, for a single frame, or for an audio-only export. Frames drawn ahead share the [memory budget](/graphics/playback-and-memory/#the-memory-budget) with the preview's.
+
+## When a graphic won't compile
+
+An export that would draw a graphic whose module is missing or doesn't compile isn't started, and any file already at that path is left alone. The message names each graphic and its first error:
+
+> The export was not started: the graphic "logo" has no module in graphics/; the graphic "title" does not compile — …. Fix the module and export again.
+
+The check covers every graphic clip in the export's range, and every graphic in each nest reached from those clips. That's the whole nest, not only the part the export plays, so a broken graphic elsewhere in a nest stops the export too.
+
+An audio-only export isn't checked, because it draws no pictures.
+
+A job in the Export Queue reports this in its row when its turn comes, and it keeps the code it was queued with. Fix the module and export again.
+
+## When a graphic fails partway
+
+Compiling is the only check made before an export starts. A graphic that throws at frame 900 is found at frame 900. A graphic that fails partway through stops the export at that frame, and no file is left behind:
+
+> The export was stopped at frame 900 of the graphic "title": … No file was written.
+
+The frame number is the graphic's own, counted from its first frame. A frame fails when your code throws, when your code takes more than 2 s on it, or when its picture can't be made.
+
+To find a failure before a long export, play the graphic through in the preview and watch for the [error card](/graphics/edit-a-module/#the-error-card). Your code has only 250 ms a frame there, so the preview is the stricter of the two. A frame whose code takes between 250 ms and 2 s shows the card in the preview and exports normally.
+
+## Warnings in a finished export
+
+Warnings a graphic gives while drawing don't stop the export. Frame Job reports each distinct one when the file is done, with the graphic's name and the first frame it happened on.
+
+- The Exporting sheet's finish line adds a count, such as "1 graphic warning (hover for details)". Rest the pointer on the line to see each warning.
+- An [Export Queue](/export/export-queue/) row adds the count too, and its tooltip lists them.
+
+Each one reads like `"title" at frame 12: message`. A warning given on every frame counts once, and an export reports up to 64 distinct warnings.
+
+## The frozen clock
+
+The clock inside a graphic is frozen, so nothing depends on when it's drawn and an export matches the preview. `Date.now()` is always `946684800000`, and `new Date()` is always 2000-01-01T00:00:00Z.
+
+A graphic can't show today's date on its own, so give it the date through a [property](/graphics/properties/). A date you write out in the code, such as `new Date("2026-03-01")`, works as usual. The rest of the sandbox is on [The module API](/graphics/module-api/).
+
+## Good to know
+
+**Save Frame** doesn't stop for a broken graphic. The graphic draws its error card, and the card is what's saved. See [Save Frame](/export/save-frame/).
+
+## With an agent
+
+[`export`](/mcp/tools-render-and-export/#export) gives a broken graphic's reason straight away, before anything is queued. A failure while writing comes back from [`export_status`](/mcp/tools-render-and-export/#export_status) as a failed job, naming the graphic and the frame, and a finished job lists any warnings under `graphic_warnings`, each with its name, frame and message. See [Export: start, then poll](/mcp/export/).
+
+## Related
+
+- [The export sheet](/export/export-sheet/)
+- [The Export Queue](/export/export-queue/)
+- [Graphics playback and memory](/graphics/playback-and-memory/)
+- [Edit a module](/graphics/edit-a-module/)

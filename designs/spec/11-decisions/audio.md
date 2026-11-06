@@ -1065,6 +1065,7 @@ landed (`git log` at `e55de46` has no AP6).
   unknown slot is refused naming the seven, and a slot the patch also names is refused in the
   both-sentence. `ReelOp.setActionEnd` lifts an `NSNull` slot inside `audio.eq` into that path.
   Agents use `set_action_end`; there is no new tool, op or format.
+  Extended by GR-36: `off` also accepts `video.qualifier.<range>`, a second three-part path.
 - **AU-89 — The proof.** `audio_ap8b_proof.py`: probe rows A1–A8 over `app/Sources` (the
   interpolation and its held numbers, an automated EQ and pan block-size invariant, the per-sample
   pan, the track-wide stages from a point, the Amount per frame, the routing, the wanted sets,
@@ -1259,6 +1260,9 @@ preview's statement) records its decisions from AU-150.
   nothing (the pipeline removes the mix and each stem it finished); the line reads "Exported
   “Mix.wav” and 3 stems."; the `export_status` result lists each stem's `{name, tracks, path}`.
   (g) Not measured: the loudness report is the mix's.
+  **Amended by #470** (docs bugs b3): (f)'s "leaves nothing" means nothing the job wrote. A mix the
+  job has not yet replaced stays, so the source collision that stops a job before writing leaves
+  an existing mix as it was.
 - **AU-109 — The proof, and part 2b.** Part 2a's proof is `audio_ap10b_proof.py`: S1–S8 (two
   tracks' stems summing to the mix within 2 LSB at 24 bits, `names` grouping, a loudness target
   leaving every stem byte-identical, mute and solo, a real recording's stem against the soloed
@@ -1679,3 +1683,13 @@ recorded before its code, continuing AU-109's block.
   (the stage at any buffer size, `ExportMixRead` against the single read, a nest bus, the tap's
   ×E/÷E at 48 and 44.1 kHz, the leads and the footer); ten mutants, each killed by a named row or
   `core/tests/track_dynamics.rs`; manual check SE-40.
+- **AU-157 — A linked pair's duck belongs to its sound half.** `detach_audio` drops `audio.duck`
+  from the picture half, and `duckers` skips a linked clip whose picture is on and whose audio is
+  off, so a pair saved earlier, or a duck pasted or set on the picture half, ducks nothing. An
+  unlinked clip with its audio off, and a linked sound half switched off, still duck: a duck is
+  otherwise a fact about the timeline. Decides what `edit_background.rs` left open. Before this
+  the picture half kept its copy, so the pair ducked the mix twice and pushed its own sound down
+  to the duck level (#468). `attach_audio` takes the sound's whole group, so nothing is lost on
+  the way back. `is_linked_picture` reads the clip alone, not its partner, because a pair inside
+  a nest is out of `Project::clip`'s reach. No format change: the read rule makes a stale duck
+  inert, and `set_audio` on a picture half still applies.

@@ -7,7 +7,8 @@
 
 Six steps, serially, stopping at the first failure: `names`
 (`name_residue.py`, spec §11 NM-8: no line or path spells the old name
-outside its allow-list; every file is its input, `*.md` included), `typecheck` (`make
+outside its allow-list, and `docs_site_proof.py --guide`: no `docs/guide/`, no link
+into it; every file is its input, `*.md` included), `typecheck` (`make
 typecheck`, which builds or reuses the bundled encoders first, `make codecs`, spec §11
 CX-5, passing only with no `error:` and exactly TYPECHECK_BASELINE's
 warnings, by file and message; `tools/codecs` is among its and `app`'s inputs, and
@@ -52,7 +53,8 @@ ALWAYS = (HERE, "Makefile")
 STEPS = ("names", "typecheck", "fmt", "lint", "test", "app")
 BOUNDS = {"names": 120, "typecheck": 600, "fmt": 120, "lint": 600, "test": 900, "app": 1500}
 COMMANDS = {
-    "names": [["python3", "tools/proof/name_residue.py"]],
+    "names": [["python3", "tools/proof/name_residue.py"],
+              ["python3", "tools/proof/docs_site_proof.py", "--guide"]],
     "typecheck": [["make", "typecheck"]],
     "fmt": [["cargo", "fmt", "--check"]] * 3,
     "lint": [["make", "lint"]],
@@ -366,6 +368,8 @@ def selftest(mutant=None):
     row("H4", all(step_hash(step, dict(base, **{".secrets/x": "2"}), "tools") == hashes[step]
                   for step in STEPS),
         "CONTROL: a .secrets/ path is in no step's inputs")
+    row("H5", ["python3", "tools/proof/docs_site_proof.py", "--guide"] in COMMANDS["names"],
+        "CONTROL: the names step runs docs_site_proof.py --guide")
 
     def log(pairs, extra=""):
         lines = []

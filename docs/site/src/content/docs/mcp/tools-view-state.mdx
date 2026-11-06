@@ -1,0 +1,95 @@
+---
+title: "Tools: playhead, range and selection"
+description: The agent tools that move the playhead, set the in/out range, select clips and open a nest, none of which is an edit.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These four tools move the playhead, set the in/out range, select clips and open a nest. They change what the app is looking at, never the project, so they make no undo step and `undo` can't reverse them. `get_project` reads all of them back.
+
+<AtAGlance tools={['set_playhead', 'set_range', 'set_selection', 'set_scope']} />
+
+Times are in ticks, 600,000 per second, and each is rounded to the project's frame grid. See [Units and ids](/mcp/units-and-ids/). Every tool here takes an optional `project`, the path of an open project as `get_project` reports it. Without it the call goes to the frontmost project.
+
+## `set_playhead`
+
+Moves the playhead and seeks the preview, as [clicking the ruler or a transport key](/timeline/move-the-playhead/) does.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `t` | integer | Yes | The time to move to, in ticks. A negative time goes to 0. |
+| `project` | string | No | The project to act on. Leave it out for the frontmost one. |
+
+It answers `ok: true`, `playhead` (the time it landed on) and the `project` summary.
+
+`split`, `freeze_frame` and `add_marker` use this time when they aren't given one. While a [nest](/mcp/nests/) is open, `t` is measured from the nest's own start.
+
+## `set_range`
+
+Sets or clears the [in/out range](/timeline/in-out-range/), as **Mark ▸ Set In** (<kbd>I</kbd>), **Mark ▸ Set Out** (<kbd>O</kbd>) and **Mark ▸ Clear Range** (<kbd>⌥X</kbd>) do.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `start` | integer | No | The In point, in ticks. Left out, it keeps the range's current In, or 0 when there's no range. |
+| `end` | integer | No | The Out point, in ticks. Left out, it keeps the range's current Out, or the project's end when there's no range. |
+| `project` | string | No | The project to act on. Leave it out for the frontmost one. |
+
+Call it with neither bound to clear the range. A negative time is taken as 0.
+
+It answers `ok: true`, `in_out_range` (`start` and `end`, or null when the range is cleared) and the `project` summary.
+
+It's refused when the end isn't after the start. [`export`](/mcp/export/) with `range: "in_out"` writes only this span, and `get_project` reports it as `in_out_range`.
+
+## `set_selection`
+
+Selects clips, as [clicking one](/timeline/selecting-clips/) in the timeline or on the canvas, or **Edit ▸ Select All** (<kbd>⌘A</kbd>), does. The canvas handles, crop mode and every inspector pane act on the selection, so this puts the app into the state you want to look at.
+
+You don't need it to edit. The editing tools take their own `clip` or `clips`.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | No | The clip ids to select, replacing the selection. Leave it out, or pass an empty array, to select nothing. |
+| `project` | string | No | The project to act on. Leave it out for the frontmost one. |
+
+It answers `ok: true`, `selection` (the selected ids, in order) and the `project` summary.
+
+An id that isn't a clip is refused by name. With a nest open, ids mean clips inside that nest, so a clip on the timeline can't be selected until you come back out with `set_scope`.
+
+## `set_scope`
+
+Opens a nest so the app is looking inside it, or comes back out, as [double-clicking a nest clip](/editing/inside-a-nest/#open-a-nest), **Clip ▸ Open Nest** (<kbd>⌘↓</kbd>) and **Clip ▸ Close Nest** (<kbd>⌘↑</kbd>) do.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | No | The nest clip to open. Prefer this one: it names the nest and the start that times inside are measured from, and it works at any depth. |
+| `nest` | integer | No | The nest to open, by id, as `get_project` lists them under `nests`. A clip on the timeline must show it. Where two clips do, the earliest is entered, and a tie goes to the lower id. |
+| `project` | string | No | The project to act on. Leave it out for the frontmost one. |
+
+Pass `clip` or `nest`, not both. Pass neither to come back out to the timeline. You say where to be, not a step to take, so a call does the same thing however deep you are.
+
+While a nest is open:
+
+- `get_project` reports the nest's own tracks, clips and canvas, and [`render_frame`](/mcp/render-frame/) draws it. This is the only way to see what an edit inside a nest did.
+- An edit lands inside the nest, unless its own `scope` says otherwise or it belongs to the whole project, as a change to the [media list](/mcp/tools-media/) does. So open the nest first, and clear it when you're done.
+
+Going in maps the playhead to the nest's own time and selects nothing. Coming out maps it back and selects the nest clip you opened.
+
+You don't need this tool to edit inside a nest. An edit tool's `scope` argument works from wherever the window is looking. [Editing inside a nest](/mcp/nests/) covers both ways.
+
+It answers `ok: true`, `scope` (the nest's id, or null at the timeline), `scope_clip` and `scope_path` with a nest open, `playhead`, and the `project` summary.
+
+It's refused when:
+
+- both `clip` and `nest` are given
+- no clip has that id, at the timeline or in any nest
+- the clip doesn't show a nest
+- no nest has that id
+- no clip on the timeline shows that nest. Name the nest clip with `clip`, or send the edit with `scope`.
+
+## Related
+
+- [Editing inside a nest](/mcp/nests/)
+- [Read the project: get_project](/mcp/get-project/)
+- [Check the picture: render_frame](/mcp/render-frame/)
+- [Export: start, then poll](/mcp/export/)
+- [Units and ids](/mcp/units-and-ids/)

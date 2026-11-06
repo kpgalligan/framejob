@@ -194,9 +194,11 @@ extension AgentServer {
                     "off": "\"group.key\" paths (video.shadow, text.width, audio.limiter) to "
                         + "switch OFF at the end — stored as null, where a null in patch removes. "
                         + "Optional keys only; never graphic, and never video.cutout (set_video "
-                        + "{cutout: null} removes a cutout). One deeper path: "
+                        + "{cutout: null} removes a cutout). Deeper paths: "
                         + "audio.eq.<slot> (high_pass, low_shelf, band_1, band_2, band_3, "
-                        + "high_shelf, low_pass) switches that EQ slot off at the end.",
+                        + "high_shelf, low_pass) switches that EQ slot off at the end. "
+                        + "A second: video.qualifier.<range> (hue, saturation, luma) switches "
+                        + "that qualifier range off at the end.",
                 ]),
             opTool(
                 "remove_action",

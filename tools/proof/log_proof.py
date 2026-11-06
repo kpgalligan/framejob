@@ -170,7 +170,10 @@ Rows (projects are the fixture alone on a canvas its size, 30 fps):
 - **L18** (B103; L9's modes: `capture DIR`, `compare DIR`, mutants): the
   frames PR-12 leaves to the generator — `slog3_fr.mov` alone,
   `vp9_8bit.mp4` alone and the mixed project at 0.5 s as PNGs, and
-  `slog3_fr_vp9e.mp4` alone as `format: "jpeg"` — byte-equal to DIR's.
+  `slog3_fr_vp9e.mp4` alone as `format: "jpeg"` — byte-equal to DIR's, and
+  `slog3_fr.mov` at `max_width` 512 (docs bugs b3, spec §11 PR-14: at full
+  size the reader's bytes equal the generator's, so only a scaled frame tells
+  a re-read from the generator's own).
   `capture` copies their media into `DIR/media/`, each extension kept, and
   every later L18 reads them from there.
 - **LP5 / LP6** (hdr H-5, spec §11 HD-17; probe rows): Canon Log 2 / Canon
@@ -276,7 +279,9 @@ the depth test is `>= 8`), `vpcc-depth-nibble` (L14, L16, L17: the depth
 read as byte 6's low nibble, the chroma and range bits), `vp9-track-wide`
 (L18: `shows` counts the composition track by any description it lists, not
 its segment at the frame time) and `vp9-jpeg-deep` (L18: `render_frame`
-passes `keepsDepth: true` for JPEG too). `isDeep`'s VP9 subtype guard has no
+passes `keepsDepth: true` for JPEG too). `hevc-read-always` (L18, docs bugs b3,
+spec §11 PR-14: `renderFrameReported`'s bits test dropped, so a frame the
+generator answers deep is re-read). `isDeep`'s VP9 subtype guard has no
 mutant: no fixture but VP9 carries a `vpcC` atom (L16 prints each file's), so
 removing it changes no answer.
 
@@ -673,6 +678,9 @@ MUTANTS = {
                          "{ return true }\n")], ["L18"]),
     "vp9-jpeg-deep": ([(RENDER_SWIFT, "            graphics: graphics, keepsDepth: format.carriesDepth)\n",
                         "            graphics: graphics, keepsDepth: true)\n")], ["L18"]),
+    "hevc-read-always": ([("app/Sources/Exporter+Frame.swift",
+                           "        if keepsDepth, let shallow = image, shallow.bitsPerComponent <= 8,\n",
+                           "        if keepsDepth, image != nil,\n")], ["L18"]),
     # hdr H-5 (spec §11 HD-17): each Canon curve's breakpoint and code domain,
     # the 0.9 scale, Cinema Gamut's primaries, and the HLG arm's log test.
     "clog2-breakpoint": ([(SHADER, "constant float kCanonLog2Break = 0.092864125;\n",
@@ -2344,10 +2352,10 @@ def png_depth(path):
     return data[24] if len(data) == 25 and data[:8] == b"\x89PNG\r\n\x1a\n" else None
 
 
-def placed_render(client, tag, paths, t=T, jpeg=False):
+def placed_render(client, tag, paths, t=T, jpeg=False, max_width=None):
     """`paths` placed on one track 1 s apart (the first at 0), any Camera Log
     import detected cleared (L9's way), rendered at `t` as a PNG, or a JPEG
-    (`format: "jpeg"`): (the file or None, why, closed)."""
+    (`format: "jpeg"`), or a PNG at `max_width`: (the file or None, why, closed)."""
     doc = Doc(client, tag)
     for index, path in enumerate(paths):
         clip = doc.place(path, at=index * SEC) if doc.ok else None
@@ -2357,7 +2365,14 @@ def placed_render(client, tag, paths, t=T, jpeg=False):
         if doc.row(media).get("color") is not None:
             doc.color(media, None)
     out = None
-    if doc.ok and not jpeg:
+    if doc.ok and max_width:
+        out = WORK / f"{tag}.png"
+        out.unlink(missing_ok=True)
+        got = doc.call("render_frame", t=t, path=str(out), max_width=max_width)
+        if not (got["ok"] and out.exists()):
+            print(f"       render {tag}: {got.get('error', 'no file')}", flush=True)
+            out = None
+    elif doc.ok and not jpeg:
         out = doc.render(tag, t=t)
     elif doc.ok:
         out = WORK / f"{tag}.jpg"
@@ -2453,18 +2468,19 @@ def run_l17(client, state):
           not shallow and not misses, f"not 16: {shallow or 'none'}; misses {misses or 'none'}")
 
 
-# L18's renders: (tag, fixtures placed 1 s apart, time, JPEG?).
-L18_CASES = (("l18-slog3_fr", ("slog3_fr",), T, False),
-             ("l18-vp9_8bit", (VP9_8BIT,), T, False),
-             ("l18-mixed", MIXED, T, False),
-             ("l18-slog3_fr_vp9e-jpeg", ("slog3_fr_vp9e",), T, True))
+# L18's renders: (tag, fixtures placed 1 s apart, time, JPEG?, max_width).
+L18_CASES = (("l18-slog3_fr", ("slog3_fr",), T, False, None),
+             ("l18-vp9_8bit", (VP9_8BIT,), T, False, None),
+             ("l18-mixed", MIXED, T, False, None),
+             ("l18-slog3_fr_vp9e-jpeg", ("slog3_fr_vp9e",), T, True, None),
+             ("l18-slog3_fr-small", ("slog3_fr",), T, False, 512))
 
 
 def run_l18(client, mode, control, state):
     """L18 (L9's modes): the frames PR-12 leaves to the generator, byte-equal
     to DIR's."""
     misses, captured = [], 0
-    for tag, names, t, jpeg in L18_CASES:
+    for tag, names, t, jpeg, max_width in L18_CASES:
         paths = [l9_media(name, None if mode == "capture" else control) for name in names]
         if None in paths:
             misses.append(f"{tag}: {[REFUSED.get(n) for n in names]}")
@@ -2473,7 +2489,8 @@ def run_l18(client, mode, control, state):
             (control / "media").mkdir(parents=True, exist_ok=True)
             for path in paths:
                 shutil.copy2(path, control / "media" / path.name)
-        out, why, state[f"{tag}_closed"] = placed_render(client, tag, paths, t=t, jpeg=jpeg)
+        out, why, state[f"{tag}_closed"] = placed_render(client, tag, paths, t=t, jpeg=jpeg,
+                                                         max_width=max_width)
         if out is None:
             misses.append(f"{tag}: {why}")
             continue
@@ -2497,8 +2514,9 @@ def run_l18(client, mode, control, state):
         state["capture_ok"] = state.get("capture_ok", True) and not misses
         return
     check(f"L18 (issue batch B103, #294, spec §11 PR-12) slog3_fr.mov alone, vp9_8bit.mp4 alone "
-          f"and the mixed project at 0.5 s (PNG), and slog3_fr_vp9e.mp4 alone as JPEG, render "
-          f"byte-identical to {control.name}'s", not misses, f"{misses}")
+          f"and the mixed project at 0.5 s (PNG), slog3_fr_vp9e.mp4 alone as JPEG, and "
+          f"slog3_fr.mov at max_width 512, render byte-identical to {control.name}'s",
+          not misses, f"{misses}")
 
 
 # ---- L19–L22 (hdr H-5, spec §11 HD-17) -----------------------------------------

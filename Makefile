@@ -77,6 +77,8 @@ test: rust codecs
 	python3 tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe
 	python3 tools/proof/name_residue.py --selftest
 	python3 tools/proof/name_residue.py
+	python3 tools/proof/docs_site_proof.py --selftest
+	python3 tools/proof/docs_site_proof.py
 
 lint:
 	cd core && cargo clippy --all-targets -- -D warnings

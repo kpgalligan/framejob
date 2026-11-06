@@ -14,8 +14,9 @@ extension AgentServer {
     /// one writer, so an agent export and a menu export cannot disagree.
     ///
     /// Answers AT ONCE (spec §11 #326): every refusal is made here, before
-    /// anything is queued — the arguments, the core's settings, the folder
-    /// and the graphics gate — and the export is then a job in the Export
+    /// anything is queued — the arguments, the core's settings, the folder,
+    /// the graphics gate, and the frame limit and same-shape rule
+    /// (`Exporter.settingsRefusal`, #470) — and the export is then a job in the Export
     /// Queue, exactly as the sheet's Add to Queue makes one, answered as
     /// `{export_id, path, status}`. `export_status` follows the job and
     /// `cancel_export` stops it (`AgentServer+ExportStatus.swift`); a failure
@@ -59,86 +60,8 @@ extension AgentServer {
             guard document.project.duration > 0 else {
                 throw ToolError(message: "There is nothing on the timeline to export.")
             }
-            // The Range popup of the export sheet, in the sheet's own terms:
-            // "Whole project" is no override at all, "In/out range" is the
-            // core's ONE nested `range` object (`export.rs`). The core snaps
-            // it to the frame grid and clamps it to the project.
-            var overrides: [String: Any] = [:]
-            if wholeProject == "in_out" {
-                guard let range = document.inOutRange, range.end > range.start else {
-                    throw ToolError(
-                        message: "This project has no in/out range — set one with set_range "
-                            + "{start, end}, or export with range \"project\".")
-                }
-                overrides["range"] = ["start": range.start, "duration": range.end - range.start]
-            }
-            // The sheet's Quality popup, in the core's own words: it resolves
-            // a tier into these two keys and nothing else
-            // (`ExportSheetController.overrides()`), so the agent spells them
-            // the same way rather than re-deriving a rate from a tier name.
-            // The core validates them — positive, u32 — and an unset key means
-            // "the preset decides", which is what a nil bitrate already means
-            // to the writer.
-            if let video = try self.intArg(a, "video_bitrate") {
-                overrides["video_bitrate"] = video
-            }
-            if let audio = try self.intArg(a, "audio_bitrate") {
-                overrides["audio_bitrate"] = audio
-            }
-            // The sheet's Loudness popup, in the core's words again — and
-            // through `doubleArg`, not `intArg`: −14.5 LUFS is a real request
-            // and every one of these figures is a negative fraction. Neither
-            // is validated here. `export_overrides.rs` owns the bounds
-            // (−70…0 and −20…0) and names the offending value the way the
-            // bitrate refusals do; either may come alone, the ceiling being
-            // the master limiter's (spec §11 AU-27).
-            // Restating a bound here would be a second spelling of it to
-            // drift from the first.
-            // The sheet sends both together and fixes the ceiling at
-            // −1 dBTP; a caller that wants −0.3 or −2.0 says so here.
-            if let target = try self.doubleArg(a, "loudness_lufs") {
-                overrides["loudness_lufs"] = target
-            }
-            if let ceiling = try self.doubleArg(a, "peak_dbtp") {
-                overrides["peak_dbtp"] = ceiling
-            }
-            // The sheet's Size popup: a row id, or "Custom…" as an explicit
-            // [width, height]. Absent is no override at all, so the tool's
-            // default and the sheet's are one code path in the core — the
-            // document's size, or an image format's cap.
-            if let size = try self.exportSizeArg(a, document.project, preset: presetID) {
-                overrides["width"] = size.width
-                overrides["height"] = size.height
-            }
-            // The sheet's Dynamic Range popup (spec §11 HD-14 (c)), forwarded
-            // unread: the core's reader and resolver own its three words, its
-            // per-row defaults and both refusals, each in its own sentence.
-            if let range = a["dynamic_range"] {
-                overrides["dynamic_range"] = range
-            }
-            // The sheet's Speed popup (spec §11 CX-12 (2)), forwarded unread on the
-            // same terms: the core reads the three words and refuses a row without one.
-            if let speed = a["encoder_speed"] {
-                overrides["encoder_speed"] = speed
-            }
-            // The sheet's Bit depth popup (spec §11 AU-29), forwarded unread on the
-            // same terms: the core reads 16 or 24 and refuses a row without a depth.
-            if let bits = a["audio_bits"] {
-                overrides["audio_bits"] = bits
-            }
-            // The sheet's Stems popup (spec §11 AU-108), forwarded unread on the same
-            // terms: the core reads "tracks" or "names", refuses a movie row, and refuses
-            // a project with no track heard.
-            if let stems = a["stems"] {
-                overrides["stems"] = stems
-            }
-            let settings: ExportSettings
-            do {
-                settings = try ReelExport.settings(
-                    document.project, preset: presetID, overrides: overrides)
-            } catch {
-                throw Self.coreRefusal(error)
-            }
+            let settings = try self.exportSettings(
+                a, on: document, preset: presetID, range: wholeProject)
             return (
                 document, document.project, document.mediaURLs(), settings,
                 GraphicRegistry.shared.snapshot(for: document.recipeKey)
@@ -156,6 +79,10 @@ extension AgentServer {
         {
             throw ToolError(message: refusal.localizedDescription)
         }
+        // The same, for the two rules the sheet shows in its readout (#470).
+        if let refusal = Exporter.settingsRefusal(settings, project: project) {
+            throw ToolError(message: refusal.localizedDescription)
+        }
         let (id, status) = onMain { () -> (UInt64, String) in
             // The editor pauses before its own export so the player is not
             // decoding the same media; the agent's does the same.
@@ -171,6 +98,104 @@ extension AgentServer {
             return (id, word ?? "queued")
         }
         return try jsonResult(["export_id": id, "path": url.path, "status": status])
+    }
+
+    /// The core's settings for `export`'s arguments, every override read as
+    /// the sheet's popups spell it, and every refusal the tool's own. Main
+    /// only. `range` is the call's `range`, already lower-cased.
+    func exportSettings(
+        _ a: [String: Any], on document: ProjectDocument, preset: String, range: String
+    ) throws -> ExportSettings {
+        // The Range popup of the export sheet, in the sheet's own terms:
+        // "Whole project" is no override at all, "In/out range" is the
+        // core's ONE nested `range` object (`export.rs`). The core snaps
+        // it to the frame grid and clamps it to the project.
+        var overrides: [String: Any] = [:]
+        if range == "in_out" {
+            guard let inOut = document.inOutRange, inOut.end > inOut.start else {
+                throw ToolError(
+                    message: "This project has no in/out range — set one with set_range "
+                        + "{start, end}, or export with range \"project\".")
+            }
+            overrides["range"] = ["start": inOut.start, "duration": inOut.end - inOut.start]
+        }
+        // The sheet's Quality popup, in the core's own words: it resolves
+        // a tier into these two keys and nothing else
+        // (`ExportSheetController.overrides()`), so the agent spells them
+        // the same way rather than re-deriving a rate from a tier name.
+        // The core validates them — positive, u32 — and an unset key means
+        // "the preset decides", which is what a nil bitrate already means
+        // to the writer.
+        if let video = try intArg(a, "video_bitrate") {
+            overrides["video_bitrate"] = video
+        }
+        if let audio = try intArg(a, "audio_bitrate") {
+            overrides["audio_bitrate"] = audio
+        }
+        // The sheet's Loudness popup, in the core's words again — and
+        // through `doubleArg`, not `intArg`: −14.5 LUFS is a real request
+        // and every one of these figures is a negative fraction. Neither
+        // is validated here. `export_overrides.rs` owns the bounds
+        // (−70…0 and −20…0) and names the offending value the way the
+        // bitrate refusals do; either may come alone, the ceiling being
+        // the master limiter's (spec §11 AU-27).
+        // Restating a bound here would be a second spelling of it to
+        // drift from the first.
+        // The sheet sends both together and fixes the ceiling at
+        // −1 dBTP; a caller that wants −0.3 or −2.0 says so here.
+        if let target = try doubleArg(a, "loudness_lufs") {
+            overrides["loudness_lufs"] = target
+        }
+        if let ceiling = try doubleArg(a, "peak_dbtp") {
+            overrides["peak_dbtp"] = ceiling
+        }
+        // The sheet's Size popup: a row id, or "Custom…" as an explicit
+        // [width, height]. Absent is no override at all, so the tool's
+        // default and the sheet's are one code path in the core — the
+        // document's size, or an image format's cap.
+        if let size = try exportSizeArg(a, document.project, preset: preset) {
+            overrides["width"] = size.width
+            overrides["height"] = size.height
+        }
+        // The sheet's Dynamic Range popup (spec §11 HD-14 (c)), forwarded
+        // unread: the core's reader and resolver own its three words, its
+        // per-row defaults and both refusals, each in its own sentence.
+        if let dynamicRange = a["dynamic_range"] {
+            overrides["dynamic_range"] = dynamicRange
+        }
+        // The sheet's Speed popup (spec §11 CX-12 (2)), forwarded unread on the
+        // same terms: the core reads the three words and refuses a row without one.
+        if let speed = a["encoder_speed"] {
+            overrides["encoder_speed"] = speed
+        }
+        // The sheet's Bit depth popup (spec §11 AU-29), forwarded unread on the
+        // same terms: the core reads 16 or 24 and refuses a row without a depth.
+        if let bits = a["audio_bits"] {
+            overrides["audio_bits"] = bits
+        }
+        // The sheet's Stems popup (spec §11 AU-108), forwarded unread on the same
+        // terms: the core reads "tracks" or "names", refuses a movie row, and refuses
+        // a project with no track heard.
+        if let stems = a["stems"] {
+            overrides["stems"] = stems
+        }
+        do {
+            return try ReelExport.settings(document.project, preset: preset, overrides: overrides)
+        } catch {
+            throw Self.coreRefusal(error)
+        }
+    }
+
+    /// The file `export` writes for these arguments: the settings' own
+    /// extension on `path`, so the assistant's question names what the tool
+    /// will write (spec §11 AI-21 (c)). It throws what the tool would refuse.
+    /// Main only, on the document the lane pinned.
+    func exportDestination(_ a: [String: Any], on document: ProjectDocument) throws -> URL {
+        let preset = try requiredString(a, "preset")
+        let path = try requiredString(a, "path")
+        let range = (try stringArg(a, "range") ?? "project").lowercased()
+        let settings = try exportSettings(a, on: document, preset: preset, range: range)
+        return Self.destinationURL(path, extension: Exporter.fileExtension(for: settings))
     }
 
     /// The `size` argument of `export`, in the Size popup's vocabulary: a row

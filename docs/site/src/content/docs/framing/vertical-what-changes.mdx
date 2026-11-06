@@ -1,0 +1,139 @@
+---
+title: What Make Vertical changes
+description: Clip by clip, what Make Vertical Version does to movies, screen recordings, camera layouts, stills, graphics, captions and everything else.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+[Make Vertical Version](/framing/make-vertical-version/) doesn't crop the timeline as one picture. It looks at each clip and treats it by what it is, so a talking head follows its subject while a title stays a title. This page says what happens to each kind of clip, and what the sheet's summary says about it.
+
+<AtAGlance menu="File ▸ Make Vertical Version…" tools={['make_vertical_version', 'reframe_clip']} />
+
+## How a clip is judged
+
+Every clip with a picture on the top-level timeline is judged on the old canvas. The first row that fits decides what happens to it.
+
+| The clip | What happens |
+| --- | --- |
+| A [blurred copy](#blurred-copies-and-background-plates) behind a clip | Removed, or re-filled to cover the new canvas |
+| A [background plate](#blurred-copies-and-background-plates) | Re-filled to cover the new canvas |
+| A [graphic exactly the old canvas's size](#graphics) | Re-sized to the new canvas |
+| A [camera or a screen in a camera layout](#camera-layouts) | Laid out again for the new canvas |
+| A [screen recording with its cursor file](#screen-recordings) that fills the frame | Follows the pointer |
+| A [movie](#full-frame-movies) that fills the frame | Follows its subject |
+| A [still, picture or nest](#stills-pictures-and-nests) that fills the frame | Centred |
+| [Word captions](#word-captions) | Paged again for the narrow frame |
+| [Everything else](#everything-else) | Kept as placed |
+
+A clip **fills the old frame** when its rectangle at its first frame covers the canvas on one side, to within a pixel at each edge, and on the other side is centred to within 2 % or covers that too. So the usual full-frame shot counts, and so does one punched in a little. A picture-in-picture doesn't.
+
+A sound-only clip, a clip with its video turned off and an adjustment clip have no picture here, so nothing happens to them.
+
+## Full-frame movies
+
+A movie clip that fills the old frame follows what you chose in **Follow**, as [Follow Subject](/framing/follow-subject/) frames it. Its own moves and actions stay, inside the framing.
+
+Where the frame shows the whole picture, a blurred copy of the clip goes behind it, so the canvas around it isn't empty. The copies go on a new **Backgrounds** track at the back, and copies that overlap in time go on further tracks behind it. The track is removed when no copy needs it.
+
+The summary tells you how each one went:
+
+| The clip | The summary says |
+| --- | --- |
+| Follows its subject | It's counted in "Follows 3 clips." |
+| Has nothing to follow at any point | It's counted in "Shows 1 clip whole on a blurred copy." |
+| Has nothing to follow for part of its length | It's still counted as followed, with "Clip 2 is followed, but it is shown whole on a blurred copy where no subject is found." |
+| Moves by a [motion preset](/motion/motion-presets/) of its own | "Clip 2 is followed, but moves by its own motion: …", with the preset's name, because that move isn't part of the framing. |
+
+Some movies can't be followed and are kept as placed, each listed with the reason:
+
+- A movie whose file is missing: "Clip 6 is not followed: its media file is missing, so it is kept as placed." With **Follow** on **Center** it's centred like any other clip instead.
+- A clip on a [matte track](/canvas/matte-tracks/), or one a matte cuts, because framing would move it out of the matte.
+- A clip turned by its rotation or by an action, or one that spins in its motion, because framing works on an upright picture.
+
+With **Follow** on **Speaker**, a wide shot beside its microphones cuts to whoever is talking, and every other movie follows its faces. See [Follow the speaker in a vertical](/framing/follow-speaker/).
+
+## Screen recordings
+
+A screen recording with its [cursor file](/recording/cursor-files/) follows the pointer instead of a face, because a face on a screen isn't what the viewer is looking at.
+
+- The frame sits on the pointer and moves only when it strays from the middle of the frame, by more than 20 % of the frame's width or 12 % of its height.
+- It arrives on a click outside that area. The move ends on the click's frame, so the click lands in view.
+- It holds still while you type.
+- Any zoom and pan of the clip's own, such as [Auto Zoom](/recording/auto-zoom/)'s, is replaced, since the tall frame is already a close-up. The summary says so: "Follows the cursor in 2 clips, their own zooms and pans replaced."
+
+**Where Empty** doesn't apply to a recording that follows its pointer. **Center** centres the recording as any other movie.
+
+When the cursor file can't be read, because it was moved or deleted, the recording is shown whole on a blurred copy and the summary says "its cursor file could not be read, so it is shown whole".
+
+## Camera layouts
+
+A screen recording and its camera in [camera layouts](/framing/camera-layouts/) keep their arrangement. This covers the layouts of **Clip ▸ Camera Layout ▸** and the layout a recording landed in. Each switch is made again for the new canvas, at the same time, length and curve.
+
+| On the old canvas | On the new canvas |
+| --- | --- |
+| A Corner | A Corner in the same corner |
+| Camera Full | Camera Full |
+| Side by Side, going to a tall canvas | Stacked, with the screen across the top and the camera below it, so the screen isn't squeezed into two-thirds of a narrow frame |
+| Side by Side, going to a square | Side by Side |
+
+The camera, the screen and the cut pieces of either are never followed and get no blurred copy. A zoom on the screen keeps showing the same part of the picture.
+
+The summary counts them, "Re-lays 2 camera layouts for the new canvas.", and lists each switch: "Re-laid: Side by Side → Stacked at 00:00:10:00."
+
+A circle or panel crop is re-centred on the middle of the crop it had. A crop that had room to move may sit nearer the middle of the camera picture than a switch made directly on the new canvas would.
+
+### A layout changed by hand
+
+If a camera's position, crop or corner radius changed by more than a pixel after its switch, or its scale or opacity by more than 0.001, it's no longer a layout Frame Job made. The camera and its screen are kept as placed, and the summary says "Clip 6 is not followed: its camera layout was edited by hand, so it is kept as placed."
+
+## Stills, pictures and nests
+
+A still or a picture that fills the frame is centred, and so is a [nest](/editing/nests/) that does. There's nothing inside them to follow. The summary lists each one: "Clip 4 is not followed: it is a still picture, so it is centred." or "Clip 4 is not followed: it is a nest, so it is centred."
+
+What's inside a nest isn't reframed. A still, picture or nest that doesn't fill the frame is [kept as placed](#everything-else).
+
+## Graphics
+
+A graphic exactly the old canvas's size, such as a full-frame lower third or title card, is re-sized to the new canvas, so it lays itself out again on the narrow frame. Its position, and the positions its actions move it to, shrink and stretch with the two sides. Its scale stays as it was. Any other graphic is [kept as placed](#everything-else).
+
+Older copies of the bundled templates in the project are updated in a copy, and listed when you apply the step in place: "Graphic module "intro" is left as it is: it is an older copy of the bundled template "lower-third"; Make Vertical updates it only in a copy." A module of your own that sizes itself by the canvas's height is listed too, and never rewritten. See [Graphics in a vertical version](/graphics/vertical-graphics/).
+
+## Everything else
+
+Titles, other graphics, shapes, a picture-in-picture and any clip that doesn't fill the frame are kept as placed. They're moved and scaled from the old canvas to the new one, as the Document tab does when a [canvas change](/projects/canvas-size/) rescales clips:
+
+- A clip's horizontal position follows the change in width.
+- Its vertical position follows the change in height.
+- Its scale follows the smaller of the two changes, so something that fitted the old canvas still fits the new one.
+
+From 1920 × 1080 to 1080 × 1920, a title's distance from the centre shrinks to 0.56 across and grows to 1.78 down, and the title itself shrinks to 0.56 of its size. The positions and scales its actions move to change the same way.
+
+## Blurred copies and background plates
+
+A blurred copy already behind a clip is removed when that clip is framed, because the framing makes a new one where it's needed. Otherwise it's re-filled to cover the new canvas. A copy counts as one when it's named **Blurred Background** and a clip of the same source, start and length sits in front of it.
+
+A background plate from **Clip ▸ Add Background** is re-filled too. A plate is a rectangle shape the canvas's size, centred at scale 1, or an image or still named **Background** that fills the canvas. See [Backgrounds](/canvas/backgrounds/).
+
+## Word captions
+
+Word captions are split into pages again for the narrow frame, from the words their pages already hold, as **File ▸ Re-lay Captions for This Canvas** does. Every correction you typed is kept, but the new pages are drawn fresh from the style, so a colour or position you changed on a page goes. A track that was hidden or locked stays that way. See [Re-lay captions for a canvas](/captions/re-lay-captions/).
+
+A caption track that can't be re-laid is kept as placed, and the summary names it: "Caption track "Captions 2" is kept as placed: it holds a page with no word timings." That happens to [Subtitles](/captions/subtitles/), and to a track when:
+
+- it's a matte track
+- a page has no word timings, or none of a page's words starts inside it
+- a page is in a style Frame Job doesn't make, or its pages are in more than one style
+- its pages wouldn't fit
+
+## With an agent
+
+[`make_vertical_version`](/mcp/tools-framing/#make_vertical_version) tells the agent how each clip was treated and why, which clips followed their pointer, and each layout switch it made again. It can also leave caption tracks as placed, where the sheet always pages them again. [`reframe_clip`](/mcp/tools-framing/#reframe_clip) applies one of these framings to a single clip. See [Reframe a clip (agents)](/framing/reframe-clip/) and [Tools: framing and vertical](/mcp/tools-framing/).
+
+## Related
+
+- [Make Vertical Version](/framing/make-vertical-version/)
+- [Follow the speaker in a vertical](/framing/follow-speaker/)
+- [Follow Subject](/framing/follow-subject/)
+- [Camera layouts](/framing/camera-layouts/)
+- [Graphics in a vertical version](/graphics/vertical-graphics/)
+- [Re-lay captions for a canvas](/captions/re-lay-captions/)

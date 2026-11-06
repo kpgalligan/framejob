@@ -405,7 +405,8 @@ Frame Job's own numbers, and nothing of Concat is opened, at design time or buil
     changed on disk is re-read at the next frame drawn (the texture cache keys by path, size and
     modification date).
   - **Removing a used LUT** (choice 6): Remove asks "It is the look of N clips, which keep their
-    place and lose the look." with "Remove and Clear Looks"; the clips stay, undoable. `remove_media`
+    place and lose the look." with "Remove and Clear Looks" (GR-37 adds the titles for a Camera
+    Log); the clips stay, undoable. `remove_media`
     without `with_clips` refuses naming the clips (`media 7 is the look of clip 3; pass with_clips:
     true to remove it and clear their looks`); with it, every base look naming the LUT, on the
     timeline and in every nest, is removed, and action ends are left alone (inert).

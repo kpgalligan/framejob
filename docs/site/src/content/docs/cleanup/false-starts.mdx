@@ -1,0 +1,83 @@
+---
+title: "Cut false starts"
+description: "Ask the Assistant to find a phrase the speaker abandoned or said again, and cut it in one undo step."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A false start is a phrase the speaker abandoned or said again. Deciding what counts is a judgement about meaning, so there's no menu command for it. You ask the [Assistant](/assistant/what-it-can-do/), and it finds the words and cuts them. To pick the words yourself, [delete them in the Transcript tab](/captions/delete-words/).
+
+<AtAGlance
+  menu="View ▸ Assistant"
+  keys="⌃⌘A"
+  where="Inspector ▸ Assistant tab"
+  tools={['get_timeline_transcript', 'get_transcript', 'ripple_delete_ranges']}
+  needs="Your own Anthropic API key, set in Frame Job ▸ Settings… ▸ Assistant."
+/>
+
+## Cut a false start with the Assistant
+
+<Steps>
+
+1. Select the clip if you're going to say "this clip". Each message tells the Assistant what's selected and where the playhead is.
+
+2. Open the Assistant tab with **View ▸ Assistant** (<kbd>⌃⌘A</kbd>).
+
+3. Ask for it, for example "cut the false start at the beginning of this clip."
+
+4. The Assistant reads the words and their times, tells you which words it will cut, and cuts them in one step.
+
+</Steps>
+
+It doesn't wait for a go-ahead between telling you and cutting. If it took the wrong words, press <kbd>⌘Z</kbd>. The **Edit** menu names the step **Undo Ripple Delete**.
+
+The Assistant cuts a false start only when you ask.
+
+## What gets cut
+
+The cut runs from the start of the first word to the start of the next word you keep, taking at most 1 second of the pause after the last cut word. That's the range the [Transcript tab](/captions/delete-words/) cuts when you delete the same words by hand.
+
+If that range would cut into a word on another unlocked track, it widens to take that whole word.
+
+The timeline closes over the cut, as it does for every clean-up cut. See [How a clean-up cut works](/cleanup/how-cleanup-cuts-work/).
+
+## Where the words come from
+
+The Assistant reads a file's kept AssemblyAI transcript when it has a current one. Otherwise it uses this Mac's own speech recogniser, which reads the whole file once and keeps the words in the project, so later reads are immediate.
+
+Neither way uploads audio or needs an AssemblyAI key. The words the Assistant reads do go to Anthropic as part of the conversation. See [Assistant privacy](/assistant/privacy/).
+
+## Remove fillers and silences by asking
+
+The Assistant can also do what the two clean-up sheets do.
+
+| Ask it to | What it does |
+| --- | --- |
+| Take out the silences | Finds the ranges [Remove Silences](/cleanup/remove-silences/) would cut, then cuts them all at once. |
+| Remove the filler words | Finds the ranges [Remove Filler Words](/cleanup/remove-filler-words/) would cut, then cuts them all at once. |
+
+Each cut is one undo step, labelled **Undo Ripple Delete** rather than the sheet's name.
+
+The Assistant can find filler words this way only in files that already have a [cloud transcript made with filler words](/cleanup/filler-transcripts/). In any other file it finds none, and its search reports which files have no such transcript.
+
+## The Assistant won't start a paid transcription
+
+The Assistant can't start a paid filler transcription, so you press **Transcribe** in the sheet yourself. Choose **Clip ▸ Remove Filler Words…**, check the price on the file's row, and choose [Transcribe](/cleanup/filler-transcripts/#transcribe-a-file). Then ask the Assistant again, or choose **Remove** in the sheet.
+
+Audio leaves your Mac only when you choose it, with the price in front of you. The same goes for transcribing captions with AssemblyAI: use **File ▸ Generate Captions…**. See [What it won't do and what it asks first](/assistant/what-it-will-not-do/).
+
+## Good to know
+
+- A clip that's muted, soloed out or at volume 0 isn't heard, so it's left out of the timeline's words the Assistant reads.
+- The cut goes across every unlocked track. A locked track is neither cut nor moved.
+- With a [nest](/editing/nests/) open, the Assistant reads and cuts inside that nest, as you would.
+- If a file has no cloud transcript and its language isn't installed on this Mac, the Assistant can't read it, and it can't download the language. Open **File ▸ Generate Captions…**, choose the language under **Language**, and press **Download**.
+
+## Related
+
+- [Set up the Assistant](/assistant/set-up/)
+- [What the Assistant can do](/assistant/what-it-can-do/)
+- [Cut by deleting words](/captions/delete-words/)
+- [How a clean-up cut works](/cleanup/how-cleanup-cuts-work/)
+- [What it costs](/assistant/cost/)

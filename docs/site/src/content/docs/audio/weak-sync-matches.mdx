@@ -1,0 +1,79 @@
+---
+title: "Confident and weak matches"
+description: How Synchronize Audio grades a match, what the Weak match sheet asks you, and what to do when nothing matches.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+[Synchronize Audio](/audio/synchronize-audio/) grades every match it finds. A confident match is applied straight away, a weak one is asked about first, and anything less moves nothing.
+
+<AtAGlance menu="Clip ▸ Synchronize Audio" tools="sync_audio" />
+
+Each possible offset, meaning how far a clip could move to line up, gets a **confidence**: a score for how far it stands out from every other offset Frame Job tried. A high score means one offset is clearly right. Frame Job keeps up to four candidates, each about a second or more from the others.
+
+Either grade must also pass [the waveform check](/audio/synchronize-audio/#the-waveform-check). A match that fails it isn't used, however high its confidence, which keeps two takes of the same words apart.
+
+## Confident matches
+
+A match is confident when its best candidate has a confidence of at least 10, and is at least 1.5 above the next candidate. A confident match is applied straight away.
+
+## The Weak match sheet
+
+A match is weak when no candidate is confident, but the best one within about 3 seconds of where the clip already sits has a confidence of at least 4. A weak match might be unrelated sound, so it's never applied without asking. A **Weak match** sheet appears:
+
+> Weak match: move “record.aifc” 0.80 s earlier (trimming 0.80 s off its head)?
+
+A clip that doesn't need to move, only to have its drift corrected, is asked about this way:
+
+> Weak match: play “record.aifc” at ×1.0004, correcting its drift?
+
+When several clips are weak, one sheet lists them all, separated by semicolons.
+
+Under the question, the sheet gives the anchor's name, each match's confidence and the rule it fell short of.
+
+| Choose | What happens |
+| --- | --- |
+| **Apply** (the default) | Makes all the changes as one undo step, including those for any clips that matched confidently. |
+| **Cancel** or <kbd>Esc</kbd> | Leaves everything as it is, including clips that matched confidently. |
+
+If you aren't sure, choose **Apply** and play the result. <kbd>⌘Z</kbd> takes all of it back in one step.
+
+If the project changed while the sheet was up, or an agent moved in or out of a nest, **Apply** moves nothing. Frame Job beeps and the inspector says to choose Synchronize Audio again.
+
+A weak match that wouldn't change anything isn't asked about.
+
+A weak match in the trimmed parts ends the search, and the whole files are searched only when the trimmed parts give neither a confident nor a weak match. So if you cancel a weak match, change the trims before trying again.
+
+## When nothing matches
+
+If no candidate is confident or weak, nothing moves. [The strip at the foot of the inspector](/getting-started/refused-edits/#the-refusal-strip) names the offsets Frame Job did find and their confidences, for example:
+
+> Refused: no matching sound found between clip 1 and clip 2: in the played windows, moving clip 2 by +0.77 s (confidence 4.31) or −12.40 s (3.90). A match applies on its own at…
+
+"The played windows" are the parts each clip is trimmed to, and "the whole files" are listed too when those were searched. A plus sign means later and a minus sign means earlier. Hover over the strip to read the whole message.
+
+To try again:
+
+<Steps>
+
+1. Pick the offset that looks right. You might know roughly where the clip belongs, or one figure may be well ahead of the others.
+
+2. Move the clip by about that much, so it sits within 3 seconds of the match.
+
+3. Choose **Clip ▸ Synchronize Audio** again. A candidate near the clip with a confidence of at least 4 now comes up as a weak match, as long as it passes the waveform check.
+
+</Steps>
+
+If the message ends "too little room to compare their sound", Frame Job found no candidates at all. Check that both clips have enough sound to compare, and try longer trims.
+
+## With an agent
+
+An agent gets no sheet. A weak match moves nothing and the agent is told the move it would make, so it should ask you. It applies the match by calling `sync_audio` again with `accept_weak: true`, and only once you've agreed to that move. See [Tools: audio](/mcp/tools-audio/#apply-a-weak-match).
+
+## Related
+
+- [Synchronize Audio](/audio/synchronize-audio/)
+- [Move clips](/editing/move-clips/)
+- [Trim clips](/editing/trimming/)
+- [When an edit is refused](/getting-started/refused-edits/)

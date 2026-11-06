@@ -1,0 +1,82 @@
+---
+title: "Your first edit"
+description: "One short walk from start to finish: open a movie, cut a section out, add a title and export an H.264 file."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+This walk takes one movie from your Mac to a finished file. You'll open it, cut a section out, add a title and export an H.264 movie. Each step links to the page that covers it in full.
+
+<AtAGlance
+  menu={['File ▸ Open…', 'Edit ▸ Ripple Delete', 'File ▸ Save', 'File ▸ Export…']}
+  keys={['⌘O', 'Space', 'I', 'O', '⌘⌫', 'T', '⌘S', '⌘E']}
+/>
+
+## Open a movie
+
+Choose **File ▸ Open…** (<kbd>⌘O</kbd>) and pick a `.mov` or `.mp4`. **Open Video…** in the [Welcome window](/projects/welcome-window/) and a drop on the Dock icon do the same.
+
+You get an untitled project with the same size and frame rate as the file. The movie is the first clip on Track 1, at the very start of the timeline. See [Start a project](/projects/start-a-project/) for the other ways in.
+
+## Find the section
+
+Press <kbd>Space</kbd> to play and again to pause. Click the [ruler](/timeline/ruler-and-playhead/) to move the playhead straight to a moment, then press <kbd>←</kbd> or <kbd>→</kbd> to step one frame at a time until it's exactly where you want it.
+
+## Cut it out
+
+<Steps>
+
+1. Move the playhead to the start of the section and press <kbd>I</kbd>.
+
+2. Move it to the end of the section and press <kbd>O</kbd>. The [range](/timeline/in-out-range/) is now shaded across the ruler and the lanes.
+
+3. Check that the left end of the timeline bar reads **No selection**. If it doesn't, click an empty part of a lane.
+
+4. Choose **Edit ▸ Ripple Delete** (<kbd>⌘⌫</kbd>).
+
+</Steps>
+
+Frame Job cuts every unlocked clip at both ends of the range, removes what lies between and closes the gap. The range stays set after the cut. Press <kbd>⌥X</kbd> to clear it, or another <kbd>⌘⌫</kbd> will cut again.
+
+:::caution
+With a clip selected, <kbd>⌘⌫</kbd> removes the whole clip, not the range. That's why step 3 matters.
+:::
+
+See [Delete, Ripple Delete and Lift](/editing/delete-clips/) for how the delete commands differ.
+
+## Add a title
+
+Move the playhead to where the title should start and press <kbd>T</kbd>.
+
+The title goes on the front-most track if there's room at the playhead, and on a new front track if there isn't. With your movie under the playhead, that means a new track, unless the playhead is in the movie's last 2.5 seconds. There the title lands on the movie's own track and overlaps its end with a Cross Dissolve. It reads "Title" in Source Sans 3 Bold at 72 px, white and centred, and it lasts 5 seconds.
+
+The new clip is selected, so the **Text** sub-tab opens on it. Type your words in **Content** and press <kbd>Return</kbd>. See [Text clips](/text-and-shapes/text-clips/) for the rest.
+
+## Save the project
+
+Choose **File ▸ Save** (<kbd>⌘S</kbd>). Frame Job writes a `.framejob` package, and offers to put it next to the source file. After that, the project autosaves. See [Undo and saving](/getting-started/undo-and-saving/).
+
+## Export the movie
+
+<Steps>
+
+1. Choose **File ▸ Export…** (<kbd>⌘E</kbd>), or the **Export…** button at the right of the toolbar. The command is greyed out while the timeline is empty.
+
+2. The first time you export, the sheet opens on **H.264 (MP4)** at the project's own size. Leave it there.
+
+3. Choose **Export…**, then pick a name and a place in the save panel.
+
+</Steps>
+
+Frame Job writes the file behind a progress sheet. When it finishes, **Show in Finder** takes you to the file. See [The export sheet](/export/export-sheet/) for every other format and setting.
+
+## If you make a mistake
+
+Press <kbd>⌘Z</kbd> at any step to take back one edit.
+
+## Related
+
+- [A tour of the editor window](/getting-started/editor-window/)
+- [Core concepts](/getting-started/core-concepts/)
+- [Keys and typing](/getting-started/keys-and-typing/)

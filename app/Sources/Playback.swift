@@ -24,7 +24,8 @@ import AppKit
 /// `previewComposition`, `setPreviewQuality` and `recompose()` live in
 /// `Playback+PreviewQuality.swift`, `stepFrames` and the main hop `onMain` in `+Step`,
 /// `seekAfterRebuild`, `seekFinished` and `report` in `+Scope`,
-/// the playing preview's graphics prefetch, `syncPrefetch(from:)`, in `+Prefetch` (G-36).
+/// the playing preview's graphics prefetch, `syncPrefetch(from:)`, in `+Prefetch` (G-36),
+/// `loopEnd` and `itemPlayedToEnd()` in `+Loop`.
 ///
 /// Road map 2's phase 8 hung two more things off the player, and both are here
 /// because both are about the PLAYER rather than about the document: View ▸
@@ -79,7 +80,9 @@ final class Playback {
     #endif
 
     /// The in/out range when one is set: playback wraps at its end (§4.4).
-    var loopRange: (start: Ticks, duration: Ticks)?
+    var loopRange: (start: Ticks, duration: Ticks)? {
+        didSet { syncItemEndAction() }
+    }
 
     private let player = AVPlayer()
     /// This document's `RecipeSource` slot. Travels onto every instruction so
@@ -137,6 +140,7 @@ final class Playback {
     var lastKnownTime: Ticks = 0
     private var timeObserver: Any?
     private var rateObservation: NSKeyValueObservation?
+    private var itemEndObserver: NSObjectProtocol?
 
     init(recipeKey: Int) {
         self.recipeKey = recipeKey
@@ -147,7 +151,8 @@ final class Playback {
         playerLayer = AVPlayerLayer(player: player)
         playerLayer.videoGravity = .resizeAspect
         // The player must not resume at the end of an item: the playhead
-        // stops there and the user decides what happens next.
+        // stops there and the user decides what happens next. Only a loop
+        // says otherwise (`syncItemEndAction`).
         player.actionAtItemEnd = .pause
         player.automaticallyWaitsToMinimizeStalling = false
 
@@ -169,8 +174,16 @@ final class Playback {
                 // end of an item or on a stall.
                 if rate == 0 { self.stopMetering() } else { self.startMetering() }
                 self.syncPrefetch(from: self.currentTime, seeking: self.isSeeking)
+                self.syncItemEndAction()
                 self.onRateChanged?(rate)
             }
+        }
+        itemEndObserver = NotificationCenter.default.addObserver(
+            forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let self = self, note.object as? AVPlayerItem === self.player.currentItem
+            else { return }
+            self.itemPlayedToEnd()
         }
     }
 
@@ -181,6 +194,9 @@ final class Playback {
     deinit {
         if let timeObserver = timeObserver { player.removeTimeObserver(timeObserver) }
         rateObservation?.invalidate()
+        if let itemEndObserver = itemEndObserver {
+            NotificationCenter.default.removeObserver(itemEndObserver)
+        }
         debounceTimer?.invalidate()
         // Both teardown doors have to close the meter, or a window that went
         // away leaves the shared model lit at whatever it last read.
@@ -478,7 +494,7 @@ final class Playback {
             NSSound.beep()
             return
         }
-        if let loop = loopRange, currentTime >= loop.start + loop.duration {
+        if let loop = loopRange, let end = loopEnd, currentTime >= end {
             seek(to: loop.start)
         }
         player.play()
@@ -499,6 +515,11 @@ final class Playback {
         guard player.currentItem != nil else {
             NSSound.beep()
             return
+        }
+        // Parked at a loop's end, as `play()`: an item already ended posts no
+        // second end, so a loop running past it would run the clock on.
+        if rate > 0, let loop = loopRange, let end = loopEnd, currentTime >= end {
+            seek(to: loop.start)
         }
         player.rate = rate
     }
@@ -542,6 +563,13 @@ final class Playback {
     }
 
     // MARK: - Observers
+
+    /// A loop that can wrap keeps the player running through the item's end,
+    /// so `itemPlayedToEnd` wraps it at its rate. Reverse play stays on
+    /// `.pause`, or `.none` would strand it running at 0.
+    private func syncItemEndAction() {
+        player.actionAtItemEnd = loopEnd != nil && player.rate >= 0 ? .none : .pause
+    }
 
     /// The periodic observer. While playing every tick is heard. While paused
     /// a tick is heard only when it is where the player is or is seeking to

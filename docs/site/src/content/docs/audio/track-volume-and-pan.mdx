@@ -1,0 +1,86 @@
+---
+title: Track volume and pan
+description: Set a whole track's level and left-right balance in the Track Mix panel, on top of what each clip already does.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Each track has its own volume and pan, applied on top of every clip on it. Use them to balance a music bed against a voice-over without touching each clip.
+
+<AtAGlance
+  menu="Track ▸ Mix…"
+  where={['The sliders switch in the track header', "Mix… in the track's right-click menu"]}
+  tools="set_track"
+/>
+
+## Open the Track Mix panel
+
+Click the sliders switch, the fifth in the track's header. **Mix…** in the track's right-click menu does the same. **Track ▸ Mix…** opens it for the [current track](/timeline/tracks/#the-current-track), and has no keyboard shortcut.
+
+A small panel opens beside the header, with the track's name at the top. It holds **Volume**, **Pan**, the track's [compressor and limiter](/audio/track-dynamics/), and **Reset**.
+
+It's the nearest thing to a mixer, because Frame Job has no mixer window. There's one panel per timeline, so opening it on another track closes the first. Clicking away closes it, and so does anything that takes its track away: removing the track, undoing it away, or going into or out of a nest.
+
+The sliders switch is lit while the track's volume or pan is off its default, or a compressor or limiter is on.
+
+## Set a track's volume
+
+| Control | What it does | Range | Default |
+| --- | --- | --- | --- |
+| **Volume** | The track's level, as a slider and a field in dB. Beside them, a readout shows the level as a percentage, or "Off". | Off (at −60) to +12 dB | 0 dB |
+
+The quick picks on the field are −12, −6, −3, 0, +3 and +6 dB. Drag the slider to its left end, or type −60, to turn the track off. A number typed outside the range goes to the nearest end of it.
+
+Track volume multiplies what's on the track. A clip at 200 % on a track at −12 dB plays at −6 dB. A muted track is silent whatever its volume.
+
+## Set a track's pan
+
+| Control | What it does | Range | Default |
+| --- | --- | --- | --- |
+| **Pan** | Leans the track's sound left or right, as a slider and a field. | −100 (left) to 100 (right) | 0 |
+
+The quick picks are −100, −50, 0, 50 and 100.
+
+Pan is a balance, like a [clip's pan](/audio/pan-and-mono/), and keeps the overall loudness steady as it moves. It applies after each clip's own pan, and two pans multiply, so a clip panned left on a track panned left leans further left. It has no effect on a mono source.
+
+## Reset the mix
+
+**Reset** puts the volume back to 0 dB and the pan to the centre, and turns the track's compressor and limiter off. Inside an open nest, it resets volume and pan only. It's greyed out when there's nothing to reset.
+
+Each change is one undo step. A drag, a typed value or a quick pick is named "Track Volume" or "Track Pan", and **Reset** is named "Reset Track Mix".
+
+## Track volume in a nest
+
+A clip inside a [nest](/editing/nests/) plays through its own track inside the nest, and through the track the nest clip sits on.
+
+- **Nesting from one track keeps its sound.** The nest's copy of that track starts at 0 dB and centre, because the track the nest clip lands on still applies.
+- **Clips from the selection's other tracks** keep their own track's volume and pan inside the nest, and also get the destination track's.
+- **Un-nesting** puts the clips back on the timeline's tracks without the nest's track settings.
+- **Mix to mono on a nest clip** folds everything inside it, so the pans of the tracks inside no longer apply.
+
+## What hears track volume
+
+Track volume is part of what you hear, so it shows up wherever Frame Job measures the mix, and not where it measures a clip.
+
+| Hears it | Doesn't hear it |
+| --- | --- |
+| The preview and every export, which sound the same | [Normalize](/audio/normalize/) |
+| The [level meter](/audio/level-meter/) | The [Loudness readout](/audio/volume/#read-the-level) |
+| [Remove Silences](/cleanup/remove-silences/) | A clip's [limiter](/audio/limiter/) |
+
+So a track turned up can take a limited clip past its ceiling. Use the track's own [limiter](/audio/track-dynamics/) to hold what the whole track hands the mix.
+
+## Good to know
+
+A track's volume and pan are one value for the whole track, and can't change over time. To ride the level, use a clip's [volume line](/audio/volume-line/) or [actions](/audio/animate-sound/).
+
+## With an agent
+
+`set_track` sets both, with different scales from the panel. `volume` is a linear gain from 0 to 4, where 1 is 0 dB, 4 is +12 dB and 0 is silent. `pan` runs from −1 (left) to 1 (right). A value outside those ranges changes nothing, where a number typed in the panel goes to the nearest end. See [Tools: tracks, markers and canvas](/mcp/tools-tracks-and-markers/#set_track).
+
+## Related
+
+- [Track compressor and limiter](/audio/track-dynamics/)
+- [Mute and solo tracks](/audio/mute-and-solo/)
+- [Clip volume](/audio/volume/)
+- [Pan and Mix to mono](/audio/pan-and-mono/)

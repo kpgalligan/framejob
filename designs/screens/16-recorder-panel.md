@@ -35,8 +35,8 @@ a pop-up reading "Separate" — the pointer is kept out of the movie and drawn b
 other row is "In the picture", which lets macOS draw the pointer into the movie; Show
 Clicks, a switch that is off, and under it an unticked checkbox, "Record shortcuts", with a
 small grey note: "Records each shortcut you press with ⌘ or ⌃, or ⌥ with an arrow, Delete,
-Return, Tab or Esc, and when you type, never what you type. Nothing is recorded while an app
-holds secure input."; "When it lands:" with three checkboxes stacked under it, "Zoom in on
+Forward Delete, Return, Enter, Tab or Esc, and when you type, never what you type. Nothing is
+recorded while an app holds secure input."; "When it lands:" with three checkboxes stacked under it, "Zoom in on
 clicks" (ticked and live), then "Show shortcuts" (ticked) and "Speed up typing" (unticked),
 those two greyed because Record shortcuts is off; Rate "60 fps"; Size "Nominal (points)", with the
 line "1728×1117 points · 3456×2234 pixels" under it — the recorded size of that

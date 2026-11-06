@@ -1,0 +1,88 @@
+---
+title: "Move, scale and rotate"
+description: "Place a clip directly on the picture by dragging it, its eight handles and its rotation grip."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Select a clip on the canvas, then drag it into place. The handles and the grip do the same job as the numbers on the [Picture tab](/canvas/transform/), with the picture in front of you.
+
+<AtAGlance
+  keys={['⌥-drag', '⇧-drag', 'Esc', '← → ↑ ↓']}
+  where="The preview canvas"
+  tools="set_video"
+/>
+
+## Move
+
+Drag inside a clip's box to move it. Every selected clip moves by the same amount and keeps its place relative to the others, including a selected clip that isn't at the playhead. Clips on locked tracks stay where they are.
+
+The move [snaps](/canvas/canvas-snapping/) to the canvas and to other layers. Snapping goes by the clip you grabbed, so the whole selection clicks into place together.
+
+To move a clip by an exact number of pixels, type a new value into **Position X** or **Position Y** on the [Picture tab](/canvas/transform/#position), or [nudge it with the arrow keys](#nudge-with-the-arrow-keys). To shift it earlier or later in time, see [Nudge clips](/editing/nudge-clips/).
+
+## Nudge with the arrow keys
+
+Click a clip on the canvas, then press an arrow key to move it 1 pixel, or hold <kbd>⇧</kbd> to move it 10. Each press is one undo step named Nudge. Every selected clip moves by the same amount, and clips on locked tracks stay where they are. With an action selected, the nudge moves the action's end state instead.
+
+This needs the canvas to have the focus and a selected clip showing at the playhead. The canvas has the focus from a click or drag on it until you click anywhere else in the window. Otherwise the arrow keys step the playhead and jump between edit points, as they do everywhere else. During a canvas drag they do nothing.
+
+## Scale
+
+Drag a corner or edge handle. The opposite handle stays pinned in place, and the clip moves as it scales to keep it there. This works on a rotated clip too. On a cropped clip, the point that stays pinned is on the uncropped picture, so the cropped edge opposite can shift.
+
+What a handle changes depends on the clip:
+
+| Clip | Corner handles | Edge handles |
+| --- | --- | --- |
+| Video, image, freeze frame, graphic | Scale the whole picture and keep its shape. | The same. A clip like this has one scale, so an edge handle can't stretch it. |
+| [Shape](/text-and-shapes/shape-settings/) | Resize the box and keep its proportions. Hold <kbd>⇧</kbd> to free them. | Change only the width or only the height. |
+| [Text](/text-and-shapes/text-box/) | Scale the text. | Left and right set the wrap width, with the clip's centre staying still. Top and bottom scale the text. |
+
+A drag scales between 1 % and 1000 %. A shape's box and a text clip's wrap width stay between 4 and 20,000 pixels.
+
+A drag acts on the front-most selected clip only, even with several selected.
+
+## Scale about the centre
+
+Hold <kbd>⌥</kbd> while you scale to keep the clip's centre still instead of the opposite handle.
+
+## Rotate
+
+Drag the round grip above the top edge to turn the clip about its centre. A positive angle turns it clockwise. However far you drag, the angle stays between −180° and 180°, so the inspector never shows a value like 540°.
+
+## Snap the angle
+
+Hold <kbd>⇧</kbd> while you rotate to snap the angle to 15° steps.
+
+## Cancel a drag
+
+Press <kbd>Esc</kbd> during a canvas drag to put everything back as it was before the drag, with no undo step. This covers move, scale, rotate, crop, line end and obscure region drags. Timeline drags have no such cancel.
+
+<kbd>⇧</kbd> can stay down and Caps Lock can stay on, but <kbd>Esc</kbd> doesn't cancel while <kbd>⌥</kbd>, <kbd>⌃</kbd> or <kbd>⌘</kbd> is held, so let go of those first.
+
+## The pivot
+
+Rotation, the Picture tab's **Scale** field and a <kbd>⌥</kbd> scale drag all pivot on the centre of the clip's uncropped picture. There's no separate anchor-point control. Because the pivot is the uncropped centre, cropping never moves it.
+
+## One undo step per drag
+
+Each canvas drag is one undo step, however many clips it moved, and a click that moves nothing adds no step. The steps are named Move, Scale, Rotate and Crop, so the Edit menu reads **Undo Move**, for example.
+
+## Good to know
+
+- With an action selected, these gestures change that action's end state rather than the clip. See [With an action selected](/canvas/the-canvas/#with-an-action-selected).
+- A clip shows an [action's](/motion/actions/) end state after the action ends. With one clip selected and no action selected, a move, nudge, resize, rotate or crop past an action that has ended and holds what the gesture changes, such as a zoom or a [camera layout](/framing/camera-layouts/#resize-or-move-a-laid-out-camera), changes nothing. Frame Job beeps, and the foot of the inspector names the action, for example "Refused: action 1 on this clip's lane holds its position at the playhead, so a move here would show only before it. Select action 1 first." Select that action, then drag. Dragging a text clip's left or right edge still sets its wrap width there, unless the action holds a width. Before the action starts, a drag changes the clip's own values.
+- With several clips selected, a drag changes the clips' own values, so past such an action the picture doesn't move.
+- A camera layout on a clip's first frame is different. With that one clip selected, a move, nudge, scale or crop changes the layout and the clip's own values together, so the clip moves on every frame. With several clips selected, a drag changes only their own values, so such a clip moves on its first frame alone.
+- In [crop mode](/canvas/crop/) the eight handles crop the clip instead of scaling it.
+- A nest clip moves, scales and rotates like any clip, in the box of the rectangle it's placed in. Its scale stays uniform. See [Layers](/canvas/the-canvas/#layers).
+
+## Related
+
+- [Select on the canvas](/canvas/select-on-canvas/)
+- [Position, scale, rotation and opacity](/canvas/transform/)
+- [Canvas snapping](/canvas/canvas-snapping/)
+- [Crop](/canvas/crop/)
+- [Lines and arrows](/text-and-shapes/lines-and-arrows/)
+- [Undo and saving](/getting-started/undo-and-saving/)

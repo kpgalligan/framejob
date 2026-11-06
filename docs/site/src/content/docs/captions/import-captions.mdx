@@ -1,0 +1,102 @@
+---
+title: "Import captions"
+description: "Bring a SubRip (.srt) or WebVTT (.vtt) caption file onto the timeline as text clips, and see what Frame Job copes with, removes and reports along the way."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Import Captions reads a SubRip (`.srt`) or WebVTT (`.vtt`) file onto a new caption track, one text clip per caption, as a single undo step. Use it when someone has already written the captions.
+
+<AtAGlance menu="File ▸ Import Captions…" tools="import_captions" />
+
+## Import captions
+
+<Steps>
+
+1. Choose **File ▸ Import Captions…**. It has no keyboard shortcut, and it's available whenever the project window has no sheet open.
+
+2. Pick the file. The open panel reads "Choose a SubRip (.srt) or WebVTT (.vtt) caption file." It accepts `.srt`, `.vtt` and any plain-text file, so a caption file saved as `.txt` imports too.
+
+</Steps>
+
+Each caption becomes one text clip in the [**Caption** preset](/text-and-shapes/text-presets/), on a new track at the front called **Captions**, or the next free number. Undo removes the lot in one step, **Import Captions**. With a [nest](/editing/inside-a-nest/) open, the track goes at the front of the nest.
+
+A clean import shows no message. If there's anything to tell you, an alert appears when it finishes. See [Malformed entries are reported](#malformed-entries-are-reported).
+
+## File variations it copes with
+
+Real caption files vary, and Frame Job copes with these variations rather than turning the file away:
+
+- A UTF-8 byte-order mark.
+- Windows (CRLF) or old Mac (bare CR) line endings.
+- A missing index line above the timing line.
+- A comma or a dot before the milliseconds.
+- The `MM:SS` and `SS` shorthands, and up to nine digits after the seconds.
+- Position settings after the end time, which are ignored.
+- Text in UTF-8, in UTF-16 with a byte-order mark, or in Windows-1252 or Latin-1.
+
+## What happens to the text
+
+A text clip holds one plain string, so formatting that can't be kept is removed rather than shown as angle brackets on the canvas.
+
+| In the file | What happens |
+| --- | --- |
+| `<i>`, `<b>`, `<u>`, `<font …>` and their closing tags | Removed, along with anything else shaped like a tag: a `<` followed by a letter, or by `/` and a letter, up to the next `>`. |
+| `{\an8}`-style overrides | Removed: a `{\` up to the next `}`. |
+| `&amp;` `&lt;` `&gt;` `&quot;` `&apos;` `&#39;` `&nbsp;` | Decoded to the character they stand for. |
+| Text that only looks like a tag, such as `<<` or `a < b` | Stays as text. |
+
+The file's own line breaks are kept, and long lines also wrap inside the caption box, which is 80% of the canvas width.
+
+## What happens to the timing
+
+Every time snaps to the project's frame grid. A caption that starts before the previous one ends cuts the earlier one back to meet it. A caption left shorter than one frame is skipped. [Frame grid and no overlaps](/captions/how-captions-work/#frame-grid-and-no-overlaps) has the rules.
+
+## Malformed entries are reported
+
+Frame Job skips an entry it can't read, carries on with the rest, and tells you. Nothing is dropped silently.
+
+When the import finishes with something to report, an alert headed "Imported 42 captions from “interview.srt”." says how many captions were shortened to fit and lists what was skipped by line number. It shows the first eight, then "…and N more."
+
+| The alert says | What's wrong with the entry |
+| --- | --- |
+| no “-->” timing line in this entry | The block has no timing line. |
+| “…” is not a HH:MM:SS,mmm time | A time can't be read. A time past 1,000,000 seconds, about 277 hours, counts as unreadable. |
+| two “-->” in one timing line | The timing line has more than one arrow. |
+| 2 lines before the timing line | More than an index line sits above the timing line. |
+| ends at or before it starts | The end time isn't after the start time. |
+| no caption text | The entry has timing but no words, or nothing left once markup is removed. |
+| starts less than a frame before the next caption | Shortening it to fit would leave it under one frame. |
+
+On a canvas taller than wide, the alert also says when captions wrap to more than two lines. See [Subtitles](/captions/subtitles/).
+
+## When a file can't be read
+
+If not one caption in a file can be read, Frame Job imports nothing and the project doesn't change.
+
+| The message says | What it means |
+| --- | --- |
+| No captions could be read from “name.srt”. | Every entry failed. The message gives the first three reasons. |
+| “name.srt” could not be read as text. | The file couldn't be opened. |
+| “name.srt” holds 5000 captions, more than this project has room for: 900 more clips would fit, out of 4096. | The file would take the project past its 4,096-clip limit. |
+
+## Good to know
+
+A caption file comes in through this command, not as media.
+
+A WebVTT file, such as one you [exported](/captions/export-captions/), is known by its first line, `WEBVTT`, whatever its name. That header and any `NOTE`, `STYLE` or `REGION` blocks aren't captions, so they're left out without a message. A time tag inside a cue, such as `<00:00:03.500>`, is removed. Cue settings and styling are lost.
+
+A file in an older encoding other than Windows-1252 or Latin-1 comes out with the wrong letters.
+
+## With an agent
+
+`import_captions` can put the captions on a track that already exists, which the menu can't. Captions that would overlap something on that track are dropped, so leaving it to make a new track is the safer choice. It reports what landed and each malformed entry by line. See [`import_captions`](/mcp/tools-captions/#import_captions).
+
+## Related
+
+- [Captions are text clips](/captions/how-captions-work/)
+- [Subtitles](/captions/subtitles/)
+- [Edit captions](/captions/edit-captions/)
+- [Export captions](/captions/export-captions/)
+- [Generate Captions](/captions/generate-captions/)

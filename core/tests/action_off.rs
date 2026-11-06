@@ -276,3 +276,126 @@ fn off_refuses_an_unknown_slot_a_deeper_path_and_a_slot_the_patch_names() {
         "\"audio.eq.high_pass\" is named in both the patch and off",
     );
 }
+
+// ---- a qualifier range keyed off (spec §11 GR-36) --------------------------
+
+/// Clip 11 as an adjustment clip with all three ranges on, and one linear
+/// action (21) over its first two seconds, whose end state is `end`.
+fn qualifier_project(end: Value) -> Handle {
+    Handle::from_value(&json!({
+        "version": 35,
+        "canvas": { "width": 1920, "height": 1080, "fps": [30, 1] },
+        "tracks": [{ "id": 2, "name": "Track 1" }],
+        "clips": [{
+            "id": 11, "track": 2, "start": 0, "duration": 10 * SEC,
+            "source": { "kind": "adjustment" },
+            "video": { "qualifier": {
+                "hue": { "center": 30.0, "width": 50.0, "softness": 25.0 },
+                "saturation": { "low": 0.2, "high": 0.8, "softness": 0.1 },
+                "luma": { "low": 0.1, "high": 0.9, "softness": 0.1 }
+            } },
+            "actions": [{ "id": 21, "start": 0, "duration": 2 * SEC,
+                          "curve": "linear", "end": end }]
+        }],
+        "next_id": 22
+    }))
+}
+
+#[test]
+fn off_keys_each_qualifier_range_off_at_the_end_and_keeps_the_others() {
+    for (range, others) in [
+        ("hue", ["saturation", "luma"]),
+        ("saturation", ["hue", "luma"]),
+        ("luma", ["hue", "saturation"]),
+    ] {
+        let path = format!("video.qualifier.{range}");
+        let after = qualifier_project(json!({})).apply(&op(json!({}), json!([path])));
+        assert_eq!(
+            end(&after),
+            json!({ "video": { "qualifier": { range: null } } })
+        );
+        let midway = after.clip_state(11, SEC).expect("clip 11 has a state");
+        let pointer = format!("/video/qualifier/{range}");
+        assert!(
+            at(&midway, &pointer).is_object(),
+            "{range} went off before the end: {midway}"
+        );
+        let at_end = after.clip_state(11, 2 * SEC).expect("clip 11 has a state");
+        assert!(
+            at_end.pointer(&pointer).is_none_or(Value::is_null),
+            "{range} is still on at the end: {at_end}"
+        );
+        for other in others {
+            assert!(
+                at(&at_end, &format!("/video/qualifier/{other}")).is_object(),
+                "keying {range} off took {other}: {at_end}"
+            );
+        }
+    }
+}
+
+#[test]
+fn off_keeps_the_range_a_patch_writes_beside_it() {
+    let after = qualifier_project(json!({})).apply(&op(
+        json!({ "video": { "qualifier": { "saturation": { "low": 0.0, "high": 0.3 } } } }),
+        json!(["video.qualifier.hue"]),
+    ));
+    assert_eq!(
+        end(&after),
+        json!({ "video": { "qualifier": {
+            "saturation": { "low": 0.0, "high": 0.3 }, "hue": null
+        } } })
+    );
+}
+
+#[test]
+fn a_ramp_on_a_range_gives_way_to_its_off_and_a_later_patch_replaces_the_null() {
+    let ramped = qualifier_project(json!({ "video": { "qualifier": {
+        "hue": { "center": 90.0 }
+    } } }));
+    let off = ramped.apply(&op(json!({}), json!(["video.qualifier.hue"])));
+    assert_eq!(
+        end(&off),
+        json!({ "video": { "qualifier": { "hue": null } } })
+    );
+    let back = off.apply(&op(
+        json!({ "video": { "qualifier": { "hue": {} } } }),
+        json!([]),
+    ));
+    assert_eq!(
+        end(&back),
+        json!({ "video": { "qualifier": { "hue": {} } } })
+    );
+}
+
+#[test]
+fn off_refuses_an_unknown_range_a_value_a_deeper_path_and_a_range_the_patch_names() {
+    let project = qualifier_project(json!({}));
+    for (path, third) in [
+        ("video.qualifier.bogus", "bogus"),
+        ("video.qualifier.invert", "invert"),
+        ("video.qualifier.blur", "blur"),
+    ] {
+        assert_eq!(
+            project.errors(&op(json!({}), json!([path]))),
+            format!(
+                "off path \"{path}\" names no qualifier range: \"{third}\" is not one of hue, \
+                 saturation, luma"
+            )
+        );
+    }
+    assert_contains(
+        &project.errors(&op(json!({}), json!(["video.qualifier.hue.center"]))),
+        "must be \"group.key\"",
+    );
+    assert_contains(
+        &project.errors(&op(
+            json!({ "video": { "qualifier": { "hue": { "center": 90.0 } } } }),
+            json!(["video.qualifier.hue"]),
+        )),
+        "\"video.qualifier.hue\" is named in both the patch and off",
+    );
+    let whole = project.errors(&op(json!({}), json!(["video.qualifier"])));
+    assert_contains(&whole, "cannot key \"video.qualifier\" off");
+    assert!(!whole.contains("internal error:"), "{whole}");
+}

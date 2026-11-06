@@ -1,8 +1,8 @@
 import AppKit
 import UniformTypeIdentifiers
 
-/// File ▸ Import Captions… — a SubRip (`.srt`) file becomes TEXT CLIPS on a
-/// track of their own (road map Phase 6, "SRT captions").
+/// File ▸ Import Captions… — a SubRip (`.srt`) or WebVTT (`.vtt`) file becomes
+/// TEXT CLIPS on a track of their own (road map Phase 6, "SRT captions").
 ///
 /// **Why text clips rather than a caption model.** Burn-in then costs
 /// nothing: a text clip already draws through `LayerRenderers`, already
@@ -29,8 +29,14 @@ import UniformTypeIdentifiers
 /// comma decimal separator (and the dot some tools write instead), the
 /// `HH:MM:SS` / `MM:SS` shorthands, cue-position settings trailing the end
 /// timestamp, `<i>`/`<b>`/`<font>` inline tags and `{\an8}` overrides, the
-/// handful of HTML entities, and text encoded as UTF-16 or Windows-1252
-/// rather than UTF-8.
+/// handful of HTML entities, and text encoded as UTF-16 with a BOM,
+/// Windows-1252 or Latin-1 rather than UTF-8.
+///
+/// **WebVTT is the same blocks** (spec §11 #498): a file whose first line is
+/// `WEBVTT` is told by that line, never by its extension. Its header and its
+/// `NOTE`, `STYLE` and `REGION` blocks are not entries, so they are left out
+/// without a problem, and a cue's time tags (`<00:00:03.500>`) go with the
+/// other markup. Cue settings, regions and styling are lost, as SubRip's are.
 ///
 /// **Malformed entries are reported, never silently dropped** — the parser
 /// keeps the line number of every block it refused and the caller shows
@@ -41,7 +47,7 @@ import UniformTypeIdentifiers
 /// (spec §5.1), which is also why a caption may end up one frame shorter
 /// than the file says.
 ///
-/// **What is here is the SubRip grammar and nothing else.** Everything from
+/// **What is here is the file grammar and nothing else.** Everything from
 /// the frame grid onwards — snapping, the overlap trim, the Caption preset,
 /// the new front-most track and the probe that learns the new clips' ids —
 /// is `CaptionLayout`, so `Transcriber.swift` lays a transcript out exactly
@@ -125,23 +131,27 @@ enum CaptionImporter {
     /// The types File ▸ Import Captions… offers. `.srt` is not a registered
     /// system type, so `UTType(filenameExtension:)` mints the same dynamic
     /// type a `.srt` file on disk is itself given — which is what makes the
-    /// filter match it — and the text types ride along for a caption file
-    /// some other app has claimed.
+    /// filter match it — and `.vtt` answers whatever the system calls it. The
+    /// text types ride along for a caption file some other app has claimed.
     static var contentTypes: [UTType] {
         var types: [UTType] = [.plainText, .text]
+        if let vtt = UTType(filenameExtension: "vtt") { types.insert(vtt, at: 0) }
         if let srt = UTType(filenameExtension: "srt") { types.insert(srt, at: 0) }
         return types
     }
 
     /// The file's text. UTF-8 first (what every modern tool writes), then
-    /// UTF-16 for a file with a wide BOM, then the two single-byte encodings
-    /// a subtitle file off a DVD rip is likely to be in. Latin-1 maps all
-    /// 256 bytes, so the last arm never fails on a file that exists —
-    /// mojibake is a better answer here than a refusal, since the timing
-    /// lines are ASCII either way.
+    /// UTF-16 ONLY for a file that starts with a wide BOM, because `.utf16`
+    /// takes any other file too and reads a single-byte one two bytes to a
+    /// letter (spec §11 #467), then the two single-byte encodings a subtitle
+    /// file off a DVD rip is likely to be in. Latin-1 maps all 256 bytes, so
+    /// the last arm never fails on a file that exists — mojibake is a better
+    /// answer here than a refusal, since the timing lines are ASCII either way.
     static func text(of url: URL) throws -> String {
         guard let data = try? Data(contentsOf: url) else { throw CaptionError.unreadable(url) }
-        for encoding in [String.Encoding.utf8, .utf16, .windowsCP1252, .isoLatin1] {
+        let wide = data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF])
+        let encodings: [String.Encoding] = [.utf8] + (wide ? [.utf16] : [])
+        for encoding in encodings + [.windowsCP1252, .isoLatin1] {
             if let text = String(data: data, encoding: encoding) { return text }
         }
         throw CaptionError.unreadable(url)
@@ -153,8 +163,16 @@ enum CaptionImporter {
     /// block that is not a cue becomes a `Problem` naming its first line;
     /// parsing never stops at the first bad block, because one broken entry
     /// in a thousand-line file must not cost the other 999.
+    ///
+    /// A WebVTT file's header is the first block's lines before its first
+    /// timing line, all of them when it has none, and a `NOTE`, `STYLE` or
+    /// `REGION` block is an aside. Neither is an entry, so neither is a
+    /// `Problem`; any other block with no timing line still is one, so a
+    /// broken cue is reported (spec §11 #498).
     static func parse(_ raw: String) -> ParsedFile {
         let lines = normalized(raw).components(separatedBy: "\n")
+        let webVTT = lines.first { !isBlank($0) }.map(isWebVTTHeader) ?? false
+        var inHeader = webVTT
         var cues: [Cue] = []
         var problems: [Problem] = []
         var index = 0
@@ -167,7 +185,17 @@ enum CaptionImporter {
                 block.append(lines[index])
                 index += 1
             }
-            switch cue(from: block, firstLine: first + 1) {
+            var firstLine = first + 1
+            if inHeader {
+                inHeader = false
+                let header = block.firstIndex { $0.contains("-->") } ?? block.count
+                block.removeFirst(header)
+                firstLine += header
+                if block.isEmpty { continue }
+            } else if webVTT, isWebVTTAside(block) {
+                continue
+            }
+            switch cue(from: block, firstLine: firstLine, webVTT: webVTT) {
             case .cue(let cue): cues.append(cue)
             case .problem(let problem): problems.append(problem)
             }
@@ -175,10 +203,30 @@ enum CaptionImporter {
         return ParsedFile(cues: cues, problems: problems)
     }
 
+    /// `WEBVTT` alone, or followed by a space or a tab and whatever title
+    /// the file gives itself. `WEBVTTX` is not one.
+    private static func isWebVTTHeader(_ line: String) -> Bool {
+        startsWithKeyword("WEBVTT", line)
+    }
+
+    /// A block WebVTT lets a file carry beside its cues: its first line is
+    /// the keyword, and it holds no timing line.
+    private static func isWebVTTAside(_ block: [String]) -> Bool {
+        guard let first = block.first, !block.contains(where: { $0.contains("-->") })
+        else { return false }
+        return ["NOTE", "STYLE", "REGION"].contains { startsWithKeyword($0, first) }
+    }
+
+    private static func startsWithKeyword(_ keyword: String, _ line: String) -> Bool {
+        guard line.hasPrefix(keyword) else { return false }
+        let next = line.dropFirst(keyword.count).first
+        return next == nil || next == " " || next == "\t"
+    }
+
     /// One block. The timing line is found by searching for `-->` rather
     /// than by counting lines, which is what makes the index line optional
     /// — plenty of tools omit it.
-    private static func cue(from block: [String], firstLine: Int) -> Block {
+    private static func cue(from block: [String], firstLine: Int, webVTT: Bool) -> Block {
         guard let offset = block.firstIndex(where: { $0.contains("-->") }) else {
             return .problem(
                 problem(line: firstLine, reason: "no “-->” timing line in this entry"))
@@ -210,7 +258,7 @@ enum CaptionImporter {
             return .problem(problem(line: timingLine, reason: "ends at or before it starts"))
         }
 
-        let body = block.dropFirst(offset + 1).map { plainText($0) }
+        let body = block.dropFirst(offset + 1).map { plainText($0, webVTT: webVTT) }
         let text = body.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
             return .problem(problem(line: timingLine, reason: "no caption text"))
@@ -268,15 +316,17 @@ enum CaptionImporter {
     /// `<font …>` and the ASS `{\an8}` overrides — and decodes the entities
     /// that come with it. The model has one plain string per text clip
     /// (spec §5.2), so markup that cannot be honoured is removed rather than
-    /// shown as angle brackets on the canvas.
-    private static func plainText(_ raw: String) -> String {
+    /// shown as angle brackets on the canvas. WebVTT's `<v Kevin>` and
+    /// `<c.yellow>` are tags by the same test; its cue time tag is the one
+    /// tag that opens with a digit, so that test is WebVTT's alone.
+    private static func plainText(_ raw: String, webVTT: Bool) -> String {
         var out = ""
         var index = raw.startIndex
         while index < raw.endIndex {
             let character = raw[index]
             let rest = raw[raw.index(after: index)...]
             if character == "<", let close = rest.firstIndex(of: ">"),
-               looksLikeTag(rest[rest.startIndex..<close]) {
+               looksLikeTag(rest[rest.startIndex..<close], webVTT: webVTT) {
                 index = raw.index(after: close)
                 continue
             }
@@ -293,11 +343,11 @@ enum CaptionImporter {
 
     /// `<i>` and `</font>` are markup; `<<` and `a < b` are text. The test
     /// is the one HTML itself uses: a tag opens with a letter, or with a
-    /// slash and a letter.
-    private static func looksLikeTag(_ body: Substring) -> Bool {
+    /// slash and a letter. In WebVTT a digit opens one too.
+    private static func looksLikeTag(_ body: Substring, webVTT: Bool) -> Bool {
         guard let first = body.first else { return false }
         if first == "/" { return body.dropFirst().first?.isLetter == true }
-        return first.isLetter
+        return first.isLetter || (webVTT && first.isASCII && first.isNumber)
     }
 
     /// `&amp;` last, or every other decoded entity would be decoded twice.
@@ -336,7 +386,7 @@ enum CaptionImporter {
     /// through `AgentServer.editResult`.
     ///
     /// The whole of the placement is `CaptionLayout.place` — this is the
-    /// SubRip half handing its cues over, and the file name being put back
+    /// file half handing its cues over, and the file name being put back
     /// into the refusals so the alert and the tool's error string say which
     /// file they are about.
     ///
@@ -383,7 +433,7 @@ extension EditorViewController {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.allowedContentTypes = CaptionImporter.contentTypes
-        panel.message = "Choose a SubRip (.srt) caption file."
+        panel.message = "Choose a SubRip (.srt) or WebVTT (.vtt) caption file."
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             self?.importCaptions(from: url, into: document, in: window)

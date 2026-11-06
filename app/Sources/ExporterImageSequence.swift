@@ -284,8 +284,8 @@ final class ImageSequenceWriter: ExportPipeline {
 
     /// The most frames either format will be assembled from. A refusal rather
     /// than a truncation: a GIF that silently stopped halfway would be a file
-    /// the user did not ask for, and the message names the two knobs that fix
-    /// it.
+    /// the user did not ask for, and the message (`frameCapRefusal`) names what
+    /// fixes it.
     ///
     /// **What the cap protects against.** Both formats store every frame as a
     /// whole picture with no inter-frame prediction, so a file's size is
@@ -302,6 +302,26 @@ final class ImageSequenceWriter: ExportPipeline {
     /// its summary line, so the number the refusal names is the one the user
     /// was looking at.
     static let maxFrames = 600
+
+    /// The frame limit's refusal for these settings, or nil when the range
+    /// fits. It offers a lower rate only when the chosen one is above the
+    /// format's own (spec §11 #504), which is the core's answer for the preset
+    /// with no overrides: no rate is written here, and no answer means no
+    /// clause. A container this build does not write and a rate it cannot step
+    /// are `init`'s to refuse.
+    static func frameCapRefusal(
+        _ settings: ExportSettings, project: ReelProject
+    ) -> Exporter.ExportError? {
+        guard let format = ImageSequenceFormat(container: settings.container),
+            let count = settings.sequenceFrameCount, count > maxFrames
+        else { return nil }
+        let own = (try? ReelExport.settings(project, preset: settings.preset))?.fps
+        let aboveOwn = own.map { settings.fps.frameDuration < $0.frameDuration } ?? false
+        return Exporter.ExportError.failed(
+            "An animated \(format.displayName) is limited to \(maxFrames) frames and "
+                + "this range is \(count). Shorten the range"
+                + (aboveOwn ? ", or lower the export frame rate." : "."))
+    }
 
     private let project: ReelProject
     private let urls: [UInt32: URL]
@@ -368,12 +388,7 @@ final class ImageSequenceWriter: ExportPipeline {
                 "The export frame rate is not one this build can step through.")
         }
         let step = settings.fps.frameDuration
-        guard count <= Self.maxFrames else {
-            throw Exporter.ExportError.failed(
-                "An animated \(format.displayName) is limited to \(Self.maxFrames) frames and "
-                    + "this range is \(count). Shorten the range, or lower the export frame "
-                    + "rate.")
-        }
+        if let refusal = Self.frameCapRefusal(settings, project: project) { throw refusal }
 
         self.project = project
         self.urls = urls

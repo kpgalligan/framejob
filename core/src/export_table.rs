@@ -89,12 +89,11 @@ use crate::time::Fps;
 /// same reason and with the field doc's caveat: AVFoundation has no
 /// session preset for LPCM, and a null would route a WAV to ImageIO.
 ///
-/// **No row carries a default bitrate, deliberately.** On the session path
-/// the preset name IS the ladder — `AVAssetExportSession` exposes no way to
-/// set a rate — so a number here would be one the export cannot honour,
-/// which is worse than none at all. On the writer path VideoToolbox derives
-/// a rate from the frame size, which beats any constant this table could
-/// hold: one that suits 4K wastes half the file at 720p. ProRes is fixed by
+/// **No row carries a default bitrate, deliberately.** Nothing runs a
+/// session (above), so every rate is the writer's; with no `video_bitrate`
+/// the writer computes one from the frame
+/// (`ExportWriter.defaultVideoBitrate`), which beats any constant this table
+/// could hold: one that suits 4K wastes half the file at 720p. ProRes is fixed by
 /// its profile and ignores a request outright, and GIF and APNG have no
 /// bitrate to set. A bitrate is therefore something the user asks for — the
 /// `video_bitrate` / `audio_bitrate` overrides — never something a preset

@@ -1,0 +1,66 @@
+---
+title: "Fit a clip to a length"
+description: "Type the length you want and Frame Job works out the rate, so a clip plays in exactly that time."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+**Fit to** makes a clip last the length you type, by changing its speed rather than trimming it. Use it to fill a gap or to land a clip on a beat, without working out the rate yourself.
+
+<AtAGlance
+  where="Clip tab ▸ Clip sub-tab ▸ Speed section ▸ Fit to"
+  tools="set_speed"
+/>
+
+## Fit a clip
+
+<Steps>
+
+1. Select one or more clips of a video or audio file.
+
+2. In the **Clip** tab's **Clip** sub-tab, open the **Speed** section.
+
+3. Type a length in **Fit to**, then press <kbd>Return</kbd> or <kbd>Tab</kbd>. The tooltip reads "Type a length: the rate changes so the clip plays in it".
+
+</Steps>
+
+The field takes a timecode such as `00:00:12:15` or `00:00:12.500`, a shorter form such as `01:30`, or a number of seconds such as `12.5`. Text that isn't a time beeps, and the field goes back to the clip's length.
+
+With several clips selected, each one is fitted to that length, as one undo step, **Fit to Duration**. Captions the change re-times are part of the same step, which is then named **Fit to Duration and Re-time Captions**.
+
+The field shows the first selected clip's length, with a **mixed** tag when the selected clips' lengths differ.
+
+Fit to lives only in the inspector. The Speed sheet has no Fit to control.
+
+## The new length
+
+The length you type snaps to the frame grid. A length that snaps to zero or less shows an error and changes nothing. Typing the clip's current length changes nothing.
+
+The same applies to any speed change: the clip's new length snaps to a whole frame, and never runs past the end of its file at the new rate.
+
+The rate is still held to ×0.1 – ×1000. A length that needs a rate past a limit stops at that limit, so the clip ends up a different length from the one you typed. For example, a 10 s clip at ×1 fitted to 200 s stops at ×0.1 and lasts 100 s.
+
+On a clip with a speed ramp, Fit to scales the whole ramp. It stops where any rate in the ramp would pass a limit, and the clip ends up a different length in the same way. See [Edit a ramped clip](/speed/edit-a-ramped-clip/).
+
+Everything else works as it does for any speed change:
+
+- The clip's start stays where it is, and later clips don't move.
+- A fit that runs into the next clip follows the [overlap rule](/speed/change-speed/#a-slowed-clip-overlapping-the-next).
+- A fit that takes a clip with sound past ×12 asks first, with **Set Speed** and **Cancel**. **Cancel** puts the field back. See [Sound at high speed](/speed/sound-at-high-speed/).
+
+## When Fit to is unavailable
+
+- **An action is selected.** Fit to belongs to the clip and can't be set inside an action, so its row is marked ⊘. Anything you type there changes the whole clip, not the action.
+- **The selection holds another kind of clip.** The Speed section appears only when every selected clip is a media clip.
+- **The clip is linked to its detached sound.** Frame Job won't change its speed until you attach it. See [Linked clips](/speed/overview/#linked-clips).
+
+## With an agent
+
+`set_speed` with `duration` in place of `rate` does the same job, one clip at a time. A duration of zero or less is an error. See [`set_speed`](/mcp/tools-speed/#set_speed).
+
+## Related
+
+- [The Speed section](/speed/speed-section/)
+- [Change a clip's speed](/speed/change-speed/)
+- [Rate stretch](/speed/rate-stretch/)

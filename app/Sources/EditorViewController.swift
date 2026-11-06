@@ -586,7 +586,7 @@ final class EditorViewController: NSViewController {
         let collapsed = !inspectorContainer.isHidden
         inspectorContainer.isHidden = collapsed
         UserDefaults.standard.set(collapsed, forKey: Self.inspectorCollapsedKey)
-        upperSplit.adjustSubviews()
+        Self.adjustInspector(in: upperSplit, inspector: inspectorContainer)
     }
 
     @objc func toggleSnapping(_ sender: Any?) {
@@ -734,6 +734,7 @@ final class EditorViewController: NSViewController {
         // inherit it, no second copy can drift, and the editor's own path pays
         // nothing for a case it cannot reach.
         if view.window?.attachedSheet != nil { return false }
+        if previewCanvas?.handleCropKey(event) == true { return true }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         guard let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first else {
             return false
@@ -958,8 +959,8 @@ extension EditorViewController: NSSplitViewDelegate {
         ofSubviewAt dividerIndex: Int
     ) -> CGFloat {
         if splitView === upperSplit {
-            return max(
-                Self.minCanvasWidth, splitView.bounds.width - Self.minInspectorWidth)
+            let end = splitView.bounds.width - Self.minInspectorWidth - splitView.dividerThickness
+            return max(Self.minCanvasWidth, end)
         }
         return max(
             Self.minUpperHeight, splitView.bounds.height - Self.minTimelineHeight)
@@ -968,7 +969,7 @@ extension EditorViewController: NSSplitViewDelegate {
     /// Only the inspector collapses, and only through ⌥⌘I — a divider
     /// dragged to the edge should clamp at 280 pt, not vanish.
     func splitView(_ splitView: NSSplitView, canCollapseSubview subview: NSView) -> Bool {
-        subview === inspectorContainer
+        false
     }
 
     func splitView(

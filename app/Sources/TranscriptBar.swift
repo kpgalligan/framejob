@@ -9,7 +9,7 @@ import AppKit
 /// `InspectorMetrics.labelWidth`, then an `OptionPopupControl` spanning the
 /// rest of the row); the status row, its sentence wrapping, with Stop at its
 /// right while the tab's waiter reads or Read when stopped; then the notes —
-/// the same-speech notes, at most three "clip N — reason" rows and
+/// the same-speech notes, at most three "“name” (clip N) — reason" rows and
 /// "…and N more clips with no words.", whose tooltip lists the rest. What is
 /// empty collapses. Every value is the source's (`TranscriptTabSource`); the
 /// bar stores none, and rebuilds a popup only when its titles change.
@@ -216,7 +216,7 @@ final class TranscriptBar: NSView, OptionControl {
     /// words and one line for the rest; rebuilt only when the text changes,
     /// which it answers.
     private func refreshNotes(_ source: TranscriptTabSource) -> Bool {
-        let rows = source.noWords.map { "\($0.tag) — \($0.reason)" }
+        let rows = source.noWords.map(\.row)
         var texts = source.notes + rows.prefix(Self.noWordsShown)
         let rest = Array(rows.dropFirst(Self.noWordsShown))
         if !rest.isEmpty {

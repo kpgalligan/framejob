@@ -48,6 +48,7 @@ extension EditorViewController {
         canvas.onLiveEnd = { [weak self] name in self?.document?.endLiveEdit(name) }
         canvas.onLiveCancel = { [weak self] in self?.document?.endLiveEdit("Cancel", cancelled: true) }
         canvas.onEdit = { [weak self] name, ops in self?.document?.applyEdit(name, ops) }
+        canvas.onRefuse = { [weak self] refusal in self?.canvasRefused(refusal) }
         canvas.onGroupedEdit = { [weak self] name, ops in self?.document?.performGroupedEdit(name, ops) }
         canvas.onZoomStep = { [weak self] delta in self?.canvasZoomStepped(delta) }
         canvas.onCropModeChanged = { [weak self] _ in self?.canvasCropModeChanged() }
@@ -111,17 +112,27 @@ extension EditorViewController {
     // MARK: - Intents from the view
 
     /// A PICK, which is not the same thing as a selection change: the
-    /// inspector is told first and unconditionally, because clicking a clip
-    /// means "show me this one" even when it was already selected (the design
-    /// handoff's interaction list, and the reason `clipPicked()` exists rather
-    /// than the panel inferring it from `ids != lastSelection`). The guard
-    /// below still stops an unchanged selection from posting a refresh.
+    /// inspector is told unconditionally, because clicking a clip means "show
+    /// me this one" even when it was already selected (the design handoff's
+    /// interaction list, and the reason `clipPicked()` exists rather than the
+    /// panel inferring it from `ids != lastSelection`). It is told AFTER the
+    /// write, because `clipPicked()` reads the selection. `changed` still
+    /// stops an unchanged selection from posting a refresh.
     private func canvasSelected(_ ids: Set<UInt32>) {
         guard let document = document else { return }
+        let changed = document.selection != ids
+        if changed { document.selection = ids }
         if !ids.isEmpty { inspector?.clipPicked() }
-        guard document.selection != ids else { return }
-        document.selection = ids
-        viewStateDidChange()
+        if changed { viewStateDidChange() }
+    }
+
+    /// A gesture the canvas refused (spec §11 CI-19): a beep and its sentence
+    /// at the inspector's foot (CI-10), as Follow Subject's own refusal is.
+    private func canvasRefused(_ refusal: ReelRefusal) {
+        guard let document = document else { return }
+        NSSound.beep()
+        NotificationCenter.default.post(
+            name: .projectDocumentDidRefuse, object: document, userInfo: ["refusal": refusal])
     }
 
     /// Pinch and ⌥-wheel walk the same four stops as the toolbar popup, so the
@@ -144,7 +155,8 @@ extension EditorViewController {
     // MARK: - Commands
 
     /// C, and the Crop section's Crop on Canvas button (spec §4.2, §9).
-    /// Refuses with nothing selected rather than entering a mode with no box in it.
+    /// Refuses with nothing selected rather than entering a mode with no box in it,
+    /// and on a clip the mode doesn't open on (spec §11 K-7).
     func toggleCanvasCropMode() {
         guard let canvas = previewCanvas else {
             NSSound.beep()

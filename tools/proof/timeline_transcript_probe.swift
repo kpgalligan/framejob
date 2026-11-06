@@ -223,10 +223,10 @@ do {
     let got = read(p, [m1]).noWords
     let want = [
         TimelineTranscript.NoWords(
-            clip: 63, nestPath: [60], tag: "clip 63 in nest Intro",
+            clip: 63, nestPath: [60], name: "a.wav", tag: "clip 63 in nest Intro",
             reason: "its audio is switched off"),
         TimelineTranscript.NoWords(
-            clip: 64, nestPath: [], tag: "clip 64",
+            clip: 64, nestPath: [], name: "a.wav", tag: "clip 64",
             reason: "it plays in reverse, so its speech cannot be transcribed"),
     ]
     row("T6", p != nil && got == want, "\(got.map { "\($0.tag): \($0.reason) \($0.nestPath)" })")

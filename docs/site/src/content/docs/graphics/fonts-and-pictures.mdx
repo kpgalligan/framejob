@@ -1,0 +1,137 @@
+---
+title: "Fonts and pictures in graphics"
+description: Add fonts and pictures to a project's graphics, find the exact font name a graphic must use, and see why a font or picture doesn't draw.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A graphic draws only with the fonts bundled with Frame Job and the fonts and pictures you add to the project, so it looks the same on any Mac. This page covers adding them, and what to do when one doesn't draw.
+
+<AtAGlance
+  menu={['File ▸ Add Font to Graphics…', 'File ▸ Add Image to Graphics…']}
+  tools={['import_graphic_font', 'import_graphic_asset', 'get_graphic']}
+/>
+
+## Add a font
+
+<Steps>
+
+1. Choose **File ▸ Add Font to Graphics…**. It has no keyboard shortcut.
+
+2. Pick a `.ttf` or `.otf` file.
+
+</Steps>
+
+Frame Job copies the file into the project's `graphics/fonts/` folder, and every graphic in the project can then use it, straight away. Nothing is shown when it works.
+
+A file with the same name replaces the old one. If the file holds no font Frame Job can load, an alert says so and nothing is added.
+
+## Use the exact family name
+
+A graphic names its fonts in its code, and the bundled templates have no font property. So to use a font you've added, [edit the module](/graphics/edit-a-module/) and write the family's name in `font-family`.
+
+That name must be the one Frame Job reads from the font file, which can differ from the name Font Book or other apps show.
+
+If a font doesn't draw, select the clip and open **Source** in the **Graphic** sub-tab. Under "Checked at the clip's first frame" it reports the missing family and lists every family the project has, so you can read the exact name there. The section's header shows "1 warning" when there's something to read.
+
+The check looks at the clip's first frame only, so a font used later in the animation isn't reported there.
+
+## Bundled fonts
+
+These seven families draw on every Mac, with nothing to install.
+
+| Family | Weights |
+| --- | --- |
+| Anton | 400 |
+| Bebas Neue | 400 |
+| Darker Grotesque | Variable, 300 to 900 |
+| IBM Plex Mono | 400, 500 |
+| Montserrat | 800, 900 |
+| Source Sans 3 | Variable, 200 to 900 |
+| Source Serif 4 | Variable, 200 to 900 |
+
+## Generic families
+
+A module can also ask for a generic family, which draws in a bundled face.
+
+| Generic | Draws in |
+| --- | --- |
+| `serif` | Source Serif 4 |
+| `sans-serif` | Source Sans 3 |
+| `monospace` | IBM Plex Mono |
+
+Write a generic without quotes, as in `font-family="sans-serif"`. With quotes it names a family called "sans-serif", which isn't there. `cursive` and `fantasy` aren't available.
+
+## System fonts
+
+Graphics never use the fonts installed on your Mac, so a project draws the same everywhere. To use one of them, add its file to the project with [Add Font to Graphics](#add-a-font).
+
+What happens to a family name in a module:
+
+- A family the project doesn't have draws nothing, with a warning naming the families it does have.
+- In a list such as `"Nope, Montserrat"`, the first family the project has draws.
+- A family with a word starting with a digit must be quoted, as in `font-family="'Source Sans 3'"`. Unquoted, it draws nothing, with a warning.
+
+:::note
+[Text clips](/text-and-shapes/fonts/) work differently, and do use the fonts on your Mac.
+:::
+
+## Add a picture
+
+<Steps>
+
+1. Choose **File ▸ Add Image to Graphics…**. It has no keyboard shortcut.
+
+2. Pick a PNG, JPEG, GIF, WebP, SVG or SVGZ file.
+
+</Steps>
+
+Frame Job copies the file into the project's `graphics/assets/` folder. A [picture property's](/graphics/properties/) pop-up then lists it, and a module can draw it by name with `<image href="${asset(name)}">`.
+
+A file with the same name replaces the old one. Any other kind of file can't be added, and an empty file gets an alert and isn't added.
+
+## Picture names
+
+A module refers to a picture by its file name, and some names can't be used that way. A name is not usable when it:
+
+- Starts with `.` or `#`.
+- Holds any of `/ : " ' < > &`, or a control character.
+- Is longer than 247 bytes.
+
+A picture with a name like that is added under a legal one, and a notice tells you which:
+
+> `"#logo&mark.png" was added as "logo-mark.png": asset(name) cannot use the name it had.`
+
+If the legal name is taken, the picture takes `-2`, `-3` and so on, as in `logo-mark-2.png`. A renamed copy never replaces an existing file.
+
+## Drop files in the folder
+
+You can also put fonts and pictures straight into `graphics/fonts/` and `graphics/assets/` with the Finder or any other tool. Frame Job notices within a moment.
+
+To find the folder, choose **Reveal in Finder** in the **Source** section of a graphic clip. It shows the module's file inside `graphics/`. If `fonts` or `assets` isn't there yet, make a folder with exactly that name.
+
+These are skipped, with a warning in **Source** under "In the graphics folder":
+
+- A font that doesn't load.
+- An empty picture.
+- A picture with a name a module can't use. Unlike a picture added from the menu, it isn't renamed for you.
+
+A file of any other kind is ignored, with no warning.
+
+## Good to know
+
+- Neither import is an undo step. To take a file out, delete it from the folder.
+- Fonts and pictures belong to the project. Another project needs its own copy.
+- Both menu items work as soon as the project window is open. There's no need to save first.
+
+## With an agent
+
+An agent can read the exact family names directly, rather than waiting for a warning. [`get_graphic`](/mcp/tools-graphics/#get_graphic) lists them, and [`import_graphic_font`](/mcp/tools-graphic-files/#import_graphic_font) returns the names a new file adds. [`import_graphic_asset`](/mcp/tools-graphic-files/#import_graphic_asset) can file a picture under a `name` you give it, and returns the name to use, including any legal name it had to choose. See [Tools: graphic fonts, pictures and packages](/mcp/tools-graphic-files/).
+
+## Related
+
+- [Graphic properties](/graphics/properties/)
+- [Write a graphic module](/graphics/write-a-module/)
+- [The module API](/graphics/module-api/)
+- [Fonts](/text-and-shapes/fonts/)

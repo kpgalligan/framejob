@@ -1,0 +1,295 @@
+---
+title: "All tools"
+description: "Every tool Frame Job gives an agent, each linked to its reference, and how a tool publishes the arguments it takes."
+---
+
+Frame Job gives an agent 125 tools. This page names every one and links to its full reference, and says how a client can read what each one takes.
+
+## The tool catalog
+
+The 125 tools come in two kinds.
+
+- **69 edit tools.** Each makes one kind of edit to the project, as one undo step. These also take `scope`, which aims the edit inside a [nest](/mcp/nests/) by the nest's id.
+- **56 app tools.** These work with files, read things, change what the app is showing, or run a whole command such as `record_screen` or `make_vertical_version`.
+
+Every tool takes `project`, which says which open project it acts on. Leave it out for the front project. See [How tool calls behave](/mcp/tool-calls/).
+
+## How arguments are published
+
+Each tool publishes its arguments as JSON Schema, in the `inputSchema` of `tools/list`. That's where a client reads every argument's name, its kind, its closed list of values, its bounds and which arguments are required. The helper answers `tools/list` even when Frame Job isn't running. See [The helper and the socket](/mcp/helper-and-socket/).
+
+Each tool's description says what it's for and what it returns. An argument that isn't in the schema stops the call before the tool runs, with a message listing what the tool does take: "trim_start does not take at. It takes alone, clip, to, project and scope."
+
+A few arguments read differently from what their kind suggests:
+
+| Argument | What's different |
+| --- | --- |
+| Every boolean | May also be sent as the string `"true"`, `"1"`, `"false"` or `"0"`. |
+| `text` on `add_text_clip`, `shape` on `add_shape_clip` | May be a plain string: the words, or the kind of shape. |
+| `kind` on `set_transition`, `region` on `add_zoom_action` | Must be sent even when null, because null means something: no transition, or zoom back out. |
+| `rate` on `set_speed` and `add_speed_ramp` | Published as ×0.1 to ×1000. A rate outside that is brought into range, with no error. Zero or less stops the call. |
+| `fps` on `set_canvas` | Each of its two numbers must be at least 1. |
+| `clips` on every tool but `set_selection`, `groups` on `paste_attributes`, `ranges` on `ripple_delete_ranges` and `copy_pieces` | Can't be empty: the call stops and names the argument. On `set_selection`, an empty `clips` selects nothing. |
+| `at` on `split`, `paste`, `freeze_frame` and `add_marker` | Optional. It takes the playhead when left out. |
+| `focus` on `switch_layout` | May be null or left out, and the tool then fills it from the camera's cached person masks. |
+
+Four tools need at least one of their optional arguments, because a call that names nothing to change stops with an error: `set_track`, `set_marker`, `set_canvas` and `set_transition_style`.
+
+Frame Job fills a few values itself, from what only it can read, so the tools don't publish them and sending one stops the call: a graphic's `schema`, a relinked file's details, and the faces and turns `reframe_clip` follows.
+
+## Every tool
+
+The groups run in the order of the sidebar. Each tool links to its own entry, with its arguments, what it returns and what can stop it.
+
+### Projects and history
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`open_project`](/mcp/tools-projects/#open_project) | Opens a package, or a movie, sound file or picture as a new untitled project. |  |
+| [`new_project`](/mcp/tools-projects/#new_project) | Creates a blank 1920 × 1080, 30 fps project. |  |
+| [`new_project_from_range`](/mcp/tools-projects/#new_project_from_range) | Opens a new project holding one span of the timeline. |  |
+| [`save_project`](/mcp/tools-projects/#save_project) | Saves a project, or writes it to a new path. |  |
+| [`close_project`](/mcp/tools-projects/#close_project) | Closes a project and its window. |  |
+| [`get_project`](/mcp/tools-projects/#get_project) | Returns the whole project as JSON. |  |
+| [`undo`](/mcp/tools-projects/#undo) | Undoes one step. |  |
+| [`redo`](/mcp/tools-projects/#redo) | Redoes one undone step. |  |
+
+### Playhead, range and selection
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`set_playhead`](/mcp/tools-view-state/#set_playhead) | Moves the playhead and seeks the preview. |  |
+| [`set_range`](/mcp/tools-view-state/#set_range) | Sets or clears the in and out range. |  |
+| [`set_selection`](/mcp/tools-view-state/#set_selection) | Selects clips. |  |
+| [`set_scope`](/mcp/tools-view-state/#set_scope) | Chooses which nest the app is looking inside. |  |
+
+### Media
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`import_media`](/mcp/tools-media/#import_media) | Reads a movie, sound file or picture, or each media file in a folder, and adds it to the media list. |  |
+| [`add_media`](/mcp/tools-media/#add_media) | Adds a media entry from a description you supply. | Yes |
+| [`relink_media`](/mcp/tools-media/#relink_media) | Points a media entry at a file that moved. | Yes |
+| [`remove_media`](/mcp/tools-media/#remove_media) | Removes a media entry. | Yes |
+| [`consolidate_media`](/mcp/tools-media/#consolidate_media) | Copies every file the project uses into its package. |  |
+| [`set_media_color`](/mcp/tools-media/#set_media_color) | Sets how a file's camera log footage is converted to the project's colour. | Yes |
+| [`set_media_speech`](/mcp/tools-media/#set_media_speech) | Saves where a file's speech is, for ducking by speech. | Yes |
+
+### Adding clips
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`add_clip`](/mcp/tools-adding-clips/#add_clip) | Places a whole media file as one clip. | Yes |
+| [`insert_clip`](/mcp/tools-adding-clips/#insert_clip) | Makes room for a media file, moving what comes after it. | Yes |
+| [`overwrite_clip`](/mcp/tools-adding-clips/#overwrite_clip) | Places a media file over whatever is on one track. | Yes |
+| [`add_text_clip`](/mcp/tools-adding-clips/#add_text_clip) | Adds a title. | Yes |
+| [`add_shape_clip`](/mcp/tools-adding-clips/#add_shape_clip) | Adds a rectangle, ellipse, line or arrow. | Yes |
+| [`add_adjustment_clip`](/mcp/tools-adding-clips/#add_adjustment_clip) | Adds a clip that grades everything behind it. | Yes |
+| [`add_background`](/mcp/tools-adding-clips/#add_background) | Puts a backdrop on a new back track. | Yes |
+| [`add_blurred_background`](/mcp/tools-adding-clips/#add_blurred_background) | Puts a muted, blurred copy of a clip on a new back track. | Yes |
+
+### Moving and trimming
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`move_clip`](/mcp/tools-move-and-trim/#move_clip) | Shifts clips along the timeline, and optionally onto another track. | Yes |
+| [`trim_start`](/mcp/tools-move-and-trim/#trim_start) | Moves a clip's start, keeping the content in place. | Yes |
+| [`trim_end`](/mcp/tools-move-and-trim/#trim_end) | Moves a clip's end. | Yes |
+| [`slip`](/mcp/tools-move-and-trim/#slip) | Slides the source under a clip that stays where it is. | Yes |
+| [`roll`](/mcp/tools-move-and-trim/#roll) | Moves a cut, so one clip grows by what the other loses. | Yes |
+| [`set_enabled`](/mcp/tools-move-and-trim/#set_enabled) | Turns a clip's picture or sound on or off. | Yes |
+
+### Cutting and deleting
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`split`](/mcp/tools-cut-and-delete/#split) | Cuts clips in two. | Yes |
+| [`split_at_shots`](/mcp/tools-cut-and-delete/#split_at_shots) | Splits clips at every shot change, found on this Mac. |  |
+| [`delete`](/mcp/tools-cut-and-delete/#delete) | Removes clips and leaves the gaps. | Yes |
+| [`ripple_delete`](/mcp/tools-cut-and-delete/#ripple_delete) | Removes clips and closes the gaps. | Yes |
+| [`ripple_delete_range`](/mcp/tools-cut-and-delete/#ripple_delete_range) | Cuts a time range out of the whole timeline and closes it up. | Yes |
+| [`ripple_delete_ranges`](/mcp/tools-cut-and-delete/#ripple_delete_ranges) | Cuts several time ranges out as one edit. | Yes |
+| [`lift_range`](/mcp/tools-cut-and-delete/#lift_range) | Cuts a time range out and leaves the hole. | Yes |
+| [`insert_time`](/mcp/tools-cut-and-delete/#insert_time) | Opens a gap in the timeline. | Yes |
+| [`close_gap`](/mcp/tools-cut-and-delete/#close_gap) | Closes the empty span on a track. | Yes |
+
+### Copying and nesting
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`duplicate`](/mcp/tools-copy-and-nest/#duplicate) | Copies clips onto the same tracks, right after the originals. | Yes |
+| [`paste`](/mcp/tools-copy-and-nest/#paste) | Inserts a clipboard payload's clips. | Yes |
+| [`paste_attributes`](/mcp/tools-copy-and-nest/#paste_attributes) | Copies one clip's property groups onto other clips. | Yes |
+| [`nest`](/mcp/tools-copy-and-nest/#nest) | Collapses clips into one clip that stands for the group. | Yes |
+| [`unnest`](/mcp/tools-copy-and-nest/#unnest) | Opens a nest clip back out onto the timeline. | Yes |
+
+### Speed and time
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`set_speed`](/mcp/tools-speed/#set_speed) | Changes a clip's rate, or fits it to a duration. | Yes |
+| [`rate_stretch`](/mcp/tools-speed/#rate_stretch) | Stretches a clip to a new end by changing its speed. | Yes |
+| [`add_speed_ramp`](/mcp/tools-speed/#add_speed_ramp) | Makes a speed ramp preset on a clip. | Yes |
+| [`retime_range`](/mcp/tools-speed/#retime_range) | Plays a range faster or slower on every unlocked track. | Yes |
+| [`set_reversed`](/mcp/tools-speed/#set_reversed) | Plays a clip back to front, or forward again. | Yes |
+| [`freeze_frame`](/mcp/tools-speed/#freeze_frame) | Holds one frame of a clip. | Yes |
+
+### Picture and grade
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`set_video`](/mcp/tools-set-video/#set_video) | Changes clips' picture properties: position, scale, crop, colour, effects and more. | Yes |
+
+### Text, shapes and clip names
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`set_text`](/mcp/tools-clip-properties/#set_text) | Changes a text clip's words and typography. | Yes |
+| [`set_shape`](/mcp/tools-clip-properties/#set_shape) | Changes a shape clip's geometry and paint. | Yes |
+| [`set_clip`](/mcp/tools-clip-properties/#set_clip) | Names or labels clips. | Yes |
+| [`text_behind_subject`](/mcp/tools-clip-properties/#text_behind_subject) | Puts a title behind the person in a clip. |  |
+
+### Animation
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`add_action`](/mcp/tools-animation/#add_action) | Adds an animation span to a clip. | Yes |
+| [`add_zoom_action`](/mcp/tools-animation/#add_zoom_action) | Adds an animation that zooms the picture to a rectangle. | Yes |
+| [`set_action`](/mcp/tools-animation/#set_action) | Moves or re-times an action, or changes its curve. | Yes |
+| [`set_action_end`](/mcp/tools-animation/#set_action_end) | Sets what an action animates to. | Yes |
+| [`remove_action`](/mcp/tools-animation/#remove_action) | Removes an action. | Yes |
+
+### Transitions
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`add_transition`](/mcp/tools-transitions/#add_transition) | Makes an overlap at a hard cut and puts a transition on it. | Yes |
+| [`set_transition`](/mcp/tools-transitions/#set_transition) | Sets or removes the transition into a clip. | Yes |
+| [`set_transition_duration`](/mcp/tools-transitions/#set_transition_duration) | Makes a transition last a given time by moving the clip. | Yes |
+| [`set_transition_style`](/mcp/tools-transitions/#set_transition_style) | Sets a transition's easing and whether it crossfades the sound. | Yes |
+
+### Tracks, markers and canvas
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`add_track`](/mcp/tools-tracks-and-markers/#add_track) | Adds an empty track. | Yes |
+| [`remove_track`](/mcp/tools-tracks-and-markers/#remove_track) | Removes a track. | Yes |
+| [`move_track`](/mcp/tools-tracks-and-markers/#move_track) | Reorders the layer stack. | Yes |
+| [`set_track`](/mcp/tools-tracks-and-markers/#set_track) | Renames a track, flips its switches or sets its matte. | Yes |
+| [`remove_empty_tracks`](/mcp/tools-tracks-and-markers/#remove_empty_tracks) | Removes every track with no clips. | Yes |
+| [`add_marker`](/mcp/tools-tracks-and-markers/#add_marker) | Drops a marker on the timeline. | Yes |
+| [`set_marker`](/mcp/tools-tracks-and-markers/#set_marker) | Moves or renames a marker, or changes its colour or chapter setting. | Yes |
+| [`remove_marker`](/mcp/tools-tracks-and-markers/#remove_marker) | Removes a marker. | Yes |
+| [`set_canvas`](/mcp/tools-tracks-and-markers/#set_canvas) | Changes the project's canvas. | Yes |
+
+### Clip sound
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`set_audio`](/mcp/tools-set-audio/#set_audio) | Changes clips' sound properties: volume, fades, ducking, noise reduction and more. | Yes |
+
+### Audio
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`detach_audio`](/mcp/tools-audio/#detach_audio) | Splits a clip's sound onto its own clip. | Yes |
+| [`attach_audio`](/mcp/tools-audio/#attach_audio) | Merges a detached pair back into one clip. | Yes |
+| [`normalize_clip`](/mcp/tools-audio/#normalize_clip) | Sets each clip's volume to a target loudness or peak. |  |
+| [`enhance_voice`](/mcp/tools-audio/#enhance_voice) | Sets clips up for speech from their own measurements. |  |
+| [`match_audio`](/mcp/tools-audio/#match_audio) | Matches clips to a reference clip's loudness and tone. |  |
+| [`sync_audio`](/mcp/tools-audio/#sync_audio) | Lines up clips by their sound. |  |
+
+### Clean-up
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`detect_silence`](/mcp/tools-clean-up/#detect_silence) | Reports the quiet stretches of the timeline, changing nothing. |  |
+| [`detect_fillers`](/mcp/tools-clean-up/#detect_fillers) | Reports the filler words in the timeline's speech, changing nothing. |  |
+| [`transcribe_for_fillers`](/mcp/tools-clean-up/#transcribe_for_fillers) | Re-transcribes one media file with AssemblyAI so its fillers can be found. |  |
+
+### Captions and transcripts
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`transcribe`](/mcp/tools-captions/#transcribe) | Transcribes clips and lays the result out as caption clips. |  |
+| [`import_captions`](/mcp/tools-captions/#import_captions) | Reads a SubRip or WebVTT file and lays it out as caption clips. |  |
+| [`export_captions`](/mcp/tools-captions/#export_captions) | Writes one text track out as a subtitle file. |  |
+| [`relay_captions`](/mcp/tools-captions/#relay_captions) | Re-lays the word captions for the current canvas. |  |
+| [`get_transcript`](/mcp/tools-captions/#get_transcript) | Returns one clip's spoken words with their times. |  |
+| [`get_timeline_transcript`](/mcp/tools-captions/#get_timeline_transcript) | Returns every word heard on the timeline, in order. |  |
+
+### Reading analysis
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`get_media_analysis`](/mcp/tools-analysis/#get_media_analysis) | Returns an analysis of a media file, made on this Mac. |  |
+| [`analyze_cutout`](/mcp/tools-analysis/#analyze_cutout) | Reports where Remove Background stands, and makes its masks now. |  |
+
+### Framing and vertical
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`reframe_clip`](/mcp/tools-framing/#reframe_clip) | Frames one clip on the current canvas. | Yes |
+| [`switch_layout`](/mcp/tools-framing/#switch_layout) | Lays out a camera clip and the screen recording behind it. | Yes |
+| [`make_vertical_version`](/mcp/tools-framing/#make_vertical_version) | Makes a vertical, 4:5 or square version of the timeline. |  |
+
+### Multicam
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`copy_pieces`](/mcp/tools-multicam/#copy_pieces) | Copies pieces of a clip onto another track at the same times. | Yes |
+| [`switch_angle`](/mcp/tools-multicam/#switch_angle) | Re-picks one shot from another camera angle. |  |
+| [`switch_by_speaker`](/mcp/tools-multicam/#switch_by_speaker) | Cuts a Program track from synced cameras, showing whoever talks. |  |
+
+### Graphics
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`graphic_reference`](/mcp/tools-graphics/#graphic_reference) | Returns the whole graphics API as Markdown. |  |
+| [`write_graphic`](/mcp/tools-graphics/#write_graphic) | Writes a graphic's JavaScript module and compiles it. |  |
+| [`get_graphic`](/mcp/tools-graphics/#get_graphic) | Reads the project's graphics folder, or one module. |  |
+| [`render_graphic`](/mcp/tools-graphics/#render_graphic) | Renders a module without a clip, to look at it first. |  |
+| [`list_graphics`](/mcp/tools-graphics/#list_graphics) | Lists the graphics **Insert ▸ Graphic…** offers. |  |
+| [`insert_graphic`](/mcp/tools-graphics/#insert_graphic) | Places a graphic clip at the playhead. |  |
+| [`add_graphic_clip`](/mcp/tools-graphics/#add_graphic_clip) | Adds a graphic clip drawn by a module in the project. | Yes |
+| [`set_graphic`](/mcp/tools-graphics/#set_graphic) | Changes what graphic clips are drawn from. | Yes |
+
+### Graphic fonts, pictures and packages
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`import_graphic_font`](/mcp/tools-graphic-files/#import_graphic_font) | Copies a font into the project's graphics. |  |
+| [`import_graphic_asset`](/mcp/tools-graphic-files/#import_graphic_asset) | Copies a picture into the project's graphics. |  |
+| [`delete_graphic`](/mcp/tools-graphic-files/#delete_graphic) | Deletes a graphic's module. |  |
+| [`rename_graphic`](/mcp/tools-graphic-files/#rename_graphic) | Renames a module, and every clip drawn by it follows. |  |
+| [`restore_graphic`](/mcp/tools-graphic-files/#restore_graphic) | Writes a kept earlier text of a module back. |  |
+| [`export_graphic`](/mcp/tools-graphic-files/#export_graphic) | Writes one graphic as a `.fjgraphic` package. |  |
+| [`import_graphic`](/mcp/tools-graphic-files/#import_graphic) | Copies a `.fjgraphic` package into the project. |  |
+
+### Recording and screencasts
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`record_screen`](/mcp/tools-recording/#record_screen) | Records the screen, a camera or a voice-over for a set time. [Full reference](/mcp/record-screen/). |  |
+| [`set_media_cursor`](/mcp/tools-recording/#set_media_cursor) | Attaches, moves or removes a recording's cursor file. | Yes |
+| [`get_cursor_events`](/mcp/tools-recording/#get_cursor_events) | Returns what a recording's cursor file holds. |  |
+| [`auto_zoom`](/mcp/tools-recording/#auto_zoom) | Plans zooms from cursor files and applies them. |  |
+| [`add_shortcut_overlays`](/mcp/tools-recording/#add_shortcut_overlays) | Places an overlay for each recorded keyboard shortcut. |  |
+| [`speed_up_typing`](/mcp/tools-recording/#speed_up_typing) | Plays the typing in screen recordings faster. |  |
+
+### Rendering and export
+
+| Tool | What it does | Takes `scope` |
+| --- | --- | --- |
+| [`render_frame`](/mcp/tools-render-and-export/#render_frame) | Renders one frame as a picture. |  |
+| [`export`](/mcp/tools-render-and-export/#export) | Starts writing the timeline to a file. |  |
+| [`export_status`](/mcp/tools-render-and-export/#export_status) | Reports how an export is going. |  |
+| [`cancel_export`](/mcp/tools-render-and-export/#cancel_export) | Stops an export. |  |
+
+## Related
+
+- [How an agent reaches Frame Job](/mcp/overview/)
+- [How tool calls behave](/mcp/tool-calls/)
+- [Units and ids](/mcp/units-and-ids/)
+- [Patches](/mcp/patches/)
+- [What a call answers](/mcp/what-a-call-answers/)

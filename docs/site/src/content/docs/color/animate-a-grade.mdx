@@ -1,0 +1,151 @@
+---
+title: "Animate a grade"
+description: "Put a grade inside an action so it changes over time: what ramps, what switches at the end, how each control shows it, and how to take it back out."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Most grade settings can change over time. Actions take the place of keyframes, so this is how you keyframe a grade. Put a change inside an [action](/motion/actions/) and a shot can warm up as the sun comes out, drain to black and white, or ease into a new contrast curve.
+
+<AtAGlance
+  menu="Clip ▸ Add Action"
+  keys="⌥⌘K"
+  where={['Clip tab ▸ action lane', 'Clip tab ▸ Color']}
+  tools={['add_action', 'set_action_end', 'set_video']}
+/>
+
+## Grade inside an action
+
+<Steps>
+
+1. Select the clip and [add an action](/motion/add-an-action/), or [select one](/motion/select-an-action/) on its action lane.
+
+2. Open the **Clip** tab's **Color** sub-tab.
+
+3. Change a control. The change goes to the action's end state, and the value ramps there from where it stands when the action starts.
+
+4. Move the playhead through the action, or play it, to watch the grade travel.
+
+</Steps>
+
+Light, Color, Wheels, Curves and the look's **Amount** can all animate, and on an [adjustment clip](/color/adjustment-clips/) so can **Strength** and the [Qualifier](/color/qualifiers/).
+
+While the action is selected, every control shows the value at the action's end. When you're done, press <kbd>Esc</kbd> to go back to editing the clip itself. See [Set what an action animates to](/motion/edit-an-action/) for how an action's end state works in every tab.
+
+:::tip
+An adjustment clip can't take a transition. To fade a grade in, set its **Strength** to 0 % on the clip, then add an action and raise **Strength** to 100 %.
+:::
+
+## What ramps smoothly
+
+These move gradually from the start value to the end value, along the action's [easing curve](/motion/actions/#easing-curves):
+
+- every slider in **Light** and **Color**
+- each wheel's colour push and master in **Wheels**
+- the look's **Amount**
+- **Strength** on an adjustment clip
+- the Qualifier's numbers: **Centre**, **Width**, **Soft**, **Low**, **High** and **Blur**
+
+## Curves animate
+
+Curves in an action always animate, on all six channels, including **Hue** and **Sat**. An edit to a curve goes to the action's end even when you add or delete a point.
+
+| The two curves | How they animate |
+| --- | --- |
+| Same number of points | They ramp point by point |
+| One is a straight line | The straight one lines up with the other curve's points, then they ramp point by point |
+| Different numbers of points | Their values blend over the action, from the first curve's result to the second's |
+
+### Animate a curve back to neutral
+
+To have a curve straighten out over the action, write a straight curve to its end:
+
+- For one channel, right-click its cell in the picker and choose **Reset Red**, or whichever channel it is. The item is greyed out while that channel is already straight.
+- For every channel, right-click the plot and choose **Set end value to default**.
+
+The section's **Reset** isn't there while an action is selected. See [Master and RGB curves](/color/curves/).
+
+## A look switches instead
+
+Turning a look on or off, or changing it, applies to the clip itself and not to the action, even with an action selected. A look tile, **None** and **Clip ▸ Look** all change the clip's own look, as one undo step called Look, and the change shows across the whole clip.
+
+**Amount** is what animates. To fade a look in, choose the look and set **Amount** to 0 % with no action selected, then select an action and raise **Amount**. The Amount row only shows once the clip has a look, so choose the look first.
+
+## Animate a qualifier
+
+A qualifier's numbers ramp, but a range itself can't fade in or out.
+
+### A qualifier range switches
+
+Ticking **Hue**, **Saturation** or **Luma** with an action selected turns that range on at the action's end. It has nothing to ramp from, so it stays off through the action and then appears whole, at the end values you set. **Invert** switches at the end too.
+
+If the clip has no qualifier at all when the action starts, the whole qualifier appears at the action's end, and its **Blur** doesn't ramp either.
+
+Unticking a range the clip has on turns it off at the action's end, and so does **Set end value to default** on its row. With the action selected the box reads unticked wherever the playhead is, and the picture keeps the range until the end. Ticking the box again turns the range back on at the clip's numbers. **Remove from action N** or **Clear** takes the whole qualifier back out of the action.
+
+### A hue centre takes the short way
+
+An animated **Centre** goes the short way round the colour wheel, so 350° to 10° passes through 0° and never visits the greens and blues. Two centres exactly 180° apart have no short way, so the number moves straight from one to the other.
+
+## See what the action animates
+
+Row marks and the tab badge show what the selected action does to the grade.
+
+- **◆** in a row's gutter means the selected action animates that row. See [Read the row marks](/motion/edit-an-action/#read-the-row-marks) for all the marks.
+- **◆N** on the **Color** sub-tab counts how many grade settings the action animates.
+
+The badge counts settings, not values. Each of these counts as one, however many values inside it change:
+
+- Light and Color, together, for all thirteen sliders
+- Wheels
+- Curves
+- Look
+- Qualifier
+- Strength, on an adjustment clip
+
+The same grouping decides the marks. All thirteen Light and Color sliders show ◆ as soon as the action changes one of them, and every Qualifier row does as soon as the action changes any part of the qualifier. The Qualifier's range rows and **Invert** read "at end" whenever that happens, even for a range whose numbers are ramping.
+
+## Take a setting back out
+
+| To | Do this |
+| --- | --- |
+| Take a row out of the action | Hover over its ◆ and click the ×, or right-click the row and choose **Remove from action N** |
+| Take a section out of the action | Choose **Clear** in the section's header |
+| Make the row animate to its default | Right-click the row and choose **Set end value to default** |
+| Put a row back to its default on the clip itself, with no action selected | Right-click the row and choose **Reset to default** |
+
+**Clear** takes the place of **Reset** in a grade section's header while an action is selected, and shows only when the action animates one of that section's rows.
+
+The default items are greyed out while the row already holds its default. A text field keeps its own right-click menu, so right-click a row's label, its slider, its pop-up or its gutter. On **Wheels** and **Curves** the whole section is one row, so these items act on all of it.
+
+:::caution
+Light and Color are one setting inside an action, so **Remove from action N** on any slider takes all thirteen out, and so does **Clear** on either section. To change one slider back, use **Set end value to default**, or type a new end value.
+:::
+
+## How each control shows an action
+
+| Control | While the action animates it |
+| --- | --- |
+| Slider | The same marks as everywhere else in the inspector. See [See the value change as it plays](/motion/edit-an-action/#see-the-value-change-as-it-plays) |
+| Wheel disc | A hollow square at the action's start value, the puck in the action colour, and a coral mark at the value under the playhead |
+| Wheel strip | The strip fills in the action colour from the start value, the knob is in the action colour, and a coral tick marks the playhead's value |
+| Curve plot | The action's start curve is dashed, and the edited curve and its points are in the action colour |
+| Qualifier strip | The band is outlined and its knobs are drawn in the action colour |
+
+The coral marks show only when the playhead is on the clip and the value there differs from the end value. A qualifier's hue band that wraps past 0° gets its knobs in the action colour but no outline. The three wheels are one row, so all three discs and strips count as animated as soon as the action changes any one of them.
+
+## With an agent
+
+An agent uses `add_action`, then `set_action_end` with the end values in its `video` group: `color`, `wheels`, `curves`, `look.amount`, and on an adjustment clip `qualifier` and `opacity`, which is **Strength**. It changes the clip's own look with `set_video`. It can do one thing the Color tab can't: name a different look in an action's end. A look or LUT that differs between the start and the end switches at the action's end, **Amount** included. **Amount** ramps only while the look stays the same. See [Tools: animation](/mcp/tools-animation/#set_action_end).
+
+## Related
+
+- [Add an action](/motion/add-an-action/)
+- [Set what an action animates to](/motion/edit-an-action/)
+- [What an action can animate](/motion/what-can-animate/)
+- [Wheels](/color/wheels/)
+- [Master and RGB curves](/color/curves/)
+- [Looks](/color/looks/)
+- [Qualifiers](/color/qualifiers/)
+- [Adjustment clips](/color/adjustment-clips/)

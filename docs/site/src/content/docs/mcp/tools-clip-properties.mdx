@@ -1,0 +1,209 @@
+---
+title: "Tools: text, shapes and clip names"
+description: Restyle text and caption words, change a shape's geometry and paint, name and label clips, and put a title behind a person, from an agent.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These tools change what a text or shape clip holds, what a clip is called, and how a title sits behind a person. Where a text or shape clip sits on the canvas is a separate matter: its position and scale are [`set_video`](/mcp/tools-set-video/)'s.
+
+<AtAGlance tools={['set_text', 'set_shape', 'set_clip', 'text_behind_subject']} />
+
+`set_text`, `set_shape` and `set_clip` each take a patch that merges into the clip: a key you leave out keeps its value, and a key set to `null` clears it where the key can be empty. See [Patches](/mcp/patches/). A colour is four numbers, `[r, g, b, a]`, each 0 to 1. Three numbers are refused, and so is a value outside the range. Each edit is one undo step however many clips it names, and answers `ok` and the `project` summary. See [What a call answers](/mcp/what-a-call-answers/).
+
+## `set_text`
+
+Changes a text clip's words and typography. It mirrors the Clip tab's Text sub-tab. See [Text clips](/text-and-shapes/text-clips/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | Yes | The text clips to change, at least one. `get_project` lists their ids. |
+| `patch` | object | Yes | The text properties to change. The table below lists its keys. |
+| `scope` | integer | No | A nest id, to edit inside that nest. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. Leave it out for the frontmost one. |
+
+| Patch key | What it does | Values |
+| --- | --- | --- |
+| `content` | The words. | A string |
+| `font` | The font, by its PostScript name. | A string |
+| `size` | The size, in pixels. | Above 0 |
+| `color` | The text's colour. | Four numbers |
+| `align` | Horizontal alignment. | `left`, `center`, `right` |
+| `valign` | Vertical alignment. | `top`, `middle`, `bottom` |
+| `line_spacing` | The space between lines. | Above 0 |
+| `tracking` | The space between letters. | Any number |
+| `outline` | An outline around the letters. | `null`, or `{width, color}` |
+| `backdrop` | A coloured box behind the text. | `null`, or `{color, padding, radius}` |
+| `width` | The width to wrap at, in pixels. `null` restores auto-sizing. | `null`, or above 0 |
+| `animation` | How the words arrive and leave. | `null`, or `{kind, in, out}` |
+| `case` | `upper` sets the text in capitals before layout, and never changes the word count. | `as_written`, `upper` |
+| `words` | When each word of a caption page is said. See [Word timings and word style](#word-timings-and-word-style). | A list, or `[]` |
+| `word_style` | How the word being said is drawn. See [Word timings and word style](#word-timings-and-word-style). | `null`, or an object |
+
+```json
+{ "clips": [21], "patch": { "content": "Chapter two", "size": 96, "outline": { "width": 3 } } }
+```
+
+**Outline and backdrop.** `outline` starts from a width of 2 in black, and `backdrop` from black at 0.6 alpha with padding 12 and radius 8. Width, padding and radius are 0 or more. See [Text outline and backdrop](/text-and-shapes/text-outline-and-backdrop/).
+
+**Animation.** `kind` is `typewriter`, `word_fade` or `line_rise`. `in` and `out` are durations in ticks, measured from the clip's first and last frame, and both snap to the frame grid. Either can be 0 for no ramp at that end, and `in` plus `out` longer than the clip shows a partial reveal. It merges, `{animation: null}` clears it, and it starts from a one-second `typewriter` with no `out`. A negative duration is an error. See [Text reveals](/text-and-shapes/text-reveal/).
+
+**When it refuses.** A key the patch doesn't know, a value outside its range, or a clip that isn't a text clip ("clip 7 has no text properties") is an error naming what's wrong.
+
+## Word timings and word style
+
+A caption page is a text clip with a time on each word. `set_text` edits these like any other text key. See [Edit captions](/captions/edit-captions/) and [Word caption styles](/captions/word-caption-styles/).
+
+### Word timings
+
+`words` is one `{start, end}` per whitespace-separated word of `content`, in ticks from the clip's start, or `[]` for an untimed page.
+
+- When the list isn't empty, it must hold exactly one timing for each word. If not, the call answers "this text is timed word by word: 5 timings for 6 words".
+- A change to `content` that alters the word count must send `words: []` in the same patch.
+- A word's `end` can't come before its `start`, and each `start` can't come before the one before it. Two words can start together.
+- A negative `start` is allowed. It means the word was already being said when the clip began.
+- The times snap to the frame grid, so two words can land on one frame.
+
+`words` can't be animated: `set_action_end` refuses it.
+
+### Word style
+
+`word_style` is `null` or an object. It replaces `animation` on the page.
+
+| Key | What it does | Values | Default |
+| --- | --- | --- | --- |
+| `mode` | `highlight` draws the whole page and picks out the active word. `build` makes words appear as they're said. | `highlight`, `build` | `highlight` |
+| `active_color` | The active word's colour. | Four numbers | The text's colour |
+| `active_scale` | Where the active word's pop settles. 1 is no pop. | 1 to 1.5 | 1 |
+| `active_pill` | A rounded plate behind the active word. | `null`, or `{color, padding, radius, glide}` | No plate |
+| `spoken_color` | The colour of words already said. | Four numbers | The text's colour |
+| `upcoming_color` | The colour of words not yet said, in `highlight` mode. | Four numbers | The text's colour |
+| `active_fill` | Fills the active word left to right as it's said. | `true`, `false` | `false` |
+| `pause_dim` | How far the words and pill fade in a pause. | 0 to 1 | 0 |
+
+**The pill.** Its `padding` and `radius` are fractions of the text's `size`, starting from 0.2 and 0.25, and its `color` starts as purple. `glide` set to `true` slides the pill from the word before to the active one over 0.2 s, or sooner when the next word starts sooner, instead of jumping.
+
+**The fill.** `active_fill` runs from the word's start to its end, taking 0.6 s at most. The part already said draws in `active_color` and the rest in `upcoming_color`, or isn't drawn yet in `build` mode. In `highlight` mode it shows only where those two colours differ.
+
+**The pause dim.** `pause_dim` fades the words and the pill to 1 minus `pause_dim` of their opacity, over 0.1 s each way, in a pause of 0.25 s or more. A pause runs from one word's end to the next one's start, before a late first word, and after the last word until the clip ends.
+
+```json
+{ "word_style": { "active_pill": { "glide": true }, "pause_dim": 0.5 } }
+```
+
+## `set_shape`
+
+Changes a shape clip's geometry and paint. It mirrors the Clip tab's Shape sub-tab. See [Shape fill, stroke and size](/text-and-shapes/shape-settings/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | Yes | The shape clips to change, at least one. `get_project` lists their ids. |
+| `patch` | object | Yes | The shape properties to change. The table below lists its keys. |
+| `scope` | integer | No | A nest id, to edit inside that nest. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. Leave it out for the frontmost one. |
+
+| Patch key | What it does | Values |
+| --- | --- | --- |
+| `kind` | The shape. Changing it changes only the kind. | `rectangle`, `ellipse`, `line`, `arrow` |
+| `width`, `height` | The box, in source pixels. | Above 0 |
+| `stroke` | The outline. `null` removes it. | `null`, or `{width, color}` |
+| `fill` | The flat fill. `null` removes it. | `null`, or a colour |
+| `radius` | A rectangle's corners. | 0 or more |
+| `arrow_start`, `arrow_end` | Whether there's a head at that end. Only an `arrow` draws one: a `line` keeps the setting and shows no head. | `true`, `false` |
+| `from`, `to` | A line's or arrow's ends, as unit coordinates in its box. | Two numbers each, such as `[0, 1]` and `[1, 0]` |
+| `gradient` | A gradient fill. | `null`, or `{kind, stops, angle}` |
+
+```json
+{ "clips": [30], "patch": { "fill": [0.1, 0.2, 0.9, 1], "stroke": null, "radius": 24 } }
+```
+
+Because changing `kind` changes only the kind, an arrow made this way keeps whatever `arrow_end` it had, unlike one created by `add_shape_clip`. See [Lines and arrows](/text-and-shapes/lines-and-arrows/).
+
+**Gradient.** A gradient takes precedence over `fill` while it's set and leaves `fill` in place, so `{gradient: null}` brings the flat colour back. `{gradient: {}}` starts a black-to-white ramp running left to right. See [Gradient fills](/text-and-shapes/gradients/).
+
+| Key | What it does | Values |
+| --- | --- | --- |
+| `kind` | The ramp's form. A radial gradient is an ellipse inscribed in the box. | `linear`, `radial` |
+| `stops` | 2 to 8 `{at, color}` objects, `at` being 0 to 1 along the ramp. They needn't be sorted. Sending `stops` replaces them all. | A list |
+| `angle` | Degrees from the right, turning anticlockwise. It means nothing for `radial`. | Any number |
+
+A `line` or `arrow` has no area and ignores the gradient.
+
+**When it refuses.** A key the patch doesn't know, a value outside its range, or a clip that isn't a shape clip ("clip 7 has no shape properties") is an error naming what's wrong. Shapes can't be animated: an action's end has no shape group.
+
+## `set_clip`
+
+Sets a clip's name and colour label. It mirrors the timeline's inline rename, the Clip tab's name field, **Clip ▸ Rename…** (<kbd>⇧⌘R</kbd>) and **Clip ▸ Label ▸**. See [Clip names and labels](/timeline/names-and-labels/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | Yes | The clips to change, at least one. `get_project` lists their ids. |
+| `patch` | object | Yes | `name`, `label` or both. A key left out keeps its value, and `null` clears it. |
+| `scope` | integer | No | A nest id, to edit inside that nest. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. Leave it out for the frontmost one. |
+
+```json
+{ "clips": [12], "patch": { "name": "Intro", "label": "green" } }
+```
+
+**Names.** Names are trimmed, and an empty or blank name clears the name, as `null` does. A clip with no name of its own shows what it holds: the nest, the media file, a text clip's words, or its kind.
+
+**Labels.** The six labels are `red`, `orange`, `yellow`, `green`, `blue` and `purple`, drawn as a dot on the clip. The label is stored as given, so keep to these names. Any other name draws in the neutral text colour.
+
+A split, duplicate, detach or paste carries the name and label along. `paste_attributes` never does.
+
+**When it refuses.** A key other than `name` or `label`, or a value that's neither a string nor `null`, is an error.
+
+## `text_behind_subject`
+
+Puts a title behind the person in a clip of a video file or a picture, in one undo step. It mirrors **Insert ▸ Text Behind Subject**. See [Text Behind Subject](/effects/text-behind-subject/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | No | The clip to put the title behind. Left out, it's picked at `at`. |
+| `content` | string | No | The title's text. Left out, it's "Title". |
+| `at` | integer | No | Where the title starts, in ticks, snapped to the frame grid. Left out, it's the playhead. |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. Leave it out for the frontmost one. |
+
+The step does four things:
+
+- It adds a track named "Behind Subject" directly above the clip's track, and above any matte tracks in front of it.
+- It adds a text clip in the look [`add_text_clip`](/mcp/tools-adding-clips/#add_text_clip) gives, at `at`, for 4 s or the rest of the clip if that's shorter.
+- It sets `behind_subject` on the title.
+- If the clip has no cutout yet, it sets `{cutout: {background: keep}}` on it, so the camera stays whole and the person still hides the title.
+
+The person's masks are made on your Mac, with no key. `analyze_cutout` says where they stand. See [Tools: reading analysis](/mcp/tools-analysis/#analyze_cutout).
+
+**Which clip it picks.** Without `clip`, it looks at the clips of a video file or a picture, with their video on, playing at `at`, on a shown track that isn't a matte track. It takes the front-most selected one, else the front-most with a cutout, else the front-most. The selection is left as it was.
+
+**What it answers.**
+
+| Key | What it is |
+| --- | --- |
+| `ok` | `true`. |
+| `clip` | The clip the title is behind. |
+| `track` | The new track's id. |
+| `text` | The title's clip id. |
+| `duration` | The title's length, in ticks. |
+| `cutout_added` | Whether the clip was given a cutout. |
+| `project` | The project summary. |
+
+**When it refuses.** Nothing is done when:
+
+- A nest is open. It works on the top-level timeline only, so call `set_scope` with no nest first.
+- `content` is empty.
+- No clip of a video file or a picture, with its video on, plays at `at` on a shown track that isn't a matte track.
+- The named clip isn't a clip of a video file or a picture, with its video on, on a shown track that isn't a matte track.
+- The named clip doesn't play at `at`.
+
+To put any other drawing clip behind the subject by hand, use `set_video` with [`behind_subject`](/mcp/tools-set-video/#behind_subject). An adjustment or nest clip can't take it.
+
+## Related
+
+- [Patches](/mcp/patches/)
+- [Tools: picture and grade (set_video)](/mcp/tools-set-video/)
+- [Tools: animation](/mcp/tools-animation/)
+- [Tools: adding clips](/mcp/tools-adding-clips/)
+- [Tools: captions and transcripts](/mcp/tools-captions/)
+- [Text clips](/text-and-shapes/text-clips/)
+- [Text Behind Subject](/effects/text-behind-subject/)

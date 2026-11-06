@@ -110,7 +110,7 @@ code. The series continues in `creator-jobs-2.md` past about 500 lines, that fil
     the frozen file, as one line of wiring with its reason (CJ5a's `keep_range`). Dev tools join
     through `AgentServer+DevTools.swift`.
   - (e) A phase that adds a key equivalent records it, and the integrator checks
-    `docs/guide/menus-and-shortcuts.md` for a clash before landing.
+    `docs/site/src/content/docs/reference/keyboard-shortcuts.mdx` for a clash before landing.
   - (f) A bet's command is a composite over ops landing as one undo step through
     `performGroupedEdit`, and its tool runs the same planner (SY-1's shape), unless its rule must
     hold inside the core, in which case it is an op.

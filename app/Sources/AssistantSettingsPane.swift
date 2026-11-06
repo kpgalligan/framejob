@@ -367,9 +367,11 @@ final class AssistantSettingsPane: NSStackView, NSTextFieldDelegate {
         let range = AssistantChatSettings.compactTokensRange
         return [
             "The assistant sends your messages, the project's details and the frames it renders "
-                + "to Anthropic, using your own API key; what it costs is billed to that key. It "
-                + "asks before writing a file. The key is kept in a file only you can read and "
-                + "is never shown again once it is saved.",
+                + "to Anthropic, using your own API key; what it costs is billed to that key. "
+                + "It asks before saving a project or writing a file to a path it chose; "
+                + "graphics, fonts and pictures it adds go into the project without asking. The "
+                + "key is kept in a file only you can read and is never shown again once it is "
+                + "saved.",
             "Leave the model blank for \(AssistantConfiguration.defaultModel). Changing the key "
                 + "or the model starts a new conversation.",
             "At the end of a turn past the compaction threshold "

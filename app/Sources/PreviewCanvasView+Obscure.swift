@@ -15,10 +15,11 @@ import AppKit
 /// and take every press while armed; the outlines stay drawn under them.
 extension PreviewCanvasView {
     /// The box whose regions are drawn: the primary box, with exactly one
-    /// clip selected, unlocked, outside crop mode and the text editor.
+    /// clip selected, unlocked, outside crop mode and the text editor. A nest
+    /// clip has none: it draws no pixels of its own for a region to cover.
     var obscureBox: CanvasLayerBox? {
         guard selection.count == 1, !cropMode, editingClip == nil,
-              let box = primaryBox, !box.locked
+              let box = primaryBox, !box.locked, box.picture == nil
         else { return nil }
         return box
     }

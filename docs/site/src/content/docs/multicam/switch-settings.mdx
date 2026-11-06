@@ -1,0 +1,114 @@
+---
+title: "Switch by Speaker settings"
+description: What each row of the Switch by Speaker sheet does, its default and range, and which values Frame Job remembers.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These rows of the [Switch by Speaker](/multicam/switch-by-speaker/) sheet shape the cut: where it opens, how long shots last, and how it treats two people talking at once.
+
+<AtAGlance menu="Clip ▸ Switch by Speaker…" tools="switch_by_speaker" />
+
+| Row | What it does | Default | Range |
+| --- | --- | --- | --- |
+| [**Wide:**](#wide) | Your wide shot, which opens the cut and shows during crosstalk | The one camera no person uses, otherwise None | Any camera, or None |
+| [**Minimum shot:**](#minimum-shot) | The shortest shot allowed | 2 s (3 s with [one microphone](/multicam/one-microphone/)) | 0.5 to 30 s |
+| [**Cut:**](#cut-before-speech) | How long before speech the cut comes | 0.2 s | 0 to 1 s |
+| [**Crosstalk:**](#crosstalk-shows) | What shows while two people talk at once | Wide | Wide, Current speaker |
+| [**Ignore bleed:**](#ignore-bleed) | How far below a speaker's level a voice is ignored | 15 dB | 3 to 40 dB |
+| [**Cut to the wide after**](#cut-to-the-wide-after) | Breaks up a long monologue | Off | 2 to 600 s |
+| [**Mute the cameras' own sound**](#mute-the-cameras-own-sound) | Turns the cameras' sound off inside the range | On when no microphone is on a camera track | |
+| [**Write to:**](#write-to) | Where the cut goes | A new Program track | |
+
+The number fields take up to two decimal places.
+
+## Wide
+
+The camera for your wide shot. Choose any of the cameras, or **None**. If exactly one camera is left over once every person has theirs, it's picked to start with. Otherwise the row opens on **None**.
+
+The Wide shows:
+
+- at the start of the cut
+- during crosstalk, when [**Crosstalk**](#crosstalk-shows) shows **Wide**
+- after [**Cut to the wide after**](#cut-to-the-wide-after)
+- for a stretch where another camera has nothing to show
+
+When nobody is talking, the current shot holds. It doesn't go to the Wide.
+
+## Minimum shot
+
+The shortest shot the cut may have, from 0.5 to 30 s. The default is 2 s.
+
+A shorter shot merges into the shot before it when that camera covers the stretch, otherwise into the shot after it. A short shot that neither neighbour covers stays.
+
+Raising this is also the way out when the cut would add more clips than a project can hold.
+
+## Cut before speech
+
+The **Cut:** row sets how long before a new speaker's first word the cut comes, from 0 to 1 s. The default is 0.2 s, and the cut lands on a whole frame.
+
+## Late cuts under heavy bleed
+
+A cut is timed from where a voice first rises above its [bleed](#ignore-bleed) line and the microphone's quiet background, not from the word itself. So with heavy bleed in a noisy room, a cut can land later than **Cut** asks. In the worst case measured, with another voice 24 dB down under −45 dBFS of noise, the cut came about 35 ms before the first word instead of 0.2 s.
+
+## Crosstalk shows
+
+What the program shows while two people talk at once for a second or more. **Wide** cuts to the [Wide](#wide), and **Current speaker** holds the shot you're on. With no Wide chosen, crosstalk holds the current shot whatever this says.
+
+Crosstalk shorter than a second starts nothing. A stretch under half a second between two bursts of crosstalk counts as crosstalk.
+
+Two microphones are crosstalk when both hear a voice above their [bleed](#ignore-bleed) line. If one leads the other by 8 dB or more, measured against each one's own speaker, it counts alone.
+
+## Ignore bleed
+
+Every microphone also hears the other people, quieter. A voice more than this far below a microphone's own speaker is bleed, and never counts as that person talking. It runs from 3 to 40 dB, and the default is 15 dB.
+
+- Raise it if a quiet guest is never shown.
+- Lower it if someone is shown while only the other person talks.
+
+A voice must also stand 6 dB above the microphone's quiet background to count. This row doesn't appear in the [one-microphone sheet](/multicam/one-microphone/#the-sheet-in-this-mode).
+
+## Cut to the wide after
+
+Breaks up a long monologue. Tick the box and set how long one person may hold the screen, from 2 to 600 s. It's off by default, and the field offers 20 s.
+
+When a shot reaches that length, the Wide shows for one [**Minimum shot**](#minimum-shot), then the speaker's camera returns. This repeats to the end of the shot.
+
+It needs a Wide. With **Wide** on **None**, ticking it does nothing.
+
+## Mute the cameras' own sound
+
+Switches the cameras' scratch sound, the rough sound each camera recorded for itself, off inside the range. It's ticked to start with when no microphone is on a camera track, which is when the microphones are separate recordings.
+
+It never touches a microphone's track, so a camera used as a microphone keeps its sound.
+
+## Write to
+
+Writes the new cut over an earlier Program track instead of adding another. Choose **Replace the shots on** and the track's name, or leave it on **A new Program track**, the default.
+
+The row shows only when an earlier track can be replaced. That track must:
+
+- be unlocked
+- hold no selected clip
+- sit in front of the cameras
+- have something in the range
+- hold only pieces of the cameras there
+
+The track is cleared over the range and cut at its ends. Nothing on it outside the range changes.
+
+## Remembered values
+
+**Minimum shot**, **Cut**, **Crosstalk** and **Ignore bleed** are kept for the next time. They're written only when you change a value and press **Switch**, so **Cancel** keeps the old ones.
+
+**Minimum shot** isn't remembered in the one-microphone sheet. Every other row opens fresh each time. An agent's call reads none of the remembered values and uses the defaults in the table above.
+
+## With an agent
+
+`switch_by_speaker` takes these rows as `wide`, `min_shot`, `lead`, `crosstalk`, `bleed_db`, `wide_after`, `mute_cameras` and `track`. See [its options](/mcp/tools-multicam/#switch-by-speaker-options).
+
+## Related
+
+- [Switch by Speaker](/multicam/switch-by-speaker/)
+- [Cut from faces with one microphone](/multicam/one-microphone/)
+- [Switch Angle](/multicam/switch-angle/)
+- [Tools: multicam](/mcp/tools-multicam/)

@@ -1,0 +1,101 @@
+---
+title: Looks for word captions
+description: Add a sliding pill, a left-to-right word fill or a dim in pauses to word captions, and find out what you can change about their colours.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Looks add movement to a [word style](/captions/word-caption-styles/)'s pages: a pill that slides between words, a word that fills as it's said, and a page that dims when nobody's talking.
+
+<AtAGlance
+  menu="File ▸ Generate Captions…"
+  where="The Generate Captions sheet, under Style:"
+  tools={['transcribe', 'set_text']}
+/>
+
+## Three looks for word captions
+
+<Steps>
+
+1. Choose **File ▸ Generate Captions…**, and set **Language:**, **Engine:** and **From:** as [Generate Captions](/captions/generate-captions/) explains.
+
+2. Set **Style:** to a [word style](/captions/word-caption-styles/).
+
+3. Tick the looks you want under the **Style:** pop-up.
+
+4. Choose **Generate**.
+
+</Steps>
+
+Each look works with some styles and not others:
+
+| Look | Highlight | Pill | Karaoke | Build | One Word |
+| --- | --- | --- | --- | --- | --- |
+| **Slide the pill** | | Yes | | | |
+| **Fill words as spoken** | Yes | | Yes | Yes | |
+| **Dim in pauses** | Yes | Yes | Yes | Yes | Yes |
+
+A box that doesn't apply to the chosen style is greyed out and does nothing, but it keeps its tick for when you switch back. With **Subtitles** chosen, all three are greyed out.
+
+Each box is off until you tick it, and the sheet remembers each one between runs.
+
+A look changes how a word is drawn, never a letter or the size of the page. Ticking one doesn't change where pages break.
+
+Looks are set when the captions are generated, like the style. To change them on a placed track, [generate again with Replace](/captions/restyle-captions/#restyle-by-generating-again).
+
+## Slide the pill
+
+The pill slides from the previous word to the one being said, instead of jumping. The slide takes 0.2 s, or less when the next word starts sooner, so the pill has always arrived before it has to leave. The first word on a page has nothing to slide from, so the pill starts there.
+
+This works with **Pill**, the only style that has one.
+
+## Fill words as spoken
+
+The word being said fills from left to right as it's spoken. The fill runs from the word's start to its end, and takes 0.6 s at most, so a long word finishes filling before it's finished being said.
+
+| Style | The part already said | The rest of the word |
+| --- | --- | --- |
+| **Highlight** | Yellow | White |
+| **Karaoke** | Yellow | White at 55% opacity |
+| **Build** | Yellow | Not drawn yet |
+
+**Pill** and **One Word** can't use this look, because their spoken word is the same colour on both sides of the fill.
+
+## Dim in pauses
+
+The page fades to half opacity during a pause of 0.25 s or more, then comes back before the next word. Each fade takes 0.1 s, and the words and the pill fade together. It works with all five word styles.
+
+The page also dims at either end of a caption, when the wait there is 0.25 s or more:
+
+- before the first word. The page opens dim, with no fade.
+- after the last word, until the caption ends.
+
+A pause of 0.25 s also [ends a page](/captions/word-caption-styles/#where-a-page-breaks), so on a generated track you'll mostly see the dim at the end of a page, after its last word.
+
+With **On this Mac** chosen and a word style selected, a note under the boxes reads "On-device words rarely carry a pause; this shows mostly with AssemblyAI."
+
+The sheet's [preview](/captions/word-caption-styles/#the-sheets-two-frame-preview) doesn't show this look.
+
+## Word colours
+
+The inspector has no section for a page's word colours, pop size or pill. Nothing in the Clip tab changes the yellow, the violet or how far the word pops.
+
+To change them, generate again with a [different style](/captions/restyle-captions/#restyle-by-generating-again), or [have an agent do it](#with-an-agent).
+
+The **Color** row under **Text ▸ Style** still works on the words drawn in the text's own colour. That's the white words in **Highlight** and **Build**, and every word in **Pill** and **One Word**. It leaves the yellow alone, and it changes nothing in **Karaoke**, which sets all its own colours.
+
+## With an agent
+
+An agent can do two things here that the sheet can't.
+
+It can change a placed page's word style with `set_text`. That covers highlighting or building word by word, the colours of the spoken word and of the words before and after it, a pop from 100% to 150%, the pill's colour, padding and corners, whether the pill slides, whether the word fills, and how far the page dims, from none to fully invisible. The sheet's dim is always half. A page changed this way is no longer one of the styles Frame Job makes, so [Re-lay Captions](/captions/re-lay-captions/#tracks-kept-as-placed) keeps its track as placed. See [Word style](/mcp/tools-clip-properties/#word-style).
+
+It can also ask for looks with `transcribe`, through `slide`, `fill` and `dim`, but each one is off unless it asks, never what the sheet last chose. Frame Job won't add a look to a style it wouldn't show on, or to captions it isn't placing. When it gives any of the three and the captions are placed, the result lists the looks that were on. See [Caption looks](/mcp/tools-captions/#caption-looks).
+
+## Related
+
+- [Generate Captions](/captions/generate-captions/)
+- [Word caption styles](/captions/word-caption-styles/)
+- [Restyle a caption track](/captions/restyle-captions/)
+- [Edit captions](/captions/edit-captions/)

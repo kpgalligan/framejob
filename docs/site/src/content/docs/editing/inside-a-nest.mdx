@@ -1,0 +1,121 @@
+---
+title: "Work inside a nest"
+description: "Open a nest to edit its clips in place, find your way back out, and see what stays project-wide while you're inside."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Open a [nest](/editing/nests/) to change the clips inside it without taking the group apart. The nest clip keeps its own position, scale, opacity, fades and volume, which [Un-nest](/editing/nests/#un-nest) would throw away.
+
+<AtAGlance
+  menu={['Clip ▸ Open Nest', 'Clip ▸ Close Nest']}
+  keys={['⌘↓', '⌘↑']}
+  where={['Double-click a nest clip', 'The breadcrumb, in the corner above the track headers']}
+  tools="set_scope"
+/>
+
+## Open a nest
+
+Double-click a nest clip. You can also select one nest clip and choose **Clip ▸ Open Nest** (<kbd>⌘↓</kbd>).
+
+**Clip ▸ Open Nest** needs exactly one nest clip selected, so it's greyed out with two selected. A double-click works whatever else is selected, because it opens the clip you clicked.
+
+A nest can hold nests. Open one the same way from inside, down to eight levels.
+
+Because a double-click opens a nest clip, it can't rename one. Use **Clip ▸ Rename…** (<kbd>⇧⌘R</kbd>) or the name field in the Clip tab.
+
+## Come back out
+
+Choose **Clip ▸ Close Nest** (<kbd>⌘↑</kbd>), or click the [breadcrumb](#use-the-breadcrumb). Either one goes out one level, and the nest clip you went in through is selected again.
+
+**Clip ▸ Close Nest** is greyed out at the top level. **Open Nest** and **Close Nest** are both greyed out while you're typing in a field, so <kbd>⌘↓</kbd> and <kbd>⌘↑</kbd> stay with the text.
+
+## Use the breadcrumb
+
+While a nest is open, the corner above the track headers shows a path such as `Timeline › Intro`, with a back arrow in front of it.
+
+- It shows the last two levels: the one you'd return to, then the one you're in, in bold. Hover over it for the full path.
+- A level is named after the nest clip you went in through, so renaming that clip changes the path.
+- A long name is shortened in the middle, so `Lower Third 1` and `Lower Third 2` still look different.
+
+Click anywhere in the corner to go out one level, the same as <kbd>⌘↑</kbd>. A double-click counts as one click, so to go up two levels, click twice with a pause or press <kbd>⌘↑</kbd> twice.
+
+With no nest open, the corner is empty and does nothing.
+
+## What you see inside
+
+The timeline shows the nest's own tracks and clips, with time counted from the start of the nest. That's all of its contents, including anything the nest clip's [trim](/editing/nest-copies/#trim-a-nest-clip) is hiding on the outer timeline.
+
+The canvas shows the nest at its fixed size, without the nest clip's position, scale, opacity or fades, and you hear it without the nest clip's volume. You're seeing the group by itself, and the nest clip's settings apply again when you leave.
+
+## Where the playhead goes
+
+The playhead moves with you, so the frame under it doesn't change. It also carries back out. If a nest clip starts at 10 s and the playhead is at 12 s, you go in at 2 s. Move to 3 s, come out, and you're at 13 s.
+
+That holds while the playhead is over the nest clip. If it's before the clip when you double-click, you go in at the nest's first frame and come out at the clip's start. If it's past the clip's end, or you move past that point inside, the playhead is on a part of the nest the clip doesn't play, so the canvas inside shows a frame the outer timeline never will.
+
+Going in or out also stops playback.
+
+## Going in and out isn't an edit
+
+Opening or closing a nest makes no undo step and doesn't mark the project as changed.
+
+- **Selection:** going in clears the selection. Coming out selects the nest clip again.
+- **In/out range:** it's cleared both ways, because a range means one thing inside a nest and another on the timeline. You can set a new [range](/timeline/in-out-range/) inside, and looping and Ripple Delete use it as they do on the timeline.
+- **Reopening:** a project always opens on its timeline, even if you saved with a nest open.
+
+## Edit inside a nest
+
+Every clip edit works inside a nest, with times counted from the start of the nest. That includes **Clip ▸ Nest**, which makes a nest inside this one, and **Clip ▸ Un-nest**.
+
+Each edit is one step on the project's single undo history:
+
+- <kbd>⌘Z</kbd> after you've come out still undoes an edit you made inside.
+- If an undo removes the nest you're in, you land in the deepest level that's left, and the in/out range clears.
+
+When more than one clip shows this nest, your edit reaches all of them. See [Shared copies](/editing/nest-copies/#shared-copies).
+
+The nest clip on the outer timeline keeps its length whatever you do inside. Material you add past its end stays hidden until you drag the clip's end out, and if the contents get shorter, the clip shows nothing over what's left of it.
+
+## What stays project-wide
+
+Some things belong to the project, not to the nest you have open. They still work, and they change the whole project.
+
+- **Media:** the Media tab lists the project's media. Adding, relinking or removing a file works as usual. Drag a row from the Media tab onto the nest's timeline to put its clip in the nest. A file dragged from the Finder onto the timeline opens as a project of its own, so add it on the Media tab first.
+- **The Document tab:** it shows the project's settings. Changing the project's size doesn't change the nest's size, which is [fixed](/editing/nests/#a-nests-size-is-fixed).
+- **Markers:** the Document tab's list stays, but the ruler shows none. You can still rename a marker, change its **Chapter** box or delete it. See [Markers](/timeline/markers/).
+- **Export:** **File ▸ Export…** writes the whole timeline, not the nest. A range you set inside a nest can't be used, so the **Range** pop-up stays on **Whole project**. Close the nest and set the range on the timeline.
+
+**File ▸ Save Frame…** is the exception: it saves what the canvas shows, so with a nest open you get a frame of the nest.
+
+## What you can't use inside a nest
+
+| Command | While a nest is open |
+| --- | --- |
+| **Mark ▸ Add Marker**, **Next Marker**, **Previous Marker** | Greyed out, and <kbd>M</kbd> beeps. **Go** in the Document tab's Markers list is greyed out too. A marker's time is on the outer timeline, and the playhead inside a nest counts from the nest's start. |
+| **Insert ▸ Adjustment Clip** | Greyed out. An [adjustment clip](/color/adjustment-clips/) only works on the timeline, never inside a nest. |
+| **Insert ▸ Text Behind Subject** | Greyed out, and the Picture tab has no **Behind Subject** section. See [Text Behind Subject](/effects/text-behind-subject/). |
+| **File ▸ New Project from Range…** | Greyed out. See [New Project from Range](/projects/new-project-from-range/). |
+| **File ▸ Make Vertical Version…** | Greyed out. See [Make Vertical Version](/framing/make-vertical-version/). |
+| **File ▸ Rename Graphic…** | Greyed out. See [Rename, delete and restore graphics](/graphics/manage-graphics/). |
+| **Track ▸ Mix…** | **Compressor** and **Limit peaks** are greyed out, because a nest's mix plays through the track that holds the nest clip. The track's volume and pan still work. |
+
+## Limits count the whole project
+
+A project holds up to 4,096 clips and 64 tracks, and nests go eight levels deep. Clips and tracks are counted across the timeline and every nest together, and the depth is counted from the timeline. So an edit that looks fine inside a nest can still take the whole project over. When it would, Frame Job shows an alert naming the limit and changes nothing.
+
+A nest's contents count once, however many clips show it. Un-nest the last clip showing a nest to take its tracks out of the count. Deleting that clip instead leaves the nest's clips and tracks counted.
+
+## With an agent
+
+An agent can open a nest in the window with [`set_scope`](/mcp/tools-view-state/#set_scope), as you would. This only changes the view, so it adds no undo step, and `set_scope` with no arguments comes back out. Given a nest two clips show, it goes in through the earlier one.
+
+An agent can also edit inside any nest without opening it, by naming the nest on the edit. See [Editing inside a nest](/mcp/nests/), which lists the edits that can't be made that way.
+
+## Related
+
+- [Nests](/editing/nests/)
+- [Shared and independent nest copies](/editing/nest-copies/)
+- [Mattes inside nests](/canvas/mattes-in-nests/)
+- [Undo and saving](/getting-started/undo-and-saving/)
+- [The in/out range](/timeline/in-out-range/)

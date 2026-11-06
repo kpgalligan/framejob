@@ -128,6 +128,11 @@ import ScreenCaptureKit
 /// when never set, and the camera's Layout and cutout (CO-82), Corner and off.
 final class RecorderPanelController: NSWindowController {
     static let shared = RecorderPanelController()
+    /// The panel once `shared` has built it, else nil: a panel never built
+    /// is idle. It exists so File ▸ New Recording…'s validation
+    /// (`AppDelegate.newRecordingStops`, #478) reads the phase without
+    /// building the panel.
+    static private(set) weak var built: RecorderPanelController?
 
     // MARK: - Defaults keys
 
@@ -162,8 +167,9 @@ final class RecorderPanelController: NSWindowController {
     static let rates = [30, 60]
     /// The note under Record shortcuts (spec §11 CU-60, CU-62).
     static let recordShortcutsSentence =
-        "Records each shortcut you press with ⌘ or ⌃, or ⌥ with an arrow, Delete, Return, Tab "
-        + "or Esc, and when you type, never what you type. Nothing is recorded while an app "
+        "Records each shortcut you press with ⌘ or ⌃, "
+        + "or ⌥ with an arrow, Delete, Forward Delete, Return, Enter, Tab or Esc, "
+        + "and when you type, never what you type. Nothing is recorded while an app "
         + "holds secure input."
 
     /// Where the panel is in a recording's life. `syncPhase()` draws it.
@@ -297,6 +303,7 @@ final class RecorderPanelController: NSWindowController {
                 leading: [statusLabel]),
             width: Self.cardWidth)
         super.init(window: panel)
+        Self.built = self
 
         buildRows(into: content)
         // The card is a subview pinned at the top-left of a plain root, and

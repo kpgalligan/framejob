@@ -1,0 +1,100 @@
+---
+title: Patches
+description: How an agent changes a clip's properties. What a patch merges and clears, how a bad key or value is refused, and how unknown arguments are named.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+A patch is an object holding only the properties you want to change. The property tools take one and merge it into what the clip already has, so an agent never has to send a clip's whole state back.
+
+<AtAGlance
+  tools={['set_video', 'set_audio', 'set_text', 'set_shape', 'set_graphic', 'set_clip', 'set_action_end', 'add_text_clip', 'add_shape_clip']}
+/>
+
+## How a patch merges
+
+Each property tool takes a `patch` argument. Three rules cover it:
+
+- **Keys you leave out keep their values, at every depth.** A patch of `{shadow: {blur: 20}}` keeps the shadow's colour, angle and distance.
+- **A key set to `null` clears it**, if it's a key that can be cleared. A required key refuses null.
+- **A list replaces the whole list.** To change one filter, send the whole `filters` stack. Send `[]` to clear it.
+
+```json
+{
+  "clips": [12, 15],
+  "patch": {
+    "opacity": 0.8,
+    "shadow": { "blur": 20 },
+    "reflection": null,
+    "filters": [{ "kind": "sepia", "amount": 0.5 }]
+  }
+}
+```
+
+This sets the opacity of clips 12 and 15, changes only the shadow's blur, removes the reflection and replaces the filter stack with one sepia filter. It's one undo step.
+
+Each entry in `filters` must name both `kind` and `amount`, because a list replaces whole and nothing else would fill the gap.
+
+| Tool | What its patch changes | What null clears |
+| --- | --- | --- |
+| `set_video` | Position, scale, opacity, crop, colour and the other picture properties | Such as `shadow`, `chroma`, `reflection`, `spotlight` and `motion` |
+| `set_audio` | Volume, fades, ducking, compression and the other sound properties | Such as `duck` and `compressor` |
+| `set_text` | The words and typography | Such as `outline`, `backdrop`, and `width`, which restores auto-sizing |
+| `set_shape` | Geometry and paint | Such as `stroke` and `fill` |
+| `set_graphic` | `name`, `width`, `height`, `length` and `props`, with `props` merged key by key | A prop's key, and `length`, which ends the graphic with its clip |
+| `set_clip` | `name` and `label` | Either key. An empty or blank name clears it too. |
+| `set_action_end` | What an action animates to: `video`, `audio`, `text`, `graphic` and `speed` | Removes the key from the end state, so that property stops animating |
+
+`set_action_end` differs in two ways. A null there means "stop animating this", so to switch something off at the end of an action, name it in `off` instead. And its values aren't range-checked, because an animation may aim past what a stored property can hold. Its keys and their kinds are still checked, and a graphic's props are held to their minimum and maximum as in `set_graphic`. See [Tools: animation](/mcp/tools-animation/).
+
+`set_graphic` has one exception to its null rule. If an action on the clip animates that prop, the prop is set to its default rather than removed, so the animation keeps its start.
+
+## Patch refusals name the path
+
+A key the property doesn't have, or a value of the wrong kind, is refused. The answer gives the dotted path, array indices included, and for a bad value, the value you sent. Nothing is dropped, corrected or clamped on the way.
+
+| What went wrong | The answer |
+| --- | --- |
+| A key that doesn't exist | `unknown key "gate.knee" in an audio patch` |
+| The wrong kind of value | `bad value at "shadow" in a video patch: expected an object, not 5` |
+| A value outside its range | `audio.gate.ratio must be between 1 and 20, not 21` |
+| A key missing from a list entry | `missing key "filters[1].amount" in a video patch` |
+
+A bad entry deep in a list is named by its place, such as `filters[1].kind`. In `set_action_end` the path also carries the group, as in `video.filters[1].kind`.
+
+A refused patch changes nothing, on any of the clips it named.
+
+## Unknown arguments are refused by name
+
+An argument a tool doesn't take is refused before anything runs, and the answer lists what it does take:
+
+> trim_start does not take speed. It takes alone, clip, to, project and scope.
+
+This holds for every tool, and for an unknown argument sent as null. So a misspelt optional argument can't be dropped in silence while the edit lands without it.
+
+A value a tool can't read under the right name is refused by name too:
+
+- `discard must be true or false.`
+- `at must be a time in ticks (600000 per second).`
+- `fit must be one of fit, fill (got "cover").`
+
+A required argument you left out is named the same way: `Missing required argument: clip (an id)`.
+
+## Text and shape shorthands
+
+`add_text_clip` and `add_shape_clip` take a patch for the new clip, and each has a shorthand. A plain string stands for the one key you'd most often set.
+
+| Tool | Shorthand | Means |
+| --- | --- | --- |
+| `add_text_clip` | `"text": "Hello"` | `"text": {"content": "Hello"}`, the words |
+| `add_shape_clip` | `"shape": "ellipse"` | `"shape": {"kind": "ellipse"}`, the kind: `rectangle`, `ellipse`, `line` or `arrow` |
+
+You can also pass an object, which works like the patch for `set_text` or `set_shape`. Both arguments are optional. Leave `shape` out and you get a rectangle.
+
+## Related
+
+- [Units and ids](/mcp/units-and-ids/)
+- [What a call answers](/mcp/what-a-call-answers/)
+- [Tools: picture and grade (set_video)](/mcp/tools-set-video/)
+- [Tools: clip sound (set_audio)](/mcp/tools-set-audio/)
+- [Tools: text, shapes and clip names](/mcp/tools-clip-properties/)

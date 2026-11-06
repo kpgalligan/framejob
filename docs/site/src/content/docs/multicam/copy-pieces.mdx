@@ -1,0 +1,144 @@
+---
+title: "Copy pieces to another track (agents)"
+description: How an agent builds a program from synced cameras with copy_pieces, and what it can do with switch_by_speaker that the sheet can't.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+An [agent](/mcp/overview/) can cut a multicam program more directly than the menus do. `copy_pieces` copies parts of a clip onto another track at the same times, and `switch_by_speaker` can preview a cut and use two values the sheet doesn't show. This page is for anyone driving Frame Job from an agent. The exact arguments and results of each tool are in [Tools: multicam](/mcp/tools-multicam/).
+
+<AtAGlance
+  where="No menu item of its own. Clip ▸ Switch Angle ▸ and Clip ▸ Switch by Speaker… write with it."
+  tools={['copy_pieces', 'switch_by_speaker', 'switch_angle']}
+  needs="Nothing. When there's only one microphone, faces are read on your Mac."
+/>
+
+## Copy pieces of a clip
+
+`copy_pieces` takes the parts of one clip between the times you give and puts them on another track at the same times. It's what [Switch Angle](/multicam/switch-angle/) and [Switch by Speaker](/multicam/switch-by-speaker/) are built from.
+
+| Argument | What it does | Required |
+| --- | --- | --- |
+| `clip` | The clip to copy from. | Yes |
+| `track` | The track the pieces land on. It must be free over every range. | Yes |
+| `ranges` | The stretches to copy, as `[[from, to], …]`, at least one pair. These are times on the timeline, in ticks, 600,000 a second. See [Units and ids](/mcp/units-and-ids/). | Yes |
+| `video` | Turns each piece's picture on or off. | No. Default: the clip's own setting. |
+| `audio` | Turns each piece's sound on or off. | No. Default: the clip's own setting. |
+
+The whole call is one undo step, **Copy Pieces**. To work inside a [nest](/mcp/nests/), pass `scope`, and the times and tracks are then the nest's own.
+
+### What a piece is
+
+Each piece is exactly what splitting the clip at both ends of the range would leave in the middle. It shows the same source frames at the same times, so a piece of a synced camera stays in sync. It keeps the clip's speed, speed ramp, reversal and a graphic's own timeline, and its actions and timed words are cut the way a split cuts them.
+
+A piece gets a new id, has no transition, and isn't linked to any detached sound.
+
+### How ranges are read
+
+- Each range's ends snap to the frame grid.
+- A pair written backwards is the same range.
+- A range that's empty on the grid is skipped. If that leaves nothing, nothing changes.
+- Ranges can touch, but they can't overlap.
+
+## Cut a whole program from the cameras
+
+An agent cuts a whole program with one `copy_pieces` per camera clip. The pieces land at the times they came from, so they fall into place around each other.
+
+<Steps>
+
+1. Add the program track with `add_track`, naming it. With no `index` it goes to the front, in front of the cameras.
+
+2. For each camera clip, call `copy_pieces` with that clip, the program track, and every stretch where the camera is on screen. This takes the stretches from 0 to 5 seconds and from 10 to 15 seconds:
+
+   ```json
+   { "clip": 12, "track": 5, "ranges": [[0, 3000000], [6000000, 9000000]], "audio": false }
+   ```
+
+3. If the sound comes from separate microphones, pass `audio: false` as above so the pieces stay silent, and mute the camera tracks with `set_track`, because they keep playing their own sound behind the program.
+
+</Steps>
+
+A range has to sit inside the one clip, so a camera that stopped and started needs a call for each of its clips.
+
+To change one shot afterwards, use `switch_angle`, the agent's form of [Switch Angle](/multicam/switch-angle/). See [Tools: multicam](/mcp/tools-multicam/).
+
+## When a copy won't happen
+
+Nothing changes when one of these stops the copy. Frame Job checks them in this order and reports the first it meets:
+
+1. The clip is a nest. A piece of a nest would replay the nest from its first frame.
+2. A range falls outside the clip.
+3. Two ranges overlap.
+4. The destination track is locked.
+5. The destination track holds a clip over one of the ranges. The error names that clip and where it starts and ends. The clip you're copying from counts, so a piece can't land on its own track over itself.
+
+A copy that would take the project past 4,096 clips also fails.
+
+## Switch by Speaker from an agent
+
+`switch_by_speaker` cuts a Program track from the selected cameras, with the same values as the [Switch by Speaker](/multicam/switch-by-speaker/) sheet and the same result, as one undo step. [Switch by Speaker settings](/multicam/switch-settings/) explains the values.
+
+- Run `sync_audio` first. It trusts where the clips sit and doesn't check that they're in sync.
+- Set the clips with `set_selection`, because it reads the selected clips.
+- Every argument is optional, including who's who (`speakers`), the range (`from` and `to`) and the track to replace (`track`).
+- The sheet pulls a number back into its range. The tool stops with an error instead, and nothing changes.
+- To work inside a nest, open it with `set_scope` first, because the tool doesn't take `scope`.
+
+### Preview the cut
+
+Pass `apply: false` to see the shots without editing anything. The result lists each shot's camera, start and end, how many edits it would make and how many clips it would add, and nothing in the project moves. It's the same work as a real run, so it stops for the same reasons.
+
+The result has `applied: false` and no `step`, and `track` is null unless you named one. Leave `apply` out and the edit is made.
+
+### Values only an agent can set
+
+| Argument | What it does | Default | Range |
+| --- | --- | --- | --- |
+| `min_turn` | The shortest turn that cuts. A shorter turn, such as a quick reply, starts no shot. | 1 s | 0.2 to 10 s |
+| `dominance_db` | How far one active microphone must lead every other to count alone. Below that lead, two active microphones are crosstalk. | 8 dB | 0 to 30 dB |
+
+### Check which mode ran
+
+Every result has a `mode`, either `microphones` or `faces`.
+
+Faces mode is [cutting from one microphone](/multicam/one-microphone/). You get it by naming one microphone for two or more cameras, and it's the default when the selection holds exactly one microphone. In this mode:
+
+- The result's `note` reads "Faces guess who is talking; check the cuts."
+- `min_shot` is 3 s unless you give it.
+- A camera you name as `wide` takes no part in deciding who's talking.
+
+### Waiting for faces
+
+Where **Clip ▸ Switch by Speaker…** would show the Analyzing sheet first, the tool waits for the faces, for up to 60 seconds. Past that it stops with nothing switched, and what it found is kept. Call it again to continue.
+
+If the analysis fails or is stopped, or the project changes during the wait, nothing is switched either.
+
+### When Switch by Speaker won't run
+
+If any of these applies, the call stops and nothing changes. Frame Job checks this first group together and names every one that applies, so you can fix them in one go:
+
+- Under two cameras, or over nine. A camera here is a track holding a selected clip with a picture.
+- A person without a microphone or without a camera.
+- One microphone for two people, outside faces mode.
+- A microphone still being analysed, or with no speech in the range.
+- Speech detection isn't available on this Mac.
+- A camera whose faces are still being found, or that shows no face whose mouth can be read.
+- A stretch no camera covers.
+
+These each stop the call on their own:
+
+- A faces analysis that failed, was stopped or ran past the wait.
+- A project that changed during the wait.
+- More clips than the project may hold. Raise `min_shot` to make fewer shots.
+- A track named to replace that can't take the shots: it's locked, it holds a selected clip, it isn't in front of the cameras, it has nothing in the range, or it holds a clip that isn't a piece of a camera.
+- A camera clip linked to its detached sound. Use [Attach Audio](/audio/detach-and-attach/) first.
+
+## Related
+
+- [Set up several cameras](/multicam/set-up/)
+- [Switch Angle](/multicam/switch-angle/)
+- [Switch by Speaker](/multicam/switch-by-speaker/)
+- [Switch by Speaker settings](/multicam/switch-settings/)
+- [Cut from faces with one microphone](/multicam/one-microphone/)
+- [Tools: multicam](/mcp/tools-multicam/)

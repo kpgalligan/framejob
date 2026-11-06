@@ -1,0 +1,69 @@
+---
+title: "Noise Reduction"
+description: "Turn down steady background noise such as hiss, hum and fans, under speech as well as between words, with no noise sample needed."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Noise Reduction turns down steady background noise such as hiss, hum and fan noise. It works out the noise level from the clip itself, so you don't need to give it a sample of the noise or a stretch of silence.
+
+<AtAGlance where="Clip tab ▸ Sound ▸ Noise Reduction" tools="set_audio" />
+
+## Remove noise
+
+<Steps>
+
+1. Select a clip with sound, and open the **Noise Reduction** section of the [Sound tab](/audio/sound-tab/).
+
+2. Raise **Remove noise** while you listen, until the noise is low enough and the voice still sounds natural.
+
+</Steps>
+
+| Control | What it does | Range | Default |
+| --- | --- | --- | --- |
+| **Remove noise** | How much steady background noise to remove. Quick picks: 0, 25, 50, 75 and 100 %. | 0 to 100 % | 0 % (off) |
+| **Depth** | Read-only. See [The Depth readout](#the-depth-readout). | | off |
+
+**Reset** in the section's header sets **Remove noise** back to 0.
+
+## The Depth readout
+
+**Depth** tells you the most any part of the sound can be turned down at this setting. It follows **Remove noise**:
+
+| Remove noise | Depth reads |
+| --- | --- |
+| 0 % | off |
+| 25 % | 2 dB at most |
+| 50 % | 6 dB at most |
+| 75 % | 12 dB at most |
+| 100 % | floor removed |
+
+Between those it climbs with the setting, so 90 % reads "20 dB at most".
+
+Noise Reduction never removes more than the noise level it found, so a higher setting isn't a stronger cut across the whole sound.
+
+## What it can't do
+
+Noise Reduction isn't a gate. It works under speech as well as between words, and it doesn't silence the gaps. To turn the pauses down, use the [Gate](/audio/gate/).
+
+It can't remove a sound that isn't steady, such as a door slam or a cough. A long held note may eventually be treated as noise.
+
+To reduce the echo of a room, use [Voice Isolation](/audio/voice-isolation/). The two work together: Noise Reduction then works on the isolated sound.
+
+## Good to know
+
+- It runs after the EQ and [hum removal](/audio/hum-removal/), and before the [Gate](/audio/gate/) and the [Compressor](/audio/compressor/). See [How audio works](/audio/how-audio-works/).
+- With an [action](/audio/animate-sound/) selected, **Remove noise** sets where the action ends and the amount glides across the action.
+- Noise Reduction set on a [nest](/editing/nests/) clip has no effect. Open the nest with <kbd>⌘↓</kbd> and set it on the clips inside.
+
+## With an agent
+
+`set_audio` sets the amount as `noise_reduction`, from 0 to 1. See [Tools: clip sound](/mcp/tools-set-audio/#noise-reduction-and-voice-isolation).
+
+## Related
+
+- [Voice Isolation](/audio/voice-isolation/)
+- [Hum removal](/audio/hum-removal/)
+- [Gate](/audio/gate/)
+- [Enhance Voice](/audio/enhance-voice/)

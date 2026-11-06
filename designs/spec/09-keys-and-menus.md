@@ -4,17 +4,18 @@
 |---|---|
 | Space | Play / pause — from any focus but a field being typed into (§11 K-1) |
 | J / K / L | Reverse / pause / forward; L again for 2×, 4× |
-| ← / → | Previous / next frame (⇧: 10 frames) |
-| ↑ / ↓ | Previous / next edit point |
+| ← / → | Previous / next frame (⇧: 10 frames). On a focused canvas with a selected clip showing: nudge it 1 px (⇧: 10 px), §4.2, §11 K-5 |
+| ↑ / ↓ | Previous / next edit point. On a focused canvas with a selected clip showing: nudge it 1 px (⇧: 10 px), §4.2, §11 K-5 |
 | Home / End | Start / end |
 | ⌘T | Split at playhead |
 | W / E | Trim start / end to playhead |
 | ⌫ | Delete the selection, leaving a gap — or LIFT the in/out range when nothing is selected. With an action selected (§11 CI-1) it removes THAT action instead |
-| esc | Leave the selected action (§11 CI-1) — the Clip tab's fields go back to the clip's base props. With no action selected the key is not consumed |
+| esc | Leave crop mode if it is on (§11 K-6); otherwise leave the selected action (§11 CI-1) — the Clip tab's fields go back to the clip's base props. With neither the key is not consumed |
 | ↩ (canvas text editor) | Apply the text and leave the editor; ⇧↩, ⌘↩, ⌥↩ or ⌃↩ insert a new line (§11 K-2) |
 | esc (canvas text editor) | Leave an unchanged edit; with the text changed, ask Cancel / Revert / Apply (§11 K-2) |
 | esc (timeline rename field) | Close the field and keep the old name; no undo step. Return, Tab or a click elsewhere commits, as its own undo step even when that click also edits |
 | esc (canvas drag) | Cancel the drag in progress — move, scale, rotate, crop, endpoint or region grip: the project goes back to the press's state, with no undo step (§11 CI-16) |
+| esc, return, keypad enter (crop mode) | Leave crop mode, from any focus but typing, ⇧ ⇪ allowed (§11 K-6) |
 | ⌘⌫ | Ripple delete (selection, or the in/out range) |
 | ⇧⌘F | Freeze frame |
 | ⌥⌘D | Detach audio |
@@ -24,7 +25,7 @@
 | I / O / ⌥X | Set in / set out / clear range |
 | N | Toggle snapping |
 | T | Add text clip at playhead |
-| C | Crop mode on the selected clip |
+| C | Crop mode on the selected clip, if it has source pixels or sits on a matte track; a beep otherwise (§11 K-7) |
 | Z | Region mode on the canvas — drag a rectangle over the selected clip to zoom to it (⇧ fills instead of fits), Esc cancels. Z again disarms it, and so does moving the selection: one key in and out, because a modal overlay that has lost focus can no longer be dismissed by Esc |
 | ⇧Z | Fit timeline |
 | ⌘= (⌘+ too) / ⌘- / ⌘0 | Zoom the canvas in / out / fit — the timeline zooms by pinch and ⌥/⌘-scroll, and ⇧Z fits it |
@@ -36,7 +37,7 @@
 | ⌥⌘V | Paste Attributes — the copied clip's look onto the selection |
 | ⌘E | Export… |
 | ⌥⌘E | Save Frame… — the frame under the playhead as a PNG, JPEG or HEIC still (road map 2's phase 7a). Export…'s still-image sibling, under the same letter |
-| ⌥⌘N | New Recording… — the recorder panel (road map 3). The same item reads Stop Recording while one runs, paused included, and stops it; a nil-target action on `AppDelegate`, so it resolves with no document open, as New Project does. Pause Recording and Resume Recording are the status item's rows (R2) and File ▸ Pause Recording, directly under this item, retitled Resume Recording while paused, with no key (#98). While a recording records shortcuts (§11 CU-61), the status item shows a keyboard mark ⌨︎ after the dot or ❚❚ and its menu's first row is a disabled "Recording keyboard shortcuts" and a separator |
+| ⌥⌘N | New Recording… — the recorder panel (road map 3). The same item reads Stop Recording while one starts or runs, paused included, and stops it (§11 #478); a nil-target action on `AppDelegate`, so it resolves with no document open, as New Project does. Pause Recording and Resume Recording are the status item's rows (R2) and File ▸ Pause Recording, directly under this item, retitled Resume Recording while paused, with no key (#98). While a recording records shortcuts (§11 CU-61), the status item shows a keyboard mark ⌨︎ after the dot or ❚❚ and its menu's first row is a disabled "Recording keyboard shortcuts" and a separator |
 | ⌘, | Settings… — Frame Job ▸ Settings…, the app's one window for something PERSISTED beyond view state (road map 6 §5d): four panes, "MCP" (§11 MC-7), holding a visible blurb on how an MCP client reaches Frame Job, the bundled helper's path and the Copy MCP Command button, then "Assistant" (road map 12 A2), holding the Anthropic key and the model (§11 AI-8, AI-11) with no Verify, the chat settings (§11 AI-20) and the month's spend line and its note (§11 P-7), under it "Transcription", holding the AssemblyAI key, the region and a Verify button, and last "Playback", holding Background render and its delay (§11 G-38); the Assistant, Transcription and Playback headings each carry an info button whose popover holds the pane's explanation (§11 SH-5). macOS's own place for the item and its own key; the nudge pair below is the BARE `,` and `.`, so nothing is displaced. A nil-target selector on `AppDelegate`, so it resolves with no document open, as New Project does |
 | ⌥⌘I | Toggle inspector |
 | ⌃⌘T | View ▸ Transcript — show the inspector, pick its Transcript tab and make its view first responder (road map "creator-jobs" TX2a, §11 TX-20). ⌘T is Split; ⌃⌘T was free. Not a toggle. In the view (§11 TX-21): ← → select one word and seek to it, ↑ ↓ the word nearest in x on the line above or below, ⇧ with any of them extends the selection without seeking, ⌘A selects every word, Esc clears the selection (with none it reaches the editor); a drag selects a run; every selection's cut is the in/out range; ⌫, ⌦, Edit ▸ Delete and Edit ▸ Ripple Delete with words selected ripple them out as one step "Delete Words" (TX3a, §11 TX-31; on the timeline ⌫ lifts); every other key, Space, J, K, L, I, O and M included, works as on the timeline |
@@ -309,7 +310,7 @@ the inspector on Clip ▸ Color. It is greyed while a nest is open and when
 there is nothing to cover (no range, no selection and an empty timeline);
 §11 GR-6 has the rules.
 Road map creator-jobs CO5 puts **Text Behind Subject** last in Insert, with no
-key equivalent: a title (the Title preset) on a new "Behind Subject" track
+key equivalent: a title (the default title) on a new "Behind Subject" track
 directly above the cut-out clip at the playhead — the front-most selected clip
 of a video file or picture there, else the front-most with Remove Background, else the
 front-most, on a shown track that is not a matte track — and above any matte

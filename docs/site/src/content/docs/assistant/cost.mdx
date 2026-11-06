@@ -1,0 +1,123 @@
+---
+title: "What it costs"
+description: See what the Assistant costs per turn, per conversation and per month, and how far to trust the figures.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The Assistant runs on your own Anthropic API key, so Anthropic bills you directly for what it uses. Frame Job shows you an estimate of that cost for each turn, each conversation and each month.
+
+<AtAGlance
+  menu="Frame Job ▸ Settings… ▸ Assistant"
+  keys="⌘,"
+  where={['Inspector ▸ Assistant tab ▸ Spend', 'The Cost line at the end of each turn']}
+  needs="An Anthropic API key. See Set up the Assistant."
+/>
+
+## Your own billing
+
+Every response is priced by Frame Job from LiteLLM's published Anthropic prices, a public price table on GitHub. Every figure on this page is **Frame Job's own estimate**. The Anthropic Console shows what your account was actually billed.
+
+| Where | What it covers |
+| --- | --- |
+| The [`Cost:` line](#per-turn) in the transcript | One turn |
+| The [**Spend** row](#per-conversation) in the tab | The conversation so far |
+| The [month's line](#per-month) in Settings | The current calendar month, across every window |
+
+## Per turn
+
+Each turn ends with a line in the transcript. For example:
+
+`Cost: $0.0182 · Frame Job's estimate at LiteLLM prices (cached 2026-10-25)`
+
+The amount sums every response in the turn, the [compaction](/assistant/context-and-compaction/#compaction) summary included. It shows to four decimal places, and a tiny positive amount reads "under $0.0001". A turn with no response has no `Cost:` line.
+
+The brackets name the price table and its date:
+
+| The brackets say | The prices came from |
+| --- | --- |
+| "bundled table of …" | The copy built into the app |
+| "cached …" | The copy Frame Job keeps, from an earlier refresh |
+| "fetched …" | A copy downloaded for this conversation |
+
+If a refresh failed, the brackets add "; not refreshed:" and the reason. A table that downloaded but couldn't be saved adds "; the price cache could not be written:" and the reason.
+
+## Unpriced responses
+
+A response that couldn't be priced shows as unknown with its reason, never as $0. In the `Cost:` line it reads "unknown (*reason*)", followed by "· at least $…" for the part that could be priced.
+
+A response goes unpriced when:
+
+- its model isn't in the price table, for example "*model* is not in the price table"
+- the table lists the model but has no rate for what was used
+- it used fast mode, for example `speed "fast" is not priced`
+- it used a batch or priority tier
+- it was a US-only request
+
+When a request sends more than 200,000 tokens, the model's higher rates apply if the table lists them.
+
+## Responses cut short
+
+A response cut short by [Stop](/assistant/stop-a-turn/) or an error is priced from what had arrived. It shows as "at least $… (a response was cut short)".
+
+## Per conversation
+
+The **Spend** row, under **Context** in the Assistant tab, adds up the conversation's turns since the last **Clear**, or since a key or model change ended the conversation.
+
+| The row reads | When |
+| --- | --- |
+| "Nothing yet" | Before the first response. |
+| "$0.0532 · Frame Job's estimate" | Every response was priced. |
+| "at least $… · Frame Job's estimate" | A response was cut short or couldn't be priced. Shortened to "≥$… · Frame Job's estimate" when the inspector is narrow. |
+| "under $0.0001 · Frame Job's estimate" | A tiny positive amount. Shortened to `<$0.0001 · Frame Job's estimate` when narrow. |
+| "unknown · Frame Job's estimate" | Nothing could be priced, or a response has no price and the priced part is under $0.00005. |
+
+Hovering the figure shows "What this conversation's responses cost at LiteLLM prices, as Frame Job estimates it. The Anthropic Console shows what your account was billed."
+
+The figure is held in memory. If the helper, the small program that talks to Anthropic, stops, the row carries on from where it was.
+
+## Per month
+
+In **Frame Job ▸ Settings… ▸ Assistant**, a line under **Save** and **Remove** totals what the Assistant has cost in the current calendar month. The month runs in UTC, so it can turn over before or after midnight where you are.
+
+A response here is one reply from Anthropic, so one turn can count as several, and a compaction summary counts as one.
+
+| The line reads | When |
+| --- | --- |
+| "October 2026 (UTC): $1.24 over 87 responses." | Every response was priced. |
+| "Nothing recorded in October 2026 (UTC)." | No responses this month. |
+| "October 2026 (UTC): 5 responses; none could be priced." | No response had a price. |
+| "October 2026 (UTC): 87 responses; 3 could not be priced, the rest came to $0.80." | Some had no price. They're counted, never added as $0. |
+| "Reading the spend ledger…" | The [ledger](#the-spend-ledger) is being read. |
+| "The spend ledger could not be read: *reason*." | It couldn't be read. |
+| "This launch keeps no spend ledger." | Frame Job has no folder to keep one in. |
+
+Totals are rounded to the cent, and a positive amount that would round to $0.00 reads "under $0.01". When some lines of the ledger are damaged, the line adds a sentence such as "2 ledger lines could not be read." That count covers the whole ledger, because a line with no readable time can't be placed in a month.
+
+The line refreshes when Settings opens, and after each response while Settings is visible. During a refresh after a response, the last sentence stays until the new one is ready.
+
+Under it, a faint note says: "Frame Job's own estimate at LiteLLM prices, from its spend ledger. The Anthropic Console shows what your account was billed."
+
+## Prices refreshed daily
+
+Frame Job prices from LiteLLM's published Anthropic prices. It has a table built into the app, and keeps a copy refreshed at most once a day at `~/Library/Application Support/Frame Job/anthropic-prices.json`.
+
+A refresh is checked when a conversation starts, with a 30-second limit, and a turn keeps the prices it started with. The download is a plain request to `raw.githubusercontent.com`, made by the helper. It carries no key and no project data.
+
+If it fails, Frame Job prices from the cached copy or the built-in table, and the `Cost:` line says which it used.
+
+## The spend ledger
+
+The figures in Settings come from a ledger, `spend.jsonl` in `~/Library/Application Support/Frame Job/`. It's on your Mac, and only your account can read it.
+
+Each response is one line, with its time, the service, the model, the token counts, its speed and service tier, the prices used, and the dollars or why they're unknown. It never records your key or the conversation's content.
+
+If a response's cost can't be written, the transcript notes it once per conversation: "The spend ledger *path* could not be written: *reason*." That response is then missing from the month's total in Settings.
+
+## Related
+
+- [Set up the Assistant](/assistant/set-up/)
+- [Stop a turn](/assistant/stop-a-turn/)
+- [Long conversations](/assistant/context-and-compaction/)
+- [Assistant privacy](/assistant/privacy/)
+- [Settings](/reference/settings/)

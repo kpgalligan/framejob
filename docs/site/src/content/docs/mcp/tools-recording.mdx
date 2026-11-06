@@ -1,0 +1,227 @@
+---
+title: "Tools: recording and screencasts"
+description: "The agent tools that record the screen, a camera or the microphone, read and attach cursor files, and add zooms, shortcut overlays and faster typing to a screencast."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These tools make a recording and then polish it as a screencast. `record_screen` records. The rest read the cursor file Frame Job writes beside a screen recording, and use what it holds to zoom on clicks, show shortcuts and speed through typing.
+
+<AtAGlance
+  menu={['File ▸ New Recording…', 'Clip ▸ Auto Zoom…', 'Clip ▸ Add Shortcut Overlays', 'Clip ▸ Speed Up Typing…']}
+  where="Media tab ▸ Cursor"
+  tools={['record_screen', 'set_media_cursor', 'get_cursor_events', 'auto_zoom', 'add_shortcut_overlays', 'speed_up_typing']}
+  needs="Recording needs its system permissions, which only a person can give. The rest runs on your Mac with no key."
+/>
+
+Every tool here also takes `project`, the path of an open project. Without it the call goes to the frontmost project. See [How tool calls behave](/mcp/tool-calls/). Times are in ticks, 600,000 a second. See [Units and ids](/mcp/units-and-ids/).
+
+## The tools that work from a cursor file
+
+`auto_zoom`, `add_shortcut_overlays` and `speed_up_typing` share these rules:
+
+- Each takes exactly one of `clip` and `clips`.
+- `from` and `to` are in the time of the timeline or nest that's open, and `to` must be after `from`. The menu commands can't limit themselves this way.
+- None takes `scope`. Each acts in whatever `set_scope` has open. See [Editing inside a nest](/mcp/nests/).
+- None remembers the settings a person last used in a sheet. They start from the defaults below.
+- With nothing to do, each returns `ok` with a `note` and makes no undo step.
+
+Each one won't run when a clip isn't a media clip, its media has no cursor file or the file is missing, or it plays reversed. If the project changes while the cursor files are read, the call changes nothing and says to call again.
+
+## `record_screen`
+
+Records for a set number of seconds and adds the result to the project as ordinary media, as **File ▸ New Recording…** does without the panel. It records a display or a window, the microphone alone, or a camera alone, and it can record a camera beside the screen. See also [The recorder panel](/recording/recorder-panel/).
+
+This is a summary. [Record with record_screen](/mcp/record-screen/) has every argument, its default and what the agent gets back.
+
+Only `seconds` is required, 1 to 600. The rest are grouped like this:
+
+| To set | Use |
+| --- | --- |
+| [The length and the source](/mcp/record-screen/#length-and-source) | `seconds`, and `source`: `screen` (the default), `voice_over` or `camera`. |
+| [The display or window](/mcp/record-screen/#display-or-window) | `display`, `window`, `size`, `rate` and `include_framejob_windows`. |
+| [The sound](/mcp/record-screen/#sound) | `system_audio` and `microphone`. |
+| [The pointer and keys](/mcp/record-screen/#pointer-and-keys) | `cursor`, `show_clicks` and `keys`. |
+| [Where it goes](/mcp/record-screen/#where-it-goes) | `path`, a folder, and `place`. |
+| [A camera](/mcp/record-screen/#choose-the-camera-and-its-format) | `camera` and `camera_format`, and beside the screen, [`camera_layout` and `camera_cutout`](/mcp/record-screen/#lay-the-camera-out). |
+| [Steps after it lands](/mcp/record-screen/#run-steps-after-it-lands) | `enhance`, [`auto_zoom`](#auto_zoom), `shortcut_overlays` and `speed_up_typing`. Each runs as its own undo step. The last two need `keys: "shortcuts"`. |
+
+Not every argument goes with every source. [Choose a source](/mcp/record-screen/#choose-a-source) has the table, and an argument the source can't use gives an error by name rather than being ignored.
+
+The call doesn't return until the recording has finished and been added to the project. [What it returns](/mcp/record-screen/#what-it-answers) lists every key. A person at the Mac can [pause or stop](/mcp/record-screen/#a-person-can-pause-or-stop-it) an agent's recording.
+
+**It never asks for a permission.** A person has to give Screen Recording, Microphone, Camera and Input Monitoring first, in the recorder panel, and a missing one gives an error that names it. See [It never asks for a permission](/mcp/record-screen/#it-never-asks-for-a-permission) and [Recording permissions](/recording/permissions/). The [Assistant tab](/assistant/what-it-can-do/) can't use this tool, so it's for a client connected over MCP.
+
+## `set_media_cursor`
+
+Attaches, moves or removes a screen recording's cursor file, the `.fjcursor` Frame Job writes beside each recorded movie. It's **Locate…** and **Remove** in the Media tab's **Cursor** section. See [Cursor files](/recording/cursor-files/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `media` | integer | Yes | The video media's id. |
+| `cursor` | object | Yes | `{path, bookmark?, in_picture}`, the media's `cursor` as `get_project` shows it, or null to forget the file. The file itself stays on disk. |
+| `scope` | integer | No | Leave it out. Passing it is refused, because this edit has no meaning inside a nest. |
+
+Give `path` in full, because `~` isn't expanded here. `in_picture` says whether the movie's picture already shows the pointer, and it must match the file.
+
+It returns what [any edit returns](/mcp/what-a-call-answers/), with `media` added, and it's one undo step, **Locate Cursor File** or **Remove Cursor File**. **Consolidate Media** copies the file into the package beside its movie, and opening a moved package finds it there.
+
+It won't attach the file when:
+
+- `path` is empty.
+- The file doesn't open as a cursor file.
+- The file was made for a movie of a different size.
+- `in_picture` isn't the file's own.
+- The media isn't a video with a picture.
+
+## `get_cursor_events`
+
+Reads what a recording's cursor file holds: its clicks, scrolls, shortcuts, stretches of typing and, if asked, the pointer's path. It runs on your Mac, needs no key, edits nothing and makes no undo step. There's no menu for it. See [What a cursor file holds](/recording/cursor-files/#what-a-cursor-file-holds).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `media` | integer | One of these | The recording, read in the file's own source ticks. |
+| `clip` | integer | One of these | A media clip of a recording, read in ticks from the clip's start, through its speed and ramps. |
+| `from` | integer | No | Where to start, in ticks, in the same time as the result. Default: 0. |
+| `to` | integer | No | Where to stop, not included, in ticks. Must be after `from`. Default: the media's or the clip's duration. |
+| `kinds` | array of strings | No | Any of `clicks`, `scrolls`, `shortcuts`, `typing` and `path`. Default: the first four. |
+| `smoothing` | number | No | The path's smoothing, 0 to 1. Default: the clip's own **Smoothing** in its Cursor section, else 0, the raw path. |
+
+It returns `ok`, `time` (`media` or `clip`), `from`, `to`, `count`, `media`, `clip` when given, `size` as `[w, h]`, `cursor_file`, `in_picture`, a `project` summary, and one key for each kind asked for:
+
+| Key | What it holds |
+| --- | --- |
+| `clicks` | A list of `{t, button, down, count, x, y}`. `button` is 0 left, 1 right, 2 other. `down` is 1 for a press and 0 for a release. |
+| `scrolls` | A list of `{t, x, y, dx, dy}`, each a single wheel event, with `dx` and `dy` in points. |
+| `shortcuts` | A list of `{t, keys, code}`. |
+| `typing` | A list of `{from, to, marks}`, each stretch that overlaps the window. |
+| `path` | `{smoothing, t, x, y}`, sampled 10 times a second. |
+
+`x` and `y` are the movie's own pixels from its top left.
+
+**Zoom on a click.** With `clip`, each click and scroll also has `q`, as `[qx, qy]`: its position as an offset in source pixels from the centre of the clip's cropped picture. That's the frame `add_zoom_action`'s region takes, so a region around a click is `{x: qx, y: qy, width, height}`. See [Zoom to Region](/motion/zoom-to-region/).
+
+**Long recordings.** Rows of every kind and path samples count together, and one result holds at most 5,000. `next` is then the first time left out, so call again with `from: next`.
+
+It won't read when:
+
+- It doesn't get exactly one of `media` and `clip`.
+- `kinds` is empty or names something else, or `smoothing` is outside 0 to 1.
+- `to` isn't after `from`.
+- The clip isn't a media clip, or it plays reversed. Ask with its media instead.
+- The media has no cursor file, or the file is missing.
+
+## `auto_zoom`
+
+Plans screencast zooms from the clicks and typing in a recording's cursor file, and applies them as one undo step, **Auto Zoom**. It's **Clip ▸ Auto Zoom…**. See [Auto Zoom](/recording/auto-zoom/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | One of these | A screen recording's media clip. |
+| `clips` | array of integers | One of these | Media clips whose media have cursor files. |
+| `zoom` | number | No | How far in, times the clip's own scale: 1.25 to 4. Default: 2. |
+| `lead` | number | No | Arrive this many seconds before the click: 0.2 to 2. Default: 0.6. |
+| `stay` | number | No | Stay this many seconds after the last activity: 0.5 to 10. Default: 2.5. |
+| `follow` | boolean | No | Follows the pointer while zoomed. Default: true. |
+| `typing` | boolean | No | Zooms on stretches of typing too. Default: true. |
+| `replace` | boolean | No | Removes the clips' existing zooms first. Default: false. |
+| `motion_blur` | number | No | The shutter given to each zoomed clip whose own `motion_blur` is 0, as a fraction of a frame: 0 to 1. Default: 0.5, a 180° shutter. 0 sets none. |
+| `from` | integer | No | Plans only clicks and typing at or after this time, in ticks. With `replace`, removes only zooms that meet the `from` to `to` window. |
+| `to` | integer | No | Plans only before this time, in ticks. |
+
+Each zoom is an ordinary action, the shape `add_zoom_action` makes, so it can be edited like any other. A visit starts at a click, or at a stretch of typing aimed at the last click before it. It zooms in `lead` seconds before that and back out over 0.8 seconds, `stay` seconds after the last activity. [How a visit is planned](/recording/auto-zoom/#how-a-visit-is-planned) has the rest.
+
+Halves of a split are planned as one, and nothing straddles a cut. See [Across a split](/recording/auto-zoom/#across-a-split). A planned zoom that meets an action already on the clip is dropped. `replace` removes only zooms, never any other action. A clip that already has a shutter keeps it.
+
+It returns what any edit returns, and adds:
+
+| Key | What it holds |
+| --- | --- |
+| `visits` | How many visits were planned. |
+| `added`, `replaced`, `dropped` | Zooms added, existing zooms removed, and planned zooms dropped because they met an action. |
+| `closed_at_cut` | Visits closed at a cut, because the later half wasn't named in the call or has an action of its own there. |
+| `bases_set` | Later halves whose base was set, by a zoom held across a cut or by `replace` putting it back. |
+| `blurred` | How many clips were given `motion_blur`. |
+| `actions` | A list of `{clip, at, duration, kind}`, with `at` in clip ticks and `kind` one of `in`, `pan`, `follow` or `back`. |
+
+Besides [the shared rules](#the-tools-that-work-from-a-cursor-file), it won't run when a number is out of range, a clip has no picture, or a clip is placed smaller than the canvas. For that last one, nest the clip, open the nest with `set_scope` and call `auto_zoom` inside it.
+
+## `add_shortcut_overlays`
+
+Places one Keyboard keys graphic clip for each keyboard shortcut recorded, at the moment it was pressed, as one undo step, **Add Shortcut Overlays**. It's **Clip ▸ Add Shortcut Overlays**, which has no sheet, so an agent is the only way to choose these settings. See [Shortcut overlays](/recording/shortcut-overlays/).
+
+Shortcuts are recorded only when the recording was made with **Record shortcuts** or `keys: "shortcuts"`. A typed key is stored as a time alone, never as a character, and makes no overlay. See [Record shortcuts](/recording/record-shortcuts/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | One of these | A screen recording's media clip. |
+| `clips` | array of integers | One of these | Media clips whose media have cursor files. |
+| `duration` | number | No | How long each overlay shows, in seconds: 0.5 to 10. Default: 1.5. |
+| `position` | string | No | Where the keycaps sit: `bottom` (the default), `center` or `top`. |
+| `theme` | string | No | The keycaps' look: `dark` (the default) or `light`. |
+| `from` | integer | No | Places only shortcuts at or after this time, in ticks. |
+| `to` | integer | No | Places only shortcuts before this time, in ticks. |
+
+An overlay never lasts less than 10 frames for each keycap plus 25, the time the template needs to press its last key and exit. Overlays never overlap:
+
+- The same shortcut pressed again before its overlay ends extends it, labelled ×2, ×3 and so on.
+- A different shortcut pressed sooner ends the earlier overlay where it starts, once the earlier one has had its minimum. If that puts it more than 0.5 seconds after its press, it's dropped.
+
+The clips go on the front-most track named **Shortcuts** when it's in front of every clip's track, unlocked, shown, not a matte and free over their span. Otherwise they go on a new **Shortcuts** track at the front. A module in `graphics/` whose text equals the bundled template is reused, and otherwise the template is copied in once, only when something is placed.
+
+The overlays are ordinary graphic clips. See [Change an overlay](/recording/shortcut-overlays/#change-an-overlay).
+
+It returns what any edit returns, and adds:
+
+| Key | What it holds |
+| --- | --- |
+| `added`, `merged`, `dropped` | Overlays placed, repeat presses folded into one, and presses left out. |
+| `track`, `new_track` | The track used, and whether it's new. |
+| `module`, `written` | The module drawn, and whether the template was copied in. |
+| `overlays` | A list of `{at, duration, keys, label}`, with `at` in timeline ticks. |
+
+Besides [the shared rules](#the-tools-that-work-from-a-cursor-file), it won't run with a `duration`, `position` or `theme` out of range.
+
+## `speed_up_typing`
+
+Plays the typing in screen recordings faster, keeping speech and shortcuts at normal speed, as one undo step, **Speed Up Typing**. It's **Clip ▸ Speed Up Typing…**. See [Speed Up Typing](/recording/speed-up-typing/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clip` | integer | One of these | A screen recording's media clip. |
+| `clips` | array of integers | One of these | Media clips whose media have cursor files. Halves of a split recording are joined. |
+| `rate` | number | No | How much faster a stretch plays: 2 to 8. Default: 4. |
+| `shortest` | number | No | The shortest stretch sped up, in seconds: 1 to 30. Default: 3. |
+| `keep_pitch` | boolean | No | Keeps the sped sound's pitch. Default: true. |
+| `from` | integer | No | Speeds only typing at or after this time, in ticks. |
+| `to` | integer | No | Speeds only typing before this time, in ticks. |
+
+A typing stretch is a run of at least 3 typed keys, each under 1 second apart. Taken out of each stretch are every span of speech, in any clip with sound under it on any track, and each recorded shortcut with its overlay, which is 1.5 seconds when it has no clip on a **Shortcuts** track. The pieces of all the clips join where they meet, and a piece shorter than `shortest` is left alone.
+
+Each kept piece is sped by `retime_range` at `rate` on every unlocked track, keeping 0.3 seconds at normal speed at each end, so everything after it moves up in step. See [Tools: speed and time](/mcp/tools-speed/).
+
+Speech detection runs on your Mac. If a stretch has sound under it and that media's detected speech hasn't been saved in the project yet, it's saved in the same step.
+
+It returns `ok`, a `project` summary and the ids it created, and adds:
+
+| Key | What it holds |
+| --- | --- |
+| `stretches`, `short` | Stretches sped up, and pieces left alone for being too short. |
+| `ranges` | A list of `{from, to, sped_to}`, in timeline ticks before the edit. |
+| `saved` | The time saved, in ticks. |
+| `speech_saved` | The media whose speech was saved in this step. |
+| `audio_left_out`, `audio_note` | Only when a clip with sound now plays past ×12, the ceiling for sound. Unlike the menu command, it doesn't ask. See [If a clip would go silent](/recording/speed-up-typing/#if-a-clip-would-go-silent). |
+
+Besides [the shared rules](#the-tools-that-work-from-a-cursor-file), it won't run, and nothing changes, when:
+
+- `rate` or `shortest` is out of range.
+- `retime_range` couldn't do one of the ranges, because of a locked track after it, a transition or a linked clip, for example. The error names it.
+- Speech detection is still running. It doesn't wait, and it says to try again in a moment.
+
+## Related
+
+- [Record with record_screen](/mcp/record-screen/)
+- [Cursor files](/recording/cursor-files/)
+- [Polish when a recording lands](/recording/when-it-lands/)
+- [Recording permissions](/recording/permissions/)
+- [Tools: speed and time](/mcp/tools-speed/)

@@ -1,0 +1,95 @@
+---
+title: Copy, cut and paste
+description: Copy clips to the clipboard and paste them at the playhead, in the same project or another one, keeping their arrangement.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+The clipboard carries clips from one place to another: later in the same timeline, or into a different project. Pasted clips land at the playhead and keep the arrangement you copied.
+
+<AtAGlance
+  menu={['Edit ▸ Copy', 'Edit ▸ Cut', 'Edit ▸ Paste']}
+  keys={['⌘C', '⌘X', '⌘V']}
+  tools="paste"
+/>
+
+## Copy and paste clips
+
+<Steps>
+
+1. Select the clips and press <kbd>⌘C</kbd>, or choose **Edit ▸ Copy**. The clipboard holds the clips and a note of the media files they show.
+
+2. Move the playhead to where they should go.
+
+3. Press <kbd>⌘V</kbd>, or choose **Edit ▸ Paste**.
+
+</Steps>
+
+The pasted clips are selected, so you can drag or style them straight away. The paste is one undo step, called Paste, and you can paste the same clips as many times as you like.
+
+**Copy** and **Cut** are greyed out with nothing selected. **Paste** needs no selection. It's greyed out unless Frame Job clips are on the clipboard, because it never pastes another app's text or files.
+
+While you're typing in a field, these keys act on the text in the field, not on clips.
+
+## Cut clips
+
+Press <kbd>⌘X</kbd> or choose **Edit ▸ Cut**. The clips go on the clipboard and are then deleted, leaving gaps, exactly as <kbd>⌫</kbd> does. To close the gaps as well, see [Delete, Ripple Delete and Lift](/editing/delete-clips/).
+
+A cut is one undo step, called Cut. If the clips can't be copied, Frame Job beeps and deletes nothing.
+
+## Where pasted clips land
+
+Paste keeps the arrangement you copied.
+
+- **In time.** The earliest clip lands at the playhead, and every other clip keeps its distance from it. Everything lands on a frame.
+- **Across tracks.** Each clip keeps its place in the stack, counted back from the front. A clip copied from the front track lands on the front track, and one copied from the second track down lands on the second track down. A selection across two lanes pastes back onto two lanes.
+- **Missing tracks.** If the project has too few tracks, new ones are added at the back.
+
+## When there's no room
+
+A paste isn't turned down for lack of room. A clip that would break the [overlap rule](/editing/how-edits-work/#the-overlap-rule) on its track goes on a new track at the front, so it stays visible over what was already there.
+
+A smaller overlap is allowed, as it is for any placement: up to half of the shorter clip. The clip stays on its track and the overlap gets a Cross Dissolve. See [Transitions](/motion/transitions/).
+
+## Paste into another project
+
+Copy in one project, switch to another and paste. The clips stay on the clipboard, so the other project can be opened before or after you copy.
+
+- **Media.** Files are matched by their path. A file the project already has is reused, and one it doesn't have is added to the [Media tab](/projects/media-tab/), with the same checks an import makes. Only files the pasted clips use come across, including the `.cube` file of a [look](/color/luts/) and the LUT of [Camera Log](/hdr/camera-log/).
+- **Frame rate.** Pasted clips are snapped to this project's frame rate.
+- **New clips.** What lands is a new set of clips, so you can paste them again into the project they came from.
+
+A graphic clip brings its name and not its files. In a project without that graphic, the clip draws a red error card until you add a graphic of the same name. See [Insert a graphic](/graphics/insert-a-graphic/).
+
+## A detached sound comes along
+
+When a clip has a [detached sound](/audio/detach-and-attach/), selecting its picture copies both, so the pair pastes as a linked pair. Selecting the sound on its own copies only the sound, and it pastes as an ordinary clip with no link to any picture.
+
+Cut follows the same split. Cutting a picture takes its sound with it, unless the sound is on a locked track. Cutting a detached sound on its own leaves the picture in place, silent.
+
+## Copied clips as text
+
+Paste into a text editor and you get a one-line summary of what was copied, in the project's timecode:
+
+```text
+Frame Job — 2 clips, 00:00:01:00 to 00:00:04:00
+```
+
+## Good to know
+
+- A nest clip pastes as an independent copy. Its nest comes with it, with every nest inside it, so editing one leaves the other alone. Clips pasted together that showed one nest share their new one. Pasted into another project, the files inside the nest come across too. To keep showing the same nest, use [Duplicate or ⌥-drag](/editing/duplicate-clips/). See [Shared and independent nest copies](/editing/nest-copies/).
+- A paste lands whole or not at all. If one clip can't go in, Frame Job shows an error naming it and nothing changes. An [adjustment clip](/color/adjustment-clips/), for example, can't be pasted while a [nest](/editing/nests/) is open.
+- Room for a paste isn't unlimited: a project holds up to 64 tracks and 4,096 clips. A paste that would pass either limit shows an error.
+- Copy and Paste work inside a nest. **Copy** takes the clips you picked and counts their depth against the nest's own tracks, and **Paste** lands in the nest that's open.
+
+## With an agent
+
+`paste` takes a description of the clips in the same form Copy writes, so an agent can place clips without touching your clipboard. `at` sets the time, the playhead if it's left out, and `track` sets where the front-most copied lane lands, the front track if it's left out. See [Tools: copying and nesting](/mcp/tools-copy-and-nest/#paste).
+
+## Related
+
+- [Paste Attributes](/editing/paste-attributes/)
+- [Duplicate clips](/editing/duplicate-clips/)
+- [Delete, Ripple Delete and Lift](/editing/delete-clips/)
+- [Select clips](/timeline/selecting-clips/)

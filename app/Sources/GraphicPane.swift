@@ -190,7 +190,10 @@ final class GraphicPane: InspectorPaneView {
                     key: key, value: ends[key] ?? .null, declared: declared.contains(key), binding))
         }
         let note: String?
-        if parsed == nil {
+        if let shared, shared.entry == nil {
+            note = GraphicDiagnostic.noModule(shared.name).message
+                + " — see Source. Stored values are listed below."
+        } else if parsed == nil {
             note = "The module did not compile — see Source. Stored values are listed below."
         } else if parsed?.schema.entries.isEmpty == true {
             note = "The module declares no properties."

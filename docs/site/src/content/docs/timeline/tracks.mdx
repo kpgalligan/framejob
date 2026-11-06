@@ -1,0 +1,96 @@
+---
+title: Tracks
+description: What a track is, how tracks stack, which track a command acts on, and what the switches in a track header do.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+A track is a row on the timeline that holds clips. Tracks are the layers of your video: what sits on a higher lane draws in front of what sits on a lower one.
+
+<AtAGlance
+  menu={['Track ▸ Hide Video', 'Track ▸ Mute Audio', 'Track ▸ Lock Track', 'Track ▸ Solo', 'Track ▸ Mix…']}
+  where={['The header at the left of each track', 'Right-click a track header or an empty stretch of its lane']}
+  tools={['set_track']}
+/>
+
+<Shot
+  name="04-editor.window"
+  alt="The editor window. Along the bottom, the timeline has one row per track. Each row has a header on the left with the track's name and its row of switches, and the track's clips run along the lane to the right."
+/>
+
+## One kind of track
+
+Frame Job has one kind of track, and it holds any mix of clips: video, audio, a picture, text, a shape, a graphic, a nest or an adjustment clip. There are no separate video and audio tracks, so a title and a music file can sit on the same track. What a track holds only changes [how tall its lane is drawn](/timeline/track-height/).
+
+Clips on one track play one after another. To show two things at once, put them on two tracks. Overlapping two clips on the same track makes a [transition](/motion/transitions/), not a layer.
+
+## Stacking order
+
+The top lane is the front-most track and the bottom lane is the back. Where two clips overlap in the frame, the one on the higher lane draws over the one below.
+
+The order affects the picture, not the sound. To change it, [drag a track header](/timeline/manage-tracks/#reorder-tracks). A [matte track](/canvas/matte-tracks/) is the one case where a track's neighbour matters, because it cuts the track directly behind it.
+
+## The current track
+
+Some commands act on one track without asking which. They use the current track: the track of the first selected clip, or the front-most track when nothing is selected. To aim one of these commands at a track, select a clip on it first.
+
+| Command | What it does to the current track |
+| --- | --- |
+| **Track ▸ Remove Track** | Removes it. |
+| **Track ▸ Hide Video**, **Mute Audio**, **Lock Track** and **Solo** | Flips that switch. |
+| **Track ▸ Mix…** and **Track ▸ Matte** | Opens its mix panel, or sets its matte. |
+| **Clip ▸ Close Gap** | Closes the gap under the playhead on it. |
+| **Edit ▸ Select All on Track** | Selects every clip on it. |
+| **Edit ▸ Insert at Playhead** and **Edit ▸ Overwrite at Playhead** | Places the Media tab's selected file on it. |
+
+The [track context menu](/timeline/manage-tracks/#the-track-context-menu) doesn't use the current track. It acts on the track you clicked, whatever is selected.
+
+With a [nest](/editing/nests/) open, the current track is one of the nest's own tracks.
+
+## Track names
+
+Each header shows its track's name. A new track gets a name such as `Track 3`, from the number of tracks there were when you added it. That name is the track's own, so it stays when you reorder the stack, and two tracks can end up with the same name.
+
+A track with no name at all shows `Track N` instead, counting up from the back track as 1. That label follows the track's place in the stack.
+
+To change a name, see [Rename a track](/timeline/manage-tracks/#rename-a-track).
+
+## The track header
+
+Each track has a header on the left with its name, four switches and the **Mix** button. Click one to use it.
+
+| Control | Symbol, off and on | What it does |
+| --- | --- | --- |
+| **Hide Video** | Eye, struck-through eye | Takes the track's picture out of the preview and the export. See [Hide Video](/timeline/hide-and-lock-tracks/#hide-video). |
+| **Mute Audio** | Speaker, crossed-out speaker | Silences the track's sound. See [Mute and solo tracks](/audio/mute-and-solo/). |
+| **Lock Track** | Open padlock, closed padlock | Protects where the track's clips sit. See [Lock Track](/timeline/hide-and-lock-tracks/#lock-track). |
+| **Solo** | Headphones, both | Silences every other track that isn't soloed too. Pictures stay. See [Mute and solo tracks](/audio/mute-and-solo/). |
+| **Mix** | Sliders, both | Opens the track's mix panel: volume, pan, compressor and limiter. See [Track volume and pan](/audio/track-volume-and-pan/). |
+
+A switch that's on is lit in the accent colour with a highlight behind it, so you can read a track's state from the symbol or the highlight. **Solo** and **Mix** keep the same symbol either way, so the highlight is what tells you. **Mix** is lit while the track's volume or pan is off its default, or a compressor or limiter is on.
+
+Each flip of **Hide Video**, **Mute Audio**, **Lock Track** or **Solo** is one undo step. **Mix** opens its panel and changes nothing by itself.
+
+The header itself does more than hold the switches:
+
+| To | Do this |
+| --- | --- |
+| Rename the track | Double-click the header. |
+| Move it up or down the stack | Drag the header. |
+| Select every clip on it | <kbd>⌥</kbd>-click the header. |
+| Open its menu | Right-click or <kbd>⌃</kbd>-click the header. |
+
+A [matte track](/canvas/matte-tracks/) also carries a tag in its header.
+
+## With an agent
+
+`set_track` changes a track's name, its four switches, its matte and its mix in one call, and anything it leaves out keeps its value. A compressor or limiter it sets replaces that whole setting, and only the timeline's tracks have them, so it can't set either on a track inside a nest. See [Tools: tracks, markers and canvas](/mcp/tools-tracks-and-markers/#set_track).
+
+## Related
+
+- [Add, rename and reorder tracks](/timeline/manage-tracks/)
+- [Hide and lock tracks](/timeline/hide-and-lock-tracks/)
+- [Track height](/timeline/track-height/)
+- [Mute and solo tracks](/audio/mute-and-solo/)
+- [Track volume and pan](/audio/track-volume-and-pan/)

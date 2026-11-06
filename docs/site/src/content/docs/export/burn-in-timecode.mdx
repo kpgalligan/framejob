@@ -1,0 +1,42 @@
+---
+title: "Burn in timecode"
+description: Draw the project's timecode into an exported picture, so a reviewer's notes point at exact frames.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Burn in timecode draws the project's timecode into the exported picture. Use it for a review copy, so a note about a frame carries the number you'll find on your timeline.
+
+<AtAGlance
+  menu="File ▸ Export…"
+  keys="⌘E"
+  where="Export sheet ▸ Burn in timecode"
+  tools={['export', 'render_frame']}
+/>
+
+## Burn in timecode
+
+Choose **File ▸ Export…** and turn on **Burn in timecode**. It's off by default.
+
+The timecode appears only in the exported file, never in the preview. It sits centred near the bottom of the picture, on a translucent black plate, on top of everything, captions included.
+
+The box works on every format with a picture, Animated GIF and Animated PNG included. It's greyed out for the audio-only formats, and **File ▸ Save Frame…** never offers it.
+
+The sheet remembers it with the rest of your last export, and a [preset](/export/presets/) stores it.
+
+## What the timecode shows
+
+It uses the project's own timecode format, as the toolbar shows it: `HH:MM:SS:FF` or `HH:MM:SS.mmm`, non-drop. See [Canvas background and timecode](/projects/background-and-timecode/).
+
+It shows **project time**. A file exported from an [in/out range](/export/range/) that starts at 00:00:10:00 begins at 00:00 in a player, but its first frame reads 00:00:10:00. That's the number a reviewer's note needs.
+
+## With an agent
+
+`burn_in_timecode` turns it on in `export`, and it's off by default. `render_frame` takes the same argument, so an agent can draw the timecode into a single frame, which **Save Frame…** can't do. See [Check the picture: render_frame](/mcp/render-frame/).
+
+## Related
+
+- [The export sheet](/export/export-sheet/)
+- [Export a range](/export/range/)
+- [Canvas background and timecode](/projects/background-and-timecode/)
+- [Save Frame](/export/save-frame/)

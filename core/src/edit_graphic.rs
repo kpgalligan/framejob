@@ -264,7 +264,7 @@ impl Project {
                 }
                 "in" => {
                     return Err(
-                        "\"in\" cannot be patched: trim_start and split own a graphic's in point"
+                        "\"in\" cannot be patched: trim_start, roll, split and add_transition move a graphic's in point"
                             .to_string(),
                     )
                 }

@@ -1,0 +1,136 @@
+---
+title: Voice effects
+description: Give a clip's sound one of sixteen effects, from a pitch shift or a phone line to a cathedral, and set how much of it you hear.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Voice Effect changes the character of a clip's sound: pitch a voice up or down, squeeze it into a phone line, or put it in a hall. A clip has one effect at a time.
+
+<AtAGlance
+  where="Clip tab ▸ Sound ▸ Voice Effect"
+  tools="set_audio"
+  needs="Nothing. Apple's audio units render the effect on your Mac, with no key and no upload."
+/>
+
+## Choose an effect
+
+<Steps>
+
+1. Select the clip and open the **Sound** sub-tab of the Clip tab.
+
+2. Open the **Voice Effect** section.
+
+3. Choose an effect from **Effect**. The list names each one with its group, such as **Space: Hall**.
+
+4. Set [Amount](#set-the-amount), and [Pitch](#set-the-pitch) for the three effects that use it.
+
+</Steps>
+
+Frame Job renders the effect in the background, and you hear it [when that's done](#when-you-hear-the-effect). Each effect keeps the clip at about the loudness it had, so switching between them doesn't jump in level.
+
+To take the effect off, choose **None**, or choose **Reset** in the section's header. The header shows the effect and its amount, such as "Space: Hall 100%", or "off".
+
+With several clips selected, a change applies to all of them. **Amount** and **Pitch** give every selected clip the first clip's whole effect, not only the value you changed. See [Edit several clips at once](/audio/sound-tab/#edit-several-clips-at-once).
+
+## The effects
+
+The figures here are at an Amount of 100 %.
+
+### Voice
+
+| Effect | What it does |
+| --- | --- |
+| **Voice: Pitch** | Shifts the voice up or down without changing its speed. It starts at 0 semitones, so it changes nothing until you set [Pitch](#set-the-pitch). |
+| **Voice: High** | Shifts the voice up 5 semitones, cuts the lows below 150 Hz and lifts the highs above 4 kHz by 3 dB, for a small, high voice. |
+| **Voice: Deep** | Shifts the voice down 5 semitones, adds 4 dB of low weight below 150 Hz and takes 3 dB off the highs above 5 kHz. |
+| **Voice: Robot** | Makes the voice metallic and buzzing, with a 60 Hz ring modulator and a short 8 ms delay. |
+
+### Tone
+
+| Effect | What it does |
+| --- | --- |
+| **Tone: Bass** | Boosts the lows below 200 Hz by 10 dB. |
+| **Tone: Treble** | Boosts the highs above 3 kHz by 10 dB. |
+| **Tone: Bright** | Lifts the presence with 4 dB around 3 kHz, and the air with 6 dB above 8 kHz. |
+| **Tone: Telephone** | Squeezes the sound into the narrow band of a phone line, 300 Hz to 3.4 kHz. |
+| **Tone: Radio** | Squeezes the sound into 400 Hz to 4.5 kHz and adds a radio tower's crackle. |
+
+### Character
+
+| Effect | What it does |
+| --- | --- |
+| **Character: Lo-Fi** | Limits the sound to 150 Hz to 6 kHz and crushes it, so it's gritty and dull, like a low-resolution recording. |
+| **Character: Distorted** | Overdrives the sound into heavy distortion. |
+
+### Space
+
+| Effect | What it does |
+| --- | --- |
+| **Space: Echo** | Repeats the sound every quarter of a second, each repeat darkened above 6 kHz. |
+| **Space: Room** | Puts the sound in a medium room, with a 35 % reverb mix. |
+| **Space: Hall** | Puts the sound in a large hall, with a 40 % reverb mix. |
+| **Space: Plate** | Adds a plate reverb, with a 35 % mix. |
+| **Space: Cathedral** | Puts the sound in a cathedral with a long tail, with a 45 % reverb mix. |
+
+## Set the amount
+
+**Amount** is how much of the effect you hear, from 0 to 100 %. It starts at 100 %, and its quick picks are 25, 50 and 100 %. It's greyed out until you choose an effect.
+
+Every boost, mix and shift scales with it, and the edges of a band move in from where they'd do nothing. At 50 %, **Voice: High** shifts 2.5 semitones and **Tone: Bass** boosts by 5 dB. At 0 the clip plays as it is.
+
+Choosing another effect keeps the Amount. Choosing **None** forgets it, so the next effect starts at 100 %.
+
+## Set the pitch
+
+**Pitch** is the shift in semitones, from −12 to 12. Its quick picks are −12, −5, 0, 5 and 12. It works only for **Voice: Pitch**, **Voice: High** and **Voice: Deep**, and it's greyed out for the rest.
+
+Choosing one of the three sets Pitch back to that effect's own: 0, +5 or −5. Amount scales the shift too, so a Pitch of 12 at an Amount of 50 % shifts by 6 semitones.
+
+## Read the status
+
+**Status** says where the effect's render has got to. With several clips selected it reads "—".
+
+| Status | What it means |
+| --- | --- |
+| Off | The clip has no effect, or one that changes nothing, such as an Amount of 0 or **Voice: Pitch** at 0 semitones. |
+| Rendering… | The effect is being worked out. Until it's done the clip plays without it. |
+| Ready | The clip plays with the effect. |
+| Plays without it at this speed | The clip has a speed change, a speed ramp or a freeze frame. An effect plays only at normal speed. |
+| Waits for the reversed copy | The clip is reversed and its [reversed copy](/speed/reverse/) isn't ready yet. |
+| Not rendered: and a reason | The render failed. The reason might be "its media cannot be found" or "its isolated voice was not rendered". |
+
+## When you hear the effect
+
+The effect is worked out once for each clip, in the background. Until it's ready the clip plays without it, and the editor switches over by itself when it is. A clip that isn't at normal speed plays without the effect, and [Status](#read-the-status) says so.
+
+Changing the effect, Amount, Pitch or the clip's [Voice Isolation](/audio/voice-isolation/) amount works it out again. So does trimming or slipping the clip, because the clip then plays a different part of its file. Moving the clip along the timeline doesn't.
+
+An export waits for every clip's effect, and its sheet reads "Preparing" and the file's name meanwhile, so a file is never written without one. If a render fails, the export stops and names the clip.
+
+## Where it sits in the chain
+
+The effect comes right after Voice Isolation and before everything else in the [Sound tab's order](/audio/how-audio-works/). An isolated clip's effect is made from its isolated voice, so it waits for that first. The channel choice, the EQ, noise reduction and the sections after them all work on the effected sound.
+
+## Good to know
+
+- A reverb or an echo stops at the end of the clip. It doesn't ring on into the next one.
+- A clip split from a take starts its effect fresh at the cut, so a reverb or echo doesn't carry across the join.
+- On a stereo file a reverb or an echo mixes the two channels together, so the [channel choice](/audio/channels/) picks from the effected pair, not from the original left and right.
+- The effect can't be animated. Voice Effect is marked ⊘ inside an [action](/audio/animate-sound/), and a change there still applies to the whole clip. It's also made from the clip's own Voice Isolation amount, not an animated one.
+- The waveform, the Loudness readout and [Remove Silences](/cleanup/remove-silences/) hear the clip without its effect. [Normalize](/audio/normalize/) in Loudness mode measures through it, and waits for the render first.
+- On a nest clip the effect does nothing. Open the [nest](/editing/nests/) and set it on the clips inside.
+
+## With an agent
+
+An agent sets the effect with `set_audio`'s `voice`: a `kind`, an `amount` from 0 to 1 (1 if left out) and, for `pitch`, `high` and `deep`, a `pitch` from −12 to 12. The kinds are the effects' names in lower case, with `lofi` for Lo-Fi. `{"voice": null}` takes the effect off.
+
+Changing the `kind` keeps a stored `pitch` unless the agent sends `pitch: null` with it, where choosing from the list always goes back to the effect's own. An agent can't read Status, though an export still waits for the render. See [Tools: clip sound](/mcp/tools-set-audio/#voice-effects).
+
+## Related
+
+- [Voice Isolation](/audio/voice-isolation/)
+- [How audio works](/audio/how-audio-works/)
+- [The Sound tab](/audio/sound-tab/)
+- [Enhance Voice](/audio/enhance-voice/)

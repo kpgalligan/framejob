@@ -1,0 +1,243 @@
+---
+title: "Tools: media"
+description: The agent tools that bring files into a project, relink and remove them, copy them into the package, and set a file's Camera Log, peak and speech.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+These tools work on the project's media list, the files a project points at. A file on the list isn't on the timeline until a clip uses it. See [Tools: adding clips](/mcp/tools-adding-clips/).
+
+<AtAGlance
+  tools={['import_media', 'add_media', 'relink_media', 'remove_media', 'consolidate_media', 'set_media_color', 'set_media_speech']}
+/>
+
+The media list belongs to the whole project, not to a nest, so:
+
+- Pass `scope` to `add_media`, `relink_media`, `remove_media`, `set_media_color` or `set_media_speech`, and the call is refused with "*tool* has no meaning inside nest *id*".
+- With a nest open and no `scope` passed, those same edits apply to the whole project. All but `add_media` list themselves under `document_ops` in the answer, so you can see they skipped the nest. See [Document edits while a nest is open](/mcp/nests/#document-edits-while-a-nest-is-open).
+- Media ids mean the same thing everywhere.
+
+Every tool here also takes an optional `project`, the path of an open project as `get_project` reports it. Without it the call goes to the frontmost project. Each edit is one undo step. See [What a call answers](/mcp/what-a-call-answers/) for the `project` summary and the two ways an edit can fail to happen.
+
+The cursor file beside a recording has its own tool, [`set_media_cursor`](/mcp/tools-recording/#set_media_cursor).
+
+## `import_media`
+
+Reads a movie, sound file, picture or `.cube` LUT and adds it to the media list, as [**File ▸ Add Media…**](/projects/import-media/#add-media) does. It isn't on the timeline yet. Place it with [`add_clip`](/mcp/tools-adding-clips/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `path` | string | Yes | The file, or a folder, as an absolute path or one starting with `~`. |
+| `project` | string | No | The project to add it to. Leave it out for the frontmost one. |
+
+For a file, it answers:
+
+| Key | What it is |
+| --- | --- |
+| `media` | The new media id. |
+| `path` | Where the entry points. For a converted file, that's the copy. |
+| `original` | The file you named, when the entry points at a copy. |
+| `kind` | `video`, `audio`, `image` or `lut`. |
+| `duration` | The file's length, in ticks. |
+| `width`, `height` | Its display size. |
+| `fps` | Its frame rate, as `[numerator, denominator]`. |
+| `has_video`, `has_audio`, `has_alpha` | What it holds. |
+| `note` | What to do next: `add_clip`, or for a LUT, [`set_video`](/mcp/tools-set-video/) with a look. |
+| `project` | The `project` summary. |
+
+A [WebM or Matroska file](/projects/webm-and-matroska/) is copied into a `.mov` first and named after the original. A file the [ffmpeg step](/projects/ffmpeg-conversion/) converts is recorded the same way.
+
+A tool call never asks, so where the app would offer to convert a file with ffmpeg, this answers with the reason instead. Convert it from the app's window, or [set Frame Job to always convert](/projects/ffmpeg-conversion/#with-an-agent).
+
+It's refused when nothing exists at `path`, or when the file can't be read. A file whose path is already on the list changes nothing, and the answer says so. The undo step is called "Add Media".
+
+### A folder
+
+Given a folder, or a link to one, `import_media` adds the media files directly inside it, as [a drop of the folder on the Media tab](/projects/import-media/#drop-on-the-media-tab) does. It looks one level down, takes the files in the order the Finder lists them by name, and adds them all as one undo step, "Add Media" for one file or "Add 3 Media Files" for three. Hidden files are left out and not listed. A package, such as a Frame Job project, is read as a file, not a folder.
+
+It answers:
+
+| Key | What it is |
+| --- | --- |
+| `folder` | The folder you named. |
+| `imported` | One entry per file added, in the Finder's order, each with the keys a file's answer has, from `media` to `has_alpha`, and `original` when there is one. |
+| `skipped` | One `{path, reason}` per item left out, always present. The reason is "not a media file", "a folder", "a package", "already in the media list", or why the file couldn't be read. |
+| `note` | What to do next: `add_clip` for each file, or `set_video` with a look for a LUT. |
+| `project` | The `project` summary. |
+
+When nothing is added, the call is refused. An empty folder answers "Nothing in *folder* was added: it has no files directly inside it." Otherwise it names each item and why, as in "Nothing in *folder* was added. Skipped: readme.txt (not a media file)." A folder Frame Job can't read answers "Nothing in *folder* was added: it could not be read."
+
+## `add_media`
+
+Adds a media entry from a description you supply, with no reading of the file. Use `import_media` unless you're replaying a project's own JSON. Frame Job has no menu item for this tool, because reading the file is the app's job.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `descriptor` | object | Yes | The entry to add, as below. |
+| `scope` | integer | No | Leave it out. Passing it is refused, because this edit has no meaning inside a nest. |
+| `project` | string | No | The project to add it to. Leave it out for the frontmost one. |
+
+The descriptor is an element of `media` from `get_project`, without its `id`. Only `path` is required by name.
+
+| Key | What it is | Default |
+| --- | --- | --- |
+| `path` | The file. A leading `~` is expanded. | |
+| `bookmark` | A base64 file bookmark. | None |
+| `kind` | `video`, `audio`, `image` or `lut`. | `video` |
+| `duration` | The length, in ticks. | 0 |
+| `width`, `height` | The size in pixels. A file with pixels needs both. | 0 |
+| `fps` | The frame rate, as `[numerator, denominator]`. | `[30, 1]` |
+| `has_video` | Whether it has a picture. | On for `video` and `image` |
+| `has_audio` | Whether it has sound. | On for `audio` |
+| `has_alpha` | Whether it has an alpha channel. | Off |
+| `original` | `{path, bookmark?}`: the file a `.mov` copy or conversion was made from. | None |
+| `color` | A video file's Camera Log, as `set_media_color` takes it, plus `detected`, and `pq`, a PQ file's `{file?, from?, peak?}` as `get_project` shows it. | None |
+| `cursor` | `{path, bookmark?, in_picture}`: the cursor file recorded beside a video, with `in_picture` true when the movie's own picture already shows the pointer. Both `path` and `in_picture` are required, and it's for a video with a picture only. | None |
+
+It answers `ok: true`, `media` (the new id), `path` and the `project` summary.
+
+An unknown key is refused by name, and so is a value of the wrong shape. A picture with no width or height, a video with a frame-rate term of 0, an empty path and a negative duration are all refused. A `color` that `set_media_color` wouldn't take is refused too. A path already on the list changes nothing.
+
+## `relink_media`
+
+Points a media entry at a file that moved, as [the Missing media sheet](/projects/relink-media/#relink-from-the-missing-media-sheet) and the Media tab's row menu do. `get_project`'s `missing_media` names the entries that need this.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `media` | integer | Yes | The media id. |
+| `path` | string | Yes | Where the file is now. |
+| `bookmark` | string | No | A base64 file bookmark. Leave it out and one is made for you, so the next move is followed automatically. |
+| `scope` | integer | No | Leave it out. Passing it is refused, because this edit has no meaning inside a nest. |
+| `project` | string | No | The project to act on. Leave it out for the frontmost one. |
+
+The new file is read as `import_media` reads one, and the entry takes its duration, size, frame rate and audio, video and alpha flags. What happens to the rest is on [Relink missing media](/projects/relink-media/#what-a-relink-keeps):
+
+- A clip running past the end of a shorter file is shortened to end with it. One that starts past the new end keeps a single frame.
+- Camera Log and an HDR10 peak are kept.
+- Saved speech is held to the new file, and forgotten when the new file has no sound.
+- The cursor file beside the new movie is taken. If there's none, the old one stays as long as it's still there and the new movie is the same size. Otherwise the entry's cursor file is cleared.
+- A WebM or Matroska file is copied into a `.mov` first, and a file the ffmpeg step converts is recorded the same way. Either becomes the entry's new `original`, and any other file clears it.
+
+It answers `ok: true`, `media`, `path`, `kind`, `duration`, `width`, `height`, `fps`, `has_video`, `has_audio`, `has_alpha`, `original` when there is one, and the `project` summary.
+
+It's refused when no media has that id, when nothing exists at `path`, when the file can't be read, and for a file of another kind, such as a sound file for a video entry. The undo step is called "Relink Media".
+
+## `remove_media`
+
+Removes a media entry from the project, as [**Remove** in the Media tab's row menu](/projects/remove-media/) does. The file on disk isn't touched.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `media` | integer | Yes | The media id. |
+| `with_clips` | boolean | No | Remove the clips using it as well, including those inside nests. For a LUT, clear the looks and Camera Log conversions that name it instead. Default `false`. |
+| `scope` | integer | No | Leave it out. Passing it is refused, because this edit has no meaning inside a nest. |
+| `project` | string | No | The project to act on. Leave it out for the frontmost one. |
+
+A nest clip isn't a user of the file, so it stays even when clips inside it go. Any [Hide While Silent](/effects/hide-while-silent/) setting that listens to the file is cleared.
+
+It answers `ok: true`, `media` and the `project` summary.
+
+It's refused while clips use the file and `with_clips` isn't `true`, naming the clips. A LUT in use as a look or a Camera Log is refused the same way, naming what uses it. The undo step is called "Remove Media".
+
+## `consolidate_media`
+
+Copies every file the project references into `media/` inside the `.framejob` package and relinks the project at the copies, as [**File ▸ Consolidate Media…**](/projects/consolidate-media/) does. Afterwards the package is the whole edit. It can be moved or archived and still open with the original footage deleted.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `project` | string | No | The project to consolidate. Leave it out for the frontmost one. |
+
+It copies as many bytes as the footage weighs, so it can take a while, and it has no **Cancel**. Frame Job's window doesn't respond until it's done. A recording's cursor file is copied beside its movie.
+
+Files already inside are left alone, and missing files are reported rather than guessed at. A file that can't be copied keeps pointing at the original, so the project always still opens.
+
+It answers `ok: true`, `copied`, `bytes`, `directory`, `summary`, `failures` and `missing` when there are any, and the `project` summary. When every file it can find is already inside, it answers `copied: 0`, `directory`, `missing`, a `note`, and the summary, and makes no step.
+
+It's refused when the project has never been saved, so call `save_project` with a path first, when the project references no media files, and when nothing could be copied. The undo step is called "Consolidate Media".
+
+The [Assistant](/assistant/what-it-will-not-do/) asks you first.
+
+## `set_media_color`
+
+Sets how a video file's camera log footage is converted to the project's colour, Rec. 709 or HLG in an [HDR project](/hdr/dynamic-range/), as the Media tab's [Camera Log popup](/hdr/camera-log/) does, and where a PQ file's highlights roll off to white, as its [HDR10 Peak field](/hdr/hdr10-peak/) does.
+
+Every clip of the file follows the setting, reversed clips included. It's converted before the chroma key and every grade, and [Show Ungraded](/color/show-ungraded/) keeps it.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `media` | integer | Yes | The video's media id, or a PQ still's for `peak` alone. |
+| `color` | object or null | Yes | What to set, as below. `null` clears it, but the key must be there. |
+| `scope` | integer | No | Leave it out. Passing it is refused, because this edit has no meaning inside a nest. |
+| `project` | string | No | The project to act on. Leave it out for the frontmost one. |
+
+`color` is one of these:
+
+| `color` | What it does |
+| --- | --- |
+| `{log, gamut?}` | Converts with a built-in curve. |
+| `{lut}` | Converts with an imported `.cube`, named by its media id. [`import_media`](#import_media) it first. See [Camera log from your own LUT](/hdr/log-luts/). |
+| `{peak}` | A PQ file's peak, a whole number of cd/m² from 1 to 10,000. |
+| `log` or `lut` beside `peak` | Both at once. |
+| `null` | No conversion, which shows the log picture, and no peak override. |
+
+The curves, and the gamuts each takes. An absent `gamut` means the first one listed:
+
+| `log` | The curve | `gamut` |
+| --- | --- | --- |
+| `apple_log` | Apple Log | `bt2020` |
+| `apple_log2` | Apple Log 2 | `apple_wide_gamut` |
+| `slog3` | S-Log3 | `s_gamut3_cine`, `s_gamut3` |
+| `vlog` | V-Log | `v_gamut` |
+| `canon_log2` | Canon Log 2 | `cinema_gamut`, `bt2020` |
+| `canon_log3` | Canon Log 3 | `cinema_gamut`, `bt2020` |
+
+An Apple Log or Apple Log 2 file is set at import, and `get_project` shows `detected: true` in the file's `media[].color`.
+
+Import reads a PQ file's own peak into `media[].color.pq`, as `{file, from}`: MaxCLL, or else the mastering display's maximum. When the file names neither, `pq` is `{}`, which means 1,000. `peak` overrides that reading.
+
+:::caution
+`color` replaces the Camera Log and the peak together, so send both to keep both. `null` clears both, and the peak goes back to the file's own reading.
+:::
+
+It answers `ok: true`, `media` and the `project` summary. The undo step is called "PQ Peak" when `color` holds only `peak`, and "Camera Log" otherwise.
+
+It's refused:
+
+- on an audio file or a LUT
+- on a picture, unless it's a PQ still and `color` is `peak` alone
+- for a `peak` on a file that isn't PQ, or outside 1 to 10,000
+- for a `color` with none of `log`, `lut` and `peak`
+- for `log` and `lut` together
+- for a `gamut` without a `log`, or one its curve doesn't take
+- for a `lut` that doesn't name a LUT in the project
+- for `detected` or `pq`, which only import writes
+
+## `set_media_speech`
+
+Saves where a file's speech is. [Duck by Speech](/audio/duck-by-speech/#where-the-speech-comes-from) ducks the mix by these spans, and [Hide While Silent](/effects/hide-while-silent/) reads them too.
+
+Setting **Duck by** to **Speech** in the Sound sub-tab's **Ducking** section writes them from the file's detected speech, and so does [`set_audio`](/mcp/tools-set-audio/) with `duck.mode` set to speech. Call this only to give spans of your own.
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `media` | integer | Yes | The media id. |
+| `spans` | array of `[start, end]` pairs | Yes | Where the speech is, in ticks of the file played forward, sorted, with each end excluded. An empty list means the file has no speech. |
+| `scope` | integer | No | Leave it out. Passing it is refused, because this edit has no meaning inside a nest. |
+| `project` | string | No | The project to act on. Leave it out for the frontmost one. |
+
+It answers `ok: true`, `media` and the `project` summary, and `get_project` shows the spans as `media[].speech`. Spans equal to what the file already has change nothing. The undo step is called "Speech Spans".
+
+It's refused:
+
+- on a file with no sound
+- for a span that starts before 0, ends at or before its start, or ends past the file's duration
+- for spans out of order or overlapping. Touching is fine.
+- past 100,000 spans
+
+## Related
+
+- [Tools: adding clips](/mcp/tools-adding-clips/)
+- [Editing inside a nest](/mcp/nests/)
+- [Tools: picture and grade (set_video)](/mcp/tools-set-video/)
+- [Tools: clip sound (set_audio)](/mcp/tools-set-audio/)
+- [Relink missing media](/projects/relink-media/)

@@ -1,0 +1,76 @@
+---
+title: "Export captions"
+description: "Write a track of captions out as a SubRip (.srt) or WebVTT file to upload to YouTube or ship beside your movie, without changing the project."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Export Captions writes one track of captions out as a separate subtitle file, for a platform or player that takes one. Burned-in captions need none of this: they're part of the picture in any [movie you export](/export/export-sheet/).
+
+<AtAGlance menu="File ▸ Export Captions…" tools="export_captions" />
+
+## Export captions
+
+<Steps>
+
+1. Choose **File ▸ Export Captions…**. It has no keyboard shortcut, and it's greyed out until some track holds only text clips, with caption text on at least one of them.
+
+2. In the save panel, choose the [**Track**](#track) and the [**Format**](#format-subrip-or-webvtt). The name starts as your project's name with `.srt` on the end.
+
+3. Choose **Save**.
+
+</Steps>
+
+Exporting changes nothing in the project, so there's no undo step. If the file can't be written, an alert says why.
+
+## Track
+
+The **Track** pop-up lists the tracks you can write, front-most first, with the front-most chosen. Each row reads like "Captions — 12 cues (track 4)". The pop-up is greyed when there's only one to choose.
+
+Nothing marks a track as a caption track, so any track made only of text clips is listed, a titles track included. A track with any other kind of clip on it isn't listed, and neither is one whose text clips are all empty.
+
+With a [nest](/editing/nests/) open, the list shows that nest's tracks.
+
+## Format: SubRip or WebVTT
+
+The **Format** pop-up offers **SubRip (.srt)**, the default, and **WebVTT (.vtt)**. Choose whichever your player or platform asks for. Changing it changes the extension in the name field and keeps the name you've typed.
+
+The words and times are the same in both. The files differ like this:
+
+| | SubRip | WebVTT |
+| --- | --- | --- |
+| First line of the file | The first cue | `WEBVTT` |
+| A number above each cue | Yes | No |
+| Timestamps | `00:00:04,133` | `00:00:04.133` |
+| `&`, `<` and `>` in the text | Written as they are | Escaped |
+
+Both use Unix (LF) line endings and end with one newline.
+
+## One cue per text clip
+
+Each text clip on the track becomes one cue, at the time and with the words it has now. A caption you dragged exports where you dragged it. Styling plays no part, so restyling a caption doesn't change the file.
+
+- A caption with no text is left out.
+- Line endings become LF. Blank lines inside a caption are removed, and so are spaces at the ends of its lines.
+- A word caption track is written one cue per page, with the page's words as written. The style's **UPPERCASE**, the word timings and the styling don't go in the file.
+
+## Frame-exact round trips
+
+Export a track and [import it again](/captions/import-captions/), and every cue goes back on the frame it came from, at every ordinary frame rate.
+
+The file itself may not match the one you first imported, because import moves each time onto a whole frame. At 30 fps, `00:00:04,120` comes back as `00:00:04,133`. A file only comes back byte for byte when its cue times are already on whole frames and a frame lasts a whole number of milliseconds, as it does at 25 or 50 fps.
+
+## With an agent
+
+`export_captions` takes a `path`, and can be given a `track` and a `format`. With no `format` it follows the path's `.srt` or `.vtt`, and a `format` you name wins over the extension.
+
+It never guesses the track. With no track to write, it writes nothing and says so. With more than one and none named, it writes nothing and lists the candidates. A track it writes comes back through `import_captions` with every cue where it was. See [`export_captions`](/mcp/tools-captions/#export_captions).
+
+## Related
+
+- [Captions are text clips](/captions/how-captions-work/)
+- [Import captions](/captions/import-captions/)
+- [Edit captions](/captions/edit-captions/)
+- [Subtitles](/captions/subtitles/)
+- [The export sheet](/export/export-sheet/)

@@ -1,0 +1,68 @@
+---
+title: "Where the transcript's words come from"
+description: "How the Transcript tab gets its words, from an AssemblyAI transcript or by reading on this Mac, and what it keeps so the next look is immediate."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The [Transcript tab](/captions/transcript-tab/) needs no setting up. It uses a transcript you already have, or transcribes the file on this Mac the first time you look, which the tab calls reading it. Either way it sends nothing anywhere.
+
+<AtAGlance
+  where="Inspector ▸ Transcript"
+  tools={['get_timeline_transcript', 'get_transcript']}
+  needs="A speech model on this Mac, for any file with no AssemblyAI transcript."
+/>
+
+## AssemblyAI first, otherwise this Mac
+
+For each file, the tab takes the first of these it finds:
+
+1. **An AssemblyAI transcript.** You have one if you've used [**File ▸ Generate Captions…** with AssemblyAI](/captions/assemblyai-transcription/) or [**Remove Filler Words**](/cleanup/remove-filler-words/) on the file. Using it needs no key.
+2. **A reading on this Mac.** Otherwise the tab transcribes the file the first time you look, in your Mac's language unless you [choose another](/captions/transcript-tab/#language).
+
+Reading on this Mac is quick: about 0.7 seconds a minute of speech on an M2 Max, so an hour takes well under a minute. Playback keeps running while it reads.
+
+The tab never makes a network request, whichever source it uses.
+
+## One file at a time, playhead first
+
+Files are read one at a time, starting with the one under the playhead. Each file's words appear as soon as it's done, without waiting for the rest.
+
+If you switch to another tab, the reading stops, and it picks up when you come back. To stop it yourself, use [**Stop**](/captions/transcript-tab/#read-and-stop).
+
+## Kept per file and language
+
+What this Mac heard is kept in the project's [cache](/reference/framejob-package/#cache), one reading for each file and language, so the next look is immediate.
+
+Each file is read whole, once. Trimming a clip, adding another clip of the same file or changing its speed doesn't read it again.
+
+A reading is used only while the file and the macOS version are the same. If either changes, or you choose another language, the file is read again.
+
+These readings are only for the transcript. [Captions](/captions/generate-captions/) and [Remove Filler Words](/cleanup/remove-filler-words/) never use them.
+
+## When no speech model is installed
+
+If your Mac has no speech model, the tab says:
+
+> This Mac has no speech model installed. Choose File ▸ Generate Captions…, pick a language and press Download.
+
+Do that, then come back to the tab. A file with an AssemblyAI transcript shows its words in the meantime.
+
+A file this Mac can't read is named in the same place, and the tab carries on with the others. It tries that file again when you next come back to the tab.
+
+## Ramped clips and following edits
+
+Words are placed through a clip's speed, including a [ramp](/speed/speed-ramps/), so a word's time matches what plays on the timeline.
+
+Editing the timeline updates the text right away, and the words you were reading stay where they were. During a drag, the text updates when you let go.
+
+## With an agent
+
+An agent reads these words with `get_timeline_transcript`, or one clip's with `get_transcript`. When it reads a file on this Mac, the tab's **Stop** leaves that reading running. The Assistant's own **Stop** ends it, unless the tab is reading that file too, and nothing is saved from a stopped reading. See [`get_timeline_transcript`](/mcp/tools-captions/#get_timeline_transcript) and [`get_transcript`](/mcp/tools-captions/#get_transcript).
+
+## Related
+
+- [The Transcript tab](/captions/transcript-tab/)
+- [Transcribe on this Mac](/captions/on-device-transcription/)
+- [Transcribe with AssemblyAI](/captions/assemblyai-transcription/)
+- [Transcripts for filler words](/cleanup/filler-transcripts/)

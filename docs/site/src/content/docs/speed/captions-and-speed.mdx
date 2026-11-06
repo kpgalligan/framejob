@@ -1,0 +1,70 @@
+---
+title: Captions follow a speed change
+description: How captions stay on the speech when a clip's speed or ramp changes, which ones move, and which ones Frame Job removes.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+When you change the speed of a clip with sound, the captions over it move with its speech, so they stay on the words you hear. There's nothing to turn on.
+
+<AtAGlance
+  menu={['Clip ▸ Speed…', 'Clip ▸ Speed Ramp…']}
+  where={['Clip tab ▸ Clip ▸ Speed section', 'The action lane', '⌥-drag a clip\'s end edge']}
+  tools={['set_speed', 'rate_stretch', 'add_speed_ramp', 'set_action', 'set_action_end', 'remove_action']}
+/>
+
+## What moves them
+
+Captions move when you:
+
+- change the clip's speed, with **Clip ▸ Speed…**, the Speed section or the ⌥ rate stretch
+- add a ramp with **Clip ▸ Speed Ramp…**
+- add, move, resize, edit or remove a Speed action on the clip
+
+The captions move in the same undo step as the edit, so one undo puts them back too. The step is named after the edit with "and Re-time Captions" added, such as **Set Speed and Re-time Captions**. A drag moves them when you let go of the mouse.
+
+The clip has to be one captions could have been made from: it plays media with sound, its audio is on, and it isn't reversed.
+
+## Which captions move
+
+A caption moves when all of these are true:
+
+- It's a text clip on a track named **Captions** or **Captions N**, such as **Captions 2**.
+- That track holds only text clips and isn't locked.
+- It lies wholly inside the clip you edited.
+
+A caption that runs past either edge of the clip stays where it is, and so does anything on another track.
+
+## Speech the clip no longer plays
+
+A ramp that slows a clip down makes it play less of its file, so it can stop reaching speech it played before.
+
+A caption whose speech the clip no longer reaches is removed. A word caption page that's only partly reached keeps the words that still play, and its text is cut to match.
+
+## Newly revealed speech
+
+When a ramp makes the clip play further into its file, the new part gets no captions. [Generate Captions](/captions/generate-captions/) again to caption it.
+
+## Neighbouring captions
+
+A moved caption is cut back where it would run into a caption that didn't move. One that would start inside such a caption, or end up shorter than a frame, is removed.
+
+## Good to know
+
+- Only speed and ramp edits re-time captions. A trim, slip or split leaves them where they are.
+- [Retime Range](/speed/retime-range/) works differently. It stretches or squeezes a text clip in the range along with everything else, and Frame Job won't retime a range that touches a caption page with timed words.
+- Frame Job checks every caption's new place before it makes the edit. If they don't all work out, the speed edit goes through on its own and the captions stay where they were.
+
+## With an agent
+
+`set_speed`, `rate_stretch`, `add_speed_ramp`, `set_action`, `remove_action` and `set_action_end` re-time captions the same way, in the same undo step. `set_action_end` does so only when it changes the speed.
+
+The result lists the caption clips that moved in `captions_retimed` and the ones removed in `captions_removed`. Each key appears only when it has something in it. See [Captions move with the speech](/mcp/tools-speed/#captions-move-with-the-speech) and [`set_action`](/mcp/tools-animation/#set_action).
+
+## Related
+
+- [Captions are text clips](/captions/how-captions-work/)
+- [Edit captions](/captions/edit-captions/)
+- [Edit a ramped clip](/speed/edit-a-ramped-clip/)
+- [Change a clip's speed](/speed/change-speed/)
+- [Speed ramps](/speed/speed-ramps/)

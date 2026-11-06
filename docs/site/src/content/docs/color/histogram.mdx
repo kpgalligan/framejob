@@ -1,0 +1,66 @@
+---
+title: "Histogram"
+description: "See how a frame's tones are spread from black to white, and read how much of the picture is clipped at each end."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The histogram shows how a frame's tones are spread: how much of the picture is dark, how much is bright, and whether either end has run out of room. Use it to judge exposure and contrast, and to catch clipping while you grade.
+
+<AtAGlance
+  menu="View ▸ Scopes"
+  keys="⌃⌘W"
+  where="The Scopes panel ▸ a slot's popup ▸ Histogram"
+  tools="render_frame"
+/>
+
+## Open the histogram
+
+Choose **View ▸ Scopes**, then pick **Histogram** from a slot's popup. Neither slot opens on it, because a new window starts with **Waveform** over **Vectorscope**. The choice lasts while the window is open. See [Scopes](/color/scopes/) for the panel itself.
+
+## Read the histogram
+
+Levels run from 0 on the left to 255 on the right, so black is at the left edge and white is at the right. The height at each level is how many pixels sit there.
+
+Red, green and blue are drawn as translucent tinted fills, and luma, the picture's brightness, is a white line on top.
+
+| What you see | What it tells you |
+| --- | --- |
+| A pile against the left edge | Shadows are crushed to black |
+| A pile against the right edge | Highlights are clipped to white |
+| Empty space at both ends | A flat picture, with room to add contrast in [Light](/color/light/) or [Curves](/color/curves/) |
+| One colour's fill sitting to the side of the others | That channel is brighter or darker overall, which often means a colour cast |
+
+Heights are on a logarithmic scale, so a small count still shows up beside a big one, and a peak twice as tall holds far more than twice the pixels. All four share one scale, set by the tallest count in any of them, so you can compare them directly.
+
+## Clipping readouts
+
+Two readouts sit below the histogram:
+
+- **Highlights clipped** is the share of the frame at the very top level, 255.
+- **Shadows clipped** is the share at the very bottom level, 0.
+
+They read like "Highlights clipped 1.9 %", to one decimal place, and show "—" until a frame has been measured. The [Waveform](/color/waveform-and-parade/) shows the same two figures.
+
+Both are measured on luma, so read them with these in mind:
+
+- A single colour channel can clip while luma doesn't. Watch the fills at the right edge, or use the [Parade](/color/waveform-and-parade/), to catch that.
+- They count the whole frame. Black canvas around a smaller picture, or letterbox bars, counts towards **Shadows clipped**.
+
+## Good to know
+
+- The histogram measures the frame the preview composes, so it follows playback, your edits and [Show Ungraded](/color/show-ungraded/). It changes nothing in the project or in an export.
+- The slot's caption says what the scope reads: "Rec. 709 · encoded", the picture's own encoded values. In an HDR (HLG) project it reads "Rec. 2100 HLG", and luma is worked out for that colour space. With **Show SDR Version** on, the scope reads that SDR picture as it would in an SDR project. See [Scopes in an HDR project](/hdr/hdr-scopes/).
+- The histogram is 140 pt tall. If the preview pane is too short for both slots, it shrinks with them. Under 360 pt tall, only the top slot shows.
+
+## With an agent
+
+`render_frame` measures a frame's histogram as numbers when an agent passes `histogram: true`, which is off by default. The reply says what share of the frame clips high and low by luma. The counts for red, green, blue and luma at each of the 256 levels, and both percentages, go to a `.histogram.json` file beside the image. See [Check the picture: render_frame](/mcp/render-frame/#waveform-parade-and-histogram).
+
+## Related
+
+- [Scopes](/color/scopes/)
+- [Waveform and RGB Parade](/color/waveform-and-parade/)
+- [Vectorscope](/color/vectorscope/)
+- [Light](/color/light/)
+- [Master and RGB curves](/color/curves/)

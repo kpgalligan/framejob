@@ -1,0 +1,95 @@
+---
+title: Export quality
+description: Set how many bits an export spends on its picture and sound, from Format default to the four tiers.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+The **Quality** popup sets the data rate of the picture and the sound. A higher rate gives a better picture and a larger file.
+
+<AtAGlance
+  menu="File ▸ Export…"
+  keys="⌘E"
+  where="Export sheet ▸ Quality"
+  tools="export"
+/>
+
+## Choose a quality
+
+Open the export sheet and pick a row in **Quality**: **Format default**, **Low**, **Medium**, **High** or **Maximum**. Each tier's title shows the rate it would ask for at the size and frame rate now chosen, for example `High · 8.0 Mbps`.
+
+Once you pick a tier, the footnote shows the rates too, for example `H264 · MP4 · 8.0 Mbps · 256 kbps audio`. With **Format default** it shows no rates.
+
+## Format default
+
+The default row. Frame Job works the rate out from the frame's size and rate:
+
+| Format | At 1080p, 30 fps | Bits per pixel per frame |
+| --- | --- | --- |
+| H.264 | About 8.7 Mbps | 0.14 |
+| HEVC, HEVC with Alpha, HEVC 10-bit | About 4.4 Mbps | 0.07 |
+| AV1, VP9 | A [cap](#rates-on-av1-and-vp9) of about 4.4 Mbps | 0.07 |
+
+The rate rises in step with the frame's area and the frame rate, and it's held between 1 and 200 Mbps. So H.264 at 1080p is about 8.7 Mbps at 30 fps, a little above **High**, and about 17.4 Mbps at 60 fps, where **High** is 12.0 Mbps.
+
+The sound is 192 kbps AAC, or 192 kbps Opus in the WebM formats.
+
+## The four tiers
+
+Each tier sets the rate from the frame's size, so a tier means the same picture quality at every size. These are the H.264 rates at 30 fps or less:
+
+| Tier | Bits per pixel per frame | 720p | 1080p | 4K | Sound |
+| --- | --- | --- | --- | --- | --- |
+| **Low** | 0.064 | 1.8 Mbps | 4.0 Mbps | 15.9 Mbps | 128 kbps |
+| **Medium** | 0.096 | 2.7 Mbps | 6.0 Mbps | 23.9 Mbps | 192 kbps |
+| **High** | 0.129 | 3.6 Mbps | 8.0 Mbps | 32.1 Mbps | 256 kbps |
+| **Maximum** | 0.193 | 5.3 Mbps | 12.0 Mbps | 48.0 Mbps | 320 kbps |
+
+A [preset](/export/presets/) stores the tier, not the number, so "High" works out the right rate on any document.
+
+## How the rate scales
+
+- **Frame size.** The rate scales with the frame's area, using the size you chose rather than the canvas's.
+- **Frame rate.** Above 30.5 fps the rate is 1.5 times higher, so 50 and 60 fps are raised and 29.97 and 30 fps aren't. **High** at 1080p and 60 fps is 12.0 Mbps in H.264.
+- **Codec.** HEVC reaches the same picture at roughly 60 % of H.264's rate, so the HEVC formats ask for 60 % of it, and AV1 and VP9 use the same figure. **High** at 1080p is 4.8 Mbps in HEVC.
+- **Rounding.** A rate is rounded to the nearest 100 kbps, and it never goes below 100 kbps.
+
+## Rates on AV1 and VP9
+
+On AV1 and VP9 the rate is a soft cap. The encoder works to a constant quality chosen to match HEVC at that rate, so the file usually stays under it. Very detailed footage can go over, by up to about 1.25 times the rate on AV1 and about 1.15 times on VP9.
+
+The tier titles and the footnote say so, for example `High · usually ≤ 4.8 Mbps`. AV1's cap stops at 100 Mbps, the most its encoder takes.
+
+On VP9 with Alpha (WebM) the rate covers the picture alone. The transparency is a second stream on top of it, so the file is larger than the rate says. See [AV1 and VP9](/export/av1-and-vp9/).
+
+## Sound rates
+
+A tier sets the sound rate as well as the video rate.
+
+| Row | Sound |
+| --- | --- |
+| **Format default** | 192 kbps |
+| **Low** | 128 kbps |
+| **Medium** | 192 kbps |
+| **High** | 256 kbps |
+| **Maximum** | 320 kbps |
+
+The H.264, HEVC and AV1 (MP4) formats use these as AAC rates. The WebM formats ask the same rates of their Opus sound, rounded to the nearest rate the Opus encoder offers.
+
+**Audio only (M4A)** has no picture, so a tier sets its AAC rate alone, and its titles read `High · 256 kbps`.
+
+## When Quality greys out
+
+**Quality** is greyed out for ProRes 422, ProRes 4444, WAV, AIFF, Animated GIF and Animated PNG, where the format fixes the rate. ProRes takes its rate from its profile and carries uncompressed sound, WAV and AIFF are uncompressed, and GIF and APNG have no rate at all.
+
+## With an agent
+
+An agent doesn't pick a tier. It passes `video_bitrate` and `audio_bitrate` to `export` in bits per second, so 8000000 is 8 Mbps, and leaving them out gives **Format default**. ProRes, GIF and APNG ignore `video_bitrate`, and ProRes, WAV and AIFF ignore `audio_bitrate`. See [Export: start, then poll](/mcp/export/#exact-bitrates).
+
+## Related
+
+- [Export size](/export/size/)
+- [Export frame rate](/export/frame-rate/)
+- [Encoder speed](/export/encoder-speed/)
+- [AV1 and VP9](/export/av1-and-vp9/)
+- [Export bit depth](/export/bit-depth/)

@@ -43,7 +43,7 @@ extension ExportSheetController {
         // the person's to fix, so the click just beeps.
         guard endSheetFieldEditing() else { return }
         guard let editor = editor, let settings = resolved,
-              let window = editor.view.window
+              writeRefusal(for: settings) == nil, let window = editor.view.window
         else {
             NSSound.beep()
             return
@@ -84,6 +84,15 @@ extension ExportSheetController {
                 editor.beginExport(settings: settings, to: url, options: options)
             }
         }
+    }
+
+    /// The sentence that would stop these settings (`Exporter.settingsRefusal`,
+    /// spec §11 #470), for the readout and for `commit`, or nil. `commit` asks
+    /// again because a Custom size typed and then clicked past is resolved
+    /// only inside that click.
+    func writeRefusal(for settings: ExportSettings) -> String? {
+        guard let project = editor?.document?.project else { return nil }
+        return Exporter.settingsRefusal(settings, project: project)?.localizedDescription
     }
 
     /// What the card asks of the RECIPE rather than of the export settings —

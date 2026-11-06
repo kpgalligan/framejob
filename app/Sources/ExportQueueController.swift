@@ -165,7 +165,9 @@ final class ExportQueueController {
         /// ledger's sentence when the memory limit holds it (CX-18), else nil.
         var message: String?
         /// What the exporter says it is doing right now, or nil for "writing",
-        /// which is the caller's own wording. Today the only phase is the
+        /// which is the caller's own wording. Two phases: "Preparing…" from
+        /// `launch` until the exporter's writer exists — the renders, masks and
+        /// measurements a job waits for, with nothing on disk (#500) — and the
         /// loudness measurement, which on an audio-only export is half the wait
         /// and the half where nothing is on disk yet.
         ///
@@ -235,6 +237,9 @@ final class ExportQueueController {
     private var ledgerToken: UInt64?
 
     private let ledger = ExportEncoderLedger.shared
+
+    /// A running job's phase until its exporter's writer exists (#500).
+    private static let preparing = "Preparing…"
 
     /// True only while `start()` is inside `Exporter.export`. An early refusal
     /// — `noPlan`, `emptyTimeline` — completes SYNCHRONOUSLY, so `finished`
@@ -377,7 +382,7 @@ final class ExportQueueController {
         jobs[index].state = .running
         jobs[index].progress = 0
         jobs[index].message = nil
-        jobs[index].phase = nil
+        jobs[index].phase = Self.preparing
         // Any COMPLETED row naming this same path stops claiming its file
         // here, and here rather than when the file is actually deleted: the
         // delete happens inside `Exporter.startWriting`, seconds later and in
@@ -417,8 +422,10 @@ final class ExportQueueController {
         // The exporter names its own phase while it has one. The progress
         // sheet asks the same question with the same call; a row that said
         // "Writing" through the measurement would be claiming a file that does
-        // not exist yet.
-        jobs[index].phase = exporter?.phaseDescription
+        // not exist yet — and so would one that said it before the writer
+        // exists (#500).
+        jobs[index].phase =
+            exporter?.phaseDescription ?? (exporter?.isWriting == true ? nil : Self.preparing)
         didChange()
     }
 
@@ -435,6 +442,7 @@ final class ExportQueueController {
         let measured = report.map { " \($0.summary)." } ?? ""
         let warnings = exporter?.graphicWarnings ?? []
         let cursorWarnings = exporter?.cursorWarnings ?? []
+        let replaced = exporter?.replacedDestination ?? false
         exporter = nil
         // The pin goes with the exporter, and from `pinnedProject` rather than
         // from the job, so that releasing it cannot depend on the job still
@@ -477,8 +485,10 @@ final class ExportQueueController {
                     // where the policy is decided, and it is what holds if a
                     // third pipeline ever arrives that is less tidy.
                     // `ExportProgressSheetController.finished` is the same line
-                    // for the same reason.
-                    try? FileManager.default.removeItem(at: jobs[index].destination)
+                    // for the same reason. It runs only once the exporter has
+                    // replaced the file: before that, what is at the path is
+                    // the file the person already had (spec §11 #470).
+                    if replaced { try? FileManager.default.removeItem(at: jobs[index].destination) }
                     jobs[index].state = .cancelled
                     jobs[index].progress = 0
                     jobs[index].message = "Cancelled."

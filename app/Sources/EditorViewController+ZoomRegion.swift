@@ -75,13 +75,15 @@ extension EditorViewController {
     /// source pixels; two clips would be two different rectangles), it has to
     /// be drawing at the playhead (`regionTarget` asks the canvas, so a
     /// clip hidden behind an in/out range or on a locked track says no), and
-    /// an obscure region needs a free slot.
+    /// an obscure region needs a free slot and a clip with pixels of its own:
+    /// a nest clip takes a zoom but not a region.
     private func beginRegionMode(_ purpose: CanvasRegionPurpose) {
         guard let target = regionTarget(), previewCanvas != nil else {
             NSSound.beep()
             return
         }
-        if purpose == .obscure, obscureRegions().count >= ObscureProps.max {
+        if purpose == .obscure,
+           target.picture != nil || obscureRegions().count >= ObscureProps.max {
             NSSound.beep()
             return
         }

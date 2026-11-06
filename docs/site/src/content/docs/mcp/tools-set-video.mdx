@@ -1,0 +1,376 @@
+---
+title: "Tools: picture and grade (set_video)"
+description: Change a clip's position, crop, effects, cutout, cursor, motion and grade from an agent with one patch tool, set_video.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+`set_video` is the one tool behind everything a clip's picture does: where it sits, how it's cropped, its effects, its motion and its grade. It takes a list of clips and a patch, an object holding only the properties you want to change. This page lists every key a patch can hold.
+
+<AtAGlance
+  tools="set_video"
+  where={['Clip tab ▸ Picture sub-tab', 'Clip tab ▸ Color sub-tab', 'Dragging on the canvas']}
+/>
+
+## `set_video`
+
+Merges a patch into each clip's own video properties, as one undo step however many clips it names. It mirrors the Clip tab's [Picture sub-tab](/canvas/picture-tab/) and [Color sub-tab](/color/color-tab/).
+
+| Argument | Type | Required | What it does |
+| --- | --- | --- | --- |
+| `clips` | array of integers | Yes | The clips to change, at least one. `get_project` lists their ids. |
+| `patch` | object | Yes | The properties to change. The rest of this page lists its keys. |
+| `scope` | integer | No | A nest id, to edit inside that nest. See [Editing inside a nest](/mcp/nests/). |
+| `project` | string | No | The path of the open project to act on, as `get_project` reports it. Leave it out for the frontmost one. |
+
+```json
+{ "clips": [12, 14], "patch": { "opacity": 0.8, "shadow": { "blur": 20 } } }
+```
+
+**How a patch merges.** A key you leave out keeps its value, inside a nested object too, so `{shadow: {blur: 20}}` keeps the shadow's colour, angle and distance. On a clip that has no shadow yet, the keys you left out take the defaults listed below. `shadow`, `chroma`, `reflection`, `spotlight`, `motion`, `look`, `cursor`, `cutout` and `hide_silent` set to `null` clear that property. `filters` and `obscure` are lists, so each replaces whole: send the full list, or `[]` to clear it. See [Patches](/mcp/patches/).
+
+**Colours.** A colour is four numbers, `[r, g, b, a]`, each 0 to 1. Three numbers are refused, and so is a value outside the range. Two keys differ: the chroma key's colour is three numbers with no alpha, and the cursor's `click_color` is a CSS colour.
+
+**What it answers.** `ok` and the `project` summary. If the patch changes nothing, the call says so and leaves no undo step. See [What a call answers](/mcp/what-a-call-answers/).
+
+**When it refuses.**
+
+- A key or value the patch doesn't know is an error naming its dotted path, array indices included, and the value you sent, such as `filters[1].kind`. Nothing is dropped, corrected or clamped.
+- A number outside its range is an error naming the key, the range and the number.
+- A clip with no video properties is an error: "clip 7 has no video properties".
+- The sections below list what a particular kind of clip can't take.
+
+### Which key does what
+
+| Keys | Section |
+| --- | --- |
+| `x`, `y`, `scale`, `rotation`, `opacity`, `blend` | [Transform](#transform-position-scale-rotation-opacity-and-blend) |
+| `crop`, `corner_radius` | [Crop and corners](#crop-and-corners) |
+| `shadow`, `chroma`, `filters`, `reflection`, `spotlight`, `obscure` | [Effects](#effects-shadow-chroma-key-filters-reflection-spotlight-and-obscure) |
+| `cutout` | [Remove Background](#cutout) |
+| `behind_subject` | [Text Behind Subject](#behind_subject) |
+| `cursor` | [The recorded cursor](#cursor) |
+| `motion` | [Motion presets](#motion) |
+| `motion_blur` | [Motion blur](#motion_blur) |
+| `hide_silent` | [Hide While Silent](#hide_silent) |
+| `color`, `wheels`, `curves`, `look`, `qualifier` | [Light and colour](#color), [wheels](#wheels), [curves](#curves), [looks and LUTs](#look), [the qualifier](#qualifier) |
+
+### On an adjustment clip
+
+An [adjustment clip](/color/adjustment-clips/) has no picture of its own. Only `color`, `wheels`, `curves`, `look`, the sepia, noir, vignette and invert filters, and `opacity` (the grade's strength) do anything there, and `qualifier` narrows which pixels they reach. The blur, sharpen and pixelate filters and any blend mode but `normal` are errors, such as "clip 7 is an adjustment clip and cannot take the blur filter".
+
+### Animate a property
+
+`set_video` changes the clip's base value, which holds for the clip's whole length. To change a value over time, use `add_action` then `set_action_end`. See [Tools: animation](/mcp/tools-animation/#set_action_end). `motion` and `hide_silent` can't be animated.
+
+## Transform: position, scale, rotation, opacity and blend
+
+The clip's picture is centred on the canvas centre plus `x` and `y`, scaled, then rotated about that same centre. The [Transform section](/canvas/transform/) and dragging on the canvas change the same values.
+
+| Key | What it does | Range |
+| --- | --- | --- |
+| `x`, `y` | The clip's centre, in canvas pixels from the canvas centre. `y` runs down. | Any number |
+| `scale` | The size. 1 is native pixels. | 0.01 to 10 |
+| `rotation` | Degrees about the clip's centre. Positive turns clockwise on screen. | Any number |
+| `opacity` | How solid the clip is. | 0 to 1 |
+| `blend` | How the clip combines with what's already on the canvas. | `normal`, `multiply`, `screen`, `add`, `overlay`, `darken`, `lighten`, `difference` |
+
+`normal` is the default. A blend mode needs something under it. Over an empty black canvas, `multiply`, `darken` and `overlay` read black, while `screen`, `add`, `lighten` and `difference` change nothing, so `add_background` is usually the call to make first.
+
+A blend is forced to `normal` for the length of any transition, and on a clip on a matte track, so the frame there can differ from the value `get_project` reports. A nest clip can't take a blend mode other than `normal`. See [Blend modes](/canvas/blend-modes/).
+
+## Crop and corners
+
+| Key | What it does | Range |
+| --- | --- | --- |
+| `crop` | `{l, t, r, b}`, the pixels to remove from each edge of the source. Cropping never shifts what's left. | Each 0 or more |
+| `corner_radius` | Rounds the corners of the cropped picture, in source pixels, before it's rotated. | 0 or more |
+
+The opposite edges have to leave something behind: `l` plus `r` must be less than the source's width, and `t` plus `b` less than its height. See [Crop](/canvas/crop/) and [Corner radius](/canvas/corner-radius/).
+
+## Effects: shadow, chroma key, filters, reflection, spotlight and obscure
+
+Each of these is off until you set it. `shadow`, `chroma`, `reflection` and `spotlight` are objects that merge, and `null` clears one. `filters` and `obscure` are lists that replace whole.
+
+### Shadow
+
+`shadow` is `null` or an object. See [Shadow](/effects/shadow/).
+
+| Key | What it does | Range | Default |
+| --- | --- | --- | --- |
+| `color` | The shadow's colour. | Four numbers | Black |
+| `opacity` | How strong it is. | 0 to 1 | 0.5 |
+| `blur` | How soft it is, in source pixels. | 0 or more | 12 |
+| `angle` | The direction, in degrees. 0 is to the right, turning anticlockwise. | Any number | 315 |
+| `distance` | How far it falls, in source pixels. | 0 or more | 8 |
+
+### Chroma key
+
+`chroma` is `null` or an object. See [Chroma Key](/effects/chroma-key/).
+
+| Key | What it does | Range | Default |
+| --- | --- | --- | --- |
+| `key` | The colour to remove, as three numbers with no alpha. | Each 0 to 1 | Green, `[0, 1, 0]` |
+| `tolerance` | How far from the key a colour can be and still go. | 0 to 1 | 0.2 |
+| `softness` | How gradually the edge falls off. | 0 to 1 | 0.1 |
+| `spill` | How much of the key's colour to take off what's left. | 0 to 1 | 0.5 |
+
+### Filters
+
+`filters` is a list of up to four `{kind, amount}` objects. `kind` is `blur`, `sharpen`, `pixelate`, `sepia`, `noir`, `vignette` or `invert`. `amount` is 0 to 1, where 0 does nothing. Each entry must name both keys: leaving one out is an error. A fifth filter is an error, never dropped. Sepia, noir, vignette and invert run in list order. Blur, sharpen and pixelate always run before them, wherever they sit in the list. See [Filters](/effects/filters/).
+
+```json
+{ "filters": [{ "kind": "noir", "amount": 1 }, { "kind": "vignette", "amount": 0.4 }] }
+```
+
+### Reflection
+
+`reflection` is `null` or an object. See [Reflection](/effects/reflection/).
+
+| Key | What it does | Range | Default |
+| --- | --- | --- | --- |
+| `opacity` | How strong the reflection is where it touches the clip. | 0 to 1 | 0.35 |
+| `height` | How much of the clip is mirrored, as a fraction of its cropped height. | 0 to 1 | 0.5 |
+| `gap` | The space between the clip and the reflection, in source pixels. | 0 or more | 0 |
+| `falloff` | How far it fades across `height`. 0 doesn't fade, 0.5 ends at half `opacity`, and 1 reaches transparent exactly at `height`. | 0 to 1 | 1 |
+
+### Spotlight
+
+`spotlight` is `null` or an object. It dims the clip outside a shape and can magnify what's inside it. See [Spotlight](/effects/spotlight/).
+
+| Key | What it does | Range | Default |
+| --- | --- | --- | --- |
+| `shape` | The shape. | `rect`, `ellipse` | `rect` |
+| `x`, `y` | The shape's centre, in source pixels from the centre of the cropped picture, `y` down. It can sit outside the picture. | Any number | 0 |
+| `width`, `height` | The shape's size, in source pixels. | Above 0 | 480, 270 |
+| `feather` | How many source pixels the edge blurs over. | 0 or more | 40 |
+| `dim` | How much darker it is outside. 0 changes nothing, and 1 is black. | 0 to 1 | 0.6 |
+| `zoom` | How much to magnify what's inside. 1 is no zoom. | 1 to 2 | 1 |
+
+Because the box is in source pixels, it stays on the picture when the clip is moved, scaled or rotated.
+
+### Obscure
+
+`obscure` is a list of up to four regions, each hiding what's under it. It uses the spotlight's frame for its centre and box. See [Obscure](/effects/obscure/).
+
+| Key | What it does | Range | Default |
+| --- | --- | --- | --- |
+| `shape` | The shape. | `rect`, `ellipse` | `rect` |
+| `x`, `y` | The region's centre, in source pixels from the centre of the cropped picture. | Any number | 0 |
+| `width`, `height` | The region's size, in source pixels. | Above 0 | 480, 270 |
+| `feather` | How many source pixels the effect ramps in over. | 0 or more | 20 |
+| `kind` | How it hides. | `blur`, `pixelate` | `pixelate` |
+| `amount` | How strongly it hides. | 0 to 1 | 1 |
+
+## `cutout`
+
+Remove Background: draws the clip as its subject alone, from masks made on your Mac. It mirrors **Clip ▸ Remove Background** and the Picture sub-tab's **Background** section. See [Remove Background](/effects/remove-background/).
+
+`cutout` is `null` or an object. `{cutout: {}}` turns it on with all five defaults, an object merges, and `null` removes it.
+
+| Key | What it does | Range | Default |
+| --- | --- | --- | --- |
+| `subject` | What to keep. `foreground` keeps every foreground subject in the picture, and only an image clip can take it. | `person`, `foreground` | `person` |
+| `quality` | The mask quality. Only `standard` works, and `best` is refused. | `standard` | `standard` |
+| `background` | `remove` draws only the subject. `keep` draws the clip whole, which [Text Behind Subject](#behind_subject) uses. | `remove`, `keep` | `remove` |
+| `edge` | Shrinks or grows the outline. | −1 to 1 | 0 |
+| `feather` | Softens the outline. | 0 to 1 | 0 |
+
+A media, still or image clip can take a cutout. A text, shape, graphic, adjustment or nest clip is refused, and so is `foreground` on a media or still clip.
+
+**When the masks are made.** They're made as soon as the cutout is set, and `analyze_cutout` says where they stand. See [Tools: reading analysis](/mcp/tools-analysis/#analyze_cutout). The cutout draws in the preview, `render_frame` and every export:
+
+- The preview draws a frame whole while its mask isn't made yet.
+- `render_frame` waits up to 30 s for its masks, then draws the clip uncut and says so.
+- An export waits for every mask it draws.
+- A clip with no person in any frame it plays draws uncut. Once a person is found anywhere in it, a frame with no person keeps little or nothing, so what's behind shows through.
+
+**In an action.** `edge` and `feather` animate, and `background` switches when the action ends. `subject` and `quality` are refused there, and an action can't switch the cutout off. On a clip with no cutout, an action's cutout keys do nothing.
+
+## `behind_subject`
+
+Text Behind Subject: `true` makes the person in a cutout clip stand in front of this clip, by cutting this clip away wherever that person is at each moment. It looks at every cutout clip on a track behind it, on the same timeline or in the same nest, and inside any nest on such a track. A cutout clip in front of it doesn't cut it. Any clip with a `cutout` counts, with `background` set to `remove` or `keep`. The default is `false`. It mirrors the Picture sub-tab's **Behind Subject** section. See [Text Behind Subject](/effects/text-behind-subject/).
+
+Any clip that draws a picture can take it, except an adjustment clip or a nest clip, which are refused. In an action it switches when the action ends. [`text_behind_subject`](/mcp/tools-clip-properties/#text_behind_subject) places a title this way in one step.
+
+## `cursor`
+
+Styles the pointer Frame Job recorded beside a screen recording, in the movie's [cursor file](/recording/cursor-files/), as it's drawn on this clip. It mirrors the Picture sub-tab's **Cursor** section. See [Style the recorded cursor](/recording/cursor-settings/).
+
+`cursor` is `null` or an object. `{cursor: {}}` stores all eight defaults, and an object merges. A value out of range is refused, never clamped.
+
+| Key | What it does | Range | Default |
+| --- | --- | --- | --- |
+| `show` | Whether the cursor is drawn. | `true`, `false` | `true` |
+| `scale` | Its size. | 0.25 to 8 | 1 |
+| `style` | `recorded` draws the pointer images a cursor file holds, and `arrow` draws Frame Job's own arrow. Frame Job's recordings hold no images, so for them `recorded` draws the arrow too. | `recorded`, `arrow` | `recorded` |
+| `smoothing` | How much the path is smoothed. | 0 to 1 | 0 |
+| `hide_idle` | Seconds of no activity before it hides. `null` never hides it. | `null`, 0.5 to 30 | `null` |
+| `clicks` | What a click draws. | `none`, `ripple` | `none` |
+| `click_color` | The ripple's colour, as a CSS colour. | Any CSS colour | `#ffffffcc` |
+| `click_size` | The ripple's size. | 0.25 to 4 | 1 |
+
+**In an action.** `scale` and `click_size` animate. `show`, `style`, `clicks` and `click_color` switch when the action ends. `smoothing` and `hide_idle` have no effect in an action, so write them here. On a clip with no cursor, every cursor key in an action switches at the end, so give the clip one first with `{cursor: {}}` if you want them to animate.
+
+## `motion`
+
+What the clip does on its way in, on its way out and all the way through. It mirrors **Clip ▸ Motion ▸**. See [Motion presets](/motion/motion-presets/).
+
+`motion` is `null` or `{in, out, during}`. The three slots merge: a slot you leave out keeps what's stored, a slot set to `null` clears that slot, and `{motion: null}` clears all three.
+
+| Slot | Keys | Values |
+| --- | --- | --- |
+| `in`, `out` | `kind`, `duration` | `kind` is `fade`, `zoom_in`, `zoom_out`, `slide_left`, `slide_right`, `slide_up`, `slide_down`, `spin` or `pop`. `duration` is in ticks, measured from the clip's first or last frame. |
+| `during` | `kind`, `amount`, `period` | `kind` is `pulse`, `shake`, `spin`, `bounce` or `drift`. `amount` is 0 to 1. `period` is in ticks, and `drift` ignores it. |
+
+```json
+{ "motion": { "in": { "kind": "fade", "duration": 300000 }, "during": null } }
+```
+
+A slot you name without its keys starts from a half-second `fade`, or for `during` a `pulse` of amount 0.5 and period 1 s.
+
+The durations snap to the frame grid, and the period snaps with a floor of one frame, so `get_project` can answer with a number near the one you sent. `in` plus `out` longer than the clip scales both down to meet, rather than being refused. A negative duration, or a period under one tick, is an error.
+
+`motion` can't be animated: `set_action_end` refuses it. `get_project` reports the clip as if it weren't moving, because the preset only becomes placement when a frame is drawn.
+
+## `motion_blur`
+
+Blurs the clip, and its moving cursor, along their motion. It mirrors the **Motion Blur** row in the Picture sub-tab's **Transform** section. See [Motion blur](/motion/motion-blur/).
+
+`motion_blur` is 0 to 1, the shutter as a fraction of one canvas frame. 0 is off and the default, and 0.5 is a 180° shutter. It animates in an action, and draws in the preview, `render_frame` and every export.
+
+Anything above 0 is refused on a nest clip, so set it on the clips inside, and on an adjustment clip. The clip draws sharp during a transition, including inside a nest clip that's in one, on a matte track or cut by a matte, when Behind Subject cuts it, and with a drop shadow. The value stays stored. See [Where it stays sharp](/motion/motion-blur/#where-it-stays-sharp).
+
+## `hide_silent`
+
+Fades a clip, usually a camera, out while a media's speech is silent, and back in ahead of the next words. It mirrors the Picture sub-tab's **Hide While Silent** section. See [Hide While Silent](/effects/hide-while-silent/).
+
+`hide_silent` is `null` or an object.
+
+| Key | What it does | Range | Default |
+| --- | --- | --- | --- |
+| `media` | Required. The id of the media, with sound, whose speech the clip follows. | A media id | |
+| `pre_roll` | How long before speech the clip is fully in, in ticks. | 0 to 3,000,000 (5 s) | 120,000 (0.2 s) |
+| `hold` | How long after speech it stays, in ticks. | 0 to 3,000,000 (5 s) | 900,000 (1.5 s) |
+| `fade` | How long the fade takes, in ticks. | 0 to 3,000,000 (5 s) | 180,000 (0.3 s) |
+
+```json
+{ "hide_silent": { "media": 3, "hold": 600000 } }
+```
+
+The fade follows the clips of that media on the clip's own timeline or nest, then in each nest around it, working outwards until it finds one playing. Where none plays, the clip stays visible. These three times don't snap to the frame grid.
+
+If the media has no saved speech, this call saves it from the on-device voice detection first, in the same undo step. It's refused when the media has no sound, when its speech hasn't been detected yet ("Try again in a moment."), and on a nest clip, so set it on the clips inside.
+
+Only the drawn frame sees the fade: `get_project` reads the clip's opacity without it. `hide_silent` can't be animated.
+
+## `color`
+
+The thirteen values of the Color sub-tab's **Light** and **Color** sections, in one object. Each is 0 for unchanged, and any subset merges. See [Light](/color/light/) and [Brightness, contrast, saturation and hue](/color/color-section/).
+
+| Key | What it does | Range |
+| --- | --- | --- |
+| `exposure` | Exposure, in stops. | −3 to 3 |
+| `temperature` | Positive is warmer. | −1 to 1 |
+| `tint` | Positive is more magenta. | −1 to 1 |
+| `highlights` | The upper half of the brightness range. | −1 to 1 |
+| `shadows` | The lower half of the brightness range. | −1 to 1 |
+| `whites` | Stretches the picture, held at black. | −1 to 1 |
+| `blacks` | Stretches the picture, held at white. | −1 to 1 |
+| `vibrance` | Saturation on the colours that have little. | −1 to 1 |
+| `fade` | Lifts black towards 10 % and lowers white towards 95 %. | 0 to 1 |
+| `brightness` | Brightness. | Any number. The inspector's row runs −1 to 1. |
+| `contrast` | Contrast. | Any number. The inspector's row runs −1 to 1. |
+| `saturation` | Saturation. | Any number. The inspector's row runs −1 to 1. |
+| `hue` | Turns every colour's hue this many degrees, red towards yellow towards green, keeping its brightness. | Any number. The inspector's row runs −180 to 180. |
+
+A value outside a stated range is refused.
+
+The grade runs in this order: `color`, `wheels`, `curves`, `look`, then the sepia, noir, vignette and invert filters.
+
+## `wheels`
+
+Lift, gamma and gain: three colour pushes, each with its own brightness. An agent can set a push as exact numbers, which the [Wheels section](/color/wheels/) has no field for.
+
+`wheels` is `{lift, gamma, gain}`, each `{x, y, master}`, each −1 to 1, with 0 unchanged. Any subset merges, so `{wheels: {lift: {x: 0.2, y: -0.1}}}` keeps lift's `master` and the other two wheels.
+
+| Key | What it does |
+| --- | --- |
+| `x`, `y` | The colour push. Its angle is the hue (0° red, 120° green, 240° blue), and its length is the strength. It must lie inside the unit circle, so `x²` plus `y²` is at most 1. |
+| `master` | The brightness. |
+
+`lift` moves black and holds white, `gain` moves white and holds black, and `gamma` moves the middle and holds both ends. A value outside these limits is refused, never clamped.
+
+## `curves`
+
+Writes the curves of the Color sub-tab's **Curves** section, one list of points per channel. See [Master and RGB curves](/color/curves/) and [Hue vs Hue and Hue vs Sat curves](/color/hue-curves/).
+
+`curves` is an object with up to six channels. A list replaces that channel whole, and `null` removes it. Each list is 2 to 16 `[x, y]` points with `x` strictly rising.
+
+| Channel | `x` | `y` | No change |
+| --- | --- | --- | --- |
+| `master`, `red`, `green`, `blue` | 0 to 1 | 0 to 1 | `y` equals `x` from 0 to 1 |
+| `hue_hue` | Hue in degrees, 0 up to but not including 360 | A shift in degrees, −180 to 180 | Every `y` is 0 |
+| `hue_sat` | Hue in degrees, 0 up to but not including 360 | A saturation gain, 0 to 2 | Every `y` is 1 |
+
+```json
+{ "curves": { "master": [[0, 0.05], [0.5, 0.55], [1, 1]], "hue_sat": null } }
+```
+
+A curve that changes nothing is stored as no curve. A point outside these limits is refused, never clamped.
+
+The tone channels are smooth monotone curves through their points, flat outside the first and last `x`, and a colour goes through `master` first, then its own channel. The two hue curves are smooth curves that wrap at 0 and 360. They run after the tone channels, and both look up the colour's original hue, so `hue_sat` doesn't see the shift `hue_hue` made. A positive shift turns red towards yellow towards green, keeping brightness, and the gain scales saturation. Greys are left alone: a colour whose strongest and weakest channels are within 0.02 of each other doesn't change, and the effect reaches full strength at 0.06.
+
+In an action, a curve that changes nothing animates to neutral, and two curves with different point counts blend their values across the action.
+
+## `look`
+
+Applies one of the eight built-in looks, or an imported `.cube` LUT, at an amount. It mirrors the Color sub-tab's **Look** section and **Clip ▸ Look ▸**. See [Looks](/color/looks/) and [.cube LUTs](/color/luts/).
+
+`look` is `null` or an object. `{look: null}` removes it.
+
+| Key | What it does | Range | Default |
+| --- | --- | --- | --- |
+| `kind` | Which look. | `warm`, `cool`, `teal_orange`, `vivid`, `faded`, `vintage`, `dramatic`, `black_white`, `lut` | |
+| `media` | The media id of the `.cube` file. Required with `lut`, and refused with any other kind. | A LUT's media id | |
+| `amount` | How much of it. | 0 to 1 | 1 |
+
+```json
+{ "look": { "kind": "teal_orange", "amount": 0.6 } }
+```
+
+For a LUT, bring the file in with `import_media`, then send `{look: {kind: "lut", media: 9}}` with the id it answers.
+
+A new kind keeps the clip's amount, and a built-in kind replaces a LUT. An amount alone needs a clip that already has a look. In an action the amount ramps while the kind and the LUT stay the same. A change of kind or of LUT switches when the action ends, amount included.
+
+## `qualifier`
+
+Narrows which pixels an adjustment clip's grade reaches, by hue, saturation and luma. It mirrors the Color sub-tab's **Qualifier** section. See [Qualifiers](/color/qualifiers/).
+
+The qualifier is for adjustment clips only. On any other clip it's an error naming the clip. It reads the picture behind the clip, before the grade.
+
+`qualifier` is `{hue, saturation, luma, invert, blur}`.
+
+| Key | Keys inside it | What it does |
+| --- | --- | --- |
+| `hue` | `center`, `width`, `softness` | In degrees. `center` is 0 to 360 and wraps. `width` is 0 to 360, fully selected about the centre. `softness` is 0 to 180, the fall-off outside each edge. A colour's selection fades out as its chroma falls from 0.06 to 0.02, and at 0.02 or under it's never selected. |
+| `saturation` | `low`, `high`, `softness` | Each 0 to 1, with `low` no more than `high`. Near-black reads as 0. |
+| `luma` | `low`, `high`, `softness` | Each 0 to 1, with `low` no more than `high`. Rec. 709 luma, or BT.2020 luma in an HDR (HLG) project. |
+| `invert` | | `true` selects everything else. |
+| `blur` | | 0 to 1, 0 being off. Softens the selection by a Gaussian of 24 × `blur` canvas pixels. It never softens a matte cutting the clip, and does nothing while no range is on. |
+
+A range merges: `{hue: {}}` turns hue on at centre 30, width 50, softness 25, and saturation and luma turn on at low 0, high 1, softness 0.1. A partial range keeps the rest, and `null` turns a range off. The selection is the product of the ranges that are on. A value outside its bounds is refused, never clamped.
+
+In an action the numbers animate, the hue centre taking the short way round, so 350 to 10 passes 0. A range turned on or off, and `invert`, switch when the action ends. To turn a range off there, name it in `off`, as in `video.qualifier.hue`. A `null` in `patch` only takes the range out of the action's end.
+
+`render_frame` with `selection` set to the adjustment clip's id draws what the qualifier selects, as [Show Selection](/color/show-selection/) does. See [Check the picture: render_frame](/mcp/render-frame/#selection).
+
+## Related
+
+- [Patches](/mcp/patches/)
+- [Tools: animation](/mcp/tools-animation/)
+- [Tools: text, shapes and clip names](/mcp/tools-clip-properties/)
+- [Tools: reading analysis](/mcp/tools-analysis/)
+- [Check the picture: render_frame](/mcp/render-frame/)
+- [The Picture tab](/canvas/picture-tab/)
+- [The Color tab](/color/color-tab/)

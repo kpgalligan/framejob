@@ -1,0 +1,75 @@
+---
+title: "De-esser"
+description: "Tame the hard s, sh and t sounds a close microphone exaggerates, turning down only the top of the voice while they last."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+The de-esser tames sibilance, the hard "s", "sh" and "t" sounds a close microphone exaggerates. It listens to the sound above its frequency and turns only that band down while it's over the threshold, so the rest of the voice keeps its level.
+
+<AtAGlance where="Clip tab ▸ Sound ▸ De-esser" tools="set_audio" />
+
+## Reduce sibilance
+
+<Steps>
+
+1. Select a clip with sound, and open the **De-esser** section of the [Sound tab](/audio/sound-tab/).
+
+2. Tick **Reduce sibilance**. It starts at 6,000 Hz, a threshold of 0 dB and a range of 6 dB.
+
+3. Play a part with hard "s" sounds. If they're still sharp, lower **Threshold** or raise **Range**.
+
+4. If the voice sounds dull or lisped, raise **Threshold** or lower **Range**. Move **Frequency** to where the sibilance sits in this voice.
+
+</Steps>
+
+The other controls are greyed out until **Reduce sibilance** is ticked. **Reset** in the section's header turns the de-esser off.
+
+## The controls
+
+| Control | What it does | Range | Default | Quick picks |
+| --- | --- | --- | --- | --- |
+| **Frequency** | Where the sibilant band starts. | 2,000 to 12,000 Hz | 6,000 Hz | 4,000, 5,000, 6,000, 8,000 |
+| **Threshold** | How loud the band must get, relative to the clip's loudness, before it's turned down. | −30 to +20 dB | 0 dB | −6, −3, 0, 3 |
+| **Range** | The most the band is turned down. | 1 to 24 dB | 6 dB | 3, 6, 10 |
+
+The de-esser never makes any frequency louder. Right at **Frequency** it takes less than half the range, about 2.5 dB of the default 6 dB, and about 5.5 dB an octave above.
+
+It reacts in 1 ms and lets go over 60 ms. You can't change those times.
+
+## Read Status and Loudness
+
+**Threshold** follows the clip's own loudness, the way the [Gate's](/audio/gate/#the-threshold-follows-the-clip) does, so a trim, a pan change or a different channel choice moves it. Two readouts show what it means for this clip. With several clips selected, **Loudness** reads "—". **Status** does too, unless the de-esser is off on the first of them, when it reads "off".
+
+**Loudness** is the level the threshold is measured from, for example "−41.7 LUFS". It reads "measuring…" until the clip has been measured.
+
+**Status** says where the de-esser acts, or why it isn't working:
+
+| Status | What it means |
+| --- | --- |
+| off | **Reduce sibilance** isn't ticked. |
+| Acts above −41.7 dBFS | The clip's loudness plus the **Threshold**. |
+| Waits for its loudness | The clip hasn't been measured yet. |
+| Not de-essing: too short | The clip plays for under 0.4 s, too short to measure. |
+| Not de-essing: too quiet | The clip is too quiet to measure. |
+| Not de-essing: no sound | The clip plays no sound in this timeline, or it's a nest clip. |
+
+Until the clip's loudness is measured it plays without the de-esser, and an export waits. See [Before the clip's loudness is measured](/audio/gate/#before-the-clips-loudness-is-measured).
+
+## Good to know
+
+- The de-esser runs after the [gate](/audio/gate/) and the [leveller](/audio/leveller/), and before the [compressor](/audio/compressor/). See [How audio works](/audio/how-audio-works/).
+- With an [action](/audio/animate-sound/) selected, these controls set where the action ends. The numbers glide across the action, and turning the de-esser on or off changes at the action's end.
+- The de-esser does nothing on a [nest](/editing/nests/) clip. Open the nest with <kbd>⌘↓</kbd> and set it on the clips inside.
+
+## With an agent
+
+`set_audio` sets the same controls through `de_esser`, with `frequency`, `threshold_db` and `range_db`. An empty `de_esser` turns it on at the defaults and `null` turns it off. See [Tools: clip sound](/mcp/tools-set-audio/#de-esser).
+
+## Related
+
+- [Gate](/audio/gate/)
+- [EQ](/audio/eq/)
+- [Enhance Voice](/audio/enhance-voice/)
+- [Compressor](/audio/compressor/)

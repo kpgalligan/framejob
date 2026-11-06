@@ -1,0 +1,97 @@
+---
+title: "Cut from faces with one microphone"
+description: When one microphone hears everyone, let Switch by Speaker decide who is talking from the cameras' pictures, and check the result.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+When one microphone hears everyone, it can't say who's talking. [Switch by Speaker](/multicam/switch-by-speaker/) then decides from the cameras' pictures instead, by watching whose mouth is moving.
+
+<AtAGlance
+  menu="Clip ▸ Switch by Speaker…"
+  tools="switch_by_speaker"
+  needs="Nothing. Face detection and speech detection run on your Mac, with no key and no upload."
+/>
+
+## One microphone for everyone
+
+Frame Job works this way when your selection holds exactly one microphone and two or more cameras. That includes a selection where only one camera has sound. See [Microphones](/multicam/set-up/#microphones).
+
+<Steps>
+
+1. Line the recordings up with **Clip ▸ Synchronize Audio**.
+
+2. Select the cameras' clips and the microphone's clip, then choose **Clip ▸ Switch by Speaker…**.
+
+3. If the cameras haven't been read yet, wait for the [Analyzing sheet](#finding-faces-first).
+
+4. Check [the sheet](#the-sheet-in-this-mode) and choose **Switch**.
+
+5. [Look through the result](#faces-only-guess) and fix any wrong shots.
+
+</Steps>
+
+While the microphone hears speech, the camera whose person's mouth moves most is shown:
+
+- Each camera's person is the largest face in its picture.
+- Frame Job watches that mouth opening and closing over half a second.
+- A camera wins when its mouth moves at least half as much again as the next camera's (1.5×) and more than a small minimum.
+- When two mouths move alike, or the busiest mouth stays under that minimum, it's crosstalk, and [**Crosstalk**](/multicam/switch-settings/#crosstalk-shows) decides what shows.
+- With no speech, or no mouth to read, the current shot holds.
+
+The rest of the cut works as it does with several microphones, and it writes the same [Program track](/multicam/switch-by-speaker/#the-program-track) as one undo step.
+
+## Finding faces first
+
+Frame Job reads faces from its [on-device analysis](/projects/media-analysis/) of each camera. When a camera's faces haven't been found yet, an **Analyzing** sheet comes up first, with a bar for each file. The Switch by Speaker sheet opens once they're found.
+
+Only the part of each camera the range needs is analysed, and what's found is kept in the project's cache, so next time it's quicker or skipped.
+
+| If | Then |
+| --- | --- |
+| You choose **Stop** | Everything stays as it was, and what was saved so far is kept. Frame Job saves as it goes, every 30 seconds. Choose the command again to carry on. |
+| The analysis fails | Frame Job beeps and says why at the foot of the inspector. |
+| The project changed while it analysed | Frame Job beeps, says so at the foot of the inspector, and switches nothing. Choose the command again. |
+
+## The sheet in this mode
+
+The sheet changes to suit one microphone:
+
+- One **Microphone:** pop-up replaces the speaker rows, and **Cameras:** lists every camera.
+- There's no **Ignore bleed** row, because there's no second microphone to bleed into.
+- **Minimum shot** opens at 3 s, not 2 s, and isn't remembered.
+- **Wide** opens on **None**.
+
+The other rows work as they do in [Switch by Speaker settings](/multicam/switch-settings/).
+
+A camera with no face whose mouth can be read stops the cut. The summary reads "The camera on track … shows no face whose mouth can be read between … and …, so it never says who is talking." A camera whose faces still aren't found reads "The camera on track … is still being analysed — its faces have not been found yet. Try again in a moment."
+
+## Wide in this mode
+
+Choose a **Wide** to show it during crosstalk. That camera then takes no part in deciding who talks, so a true wide shot whose faces are too small to read won't stop the cut. With no Wide, crosstalk holds the current shot.
+
+With only two cameras, making one the Wide leaves a single camera for faces to decide between. Faces no longer decide and the warning leaves the summary. The cut then opens on the Wide, moves to the other camera at the first turn of speech, and stays there unless [**Cut to the wide after**](/multicam/switch-settings/#cut-to-the-wide-after) breaks it up.
+
+## Faces only guess
+
+The summary starts "Faces guess who is talking; check the cuts."
+
+Frame Job measures only how much each mouth moves while the microphone hears speech, so a mouth that moves without speaking, such as laughing or chewing, can put a cut in the wrong place. A face turned away gives no mouth to read, so that camera can't be chosen while it's turned, even if that person is the one talking. Look through the result and fix those shots with [Switch Angle](/multicam/switch-angle/).
+
+## Good to know
+
+- Only the largest face in a camera is read. With two people in one shot, the other person's mouth doesn't count.
+- Only video files are read for faces. A still picture on a camera track has no mouth to read.
+- Pointing every speaker row at one microphone in the ordinary sheet also reads faces. It doesn't bring up the Analyzing sheet, so a camera not yet read stays "still being analysed". To find its faces, change the selection so it comes to [one microphone](/multicam/set-up/#microphones), and choose the command again.
+
+## With an agent
+
+There's no Analyzing sheet for [`switch_by_speaker`](/mcp/tools-multicam/#switch_by_speaker). The call waits up to 60 seconds for the faces, then stops, keeping what was saved so far, and calling it again carries on. Its answer says which way it decided and repeats the warning. See [Waiting for faces](/multicam/copy-pieces/#waiting-for-faces).
+
+## Related
+
+- [Switch by Speaker](/multicam/switch-by-speaker/)
+- [Switch by Speaker settings](/multicam/switch-settings/)
+- [Switch Angle](/multicam/switch-angle/)
+- [On-device media analysis](/projects/media-analysis/)

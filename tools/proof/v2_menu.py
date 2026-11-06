@@ -44,7 +44,9 @@ shows a visible "Reversing"; the sheet is then closed with `cancel_sheet`
 (at most three calls). `perform_ms` and `settle_ms` are printed.
 
 The script performs only Add Marker, Export… (cancelled), Remove Track
-(cancelled), Add Media… (cancelled), Settings…, and View ▸ Zoom In and Zoom
+(cancelled, on A with a back track added first, since the item is disabled
+on a project's only track (#490), and the add undone after), Add Media…
+(cancelled), Settings…, and View ▸ Zoom In and Zoom
 Out (U2: an item that edits nothing leaves undo and redo as they were, #167),
 Clip ▸ Rename… and Edit ▸ Select All on its field (U3: a text field's Select
 All leaves undo and redo as they were, #176; the field is then closed by a
@@ -670,18 +672,26 @@ def rows_s(mcp):
           f"{(disabled or 'PERFORMED')[:60]!r}; cancel {c['how']} → sheet {c['sheet']}; counts "
           f"{a0} → {a1}")
 
+    # A's only track holds the shapes, and Remove Track is disabled on a
+    # project's last track (#490): a back track first, so the current track
+    # (the front one) is still the one with the clips; undone after.
+    mcp.call_with("add_track", {"project": A, "index": 0})
+    s0 = counts(mcp, A)
     r = perform(mcp, ["Track", "Remove Track"], A)
     got = want = None
     if r["sheet"] is not None:
         _, want, got = sheet_capture(mcp, A, "s2_alert")
     c = cancel(mcp, A)
     a2 = counts(mcp, A)
+    mcp.call_with("undo", {"project": A})
+    back = counts(mcp, A)
     ok = (r["sheet"] is not None and got == want and c["how"] == "cancel_button"
-          and c["button"] == "Cancel" and c["sheet"] is None and a2 == a0)
+          and c["button"] == "Cancel" and c["sheet"] is None and a2 == s0
+          and s0["tracks"] == a0["tracks"] + 1 and back == a0)
     score("S2", "pass" if ok else "fail",
-          f"Remove Track ({a0['clips']} clips): sheet {(r['sheet'] or {}).get('class')}, "
-          f"capture {got} vs {want}; cancel {c['how']} {c['button']!r} → sheet {c['sheet']}; "
-          f"counts {a0} → {a2}")
+          f"Remove Track ({s0['clips']} clips, {s0['tracks']} tracks): sheet "
+          f"{(r['sheet'] or {}).get('class')}, capture {got} vs {want}; cancel {c['how']} "
+          f"{c['button']!r} → sheet {c['sheet']}; counts {s0} → {a2}; the add undone → {back}")
 
     r = perform(mcp, ["File", "Add Media…"], A)
     panel = (r["sheet"] or {}).get("file_panel")

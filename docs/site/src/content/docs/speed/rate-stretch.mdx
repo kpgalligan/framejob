@@ -1,0 +1,81 @@
+---
+title: "Rate stretch"
+description: "Hold ⌥ and drag a clip's end edge to change its length by changing its speed, so it still plays everything it showed."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+A rate stretch changes a clip's length by changing its speed, not by trimming it. The clip still plays all of the source it showed, faster or slower, so it's the quick way to make a shot fit by eye.
+
+<AtAGlance
+  keys="⌥-drag"
+  where="Timeline: a media clip's end edge"
+  tools="rate_stretch"
+/>
+
+## Stretch a clip
+
+<Steps>
+
+1. Hold <kbd>⌥</kbd>.
+
+2. Press on the **end** edge of a clip of a video or audio file, and drag. The timeline shows the result as you drag.
+
+3. Let go.
+
+</Steps>
+
+The stretch lands as one undo step, **Rate Stretch**. The new rate is the length of source the clip shows divided by its new length, so a 10 s clip at ×1 dragged to 5 s plays at ×2.
+
+Frame Job reads <kbd>⌥</kbd> when you press, so hold it before the drag starts. <kbd>⌥⇧</kbd> on an edge is a [roll](/editing/slip-and-roll/), not a stretch.
+
+Actions keep their fraction of the clip. Captions over the clip are re-timed in the same step, which is then named **Rate Stretch and Re-time Captions**, and they jump when you let go. See [Captions follow a speed change](/speed/captions-and-speed/).
+
+## Snapping
+
+A rate stretch snaps like any other edge drag. Hold <kbd>⌘</kbd> during the drag to turn snapping off for it. See [Snapping](/timeline/snapping/).
+
+## Which edges and clips stretch
+
+| You drag with ⌥ | What happens |
+| --- | --- |
+| A media clip's end edge | A rate stretch |
+| A clip's start edge | An ordinary trim |
+| The end edge of a still, text, shape, graphic or any other clip | An ordinary trim, with the undo step **Trim Clip** |
+| An edge on a locked track | Nothing. The edge doesn't move. |
+| The end edge of a clip linked to its detached sound | Nothing, with no beep and no reason, until you [attach it](/audio/detach-and-attach/) |
+
+## Where a stretch stops
+
+The clip stops following the drag when the next step would break a limit, and it lands at the last length that worked:
+
+- **Rate limits.** The stretch can't need a rate outside ×0.1 – ×1000.
+- **One frame.** The clip can't get shorter than one frame.
+- **The next clip.** A stretch into the next clip follows the same [overlap rule](/speed/change-speed/#a-slowed-clip-overlapping-the-next) as any slowed clip, so the later clip gains a transition across an allowed overlap.
+
+Drag back inside the limit and the clip follows you again.
+
+## A ramped clip
+
+On a clip with a speed ramp, the whole ramp stretches with the clip and keeps its shape. The stretch stops where any of its rates would pass the limits. See [Edit a ramped clip](/speed/edit-a-ramped-clip/).
+
+## Stretching past ×12
+
+If a stretch takes a clip with sound past ×12, Frame Job puts the stretch back and asks first.
+
+- **Set Speed** applies the stretch you made.
+- **Cancel** leaves the clip as it was.
+
+See [Sound at high speed](/speed/sound-at-high-speed/).
+
+## With an agent
+
+`rate_stretch` takes `clip` and `to_end`, the clip's new end on the timeline, and both are required. A text, shape, image or freeze clip is an error. The reply's `captions_retimed` lists the captions that moved, and `captions_removed` those whose speech the clip no longer plays. See [`rate_stretch`](/mcp/tools-speed/#rate_stretch).
+
+## Related
+
+- [Change a clip's speed](/speed/change-speed/)
+- [Fit a clip to a length](/speed/fit-to-duration/)
+- [Trim clips](/editing/trimming/)
+- [Edit a ramped clip](/speed/edit-a-ramped-clip/)

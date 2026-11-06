@@ -98,8 +98,9 @@ app/
 designs/         spec/ (the normative spec, one file per section), adr/
                  (condensed decision records), the design handoffs, screens/
                  (the screen catalog).
-docs/            guide/ (the user guide), graphics-api.md, manual-checks.md,
-                 agents/ (what the engineering skills read), this file.
+docs/            site/ (the public documentation site), graphics-api.md,
+                 manual-checks.md, agents/ (what the engineering skills read),
+                 this file.
 tools/codecs/    build_codecs.py (`make codecs`: the bundled encoders' pins, their
                  fetch, digest check, build and stamp) and PROVENANCE.md.
 tools/licenses/  acknowledgements.py (every build's third-party notices,

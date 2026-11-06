@@ -1,0 +1,73 @@
+---
+title: "Shorten a pause"
+description: Spot long pauses in the Transcript tab and tighten them, keeping 0.2 s at each end and closing the gap on every unlocked track.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+The Transcript tab marks each long pause in the speech. Click one and delete it to tighten the pause without taking any words, as one undo step.
+
+<AtAGlance
+  menu={['Edit ▸ Delete', 'Edit ▸ Ripple Delete']}
+  keys={['⌫', '⌦', '⌘⌫']}
+  where="Inspector ▸ Transcript"
+  tools={['get_timeline_transcript', 'ripple_delete_ranges', 'set_range']}
+  needs="Words in the Transcript tab, and the voice model, which runs on your Mac with no key and no upload."
+/>
+
+## Pauses in the transcript
+
+Where the speech stops for more than a second between two words of one clip, the transcript shows the pause's length in grey after the word before it, such as `[2.4 s]`.
+
+The length is what the voice model hears as silence between that word and the next. The model is the one [Remove Silences](/cleanup/remove-silences/) uses. It runs when the project opens the file, so a file's pauses appear once it has finished. They appear for words from an [AssemblyAI transcript](/captions/assemblyai-transcription/) as well as words read on this Mac.
+
+That second is measured as the clip plays on the timeline, so a clip's speed changes what counts. A 0.8 s silence in a clip slowed to half speed plays for 1.6 s, and shows as a pause.
+
+## Select a pause
+
+Click the pause. It's selected on its own, the part that would go becomes the timeline's [in/out range](/timeline/in-out-range/), and the playhead moves to the start of that cut. To hear what would go, turn on [Loop](/timeline/loop/).
+
+<kbd>⎋</kbd> clears the selection and the range. Dragging, <kbd>⇧</kbd> and <kbd>⌘A</kbd> select words only, so a pause is always selected by clicking it.
+
+## Delete the pause
+
+<Steps>
+
+1. Choose **View ▸ Transcript** (<kbd>⌃⌘T</kbd>) to open the Transcript tab.
+
+2. Click the pause, the grey length in the text.
+
+3. Press <kbd>⌫</kbd>.
+
+</Steps>
+
+The pause is shortened, keeping 0.2 s at each end, and the gap closes on every unlocked track, as one undo step named **Delete Pause**. A `[2.4 s]` pause loses about 2 s and leaves about 0.4 s. The range clears and the playhead lands where the cut was.
+
+<kbd>⌦</kbd>, <kbd>⌘⌫</kbd>, **Edit ▸ Delete** and **Edit ▸ Ripple Delete** do the same, as long as the transcript text has the keyboard.
+
+The cut lands on whole frames and never takes the start of a word.
+
+The tab won't cut a pause when a locked track has words inside the cut, or when the cut would pass the limit of 4,096 clips. It beeps and shows the same [reason](/captions/delete-words/#when-the-tab-wont-cut) it gives for words, at the foot of the inspector.
+
+## When a pause isn't shown
+
+The tab shows a pause only when it can cut it cleanly. There's no pause marked:
+
+- between two clips, including the two halves of a clip you've split
+- when either word next to it is [faint](/captions/delete-words/#words-that-cant-be-cut): inside a nest, under a transition or on a locked track
+- when a word on another track, one the tab shows, reaches into the part that would go, because the cut would take that word
+- when a clip whose words haven't been read yet starts inside the cut
+- when keeping 0.2 s at each end would leave nothing to cut
+
+## With an agent
+
+`get_timeline_transcript` reads the same pauses, each with the range the tab would cut it by, and one [`ripple_delete_ranges`](/mcp/tools-cut-and-delete/#ripple_delete_ranges) call shortens one. `set_range` can shade that range first. An agent can pass several in that call, which makes them one undo step. See [Cut words and pauses](/mcp/tools-captions/#cut-words-and-pauses).
+
+## Related
+
+- [Cut by deleting words](/captions/delete-words/)
+- [The Transcript tab](/captions/transcript-tab/)
+- [Transcript keys](/captions/transcript-keys/)
+- [Remove Silences](/cleanup/remove-silences/)
+- [The in/out range](/timeline/in-out-range/)

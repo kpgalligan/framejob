@@ -1,0 +1,74 @@
+---
+title: "The preview"
+description: What the preview pane shows, what its corner tags mean, and the View menu items that change it.
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
+
+The preview shows the frame under the playhead, so you can see what you're making while you edit and play.
+
+<AtAGlance
+  menu={['View ▸ Safe Areas', 'View ▸ Show Ungraded', 'View ▸ Show Selection', 'View ▸ Show SDR Version', 'View ▸ Show Subjects', 'View ▸ Scopes', 'View ▸ Loudness Meter']}
+  keys={['⌃⌘U', '⌃⌘W', '⌃⌘L']}
+  where="The editor window, top left, above the timeline"
+/>
+
+## What it shows
+
+The picture keeps the canvas's shape, letterboxed to fit the pane to the left of the inspector. Under it, a small caption gives the canvas size and frame rate, for example `1920 × 1080 · 30 fps`.
+
+The preview is also where you work on the picture: selecting clips, then moving, scaling, rotating and cropping them. That's covered in [The canvas](/canvas/the-canvas/), and zooming it in [Zoom and pan the preview](/canvas/zoom-and-pan/).
+
+Two settings change how the preview is drawn, and neither touches an export:
+
+- [Preview Quality](/timeline/preview-quality/) draws it smaller, so heavy projects play more smoothly.
+- [The Preview Window](/timeline/preview-window/) shows the same picture in a second window, for another display.
+
+## Colour on your display
+
+Frame Job has no display settings of its own. The preview is a macOS video layer: the picture goes to it in the project's colour, Rec. 709 or BT.2100 HLG, and macOS draws it for your display. So what you see depends on the display and its colour profile. There's no viewer LUT and no calibration setting.
+
+The [scopes](/color/scopes/) read the picture itself, not your display, so trust them over your eye. An HDR (HLG) project's highlights only look brighter than white on a display that can show them. For why a file can look different in another player, see [Colour labels](/export/what-an-export-includes/#colour-labels).
+
+## Preview tags
+
+Small tags in the top-left corner of the pane tell you when the picture isn't the plain one. Each shows only while its **View** item is on.
+
+| Tag | Means | View item |
+| --- | --- | --- |
+| **Ungraded** | The picture shows no clip's grade. | [Show Ungraded](/color/show-ungraded/) |
+| **Selection** | The picture shows which pixels the selected adjustment clip's qualifier picks. | [Show Selection](/color/show-selection/) |
+| **SDR Version** | The picture shows the project's SDR version. | [Show SDR Version](/hdr/show-sdr-version/) |
+
+<Shot
+  name="04b-preview-scopes.preview"
+  alt="The preview pane with the Ungraded tag in its top-left corner, the picture with its caption 960 × 540 · 30 fps underneath, and the scopes panel beside it showing a waveform over a vectorscope."
+/>
+
+The tags sit in that order, and a hidden tag leaves no space, so **Selection** moves into the corner when **Ungraded** is off. **SDR Version** shows in an SDR project too, where the picture doesn't change.
+
+## Other View items
+
+The **View** menu holds the other switches for the preview. Each has its own page.
+
+| Item | Keys | What it does | Remembered |
+| --- | --- | --- | --- |
+| [**Safe Areas**](/canvas/safe-areas/) | | Shows the title-safe and action-safe guides, the same as the toolbar's **Safe** box. Checked when on. | Yes |
+| [**Show Ungraded**](/color/show-ungraded/) | <kbd>⌃⌘U</kbd> | Shows the picture as if no clip were graded. | No |
+| [**Show Selection**](/color/show-selection/) | | Shows what an adjustment clip's qualifier picks. It needs a selected adjustment clip to turn on. | No |
+| [**Show SDR Version**](/hdr/show-sdr-version/) | | Shows an HDR project's SDR version. | No |
+| [**Show Subjects**](/framing/show-subjects/) | | Draws the faces, people and salient regions found for the selected clip. | No |
+| [**Scopes**](/color/scopes/) | <kbd>⌃⌘W</kbd> | Shows the scopes panel beside the picture. | No |
+| [**Loudness Meter**](/audio/loudness-meter/) | <kbd>⌃⌘L</kbd> | Shows the live loudness column beside the picture. | No |
+
+Remembered means between launches, for every project. The items that aren't remembered start off in each new window, as the [Preview Window](/timeline/preview-window/) does, and none of these changes an export.
+
+**View ▸ Assistant** (<kbd>⌃⌘A</kbd>) sits nearby but doesn't change the picture. It opens the inspector's Assistant tab, beside the preview. See [Chat with the Assistant](/assistant/chat/).
+
+## Related
+
+- [A tour of the editor window](/getting-started/editor-window/)
+- [The canvas](/canvas/the-canvas/)
+- [Preview Quality](/timeline/preview-quality/)
+- [The Preview Window](/timeline/preview-window/)

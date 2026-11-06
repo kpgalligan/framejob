@@ -156,7 +156,8 @@ final class FillerSheetController: NSViewController {
                 + "closes over it, as one edit. A cut is widened to the 32 ms speech grid so "
                 + "the whole filler goes, but never into the words beside it, and its edges "
                 + "snap inward to the frame grid. A filler that would cut into another clip's "
-                + "word, a nest or a transition is left in.",
+                + "word, a nest, or an overlap between two clips on one track or the area around "
+                + "it is left in.",
             content: content,
             buttonRow: makeButtonRow(
                 cancel: cancelButton, apply: applyButton,
@@ -209,7 +210,8 @@ final class FillerSheetController: NSViewController {
             notes.append(
                 (dropped == 1 ? "1 filler is" : "\(dropped) fillers are")
                     + " left in: too short to cut, or cutting would reach another clip's word, "
-                    + "a nest or a transition.")
+                    + "a nest, or an overlap between two clips on one track or the area around "
+                    + "it.")
         }
         let locked = outcome.locked.count
         if locked > 0 {
@@ -218,9 +220,12 @@ final class FillerSheetController: NSViewController {
                     + " on a locked track, which the cut neither cuts nor moves, so "
                     + (locked == 1 ? "its" : "their") + " fillers were not read.")
         }
-        if outcome.clips.isEmpty, outcome.needsTranscript.isEmpty, outcome.locked.isEmpty {
+        if outcome.clips.isEmpty, outcome.needsTranscript.isEmpty, outcome.locked.isEmpty,
+            input.missing.isEmpty
+        {
             notes.append("Nothing in scope plays speech from a media file, so nothing was read.")
         }
+        if let note = missingNote() { notes.append(note) }
         notes.append(contentsOf: transcribeNotes())
         if let lastError { notes.append(lastError) }
         return notes.joined(separator: " ")

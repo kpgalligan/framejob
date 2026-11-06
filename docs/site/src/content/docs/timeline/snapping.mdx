@@ -1,0 +1,78 @@
+---
+title: "Snapping"
+description: "Make timeline drags catch clip edges, markers, the playhead and the in and out points, and turn it off when you don't want it."
+---
+
+import AtAGlance from '@components/AtAGlance.astro';
+
+Snapping makes a drag catch the useful points on the timeline, so a clip lines up with the next cut instead of landing a frame away from it. This page is about the timeline. For dragging on the picture, see [Canvas snapping](/canvas/canvas-snapping/).
+
+<AtAGlance
+  menu="View ▸ Snapping"
+  keys="N"
+  where="The Snap checkbox in the timeline bar"
+/>
+
+## Turn snapping on or off
+
+Press <kbd>N</kbd>, click the **Snap** checkbox in the timeline bar, or choose **View ▸ Snapping**, which has a tick when snapping is on. The menu item shows no key, because <kbd>N</kbd> is one of the keys the editor handles itself.
+
+Snapping is on by default, and your choice is remembered between launches. One setting serves both the timeline and the canvas. There's no agent tool for it.
+
+## What a drag snaps to
+
+These drags snap:
+
+- moving clips
+- trimming a clip's edge
+- a [rate stretch](/speed/rate-stretch/)
+- a [roll](/editing/slip-and-roll/)
+- dragging a [marker](/timeline/markers/)
+- scrubbing along the [ruler](/timeline/ruler-and-playhead/)
+
+They catch these targets:
+
+- the start and the end of the timeline
+- the edges of other clips, but never of the clips you're dragging
+- markers
+- the playhead
+- the in and out points
+
+A target catches when it's within 8 points on screen, the unit macOS measures the screen in. That's the same distance at every zoom, so when you're zoomed out it covers more time. If two targets are equally close, the earlier one wins.
+
+When you move clips, it's the start of the earliest clip you're dragging that snaps, and the whole group moves with it. The end of a moved clip doesn't catch anything.
+
+Inside a [nest](/editing/nests/), there are no markers to catch, and the other targets are the nest's own.
+
+## Turn snapping off for one drag
+
+Hold <kbd>⌘</kbd> during the drag. It works from the moment you press or at any time during the drag, and it takes effect the next time the pointer moves. Let go of <kbd>⌘</kbd> and the drag snaps again.
+
+This works on the canvas too, and it changes nothing that's remembered.
+
+## See what a drag caught
+
+When a drag snaps, a thin vertical line runs across the timeline at the target it caught. Scrubbing the ruler snaps too, but it draws no line. The playhead is already there to show you.
+
+## Drags land on whole frames
+
+A drag that doesn't snap still lands on a whole frame. That's true with snapping off, while you're holding <kbd>⌘</kbd>, and when nothing is close enough to catch.
+
+## What never snaps
+
+- A [slip](/editing/slip-and-roll/) never snaps.
+- A row from the [Media tab](/projects/media-tab/) dropped on a lane lands on the nearest frame at the pointer, and doesn't snap to edges.
+- Dragging an [action band](/motion/action-lane/) lands on whole frames, and doesn't snap.
+- Dragging a [fade handle](/audio/fades/) doesn't snap.
+
+## Good to know
+
+A window reads the setting when it opens. If two projects are open, changing it in one leaves the other as it is until you close that project and open it again.
+
+## Related
+
+- [Canvas snapping](/canvas/canvas-snapping/)
+- [Move clips](/editing/move-clips/)
+- [Trim clips](/editing/trimming/)
+- [Slip and roll](/editing/slip-and-roll/)
+- [Markers](/timeline/markers/)
