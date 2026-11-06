@@ -28350,7 +28350,10 @@ the paragraph rule; T8 the follow pause with `now` injected, in a standalone
 view; then in the app's own editor window over `work/transcript_tab/probe.framejob`
 (a 120 s silent WAV under two clips, words through `preload`): T5 Space, J, L
 and ←; T4p a click while playing; T10 `clipPicked()` on the Transcript tab
-and from Media; T7 a live trim.
+and from Media; T7 a live trim; T14p `characterOffset(at:)` at the first line's
+edges and swept every 1 pt over 420 pt at nine x positions (a drag's path,
+above the text included, where the line answers `NSNotFound`): every answer
+inside the text, never a trap (the owner's CP1 crash, 2026-11-06).
 
 **The app rows** (one `assistant_session_proof.App` with dummy keys,
 `assemblyai_fake.py` and `anthropic_fake.py`, as TX1's): Z0 the schema and
@@ -28364,8 +28367,8 @@ still reads, then the tab hidden and shown again with the long run started
 over. T11 runs `view_spike.py --measure`.
 
 Mutants: `highlight-containment`, `follow-pause-ignored`, `space-consumed`,
-`paragraph-1.0s`, `live-rebuild` and `clip-picked-switches` rebuild the probe
-over a copy of `app/Sources`; `one-wait` builds the app in a tree copy
+`paragraph-1.0s`, `live-rebuild`, `clip-picked-switches` and
+`line-index-unchecked` (T14p) rebuild the probe over a copy of `app/Sources`; `one-wait` builds the app in a tree copy
 (`work/transcript_tab/mutant-app-one-wait/`) and runs T12.
 
 ### TX2b — the tab's bar (`transcript_tab_proof.py` B1–B4; two mutants; spec §11 TX-24…TX-27)

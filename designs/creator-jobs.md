@@ -5541,6 +5541,21 @@ floats and its cutout group, and the `texture(4)` sentence beside `texture(5)`'s
 - **No code, no proof, no mutants.** The checkpoint is not a JOB row (CJ-5).
 - **Depends on:** TX3.
 
+**The first attempt (2026-11-06) crashed.** The owner was dragging to select words in the
+Transcript tab of a build of `worktree-creator-jobs` at `26734a7c`, run from Xcode on S-TH1, and
+the app stopped at an arithmetic overflow in `TranscriptView.characterOffset(at:)`
+(`TranscriptView+Layout.swift`, from TX2a, reached from TX3a's `mouseDragged`). Off a line's
+glyphs, `NSTextLineFragment.characterIndex(for:)` answers `NSNotFound` (`Int.max`), and
+`start + max(index, …)` overflowed once `start` was above 0.
+- **The fix:** an index of `NSNotFound` (or below 0) answers the line's first character when the
+  point is left of it (or the line is empty), else its last.
+- **The row:** the probe's T14p checks the first line's edges, then sweeps every 1 pt from −20 to
+  400 pt at nine x positions, 3,789 points: 3,789 answered, none outside the text.
+- **The mutant:** `line-index-unchecked` puts the old line back. T14p fails, with
+  9223372036854775807 at (150, −20) and above the text.
+- **Checks:** `make gate` passed on the fixed tree before the commit.
+- The checkpoint itself is still owed: the owner's cut of T1, with its notes.
+
 ### CJ5a — `keep_range`: a timeline range as a whole project
 
 The first draft's FC1 and FC2 are CJ5a and CJ5b, made shared because VR3 builds its copy on the same

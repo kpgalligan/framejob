@@ -394,8 +394,45 @@ if let (document, editor, window, pane) = openEditor() {
     row("T7", during == r0 && after == r0 + 1,
         "rebuilds \(r0) before, \(during) during three live ticks, \(after) after the gesture "
             + "(want \(r0), \(r0 + 1))")
+
+    // T14p a drag past a line's end or before its start: the line answers
+    // NSNotFound off its glyphs, and the offset is the line's last or first
+    // character, inside the text, never a trap (the owner's CP1 crash).
+    view.scrollToToken(0)
+    spin(0.2)
+    let length = view.offset(of: view.contentStorage.documentRange.endLocation)
+    var offsets: [String: Int] = [:]
+    var notes: [String] = []
+    if let line = view.rects(forToken: 0).first {
+        for (name, x) in [("left", CGFloat(0)), ("far left", CGFloat(-400)),
+                          ("right", view.bounds.maxX - 1), ("far right", view.bounds.maxX + 400)] {
+            let offset = view.characterOffset(at: NSPoint(x: x, y: line.midY))
+            notes.append("\(name) \(String(describing: offset))")
+            offsets[name] = offset
+        }
+    } else {
+        notes.append("token 0 has no rect")
+    }
+    let inside = offsets.count == 4 && offsets.values.allSatisfy { $0 >= 0 && $0 < length }
+    let ordered = inside && offsets["left"] == offsets["far left"]
+        && offsets["left"]! < offsets["right"]! && offsets["left"]! < offsets["far right"]!
+    // A drag's path: every 1 pt down the first 400 pt (lines, the gaps between
+    // them and between paragraphs, the timecodes) at nine x positions.
+    var swept = 0, answered = 0, outside: [String] = []
+    for y in stride(from: CGFloat(-20), through: 400, by: 1) {
+        for x in [-400, -1, 0, 4, 12, 60, 150, view.bounds.maxX - 1, view.bounds.maxX + 400] as [CGFloat] {
+            swept += 1
+            guard let offset = view.characterOffset(at: NSPoint(x: x, y: y)) else { continue }
+            answered += 1
+            if offset < 0 || offset > length, outside.count < 5 { outside.append("(\(x), \(y)) → \(offset)") }
+        }
+    }
+    notes.append("swept \(swept) points, \(answered) answered, outside the text: \(outside)")
+    row("T14p", ordered && outside.isEmpty && answered > 0,
+        notes.joined(separator: "; ") + " (text length \(length); want four offsets inside it, "
+            + "both lefts equal, each left before each right, and every swept answer inside)")
 } else {
-    for id in ["T4p", "T5", "T7", "T10"] { row(id, false, "the editor did not open on \(package)") }
+    for id in ["T4p", "T5", "T7", "T10", "T14p"] { row(id, false, "the editor did not open on \(package)") }
 }
 
 if let data = try? JSONSerialization.data(withJSONObject: ["rows": rows], options: [.sortedKeys]),

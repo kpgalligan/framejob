@@ -66,8 +66,14 @@ extension TranscriptView {
         let local = CGPoint(x: inner.x - frame.minX, y: inner.y - frame.minY)
         let line = lines.first { $0.typographicBounds.maxY > local.y } ?? lines[lines.count - 1]
         let inLine = CGPoint(x: local.x - line.typographicBounds.minX, y: local.y - line.typographicBounds.minY)
+        let range = line.characterRange
         let index = line.characterIndex(for: inLine)
-        return start + max(index, line.characterRange.location)
+        // Off the line's glyphs (a drag past its end, or before its start) the line answers
+        // NSNotFound; the nearest offset is then its last or first character.
+        guard index != NSNotFound, index >= 0 else {
+            return start + (inLine.x <= 0 || range.length == 0 ? range.location : NSMaxRange(range) - 1)
+        }
+        return start + max(index, range.location)
     }
 
     /// The last token starting at or before `offset`, by binary search.
