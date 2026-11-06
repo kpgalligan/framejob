@@ -97,7 +97,7 @@ extension Exporter {
             try ExportWriter.checkAlphaSurvivesTheSize(settings, canvas: canvas)
             return nil
         } catch {
-            return error as? ExportError
+            return (error as? ExportError) ?? .failed(error.localizedDescription)
         }
     }
 }

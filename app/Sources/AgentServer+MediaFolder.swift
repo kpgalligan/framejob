@@ -11,9 +11,15 @@ extension AgentServer {
     /// then added as ONE undo step under the drop's name. A probe's refusal,
     /// a file already in the media list and every item `MediaFolder.list`
     /// skips are named in `skipped`; when nothing is left to add, the call is
-    /// refused naming them.
+    /// refused naming them. A folder whose items cannot be listed is refused
+    /// in `MediaFolder.Unreadable`'s sentence, the one the drop's alert shows.
     func importMediaFolder(_ folder: URL, _ document: ProjectDocument) throws -> String {
-        let listing = MediaFolder.list(folder)
+        let listing: MediaFolder.Listing
+        do {
+            listing = try MediaFolder.list(folder)
+        } catch let error as MediaFolder.Unreadable {
+            throw ToolError(message: error.errorDescription!)
+        }
         var skipped = listing.skipped
         var probed: [(url: URL, descriptor: MediaDescriptor)] = []
         for url in listing.files {

@@ -327,8 +327,9 @@ editor.playback.pause()
 editor.playback.loopRange = nil
 spin(0.5)
 
-// L parked at the end of a loop running past the item: the item ends again at once, and that post
-// wraps it. Parked by a seek, then by playing in, which can rest off the end tick.
+// These rows press L (`setRate(1)`) while parked at the end of a loop running past the item, and
+// `setRate`'s own seek (`Playback.setRate`) wraps it to the loop's start. Parked by a seek, then by
+// playing in, which can rest off the end tick.
 start(at: D)
 editor.playback.loopRange = (start: D - second, duration: 3 * second)
 editor.playback.setRate(1)

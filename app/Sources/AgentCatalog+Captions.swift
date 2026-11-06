@@ -69,15 +69,15 @@ extension AgentServer {
         return [
             tool(
                 "import_captions",
-                "Reads a SubRip (.srt) or WebVTT (.vtt) caption file and lays it out as TEXT "
-                    + "CLIPS, one per cue, on a new track of its own — File ▸ Import Captions…. "
-                    + "They are ordinary "
-                    + "text clips in the Caption preset, so they render in the preview, in "
-                    + "render_frame and in an export (burn-in) with no further step, and any of "
-                    + "them can be retimed with move_clip or restyled with set_text. Times snap "
-                    + "to the frame grid; a cue that overlapped the next one is shortened to "
-                    + "meet it. The result reports how many cues landed and, under skipped, "
-                    + "every entry the file was too malformed to read, with its line number.",
+                "Reads a SubRip (.srt) or WebVTT (.vtt) caption file and lays it out as "
+                    + "TEXT CLIPS, one per cue, on a new track of its own — File ▸ Import "
+                    + "Captions…. They are ordinary text clips in the Caption preset, so they "
+                    + "render in the preview, in render_frame and in an export (burn-in) with "
+                    + "no further step, and any of them can be retimed with move_clip or "
+                    + "restyled with set_text. Times snap to the frame grid; a cue that "
+                    + "overlapped the next one is shortened to meet it. The result reports how "
+                    + "many cues landed and, under skipped, every entry the file was too "
+                    + "malformed to read, with its line number.",
                 [
                     "path": [
                         "type": "string",

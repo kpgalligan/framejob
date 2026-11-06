@@ -15,17 +15,21 @@ extension ProjectDocument {
     /// File > Add Media… and every drop that adds files to an OPEN project.
     /// A folder among `urls` is replaced, in place, by the media files
     /// directly inside it (`MediaFolder.expand`, spec §11 #497), so one with
-    /// nothing to add adds nothing and says nothing. Probing is asynchronous,
-    /// so the files are probed one at a time and the whole batch commits as
-    /// ONE undo step; `completion` gets the new media ids in the order the
-    /// files were given, on the main thread.
+    /// nothing to add adds nothing and says nothing. A folder whose items
+    /// cannot be listed is presented first, in `MediaFolder.Unreadable`'s
+    /// sentence (the one `import_media` refuses with), and the rest of `urls`
+    /// still goes on. Probing is asynchronous, so the files are probed one at
+    /// a time and the whole batch commits as ONE undo step; `completion` gets
+    /// the new media ids in the order the files were given, on the main
+    /// thread.
     func importMedia(_ urls: [URL], completion: (([UInt32]) -> Void)? = nil) {
-        let urls = MediaFolder.expand(urls)
-        guard !urls.isEmpty else {
+        let (files, unreadable) = MediaFolder.expand(urls)
+        for folder in unreadable { present(folder) }
+        guard !files.isEmpty else {
             completion?([])
             return
         }
-        probeNext(urls, index: 0, descriptors: [], completion: completion)
+        probeNext(files, index: 0, descriptors: [], completion: completion)
     }
 
     private func probeNext(

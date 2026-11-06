@@ -1699,9 +1699,14 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   it. A folder that yields nothing adds nothing and says nothing on
   the drop; the tool refuses, `Nothing in Shoot was added: it has no files
   directly inside it.` or `Nothing in Shoot was added. Skipped: readme.txt
-  (not a media file).` `import_media` on a folder answers `{folder,
-  imported, skipped, note, project}`, `imported` in Finder order with each
-  file's probe as a file's answer gives it; a file keeps its answer. **Out:**
+  (not a media file).` A folder whose items cannot be listed is not one
+  that yields nothing: the tool refuses `Nothing in Shoot was added: it
+  could not be read.`, and the drop shows the same sentence as an alert,
+  before probing, and still adds the rest of what was dropped; this
+  replaces "says nothing" for that case only. `import_media` on a folder
+  answers `{folder, imported, skipped, note, project}`, `imported` in
+  Finder order with each file's probe as a file's answer gives it; a file
+  keeps its answer. **Out:**
   recursion past one level, and any folder handling at Add Media… (whose
   panel chooses no folder), File ▸ Open, the window or Dock drop, Add
   Background, `relink_media` and `open_project`. **Risks accepted:** for a

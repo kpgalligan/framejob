@@ -449,7 +449,7 @@ See [Projects and media](projects-and-media.md) and [Timeline](timeline.md).
 
 | Tool | What it does |
 |---|---|
-| `import_media` | Probes a file and adds it to the media list (**File ▸ Add Media…**), answering its new id. A WebM or Matroska file is copied into a `.mov` first. A folder adds the media files directly inside it, as a Media tab drop does, in one undo step, answering `imported` and `skipped` (each `{path, reason}`); a folder with nothing to add is refused, naming what it skipped. |
+| `import_media` | Probes a file and adds it to the media list (**File ▸ Add Media…**), answering its new id. A WebM or Matroska file is copied into a `.mov` first. A folder adds the media files directly inside it, as a Media tab drop does, in one undo step, answering `imported` and `skipped` (each `{path, reason}`); a folder with nothing to add is refused, naming what it skipped, and a folder that cannot be read is refused as "Nothing in *folder* was added: it could not be read." |
 | `add_media` | *op* — the raw op behind `import_media`, from a descriptor you supply. Use `import_media` unless you are replaying a project's own JSON. |
 | `relink_media` | *op* — points a media entry at a file that moved (the Relink… sheet). |
 | `remove_media` | *op* — removes a media entry; refused while clips use it unless `with_clips`. |

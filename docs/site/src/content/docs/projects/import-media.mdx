@@ -41,7 +41,7 @@ Adding a file that's already in the list changes nothing. A file Frame Job can't
 
 Drag files or folders from the Finder onto the Media tab to add them to this project. It works like **Add Media…**, with one difference: a drop has no list of allowed types, so Frame Job tries every file you drop. That's how a format the panels don't list gets in.
 
-A folder adds the media files directly inside it: movies, sound files, pictures, `.cube` LUTs, and WebM or Matroska files. They're added in the order the Finder lists them by name, so `Clip 2.mov` comes before `Clip 10.mov`. Frame Job looks one level down only. Folders inside it, packages such as another Frame Job project, hidden files and files that aren't media are left out, with no alert. A media file in the folder that Frame Job can't read still shows its alert, and the rest are added. A folder with nothing to add does nothing.
+A folder adds the media files directly inside it: movies, sound files, pictures, `.cube` LUTs, and WebM or Matroska files. They're added in the order the Finder lists them by name, so `Clip 2.mov` comes before `Clip 10.mov`. Frame Job looks one level down only. Folders inside it, packages such as another Frame Job project, hidden files and files that aren't media are left out, with no alert. A media file in the folder that Frame Job can't read still shows its alert, and the rest are added. A folder with nothing to add does nothing. A folder Frame Job can't read shows the alert "Nothing in *folder* was added: it could not be read.", and the rest of the drop is still added.
 
 Files dropped with a folder are added with its files, in the order you dropped them, all as one undo step.
 

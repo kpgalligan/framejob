@@ -406,7 +406,10 @@ final class Exporter {
     }
 
     /// Renames the file at `url` to a hidden name in the same folder, or nil
-    /// when nothing is there or the move failed.
+    /// when nothing is there or the move failed. A crash between this move
+    /// and the removal or `putBack` leaves the person's file under that
+    /// `.framejob-replaced-<UUID>` name: such a leftover is the original, and
+    /// renaming it back to its own name restores it.
     private static func moveAside(_ url: URL) -> URL? {
         let aside = url.deletingLastPathComponent()
             .appendingPathComponent(".framejob-replaced-\(UUID().uuidString)")

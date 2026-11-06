@@ -30205,7 +30205,7 @@ python3 tools/proof/docs_bugs_c2_proof.py --mutant <name>
 RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_c2_proof.py --base-sources <its app/Sources>
 ```
 
-## Docs bugs b2 — caption files, AVIF stills, an unreadable project.json (`docs_bugs_b2_proof.py`, `docs_bugs_b2_probe.swift`; nine mutants by `--mutant`; spec §11 #467, #498, #487)
+## Docs bugs b2 — caption files, AVIF stills, an unreadable project.json (`docs_bugs_b2_proof.py`, `docs_bugs_b2_probe.swift`; ten mutants by `--mutant`; spec §11 #467, #498, #487)
 
 #467, #482, #498, #487 and #497's agent sentence. **`docs_bugs_b2_proof.py`** makes its own fixtures
 under `work/docs-bugs-b2/` (ffmpeg with libsvtav1, and `sips`) on a scratch `CFFIXED_USER_HOME`. The
@@ -30216,7 +30216,9 @@ the debugger and no crash report window appears, and a Release run scores a dead
 failure. `-NSOpen` is never used, because on the fix its alert would reach the screen: that alert is
 `docs/manual-checks.md` PB-16. An attach makes `Popen.poll` answer 0, so these rows ask `ps`, and
 end the instance by its pid. F1, F2 and F4 send the folder to `relink_media` on an imported `A.mov`,
-since `import_media` imports a folder's files (#497, batch b5 below).
+since `import_media` imports a folder's files (#497, batch b5 below). V13 covers the WebVTT header's
+line offset: a broken cue straight after `WEBVTT` and `Kind:` in the first block is reported at its own
+line 3, and `vtt-header-line`, which drops that offset, turns it red.
 
 **`docs_bugs_b2_probe.swift`** runs what MCP cannot send: a Media tab drop through `MediaPane` on a
 private pasteboard, and `importCaptionsCommand()` and `addImageBackground(nil)` whole, `NSOpenPanel`
@@ -30305,22 +30307,25 @@ python3 tools/proof/docs_bugs_b4_proof.py --mutant <name>
 RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_b4_proof.py --base-sources <its app/Sources> --expect-red
 ```
 
-## Docs bugs b5 — a folder at an import door (`docs_bugs_b5_proof.py`, `docs_bugs_b5_probe.swift`; eight mutants by `--mutant`; spec §11 #497)
+## Docs bugs b5 — a folder at an import door (`docs_bugs_b5_proof.py`, `docs_bugs_b5_probe.swift`; ten mutants by `--mutant`; spec §11 #497)
 
 #497. **`docs_bugs_b5_proof.py`** makes its own fixtures under `work/docs-bugs-b5/` (ffmpeg) on a
 scratch `CFFIXED_USER_HOME`: a `Shoot` folder of two movies, a LUT, a still, a Matroska file with no
 extension, a `.txt`, a hidden movie, a subfolder, an `.rtfd` and a `.framejob`, a link to it, an
-empty folder named `Shoot.mov`, `Broken` (a movie and a text file named `.mov`) and `Docs` (a `.txt`).
-The M rows send `import_media` to one instance and read `imported`, `skipped`, the refusals, `undo`
-and `tools/list`; M6, M9 and M10 are controls on a file, a Matroska file and a package. The same
-instance saves an empty project for the probe.
+empty folder named `Shoot.mov`, `Broken` (a movie and a text file named `.mov`), `Docs` (a `.txt`)
+and `Locked` (a movie, the folder made mode 000 once made, and given back mode 755 when the run ends
+and before the next clears the work folder). The M rows send `import_media` to one instance and read
+`imported`, `skipped`, the refusals, `undo` and `tools/list`; M6, M9 and M10 are controls on a file, a
+Matroska file and a package, and M11 is `Locked`'s refusal, `Nothing in Locked was added: it could not
+be read.` The same instance saves an empty project for the probe.
 
 **`docs_bugs_b5_probe.swift`** runs the drop MCP cannot send: `MediaPane.draggingEntered` and
 `performDragOperation` with a stub drag over a private pasteboard, on a copy of that package per row,
 with `-RCFFmpegPath /nonexistent/ffmpeg`, `NSAlert.runModal` replaced, `ProjectDocument.copyWatch` a
 counting no-op for each drop (so `Take 3`'s copy shows no progress panel) and its window 20,000 pt off
-every display. It names only symbols the base has, so it builds over `--base-sources`. A Finder drag
-itself is `docs/manual-checks.md` PB-17.
+every display. It names only symbols the base has, so it builds over `--base-sources`. D6 drops
+`Locked`: one alert in that same sentence, nothing added. A Finder drag itself is
+`docs/manual-checks.md` PB-17.
 
 ```sh
 make app-debug && python3 tools/proof/docs_bugs_b5_proof.py [--only M1,D1]

@@ -24,7 +24,9 @@ are needed at proof time.
   `tools/list` says WebVTT. V8 one broken cue: exactly one `skipped`, naming its line (the base
   answers two, the header's and the cue's). V9 (c) `clean.srt`: no `skipped`. V10 (c) an `.srt` with
   a `NOTE` block still reports it. V11 (c) `<00:00:03.500>` in an `.srt` stays. V12 (c) a first line
-  `WEBVTTX` still reports it.
+  `WEBVTTX` still reports it. V13 `kind_broken.vtt`: a broken cue straight after `WEBVTT` and `Kind:`
+  in the first block is one `skipped` naming line 3, its own timing line, and the good cue after it
+  lands.
 - Package, `open_project`, one instance a row: P1 project.json a folder. P2 a link to a folder. P3 a
   link to a file opens with its clip. P4 a dangling link. P5 no project.json. P6 (c) not UTF-8. P7
   (c) a good package. Each refusing row also proves the instance alive afterwards. On a Debug build
@@ -91,7 +93,8 @@ NOT_READABLE = "does not contain a readable project.json."
 AVIF_NEAR = 8 / 255
 
 CAPTION_ROWS = ["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8",
-                "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12"]
+                "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12",
+                "V13"]
 PACKAGE_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7"]
 AVIF_ROWS = ["A1", "A4", "A5", "A6", "A7"]
 FOLDER_ROWS = ["F1", "F2", "F3", "F4"]
@@ -128,6 +131,7 @@ MUTANTS = {
     "folder-link-unresolved": ("F4", [(
         AGENT, "(try? url.resolvingSymlinksInPath().resourceValues(forKeys: [.isDirectoryKey]))?",
         "(try? url.resourceValues(forKeys: [.isDirectoryKey]))?")]),
+    "vtt-header-line": ("V13", [(CAPTIONS, "                firstLine += header\n", "")]),
 }
 
 results = {}
@@ -207,6 +211,8 @@ def fixtures():
                       "2\n00:00:03,000 --> 00:00:04,000\nWorld\n")
     write("tag.srt", "1\n00:00:01,000 --> 00:00:02,000\nHello <00:00:03.500>there\n")
     write("notvtt.vtt", f"WEBVTTX\n\n{CUE}Hello\n")
+    write("kind_broken.vtt", "WEBVTT\nKind: captions\n00:00:01.000 --> later\nBad\n\n"
+                             + CUE2 + "Also good\n")
     write("bad.avif", "This is plain text with an AVIF's name, and ImageIO cannot parse it.\n" * 12)
 
     png = str(FILES / "still.png")
@@ -385,6 +391,7 @@ def caption_rows(client):
     attempt(["V10"], lambda: reported("V10", "note.srt", 5, ["Hello", "World"]))
     attempt(["V11"], lambda: clean("V11", project, "tag.srt", ["Hello <00:00:03.500>there"]))
     attempt(["V12"], lambda: reported("V12", "notvtt.vtt", 1, ["Hello"]))
+    attempt(["V13"], lambda: reported("V13", "kind_broken.vtt", 3, ["Also good"]))
     project.close()
 
 

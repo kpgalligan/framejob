@@ -16,7 +16,9 @@ only when that holds. The fixtures are made here, so ffmpeg is needed at proof t
 The fixtures: `Shoot/` holds `Clip 2.mov` (A.mov), `Clip 10.mov` (B.mov), `look.cube` (a 2³ LUT),
 `still.png`, `Take 3` (Matroska with no extension), `readme.txt`, `.h.mov` (hidden), `Sub/C.mov`,
 `Notes.rtfd/` (a package) and `Old.framejob/` (with `C.mov`). `ShootLink` is a link to it, `Shoot.mov/`
-an empty folder, `Broken/` holds `A.mov` and `broken.mov` (text), and `Docs/` holds `readme.txt`.
+an empty folder, `Broken/` holds `A.mov` and `broken.mov` (text), `Docs/` holds `readme.txt`, and
+`Locked/` holds `A.mov` and is made unreadable (mode 000) once made; the run gives it back mode 755 at
+its end and before it clears the work folder.
 
 - App, `import_media`: M1 on `Shoot`: `imported` is exactly `Clip 2.mov, Clip 10.mov, look.cube,
   still.png, Take 3` in that order (kinds video, video, lut, image, video; `Take 3` with `original`),
@@ -28,13 +30,15 @@ an empty folder, `Broken/` holds `A.mov` and `broken.mov` (text), and `Docs/` ho
   project: the same five. M5 `Broken`: `imported` is `A.mov`; `broken.mov`'s reason starts `Could
   not read broken.mov.` M6 (c) `A.mov`: a `media` integer, no `imported`. M7 `tools/list`'s
   `import_media` says "folder". M9 (c) `Take 3` itself: kind video. M10 (c) `Notes.rtfd` itself:
-  `Could not read Notes.rtfd.`
+  `Could not read Notes.rtfd.` M11 `Locked` in a fresh project: exactly `import_media: Nothing in
+  Locked was added: it could not be read.`, media unchanged.
 - Probe, `docs_bugs_b5_probe.swift` through `swift_build.build()`, with `-RCFFmpegPath
   /nonexistent/ffmpeg`, `ProjectDocument.copyWatch` a no-op for each drop: D1 `Shoot` dropped on the
   Media tab: no sheet, the five added in order, the undo step `Add 5 Media Files`. D2 `Shoot` and
   `C.mov`: no sheet, six added, `C.mov` last. D3 `Broken`: the sheet `Could not read broken.mov.`,
-  `A.mov` added. D4 (c) `B.mov` alone: no sheet, one added. D5 `Docs`: no sheet, nothing added. PB
-  (c) the general pasteboard's change count is unchanged.
+  `A.mov` added. D4 (c) `B.mov` alone: no sheet, one added. D5 `Docs`: no sheet, nothing added. D6
+  `Locked`: one sheet `Nothing in Locked was added: it could not be read.`, nothing added, the drop
+  performed. PB (c) the general pasteboard's change count is unchanged.
 - Z1 (c) `grep "Frame Job: "` on each launch's log prints nothing.
 
 `--mutant NAME`: the named decision broken in a `tree_copy.py` copy, whose app is built and driven
@@ -74,8 +78,8 @@ PROBE_BOUND = 300
 FIVE = ["Clip 2.mov", "Clip 10.mov", "look.cube", "still.png", "Take 3"]
 FIVE_KINDS = ["video", "video", "lut", "image", "video"]
 
-APP_ROWS = ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M9", "M10"]
-PROBE_ROWS = ["D1", "D2", "D3", "D4", "D5", "PB"]
+APP_ROWS = ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M9", "M10", "M11"]
+PROBE_ROWS = ["D1", "D2", "D3", "D4", "D5", "D6", "PB"]
 ROWS = APP_ROWS + PROBE_ROWS + ["Z1"]
 CONTROLS = {"M6", "M9", "M10", "D4", "PB", "Z1"}
 
@@ -99,7 +103,15 @@ MUTANTS = {
     "matroska-unsniffed": ("M1", [(
         FOLDER, "return ContainerRewrap.isMatroska(url)", "return false")]),
     "listed-sent": ("M2", [(AGENT, "if listed.contains(descriptor.path) {", "if false {")]),
-    "drop-unexpanded": ("D1", [(IMPORT, "        let urls = MediaFolder.expand(urls)\n", "")]),
+    "drop-unexpanded": ("D1", [(
+        IMPORT, "let (files, unreadable) = MediaFolder.expand(urls)",
+        "let (files, unreadable) = (urls, [MediaFolder.Unreadable]())")]),
+    "unreadable-as-empty": ("M11", [(
+        FOLDER, "throw Unreadable(folder: folder)",
+        "return Listing(folder: folder, files: [], skipped: [])")]),
+    "unreadable-unsaid": ("D6", [(
+        IMPORT, "for folder in unreadable { present(folder) }",
+        "for folder in unreadable { _ = folder }")]),
 }
 
 results = {}
@@ -162,6 +174,16 @@ def fixtures():
     (FILES / "Docs" / "readme.txt").write_text("Only words.\n")
     for name in ("A.mov", "B.mov", "C.mov"):
         shutil.copy(MEDIA / name, FILES / name)
+    (FILES / "Locked").mkdir()
+    shutil.copy(MEDIA / "A.mov", FILES / "Locked" / "A.mov")
+    (FILES / "Locked").chmod(0o000)
+
+
+def unlock():
+    """`Locked` readable again, so the work folder can be cleared."""
+    locked = FILES / "Locked"
+    if locked.exists():
+        locked.chmod(0o755)
 
 
 # ---- instances --------------------------------------------------------------------------
@@ -333,6 +355,20 @@ def app_rows(client):
 
     attempt(["M4"], m4)
 
+    def m11():
+        fresh = Project(client, "locked")
+        try:
+            before = len(fresh.media())
+            answer = imported(fresh, "Locked")
+            after = len(fresh.media())
+            want = "import_media: Nothing in Locked was added: it could not be read."
+            check("M11", answer == want and after == before,
+                  f"media {before} → {after}, {str(answer)[:240]}")
+        finally:
+            fresh.close()
+
+    attempt(["M11"], m11)
+
 
 def make_package(client, package):
     """One real empty project saved by the app under test, for the probe to copy per row."""
@@ -394,6 +430,10 @@ def probe_rows(binary, package):
           and added("D3") == ["A.mov"], detail("D3"))
     check("D4", quiet("D4") and added("D4") == ["B.mov"], detail("D4"))
     check("D5", quiet("D5") and added("D5") == [], detail("D5"))
+    shown = rows["D6"]["alerts"]
+    check("D6", len(shown) == 1
+          and any("Nothing in Locked was added: it could not be read." in t for t in shown[0])
+          and added("D6") == [] and rows["D6"]["performDragOperation"], detail("D6"))
     check("PB", rows["PB"]["unchanged"], f"unchanged {rows['PB']['unchanged']}")
 
 
@@ -457,6 +497,7 @@ def main():
             return 2
         selected.add("Z1")
     if WORK.exists():
+        unlock()
         tree_copy.remove_tree(str(WORK))
     for folder in (FILES, HOME, LOGS):
         folder.mkdir(parents=True)
@@ -488,6 +529,8 @@ def main():
     else:
         run(binary, sources)
         parity()
+    finally:
+        unlock()
 
     failed = [name for name in ROWS if name in results and not all(ok for ok, _ in results[name])]
     passed = [name for name in ROWS if name in results and name not in failed]

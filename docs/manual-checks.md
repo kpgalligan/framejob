@@ -120,7 +120,7 @@ the same way.
 
 **PB-15 — Loop goes round at the timeline's end, with its sound**
 - **Do:** 1. Put one clip with sound alone on a timeline. 2. Click **Loop** in the toolbar. 3. Press Home, then Space, and watch at least three passes.
-- **Expect:** playback goes round until you stop it, and the sound plays across each wrap.
+- **Expect:** playback goes round until you stop it, and the sound plays across each wrap. The picture shows no black flash at the wrap.
 - **Source:** #466 (spec §4.1); `docs_bugs_b1_proof.py` L1–L5 and `playhead_echo_probe.py` `loopend·1`–`·11` score the playhead through Motion Preview, `play_preview` and `editor.toggleLoop`, never the real button, the keys or the sound.
 
 **PB-16 — A package whose project.json is a folder shows a message, and the app stays open**

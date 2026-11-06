@@ -30,6 +30,14 @@ enum MediaFolder {
         let skipped: [Skip]
     }
 
+    /// A folder whose items could not be listed (spec §11 #497).
+    struct Unreadable: LocalizedError {
+        let folder: URL
+        var errorDescription: String? {
+            "Nothing in \(folder.lastPathComponent) was added: it could not be read."
+        }
+    }
+
     /// Whether `url` is a folder an import door expands: a directory, or a
     /// link to one, that is not a package (a `.framejob`, an `.rtfd`).
     static func isFolder(_ url: URL) -> Bool {
@@ -55,13 +63,18 @@ enum MediaFolder {
 
     /// The media files directly inside `folder` and every other visible item
     /// as a skip. Hidden files are left out; an item that is a link is
-    /// judged by what it names.
-    static func list(_ folder: URL) -> Listing {
+    /// judged by what it names. A folder whose items cannot be listed throws
+    /// `Unreadable`, never an empty listing.
+    static func list(_ folder: URL) throws -> Listing {
         let keys: [URLResourceKey] = [.isDirectoryKey, .isPackageKey, .contentTypeKey]
-        let children =
-            (try? FileManager.default.contentsOfDirectory(
+        let children: [URL]
+        do {
+            children = try FileManager.default.contentsOfDirectory(
                 at: folder.resolvingSymlinksInPath(), includingPropertiesForKeys: keys,
-                options: [.skipsHiddenFiles])) ?? []
+                options: [.skipsHiddenFiles])
+        } catch {
+            throw Unreadable(folder: folder)
+        }
         var files: [URL] = []
         var skipped: [Skip] = []
         for child in children {
@@ -82,9 +95,25 @@ enum MediaFolder {
         return Listing(folder: folder, files: files, skipped: skipped)
     }
 
-    /// `urls` with each folder replaced, in place, by its media files.
-    static func expand(_ urls: [URL]) -> [URL] {
-        urls.flatMap { isFolder($0) ? list($0).files : [$0] }
+    /// `urls` with each folder replaced, in place, by its media files, and
+    /// each folder that could not be listed, in the order given.
+    static func expand(_ urls: [URL]) -> (files: [URL], unreadable: [Unreadable]) {
+        var files: [URL] = []
+        var unreadable: [Unreadable] = []
+        for url in urls {
+            guard isFolder(url) else {
+                files.append(url)
+                continue
+            }
+            do {
+                files += try list(url).files
+            } catch let error as Unreadable {
+                unreadable.append(error)
+            } catch {
+                unreadable.append(Unreadable(folder: url))
+            }
+        }
+        return (files, unreadable)
     }
 
     /// The Finder's order of two names: numbers by value, case ignored.
