@@ -5560,7 +5560,8 @@ glyphs, `NSTextLineFragment.characterIndex(for:)` answers `NSNotFound` (`Int.max
   400 pt at nine x positions, 3,789 points: 3,789 answered, none outside the text.
 - **The mutant:** `line-index-unchecked` puts the old line back. T14p fails, with
   9223372036854775807 at (150, −20) and above the text.
-- **Checks:** `make gate` passed on the fixed tree before the commit.
+- **Checks:** `make gate` passed in 380 s on the fixed tree before the commit (`85a79cda`).
+  `RC_PROOF_APP=release transcript_tab_proof.py`, run whole after it, scored 23/23, T14p included.
 - The checkpoint itself is still owed: the owner's cut of T1, with its notes.
 
 ### CJ5a — `keep_range`: a timeline range as a whole project
