@@ -5578,6 +5578,8 @@ scrolls vertically, even when I'm just trying to select horizontally."
 - **The result:** none of the eighteen drags scroll (within 0.5 pt). Every probe row passes, 12/12,
   T8's follow pause and T4p's click while playing included. The mutant `drag-follows`, which
   takes out both calls, is caught.
+- **Checks:** `make gate` passed in 277 s (`7a22e4dc`). `RC_PROOF_APP=release
+  transcript_tab_proof.py`, run whole after it, scored 24/24.
 
 ### CJ5a — `keep_range`: a timeline range as a whole project
 
