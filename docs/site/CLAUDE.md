@@ -21,7 +21,7 @@ src/styles/             the brand: the mark's inks, the app's faces, square chro
 
 **Every claim is written from the code.** A label, a default, a range, a shortcut, a limit or a
 refusal is checked against `app/Sources/`, `core/src/`, `graphic/` or `mcp-proxy/` before it is
-written, and the code wins over `docs/guide/`, a spec or an ADR. Never write what a feature
+written, and the code wins over a spec or an ADR. Never write what a feature
 probably does. If the code cannot settle it, leave it out.
 
 Nothing dev-only, deferred or unbuilt is documented. That excludes the dev tools (`snapshot_ui`,
@@ -44,7 +44,7 @@ MCP pages and `tools=` in `AtAGlance` name agent tools, because those are the pr
 
 - Plain, direct and second person. Say what it does, then how. Short sentences.
 - Open with what the feature is for, in a sentence or two, before any steps.
-- British spelling in prose, as `docs/guide/` does (colour, centre, grey, normalise), and the
+- British spelling in prose (colour, centre, grey, normalise), and the
   app's exact spelling for its own labels (the **Color** tab, **Normalize**).
 - Contractions are fine. No marketing: never "powerful", "seamless", "effortless", "robust",
   "simply", "just", "easily", "unleash", "supercharge".
@@ -140,7 +140,8 @@ it: its MCP section prints the helper's full path. Never weaken the refusal.
 
 ## When the app changes
 
-A user-visible change edits its page here as well as `docs/guide/`, and a new feature adds its row
-to `src/data/features.json`. `tools/proof/docs_site_proof.py` runs in `make test` and fails on a
-menu item or agent tool the site doesn't document, a feature whose page or anchor is missing, or a
-page that names something internal.
+A user-visible change edits its page here, and a new feature adds its row to
+`src/data/features.json`. `tools/proof/docs_site_proof.py` runs in `make test` and fails on a
+menu item or agent tool the site doesn't document, a feature whose page or anchor is missing, a
+page that names something internal, or `docs/guide/` (the retired user guide) existing or a link
+into it; its `--guide` row also runs in `make gate`'s `names` step.

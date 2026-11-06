@@ -13543,10 +13543,10 @@ When the last phase built has landed (VR7a–VR9 included only if the owner said
   SW-S2 or SW1's P5, V8's Remove Struck timing) — is reviewed against the tree and filed with
   `ai-drafted` and `low-priority` (unless urgent by the repo's rule), performance items in the
   "Frame Job — Performance" project.
-- **Guide and README.** Every user-visible change has its page in `docs/guide/` (new:
-  `transcript.md`, `vertical-and-framing.md`, `find-clips.md`, `multicam.md`), its
-  `menus-and-shortcuts.md` rows and its README highlight; a final read checks each claim against the
-  code.
+- **Docs site and README.** Every user-visible change has its page or pages in `docs/site/` with
+  their `src/data/features.json` rows, the reference pages' rows for menus and keys, and its README
+  highlight; a final read checks each claim against the code. The user guide was retired on
+  2026-11-05, so a phase's "Docs:" line that names a `docs/guide/` page means that page's site pages.
 - **Manual checks.** `docs/manual-checks.md` holds JOB-1…JOB-65's rows that survived (renumbered
   inside their blocks); the owner runs the list.
 - **Maps and counts.** The three `CLAUDE.md` maps, `app-file-history.md` and `core-file-history.md`

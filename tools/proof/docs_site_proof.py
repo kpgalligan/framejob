@@ -19,15 +19,20 @@ item or an agent tool it has never heard of. These rows do:
   D9  no page uses the words `docs/site/CLAUDE.md` bans;
   D10 every tool an `AtAGlance` names is a product tool, and every step of a menu path written on
       a page is a string in `app/Sources` (`MACOS_MENU` allows what macOS draws itself), so a
-      renamed menu item can't stay on the site under its old name.
+      renamed menu item can't stay on the site under its old name;
+  D11 the site replaced the user guide, so `docs/guide/` does not exist and no file the gate
+      hashes, outside `archive/` and `designs/adr/`, links into it (a relative link, or a GitHub
+      URL of this repository).
 
     python3 tools/proof/docs_site_proof.py                       # the tree (make test)
     python3 tools/proof/docs_site_proof.py --pages a.mdx b.mdx   # those pages: D1, D6–D9
-    python3 tools/proof/docs_site_proof.py --selftest            # CONTROL + M1..M11
+    python3 tools/proof/docs_site_proof.py --guide               # D11 alone (make gate's names)
+    python3 tools/proof/docs_site_proof.py --selftest            # CONTROL + M1..M14
 
 `--selftest` copies the site's inputs to `tools/proof/work/docs_site/` and requires the copy to
 show no problem (CONTROL), then eleven mutants, each on a fresh copy, to show a problem in exactly
-its row. Exit 0 when all hold, 1 otherwise.
+its row; then D11's CONTROL on a scratch root, `tools/proof/work/docs_site_guide/`, and its three
+mutants, fourteen mutants in all. Exit 0 when all hold, 1 otherwise.
 """
 
 import argparse
@@ -36,6 +41,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
@@ -67,6 +73,18 @@ LOCAL_PATH = re.compile(r"/Users/[a-z]|/private/(?:tmp|var)|/var/folders/")
 BANNED = re.compile(r"\b(?:seamless(?:ly)?|effortless(?:ly)?|robust|powerful|simply|supercharge"
                     r"|unleash)\b", re.I)
 FENCE = re.compile(r"^```.*?^```", re.M | re.S)
+
+# D11. The history keeps its links to the retired guide; the guide itself existing is its own row.
+GUIDE_EXEMPT = ("archive/", "designs/adr/", "docs/guide/")
+GUIDE_SUFFIXES = (".md", ".mdx", ".astro", ".mjs", ".json", ".swift", ".yml", ".yaml", ".html",
+                  ".plist")
+GUIDE_WORK = os.path.join(ROOT, "tools", "proof", "work", "docs_site_guide")
+GUIDE_LINKS = (
+    re.compile(r"\]\(\s*<?([^)\s>]+)"),                              # [text](target)
+    re.compile(r"^\s{0,3}\[[^\]\n]+\]:\s*<?([^\s>]+)", re.M),          # [ref]: target
+    re.compile(r"\b(?:href|src)\s*=\s*[\"']([^\"']+)[\"']"),          # href="target"
+    re.compile(r"(https?://[^\s)\]>\"'`]+)"),                         # a bare URL
+)
 
 
 def content_dir(site):
@@ -244,6 +262,50 @@ def check(site, tools, devs, menus, strings):
     return problems
 
 
+def listed(root):
+    """The tracked and untracked, not ignored, files under `root`, repo-relative: the list
+    `gate.py` hashes. A failed git call raises."""
+    out = subprocess.run(["git", "ls-files", "-z", "-co", "--exclude-standard"], cwd=root,
+                         capture_output=True, check=True).stdout
+    return [path for path in out.decode("utf-8", "replace").split("\0") if path]
+
+
+def guide_rows(root, paths):
+    """D11: the user guide was retired for the site, so `docs/guide/` must not exist and no file
+    outside the history (`GUIDE_EXEMPT`) may link into it."""
+    problems = []
+    if os.path.exists(os.path.join(root, "docs", "guide")):
+        problems.append(("D11", "docs/guide exists"))
+    seen = set()
+    for path in paths:
+        if not path.endswith(GUIDE_SUFFIXES) or path.startswith(GUIDE_EXEMPT):
+            continue
+        full = os.path.join(root, path)
+        if not os.path.isfile(full):
+            continue
+        with open(full, encoding="utf-8", errors="replace") as source:
+            text = source.read()
+        for pattern in GUIDE_LINKS:
+            for match in pattern.finditer(text):
+                target = re.split(r"[#?]", match.group(1), maxsplit=1)[0]
+                if not target:
+                    continue
+                if "://" in target:
+                    flagged = ("github.com/kpgalligan/framejob/" in target
+                               and re.search(r"/docs/guide(?:/|$)", target) is not None)
+                elif re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", target) or target.startswith("/"):
+                    flagged = False
+                else:
+                    resolved = os.path.normpath(os.path.join(os.path.dirname(path), target))
+                    flagged = resolved == os.path.join("docs", "guide") or resolved.startswith(
+                        os.path.join("docs", "guide") + os.sep)
+                line = text.count("\n", 0, match.start()) + 1
+                if flagged and (path, line, target) not in seen:
+                    seen.add((path, line, target))
+                    problems.append(("D11", f"{path}:{line}: links into docs/guide: {target}"))
+    return problems
+
+
 def report(problems):
     for row, message in sorted(problems):
         print(f"{row} {message}")
@@ -314,6 +376,52 @@ def selftest():
         print(f"{name} {'pass' if held else 'fail'}: wanted {row}, got {sorted(rows)}")
         failed += not held
     shutil.rmtree(WORK, ignore_errors=True)
+
+    # D11 on a root of its own: a link into the guide from the README or the app is caught, the
+    # history's links and the site's root-absolute links are not, and a listed file that is gone
+    # from disk is skipped.
+    guide_files = {
+        "README.md": "[Audio](docs/site/src/content/docs/audio/how-audio-works.mdx)\n",
+        "archive/old.md": "[Old](../docs/guide/audio.md)\n",
+        "designs/adr/old.md": "[Old](../../docs/guide/audio.md)\n",
+        "docs/site/x.mdx": "[Markers](/timeline/markers/)\n",
+    }
+
+    def guide_root():
+        shutil.rmtree(GUIDE_WORK, ignore_errors=True)
+        for path, text in guide_files.items():
+            os.makedirs(os.path.dirname(os.path.join(GUIDE_WORK, path)), exist_ok=True)
+            with open(os.path.join(GUIDE_WORK, path), "w", encoding="utf-8") as target:
+                target.write(text)
+        return GUIDE_WORK, sorted(guide_files) + ["gone.md"]
+
+    def make_guide(root, paths):
+        os.makedirs(os.path.join(root, "docs", "guide"))
+        return paths
+
+    def readme_link(root, paths):
+        edit(os.path.join(root, "README.md"), lambda text: text + "[Audio](docs/guide/audio.md#fades)\n")
+        return paths
+
+    def app_link(root, paths):
+        os.makedirs(os.path.join(root, "app", "Sources"))
+        with open(os.path.join(root, "app", "Sources", "Help.swift"), "w", encoding="utf-8") as target:
+            target.write('let help = "https://github.com/kpgalligan/framejob/blob/main/docs/guide/README.md"\n')
+        return paths + ["app/Sources/Help.swift"]
+
+    try:
+        control = guide_rows(*guide_root())
+    except Exception as error:  # a raise is a failed CONTROL, never a crash
+        control = [("D11", f"raised {error!r}")]
+    print(f"CONTROL (D11) {'pass' if not control else 'fail'}: {len(control)} problems")
+    failed += bool(control)
+    for name, mutate in (("M12", make_guide), ("M13", readme_link), ("M14", app_link)):
+        root, paths = guide_root()
+        rows = {problem[0] for problem in guide_rows(root, mutate(root, paths))}
+        held = rows == {"D11"}
+        print(f"{name} {'pass' if held else 'fail'}: wanted D11, got {sorted(rows)}")
+        failed += not held
+    shutil.rmtree(GUIDE_WORK, ignore_errors=True)
     return 1 if failed else 0
 
 
@@ -321,6 +429,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--selftest", action="store_true")
     parser.add_argument("--pages", nargs="+")
+    parser.add_argument("--guide", action="store_true")
     arguments = parser.parse_args()
     if arguments.selftest:
         return selftest()
@@ -330,7 +439,10 @@ def main():
             path = os.path.abspath(path)
             problems += page_rows(os.path.relpath(path, content_dir(SITE)), path)
         return report(problems)
-    return report(check(SITE, product_tools(), dev_tools(), menu_items(), app_strings()))
+    if arguments.guide:
+        return report(guide_rows(ROOT, listed(ROOT)))
+    return report(check(SITE, product_tools(), dev_tools(), menu_items(), app_strings())
+                  + guide_rows(ROOT, listed(ROOT)))
 
 
 if __name__ == "__main__":

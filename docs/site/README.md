@@ -27,4 +27,5 @@ python3 tools/proof/docs_site_proof.py                # the site against the tre
 `pnpm build` writes a static site to `dist/`, which any static host can serve. Before the first
 publish, set `site` in `astro.config.mjs` to the published URL, so Starlight writes a sitemap.
 Page links are root-absolute, so serving the site from a sub-path needs Astro's `base` as well as
-a change to those links.
+a change to those links. The repository's `README.md` links each highlight to its page's source
+under `src/content/docs/`; once the site has a URL, those links become the published pages.

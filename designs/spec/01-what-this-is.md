@@ -19,8 +19,8 @@ ML or heavy pixel work outside the compositor's one pass; callouts
 reconstructed after a recording; and any platform but macOS. Screen
 recording (road map 3), camera recording (CAM-1) and audio beyond what
 shipped (AU-2) were lifted before them. Lifting makes a thing allowed, not
-scheduled: what is built is what a road map builds, and the guide
-(`docs/guide/`) says what is built today. Four decisions shape what is built
+scheduled: what is built is what a road map builds, and the documentation
+site (`docs/site/`) says what is built today. Four decisions shape what is built
 and stand until a road map amends them: a graphic is a source (G-1), no
 third-party Audio Unit is hosted (AU-2), effects are closed vocabularies
 (R5-1), and a recording is ordinary media (`recording.md`, as CU-2 amends

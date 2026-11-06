@@ -28,18 +28,18 @@ then writes a `.framejob` package, offered next to the source.
 **Projects and media.** Movies, sound and pictures from everything macOS plays,
 plus WebM and MKV copied in without re-encoding; missing files relinked;
 Consolidate Media copies footage into the package.
-→ [Projects and media](docs/guide/projects-and-media.md)
+→ [Projects and media](docs/site/src/content/docs/projects/start-a-project.mdx)
 
 **Timeline.** One kind of track that holds any clip; a frame-accurate ruler,
 filmstrips and waveforms, zoom about the cursor, snapping, markers, an in/out
 range, track mute, solo, lock, volume, pan, compressor and limiter, clip names
 and colour labels.
-→ [The timeline and playback](docs/guide/timeline.md)
+→ [The timeline and playback](docs/site/src/content/docs/timeline/tracks.mdx)
 
 **Editing.** Move, nudge, trim, slip, roll, split, lift, ripple delete, close
 gap, insert time, insert and overwrite, copy and paste, Paste Attributes, and
 nests that group clips into one.
-→ [Editing clips](docs/guide/editing.md)
+→ [Editing clips](docs/site/src/content/docs/editing/how-edits-work.mdx)
 
 **Canvas and layers.** Move, scale, rotate and crop on the preview; opacity,
 blend modes, shadows, filters, chroma key, spotlight and obscure; Remove
@@ -47,7 +47,7 @@ Background, which keeps the person (or a photo's subject) and drops the rest
 with no green screen, found on your Mac, and Text Behind Subject, a title the person stands in front
 of; text, shape, image and background clips; matte tracks that cut the track
 behind them.
-→ [Canvas, layers, text and shapes](docs/guide/canvas-and-layers.md)
+→ [Canvas, layers, text and shapes](docs/site/src/content/docs/canvas/the-canvas.mdx)
 
 **Vertical and framing.** Faces, people and the regions the eye goes to, found
 on your Mac and drawn over the preview by View ▸ Show Subjects; Clip ▸ Follow
@@ -58,17 +58,17 @@ a whole landscape edit into its 9:16, 4:5 or 1:1 version in a new project, each
 full-frame shot following its subject — or, for a wide shot of two to four
 people with a microphone each, whoever is talking — and titles and
 pictures-in-picture kept as placed.
-→ [Vertical and framing](docs/guide/vertical-and-framing.md)
+→ [Vertical and framing](docs/site/src/content/docs/framing/what-is-found.mdx)
 
 **Motion and transitions.** Actions that ease any property to a new state over
 a span — Zoom to Region for screencasts — motion presets for entrances, exits
 and continuous movement, and thirteen transition styles.
-→ [Motion, actions and transitions](docs/guide/motion-and-transitions.md)
+→ [Motion, actions and transitions](docs/site/src/content/docs/motion/actions.mdx)
 
 **Speed.** Constant speed or fit to a length, ⌥-drag rate stretch, keep pitch,
 reverse, freeze frame, and speed ramps — **Clip ▸ Speed Ramp…** makes a Ramp
 Up, Ramp Down, Speed Dip or Speed Burst in one step.
-→ [Speed, reverse and freeze frames](docs/guide/speed.md)
+→ [Speed, reverse and freeze frames](docs/site/src/content/docs/speed/overview.mdx)
 
 **Audio.** Per-clip volume, drawn as a line on each clip that you drag and
 ⌥-click to add points, fades in four shapes, ducking for a clip's length
@@ -89,27 +89,27 @@ live loudness meter for the mix as it plays; Synchronize Audio lines up a
 camera and a separate recorder by their sound, drift included. Detach Audio
 keeps the sound linked to its picture, so J- and L-cuts stay in sync through
 every edit, and Attach Audio puts it back.
-→ [Audio](docs/guide/audio.md)
+→ [Audio](docs/site/src/content/docs/audio/how-audio-works.mdx)
 
 **Clean-up tools.** Remove Silences cuts dead air by voice or by level; Remove
 Filler Words cuts the ums and uhs on their own timings. Both preview the cuts
 and make them as one undo step.
-→ [Remove Silences and Remove Filler Words](docs/guide/cleanup-tools.md)
+→ [Remove Silences and Remove Filler Words](docs/site/src/content/docs/cleanup/how-cleanup-cuts-work.mdx)
 
 **Captions.** Import and export SubRip or WebVTT; generate captions on this Mac
 or with AssemblyAI, as two-line subtitles or word-by-word captions in five
 styles. Every caption is an ordinary text clip.
-→ [Captions and transcription](docs/guide/captions.md)
+→ [Captions and transcription](docs/site/src/content/docs/captions/how-captions-work.mdx)
 
 **Colour grading.** Light and colour controls, three wheels, curves, eight
 built-in looks and your own `.cube` LUTs, adjustment clips with qualifiers,
 Show Ungraded, and waveform, parade, vectorscope and histogram scopes.
-→ [Colour grading](docs/guide/color-grading.md)
+→ [Colour grading](docs/site/src/content/docs/color/color-tab.mdx)
 
 **HDR and colour management.** iPhone HDR, HDR10, wide gamut and camera log
 read as what they are; SDR or HDR (HLG) projects; HLG, HDR10 and SDR-version
 deliverables, with Show SDR Version to preview the last.
-→ [HDR and colour management](docs/guide/hdr-and-color.md)
+→ [HDR and colour management](docs/site/src/content/docs/hdr/how-sources-are-read.mdx)
 
 **Motion graphics.** Graphic clips drawn every frame by a small JavaScript
 module: 23 built-ins, browsed by category with a live looping preview in the
@@ -118,14 +118,14 @@ frames, title, quote and logo cards, and social pop-ups; properties as
 inspector controls, your own modules too, each saved to share as a
 `.fjgraphic` file with only the fonts and pictures it uses, which Frame Job
 opens to import into a project.
-→ [Motion graphics](docs/guide/graphics.md)
+→ [Motion graphics](docs/site/src/content/docs/graphics/what-is-a-graphic.mdx)
 
 **Several cameras.** Each camera on a track of its own and a program track cut
 from them; **Clip ▸ Switch by Speaker…** cuts that program from the
 microphones, showing whoever is talking and the wide while both talk, and
 **Clip ▸ Switch Angle ▸** re-picks a shot from another camera in sync, keeping
 its span and its dissolves, each in one undo step.
-→ [Podcasts and several cameras](docs/guide/multicam.md)
+→ [Podcasts and several cameras](docs/site/src/content/docs/multicam/set-up.mdx)
 
 **Screen recording.** A display or a window, with system audio, microphone and
 click rings, at 30 or 60 fps, into a new project or at the playhead; a camera,
@@ -136,7 +136,7 @@ and drawn by Frame Job, so you can resize, smooth or hide it after the fact.
 clicks and typing and back out after, as ordinary actions you can edit, and
 **Clip ▸ Add Shortcut Overlays** shows the shortcuts you pressed as keycaps.
 **Clip ▸ Speed Up Typing…** plays the typing faster where nobody speaks.
-→ [Screen recording](docs/guide/screen-recording.md)
+→ [Screen recording](docs/site/src/content/docs/recording/recorder-panel.mdx)
 
 **Export.** H.264, HEVC (8-bit, 10-bit, with alpha), AV1 in MP4 or WebM
 (10-bit, with HDR, from its own encoder built in, at three speeds; Opus sound
@@ -146,12 +146,12 @@ M4A, WAV and AIFF (16- or 24-bit, with stems: a file per track beside the
 mix), GIF and animated PNG; loudness targets
 reached through a true-peak master limiter on every export, presets, an Export
 Queue that runs while you edit, and single frames as stills.
-→ [Exporting](docs/guide/export.md)
+→ [Exporting](docs/site/src/content/docs/export/export-sheet.mdx)
 
 **The Assistant.** A conversation with Claude in the inspector that edits the
 open project with the same tools an agent uses, asks before it saves or exports,
 and shows what each turn cost.
-→ [The Assistant](docs/guide/assistant.md)
+→ [The Assistant](docs/site/src/content/docs/assistant/set-up.mdx)
 
 **The Transcript.** Everything said on the timeline as text in the inspector,
 in paragraphs with timecodes, read on this Mac or from an AssemblyAI
@@ -159,21 +159,21 @@ transcript; the spoken word lights up and the text follows it as the video
 plays, and a click on a word moves the playhead there. Select words and press
 ⌫ to cut them out of every track at once; click a long pause and press ⌫ to
 shorten it.
-→ [The Transcript](docs/guide/transcript.md)
+→ [The Transcript](docs/site/src/content/docs/captions/transcript-tab.mdx)
 
 **Agents over MCP.** The whole editor as MCP tools — one per edit plus open,
 save, render a frame, export and the rest — for Claude Code or any MCP client.
-→ [Driving Frame Job from an AI agent](docs/guide/mcp.md)
+→ [Driving Frame Job from an AI agent](docs/site/src/content/docs/mcp/overview.mdx)
 
-Also: [Settings](docs/guide/settings.md) and
-[Menus and keyboard shortcuts](docs/guide/menus-and-shortcuts.md).
+Also: [Settings](docs/site/src/content/docs/reference/settings.mdx),
+[Menus](docs/site/src/content/docs/reference/menus.mdx) and [keyboard shortcuts](docs/site/src/content/docs/reference/keyboard-shortcuts.mdx).
 
 ## Getting Frame Job
 
 The newest signed and notarized build is always at
 <https://github.com/kpgalligan/framejob/releases/latest/download/FrameJob.dmg>.
 Open the DMG and drag Frame Job to Applications. An installed copy
-updates itself (Frame Job ▸ Check for Updates…, [Settings](docs/guide/settings.md#updates)).
+updates itself (Frame Job ▸ Check for Updates…, [Settings](docs/site/src/content/docs/getting-started/updates.mdx)).
 
 To build it yourself, see [Developing Frame Job](docs/developing.md).
 
@@ -189,12 +189,12 @@ Claude Code registration line on the clipboard, with your copy's path:
 claude mcp add --scope user framejob -- '/Applications/Frame Job.app/Contents/Helpers/framejob-mcp'
 ```
 
-[MCP](docs/guide/mcp.md) covers other clients and every tool;
-[the Assistant](docs/guide/assistant.md) is the same tools inside the window.
+[MCP](docs/site/src/content/docs/mcp/overview.mdx) covers other clients and every tool;
+[the Assistant](docs/site/src/content/docs/assistant/set-up.mdx) is the same tools inside the window.
 
 ## Documentation
 
-- [The user guide](docs/guide/README.md) — every feature, by task.
+- [The documentation site](docs/site/README.md) — every feature, a page each.
 - [The graphics API](docs/graphics-api.md) — writing a graphic module.
 - [Manual checks](docs/manual-checks.md) — what only a person at the machine
   can confirm, run before each release.

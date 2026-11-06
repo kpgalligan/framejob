@@ -1864,12 +1864,14 @@ imports `dist_check`.
 ```
 make gate                                   # or: python3 tools/proof/gate.py [--force] [--wait SECONDS]
 make gate GATE_ARGS=--force                 # run every step, stamps or not
-python3 tools/proof/gate.py --selftest      # H0, M1–M8, H2–H4, W0–W4 (make test)
+python3 tools/proof/gate.py --selftest      # H0, M1–M8, H2–H5, W0–W4 (make test)
 python3 tools/proof/gate.py --mutant no-tools|stamp-always|md-counted|warning-count
 ```
 
 **The steps**, serially, stopping at the first failure, each under its
-bound (running past it is a FAIL): `typecheck` (`make typecheck`, 600 s,
+bound (running past it is a FAIL): `names` (120 s) runs `name_residue.py`,
+then `docs_site_proof.py --guide` (no `docs/guide/` and no link into it);
+`typecheck` (`make typecheck`, 600 s,
 which first builds or reuses the bundled encoders, `make codecs`: a cold
 fetch and build of SVT-AV1 and libvpx is about a minute, codec-export C0) —
 passes only with no `error:` and exactly the four baseline warnings by file
@@ -1927,7 +1929,8 @@ proof, a spec file, `docs/manual-checks.md`; `archive/`, `README.md`, a
 M8 `tools/codecs/build_codecs.py` moves names, typecheck, test and app, and
 `tools/licenses/acknowledgements.py` names, test and app); H2
 a substituted tool string moves every step; H3 unequal before and after
-hashes record no pass; H4 (CONTROL) a `.secrets/` path is in no step; W0
+hashes record no pass; H4 (CONTROL) a `.secrets/` path is in no step; H5
+(CONTROL) the `names` step runs `docs_site_proof.py --guide`; W0
 (CONTROL) the four baseline warnings at other line numbers, each with its
 caret line, pass; W1 a fifth fails, named; W2 a baseline warning in another
 file fails; W3 one gone fails; W4 an `error:` fails. Each mutant fails
@@ -30135,12 +30138,19 @@ has a title and a description, D2 the sidebar and the pages are one-to-one, D3 e
 an `mcp/` page and no dev tool is named, D5 every menu item is on a reference page, D6 no page
 names something internal, D7 no page or data file holds a local path, D8 every `<Shot>` has both
 captures, D9 no page uses a banned word, D10 every tool in an `AtAGlance` and every step of a menu
-path is real.
+path is real, D11 `docs/guide/` (the user guide the site replaced) doesn't exist and no file
+`git ls-files -co --exclude-standard` lists, outside `archive/` and `designs/adr/`, links into it
+by a relative link or a GitHub URL of this repository. `--guide` runs D11 alone; it is the second
+command of `make gate`'s `names` step, whose inputs are every file, so a `README.md` edit runs it.
+The selftest's M12 makes `docs/guide/`, M13 adds a README link into it and M14 an app string with
+its GitHub URL, each on a scratch root (`tools/proof/work/docs_site_guide/`) whose CONTROL holds
+an archive's and an ADR's links, a site's root-absolute link and a listed file gone from disk.
 
 ```sh
 python3 tools/proof/docs_site_proof.py                       # the tree (make test)
 python3 tools/proof/docs_site_proof.py --pages a.mdx b.mdx   # those pages: D1, D6–D9
-python3 tools/proof/docs_site_proof.py --selftest            # CONTROL + M1..M11
+python3 tools/proof/docs_site_proof.py --guide               # D11 alone (make gate's names)
+python3 tools/proof/docs_site_proof.py --selftest            # CONTROL + M1..M14
 ```
 
 A new menu file is picked up by its name (`AppDelegate+*Menu*.swift`); a new tool by its catalog
