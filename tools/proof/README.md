@@ -30315,7 +30315,7 @@ python3 tools/proof/docs_bugs_b4_proof.py --mutant <name>
 RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_b4_proof.py --base-sources <its app/Sources> --expect-red
 ```
 
-## Docs bugs b5 — a folder at an import door (`docs_bugs_b5_proof.py`, `docs_bugs_b5_probe.swift`; ten mutants by `--mutant`; spec §11 #497)
+## Docs bugs b5 — a folder at an import door (`docs_bugs_b5_proof.py`, `docs_bugs_b5_probe.swift`; eleven mutants by `--mutant`; spec §11 #497)
 
 #497. **`docs_bugs_b5_proof.py`** makes its own fixtures under `work/docs-bugs-b5/` (ffmpeg) on a
 scratch `CFFIXED_USER_HOME`: a `Shoot` folder of two movies, a LUT, a still, a Matroska file with no
@@ -30332,7 +30332,8 @@ be read.` The same instance saves an empty project for the probe.
 with `-RCFFmpegPath /nonexistent/ffmpeg`, `NSAlert.runModal` replaced, `ProjectDocument.copyWatch` a
 counting no-op for each drop (so `Take 3`'s copy shows no progress panel) and its window 20,000 pt off
 every display. It names only symbols the base has, so it builds over `--base-sources`. D6 drops
-`Locked`: one alert in that same sentence, nothing added. A Finder drag itself is
+`Locked`: one alert in that same sentence, nothing added. D7 and D8 drop it beside `B.mov` and beside
+`Shoot`: the same one alert, and the rest of the drop still added. A Finder drag itself is
 `docs/manual-checks.md` PB-17.
 
 ```sh

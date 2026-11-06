@@ -180,7 +180,9 @@ func media(_ o: Open) -> [[String: Any]] {
     }
 }
 
-func drop(_ row: String, _ names: [String]) {
+/// `landing`: a row whose drop also shows an alert waits, after the alerts, for the media to land:
+/// the alert arrives at once, before the files are probed.
+func drop(_ row: String, _ names: [String], landing: Bool = false) {
     let o = open()
     o.controller.inspector?.select(.media)
     spin(0.2)
@@ -205,6 +207,7 @@ func drop(_ row: String, _ names: [String]) {
     // Matroska copy more.
     _ = waitUntil(20) { o.window.attachedSheet != nil || o.doc.project.snapshot.media.count > before }
     var shown = alerts(o, wait: 1.5)
+    if landing { _ = waitUntil(20) { o.doc.project.snapshot.media.count > before } }
     spin(1.0)
     shown += alerts(o, wait: 0.5)
     ProjectDocument.copyWatch = original
@@ -226,5 +229,7 @@ drop("D2", ["Shoot", "C.mov"])
 drop("D3", ["Broken"])
 drop("D5", ["Docs"])
 drop("D6", ["Locked"])
+drop("D7", ["Locked", "B.mov"], landing: true)  // the rest of a mixed drop: a file
+drop("D8", ["Locked", "Shoot"], landing: true)  // and a readable folder
 say("PB", ["unchanged": NSPasteboard.general.changeCount == realGeneralCount])
 exit(0)

@@ -38,7 +38,9 @@ its end and before it clears the work folder.
   `C.mov`: no sheet, six added, `C.mov` last. D3 `Broken`: the sheet `Could not read broken.mov.`,
   `A.mov` added. D4 (c) `B.mov` alone: no sheet, one added. D5 `Docs`: no sheet, nothing added. D6
   `Locked`: one sheet `Nothing in Locked was added: it could not be read.`, nothing added, the drop
-  performed. PB (c) the general pasteboard's change count is unchanged.
+  performed. D7 `Locked` and `B.mov`: that one sheet, and `B.mov` still added. D8 `Locked` and
+  `Shoot`: that one sheet, and the five still added in order. PB (c) the general pasteboard's change
+  count is unchanged.
 - Z1 (c) `grep "Frame Job: "` on each launch's log prints nothing.
 
 `--mutant NAME`: the named decision broken in a `tree_copy.py` copy, whose app is built and driven
@@ -79,7 +81,7 @@ FIVE = ["Clip 2.mov", "Clip 10.mov", "look.cube", "still.png", "Take 3"]
 FIVE_KINDS = ["video", "video", "lut", "image", "video"]
 
 APP_ROWS = ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M9", "M10", "M11"]
-PROBE_ROWS = ["D1", "D2", "D3", "D4", "D5", "D6", "PB"]
+PROBE_ROWS = ["D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "PB"]
 ROWS = APP_ROWS + PROBE_ROWS + ["Z1"]
 CONTROLS = {"M6", "M9", "M10", "D4", "PB", "Z1"}
 
@@ -112,6 +114,8 @@ MUTANTS = {
     "unreadable-unsaid": ("D6", [(
         IMPORT, "for folder in unreadable { present(folder) }",
         "for folder in unreadable { _ = folder }")]),
+    "unreadable-drops-rest": ("D7", [(
+        IMPORT, "guard !files.isEmpty else {", "guard !files.isEmpty && unreadable.isEmpty else {")]),
 }
 
 results = {}
@@ -434,6 +438,12 @@ def probe_rows(binary, package):
     check("D6", len(shown) == 1
           and any("Nothing in Locked was added: it could not be read." in t for t in shown[0])
           and added("D6") == [] and rows["D6"]["performDragOperation"], detail("D6"))
+    for row, rest in (("D7", ["B.mov"]), ("D8", FIVE)):
+        shown = rows[row]["alerts"]
+        check(row, len(shown) == 1
+              and any("Nothing in Locked was added: it could not be read." in t for t in shown[0])
+              and not rows[row]["modals"] and added(row) == rest
+              and rows[row]["performDragOperation"], detail(row))
     check("PB", rows["PB"]["unchanged"], f"unchanged {rows['PB']['unchanged']}")
 
 
