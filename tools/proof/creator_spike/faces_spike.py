@@ -4,6 +4,7 @@ and CJ-32).
 
     python3 tools/proof/creator_spike/faces_spike.py              # the run, on AC
     python3 tools/proof/creator_spike/faces_spike.py --selftest   # the deciders only
+    python3 tools/proof/creator_spike/faces_spike.py --sth1       # rules 3 and 6 on S-TH1 (CJ7)
 
 The inputs are the face fixtures (`face_fixtures.py`); S-TH1…S-TH4 do not
 exist yet, so their rows (rule 3's S-TH1 recall, rule 5's log and HLG
@@ -31,6 +32,15 @@ analysed frame on a fresh handler, each request pinned with
 
 Writes `tools/proof/work/creator_spike/CJ-S2/results.json` (`rule.write_results`)
 and prints one `VERDICT` line.
+
+**`--sth1`** (road map CJ7) runs rule 3 and rule 6 on S-TH1 (`sth1.py`),
+rectangles alone on CJ-32's device (`neural_engine`) at 10 a second:
+recall at 720, 1280, 1920 and native, the truth any face box on every sample
+where `sth1.face_present` holds (one person), decided by `size_rule` on
+S-TH1 and on `faces_small.mov`'s recorded recall (1.0000 at every size, CJ3's
+record); rule 6, the share of 0–60 s samples with at least one face, at each
+size (720 is CJ-32's). Writes `CJ-S2-STH1/results.json`; the earlier
+`CJ-S2/results.json` is untouched.
 """
 
 import argparse
@@ -47,6 +57,7 @@ sys.path.insert(0, str(HERE))
 import face_fixtures  # noqa: E402
 import faces_deciders as deciders  # noqa: E402
 import rule  # noqa: E402
+import sth1  # noqa: E402
 
 RUNS = 3
 TICKS = 600_000
@@ -158,12 +169,85 @@ def rule2(binary, size, devices):
     return deciders.rate_rule(realtime), realtime, rows
 
 
+# CJ3's record: rule 3 on faces_small.mov, recall 1.0000 over 600 samples at every size.
+FACES_SMALL_RECALL = {720: 1.0, 1280: 1.0, 1920: 1.0, "native": 1.0}
+CJ32_DEVICE = "neural_engine"
+
+
+def sth1_rows(answer):
+    """(t, [found boxes]) per sample of a run on S-TH1."""
+    return [(row["pts"] / TICKS, [f["box"] for f in row["faces"]])
+            for row in answer["samples"] if row["pts"] >= 0]
+
+
+def sth1_recall(rows):
+    present = [found for t, found in rows if sth1.face_present(t)]
+    return (sum(1 for found in present if found) / len(present) if present else None,
+            len(present))
+
+
+def sth1_share(rows, span):
+    window = [found for t, found in rows if span[0] <= t < span[1]]
+    return (sum(1 for found in window if found) / len(window) if window else None, len(window))
+
+
+def run_sth1():
+    movie = sth1.movie()
+    if movie is None:
+        log(f"SKIP CJ-S2 rules 3 and 6 on S-TH1: {sth1.missing_reason()}")
+        return 0
+    rule.check_rule("CJ-S2")
+    host = rule.host()
+    log(f"host: {host['os']} ({host['os_build']}), {host['device']}, AC power "
+        f"{host['ac_power']}, {host['uptime']}")
+    binary = face_fixtures.spike_binary()
+    recall, rows, share = {}, {}, {}
+    for side in (*deciders.SIZES, "native"):
+        answer = run(binary, movie, side, 10, CJ32_DEVICE, "none")
+        found = sth1_rows(answer)
+        recall[side], count = sth1_recall(found)
+        share[str(side)] = {"0_60": sth1_share(found, (0.0, 60.0)),
+                            "facing_0_60": sth1_share(found, sth1.FACING_0_60)}
+        rows[str(side)] = {"recall": recall[side], "samples": count, "read": answer["read"],
+                           "seconds": answer["seconds"], "realtime": answer["realtime"],
+                           "pin": answer["pin"]["rectangles"]["joined"], "load": answer["load"],
+                           "sha256": answer["sha256"]["rectangles"],
+                           "samples_with_face": sum(1 for _, f in found if f),
+                           "samples_all": len(found)}
+        log(f"rule 3 S-TH1 at {side} (read {answer['read']}, pin "
+            f"{rows[str(side)]['pin']}, {answer['seconds']['rectangles']:.1f} s rectangles, "
+            f"{answer['realtime']:.2f}x): recall {recall[side]:.4f} over {count} samples; "
+            f"rule 6 0-60 s {share[str(side)]['0_60'][0]:.4f} of {share[str(side)]['0_60'][1]}, "
+            f"facing span {sth1.FACING_0_60} {share[str(side)]['facing_0_60'][0]:.4f} of "
+            f"{share[str(side)]['facing_0_60'][1]} (load {answer['load']})")
+    on_sth1 = deciders.size_rule(recall)
+    on_small = deciders.size_rule(FACES_SMALL_RECALL)
+    order = [*deciders.SIZES, "native"]
+    size = max(on_sth1["size"], on_small["size"], key=order.index)
+    face_share = share["720"]["0_60"][0]
+    rule6 = "pass" if face_share >= 0.95 else "STOP"
+    line = (f"VERDICT size={size} (S-TH1 {on_sth1['size']}, floor {on_sth1['floor']:.4f}; "
+            f"faces_small {on_small['size']}) shipped=720 rule6={rule6} "
+            f"face_share_0_60={face_share:.4f} (at 720)")
+    results = {**sth1.record(), "device": CJ32_DEVICE, "rate": 10,
+               "recall": {str(k): v for k, v in recall.items()}, "rows": rows,
+               "size_sth1": on_sth1, "size_faces_small": on_small, "size": size,
+               "face_share": share, "rule6": rule6, "verdict_line": line}
+    written = rule.write_results("CJ-S2", results, folder="CJ-S2-STH1")
+    log(line)
+    log(f"results: {written}")
+    return 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--selftest", action="store_true")
+    parser.add_argument("--sth1", action="store_true")
     args = parser.parse_args(argv)
     if args.selftest:
         return 1 if deciders.selftest() else 0
+    if args.sth1:
+        return run_sth1()
     if deciders.selftest():
         raise SystemExit("the deciders' selftest failed")
     rule.check_rule("CJ-S2")

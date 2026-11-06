@@ -31,7 +31,10 @@ d2(n(i)) ≥ T, n(i) the next frame after i, passing when no frame lies in
 i+1…i+m+1 or at the media's end; and d1(i) is the largest d1 over i−m…i+m
 (empty indices 0), ties to the earlier.
 
-Writes `tools/proof/work/creator_spike/CJ-S4/results.json`.
+Writes `tools/proof/work/creator_spike/CJ-S4/results.json`. With S-TH1
+(`sth1.movie()`, `IMG_0181.MOV`) as the no-cut input (road map CJ7) it writes
+`CJ-S4-STH1/results.json` instead, and also prints the false cuts on it at
+CJ-24's shipped setting (colour, T 0.34, m 12) and a `VERDICT` line.
 """
 
 import argparse
@@ -49,10 +52,11 @@ sys.path.insert(0, str(PROOF))
 sys.path.insert(0, str(HERE))
 import analysis_fixtures as fixtures  # noqa: E402
 import rule  # noqa: E402
+import sth1  # noqa: E402
 import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/creator_spike/CJ-S4"
-STH1 = ROOT / "tools/proof/media/creator/S-TH1"
+SHIPPED = ("colour", 0.34, 12)   # CJ-24's signature, T and m
 SIGNATURES = {"luma": ("l1", "l2"), "colour": ("c1", "c2"), "sad": ("s1", "s2")}
 THRESHOLDS = [round(0.02 * n, 2) for n in range(1, 100)]
 MS = [4, 6, 8, 12]
@@ -76,7 +80,8 @@ def score(binary, movie):
     rate = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
                            "stream=r_frame_rate", "-of", "csv=p=0", str(movie)],
                           capture_output=True, text=True).stdout.strip()
-    num, _, den = rate.partition("/")
+    # A rotated movie's display matrix adds a field: S-TH1 prints "30/1," (road map CJ7).
+    num, _, den = rate.split(",")[0].partition("/")
     fps = float(num) / float(den or 1)
     run = subprocess.run([str(binary), str(movie), str(out), str(fps)], capture_output=True,
                          text=True, timeout=3600)
@@ -135,9 +140,9 @@ def recall(found, truth):
 
 
 def no_cut_input(force):
-    clips = sorted(STH1.glob("*.mov")) + sorted(STH1.glob("*.mp4")) if STH1.exists() else []
-    if clips:
-        return clips[0], "S-TH1", None
+    movie = sth1.movie()
+    if movie is not None:
+        return movie, "S-TH1", None
     return fixtures.moving_still(10, force), "moving_still (10 min)", "S-TH1 is missing: owed"
 
 
@@ -242,11 +247,29 @@ def main(argv=None):
         rows = [row for row in table if row["signature"] == other]
         ok = [row for row in rows if row["false_no_cut"] <= allowed]
         verdict[f"{other}_best_recall"] = max((row["recall"] for row in ok), default=None)
-    path = rule.write_results("CJ-S4", {"verdict": verdict, "sweep": table,
+    extra, folder = {}, None
+    if owed is None:
+        # S-TH1 is the no-cut input (road map CJ7): the false cuts at CJ-24's shipped setting.
+        sig, t_shipped, m_shipped = SHIPPED
+        found = cuts(*grid(answers["still"], SIGNATURES[sig]), t_shipped, m_shipped)
+        fps_still = answers["still"]["fps"]
+        verdict["shipped"] = {"signature": sig, "T": t_shipped, "m": m_shipped,
+                              "false_cuts": len(found), "frames": found,
+                              "seconds": [round(k / fps_still, 3) for k in found],
+                              "allowed": allowed,
+                              "passes": len(found) <= allowed}
+        extra, folder = sth1.record(), "CJ-S4-STH1"
+        print(f"CJ-24 shipped ({sig}, T {t_shipped}, m {m_shipped}) on S-TH1: "
+              f"{len(found)} false cuts over {still_minutes:.2f} min (allowed {allowed:.3f}) "
+              f"at {verdict['shipped']['seconds']}")
+    path = rule.write_results("CJ-S4", {**extra, "verdict": verdict, "sweep": table,
                                         "inputs": {k: str(v) for k, v in (("shots", shots),
                                                    ("vfr", vfr), ("still", still),
-                                                   ("flattened", flat))}})
+                                                   ("flattened", flat))}}, folder=folder)
     print(json.dumps(verdict, indent=1))
+    if owed is None:
+        print(f"VERDICT signature={name} T={threshold} m={m} passes={verdict['passes']} "
+              f"no_cut={still_name} shipped_false_cuts={verdict['shipped']['false_cuts']}")
     print(f"results: {path}")
     return 0
 

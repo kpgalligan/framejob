@@ -565,6 +565,7 @@ CJ0a first. "p" marks a provisional format bump, numbered from 38 in landing ord
 | FC8a | FC | File ▸ Make Short from Range…; `make_short` | CJ5b, FC4, CJ0c (T5) | A | — |
 | CU12 | trial | The owner's screen-tutorial trial with CU's tools | CU10, CU11 | beside B | — |
 | CJ6 | CJ | Larger projects, only if CJ-S1 earns it | CJ0a; CJ-S1 at its head | C | — |
+| CJ7 | CJ | Nothing new: the rows owed on S-TH1 run on the owner's recording | CJ3, CO0, VR1, TX3b, FC3 | A | — |
 | FC8b | FC | Make Shorts from the ranked list | FC7b, FC8a | A | — |
 | CO6 | CO | Clip ▸ Camera Layout ▸; `switch_layout` | CO0, CU7 (`action_class.rs`) | B | — |
 | SW0 | SW | Nothing: SW-S2's verdict; the dev tool `playback_rebuilds` | CJ0a (question 4 answered yes), CJ0c (T8) | C | — |
@@ -2572,6 +2573,23 @@ integration (`ai-drafted`, `low-priority`).
 **Owed.** S-TH1 (CJ-S4's no-cut input, a re-run when it exists) and S-TH4 (CJ-S3 (a), (c) on
 the owner's 4K HLG). No manual checks.
 
+**S-TH1 (2026-11-06).** Road map CJ7 ran CJ-S4 once with S-TH1 as the no-cut input
+(`shots_spike.py --socket` on a Debug instance, which made the 40-clip export again: 39 cuts;
+`rule_sha256` `eea6c190…46f9d1`, matching; `CJ-S4-STH1/results.json`). The movie is 4.85 minutes,
+so the rule allows 0.485 false cuts: none. Its rotation's display matrix made ffprobe print the
+rate as "30/1,", which the script could not parse; it now reads the first field. The run printed
+`VERDICT signature=colour T=0.38 m=12 passes=True no_cut=S-TH1 shipped_false_cuts=0`.
+- Recall on the export was 39 of 39 at m = 4 for both histograms (each one's best under the cap),
+  and for the colour histogram at m = 12. Every m of 4, 6, 8 and 12 kept the fixture's cuts; at
+  the chosen T and m the fixture and its VFR twin each gave frames 60, 120, 180 and 240.
+- On S-TH1 the colour histogram's false cuts were 44, 17, 5, 4 and 1 at T = 0.02 to 0.10, and 0
+  from 0.12 to 0.64 (recall 0.9487 at 0.66). The luma histogram's last false cuts were 2 at 0.14
+  and 1 at 0.16 and 0.18.
+- CJ-24's shipped setting (colour, T 0.34, m 12) found 0 false cuts on S-TH1.
+- The script's tie-break (the median T of the top-recall band) moved from 0.34 to 0.38, because
+  the band now starts at 0.12, not 0.08. The rule's verdict (the colour histogram at recall 100 %,
+  PASS) and the shipped T inside the band are unchanged; CJ-24 is not amended.
+
 ### TX1 — the timeline's words
 
 Bet 1 opens here. Every TX phase is in lane A, after CJ1. No TX phase changes the persisted format.
@@ -2837,6 +2855,14 @@ gate's count, and `core/CLAUDE.md`'s `plan.rs` nested keys.
 **Owed.** TX-S1 on S-TH1 and S-LONG1 when they exist. The CJ-5 baseline cuts T1 and T2 are the
 owner's (they were due when TX1 started). `07.9e` took no edit (499 lines). The lock sentence's
 wording ("Track Track 1") is the owner's to settle.
+
+**S-TH1 (2026-11-06).** Road map CJ7 ran `fill_spike.py --part owner` three times on S-TH1's
+movie, its first audio track (`rule_sha256` `5f784283…2c043b`, matching; each run appended to
+`TX-S1-STH1/results.json`). Over 291.17 s, the three runs took 2.88, 2.72 and 2.67 s wall (2.53,
+2.38 and 2.31 s recognising, 0.35, 0.34 and 0.36 s extracting the 9,321,632-byte WAV), peaked at
+10,125,624, 10,207,544 and 9,863,456 bytes added, and found 375, 374 and 374 words. One-minute
+loads after the runs were 95.43, 75.57 and 70.08 (another session was building). The rule needs
+no verdict from it: outcome A stands on the 60-minute runs. S-LONG1 is still owed.
 
 ### CU0b — the spikes
 
@@ -4097,6 +4123,23 @@ tree, before this sentence: "gate: PASS 80s" (names 1 s, test 79 s; typecheck, f
 skipped, their inputs unchanged). No Release proof: the road map names none for CO0, and nothing
 the app builds from changed.
 
+**S-TH1 (2026-11-06).** Road map CJ7 ran CO-S1's speed rows once on S-TH1's whole movie the way
+CO1's re-measure did (`cutout_spike.py --only s1-sth1 --device gpu`: Standard, person `.balanced`
+revision 1, alone, pinned to the GPU per CO-11, three runs a row, no first-request row; CO-S1's
+`rule_sha256` `035665d1…9fd05a`, matching; `CO-S1-STH1/results.json`). `mask_speed` now hands
+Vision the track's orientation (`.down` for S-TH1's −180; `.up`, as before, for the fixtures).
+Over 8,735 frames (291.17 s), every mask 512 × 384, medians of three:
+
+| Rate | At the source size (3840 × 2160) | At 1920 × 1080 |
+|---|---|---|
+| Every frame (8,725 requests) | 1.463× (1.424, 1.468, 1.463) | 1.819× (1.663, 1.819, 1.823) |
+| 15 a second (4,368) | 2.919× (2.919, 3.052, 2.660) | 3.608× (3.608, 3.546, 3.651) |
+| 10 a second (2,912) | 3.451× (3.428, 3.451, 3.584) | 5.387× (5.565, 5.387, 5.155) |
+
+Beside CO1's GPU re-measure on `push_4k.mov` (1.59× at the source size, 1.98× at 1920, every
+frame), S-TH1 runs at 1.46× and 1.82×. Recorded only: rule (c) is judged at 1080p30, and S-TH1 is
+4K. One-minute loads were 18.81 at the start, then 4.76…11.37 after each row.
+
 ### TX2b — the tab's bar
 
 - **What a person gets:** the bar pinned above the transcript: Words from (which tracks to read),
@@ -4845,6 +4888,14 @@ skipped, no Rust changed), "gate: PASS 291s"; a Release instance of that build l
 S-RT1 once they are copied (CP1's step 1 above); TX3b, the pause token (TX-34), is the next
 pipeline, not an issue. Filed after the commit: "TX-S3: E0's cut edges fall inside the previous
 word on the `say` fixture (13 of 20)".
+
+**S-TH1 (2026-11-06).** Road map CJ7 ran TX-S3 once with S-TH1 (`cut_spike.py` on the Debug app;
+`rule_sha256` `bede33d2…c5a0`, matching; `TX-S3-STH1/results.json`). The script now picks the
+owner's file by name (`IMG_0181.MOV`), never `notes.txt`. Recorded per TX-19, E0 only: of S-TH1's
+373 edges after the first word, 18.50 % lie in voice-cache non-speech and 17.16 % under −40 dBFS
+in the peak cache. On fixture (1) E0 clipped no onset (errors −9.9…0.0 ms); on o2, 5.17 % and
+13.79 %. The verdict the script prints is not recorded (TX-19); TX-S3's real-speech verdict stays
+owed on S-RT1, and JOB-11 stays the judge.
 
 #### TX3b's record (2026-11-02)
 
@@ -7937,6 +7988,29 @@ figure as the lane's but F7, 6.55 s per minute.
 
 None is a STOP. No manual check.
 
+**S-TH1 (2026-11-06).** Road map CJ7 ran CJ-S2's rules 3 and 6 once on S-TH1
+(`faces_spike.py --sth1`, rectangles alone on the Neural Engine at 10 a second; `rule_sha256`
+`c41417fb…95bb2b11`, matching; `CJ-S2-STH1/results.json`), and F5 against Release. The movie is
+read upright through `AnalysisFrames.read` (−180). The truth for recall is any face box on the
+2,619 of 2,912 samples where a face is known in frame: outside the owner's three beats and the
+empty chair (0–7 s and from 284 s), read from autorotated frames (CJ7's record).
+- **Rule 3:** recall 0.9977 at 720, 1280 and native, 0.9973 at 1920 (floor 0.9778): the size is
+  720 on S-TH1 and on `faces_small.mov` (1.0000 at every size), as CJ-32 has it. Rectangles took
+  20.8, 23.4, 27.0 and 64.2 s, and the runs 8.74×, 5.66×, 3.29× and 0.86× real time with decode
+  (one-minute loads 66.42, 38.57, 14.21 and 43.22: another session was building).
+- **Rule 6: STOP.** A face in 523 of the first 60 s's 600 samples, 0.8717 at 720 (0.8700 at 1920),
+  under 95 %. The frames show an empty chair from 0 to 6 s, the owner sitting down at 7 s and his
+  face from 8 s; over 8–60 s the share is 518/520 = 0.9962. By the rule this stops VR1 and SW8
+  until CJ-30 is amended; both have shipped. It is put to the owner (CJ7's record); CJ-30 is not
+  amended here.
+- **F5** (`RC_PROOF_APP=release faces_proof.py`, 13/13): `IMG_0181.MOV` imported and placed at
+  0, its `faces` read in 120 s windows; `detect_silence` (voice, `min_length` 300000, `padding` 0)
+  found 42 pauses (194.1 s). The largest face's mean inner-lip gap is 0.0315 over 930 speech
+  samples against 0.0165 over 1,697 pause samples, a ratio of 1.908 (want ≥ 1.5): PASS. Dropped:
+  143 samples in the beats, 142 with no face. A run of F5 alone just before gave 931 and 1,696
+  samples, 193.7 s of pauses, the same means and ratio. F1–F4, F6 and Z1 as CJ3's; F7 7.11 s per
+  minute.
+
 ### FC3 — sound events, heard on the Mac
 
 Bet 4 opens here. FC's phases run in lane A after TX and CJ5b. No phase bumps the format. The first
@@ -8129,6 +8203,15 @@ none of which FC3's rows read.
 **Owed (at integration).** As above: S-EV (E9), S-TH1/S-ST1, S-MU (E10). Nothing filed; the second
 review's nit (`answerNumber` building its `en_US_POSIX` locale once per value) was left as review 1
 left it.
+
+**S-TH1 (2026-11-06).** Road map CJ7 ran `sound_spike.py --sth1` once on S-TH1's movie, its first
+audio track copied out (`rule_sha256` `7fe7bcab…b06989`, matching; `FC-S1-STH1/results.json`), at
+window 1.5 s: 291.17 s, 387 windows each way, the file analyzer at 226.9× and the stream analyzer
+at 223.1×. Speech-only calls at t = 0.3…0.8: the file analyzer called no laughter, applause or
+cheering window at any t; the stream analyzer called one laughter window at t ≤ 0.5 (2.06 per 10
+minutes; the window at 16.5 s, 0.513, read from a second stream run of the same file), none at
+0.6 and above, and no applause or cheering. No group verdict: S-EV is owed, and S-ST1 for the
+rest of the 10 minutes of speech only, and S-MU.
 
 ### CU7 — Auto Zoom
 
@@ -8493,6 +8576,19 @@ Power'"), three lanes on the machine (one-minute loads 7.86…125.69 over the sp
   588 lines).
 
 None is a STOP. No manual check.
+
+**S-TH1 (2026-11-06).** Road map CJ7 ran `subjects_spike.py --sth1` once (`rule_sha256`
+`6650e95d…03c28ac`, matching; `VR-S1-STH1/results.json`): both requests on the Neural Engine at 10
+a second, upper body. The truth is any person box on every sample where a face is known in frame:
+2,619 of the movie's 2,912 samples, outside the three beats and the empty chair (0–7 s and from
+284 s), read from autorotated frames (CJ7's record).
+- **Rule 2:** person recall 2,597/2,619 = 0.9916 at 720 (5.85× real time) and 2,594/2,619 =
+  0.9905 at 1440 (3.91×): 720 is not more than 1 point under, so the size stays 720 (VR-11).
+- **Rule 4, the turned-away half:** a person box in 60 of the look-away beat's 60 samples (100 %).
+  The side-on half is owed on S-TH1's side-on add-on (it was not in the folder when the row ran).
+  Judged on the turned-away half alone, people stay.
+- Recorded beside it: a person box in 2 of the lean-out beat's 20 samples, 14 of the leave beat's
+  60, 1 of the empty chair's first 71 and 9 of its last 72.
 
 ### FC4 — `find_clips`: the analysis any agent can rank
 
@@ -8910,6 +9006,25 @@ Release proof: VR2a1 changes no app file.
 
 **Owed.** As above: VR-S2's S-TH1, T1 and T2 rows and the headroom's first real measurement;
 JOB-31's feel. No person check; nothing filed.
+
+**S-TH1 (2026-11-06).** Road map CJ7 ran VR-S2's S-TH1 rows once (`reframe_spike.py --sth1
+--socket` on a Release instance, PID 47736, stopped after; `rule_sha256` `f55e33e6…13cce3870e7`,
+matching; `VR-S2-STH1/results.json`). The input is S-TH1's cached `faces` and `subjects` read
+through `get_media_analysis` in 120 s windows: 2,912 samples, 2,662 with a face and 2,692 with a
+person, from 3840 × 2160 to 1080 × 1920, 4.85 minutes. The grid ran on the core's planner as it is
+now (VR2a2's VR-24 since VR-S2's run), twice:
+- **S-TH1 alone: STOP.** No setting is at 6 moves a minute or under (the fewest, 8.04 a minute at
+  dead zone 0.15), and at dead zone 0.06 none is at 8 or under (16.49…19.37). Containment moved
+  only with the speed (0.3: 94.59…94.74 %, 0.5: 96.21…96.32 %, 0.8: 96.96…97.03 %) and moves only
+  with the dead zone (0.06: 80–94, 0.10: 61–67, 0.15: 39–42); the headroom moved neither. VR-23's
+  shipped (0.15, 0.8, 0.38): 2,581/2,662 = 96.96 %, 41 moves, 8.45 a minute.
+- **Pooled with the six canned inputs: STOP** (4,042 counted, 7.52 minutes): the fewest moves 7.31
+  a minute at dead zone 0.15, none under 8 at 0.06 (14.10…15.96). Shipped: 3,841/4,042 = 95.03 %,
+  57 moves, 7.58 a minute. In that run the six canned inputs alone at the shipped setting held
+  1,260 of 1,380 (`c-two-faces` 80 of 200) and 16 moves in 160 s, against VR-S2's 1,358 and 15:
+  the planner changed under them since VR-S2 ran.
+- The verdict differs from VR-23's (the first arm at (0.15, 0.8, 0.38)): it is put to the owner
+  (CJ7's record), and VR-23 is not amended here. T1's and T2's rows stay owed.
 
 #### VR2a2's record (2026-11-03)
 
@@ -10933,6 +11048,150 @@ unchanged).
 ranges takes 3.7 s at 4,096 clips (row (4)); the timeline's full draw takes 116–126 ms at the
 default zoom whatever the clip count (row (7)). Each alone holds the ceiling at 4,096; neither is
 CJ6's to speed up.
+
+### CJ7 — S-TH1's owed rows
+
+- **What a person gets:** nothing new. S-TH1 arrived on 2026-11-06, and every automatic row that
+  earlier phases skipped by name for want of it runs on it now, with its pinned instrument and its
+  rule. A rule's verdict is never changed here: a STOP arm is put to the owner.
+- **The sample.** The owner recorded S-TH1 on an iPhone 18 Pro Max in place of the GH5 (it is in
+  storage), so the movie is HEVC 4K 30 SDR, stored upside down (−180), with an AAC stereo track, a
+  4-channel APAC (Spatial Audio) track and six metadata tracks; the RØDE is its own AIFC.
+  `notes.txt` gives three beats (lean out 3:38, stand and leave 3:53, look away 4:09). The movie has
+  no side-on beat; the owner is recording a short side-on add-on as a second movie, and the
+  side-on rows run on it when it is in the folder, else stay owed on "S-TH1's side-on add-on".
+- **Instruments:** `creator_spike/sth1.py` (the paths, the facts, the beats read from frames, the
+  profile span); an S-TH1 arm on `faces_spike.py`, `subjects_spike.py`, `sound_spike.py`,
+  `reframe_spike.py`, `cutout_spike.py` (`--only s1-sth1 --device gpu`) and `shots_spike.py`; the
+  owner file picked by name in `cut_spike.py` and `fill_spike.py`; `faces_proof.py`'s F5;
+  `audio_tracks_probe.swift` and `audio_tracks.py` for SW-S1 (f). Each run writes
+  `<ID>-STH1/results.json` with its spike's own `rule_sha256`.
+- **Not here:** FC-S2 and FC-S3 (paid, at FC5's and FC4's heads), TX-S1's cloud arm, every row
+  that needs S-RT1, S-KEY1, S-TH2–S-TH5, S-ST1, S-EV, S-MU or S-LONG1, and the JOB rows (a person).
+- **Depends on:** CJ3, CO0, VR1, TX3b, FC3. **Lane** A. No decision (CJ-70…CJ-79 unused).
+
+#### CJ7's record (2026-11-06)
+
+**Landed.** Lane A, base `b4b22392`, commits `1400b374` and fix 1 `abae059c`. No app, core or
+format change; what landed: the instruments (below), this record, the addenda dated "S-TH1 (2026-11-06)" in the records of CJ2a, TX1, TX3a, CO0, CJ3, FC3,
+VR1 and VR2a1, and `samples/README.md`'s S-TH1 and S-IP1 rows. macOS 26.5.1 (25F80), Apple M2 Max,
+on AC power (`pmset`: "Now drawing from 'AC Power'"). The lanes were idle, but another session
+built on the machine for the first hour: one-minute loads reached 95.43.
+
+**Two STOP arms, put to the owner** (nothing amended):
+- **CJ-S2 rule 6:** S-TH1's first 60 s hold a face in 523 of 600 samples (0.8717), under 95 %,
+  because the recording opens on an empty chair and the owner sits down at 7–8 s; over 8–60 s the
+  share is 0.9962. The rule stops VR1 and SW8 until CJ-30 is amended.
+- **VR-S2:** on S-TH1 alone and pooled with the six canned inputs, no setting is at 6 moves a
+  minute or under, and none at dead zone 0.06 is at 8 or under; VR-23's shipped (0.15, 0.8,
+  0.38) runs 8.45 moves a minute on S-TH1 at 96.96 % containment.
+
+**The sample, re-measured** (`sth1.py`, ffprobe): `IMG_0181.MOV`, 831,228,672 bytes, HEVC Main
+3840 × 2160, BT.709 primaries, transfer and matrix, r_frame_rate 30/1, avg 349400/11647, 291.17 s,
+display-matrix rotation −180; stream 1 AAC LC stereo 48 kHz (default), stream 2 `apple_apac` 4
+channels 48 kHz (not default), streams 3–8 `mebx` metadata. `IMG_0181.aifc`: PCM 24-bit
+big-endian mono 48 kHz, 210.71 s. A 100 Hz envelope cross-correlation of the movie's first audio
+track against the RØDE file peaks at 71.93 s (0.696, the runner-up 0.082), so the movie's first
+72 s have only the phone's sound. The integration worktree's `S-TH1/` held `IMG_0181.aifc`,
+`IMG_0181.MOV` and `notes.txt` when CJ7 began and when each side-on row ran: the side-on add-on
+had not arrived.
+
+**The truth spans**, read from autorotated `fps=1` frames at 480 px (205–274 s, 0–13 s, 275–290 s
+one a second; 0–55 s and 60–288 s one every 5 and 3 s), whole seconds, both ends inclusive:
+
+| Span | Seconds | The frames that set it |
+|---|---|---|
+| `lean_out` | 219–220 | 218 a face (moving), 219 and 220 none, 221 a face |
+| `leave` | 234–239 | 233 seated, 234 rising, 235–238 gone, 239 sitting, 240 seated |
+| `look_away` | 249–254 | 248 facing, 249 turned, 250–253 away, 254 turning back, 255 facing |
+| `arrive` (no one in the chair) | 0–7 | 0–6 the empty chair, 7 a torso, 8 the first face |
+| `exit` (no one in the chair) | 284–292 | 283 a face, 284 standing, 285–290 the empty chair |
+| `FACING_0_60` | 8–60 | 10 of the 12 frames at 0, 5, … 55 s show the face (not 0 and 5); 10 s faces the lens, and from 15 s the owner looks off camera, the face in three-quarter view; at 11 s he is turned away |
+
+`face_present(t)` is false inside every span, each widened by 0.5 s. The retakes, false starts
+and the 3 s pause were not needed by any row that ran: TX-S4 (S-RT1) and JOB-14 are where they
+count.
+
+**Rows run** (each once unless said; every run printed its `rule_sha256` matching the table):
+
+| Row | Command | Result | Owning record |
+|---|---|---|---|
+| CJ-S2 rule 3 | `faces_spike.py --sth1` | recall 0.9977 at 720 (2,619 samples); size 720, as CJ-32 | CJ3 |
+| CJ-S2 rule 6 | the same | **STOP**: 0.8717 (523/600) | CJ3 |
+| F5 | `RC_PROOF_APP=release faces_proof.py` (13/13) | ratio 1.908 (0.0315 / 0.0165): PASS | CJ3 |
+| VR-S1 rule 2 | `subjects_spike.py --sth1 --addon-dir <I>/…/S-TH1` | 0.9916 at 720, 0.9905 at 1440: 720, as VR-11 | VR1 |
+| VR-S1 rule 4, turned away | the same | 60/60: people stay (turned-away alone) | VR1 |
+| VR-S2 | `reframe_spike.py --sth1 --socket` (Release) | **STOP** alone and pooled | VR2a1 |
+| CJ-S4 | `shots_spike.py --socket` (Debug) | 0 false cuts at CJ-24's setting; PASS | CJ2a |
+| CO-S1 speed | `cutout_spike.py --only s1-sth1 --device gpu` | 1.463× every frame at 4K, 1.819× at 1920 (recorded only) | CO0 |
+| TX-S1 | `fill_spike.py --part owner`, three runs | 2.88, 2.72, 2.67 s wall; 375, 374, 374 words | TX1 |
+| TX-S3, E0 | `cut_spike.py` (Debug) | 373 edges: 18.50 % in non-speech, 17.16 % under −40 dBFS | TX3a |
+| FC-S1 speech-only | `sound_spike.py --sth1` | file 0 calls; stream 1 laughter window at t ≤ 0.5 | FC3 |
+| SW-S1 (f) | `audio_tracks.py` | two audio tracks, both decode (below) | SW3a (no record yet) |
+
+**SW-S1 (f) and S-IP1's question**, answered from S-TH1's movie, recorded with Spatial Audio on
+(`audio_tracks.py`, `rule_sha256` `4d601156…46ba43`, matching; `SW-S1-f/results.json`):
+`tracks(withMediaType: .audio)` lists track 2, `aac ` 2 channels 48 kHz, enabled, decoding; and
+track 3, `apac` 4 channels 48 kHz, NOT enabled, decoding to 32-bit float LPCM (one buffer each).
+Neither has a title. The other tracks are 1 `vide` and 6 `meta`. ffprobe agrees (stream 1 id 2,
+stream 2 id 3, the APAC's default disposition 0). So the iPhone writes two audio tracks, the
+second a disabled 4-channel APAC that AVFoundation decodes; the app reads only the first (SW3a
+owns the rest).
+
+**Rows skipped by name and still owed:**
+
+| Row | Owed on | Record |
+|---|---|---|
+| VR-S1 rule 4, the side-on half | S-TH1's side-on add-on | VR1 |
+| TX-S3's real-speech verdict | S-RT1 | TX3a |
+| TX-S4 | S-RT1 | TX7 |
+| TX-S1 on a long file | S-LONG1 | TX1 |
+| FC-S1's group verdicts and the rest of the speech-only and music minutes | S-EV, S-ST1, S-MU | FC3 |
+| FC-S3 and FC-S2 (paid) | FC4's and FC5's heads | FC4, FC5 |
+| TX-S1's cloud arm (paid) | the owner's run | TX1 |
+| CJ-S2 rule 5, CJ-S3 (a) and (c) | S-TH2…S-TH4 | CJ3, CJ2a |
+| CO-S1 (a), (b), (d), (e), (f), CO-S3 | S-KEY1 | CO0 |
+| VR-S2's T1 and T2 rows | the CJ-5 trials | VR2a1 |
+| JOB-10, 11, 12, 13, 14, 31, 60, 62 | a person at the machine | `docs/manual-checks.md` |
+| CP1 and TX8's T1 | the owner; T1 is cut from S-TH1, its speech on the RØDE only from 71.9 s of the movie | CP1, TX8 |
+
+**Timing, with its runs and loads.** CJ-S2's four sizes once each (loads 66.42, 38.57, 14.21,
+43.22); VR-S1's two sizes once each (44.71, 18.61); FC-S1 once each way (16.51 at the start);
+TX-S1 three runs (95.43, 75.57, 70.08 after each); CO-S1 three runs a row (18.81 at the start,
+4.76…11.37 after each row); `faces_proof.py` F7 7.11 s per minute. The CO-S1 rows ran after the
+other session's builds ended, the rest under them.
+
+**Instrument fixes** (this phase): `shots_spike.py` read S-TH1 by `glob("*.mov")`, which misses
+`.MOV`, and could not parse "30/1," (the display matrix's extra field); `cut_spike.py` picked
+`sorted(glob("*"))[0]`; `fill_spike.py` would have taken whichever movie sorted first once the
+add-on lands; `mask_speed.swift` passed Vision no orientation; `faces_proof.py`'s F5 first shared
+F1's document, whose clip at 0 refused its `add_clip`, and now has a document of its own.
+
+**Commands.** The spikes' `--selftest`s exit 0 (`faces_spike.py` and `subjects_spike.py` "0
+failed", `sound_spike.py` PASS, `reframe_spike.py` six rows PASS, `cutout_spike.py` 25/25); `cutout_spike.py
+--build-only` exit 0; `--only s1-sth1` without `--device` refused (exit 2). `make gate`: "gate:
+PASS 633s" (names 1, typecheck 11, fmt 4, lint 32, test 369, app 215); after F5's fix and the
+records, before this sentence: "gate: PASS 90s" (names 1, test 88; the rest skipped). F5 ran against Release, not
+Debug: the Debug reader turns a rotated 4K frame upright in its per-pixel loop at about 3 frames a
+second (CJ3's record), some 50 minutes for S-TH1. So on a Debug build `faces_proof.py` skips F5 by
+name (spec §11 V-4) rather than pinning the whole proof `release_only`, which would take F1–F4, F6
+and F7 off Debug too; the record's F5 figures are Release's.
+
+**Reviews.** Review 1 (`b4b22392..1400b374`, fix-required): one should-fix and three nits. The
+should-fix: F5 ran on every `faces_proof.py` run, and the default Debug app cannot finish it, with
+no pin (spec §11 V-4). Fix pass 1 (`abae059c`) skips F5 by name on a Debug build, as above;
+`RC_PROOF_APP=debug faces_proof.py --only F5` printed "SKIP F5 a Debug build: …" and "1/1 rows
+passed", and `make gate` "gate: PASS 320s". Review 2 (`b4b22392..abae059c`): pass, the three nits
+resolved at integration: this record's "no … tool change" now reads "no app, core or format
+change"; `sth1.py`'s comments say "the face in frame" for `FACING_0_60` and 285–290 for the exit's
+empty chair, as the table above; and `fill_spike.py --part owner` filing a future S-LONG1 run in
+`TX-S1-STH1/` is left as it stands, since its `owner` map keys each run by the sample's name.
+
+**Integrated** onto `worktree-creator-jobs` at `b4b22392` with no conflict (no phase had landed
+since the lane's base). No §11 decision, no format change, no `CLAUDE.md` edit. `make gate`:
+"gate: PASS 617s" (names 1, typecheck 35, fmt 4, lint 27, test 354, app 197).
+
+**To file:** none. **CLAUDE.md edits owed:** none.
 
 ### FC8b — Make Shorts from the ranked list
 

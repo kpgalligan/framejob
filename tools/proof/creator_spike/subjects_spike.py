@@ -31,6 +31,22 @@ one fresh handler, each pinned with `AnalysisVision.pin`).
 
 Writes `tools/proof/work/creator_spike/VR-S1/results.json`
 (`rule.write_results`) and prints one `VERDICT` line.
+
+**`--sth1 [--addon-dir DIR]`** (road map CJ7) runs VR-S1 rules 2 and 4 on
+S-TH1 (`sth1.py`), both requests on VR-11's Neural Engine at 10 a second,
+upper body (VR-4 as VR-10 amends it):
+- rule 2: person recall (any person box) on every `sth1.face_present` sample
+  at 720 and at 1440; 1440 if 720's is more than 1 point under;
+- rule 4's turned-away half: the share of `look_away` samples with a person
+  box on `IMG_0181.MOV`;
+- rule 4's side-on half on the add-on (`sth1.addon(DIR)`): `faces_spike`'s
+  probe at 720 on the Neural Engine finds the profile stretch
+  (`sth1.profile_span`, |yaw| ≥ π/4 − 0.01 or no face), autorotated `fps=1`
+  frames from 3 s before to 3 s after it are written for reading, and the
+  share is the person-box share over the stretch's samples. With no add-on
+  the half skips by name, owed on S-TH1's side-on add-on.
+Rule 4's verdict pools both halves when both ran, else the turned-away half
+alone, labelled. Writes `VR-S1-STH1/results.json`.
 """
 
 import argparse
@@ -47,6 +63,7 @@ sys.path.insert(0, str(PROOF))
 sys.path.insert(0, str(HERE))
 import face_fixtures  # noqa: E402
 import rule  # noqa: E402
+import sth1  # noqa: E402
 import subjects_deciders as deciders  # noqa: E402
 import swift_build  # noqa: E402
 
@@ -160,12 +177,122 @@ def rate(probe, side, devices):
     return deciders.rate_rule(realtime), realtime, rows, kept
 
 
+PEOPLE_SHARE = 0.90     # VR-S1 rule 4
+VR11_DEVICE = "neural_engine"
+
+
+def people_rows(answer):
+    """(t, person found) per sample that read a frame."""
+    return [(row["pts"] / TICKS, bool(row["people"])) for row in answer["samples"]
+            if row["pts"] >= 0]
+
+
+def share(rows, keep):
+    kept = [found for t, found in rows if keep(t)]
+    return {"hits": sum(kept), "samples": len(kept),
+            "share": sum(kept) / len(kept) if kept else None}
+
+
+def side_on(probe, addon):
+    """Rule 4's side-on half on the add-on, or (None, reason)."""
+    import faces_spike
+    faces = faces_spike.run(face_fixtures.spike_binary(), addon, deciders.FACES_SIZE,
+                            deciders.FACES_RATE, VR11_DEVICE, "none")
+    samples = [{"t": row["pts"] / TICKS, "faces": [{"yaw": f.get("yaw")} for f in row["faces"]]}
+               for row in faces["samples"] if row["pts"] >= 0]
+    yaws = {"frontal": sum(1 for s in samples if any(
+                f["yaw"] is not None and abs(f["yaw"]) < sth1.PROFILE_YAW for f in s["faces"])),
+            "no_face": sum(1 for s in samples if not s["faces"]), "samples": len(samples)}
+    span = sth1.profile_span(samples)
+    if span is None:
+        return None, f"no profile stretch found in {addon.name}", {"yaw_counts": yaws}
+    frames = rule.WORK / "sth1_addon_frames"
+    frames.mkdir(parents=True, exist_ok=True)
+    start = max(0.0, span[0] - 3)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{start:.2f}", "-i", str(addon),
+                    "-t", f"{span[1] + 3 - start:.2f}", "-vf", "fps=1,scale=480:-2",
+                    str(frames / "a%03d.jpg")], check=True)
+    answer = run(probe, addon, deciders.FACES_SIZE, deciders.FACES_RATE, VR11_DEVICE,
+                 VR11_DEVICE)
+    row = share(people_rows(answer), lambda t: span[0] <= t <= span[1])
+    log(f"rule 4 side-on: {addon.name}, profile span {span[0]:.1f}–{span[1]:.1f} s "
+        f"(no face, or every face |yaw| >= {sth1.PROFILE_YAW:.4f}); yaw counts {yaws}; frames "
+        f"{start:.1f}–{span[1] + 3:.1f} s in {frames}; person {row['hits']}/{row['samples']}")
+    return row, None, {"file": addon.name, "span": span, "yaw_counts": yaws,
+                       "frames": str(frames), "frames_from": start}
+
+
+def run_sth1(addon_dir):
+    movie = sth1.movie()
+    if movie is None:
+        log(f"SKIP VR-S1 rules 2 and 4 on S-TH1: {sth1.missing_reason()}")
+        return 0
+    rule.check_rule("VR-S1")
+    host = rule.host()
+    log(f"host: {host['os']} ({host['os_build']}), {host['device']}, AC power "
+        f"{host['ac_power']}, {host['uptime']}")
+    probe = binary()
+    runs, recall = {}, {}
+    for side in (deciders.FACES_SIZE, deciders.BIG_SIZE):
+        answer = run(probe, movie, side, deciders.FACES_RATE, VR11_DEVICE, VR11_DEVICE)
+        rows = people_rows(answer)
+        recall[side] = share(rows, sth1.face_present)
+        runs[side] = {"summary": summary(answer), "recall": recall[side],
+                      "look_away": share(rows, lambda t: sth1.in_beat(t, "look_away")),
+                      "beats": {name: share(rows, lambda t, n=name: sth1.in_beat(t, n))
+                                for name in sth1.BEATS},
+                      "absent": {name: share(rows, lambda t, s=span: s[0] <= t <= s[1])
+                                 for name, span in sth1.ABSENT.items()}}
+        log(f"rule 2 S-TH1 at {side} (read {answer['read']}, {answer['realtime']:.2f}x, pins "
+            f"{answer['pin']['people']['joined']}/{answer['pin']['salient']['joined']}, load "
+            f"{answer['load']}): person recall {recall[side]['hits']}/{recall[side]['samples']}"
+            f" = {recall[side]['share']:.4f}; beats {runs[side]['beats']}; absent "
+            f"{runs[side]['absent']}")
+    small, big = recall[deciders.FACES_SIZE]["share"], recall[deciders.BIG_SIZE]["share"]
+    size = deciders.BIG_SIZE if big - small > 0.01 else deciders.FACES_SIZE
+    turned = runs[deciders.FACES_SIZE]["look_away"]
+    try:
+        addon = sth1.addon(addon_dir)
+    except SystemExit as ambiguous:
+        addon, skip = None, str(ambiguous)
+    else:
+        skip = None if addon else "owed on S-TH1's side-on add-on"
+    side_row, side_info = None, {}
+    if addon is not None:
+        side_row, skip, side_info = side_on(probe, addon)
+    if skip:
+        log(f"SKIP rule 4 side-on: {skip}")
+    if side_row is not None:
+        hits, n = turned["hits"] + side_row["hits"], turned["samples"] + side_row["samples"]
+        pooled, basis = hits / n, "pooled turned-away and side-on"
+    else:
+        pooled, basis = turned["share"], "turned-away alone (side-on owed)"
+    rule4 = "people stay" if pooled >= PEOPLE_SHARE else "STOP"
+    line = (f"VERDICT size={size} shipped=720 recall_720={small:.4f} recall_1440={big:.4f} "
+            f"rule4={rule4} share={pooled:.4f} ({basis}) turned_away={turned['hits']}/"
+            f"{turned['samples']} side_on="
+            + (f"{side_row['hits']}/{side_row['samples']}" if side_row else "skipped"))
+    results = {**sth1.record(), "device": VR11_DEVICE, "rate": deciders.FACES_RATE,
+               "runs": {str(k): v for k, v in runs.items()}, "size": size,
+               "turned_away": turned, "side_on": side_row, "side_on_info": side_info,
+               "side_on_skip": skip, "rule4": rule4, "rule4_share": pooled,
+               "rule4_basis": basis, "verdict_line": line}
+    written = rule.write_results("VR-S1", results, folder="VR-S1-STH1")
+    log(line)
+    log(f"results: {written}")
+    return 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--selftest", action="store_true")
+    parser.add_argument("--sth1", action="store_true")
+    parser.add_argument("--addon-dir")
     args = parser.parse_args(argv)
     if args.selftest:
         return 1 if deciders.selftest() else 0
+    if args.sth1:
+        return run_sth1(args.addon_dir)
     if deciders.selftest():
         raise SystemExit("the deciders' selftest failed")
     rule.check_rule("VR-S1")

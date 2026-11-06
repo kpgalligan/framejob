@@ -16,6 +16,7 @@ python3 tools/proof/cutout_spike/cutout_spike.py --only s2      # CO-S2, after s
 python3 tools/proof/cutout_spike/cutout_spike.py --only s2 --pack   # the mask pack too, whatever the track answers
 python3 tools/proof/cutout_spike/cutout_spike.py --only device       # CO1's head: CJ-S2 rule 1 for masks (about 10 minutes)
 python3 tools/proof/cutout_spike/cutout_spike.py --only s1 --device gpu   # Standard re-measured on the pick
+python3 tools/proof/cutout_spike/cutout_spike.py --only s1-sth1 --device gpu   # CJ7: the same rows on S-TH1's whole movie (about 30 minutes); refused without --device
 ```
 
 **Exit codes.**
@@ -23,7 +24,7 @@ python3 tools/proof/cutout_spike/cutout_spike.py --only s1 --device gpu   # Stan
 - **1:** an instrument failure (a probe that does not build, a probe crash, a fixture that does not probe as made, CO-S2 run before CO-S1's results exist, the pack's free-space check), a selftest row, or `RULE CHANGED`.
 - **2:** not performed: `core/target/release/libframejob_core.a` or `build/codecs/stamp.json` is missing (`swift_build.build` links both).
 
-**Owed, never a failure.** S-KEY1's rows (CO-S1 (a) flicker, (b) the rate by B, (d) Best, (e) the read size, (f) the rotated composite; and CO-S3) and S-TH1's speed rows are printed `SKIP` with their reason, and their VERDICT fields read `owed`. S-TH4 is replaced by an `ffmpeg` HLG variable-frame-rate fixture in CO-S2 (1).
+**Owed, never a failure.** S-KEY1's rows (CO-S1 (a) flicker, (b) the rate by B, (d) Best, (e) the read size, (f) the rotated composite; and CO-S3) are printed `SKIP` with their reason (S-TH1's speed rows run under `--only s1-sth1` since road map CJ7; `mask_speed` hands Vision the track's orientation, `.up` for the fixtures), and their VERDICT fields read `owed`. S-TH4 is replaced by an `ffmpeg` HLG variable-frame-rate fixture in CO-S2 (1).
 
 ## Fixtures
 

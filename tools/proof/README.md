@@ -30031,3 +30031,39 @@ python3 tools/proof/vr6b_proof.py --mutant <name>
 
 The recorded runs are in `designs/creator-jobs.md`'s VR6b record; JOB-37 is what only a person
 judges.
+
+## Road map "creator-jobs" CJ7 — S-TH1's owed rows (`creator_spike/sth1.py`; the S-TH1 arms of the spikes, `faces_proof.py` F5, `creator_spike/audio_tracks.py` SW-S1 (f))
+
+S-TH1 is the owner's talking head (`samples/README.md`), in
+`tools/proof/media/creator/S-TH1/` (untracked): `IMG_0181.MOV` (an iPhone 18 Pro Max, 4K 30 HEVC
+SDR, stored upside down, a −180 rotation; AAC stereo, a 4-channel APAC track and six metadata
+tracks), `IMG_0181.aifc` (the RØDE) and `notes.txt` (the owner's beat times). `sth1.py` is what
+every arm reads: `movie()` pinned to `IMG_0181.MOV` by name (never a suffix pick: the side-on
+add-on lands in the same folder), `addon(folder)` the add-on, `facts()` an ffprobe re-measure,
+`BEATS` (lean out, leave, look away) and `ABSENT` (the empty chair at the start and the end) as
+whole-second spans read from autorotated `fps=1` frames, `face_present(t)` outside both, and
+`profile_span(samples)` the longest run after 10 s with no face at |yaw| < π/4 − 0.01. Every arm
+writes `tools/proof/work/creator_spike/<ID>-STH1/results.json` through `rule.write_results`
+(the spike's own `rule_sha256`, `sth1_facts` and the spans), leaving the spike's earlier
+`results.json` untouched, and prints a `VERDICT` line or `SKIP <row>: <reason>`.
+
+```sh
+python3 tools/proof/creator_spike/sth1.py                       # the facts, the spans, the add-on
+python3 tools/proof/creator_spike/faces_spike.py --sth1         # CJ-S2 rules 3 and 6 (CJ-S2-STH1)
+python3 tools/proof/creator_spike/subjects_spike.py --sth1 --addon-dir <I>/tools/proof/media/creator/S-TH1   # VR-S1 rules 2 and 4 (VR-S1-STH1)
+python3 tools/proof/creator_spike/shots_spike.py --socket <sock>   # CJ-S4 with S-TH1 as the no-cut input (CJ-S4-STH1)
+python3 tools/proof/creator_spike/sound_spike.py --sth1         # FC-S1's speech-only calls (FC-S1-STH1)
+python3 tools/proof/creator_spike/audio_tracks.py [--movie PATH]   # SW-S1 (f) (SW-S1-f)
+python3 tools/proof/cutout_spike/cutout_spike.py --only s1-sth1 --device gpu   # CO-S1's speed rows (CO-S1-STH1), about 30 minutes
+python3 tools/proof/transcript_spike/fill_spike.py --part owner   # TX-S1 on S-TH1, one run per call (TX-S1-STH1)
+python3 tools/proof/transcript_spike/cut_spike.py               # TX-S3 with S-TH1 (TX-S3-STH1)
+make app && python3 tools/proof/proof_app.py launch --app release
+python3 tools/proof/creator_spike/reframe_spike.py --sth1 --socket <dir>/agent.sock   # VR-S2 (VR-S2-STH1)
+RC_PROOF_APP=release python3 tools/proof/faces_proof.py --only F5   # F5 on S-TH1
+```
+
+`audio_tracks_probe.swift` is built alone; it prints each `tracks(withMediaType: .audio)` row
+(track ID, the FourCC, channels, rate, title, enabled, whether one float LPCM buffer decodes) and
+the other tracks' counts, and `audio_tracks.py` sets ffprobe's audio streams beside it. The
+recorded runs, the rows skipped and those still owed are in `designs/creator-jobs.md`'s
+"CJ7's record".

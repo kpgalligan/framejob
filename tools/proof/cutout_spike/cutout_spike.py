@@ -32,7 +32,11 @@ the GPU and the Neural Engine, each run's SHA-256 over its masks' bytes and
 its realtime factor; then `deciders.device_rule`. R0 checks CJ-S2's hash;
 results in `tools/proof/work/creator_spike/CJ-S2-masks/`. `--only s1 --device
 D` re-measures Standard alone (person `.balanced` at every, 15 and 10 a second
-on both push-ins) pinned to D, results in `CO-S1-D/`.
+on both push-ins) pinned to D, results in `CO-S1-D/`. `--only s1-sth1 --device
+gpu` (road map CJ7) measures the same rows on S-TH1's whole movie
+(`sth1.movie()`, every frame, 15 and 10 a second, at the source size and
+1920), recorded only, results in `CO-S1-STH1/`; it is refused without
+`--device`.
 
 `fixtures()` also makes M5's 640 × 360 lossless push-in and its three
 rotation twins (`co1_proof.py`'s M5): `push_640.mov`, `push_640_cw.mov` (its
@@ -393,6 +397,49 @@ def s1(binaries, results, device=None):
     return line
 
 
+def s1_sth1(binaries, results, device):
+    """CO-S1's speed rows on S-TH1's whole movie (road map CJ7), the way CO1's
+    re-measure ran them: Standard alone pinned to `device`, every frame, 15
+    and 10 a second, at the source size and a long side of 1920, three runs
+    each, no first-request row. Recorded only: S-TH1 is 4K, and rule (c) is
+    judged at 1080p30."""
+    import sth1
+    movie = sth1.movie()
+    if movie is None:
+        line = f"SKIP CO-S1 on S-TH1: {sth1.missing_reason()}"
+        log(line)
+        results.update({"skipped": line})
+        return line
+    speed = binaries["mask_speed"]
+    rows = {}
+    for size in ("source", "1920"):
+        for rate in deciders.RATES:
+            runs = []
+            for _ in range(RUNS):
+                answer = run_probe(speed, ["job", str(movie), deciders.STANDARD, rate, size,
+                                           device], timeout=3600)
+                answer["load"] = load()
+                runs.append(answer)
+            key = f"{deciders.STANDARD}/{rate}/sth1/{size}"
+            factors = [r["realtime"] for r in runs]
+            rows[key] = {"realtime": statistics.median(factors), "realtime_runs": factors,
+                         "wall_s": [r["wall_s"] for r in runs], "source_s": runs[0]["source_s"],
+                         "requests": runs[0]["requests"], "frames": runs[0]["frames"],
+                         "mask": f"{runs[0]['mask_w']}x{runs[0]['mask_h']}",
+                         "read": f"{runs[0]['read_w']}x{runs[0]['read_h']}",
+                         "revision": runs[0]["revision"], "device": runs[0]["device"],
+                         "loads": [r["load"] for r in runs]}
+            log(f"CO-S1 S-TH1 {key}: {rows[key]['realtime']:.3f}x "
+                f"({', '.join(f'{f:.3f}' for f in factors)}) read {rows[key]['read']} mask "
+                f"{rows[key]['mask']} device {rows[key]['device']} load {runs[-1]['load']}")
+    every = f"{deciders.STANDARD}/every/sth1"
+    line = (f"VERDICT recorded-only standard={deciders.STANDARD} device={device} "
+            f"realtime_every_source={fmt(rows[every + '/source']['realtime'])} "
+            f"realtime_every_1920={fmt(rows[every + '/1920']['realtime'])}")
+    results.update({**sth1.record(), "rows": rows, "device": device, "verdict_line": line})
+    return line
+
+
 def fmt(value, places=2):
     return "none" if value is None else f"{value:.{places}f}"
 
@@ -631,7 +678,11 @@ def main(argv=None):
         print(f"NOT PERFORMED: {', '.join(missing)} missing (cargo build --release, make codecs)")
         return 2
     only = {part.strip() for part in args.only.split(",") if part.strip()}
-    spikes = {"s1": "CO-S1", "s2": "CO-S2", "device": "CJ-S2"}
+    spikes = {"s1": "CO-S1", "s2": "CO-S2", "device": "CJ-S2", "s1-sth1": "CO-S1"}
+    if "s1-sth1" in only and not args.device:
+        print("REFUSED s1-sth1 needs --device (spec §11 CO-11 pins Standard to the GPU: "
+              "--device gpu)")
+        return 2
     if not args.build_only:
         for part in sorted(only):
             computed, table, match = rule.check_rule(spikes[part])
@@ -659,6 +710,12 @@ def main(argv=None):
             results["load_end"] = load()
             path = rule.write_results(
                 "CO-S1", results, folder=f"CO-S1-{args.device}" if args.device else None)
+            log(f"results: {path}")
+        if "s1-sth1" in only:
+            results = {"load_start": load()}
+            lines.append(s1_sth1(binaries, results, args.device))
+            results["load_end"] = load()
+            path = rule.write_results("CO-S1", results, folder="CO-S1-STH1")
             log(f"results: {path}")
         if "device" in only:
             record = {}

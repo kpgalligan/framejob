@@ -160,8 +160,8 @@ def summary(answer):
     return {k: v for k, v in answer.items() if k != "words"}
 
 
-def load():
-    return json.loads(RESULTS.read_text()) if RESULTS.exists() else {}
+def load(path=RESULTS):
+    return json.loads(path.read_text()) if path.exists() else {}
 
 
 def tokens(words, offset=0.0):
@@ -242,6 +242,10 @@ def part_owner(results, binary):
     for name, folder in OWNER.items():
         found = sorted(p for p in folder.glob("*") if p.suffix.lower() in
                        (".mov", ".mp4", ".wav", ".m4a")) if folder.exists() else []
+        if name == "S-TH1":
+            # IMG_0181.MOV by name, never its side-on add-on (road map CJ7)
+            import sth1
+            found = [sth1.movie()] if sth1.movie() else []
         if not found:
             owner[name] = f"SKIP: {name} does not exist under {folder}; owed"
             print(owner[name], flush=True)
@@ -251,6 +255,7 @@ def part_owner(results, binary):
              "default=nw=1:nk=1", str(found[0])], capture_output=True, text=True).stdout or 0)
         owner[name] = summary(run_once(binary, found[0], 0, seconds, name))
     results["owner"] = owner
+    results.setdefault("owner_runs", []).append(owner)
 
 
 def playback(socket, binary):
@@ -349,7 +354,9 @@ def main(argv=None):
     parser.add_argument("--socket")
     args = parser.parse_args(argv)
     rule.check_rule(SPIKE)
-    results = load()
+    # --part owner keeps its runs apart (road map CJ7): TX-S1-STH1/, each run appended
+    folder = "TX-S1-STH1" if args.part == "owner" else None
+    results = load(RESULTS.parent.parent / folder / "results.json") if folder else load()
     for key in ("spike", "rule_sha256", "rule_sha256_recorded", "rule_matches", "os_build",
                 "os", "device", "cores", "memory", "ac_power", "uptime"):
         results.pop(key, None)
@@ -366,7 +373,7 @@ def main(argv=None):
         raise SystemExit("name a --part or --playback")
     results["verdict"] = verdict(results)
     print("VERDICT " + json.dumps(results["verdict"], sort_keys=True))
-    written = rule.write_results(SPIKE, results)
+    written = rule.write_results(SPIKE, results, folder=folder)
     print(f"results: {written}")
     return 0
 

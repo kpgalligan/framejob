@@ -17,7 +17,7 @@ face and voice); the road map's "Samples the owner supplies" says what each meas
 
 | Sample | Lives in | What it is | Recorded |
 |---|---|---|---|
-| S-TH1 | `tools/proof/media/creator/S-TH1/` | A talking head, one person, GH5 in Rec. 709, 4K 30, about 6 min, with retakes, false starts, fillers and leaving the frame, the RØDE as its own file | not yet |
+| S-TH1 | `tools/proof/media/creator/S-TH1/` | A talking head, one person, recorded on an iPhone 18 Pro Max in place of the GH5 (the owner's substitution, 2026-11-06): `IMG_0181.MOV`, HEVC Main 3840 × 2160 SDR (BT.709), 30 fps, 4 min 51 s (291.17 s), stored upside down (rotation −180), with an AAC stereo track, a 4-channel APAC (Spatial Audio) track and six metadata tracks; the RØDE as its own file, `IMG_0181.aifc` (24-bit mono 48 kHz, 210.71 s, its speech from 71.9 s of the movie); `notes.txt`, the owner's times for leaning out, standing to leave and looking away. The owner sits down at 8 s. `IMG_0181.MOV` has no side-on beat; the side-on add-on, a second movie in the same folder, is owed: S-TH1's side-on add-on | 2026-11-06 |
 | S-TH2 | `tools/proof/media/creator/S-TH2/` | The same set-up on the GH5 in V-Log L, 4K 25 10-bit, about 2 min | not yet |
 | S-TH3 | `tools/proof/media/creator/S-TH3/` | 1 min on the iPhone 18 Pro in Apple Log | not yet |
 | S-TH4 | `tools/proof/media/creator/S-TH4/` | The iPhone 18 Pro at its defaults (HDR, HLG, variable frame rate), 1 min landscape and 20 s portrait | not yet |
@@ -35,7 +35,7 @@ face and voice); the road map's "Samples the owner supplies" says what each meas
 | S-PC3 | `tools/proof/media/creator/S-PC3/` | Two people in one wide shot, a microphone each, 3–5 min | not yet |
 | S-MT1 | `tools/proof/media/creator/S-MT1/` | An OBS screen recording with three audio tracks, as `.mkv` and as Hybrid MP4 | not yet |
 | S-MT2 | `tools/proof/media/creator/S-MT2/` | A recorder's or mixer's multichannel file, or a wireless kit's two people in one stereo track | not yet |
-| S-IP1 | `tools/proof/media/creator/S-IP1/` | A short iPhone 18 Pro clip with Spatial Audio on | not yet |
+| S-IP1 | `tools/proof/media/creator/S-IP1/` | A short iPhone 18 Pro clip with Spatial Audio on. SW-S1 (f)'s question was answered from S-TH1's movie, recorded with Spatial Audio on (road map creator-jobs CJ7): two audio tracks, AAC stereo and a disabled 4-channel APAC, each decoding | not yet |
 | S-EV | `tools/proof/media/creator/S-EV/` | About 8 min of the owner talking while someone off-mic laughs, claps and cheers, with a list of each event's start | not yet |
 | S-MU | `tools/proof/media/creator/S-MU/` | 2 min of the owner talking over a music bed | not yet |
 | S-LONG1 | `tools/proof/media/creator/S-LONG1/` | A recording of an hour or more | not yet |

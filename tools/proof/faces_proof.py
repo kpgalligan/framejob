@@ -40,7 +40,14 @@ not fit and the same samples to that `to` answering.
 - F4 `faces_two.mov`: every sample whose two truth boxes are whole in the frame
   holds two faces, left to right, each overlapping its truth; the first sample
   after the back face's truth box has left holds one.
-- F5 S-TH1's mouth gap in speech against pauses: skipped by name, owed.
+- F5 S-TH1's mouth gap in speech against pauses (road map CJ7): `IMG_0181.MOV`
+  (`sth1.movie()`) imported and placed at 0, its `faces` read in 120 s
+  windows, the pauses `detect_silence` (voice, `min_length` 300000,
+  `padding` 0) on that clip and speech the rest; samples inside the owner's
+  beats or with no face dropped; the largest face's mean inner-lip gap in
+  speech at least 1.5× its mean in the pauses. Skipped by name when S-TH1 is
+  absent, and on a Debug build (its upright face loop needs about 50 min for
+  S-TH1, past `faces()`'s 60-call bound; spec §11 V-4).
 - F6 `faces_small.mov`'s recall at CJ-S2's size, beside CJ-S2's figure (at
   least 98 % of it).
 - F7 seconds of work per minute of source (F1's run), recorded.
@@ -56,6 +63,7 @@ import json
 import math
 import shutil
 import subprocess
+import time
 import sys
 from pathlib import Path
 
@@ -69,6 +77,7 @@ import face_fixtures  # noqa: E402
 import faces_deciders  # noqa: E402
 import mcp  # noqa: E402
 import proof_app  # noqa: E402
+import sth1  # noqa: E402
 import swift_build  # noqa: E402
 import tree_copy  # noqa: E402
 
@@ -240,6 +249,75 @@ def path_rms(answer, record, name, width):
     return rms, framed, empty
 
 
+F5_WINDOW = 120 * SEC        # under CJ-34's cap of about 235 s with clip, 296 s without
+F5_RATIO = 1.5
+
+
+def largest_gap(faces):
+    """The largest face's mouth gap, or None."""
+    if not faces:
+        return None
+    face = max(faces, key=lambda f: f["box"][2] * f["box"][3])
+    return face.get("mouth_gap")
+
+
+def f5(client):
+    """S-TH1's mouth gap in speech against pauses (road map CJ7), in a
+    document of its own (F1's clip already sits at 0 in the shared one)."""
+    doc = Doc(client, "sth1")
+    try:
+        f5_row(doc)
+    finally:
+        doc.close()
+
+
+def f5_row(doc):
+    movie = sth1.movie()
+    media = doc.call("import_media", path=str(movie))["media"]
+    track = doc.state()["tracks"][0]["id"]
+    clip = doc.call("add_clip", track=track, media=media, at=0)["new_clips"][0]
+    duration = next(m for m in doc.state()["media"] if m["id"] == media)["duration"]
+    samples = []
+    for lo in range(0, duration, F5_WINDOW):
+        answer = doc.faces(**{"media": media, "from": lo, "to": min(duration, lo + F5_WINDOW)})
+        samples += answer["samples"]
+    silence = None
+    for _ in range(120):
+        silence = doc.call("detect_silence", clips=[clip], mode="voice", min_length=300_000,
+                           padding=0)
+        if not silence.get("pending_peaks"):
+            break
+        time.sleep(2)
+    if silence.get("pending_peaks"):
+        raise RuntimeError(f"detect_silence still pending after 240 s: {silence}")
+    pauses = [tuple(r) for r in silence["ranges"]]
+    speech_gaps, pause_gaps, dropped = [], [], {"beat": 0, "no_face": 0, "no_gap": 0}
+    for row in samples:
+        t = row["source"] / SEC
+        if any(sth1.in_beat(t, name) for name in sth1.BEATS):
+            dropped["beat"] += 1
+            continue
+        if not row["faces"]:
+            dropped["no_face"] += 1
+            continue
+        gap = largest_gap(row["faces"])
+        if gap is None:
+            dropped["no_gap"] += 1
+            continue
+        in_pause = any(a <= row["source"] < b for a, b in pauses)
+        (pause_gaps if in_pause else speech_gaps).append(gap)
+    speech = sum(speech_gaps) / len(speech_gaps) if speech_gaps else None
+    pause = sum(pause_gaps) / len(pause_gaps) if pause_gaps else None
+    ratio = speech / pause if speech is not None and pause else None
+    paused = sum(b - a for a, b in pauses) / SEC
+    check("F5", ratio is not None and ratio >= F5_RATIO,
+          f"{movie.name}: {len(samples)} samples, {len(pauses)} pauses ({paused:.1f} s; voice "
+          f"mode, min_length 300000, padding 0); mean inner-lip gap in speech "
+          f"{speech and round(speech, 4)} over {len(speech_gaps)} samples, in pauses "
+          f"{pause and round(pause, 4)} over {len(pause_gaps)}; ratio "
+          f"{ratio and round(ratio, 3)} (want ≥ {F5_RATIO}); dropped {dropped}")
+
+
 def plain_rows(client, record):
     doc = Doc(client, "faces")
     fps = {}
@@ -363,8 +441,15 @@ def plain_rows(client, record):
     if "F4" in selected:
         attempt(f4, "F4")
 
-    skip("F5", "S-TH1 (the owner's talking head) is missing: its mouth gap in speech against "
-         "pauses is owed")
+    if "F5" in selected:
+        if sth1.movie() is None:
+            skip("F5", f"{sth1.missing_reason()}: its mouth gap in speech against pauses is "
+                 "owed")
+        elif proof_app.config() == "debug":
+            skip("F5", "a Debug build: its upright face loop needs about 50 min for S-TH1's "
+                 "291 s, past faces()'s 60-call bound; F5 runs on Release (spec §11 V-4)")
+        else:
+            attempt(lambda: f5(client), "F5")
 
     def f6():
         media, _ = doc.media(face_fixtures.path("faces_small"), "small")

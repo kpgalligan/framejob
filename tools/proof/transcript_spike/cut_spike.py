@@ -31,7 +31,9 @@ word's onset after the first, the share in voice-cache non-speech and under
 Rule (the road map's, `rule_sha256` in CJ0a's table): E2 with the smallest
 guard that clips no onset on (1) and keeps at least 95 % of real-speech edges
 in non-speech; else E1 if it clips none on (1); else E0, with JOB-11 the only
-judge. Results: `tools/proof/work/creator_spike/TX-S3/results.json`.
+judge. Results: `tools/proof/work/creator_spike/TX-S3/results.json`; once
+S-TH1 is read (road map CJ7: `IMG_0181.MOV` by `sth1.movie()`, an S-RT1 file
+by suffix, movie first, never `notes.txt`), `TX-S3-STH1/results.json`.
 """
 
 import json
@@ -208,6 +210,25 @@ def verdict(fixture, real):
     return "E0", "neither E2 nor E1 met the rule; E0, JOB-11 the only judge"
 
 
+MOVIE_SUFFIXES = (".mov", ".mp4", ".m4v")
+AUDIO_SUFFIXES = (".wav", ".aif", ".aiff", ".aifc", ".m4a", ".mp3", ".caf")
+
+
+def owner_file(name, folder):
+    """The owner's recording in `folder`, picked by suffix: S-TH1's movie is
+    `sth1.movie()` (`IMG_0181.MOV`, never its side-on add-on); otherwise the
+    first movie, else the first audio file; never `notes.txt` (road map CJ7)."""
+    if name == "S-TH1":
+        import sth1
+        return sth1.movie()
+    files = sorted(folder.iterdir()) if folder.is_dir() else []
+    for suffixes in (MOVIE_SUFFIXES, AUDIO_SUFFIXES):
+        found = [p for p in files if p.suffix.casefold() in suffixes]
+        if found:
+            return found[0]
+    return None
+
+
 def main():
     WORK.mkdir(parents=True, exist_ok=True)
     rule.check_rule(SPIKE)
@@ -229,11 +250,11 @@ def main():
         else:
             skipped["o2"] = f"{O2} is absent"
         for name, folder in OWNER.items():
-            files = sorted(folder.glob("*")) if folder.is_dir() else []
-            if not files:
+            recording = owner_file(name, folder)
+            if recording is None:
                 skipped[name] = f"{folder} holds no recording: owed"
                 continue
-            package, media, engine, owner_words = read_fixture(launched.client, files[0], name)
+            package, media, engine, owner_words = read_fixture(launched.client, recording, name)
             real[name] = shares(onsets(binary, package, media, engine, owner_words, name))
             real[name]["words"] = len(owner_words)
     finally:
@@ -250,7 +271,10 @@ def main():
                "fixture_boundaries": fixture, "real": real, "skipped": skipped,
                "silences_ms": SILENCES_MS, "rounds": ROUNDS, "app": str(app),
                "joined_words": len(words), "guards_ms": GUARDS}
-    out = rule.write_results(SPIKE, results)
+    if "S-TH1" in real:
+        import sth1
+        results.update(sth1.record())
+    out = rule.write_results(SPIKE, results, folder="TX-S3-STH1" if "S-TH1" in real else None)
     for name in RULES:
         print(f"{name}: (1) {summary[name]}; real "
               + "; ".join(f"{k} {v[name]}" for k, v in real.items()))

@@ -99,7 +99,8 @@ func pin(_ request: VNRequest, to name: String) -> String {
 func mask(_ candidate: Candidate, _ frame: CVPixelBuffer)
     throws -> (bytes: [UInt8], width: Int, height: Int, revision: Int, device: String)
 {
-    let handler = VNImageRequestHandler(cvPixelBuffer: frame, options: [:])
+    let handler = VNImageRequestHandler(
+        cvPixelBuffer: frame, orientation: frameOrientation, options: [:])
     switch candidate {
     case .personBalanced, .personAccurate:
         let request = VNGeneratePersonSegmentationRequest()
@@ -168,6 +169,21 @@ struct Reader {
     let size: (Int, Int)
 }
 
+/// The orientation `open` read from the track's `preferredTransform`, handed
+/// to every request's handler (road map CJ7: S-TH1 is stored upside down, a
+/// −180 rotation); `.up` for an identity transform, so the existing fixtures
+/// run as before.
+var frameOrientation: CGImagePropertyOrientation = .up
+
+func orientation(of t: CGAffineTransform) -> CGImagePropertyOrientation {
+    switch (t.a.rounded(), t.b.rounded(), t.c.rounded(), t.d.rounded()) {
+    case (-1, 0, 0, -1): return .down
+    case (0, 1, -1, 0): return .right
+    case (0, -1, 1, 0): return .left
+    default: return .up
+    }
+}
+
 /// Every frame, 32BGRA, at `readSize` (`source` or `1920`: a long side of
 /// 1920 for a larger source, never up).
 func open(_ path: String, readSize: String) -> Reader {
@@ -175,6 +191,7 @@ func open(_ path: String, readSize: String) -> Reader {
         url: URL(fileURLWithPath: path), options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
     guard let track = asset.tracks(withMediaType: .video).first else { die("\(path): no video") }
     let natural = track.naturalSize
+    frameOrientation = orientation(of: track.preferredTransform)
     var w = Int(natural.width), h = Int(natural.height)
     if readSize == "1920", max(w, h) > 1920 {
         let scale = 1920.0 / Double(max(w, h))

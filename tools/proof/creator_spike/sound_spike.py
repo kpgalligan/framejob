@@ -33,6 +33,13 @@ rows skip by name and are owed.
 
 Writes `tools/proof/work/creator_spike/FC-S1/results.json`
 (`rule.write_results`) and prints one `VERDICT` line.
+
+**`--sth1`** (road map CJ7) measures the speech-only calls on S-TH1
+(`sth1.py`): the movie's first audio track copied out (`ffmpeg -map 0:a:0
+-c copy`) into `FC-S1-STH1/`, both analyzers at window 1.5 s (FC-30's), and
+for laughter, applause and cheering the windows at or above each t in
+{0.3 … 0.8}, also per 10 minutes. No group verdict: S-EV is owed, and S-ST1
+for the rest of the 10 minutes. Writes `FC-S1-STH1/results.json`.
 """
 
 import argparse
@@ -122,12 +129,66 @@ def by_group(answer):
     return out
 
 
+STH1_WINDOW = 1.5
+STH1_GROUPS = ("laughter", "applause", "cheering")
+
+
+def run_sth1():
+    import sth1
+    movie = sth1.movie()
+    if movie is None:
+        log(f"SKIP FC-S1 speech-only calls on S-TH1: {sth1.missing_reason()}")
+        return 0
+    rule.check_rule("FC-S1")
+    host = rule.host()
+    log(f"host: {host['os']} ({host['os_build']}), {host['device']}, AC power "
+        f"{host['ac_power']}, {host['uptime']}")
+    out = rule.WORK / "FC-S1-STH1"
+    out.mkdir(parents=True, exist_ok=True)
+    audio = out / "sth1_audio0.m4a"
+    if not audio.exists():
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(movie), "-map", "0:a:0", "-c",
+                        "copy", str(audio)], check=True, timeout=600)
+    exe = binary()
+    calls, answers = {}, {}
+    for mode in ("file", "stream"):
+        answer = probe(exe, "run", audio, STH1_WINDOW, mode)
+        groups = by_group(answer)
+        minutes = answer["duration"] / 60
+        calls[mode] = {"duration": answer["duration"], "realtime": answer["realtime"],
+                       "windows": len(answer["windows"]), "groups": {}}
+        for group in STH1_GROUPS:
+            row = {}
+            for t in deciders.THRESHOLDS:
+                n = sum(1 for _, v in groups[group] if v is not None and v >= t)
+                row[str(t)] = {"windows": n, "per_10_min": n / minutes * 10}
+            calls[mode]["groups"][group] = row
+            log(f"{mode} {group}: " + ", ".join(
+                f"t {t} {row[str(t)]['windows']} ({row[str(t)]['per_10_min']:.2f}/10 min)"
+                for t in deciders.THRESHOLDS))
+        answers[mode] = answer
+        log(f"{mode}: {answer['duration']:.2f} s, {len(answer['windows'])} windows, "
+            f"{answer['realtime']:.1f}x")
+    line = ("VERDICT none (S-EV owed; S-ST1 owed for 10 minutes of speech only) "
+            + " ".join(f"{mode}_{g}_0.3={calls[mode]['groups'][g]['0.3']['windows']}"
+                       for mode in calls for g in STH1_GROUPS))
+    results = {**sth1.record(), "window": STH1_WINDOW, "audio": str(audio), "calls": calls,
+               "verdict_line": line}
+    written = rule.write_results("FC-S1", results, folder="FC-S1-STH1")
+    log(line)
+    log(f"results: {written}")
+    return 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--selftest", action="store_true")
+    parser.add_argument("--sth1", action="store_true")
     args = parser.parse_args(argv)
     if args.selftest:
         return 1 if deciders.selftest() else 0
+    if args.sth1:
+        return run_sth1()
     if deciders.selftest():
         raise SystemExit("the deciders' selftest failed")
     rule.check_rule("FC-S1")
