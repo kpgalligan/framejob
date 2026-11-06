@@ -18,13 +18,19 @@ on the frozen base app with `--base-sources` set to the base's `app/Sources`.
   assemblyai}` with no clips: `clips_read` the other, no `trimmed`, each line once. C2 the same with
   `set_track muted`. C3 the same with a solo on the other track. C4 (c) `clips: [muted]`: read. C5
   every clip muted, none named: TX-35's refusal, no track added. C6 the sheet's capture reads
-  "1 clip". C7 (c) audio switched off alone: the older refusal.
+  "1 clip". C7 (c) audio switched off alone: the older refusal. C8 the camera muted and the
+  microphone reversed, none named: TX-35's refusal, which says nothing heard can be transcribed, and
+  no track added. C9 the same with the microphone in a nest.
 - P1 (probe) a muted clip beside a heard one: `jobs(in: .all)` the heard clip. P2 everything muted,
   nothing selected, both engines: the heard sentence, and the note lacks "Only a clip whose media
   has sound". P3 (c) the muted clip selected: `jobs(in: .selection)` reads it. P4 the same: the sheet
   opens on Whole timeline, jobs the heard clip. P5 (c) both selected: opens on Selected clips, 2
   jobs. P6 (c) every clip muted, one selected: opens on Selected clips, 1 job. P7 (c) audio off
-  alone, both engines: "Nothing to transcribe", and the note keeps its sentence.
+  alone, both engines: "Nothing to transcribe", and the note keeps its sentence. P8 C8's project,
+  nothing selected, both engines: the heard sentence, the note lacks "Only a clip whose media has
+  sound", and `jobs(in: .all)` is empty. P9 the same over C9's. P10 (c) P1's project with an In/Out
+  range of 1 to 5 s, nothing selected: `jobs(in: .range)` the heard clip, and the sheet opens on
+  In/out range with it.
 - N1 the tab's same-speech note names both clips and ids. N2 a clip's audio off: the named row. N3
   (c) `get_timeline_transcript`'s `notes` and `no_words[].tag` as TX-10 words them.
 - F1 (probe) a press on the lost row: no beep, button off, the row and `lastError` say the file is
@@ -81,10 +87,10 @@ PROBE_BOUND = 200
 PINS = ["-FrameJobInspectorCollapsed", "NO", "-FrameJobCaptionEngine", "apple"]
 
 ONLY_SOUND = "Only a clip whose media has sound"
-HEARD_SUMMARY = "No clip here can be heard. Select one to caption it."
+HEARD_SUMMARY = "Nothing heard can be transcribed. Select a clip."
 NOTHING = "Nothing to transcribe"
-UNHEARD = ("Nothing in this timeline can be heard, so nothing was transcribed. Name a clip in clips "
-           "to transcribe it anyway.")
+UNHEARD = ("Nothing heard in this timeline can be transcribed. Name a clip in clips to transcribe it "
+           "anyway.")
 NO_SOUND = "Nothing in this timeline has recorded sound to transcribe."
 ROW_MISSING = "This file is missing. Relink it to transcribe it."
 DROPPED = ("it reaches an overlap between two clips on one track, or the area around it, where a cut "
@@ -97,9 +103,10 @@ HINT = ("A filler that would cut into another clip's word, a nest, or an overlap
 LEFT_IN = ("left in: too short to cut, or cutting would reach another clip's word, a nest, or an "
            "overlap between two clips on one track or the area around it.")
 
-APP_ROWS = ["C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "N1", "N2", "N3", "F4", "F5", "F6", "F7",
-            "W1", "W2", "W3", "W4", "W5"]
-PROBE_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "F1", "F2", "F3", "F8", "H1", "H2"]
+APP_ROWS = ["C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "N1", "N2", "N3", "F4", "F5",
+            "F6", "F7", "W1", "W2", "W3", "W4", "W5"]
+PROBE_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "F1", "F2", "F3", "F8", "H1",
+              "H2"]
 ROWS = APP_ROWS + PROBE_ROWS + ["Z1"]
 
 SHEET = "app/Sources/TranscribeSheetController.swift"
@@ -116,8 +123,11 @@ SCOPE_KEPT = ("if outcome.clips.isEmpty, outcome.needsTranscript.isEmpty, outcom
 # name: (the rows it must turn red, whether a row drives the app, the edits).
 MUTANTS = {
     "selection-filtered": (["P3", "P6"], False, [(
-        SHEET, "for: scope == .selection ? held : Transcriber.heard(held, in: plan), in: snapshot,",
-        "for: Transcriber.heard(held, in: plan), in: snapshot,")]),
+        SHEET, "for: scope == .selection ? held : Transcriber.heard(held, among: heardIDs),",
+        "for: Transcriber.heard(held, among: heardIDs),")]),
+    "range-unfiltered": (["P10"], False, [(
+        SHEET, "for: scope == .selection ? held : Transcriber.heard(held, among: heardIDs),",
+        "for: scope != .all ? held : Transcriber.heard(held, among: heardIDs),")]),
     "named-filtered": (["C4"], True, [(
         TOOL,
         "let clips = named.map { ids in ids.compactMap { snapshot.clip($0) } }\n"
@@ -129,7 +139,7 @@ MUTANTS = {
         JOBS, "if SilenceDetector.isAudible(track.ramps, over: span) { heard.insert(segment.clip) }",
         "_ = span\n                heard.insert(segment.clip)")]),
     "default-on-unheard": (["P4"], False, [(
-        SHEET, "let selected = Transcriber.heard(clips(in: .selection), in: plan)",
+        SHEET, "let selected = Transcriber.heard(clips(in: .selection), among: heardIDs)",
         "let selected = clips(in: .selection)")]),
     "stale-note": (["P2"], False, [
         (SHEET, "if jobs.isEmpty, !unheardScope {", "if jobs.isEmpty {"),
@@ -362,6 +372,20 @@ def caption_rows(client, media):
         check("C7", said is not None and NO_SOUND in said, repr(said))
         s.close()
 
+    def unheard_row(row, hide):
+        def body():
+            s = Session(client, row.lower())
+            c, k = s.pair(media)
+            s.op("set_audio", clips=[c], patch={"muted": True})
+            hide(s, k)
+            before = len(s.tracks())
+            said = refusal(lambda: s.op("transcribe", engine="assemblyai"))
+            after = len(s.tracks())
+            check(row, said is not None and UNHEARD in said and after == before,
+                  f"{said!r}; tracks {before} → {after}")
+            s.close()
+        return body
+
     attempt(["C0"], c0)
     attempt(["C1"], muted_row(
         "C1", lambda s, c: s.op("set_audio", clips=[c], patch={"muted": True})))
@@ -371,6 +395,18 @@ def caption_rows(client, media):
     attempt(["C5"], c5)
     attempt(["C6"], c6)
     attempt(["C7"], c7)
+    attempt(["C8"], unheard_row("C8", reverse_mic))
+    attempt(["C9"], unheard_row("C9", nest_mic))
+
+
+def reverse_mic(s, mic):
+    s.op("set_reversed", clip=mic, reversed=True)
+
+
+def nest_mic(s, mic):
+    """The microphone put in a nest: answers the nest clip's id, read back from `get_project`."""
+    s.op("nest", clips=[mic])
+    return next(c["id"] for c in s.project()["clips"] if c["source"].get("kind") == "nest")
 
 
 def name_rows(client, media):
@@ -535,6 +571,14 @@ def make_packages(client, media, packages):
             return c, k
         return build
 
+    def muted_beside(hide):
+        """The camera muted, the microphone reversed or nested: (camera, the clip that plays)."""
+        def build(s):
+            c, k = s.pair(media)
+            s.op("set_audio", clips=[c], patch={"muted": True})
+            return c, hide(s, k) or k
+        return build
+
     def audio_off(s):
         clip = s.add(s.media_of(media["mic"]))
         s.op("set_enabled", clip=clip, audio=False)
@@ -553,12 +597,16 @@ def make_packages(client, media, packages):
         s.add(s.media_of(path))
         packages["only"] = str(path)
 
-    if selected & {"P1", "P3", "P4", "P5"}:
+    if selected & {"P1", "P3", "P4", "P5", "P10"}:
         packages["ids"] = saved("muted", muted_pair(False))
     if selected & {"P2", "P6"}:
         packages["all-ids"] = saved("all-muted", muted_pair(True))
     if "P7" in selected:
         saved("off", audio_off)
+    if "P8" in selected:
+        packages["reversed-ids"] = saved("reversed", muted_beside(reverse_mic))
+    if "P9" in selected:
+        packages["nested-ids"] = saved("nested", muted_beside(nest_mic))
     if selected & {"F1", "F2", "F3", "H1"}:
         saved("fillers", two_files)
     if "F8" in selected:
@@ -600,9 +648,10 @@ def probe_run(binary, *arguments):
 
 
 def caption_probe_rows(binary, server, packages):
-    def sheet(package, ids=()):
+    def sheet(package, ids=(), in_out=None):
+        extra = [f"{in_out[0]},{in_out[1]}"] if in_out else []
         return probe_run(binary, "captions", packages[package], server.base,
-                         ",".join(str(i) for i in ids) or "-")
+                         ",".join(str(i) for i in ids) or "-", *extra)
 
     def card(answer):
         return {key: answer[key] for key in ("scope", "jobs", "summary")}
@@ -626,6 +675,22 @@ def caption_probe_rows(binary, server, packages):
         chosen = sheet("all-muted", [c])["apple"]
         check("P6", chosen["scope"] == "selection" and chosen["jobs"] == [c], str(card(chosen)))
 
+    def in_out_range():
+        _, k = packages["ids"]
+        ranged = sheet("muted", in_out=(SEC, 5 * SEC))["apple"]
+        check("P10", ranged["range"] == [k] and ranged["scope"] == "range" and ranged["jobs"] == [k],
+              f"jobs(in: .range) {ranged['range']}, heard clip {k}; {card(ranged)}")
+
+    def beside_unheard(row, package):
+        def body():
+            answer = sheet(package)
+            rows = [answer["apple"], answer["assemblyai"]]
+            check(row, all(r["summary"] == HEARD_SUMMARY and ONLY_SOUND not in r["note"]
+                           and r["all"] == [] for r in rows),
+                  f"{[(r['summary'], r['note'], r['all']) for r in rows]}; clips "
+                  f"{packages[package + '-ids']}")
+        return body
+
     def audio_off():
         answer = sheet("off")
         rows = [answer["apple"], answer["assemblyai"]]
@@ -635,6 +700,9 @@ def caption_probe_rows(binary, server, packages):
     attempt(["P1", "P3", "P4", "P5"], one_muted)
     attempt(["P2", "P6"], every_clip_muted)
     attempt(["P7"], audio_off)
+    attempt(["P8"], beside_unheard("P8", "reversed"))
+    attempt(["P9"], beside_unheard("P9", "nested"))
+    attempt(["P10"], in_out_range)
 
 
 def row_of(stage, name):

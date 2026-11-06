@@ -309,7 +309,8 @@ extension AgentServer {
         /// is the honest one: "none of THOSE" or "nothing here at all".
         let named: Bool
         /// Unnamed, no job, and the gate alone would take one: there is sound
-        /// to read and none of it can be heard (TX-35).
+        /// to read and nothing heard can be read — beside a reversed clip or a
+        /// nest that plays, a muted clip alone still answers this (TX-35).
         let unheard: Bool
         let frame: Ticks
         /// What the pager measures pages against.
@@ -318,8 +319,8 @@ extension AgentServer {
         var emptyRefusal: AgentServer.ToolError {
             if unheard {
                 return ToolError(
-                    message: "Nothing in this timeline can be heard, so nothing was transcribed. "
-                        + "Name a clip in clips to transcribe it anyway.")
+                    message: "Nothing heard in this timeline can be transcribed. Name a clip in "
+                        + "clips to transcribe it anyway.")
             }
             guard named else {
                 return ToolError(

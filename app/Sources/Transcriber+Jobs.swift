@@ -196,7 +196,13 @@ extension Transcriber {
     /// named `clips` do not, which is how a muted clip gets captions. A nil
     /// plan answers `clips` unchanged.
     static func heard(_ clips: [ClipSnapshot], in plan: CompositionPlan?) -> [ClipSnapshot] {
-        guard let plan else { return clips }
+        heard(clips, among: plan.map(heardIDs(in:)))
+    }
+
+    /// The ids of the clips a plan plays out loud (spec §11 TX-35): each
+    /// `plan.audioTracks` segment's `clip` with `duration > 0` that
+    /// `SilenceDetector.isAudible(track.ramps, over:)` passes. One walk.
+    static func heardIDs(in plan: CompositionPlan) -> Set<UInt32> {
         var heard = Set<UInt32>()
         for track in plan.audioTracks {
             for segment in track.segments where segment.duration > 0 {
@@ -204,7 +210,14 @@ extension Transcriber {
                 if SilenceDetector.isAudible(track.ramps, over: span) { heard.insert(segment.clip) }
             }
         }
-        return clips.filter { heard.contains($0.id) }
+        return heard
+    }
+
+    /// `clips` kept to those `ids` holds; nil ids (no plan) answers `clips`
+    /// unchanged.
+    static func heard(_ clips: [ClipSnapshot], among ids: Set<UInt32>?) -> [ClipSnapshot] {
+        guard let ids else { return clips }
+        return clips.filter { ids.contains($0.id) }
     }
 
     /// Whether anything in this project could be transcribed at all — the

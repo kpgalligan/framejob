@@ -710,8 +710,11 @@ Nothing is sent anywhere, so nothing is keyed (CJ-3).
   other scope has work. `Transcriber.jobs` is unchanged, because `no_words`, the fillers and
   `CaptionRetime` share it, and `hasTranscribableClip` stays the cheap snapshot question, so with
   nothing heard the sheet opens and says so. An unnamed `transcribe` with nothing heard is refused:
-  "Nothing in this timeline can be heard, so nothing was transcribed. Name a clip in clips to
-  transcribe it anyway."
+  "Nothing heard in this timeline can be transcribed. Name a clip in clips to transcribe it
+  anyway." The test asks only whether the gate would take a clip and nothing heard is left to
+  read. Beside a reversed clip or a nest that plays, a muted clip alone still gets the sentence,
+  which therefore says that nothing heard can be transcribed, not that nothing can be heard; the
+  sheet reads "Nothing heard can be transcribed. Select a clip." (docs bugs rc).
 - **TX-36 — The Transcript tab names a clip as the timeline does, its id beside the name** (amends
   TX-22, TX-24). The same-speech note reads "“Interview.mov” (clip 5) and “Mic.wav” (clip 6) carry
   the same speech. Mute one, or switch its audio off, to read it once." and a no-words row

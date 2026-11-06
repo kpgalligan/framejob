@@ -23,7 +23,7 @@ import AppKit
 extension FillerSheetController {
 
     /// The rows, made again from `input.needsTranscript`: called at open, when
-    /// a run starts and when it ends.
+    /// a run starts, when it ends, and when a press finds nothing to upload.
     func rebuildRows() {
         for view in rowsStack.arrangedSubviews {
             rowsStack.removeArrangedSubview(view)

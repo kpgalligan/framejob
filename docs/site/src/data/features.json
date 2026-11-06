@@ -17877,7 +17877,7 @@
     {
      "id": "assistant-ask-first",
      "name": "What it asks about first",
-     "summary": "Before it exports, saves the project, copies media or exports a graphic, the Assistant waits for you to choose Allow or Deny.",
+     "summary": "Before it exports, saves the project, copies media, exports a graphic or writes anything else to a path it chose, the Assistant waits for you to choose Allow or Deny.",
      "page": "assistant/what-it-will-not-do",
      "anchor": "tools-it-asks-about-first",
      "where": "Assistant tab ▸ ask-first row ▸ Allow or Deny",

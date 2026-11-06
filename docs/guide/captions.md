@@ -84,7 +84,7 @@ Captions follow a clip's speed. On a sped-up, slowed or speed-ramped clip, each 
 
 The **Speakers**, **Vocabulary** and **Transcribe again** rows are hidden, not greyed, while Engine is **On this Mac**. They appear when you choose **AssemblyAI**.
 
-Under the grid, a summary line gives the clip count and the length of audio (for example, `3 clips · 00:04:12.000 of audio`) or "Nothing to transcribe". When there are clips to read but none of them can be heard, it reads "No clip here can be heard. Select one to caption it." Under the summary is a note explaining anything that is stopping the run. **Generate** is live only when the run can go ahead.
+Under the grid, a summary line gives the clip count and the length of audio (for example, `3 clips · 00:04:12.000 of audio`) or "Nothing to transcribe". When there are clips to read but none you can hear, it reads "Nothing heard can be transcribed. Select a clip." Under the summary is a note explaining anything that is stopping the run. **Generate** is live only when the run can go ahead.
 
 ### On this Mac
 

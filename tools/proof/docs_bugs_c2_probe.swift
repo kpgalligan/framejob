@@ -7,7 +7,8 @@
 // It names only symbols present before the fix, and compares nothing itself, so it builds over the
 // base's sources and `docs_bugs_c2_proof.py` scores the same rows on both.
 //
-//   probe captions <package> <fake base> <selected ids, comma separated, or ->
+//   probe captions <package> <fake base> <selected ids, comma separated, or -> [<start>,<end> ticks]
+//     (the optional fifth argument is the In/Out range, set before the sheet is made)
 //   probe fillers <package> <file to delete> <fake base>
 //   probe lost <package> <file to delete> <fake base>
 //   probe note <package> <fake base>
@@ -86,11 +87,13 @@ let keyed = [AssemblyAIConfiguration.environmentKey: "proof-key"]
 
 // MARK: - Generate Captions
 
-func captionSheet(_ package: String, base: String, selection: Set<UInt32>, engine: String)
-    -> [String: Any]
-{
+func captionSheet(
+    _ package: String, base: String, selection: Set<UInt32>, engine: String,
+    range: (start: Ticks, end: Ticks)?
+) -> [String: Any] {
     let document = open(package)
     document.selection = selection
+    if let range { document.inOutRange = range }
     let sheet = TranscribeSheetController(
         document: document, store: MemoryStore(), defaults: defaults(base, engine: engine),
         environment: keyed,
@@ -164,12 +167,22 @@ let control = beeps() - before
 switch arguments[1] {
 case "captions":
     let selection = Set(arguments[4].split(separator: ",").compactMap { UInt32($0) })
+    var range: (start: Ticks, end: Ticks)?
+    if arguments.count > 5 {
+        let ends = arguments[5].split(separator: ",").compactMap { Ticks($0) }
+        guard ends.count == 2 else {
+            emit(["error": "the range is <start>,<end> in ticks"])
+            exit(64)
+        }
+        range = (start: ends[0], end: ends[1])
+    }
     emit([
         "control": control,
         "apple": captionSheet(
-            arguments[2], base: arguments[3], selection: selection, engine: "apple"),
+            arguments[2], base: arguments[3], selection: selection, engine: "apple", range: range),
         "assemblyai": captionSheet(
-            arguments[2], base: arguments[3], selection: selection, engine: "assemblyai"),
+            arguments[2], base: arguments[3], selection: selection, engine: "assemblyai",
+            range: range),
     ])
 
 case "fillers":

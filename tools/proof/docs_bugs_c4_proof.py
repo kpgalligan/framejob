@@ -138,7 +138,9 @@ TOOLS = {
              "abut the next page where the gap is under 0.25 s, else hold 0.5 s after the last "
              "word",
              "hold 0.5 s after the last word, or abut the next page where that starts sooner")],
-    "T12": [("transcribe", "Omit for every clip the timeline plays out loud",
+    # T12's old half is the frozen base binary's `transcribe.clips` text (`strings` over
+    # docs-bugs/base-app), so its absence is red there.
+    "T12": [("transcribe", "Omit for every clip in the project that has recorded sound",
              "Omit for every clip the open timeline or nest plays out loud")],
     "T13": [("normalize_clip", "a stereo clip through its own mono and pan",
              "a stereo clip through its own channel pick, mono and pan"),

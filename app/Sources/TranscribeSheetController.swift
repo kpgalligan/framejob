@@ -211,14 +211,19 @@ final class TranscribeSheetController: NSViewController {
         }
     }
 
+    /// The ids of the clips `plan` plays out loud, walked once per sheet:
+    /// `plan` is taken at init and cannot change under an open sheet. Nil
+    /// with no plan, which filters nothing (spec §11 TX-35).
+    private lazy var heardIDs: Set<UInt32>? = plan.map(Transcriber.heardIDs(in:))
+
     /// What a run over `scope` reads. In/out range and Whole timeline read
-    /// only clips that can be heard; Selected clips reads every clip the gate
-    /// takes, which is how a muted clip gets captions (spec §11 TX-35).
+    /// only the clips `heardIDs` holds; Selected clips reads every clip the
+    /// gate takes, which is how a muted clip gets captions (spec §11 TX-35).
     func jobs(in scope: Scope) -> [Transcriber.Job] {
         let held = clips(in: scope)
         return Transcriber.jobs(
-            for: scope == .selection ? held : Transcriber.heard(held, in: plan), in: snapshot,
-            urls: mediaURLs, maps: sourceMaps
+            for: scope == .selection ? held : Transcriber.heard(held, among: heardIDs),
+            in: snapshot, urls: mediaURLs, maps: sourceMaps
         ).jobs
     }
 
@@ -229,8 +234,10 @@ final class TranscribeSheetController: NSViewController {
         ).jobs
     }
 
-    /// Whether `scope` is empty only because nothing in it can be heard:
-    /// there is sound to read, and the way to it is Selected clips.
+    /// Whether `scope` is empty only because nothing heard in it can be read:
+    /// there is sound to read, and the way to it is Selected clips. Beside a
+    /// reversed clip or a nest that plays, a muted clip alone still answers
+    /// this, which is why the summary says nothing heard (spec §11 TX-35).
     var unheardScope: Bool {
         scope != .selection && jobs(in: scope).isEmpty && !gated(in: scope).isEmpty
     }
@@ -238,7 +245,7 @@ final class TranscribeSheetController: NSViewController {
     /// The readout with no job, on either engine.
     var emptySummary: String {
         unheardScope
-            ? "No clip here can be heard. Select one to caption it." : "Nothing to transcribe"
+            ? "Nothing heard can be transcribed. Select a clip." : "Nothing to transcribe"
     }
 
     /// The scope the sheet opens on (spec §11 TX-35): what the user pointed
@@ -246,7 +253,7 @@ final class TranscribeSheetController: NSViewController {
     /// then everything; and what they pointed at after all when no other
     /// scope has work, so a muted clip alone opens ready to caption.
     private var defaultScope: Scope {
-        let selected = Transcriber.heard(clips(in: .selection), in: plan)
+        let selected = Transcriber.heard(clips(in: .selection), among: heardIDs)
         if !Transcriber.jobs(for: selected, in: snapshot, urls: mediaURLs, maps: sourceMaps)
             .jobs.isEmpty
         {

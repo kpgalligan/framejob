@@ -474,8 +474,9 @@ extension AgentServer {
                     + "uploaded, cached, audio_seconds, engine, language and, when there is "
                     + "something to say, note. A media that already has a transcript made with "
                     + "filler words makes no request and answers ready true, uploaded []. "
-                    + "Refused for a document with nowhere to keep its transcript cache and a "
-                    + "media no clip plays from its file. " + ModelKey.assemblyAI.catalogClause
+                    + "Refused for a document with nowhere to keep its transcript cache, a "
+                    + "media whose file is missing and a media no clip plays from its file. "
+                    + ModelKey.assemblyAI.catalogClause
                     + ".",
                 [
                     "media": [
