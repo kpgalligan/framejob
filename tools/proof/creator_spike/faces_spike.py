@@ -38,8 +38,10 @@ rectangles alone on CJ-32's device (`neural_engine`) at 10 a second:
 recall at 720, 1280, 1920 and native, the truth any face box on every sample
 where `sth1.face_present` holds (one person), decided by `size_rule` on
 S-TH1 and on `faces_small.mov`'s recorded recall (1.0000 at every size, CJ3's
-record); rule 6, the share of 0–60 s samples with at least one face, at each
-size (720 is CJ-32's). Writes `CJ-S2-STH1/results.json`; the earlier
+record); rule 6, the share of samples with at least one face in the 60 s
+from the first face in frame (`sth1.FIRST_FACE`, 8–68 s; rule 6 as amended at
+CJ7b), at each size (720 is CJ-32's), with CJ7's 0–60 s and facing-span
+shares recorded beside it. Writes `CJ-S2-STH1/results.json`; the earlier
 `CJ-S2/results.json` is untouched.
 """
 
@@ -206,8 +208,10 @@ def run_sth1():
         answer = run(binary, movie, side, 10, CJ32_DEVICE, "none")
         found = sth1_rows(answer)
         recall[side], count = sth1_recall(found)
+        first_face = (sth1.FIRST_FACE, sth1.FIRST_FACE + 60.0)
         share[str(side)] = {"0_60": sth1_share(found, (0.0, 60.0)),
-                            "facing_0_60": sth1_share(found, sth1.FACING_0_60)}
+                            "facing_0_60": sth1_share(found, sth1.FACING_0_60),
+                            "first_face_60": sth1_share(found, first_face)}
         rows[str(side)] = {"recall": recall[side], "samples": count, "read": answer["read"],
                            "seconds": answer["seconds"], "realtime": answer["realtime"],
                            "pin": answer["pin"]["rectangles"]["joined"], "load": answer["load"],
@@ -219,20 +223,25 @@ def run_sth1():
             f"{answer['realtime']:.2f}x): recall {recall[side]:.4f} over {count} samples; "
             f"rule 6 0-60 s {share[str(side)]['0_60'][0]:.4f} of {share[str(side)]['0_60'][1]}, "
             f"facing span {sth1.FACING_0_60} {share[str(side)]['facing_0_60'][0]:.4f} of "
-            f"{share[str(side)]['facing_0_60'][1]} (load {answer['load']})")
+            f"{share[str(side)]['facing_0_60'][1]}, first face {first_face[0]:g}–{first_face[1]:g} s "
+            f"{share[str(side)]['first_face_60'][0]:.4f} of {share[str(side)]['first_face_60'][1]} "
+            f"(load {answer['load']})")
     on_sth1 = deciders.size_rule(recall)
     on_small = deciders.size_rule(FACES_SMALL_RECALL)
     order = [*deciders.SIZES, "native"]
     size = max(on_sth1["size"], on_small["size"], key=order.index)
-    face_share = share["720"]["0_60"][0]
+    face_share, face_count = share["720"]["first_face_60"]
     rule6 = "pass" if face_share >= 0.95 else "STOP"
     line = (f"VERDICT size={size} (S-TH1 {on_sth1['size']}, floor {on_sth1['floor']:.4f}; "
             f"faces_small {on_small['size']}) shipped=720 rule6={rule6} "
-            f"face_share_0_60={face_share:.4f} (at 720)")
+            f"face_share_first_60={face_share:.4f} ({face_count} samples from "
+            f"{sth1.FIRST_FACE:g} s, at 720) "
+            f"face_share_0_60={share['720']['0_60'][0]:.4f} (CJ7's window)")
     results = {**sth1.record(), "device": CJ32_DEVICE, "rate": 10,
                "recall": {str(k): v for k, v in recall.items()}, "rows": rows,
                "size_sth1": on_sth1, "size_faces_small": on_small, "size": size,
-               "face_share": share, "rule6": rule6, "verdict_line": line}
+               "face_share": share, "rule6": rule6,
+               "rule6_window": [sth1.FIRST_FACE, sth1.FIRST_FACE + 60.0], "verdict_line": line}
     written = rule.write_results("CJ-S2", results, folder="CJ-S2-STH1")
     log(line)
     log(f"results: {written}")

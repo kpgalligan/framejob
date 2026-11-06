@@ -454,6 +454,8 @@ change (CJ-20); no tool is added.
     or through `oneClip` and step 0 (CJ-23), not CO-7's third arm. The log and HLG rows are owed
     with S-TH2…S-TH4.
   - **Rule 6** (S-TH1's face share) and every S-TH row skip by name and are owed in CJ3's record.
+    Run at CJ7b (2026-11-06) under rule 6's amended window (the owner: count from the first face
+    in frame): 0.9967 (598/600), a pass; CJ-30 unchanged.
 - **CJ-31 — No identity is stored.** Each sample's faces are stored as Vision found them, in a
   fixed order: by box centre x, then centre y, both in CJ-22's top-left frame, compared as exact
   `Float`s (`AnalysisFaces.ordered`). A consumer that needs a face followed links faces itself over

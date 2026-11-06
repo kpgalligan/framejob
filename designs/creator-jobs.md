@@ -566,6 +566,7 @@ CJ0a first. "p" marks a provisional format bump, numbered from 38 in landing ord
 | CU12 | trial | The owner's screen-tutorial trial with CU's tools | CU10, CU11 | beside B | — |
 | CJ6 | CJ | Larger projects, only if CJ-S1 earns it | CJ0a; CJ-S1 at its head | C | — |
 | CJ7 | CJ | Nothing new: the rows owed on S-TH1 run on the owner's recording | CJ3, CO0, VR1, TX3b, FC3 | A | — |
+| CJ7b | CJ | Nothing new: the owner's rulings on CJ7's STOPs written in | CJ7 | A | — |
 | FC8b | FC | Make Shorts from the ranked list | FC7b, FC8a | A | — |
 | CO6 | CO | Clip ▸ Camera Layout ▸; `switch_layout` | CO0, CU7 (`action_class.rs`) | B | — |
 | SW0 | SW | Nothing: SW-S2's verdict; the dev tool `playback_rebuilds` | CJ0a (question 4 answered yes), CJ0c (T8) | C | — |
@@ -1038,7 +1039,7 @@ its value as `rule_sha256`, and a run whose rule hashes differently re-records i
 | Spike | `rule_sha256` |
 |---|---|
 | CJ-S1 | `e4ead1af47d079314698d3cf13ee84dfe9d35cace69182bf2fc63c772d12e2f5` |
-| CJ-S2 | `c41417fb1f72f98f72225c7fb8b0ffd22b04150c8bed4c2836dd75d395bb2b11` |
+| CJ-S2 | `2865337cb27dec663b1ba97fc7b949b863148243529d4d650652ebc4e3c558c4` |
 | CJ-S3 | `209c6f01726c2c969e87c3146019a75f69ea86cec8ccac646f3e67f0309ce830` |
 | CJ-S4 | `eea6c19036b19e7cc5bb0ed0c8d49f649d3b7653beda35937a8d8a77ab46f9d1` |
 | TX-S1 | `5f784283c6a525aa8029942d0cf5aa91ac2b65d548576861d12ff1d25b2c043b` |
@@ -1064,6 +1065,9 @@ its value as `rule_sha256`, and a run whose rule hashes differently re-records i
 | SW-S2 | `ecd9d732bf8ec0c13b417c768577092f1b175728ac425c319529ba19324f0961` |
 | SW-S3 | `abc5ccefef8614fdb571da20c44f0768ad2e40bd4066ba7b90870359fd3f1fae` |
 | SW-S4 | `c206847c4b1164a6f72e988b8acb1cbd67e1fecfef88c78d11f71174a03981a0` |
+
+CJ-S2's row re-recorded at CJ7b (2026-11-06) after rule 6's amendment (the owner); it was
+`c41417fb…95bb2b11`.
 
 **Verification.** `make gate`.
 
@@ -1456,8 +1460,11 @@ playback impact and shots; VR1 and CO1 re-run their rows for their own kinds.)**
   or HLG sample raw recall is at least 98 % of converted recall AND the converted reader costs more
   than 1.5× the direct one per frame (CJ-S3's figure); then face kinds read raw. With no such
   sample, converted. (6) **Face share** on S-TH1's first 60 s below 95 % stops VR1 and SW8 until
-  CJ-30 is amended; without S-TH1 the row skips by name and is owed in CJ3's record. VR1 re-runs
-  rules 1–3 and 5 for its requests; CO1 re-runs rule 1 for its mask request.
+  CJ-30 is amended; without S-TH1 the row skips by name and is owed in CJ3's record. **Amended at
+  CJ7b (the owner, 2026-11-06):** the 60 s window starts at the first sample with a face in frame,
+  as an edit trimmed to the speaker would; on S-TH1 that is 8 s, the first face CJ7 read from the
+  frames (`sth1.FIRST_FACE`), so the window is 8–68 s. VR1 re-runs rules 1–3 and 5 for its
+  requests; CO1 re-runs rule 1 for its mask request.
 - **CJ-S3 — The lane** (at CJ2a's head; decides CJ-21 and CJ-23; replaces CO's former CO-S4). What
   does decoding for analysis cost, does a second concurrent picture job pay, and does analysis cost
   playback? On a 4K HEVC 10-bit HLG file and a 1080p H.264 file (synthetic until S-TH4 exists):
@@ -8018,6 +8025,13 @@ empty chair (0–7 s and from 284 s), read from autorotated frames (CJ7's record
   face from 8 s; over 8–60 s the share is 518/520 = 0.9962. By the rule this stops VR1 and SW8
   until CJ-30 is amended; both have shipped. It is put to the owner (CJ7's record); CJ-30 is not
   amended here.
+- **Rule 6, amended (CJ7b, the owner, 2026-11-06):** "Count from when I'm seated." The 60 s window
+  now starts at the first sample with a face in frame, 8 s on S-TH1 (`sth1.FIRST_FACE`), so it is
+  8–68 s. `faces_spike.py --sth1` ran once more (`rule_sha256` `2865337c…e3c558c4`, matching the
+  re-recorded table): a face in 0.9967 of the window's 600 samples at 720 (598/600; 0.9950 at
+  1920, 0.9967 at 1280 and native), at least 95 %: **pass**. CJ7's window printed the same 0.8717
+  (0–60 s) and 0.9962 (8–60 s, 520 samples). Rule 3 printed CJ7's figures again (recall 0.9977 at
+  720, 1280 and native, 0.9973 at 1920; size 720). CJ-30 is unchanged.
 - **F5** (`RC_PROOF_APP=release faces_proof.py`, 13/13): `IMG_0181.MOV` imported and placed at
   0, its `faces` read in 120 s windows; `detect_silence` (voice, `min_length` 300000, `padding` 0)
   found 42 pauses (194.1 s). The largest face's mean inner-lip gap is 0.0315 over 930 speech
@@ -9040,6 +9054,10 @@ now (VR2a2's VR-24 since VR-S2's run), twice:
   the planner changed under them since VR-S2 ran.
 - The verdict differs from VR-23's (the first arm at (0.15, 0.8, 0.38)): it is put to the owner
   (CJ7's record), and VR-23 is not amended here. T1's and T2's rows stay owed.
+- **The owner's ruling (CJ7b, 2026-11-06): "Keep it; I'll judge it."** VR-23's shipped (0.15, 0.8,
+  0.38) stays: on S-TH1 it makes 8.45 moves a minute at 2,581/2,662 = 96.96 % contained; the grid's
+  fewest is 8.04 at dead zone 0.15; pooled, the shipped setting makes 7.58 at 95.03 %. JOB-31
+  judges whether it is busy, and T1's and T2's rows stay owed.
 
 #### VR2a2's record (2026-11-03)
 
@@ -11101,6 +11119,12 @@ built on the machine for the first hour: one-minute loads reached 95.43.
   minute or under, and none at dead zone 0.06 is at 8 or under; VR-23's shipped (0.15, 0.8,
   0.38) runs 8.45 moves a minute on S-TH1 at 96.96 % containment.
 
+**Resolved by the owner (2026-11-06, CJ7b):**
+- **CJ-S2 rule 6:** amended so its 60 s window starts at the first face in frame (8–68 s on
+  S-TH1) and re-run: 0.9967 (598/600) at 720, a pass; CJ-30 unchanged (CJ3's addendum).
+- **VR-S2:** "Keep it; I'll judge it." VR-23's shipped (0.15, 0.8, 0.38) stays, JOB-31 judges
+  whether 8.45 moves a minute is busy, and T1's and T2's rows stay owed (VR2a1's addendum).
+
 **The sample, re-measured** (`sth1.py`, ffprobe): `IMG_0181.MOV`, 831,228,672 bytes, HEVC Main
 3840 × 2160, BT.709 primaries, transfer and matrix, r_frame_rate 30/1, avg 349400/11647, 291.17 s,
 display-matrix rotation −180; stream 1 AAC LC stereo 48 kHz (default), stream 2 `apple_apac` 4
@@ -11207,6 +11231,64 @@ since the lane's base). No §11 decision, no format change, no `CLAUDE.md` edit.
 "gate: PASS 617s" (names 1, typecheck 35, fmt 4, lint 27, test 354, app 197).
 
 **To file:** none. **CLAUDE.md edits owed:** none.
+
+### CJ7b — the owner's rulings on CJ7's STOPs
+
+- **What a person gets:** nothing new. CJ7 put two STOP arms to the owner; their rulings are
+  written into the rule, the records and JOB-31.
+- **CJ-S2 rule 6: "Count from when I'm seated."** The owner: "I didn't make an actual framejob
+  file, just gave you the raw recordings. In a framejob file, I would have already synced audio
+  and trimmed the timeline to when I start speaking." Rule 6's 60 s window starts at the first
+  sample with a face in frame (the dated clause in "Every spike, with its rule"); its pin is
+  re-recorded in CJ0a's table under CJ-7, and rule 6 runs again on S-TH1.
+- **VR-S2: "Keep it; I'll judge it."** VR-23's shipped (0.15, 0.8, 0.38) stays; S-TH1's figures
+  are recorded beside it, JOB-31 asks the owner whether the moves are busy, and T1's and T2's rows
+  stay owed.
+- **Depends on:** CJ7. **Lane** A. No decision (CJ7b takes no ID).
+
+#### CJ7b's record (2026-11-06)
+
+**Landed.** Lane A, base `26734a7c`. No app, core, FFI or format change, no `docs/site/` change.
+What landed: rule 6's dated amendment in CJ-S2's entry; CJ-S2's pin re-recorded in CJ0a's table
+(`2865337c…e3c558c4`, was `c41417fb…95bb2b11`), with the line under the table; `sth1.FIRST_FACE`
+(8.0, `FACING_0_60` now `(FIRST_FACE, 60.0)`, the same value) and `"first_face"` in `record()`;
+`faces_spike.py --sth1`'s rule 6 on the 60 s from the first face (`first_face_60`, the window in
+`rule6_window`), CJ7's `0_60` and `facing_0_60` still recorded; the addenda's bullets in CJ3's and
+VR2a1's records, the resolution in CJ7's record, a dated line under CJ-30's rule 6
+(`creator-jobs-4.md`) and a note at VR-23's end (`creator-jobs-7.md`) with their index cells,
+JOB-31's row, and `tools/proof/README.md`'s `--sth1` comment.
+
+**The run** (`faces_spike.py --sth1`, once; macOS 26.5.1 (25F80), Apple M2 Max, on AC power,
+`pmset`: "Now drawing from 'AC Power'"; the lanes' other sessions on the machine):
+- `CJ-S2 rule_sha256 2865337cb27dec663b1ba97fc7b949b863148243529d4d650652ebc4e3c558c4 matches
+  the table`, before the sizes and again after them.
+- At 720: rule 6 0–60 s 0.8717 of 600, facing span (8.0, 60.0) 0.9962 of 520, first face 8–68 s
+  0.9967 of 600; at 1280 and native the same; at 1920 0.8700, 0.9942 and 0.9950. Rule 3's recall
+  0.9977 over 2,619 samples at 720, 1280 and native, 0.9973 at 1920.
+- Rectangles 21.6, 24.3, 30.8 and 47.0 s; the runs 8.87×, 5.54×, 2.97× and 0.99× real time, at
+  one-minute loads 88.29, 41.87, 26.50 and 4.84 (one run each; load 9.73 at the start).
+- `VERDICT size=720 (S-TH1 720, floor 0.9778; faces_small 720) shipped=720 rule6=pass
+  face_share_first_60=0.9967 (600 samples from 8 s, at 720) face_share_0_60=0.8717 (CJ7's
+  window)`. `results.json` holds 0.9966666666666667 over 600 at 720 (598/600) and
+  `rule6_window` [8.0, 68.0].
+
+**Commands.** `python3 -m py_compile` of `faces_spike.py` and `sth1.py`, exit 0;
+`faces_spike.py --selftest`, "selftest: 0 failed", exit 0; every pinned rule checked through
+`rule.check_rule`, "27 27"; `spec_index_proof.py`, "276/276 checks passed". `make gate`, before
+this sentence: "gate: PASS 554s" (names 2, test 551; typecheck, fmt, lint and app skipped).
+
+**Review:** pass, two nits, neither changed: 598/600 is worked out from `results.json`'s share
+over 600 (the log prints the share and the count of samples, not the hits; CJ7's 523/600 was
+worked out the same way), and the gate sentence above was written after that gate ran. No
+Release proof applies: no app, core or proof instrument that drives the app changed.
+
+**Integrated** onto `worktree-creator-jobs` at `85a79cda` with no conflict (CP1's first attempt
+had landed since the lane's base, in this file and `tools/proof/README.md`; both merged
+cleanly). All 27 pinned rules still match after the merge ("27 27"). No §11 decision, no format
+change, no `CLAUDE.md` edit. `make gate`, before this sentence: "gate: PASS 118s" (names 3,
+test 114; typecheck, fmt, lint and app skipped).
+
+**Owed:** VR-S2's T1 and T2 rows; JOB-31. **To file:** none. **CLAUDE.md edits owed:** none.
 
 ### FC8b — Make Shorts from the ranked list
 

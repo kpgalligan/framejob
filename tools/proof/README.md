@@ -30068,7 +30068,7 @@ writes `tools/proof/work/creator_spike/<ID>-STH1/results.json` through `rule.wri
 
 ```sh
 python3 tools/proof/creator_spike/sth1.py                       # the facts, the spans, the add-on
-python3 tools/proof/creator_spike/faces_spike.py --sth1         # CJ-S2 rules 3 and 6 (CJ-S2-STH1)
+python3 tools/proof/creator_spike/faces_spike.py --sth1         # CJ-S2 rules 3 and 6, rule 6 over the 60 s from the first face, 8–68 s (CJ7b) (CJ-S2-STH1)
 python3 tools/proof/creator_spike/subjects_spike.py --sth1 --addon-dir <I>/tools/proof/media/creator/S-TH1   # VR-S1 rules 2 and 4 (VR-S1-STH1)
 python3 tools/proof/creator_spike/shots_spike.py --socket <sock>   # CJ-S4 with S-TH1 as the no-cut input (CJ-S4-STH1)
 python3 tools/proof/creator_spike/sound_spike.py --sth1         # FC-S1's speech-only calls (FC-S1-STH1)

@@ -549,6 +549,12 @@ CJ-3). No owner question: the road map expects none for VR2a.
   verdict's inputs: pan 200 of 200 contained, 11 moves; exit 80 of 80, 1; two faces 194 of 200, 1;
   still 600 of 600, 0; cuts 284 of 300, 2; card none counted, 0 (`VR-S2/results.json`,
   `rule_matches: true`). S-TH1's and T1's and T2's rows are owed; JOB-31 judges the feel.
+  **Noted at CJ7b (the owner, 2026-11-06), not an amendment:** S-TH1's row ran at CJ7 (road map
+  VR2a1's record) and stopped: the shipped (0.15, 0.8, 0.38) makes 8.45 moves a minute on S-TH1
+  at 2,581/2,662 = 96.96 % contained, the grid's fewest is 8.04 at dead zone 0.15, and pooled with
+  the six canned inputs the shipped setting makes 7.58 at 95.03 %. The owner: "Keep it; I'll judge
+  it." The shipped setting stays, JOB-31 judges whether it is busy, and T1's and T2's rows stay
+  owed.
 
 ## CJ6 — the clip ceiling (2026-11-02)
 

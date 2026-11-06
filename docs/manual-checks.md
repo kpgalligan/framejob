@@ -179,9 +179,9 @@ the same way.
 - **Source:** road map creator-jobs SW2b (SW2c's question, SW-28; SW0's SW-S2 measured rebuild times, never what a person sees).
 
 **JOB-31 — Follow Subject's framing feels like a camera operator's**
-- **Do:** On a 1080 × 1920 project, put a landscape talking-head recording on the timeline (T1 or S-TH1 when it exists: one person who sways, turns, leans out of frame and comes back), select it, choose Clip ▸ Follow Subject… at Subject, 100 % and Show Whole, and press Follow. Play it through, then try Faces and 125 %.
-- **Expect:** the frame stays put while the person sways, moves only when they really move, never fidgets or trails behind them, eases out to the whole picture over the blurred copy when they leave and back once they return, and cuts with the picture at each shot change — the moves a camera operator would make.
-- **Source:** road map creator-jobs VR2b2, spec §11 VR-29 (k), VR-22, VR-23 (`vr2b_proof.py` scores the edit against canned faces, never how the framing feels).
+- **Do:** On a 1080 × 1920 project, put a landscape talking-head recording on the timeline (S-TH1 (`IMG_0181.MOV`), or T1 when it exists: one person who sways, turns, leans out of frame and comes back), select it, choose Clip ▸ Follow Subject… at Subject, 100 % and Show Whole, and press Follow. Play it through, then try Faces and 125 %.
+- **Expect:** the frame stays put while the person sways, moves only when they really move, never fidgets or trails behind them, eases out to the whole picture over the blurred copy when they leave and back once they return, and cuts with the picture at each shot change — the moves a camera operator would make. Follow Subject's shipped setting moves the frame about 8.5 times a minute on a talking head with movement (8.45 on S-TH1): judge whether that feels busy.
+- **Source:** road map creator-jobs VR2b2, spec §11 VR-29 (k), VR-22, VR-23 (`vr2b_proof.py` scores the edit against canned faces, never how the framing feels), CJ7b (the owner's ruling on VR-S2).
 
 **JOB-32 — Follow Subject's two-shot**
 - **Do:** On a 1080 × 1920 project, frame a landscape two-person recording (S-PC3 when it exists: two people side by side who lean together and apart) with Clip ▸ Follow Subject… at Subject, 100 %. Play it through.

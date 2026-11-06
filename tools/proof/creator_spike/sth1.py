@@ -13,6 +13,7 @@
   bound). `ABSENT` are the spans with nobody in the chair: the first seconds
   before the owner sits (no face until 8 s) and the end after they stand
   (gone from 285 s). `face_present(t)` is false inside either.
+- `FIRST_FACE` is the first second with a face in frame (8 s, CJ7's frames).
 - `FACING_0_60` is the part of 0–60 s with the owner's face in frame.
 - `profile_span(samples)` finds the profile stretch in the add-on from the
   faces probe's yaw.
@@ -40,7 +41,8 @@ ABSENT = {
     "arrive": (0.0, 7.0),         # 0–6 an empty chair, 7 a torso, 8 the first face
     "exit": (284.0, 292.0),       # 283 face, 284 standing, 285–290 an empty chair
 }
-FACING_0_60 = (8.0, 60.0)
+FIRST_FACE = 8.0
+FACING_0_60 = (FIRST_FACE, 60.0)
 
 PROFILE_YAW = math.pi / 4 - 0.01
 PROFILE_AFTER = 10.0
@@ -163,7 +165,7 @@ def rode_facts():
 def record():
     """What every S-TH1 results file carries: the facts and the spans."""
     return {"sth1_facts": facts(), "beats": BEATS, "absent": ABSENT,
-            "facing_0_60": FACING_0_60}
+            "facing_0_60": FACING_0_60, "first_face": FIRST_FACE}
 
 
 if __name__ == "__main__":
