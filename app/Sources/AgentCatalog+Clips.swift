@@ -96,7 +96,7 @@ extension AgentServer {
                     + "trim it afterwards with trim_start / trim_end. It is given "
                     + "Fit scale when the project's fit_new_clips is on and the source is bigger "
                     + "than the canvas. Refused when it would break the overlap rule: a clip may "
-                    + "overlap at most one neighbour on each side, and each overlap must be at "
+                    + "overlap at most one neighbor on each side, and each overlap must be at "
                     + "most half of the shorter of the two clips (an overlap IS a transition).",
                 [
                     "track": trackDescription,
@@ -234,7 +234,7 @@ extension AgentServer {
                 "Shifts clips along the timeline by delta ticks (negative moves left; starts "
                     + "clamp at 0) and optionally onto another track — the timeline's clip drag. "
                     + "Several clips keep their relative track offsets. Refused when the "
-                    + "destination would break the overlap rule (at most one neighbour "
+                    + "destination would break the overlap rule (at most one neighbor "
                     + "overlapped on each side, each overlap at most half the shorter clip); a "
                     + "clip that gains an overlap with the clip before it also gains a "
                     + "cross_dissolve transition if it had none. A detach_audio pair moves "

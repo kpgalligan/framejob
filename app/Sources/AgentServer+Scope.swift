@@ -250,7 +250,7 @@ extension AgentServer {
                         + "markers, and every tick in this call is measured from that nest's "
                         + "own zero, so the marker would land somewhere else on the timeline. "
                         + "set_scope with no arguments comes back out; then add_marker at a "
-                        + "project time. The app greys Add Marker out in here for the same "
+                        + "project time. The app grays Add Marker out in here for the same "
                         + "reason.")
             case "set_marker" where op.args["time"] != nil:
                 throw ToolError(

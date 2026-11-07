@@ -101,7 +101,7 @@ In loudness mode:
 
 Either mode adds `skipped`, one sentence per clip it left out, and `note` when the ceiling stopped a clip short. The rest are still normalised.
 
-**Skips** by name a clip that plays no sound and a nest. Peak mode also skips one that's silent over the part that plays, or whose waveform hasn't been analysed yet. Loudness mode also skips one that plays under 0.4 s, is under −70 LUFS over the part that plays, or whose loudness hasn't been measured yet. In loudness mode a clip with processing is also skipped when its reversed copy is still being made, its processing can't be rendered, or it's under −70 LUFS after it. When every clip is skipped, the call fails with "Nothing could be normalised" and every reason.
+**Skips** by name a clip that plays no sound and a nest. Peak mode also skips one that's silent over the part that plays, or whose waveform hasn't been analysed yet. Loudness mode also skips one that plays under 0.4 s, is under −70 LUFS over the part that plays, or whose loudness hasn't been measured yet. In loudness mode a clip with processing is also skipped when its reversed copy is still being made, its processing can't be rendered, or it's under −70 LUFS after it. When every clip is skipped, the call fails with "Nothing could be normalized" and every reason.
 
 **Refuses** a `target_lufs` or `peak_db` out of range, and either one in the other's mode. Neither is clamped.
 

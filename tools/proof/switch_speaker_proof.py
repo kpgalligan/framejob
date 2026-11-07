@@ -12,7 +12,7 @@ always launch one more instance of the same build with `-RCDevSwitchSpeakerAccep
 while its manifest's generator hash holds); without `say -v Samantha` or `Daniel` it exits 2 and
 every row is skipped by name. Each document is built over MCP — tracks back to front Wide, Cam B,
 Cam A (two abutting files), Mic B, Mic A on a 1920 × 1080, 30 fps canvas, every clip selected —
-and its loudness and speech caches waited for (a call refused as "still being analysed" is
+and its loudness and speech caches waited for (a call refused as "still being analyzed" is
 polled). Packages are made under `tools/proof/work/sw2b/`. A frame is 20 000 ticks. Every
 expected number is worked here from the manifest (onsets, expected shots, the card colours, the
 frame code), never read back from the code under test.
@@ -293,13 +293,13 @@ class Doc:
         return self.call_with("switch_by_speaker", arguments)
 
     def ready(self):
-        """Polls `apply: false` until no microphone is still being analysed."""
+        """Polls `apply: false` until no microphone is still being analyzed."""
         deadline = time.monotonic() + CACHE_BOUND
         while True:
             try:
                 return self.switch(apply=False)
             except mcp.ToolError as error:
-                if "still being analysed" not in str(error) or time.monotonic() > deadline:
+                if "still being analyzed" not in str(error) or time.monotonic() > deadline:
                     raise
             time.sleep(2)
 
@@ -646,7 +646,7 @@ def s7(doc, base):
         found.unlink()
         gone.append(found.name)
     why = refused(lambda: doc.switch(apply=False))
-    want = (f"The microphone on track {doc.mic_a} is still being analysed — its loudness has not "
+    want = (f"The microphone on track {doc.mic_a} is still being analyzed — its loudness has not "
             "been measured yet.")
     check("S7", bool(gone) and why is not None and want in why,
           f"deleted {gone}: {why!r}")

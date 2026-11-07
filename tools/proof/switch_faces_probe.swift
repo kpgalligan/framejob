@@ -231,7 +231,7 @@ if wanted("P4") {
 // MARK: - P5 the pending and no-face refusals, in order
 
 if wanted("P5") {
-    let pending = "The camera on track 13 is still being analysed — its faces have not been found "
+    let pending = "The camera on track 13 is still being analyzed — its faces have not been found "
         + "yet. Try again in a moment."
     let count = 1000
     let got = S.plan(input(

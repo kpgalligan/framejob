@@ -140,6 +140,10 @@ python3 tools/proof/screens.py --out <dir>                      # from the repos
 node docs/site/scripts/import-screens.mjs <dir> --used
 ```
 
+`screens.py` captures at 2× on any display (`-RCDevCaptureScale 2`). To refresh a few screens,
+run it with `--only` and import those files without `--used`, which first empties
+`src/assets/screens/`.
+
 **This site is public.** `import-screens.mjs` refuses a capture whose layout dump holds a local
 path, and its `CROP` table is the only way past that, by cutting the region away. Settings needs
 it: its MCP section prints the helper's full path. Never weaken the refusal.

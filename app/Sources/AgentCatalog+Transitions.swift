@@ -34,7 +34,7 @@ extension AgentServer {
                     + "edges stay exactly where they were. duration is rounded to the nearest "
                     + "frame (one that rounds to 0 is an error) and CLAMPED — to each side's "
                     + "available material, to the "
-                    + "neighbours on the track, and to the overlap rule — so a request too "
+                    + "neighbors on the track, and to the overlap rule — so a request too "
                     + "long for the media lands shorter rather than failing; a request that "
                     + "clamps below one frame is refused. An affected track already outside "
                     + "the overlap rule is refused by that rule before fitting. align center takes half from "
@@ -57,7 +57,7 @@ extension AgentServer {
                     + "window changes. It is capped at half the shorter of the two clips and "
                     + "limited to the greatest whole-frame shift that leaves every moved "
                     + "track inside the overlap rule, including after clips cross; a clip "
-                    + "on another track pushed into its neighbour gets a cross_dissolve; "
+                    + "on another track pushed into its neighbor gets a cross_dissolve; "
                     + "markers do not move.",
                 [
                     "clip": clipDescription,

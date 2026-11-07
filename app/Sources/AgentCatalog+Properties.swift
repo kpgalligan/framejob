@@ -88,7 +88,7 @@ extension AgentServer {
         + "to the clip's loudness, -20 to 10, default 0), never more than max_up_db up or "
         + "max_down_db down (each 0–24, default 12); a phrase starts at its own level, a pause "
         + "holds the gain and glides to the next phrase over its last 0.25 s, and a phrase "
-        + "under 1 s takes its neighbour's; the same in the preview and an export; it waits "
+        + "under 1 s takes its neighbor's; the same in the preview and an export; it waits "
         + "for the clip's speech as well as its loudness, and does nothing where speech "
         + "detection is unavailable or no phrase has 1 s of speech; {leveller: {}} turns it on "
         + "at the defaults), "

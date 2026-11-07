@@ -7527,6 +7527,13 @@ as a launch argument changes nothing, so no Apple argument gives a dark app on
 a light system. A real Light host was not available (the machine's setting was
 not changed).
 
+**One scale on any display.** Every launch also pins `-RCDevCaptureScale 2`
+(`screens.CAPTURE_SCALE`, `DevCaptureScale.swift`, spec §11 #539), which P2
+counts as pinned: `snapshot_ui` draws each capture at 2× whatever screen the
+window opened on, so a run on a 1× external display gives the same pixel sizes
+as one on a Retina screen, with no window moved. A capture whose answered
+`scale` is not 2 fails its screen, as one that answers the wrong look does.
+
 **The pins.** `PINS` is the offscreen harness's `pinDefaults`
 (`harness/main.swift:289-395`), as launch arguments
 (booleans and numbers as plist fragments, `<false/>`, `<real>304</real>`), plus
@@ -23800,8 +23807,9 @@ uses. A pure refactor: no pixel, sentence, undo name or result key moves.
   them (so no `viewDidAppear` starts a job) — Export (`prores_4444` over a one-clip project),
   Reverse (one job), Consolidate (an empty plan), Transcribe after `showProgress()`,
   AudioSync (an empty input), Rewrap (its own panel's content view) — puts each in an
-  offscreen borderless window sized to fit, and captures it with `UISnapshot.pass` (PNG)
-  and `UISnapshotLayout.report(root:skipping: nil)` (JSON).
+  offscreen borderless window sized to fit, and captures it through `cacheDisplay`, as
+  `UISnapshot.pass` does at the window's scale (PNG), and
+  `UISnapshotLayout.report(root:skipping: nil)` (JSON).
   - **B0** both builds succeed (a build failure is a scored FAIL, never an exit).
   - **C0** (CONTROL) each run produced all six captures, and the Export sheet's light and
     dark PNGs differ, in both builds.
@@ -30639,3 +30647,38 @@ make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_b2_proof.py
 python3 tools/proof/ai_docs_b2_proof.py --mutant <name>
 RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_b2_proof.py --base-sources <its app/Sources> --expect-red
 ```
+
+## ai-docs r2c — the rest of the British spellings, and captures at a forced scale (`ai_docs_r2c_proof.py`; four mutants; spec §11 #526 as extended by #538, #539)
+
+ai-docs batch r2c (#538, #539). The built app under a scratch home, driven over MCP, on projects
+built from media made into `work/ai-docs-r2c/media/` (a `say`-voiced WAV and a 3 s ffmpeg clip with
+sound). Launch 1 pins `-FrameJobCaptionEngine apple` in the argument domain (a Release build
+shares the person's defaults): S1 and S2 read `tools/list` (no map form — analyse, normalise,
+recognise, neighbour, grey, labelled, summarise, standardised and their forms — and "analyses" only
+as `analysis_job`'s noun), S3 is the control that "cancelled" still occurs five times; S4 and S5 are
+the Export and Generate Captions sheets' layout dumps (hidden views included); S6–S10 are the
+messages a caller reads (`detect_silence`'s note, `normalize_clip`'s two refusals with the loudness
+cache removed, `add_transition`'s no-room sentence, `render_graphic`'s `interpolateColors` error);
+S11 the control `export_status` `cancelled` / "Cancelled."; C4 the control that a plain capture's
+`scale` is its window's. Launch 2 (`-RCDevCaptureScale 3`) captures the inspector and the Export
+sheet at 3× (C1, C2: the answer, the dump and the PNG's IHDR); launch 3 (`-RCDevCaptureScale 5`)
+reads the stderr line and the window's scale (C3). T1 scans `app/Sources`, `core/src` and
+`graphic/src` string literals (comments skipped, Swift interpolations and JS substitutions read as
+code) for a map form outside spec §11 #526's survivors; I1 holds the eight recaptured webps to their
+siblings' sizes. Z1 is each launch's parity grep. The docstring lists every row and marks the
+controls and the tree rows; every other row is red on the frozen base app (`main` at `eab6adf2`),
+and `--expect-red` (which skips the tree rows) exits 0 only when that holds. The four mutants are
+applied by hand to `UISnapshot.swift`, `AgentServer+Snapshot.swift` and `DevCaptureScale.swift`.
+
+```sh
+make app-debug && python3 tools/proof/ai_docs_r2c_proof.py [--only S1,C1,T1]
+make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_r2c_proof.py
+RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_r2c_proof.py --expect-red
+```
+
+| Run | Result |
+|---|---|
+| The frozen base app, `--expect-red` | exit 0: S1 54 map forms, S2 "analyses" ×5, S4 "normalises", S5 "recognised", S6–S10 the British sentences, C1 and C2 scale 2 (the window's) with `-RCDevCaptureScale 3`, C3 no stderr line; the controls S3, S11, C4 and Z1 passed |
+| The fix, Debug | 18/18: C1 912 × 2157 px for 304 × 719 pt, C2 1440 × 2421 for 480 × 807, `window_facts.scale` 2 in both |
+| Release | 18/18, the same answers (C1 1317 × 2012 px for 439 × 670.5 pt: the Release editor's inspector is wider) |
+| The four mutants, Debug | `pass` ignoring `scale` CAUGHT (C1: 608 × 1438 px at an answered 3); the answer's `scale` left as the window's CAUGHT (C1: scale 2); any value honoured CAUGHT (C3: scale 5, no line); the stderr line dropped CAUGHT (C3) |

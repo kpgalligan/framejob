@@ -23,10 +23,10 @@ extension AgentServer {
                     + "why, for a word inside a nest, near an overlap between two clips or on a locked track. "
                     + "id {nest_path, media, source, k} names the word across edits: the nest "
                     + "clips it plays through, its media, its start in the media's SOURCE ticks "
-                    + "as the recogniser put it and k, counting earlier words with the same "
+                    + "as the recognizer put it and k, counting earlier words with the same "
                     + "three (0 unless one piece of the source plays twice). An engine apple "
                     + "word's start is where its sound begins, read from the media's voice and "
-                    + "waveform caches; until the voice cache exists it is the recogniser's, "
+                    + "waveform caches; until the voice cache exists it is the recognizer's, "
                     + "often early, and notes says so. cut_start and cut_end are the range the "
                     + "Transcript tab cuts that word by when it alone is deleted, snapped to "
                     + "frames: from the word's onset (where its sound starts, read from the voice "
@@ -42,7 +42,7 @@ extension AgentServer {
                     + "frames): shorten one with ripple_delete_ranges [[cut_start, cut_end]]. "
                     + "Each media's words come from its cached "
                     + "transcript (engine assemblyai) when it has a current one, else this "
-                    + "Mac's own recogniser, which reads the WHOLE file once (about 0.7 s per "
+                    + "Mac's own recognizer, which reads the WHOLE file once (about 0.7 s per "
                     + "minute of speech on an M2 Max) and keeps it in the project's cache, so a "
                     + "later call answers at once. It NEVER makes a network request and needs no "
                     + "API key. media is [{media, engine, language, fillers_reported}] for each "
@@ -76,7 +76,7 @@ extension AgentServer {
                     ],
                     "language": [
                         "type": "string",
-                        "description": "A language tag, e.g. en-US, for this Mac's recogniser "
+                        "description": "A language tag, e.g. en-US, for this Mac's recognizer "
                             + "only (a cached transcript answers in its own language). This "
                             + "Mac's own language by default; each language is kept apart in "
                             + "the cache. A tag speech recognition does not know is refused "

@@ -166,8 +166,8 @@ tool-schema change.
     media count. `facesWanted` (main thread) asks `analysisRequest(kind: .faces, …)` per window
     and merges each media's misses with `AnalysisStore.merged`, as `ShotSplit.wants` does.
   - SW-24 gains two refusals. From `read`, per face-speaker angle front first, after the
-    microphones' problems: "The camera on track T is still being analysed — its faces have not
-    been found yet. Try again in a moment." (a needed window the store does not answer). Pure, in
+    microphones' problems: "The camera on track T is still being analyzed — its faces have not
+    been found yet. Try again in a moment." (amended by #526) (a needed window the store does not answer). Pure, in
     `refusals`, right after the no-speech refusal: "The camera on track T shows no face whose
     mouth can be read between A and B, so it never says who is talking." (a read angle whose
     activity is nil on every step).

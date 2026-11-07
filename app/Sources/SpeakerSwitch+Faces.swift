@@ -208,7 +208,7 @@ extension SpeakerSwitch {
             }
             if pending {
                 problems.append(
-                    "The camera on track \(angle.track) is still being analysed — its faces have "
+                    "The camera on track \(angle.track) is still being analyzed — its faces have "
                         + "not been found yet. Try again in a moment.")
                 faces.append(FaceAngle(track: angle.track, activity: []))
             } else {

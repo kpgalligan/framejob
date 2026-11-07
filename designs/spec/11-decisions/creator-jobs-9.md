@@ -288,11 +288,11 @@ and SW2a lands second adds it.
     none or not an angle.
   - "Track T is the microphone for N speakers; each person needs their own microphone." (until
     SW8).
-  - From `read`, per microphone, front first: "The microphone on track T is still being analysed
+  - From `read`, per microphone, front first: "The microphone on track T is still being analyzed
     — its loudness has not been measured yet. Try again in a moment." and "… — its speech has not
-    been detected yet. Try again in a moment."; then, once, "Speech detection is unavailable on
+    been detected yet. Try again in a moment." (amended by #526); then, once, "Speech detection is unavailable on
     this Mac, so Switch by Speaker cannot tell who is talking." A missing cache file is "still
-    being analysed", never silence.
+    being analyzed" (amended by #526), never silence.
   - "The microphone on track T has no speech between A and B, so it never says who is talking."
     — a microphone with no covered step at v ≥ `voice_threshold`.
   - "No angle has a picture between A and B." — the first stretch of the range no angle covers.

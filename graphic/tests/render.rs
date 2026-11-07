@@ -139,7 +139,7 @@ fn a_throw_from_the_stdlib_names_the_module_helpers_line() {
     let d = failure(source, 21);
     assert_eq!(
         d.message,
-        "Error: interpolateColors: cannot parse colour \"boom\""
+        "Error: interpolateColors: cannot parse color \"boom\""
     );
     assert_eq!((d.line, d.column), (Some(3), Some(10)), "{d:?}");
     assert_eq!(d.frame, Some(21));

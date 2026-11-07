@@ -304,7 +304,9 @@ Inspector, Timeline Track Height, Preview Quality) from a script.
 
 A Debug or Release build, never Distribution, also has dev-only tools over
 MCP: `snapshot_ui` (a capture of the editor, a sheet, Settings, Welcome or the
-recorder panel, with a layout dump), `perform_menu_item`, `cancel_sheet`,
+recorder panel, with a layout dump; launch with `-RCDevCaptureScale 1|2|3` to
+draw every capture at that scale whatever screen its window is on, as
+`screens.py` does at 2), `perform_menu_item`, `cancel_sheet`,
 `select_inspector_tab`, `play_preview` (plays a preview and answers the frames
 composed), `graphic_memory` (the graphic rasters' memory budget, and a
 simulated memory-pressure event), `loudness_meter` (the live loudness meter's

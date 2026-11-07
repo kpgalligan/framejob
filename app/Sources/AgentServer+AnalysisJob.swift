@@ -203,7 +203,7 @@ extension AgentServer {
                 + "get_media_analysis's media form) it wants that window's missing ranges "
                 + "under the document's dev owner — one per document, alive while it is open, "
                 + "keeping its earlier wants — and returns at once. With clips instead (spec "
-                + "VR-16) it wants what a VR command analyses (FramingAnalysis, VR-12): for "
+                + "VR-16) it wants what a VR command analyzes (FramingAnalysis, VR-12): for "
                 + "each media the clips show, the windows they play plus 1 s each side, in "
                 + "kinds shots, faces, subjects, answering wanted: {project, clips, requests}; "
                 + "kind, from and to are not read with clips. "

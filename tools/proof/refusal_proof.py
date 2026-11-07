@@ -685,7 +685,7 @@ def the_transition_cut(mcp):
             "a cut whose two clips have no unused material names the frames asked for",
             f"the cut before clip {b} has no room for an overlap: the {frames} frames "
             "asked for clamp to nothing against the two clips' unused material, their "
-            "neighbours and the overlap rule; pass ripple: true to make the overlap by "
+            "neighbors and the overlap rule; pass ripple: true to make the overlap by "
             "shifting the timeline left instead",
             clip=b, duration=SEC // 2)
 

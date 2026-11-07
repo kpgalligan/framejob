@@ -1803,8 +1803,19 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   label, and an alt text quoting one, follows the app. Amends GR-13's
   caption ("Center"), GR-38's tip and its "Centre stays", HD-13 (k)'s
   "Color row", VR-34's two notes, and G-12's and CU-30's quoted sentences.
-  Other British forms in the app's strings (analysed, normalised,
-  recognised, neighbour, grey and the rest) are a separate issue.
+  **Extended by #538** (the owner, 2026-11-07, "#538 follows #526's
+  American"): the same strings spell analyze, analyzed, analyzing and
+  analyzes (the verb; the noun 'analyses' is already right),
+  normalize(d/s), recognize(d), recognizer, neighbor(s), gray(s), labeled,
+  summarize and standardized, the graphics library's `interpolateColors`
+  error included. 'cancelled', 'Cancelled.' and 'Cancelling…' stay in
+  prose. American English accepts that spelling, and it is the status value
+  a caller reads beside the sentence (`export_status`'s and
+  `analysis_job`'s `cancelled`, with the reason 'Cancelled.'), so the word
+  reads one way. 'judgement', also accepted, stays. JSON keys (`leveller`),
+  identifiers and comments keep their spelling. Amends the quoted strings
+  of AU-14, SY-11, SY-17, SY-31, SY-34, SY-38, SW-24, SW-84, VR-63, TX-18
+  and G-12.
 - **#532 — A frames timecode counts real seconds at a fractional rate that
   is not NTSC.** At an NTSC rate (`Fps::counts_nominal_seconds`: the rate's
   denominator over the gcd of its numerator and denominator is 1001, so

@@ -293,8 +293,8 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
             notes.append(
                 outcome.scope == .selected
                     ? "Nothing the selected clips play is audible in the mix, so nothing "
-                        + "was analysed."
-                    : "Nothing in this timeline is audible, so nothing was analysed.")
+                        + "was analyzed."
+                    : "Nothing in this timeline is audible, so nothing was analyzed.")
         } else if !outcome.pendingMedia.isEmpty {
             // Named rather than counted: which file is still being analysed
             // is what tells the user whether to wait or to go ahead, and the
@@ -310,9 +310,9 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
             // waits for the waveform (the reader review, road map 4 §8, R3·1).
             notes.append(
                 outcome.mode == .level
-                    ? "The waveform is still being analysed for \(listed). "
+                    ? "The waveform is still being analyzed for \(listed). "
                         + promise(about: outcome.pendingMedia)
-                    : "The waveform is still being analysed for \(listed). "
+                    : "The waveform is still being analyzed for \(listed). "
                         + waveformPromise())
         }
         if !input.voiceAvailable {
@@ -326,7 +326,7 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
                     ? "one file" : "\(outcome.voicePending.count) files")
                 : names.joined(separator: ", ")
             notes.append(
-                "Speech is still being analysed for \(listed). "
+                "Speech is still being analyzed for \(listed). "
                     + promise(about: outcome.voicePending))
         }
         // Named by CLIP (#107): two clips of one file can be judged

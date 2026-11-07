@@ -187,7 +187,7 @@ extension AgentServer {
             fields["enhance_error"] = RecordingEnhance.notReadyToolSentence
         case .wait:
             fields["enhance_error"] =
-                "record_screen was stopped while the microphone's sound was being analysed, so "
+                "record_screen was stopped while the microphone's sound was being analyzed, so "
                 + "Enhance Voice did not run."
         }
     }

@@ -146,7 +146,7 @@ enum AudioEnhance {
                 for: id, snapshot: snapshot, segments: segments, loader: loader)
             guard case .reading(let loudness) = answer else {
                 if answer == .pending {
-                    skip(id, "is still being analysed — its loudness has not been measured "
+                    skip(id, "is still being analyzed — its loudness has not been measured "
                         + "yet. Try again in a moment.")
                 } else {
                     problems.append(
@@ -171,7 +171,7 @@ enum AudioEnhance {
             guard let media = snapshot.media(mediaID),
                 let spans = media.speech ?? speechSpans(media, cache: document.cacheDirectory)
             else {
-                skip(id, "is still being analysed — its speech has not been detected yet. Try "
+                skip(id, "is still being analyzed — its speech has not been detected yet. Try "
                     + "again in a moment.")
                 continue
             }

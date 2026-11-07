@@ -93,7 +93,7 @@ extension AgentServer {
         guard try doubleArg(a, "target_lufs") == nil else {
             throw ToolError(
                 message: "target_lufs is the loudness mode's target; with mode \"peak\" the "
-                    + "level is peak_db. Pass mode \"loudness\" to normalise to a loudness.")
+                    + "level is peak_db. Pass mode \"loudness\" to normalize to a loudness.")
         }
         let peakDB = try normalizePeakDB(a)
         guard let input = AudioNormalize.read(from: document, clips: clips) else {
@@ -110,7 +110,7 @@ extension AgentServer {
         guard !input.isEmpty else {
             let reasons = input.problems.map { $0.description }.joined(separator: " ")
             throw ToolError(
-                message: "Nothing could be normalised. \(reasons)")
+                message: "Nothing could be normalized. \(reasons)")
         }
         let plan = AudioNormalize.plan(input, peakDB: peakDB)
 
@@ -347,7 +347,7 @@ extension AgentServer {
             }
             guard !input.isEmpty else {
                 let reasons = input.problems.map { $0.description }.joined(separator: " ")
-                throw ToolError(message: "Nothing could be normalised. \(reasons)")
+                throw ToolError(message: "Nothing could be normalized. \(reasons)")
             }
             let run = LoudnessMeasureRun(
                 document: document, jobs: AudioMeasureDoor.normalizeJobs(input, in: document),
@@ -363,7 +363,7 @@ extension AgentServer {
                 outcome.input, targetLUFS: requested, solved: outcome.solved)
             guard !plan.normalized.isEmpty else {
                 let reasons = plan.skipped.map { $0.description }.joined(separator: " ")
-                throw ToolError(message: "Nothing could be normalised. \(reasons)")
+                throw ToolError(message: "Nothing could be normalized. \(reasons)")
             }
             return try self.loudnessAnswer(plan, document: document)
         }

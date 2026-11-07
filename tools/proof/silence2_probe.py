@@ -1070,7 +1070,7 @@ def sheet_part(answer):
               any(text == "No cuts" for text in pending.get("texts", [])),
               f"{pending.get('texts')}")
         check("and names what it is waiting for",
-              any("Speech is still being analysed" in text
+              any("Speech is still being analyzed" in text
                   for text in pending.get("texts", [])), f"{pending.get('texts')}")
         check("with Remove disabled", pending.get("removeEnabled") is False,
               f"{pending.get('removeEnabled')}")
@@ -1105,7 +1105,7 @@ def ducked_part(answer):
           nopeaks.get("candidateSpans", 0) >= 1 and nopeaks.get("removeEnabled") is True,
           f"wash {nopeaks.get('candidateSpans')}, Remove {nopeaks.get('removeEnabled')}")
     check("and the note names the waveform as what it is waiting for",
-          any("The waveform is still being analysed for" in text
+          any("The waveform is still being analyzed for" in text
               for text in nopeaks.get("texts", [])), f"{nopeaks.get('texts')}")
     label_a = answer.get("labelA", "(no label)")
     label_b = answer.get("labelB", "(no label)")
@@ -1130,7 +1130,7 @@ def ducked_part(answer):
           nocaches.get("candidateSpans", 0) >= 1, f"{nocaches.get('candidateSpans')}")
     check("the media is now a VOICE waiter with a span inside it — the speech line is "
           "printed and its own promise says the mix is what made it quiet",
-          any("Speech is still being analysed for" in text
+          any("Speech is still being analyzed for" in text
               for text in nocaches.get("texts", []))
           and any("quiet in the MIX" in text for text in nocaches.get("texts", []))
           and any(f"What is proposed inside {label_a} is quiet in the MIX — turned down, "

@@ -510,7 +510,9 @@ layout dump. `perform_menu_item` runs a menu item by path to put a sheet or
 Settings up, `cancel_sheet` closes the sheet, and `select_inspector_tab`
 picks an inspector tab and sub-tab. All four work with the
 app inactive and its window covered. A capture's look is set at launch with
-the dev-only `-RCDevAppearance light|dark`, never switched live. To see every
+the dev-only `-RCDevAppearance light|dark`, never switched live. Its scale is
+`-RCDevCaptureScale 1|2|3` (spec §11 #539), which `screens.py` pins to 2, so a
+capture is 2× on a 1× display without moving a window. To see every
 catalogued screen at once, `python3 tools/proof/screens.py` walks
 `designs/screens/`, once per look, each time on its own pinned instance. It
 writes each screen's PNGs and layout dumps and one `screens.md` with the

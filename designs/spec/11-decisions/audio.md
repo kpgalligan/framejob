@@ -130,8 +130,8 @@ spike S4 (`archive/audio.md`'s AP0 record).
   which is what matching clips means. A non-finite target falls back to −16 LUFS and is
   reported.
 - **AU-14 — What Loudness mode skips, by name.** Normalize's own (a nest, no audio segment, no
-  audio props); a cache not yet written ("still being analysed — its loudness has not been
-  measured yet"); under 0.4 s played; gated out (every block under −70 LUFS).
+  audio props); a cache not yet written ("still being analyzed — its loudness has not been
+  measured yet" (amended by #526)); under 0.4 s played; gated out (every block under −70 LUFS).
 - **AU-15 — The inspector.** The Volume section gains a Loudness row (the measured LUFS and
   dBTP; "measuring…" while the cache is pending; "—" when unavailable or several clips are
   selected) and an At volume row (the same plus 20·log10 of the base volume), and the

@@ -58,7 +58,9 @@ screens run in name order.
   layout dump beside it. The two looks come from two instances, one launched
   with `-RCDevAppearance light` and one with `-RCDevAppearance dark`, so every
   step runs once per look; a capture that answers any other appearance fails the
-  screen.
+  screen. Both instances are launched with `-RCDevCaptureScale 2` (spec §11
+  #539), so every capture is drawn at 2× whatever display its window opened on;
+  a capture that answers any other `scale` fails the screen.
 - `after`: steps run after the captures, to put the app back — `cancel_sheet`
   for a screen that opened a sheet. A screen that leaves a sheet attached fails.
 - `expect`: `{"capture", "visible_text" | "no_visible_text"}`, checked on every

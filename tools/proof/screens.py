@@ -32,7 +32,10 @@ sets `NSApp.appearance` before any window is built). `snapshot_ui` is never
 asked for an appearance: switching a live window left the colours its views
 took when they were built in the launch appearance, so such a capture was a
 mix the app never draws. Every capture must answer the look its instance was
-launched in, or the screen fails.
+launched in, or the screen fails. Every launch also pins `-RCDevCaptureScale 2`
+(`DevCaptureScale.swift`, spec §11 #539), so each capture is drawn at 2× on any
+display, a 1× one included, with no window moved; a capture whose answered
+`scale` is not 2 fails its screen.
 
 A screen file is a JSON front block (```` ```json screen ```` … ```` ``` ````)
 and prose; `designs/screens/README.md` is the format. Every step is checked
@@ -110,6 +113,11 @@ APPEARANCE_KEY = "RCDevAppearance"
 # 05i's Background Status reads "Analyzing 0 %" (CO3, spec §11 CO-30). P2
 # counts it pinned.
 ANALYSIS_HOLD = ("RCDevAnalysisHold", "600")
+# Every launch draws its captures at 2× whatever screen the window opened on
+# (`-RCDevCaptureScale`, spec §11 #539), so a 1× display gives the same pixel
+# sizes as a Retina one with no window moved; a capture whose answered `scale`
+# is not 2 fails its screen. P2 counts it pinned.
+CAPTURE_SCALE = ("RCDevCaptureScale", "2")
 WINDOWS = ("welcome", "settings", "editor", "sheet", "recorder")
 REGIONS = ("toolbar", "preview", "inspector", "timeline")
 NEW_RECORDING = ["File", "New Recording…"]
@@ -448,6 +456,7 @@ def launch(app, out, look=None):
     if look is not None:
         argv += [f"-{APPEARANCE_KEY}", look]
     argv += [f"-{ANALYSIS_HOLD[0]}", ANALYSIS_HOLD[1]]
+    argv += [f"-{CAPTURE_SCALE[0]}", CAPTURE_SCALE[1]]
     socket_path = scratch_socket()
     env = bounded.child_env({"RC_AGENT_SOCKET": socket_path})
     env.pop("ANTHROPIC_API_KEY", None)
@@ -1221,7 +1230,8 @@ class Run:
             text = open(os.path.join(SOURCES, name), encoding="utf-8").read()
             declared |= set(re.findall(r'id: "([a-z]+\.[a-zA-Z._]+)", title:', text))
             literals |= set(re.findall(r'static let \w*Key = "((?:FrameJob|RC)[^"]*)"', text))
-        pinned = {key for key, _ in PINS} | {APPEARANCE_KEY, ANALYSIS_HOLD[0]}
+        pinned = {key for key, _ in PINS} | {APPEARANCE_KEY, ANALYSIS_HOLD[0],
+                                               CAPTURE_SCALE[0]}
         problems = []
         if declared != set(SECTIONS):
             problems.append(f"sections in app/Sources but not SECTIONS "
@@ -1336,8 +1346,12 @@ class Run:
         if wrong:
             raise ScreenError(f"the instance was launched {look}, but "
                               + "; ".join(wrong))
-        else:
-            list(self.run_steps(front.get("after", []), path, ids))
+        scaled = [f"{cap['name']} answered scale {a.get('scale')!r}" for cap, _, a in captures
+                  if a.get("scale") != float(CAPTURE_SCALE[1])]
+        if scaled:
+            raise ScreenError(f"the instance was launched with -{CAPTURE_SCALE[0]} "
+                              f"{CAPTURE_SCALE[1]}, but " + "; ".join(scaled))
+        list(self.run_steps(front.get("after", []), path, ids))
         return captures
 
     def check_expect(self, front, captures):

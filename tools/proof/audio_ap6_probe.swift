@@ -465,8 +465,8 @@ do {
     let input = AudioEnhance.read(from: document, clips: [99, 3, 4, 5, 6])
     let reasons = input?.problems.map { $0.description } ?? []
     let want = ["clip 99: is not a clip", "clip 3: plays for under 0.4 s",
-                "clip 4: has under 1 s of speech", "clip 5: is still being analysed — its loudness",
-                "clip 6: is still being analysed — its speech has not been detected yet"]
+                "clip 4: has under 1 s of speech", "clip 5: is still being analyzed — its loudness",
+                "clip 6: is still being analyzed — its speech has not been detected yet"]
     check("E7", "five skips, each by name: not a clip, 0.3 s, 0.5 s of speech, no loudness file, "
             + "no speech",
           input?.readings.isEmpty == true && reasons.count == 5

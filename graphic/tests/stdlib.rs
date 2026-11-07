@@ -183,7 +183,7 @@ fn interpolate_colors_answers_the_shared_colour_fixture() {
         let sent = sent.as_str().unwrap();
         assert_eq!(
             answer,
-            &format!("threw: interpolateColors: cannot parse colour \"{sent}\""),
+            &format!("threw: interpolateColors: cannot parse color \"{sent}\""),
             "{sent:?}"
         );
     }

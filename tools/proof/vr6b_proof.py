@@ -33,7 +33,7 @@ Launch 1 (`-RCDevAnalysisCanned YES -RCDevAnalysisHold 3600`):
   talking, because clip W's faces do not show", `speaker` [], W equal to a reference `follow:
   face`.
 - Q4 nothing made, each in its sentence: speaker without `mics`; `mics: [A]` (no speaker clip);
-  an unknown id; Mic A's loudness cache removed (SW-24's "still being analysed").
+  an unknown id; Mic A's loudness cache removed (SW-24's "still being analyzed").
 Launch 2 (`-RCDevAnalysisCanned YES -FrameJobFollowKind speaker -RCDevVerticalAccept in-place`):
 - Q5 the menu on Q1's fixture: within 60 s the canvas is 1080 × 1920 in place and W equals the
   reference's (and Q1's, when Q1 ran); undo "Make Vertical".
@@ -420,7 +420,7 @@ def q4(client, manifest):
             path.unlink()
         why = refused(lambda: doc.vertical())
         sentence = (f"make_vertical_version was refused: The microphone on track "
-                    f"{doc.mic_a_track} is still being analysed — its loudness has not been "
+                    f"{doc.mic_a_track} is still being analyzed — its loudness has not been "
                     f"measured yet.")
         check("Q4", why is not None and sentence in why and model(doc.state()) == base,
               f"Mic A's loudness removed: {why!r}")

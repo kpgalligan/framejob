@@ -27,14 +27,14 @@ run and its readings after, from the implementer's printed runs of 2026-10-19.
   included; and the features are current under those sizes. The marker's version is NOT bumped:
   an old pass never published a zero-frame file, so no old cache reads differently. `AudioSync.read`
   is unchanged: no frames is a frame count equal to the samples', so the file passes "still being
-  analysed" and reaches SY-12's floor, "is too short to match: its file holds under 2 s of sound."
+  analyzed" (amended by #526) and reaches SY-12's floor, "is too short to match: its file holds under 2 s of sound."
   — the sentence it always should have read. Not handled, and not wanted here: a file whose read
   does not complete still publishes nothing (SY-11), and the speech pass already publishes one
   chunk for any file (`MediaSpeech.chunkCount`'s floor of 1). **The rows:** the probe's P23 (a
   40 ms 16 kHz tone through the product's `writeSyncFeatures`: the marker present, no frames,
   samples whose frame count is 0, current; control: 1 s of the same tone gives its frames) and
   the proof's S31 (a 40 ms `short-v1.wav` beside CAMERA: refused "is too short to match", never
-  "still being analysed"). **The risk it accepts:** none new; a zero-frame cache is 0 bytes plus
+  "still being analyzed" (amended by #526)). **The risk it accepts:** none new; a zero-frame cache is 0 bytes plus
   under 1 KB.
 
 - **SY-32 — The refinement's region is chosen by the features' evidence (#302; amends SY-20's
@@ -126,7 +126,7 @@ run and its readings after, from the implementer's printed runs of 2026-10-19.
   input outside the file 0, `⌈N·8000/rate⌉` outputs for N inputs,
   each summed in one fixed order so the answer does not depend on how the reader splits the
   file, and the identity at 8,000 Hz. The marker's version is 3, so every version-2 cache reads
-  "still being analysed" until the next pass rewrites it (SY-11's posture, no migration). **The
+  "still being analyzed" (amended by #526) until the next pass rewrites it (SY-11's posture, no migration). **The
   gate it passed** (the run after the change, the arms interleaved): P, the product's pass, wrote
   identical `.pcm` and `.bin` over two passes on D1–D4; its wall was 1.213× T's on D1 (fastest
   of two: 1.47 s against 1.21 s) and 1.157× on D2 (0.29 s against 0.25 s), under the 1.5× bound.
@@ -229,7 +229,7 @@ run and its readings after, from the implementer's printed runs of 2026-10-19.
 
 - **SY-38 — The MP3's other readers (#306).** **The sync pass** reads from the same
   `MP3Gapless.leadingTrim` as the copy, its reader's time range starting there, and its marker's
-  version is 4: every media's sync cache reads "still being analysed" once and is re-made on the
+  version is 4: every media's sync cache reads "still being analyzed" (amended by #526) once and is re-made on the
   next pass (SY-34's no-migration posture); a file with no trim decodes the same bytes as at
   version 3. Measured before the change (X12, the product's `writeSyncFeatures` → `loadSyncSamples`,
   the implementer's run of 2026-10-17): clicks44-mp3 +13.061 ms and clicks48-mp3 +12.000 ms, the

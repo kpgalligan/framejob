@@ -1499,9 +1499,9 @@ unlocked Mac; paste each score into the issue in the Source.
 - **Source:** #139 (road map 11's V3).
 
 **HS-5 — The screen catalog on a second display**
-- **Do:** Run `python3 tools/proof/screens.py` on a display at a different scale from the usual one, e.g. a Mac's built-in Retina screen (scale 2); every run so far was at scale 1 on one external display.
-- **Expect:** the run passes. Screens and prose that depend on the host are noted in the screen's prose, or filed.
-- **Source:** #139 (road map 11's V3).
+- **Do:** 1. On a Mac whose editor window opens on a 1× display, run `python3 tools/proof/screens.py --out A` (every screen). 2. Change the display arrangement so the window opens on the built-in Retina screen, and run `python3 tools/proof/screens.py --out B`. 3. Compare each capture in A with its pair in B: its pixel size, its layout dump, and by eye.
+- **Expect:** both runs pass. Every capture in A has the same pixel size as its pair in B (`screens.py` pins `-RCDevCaptureScale 2`). Each pair's layout dumps agree in every frame and string, `window_facts` aside. By eye nothing looks softer in A except the colour wheels' discs and the curves' hue strips, which are drawn at the window's scale and scaled up. The two windows' colour spaces differ (`window_facts.color_space`), so a pair's pixels differ across the whole image and are not compared. Screens and prose that depend on the host are noted in the screen's prose, or filed.
+- **Source:** #139 (road map 11's V3), #539.
 
 **HS-6 — AV1 on an M3 or later Mac**
 - **Do:** On an M3 or later Mac: 1. `python3 tools/proof/formats_probe.py`. 2. `python3 tools/proof/codec_import_proof.py` (it launches its own instance on a scratch socket). 3. Drop an AV1 MP4 into a project and play it.

@@ -142,8 +142,8 @@ extension AgentServer {
                     + "foreground masks; any other, its person masks); past that it is drawn "
                     + "uncut and a sentence before the last names it. In an "
                     + "HLG project (set_canvas output) the frame is a 16-bit PNG or a 10-bit "
-                    + "HEIC labelled BT.2100 HLG; a JPEG, and any frame asked with "
-                    + "sdr_version, is the project's SDR version, labelled BT.709. Its scopes "
+                    + "HEIC labeled BT.2100 HLG; a JPEG, and any frame asked with "
+                    + "sdr_version, is the project's SDR version, labeled BT.709. Its scopes "
                     + "read the picture it draws: in an HLG project the HLG signal, each JSON "
                     + "adding signal \"hlg\" and, for the waveform, parade and histogram, scale "
                     + "(the HLG % ticks in cd/m², reference white at 75 %), the luma and "
@@ -190,7 +190,7 @@ extension AgentServer {
                     "selection": [
                         "type": "integer",
                         "description": "An adjustment clip's id: draw what its video.qualifier "
-                            + "selects instead of grading — grey, white fully graded, black "
+                            + "selects instead of grading — gray, white fully graded, black "
                             + "untouched, its blurred selection when video.qualifier.blur is "
                             + "above 0, times any matte cutting it, its strength not applied "
                             + "— with every layer in front of it left out; black where the clip "
@@ -231,7 +231,7 @@ extension AgentServer {
                         "type": "integer", "enum": [1, 2, 4],
                         "description": "The vectorscope's zoom, as a vectorscope slot's 1× 2× "
                             + "4× cells: each pixel is binned 128 + round(255 × zoom × Cb) (and "
-                            + "Cr), so ×2 and ×4 spread a near-grey picture over more bins; at "
+                            + "Cr), so ×2 and ×4 spread a near-gray picture over more bins; at "
                             + "2 and 4 a pixel off the plot is not counted and the text says "
                             + "what share lie off it. Needs vectorscope: true. Default 1.",
                     ],
@@ -318,14 +318,14 @@ extension AgentServer {
                     ],
                     "loudness_lufs": [
                         "type": "number", "minimum": -70, "maximum": 0,
-                        "description": "Normalise the whole mix to this integrated loudness, "
+                        "description": "Normalize the whole mix to this integrated loudness, "
                             + "in LUFS — the sheet's Loudness popup, whose rows are -14 "
                             + "(streaming), -16 (podcast) and -23 (EBU R 128 broadcast). The "
                             + "export measures itself first and then applies ONE gain to "
                             + "everything, solved through the master limiter every export "
                             + "runs at peak_dbtp, so the file lands on the target and its "
                             + "loudest peaks are limited rather than the whole mix capped. "
-                            + "Omit not to normalise: the export still measures, still "
+                            + "Omit not to normalize: the export still measures, still "
                             + "limits at the ceiling and still reports. Ignored where there "
                             + "is no sound to measure (gif, apng).",
                     ],
@@ -406,7 +406,7 @@ extension AgentServer {
                     + "picture written), encoder_speed on av1 and av1_webm, audio_bits on "
                     + "audio_wav and audio_aiff, stems [{name, tracks, path}] when stems was "
                     + "asked (each file beside the mix), loudness for every format "
-                    + "that carries sound, normalised or not — summary, integrated_lufs, "
+                    + "that carries sound, normalized or not — summary, integrated_lufs, "
                     + "true_peak_dbtp, "
                     + "sample_peak_dbfs, gain_db, ceiling_dbtp (the master limiter's), "
                     + "limited_db (how far it turned the hottest peak down), capped_by_gain "

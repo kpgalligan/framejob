@@ -117,7 +117,7 @@ extension AgentServer {
         + "no curve. Each is a periodic spline that wraps at 0/360. Applied after the "
         + "channel curves and before look, at the color's HSV hue read once: a positive "
         + "shift turns HSV hue red → yellow → green keeping Rec. 709 luma, the gain scales "
-        + "saturation about that luma; a grey or near-grey (chroma at most 0.02) is left "
+        + "saturation about that luma; a gray or near-gray (chroma at most 0.02) is left "
         + "alone, and the effect fades in up to chroma 0.06)"
     private static let qualifierClause: String =
         ", qualifier (adjustment clips only — anything else is an error naming the clip; "

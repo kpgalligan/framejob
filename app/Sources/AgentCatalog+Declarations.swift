@@ -317,7 +317,7 @@ extension AgentServer {
                 + "one as a stranger."),
         AgentDeclaration(
             .argument("subjects", of: "reframe_clip"), requirement: .filledByTheApp,
-            why: "VR-28: the tool fills the analysed faces (each with its mouth opening, "
+            why: "VR-28: the tool fills the analyzed faces (each with its mouth opening, "
                 + "VR-60), people, salient regions and shots from the analysis cache over the "
                 + "clip's window, waiting for them within CJ-25's bound, and for follow "
                 + "speaker the turns Switch by Speaker reads from the microphones' caches, so "

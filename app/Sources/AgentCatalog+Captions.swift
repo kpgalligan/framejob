@@ -291,16 +291,16 @@ extension AgentServer {
                 "get_transcript",
                 "Answers one clip's spoken words with their times in TIMELINE ticks, ready for "
                     + "ripple_delete_ranges: words is [{text, start, end, filler}] sorted by "
-                    + "start, with speaker on a word whose transcript labelled it, plus count. "
+                    + "start, with speaker on a word whose transcript labeled it, plus count. "
                     + "The source is the media's cached transcript when it has a current one "
                     + "(engine assemblyai: made earlier by transcribe with engine assemblyai), "
-                    + "else this Mac's own speech recogniser run over the clip (engine apple), "
+                    + "else this Mac's own speech recognizer run over the clip (engine apple), "
                     + "which takes about 0.7 s per minute of speech on an M2 Max; what it heard is cached per "
                     + "media and language, so a later call inside an earlier run's span answers "
                     + "from the cache, and an engine apple answer's cached says which it was. "
                     + "An engine apple word's start is where its sound begins, read from the "
                     + "media's voice and waveform caches; until the voice cache exists it is "
-                    + "the recogniser's, often early, and note says so. "
+                    + "the recognizer's, often early, and note says so. "
                     + "It NEVER makes a network request and never uploads anything. filler is "
                     + "true for the filler words um, uh, hmm, mhm, uh-huh, ah, huh, hm, m, er "
                     + "and erm, matched lowercased with edge punctuation trimmed; "
@@ -320,7 +320,7 @@ extension AgentServer {
                     ],
                     "language": [
                         "type": "string",
-                        "description": "A language tag, e.g. en-US, for this Mac's recogniser "
+                        "description": "A language tag, e.g. en-US, for this Mac's recognizer "
                             + "only (a cached transcript answers in its own language, reported "
                             + "as language). Matched as transcribe matches it: this Mac's own "
                             + "language by default; a tag speech recognition has never heard "

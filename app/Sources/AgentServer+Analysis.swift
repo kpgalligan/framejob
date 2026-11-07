@@ -88,8 +88,8 @@ extension AgentServer {
         func given(_ key: String) -> Bool { a[key] != nil && !(a[key] is NSNull) }
         guard given("media") != given("clip") else {
             throw ToolError(
-                message: "Name exactly one of media and clip: the media file to analyse, or "
-                    + "the clip whose part of its media to analyse.")
+                message: "Name exactly one of media and clip: the media file to analyze, or "
+                    + "the clip whose part of its media to analyze.")
         }
         let name = try requiredString(a, "kind")
         // A picture's foreground masks are `analyze_cutout`'s, not this tool's (spec §11 CO-105).
@@ -108,7 +108,7 @@ extension AgentServer {
             else {
                 throw ToolError(
                     message: "Clip \(snapshot.id) is not a media clip (it shows "
-                        + "\(snapshot.source.kindName)), so it has no media to analyse.")
+                        + "\(snapshot.source.kindName)), so it has no media to analyze.")
             }
             guard !(kind == .soundEvents && snapshot.source.isReversed) else {
                 throw ToolError(

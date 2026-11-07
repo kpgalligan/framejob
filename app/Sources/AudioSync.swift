@@ -265,7 +265,7 @@ enum AudioSync {
                 problems.append(
                     Problem(
                         clip: id,
-                        reason: "is still being analysed" + missing + " Try again in a moment."))
+                        reason: "is still being analyzed" + missing + " Try again in a moment."))
                 continue
             }
             featuresByMedia[first.media] = features

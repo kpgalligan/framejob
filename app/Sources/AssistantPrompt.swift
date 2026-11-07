@@ -161,7 +161,7 @@ enum AssistantPrompt {
     /// What the end-of-turn compaction summary must carry (AI-9), in
     /// Rasterize's shape.
     static let compactionInstructions =
-        "Summarise this video-editing conversation so the work can continue without it. Keep: "
+        "Summarize this video-editing conversation so the work can continue without it. Keep: "
         + "what the person asked for and every preference they stated; the project's name and "
         + "path, and any nest open; every clip, track, marker and media involved, by id, and "
         + "what each is; each edit made, in order, how it turned out, and which were undone; "

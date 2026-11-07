@@ -326,7 +326,7 @@ impl Project {
             {
                 if overlap_of(a, c).is_some() {
                     return Err(format!(
-                        "clip {} would overlap more than one neighbour on one side \
+                        "clip {} would overlap more than one neighbor on one side \
                          (clips {} and {})",
                         a.id, b.id, c.id
                     ));

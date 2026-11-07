@@ -176,7 +176,7 @@ before and after, and the last undo step not "Synchronize Audio"):
   S31  SHORT at 0 on track 1, CAMERA at 10 s (SY-31): its sync marker lands
        within the 120 s wait (its seconds printed); refused "clip N: is too
        short to match: its file holds under 2 s of sound.", never naming
-       "still being analysed", unchanged, no step.
+       "still being analyzed", unchanged, no step.
   S32  RECORDER_MP3 for the recorder (SY-36, SY-38). Control first:
        `afinfo` prints no `valid frames` line for it (no packet table, so the
        row exercises the trim), and by `wav_samples` against RECORDER,
@@ -1439,9 +1439,9 @@ def mcp_rows(sock, wanted, files):
                                  f"clip {short}: is too short to match: its file holds under 2 s "
                                  "of sound.", clips=[cam, short])
             said = c.error("sync_audio", clips=[cam, short]) or ""
-            analysing = "still being analysed" in said
+            analysing = "still being analyzed" in said
             score("S31", ok and not analysing,
-                  f"{detail}; 'still being analysed' named {analysing} (want False)")
+                  f"{detail}; 'still being analyzed' named {analysing} (want False)")
         finally:
             c.close()
 

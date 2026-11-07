@@ -5428,7 +5428,7 @@ def section_cache_write(binary, sources):
     lines = " ".join((answer or {}).get("cloudReportLines", []))
     check("CW: zero words after an unrecorded failed DELETE names error, bill and dashboard",
           answer is not None and answer.get("ok") is False
-          and "No speech was recognised" in failure
+          and "No speech was recognized" in failure
           and "AssemblyAI had already been billed for 1 media file" in failure
           and dashboard in failure and dashboard in lines and retry not in failure,
           f"error={error!r}, failure={failure!r}, lines={lines!r}")
@@ -6599,7 +6599,7 @@ def section_hygiene(binary, sources):
           "the janitor's empty list, no media to group, nothing uploaded to find out",
           answer.get("emptyRunThrew") is True
           and answer.get("emptyRunMessage")
-          == "No speech was recognised in the audio that was transcribed."
+          == "No speech was recognized in the audio that was transcribed."
           and answer.get("emptyRunRequests") == 0,
           f"got {answer.get('emptyRunMessage')!r} / "
           f"{answer.get('emptyRunRequests')!r} requests")
@@ -7001,7 +7001,7 @@ def project_yml_blocks(text):
     return blocks
 
 
-APPLE_HINT = ("The words are recognised ON THIS MAC and land as ordinary text clips on a "
+APPLE_HINT = ("The words are recognized ON THIS MAC and land as ordinary text clips on a "
               "track of their own, so they show in the preview and burn into an export with "
               "no further step. Nothing is uploaded.")
 

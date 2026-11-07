@@ -49,3 +49,18 @@ V-4 and V-5 come from the build-velocity road map, now closed: `designs/adr/buil
   "`PRODUCT_NAME` stays `Reelcut` (bundle, executable, module)" is now `PRODUCT_NAME`
   `Frame Job` in Release and Distribution, the bundle and executable following it in every
   configuration, and the module `FrameJob` in every configuration through `PRODUCT_MODULE_NAME`.
+- **#539 — `-RCDevCaptureScale 1|2|3` draws every `snapshot_ui` capture at that many pixels per
+  point, whatever screen its window is on.** `DevCaptureScale.forced` is 1, 2 or 3 when the
+  instance was launched with one of those and nil otherwise; any other value prints one stderr
+  line, `RCDevCaptureScale must be 1, 2 or 3 (got "<raw>"); captures keep the window's scale.`,
+  and is ignored. The capture's scale is `forced ?? window.backingScaleFactor`. When it equals the
+  window's `backingScaleFactor`, `UISnapshot.pass` keeps `bitmapImageRepForCachingDisplay(in:)`,
+  so a 2× host captures exactly as before; otherwise it makes an `NSBitmapImageRep` of that rep's
+  format at `round(bounds × scale)` pixels, `size` = `bounds.size`, retagged to its colour space,
+  and `cacheDisplay`s into it. In the `snapshot_ui` answer, `scale` and the dump's `scale` are the
+  capture's (`width_px == round(points.w × scale)`); `window_facts.scale` and the listing's
+  `scale` stay the window's. `screens.py` pins 2 and fails a screen whose capture answers another
+  scale, so the catalog and the site's pictures are 2× on a 1× display with no window moved.
+  **Accepted:** in a forced capture, a bitmap a view makes at its window's `backingScaleFactor`
+  (`ColorWheelControl`'s disc, `CurvePlotDecor.drawHueStrip`) is drawn at the window's scale and
+  scaled up; HS-5 is where a person compares the two.

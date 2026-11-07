@@ -395,7 +395,7 @@ final class ExportSheetController: NSViewController {
             title: "Export",
             hint: "The format decides the codec and the container. Size, frame rate and "
                 + "range start as the document's and quality as the format's; a GIF or an "
-                + "APNG starts at its own cap and rate. Loudness normalises the whole mix "
+                + "APNG starts at its own cap and rate. Loudness normalizes the whole mix "
                 + "by one gain, and every export's sound goes through a master limiter "
                 + "that keeps its true peak at or under −1 dBTP. A preset remembers the choices on this card rather than the "
                 + "numbers they resolve to, so it means the same thing on a document of "

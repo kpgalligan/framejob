@@ -79,7 +79,7 @@ extension SpeakerSwitch {
                     }) { speech[id] = read }
                 }
             }
-            let unread = "The microphone on track \(track) is still being analysed — its "
+            let unread = "The microphone on track \(track) is still being analyzed — its "
             var pending = false
             if media.contains(where: { loudness[$0] == nil }) {
                 pending = true

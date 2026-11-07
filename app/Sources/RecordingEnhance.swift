@@ -39,7 +39,7 @@ enum RecordingEnhance {
     /// The panel box's tooltip (AU-69 (a)), naming AU-68's step.
     static let boxTooltip =
         "After the recording lands, run Clip ▸ Enhance Voice on the microphone's clip as its own "
-        + "undo step, \"Enhance Voice\", once its sound has been analysed."
+        + "undo step, \"Enhance Voice\", once its sound has been analyzed."
 
     /// What one check decides (AU-68 (d)).
     enum Step: Equatable {

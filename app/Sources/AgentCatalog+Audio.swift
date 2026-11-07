@@ -71,7 +71,7 @@ extension AgentServer {
                 [
                     "clips": [
                         "type": "array", "items": ["type": "integer"], "minItems": 1,
-                        "description": "Analyse only these clips — the sheet's Selected "
+                        "description": "Analyze only these clips — the sheet's Selected "
                             + "clips scope. Omit to take the sheet's own opening rule: the "
                             + "project's current selection when it holds anything with sound, "
                             + "every audible clip otherwise. The result says which ran.",
@@ -128,13 +128,13 @@ extension AgentServer {
                     + "export plays it: a mono clip as dual mono, a stereo clip through its own "
                     + "channel pick, mono and pan) over the part of it that actually plays, which is "
                     + "PRE-FADER: it knows nothing about the volume, fades, ducking, mute or "
-                    + "solo already on the clip, because normalise is a statement about the "
+                    + "solo already on the clip, because normalize is a statement about the "
                     + "material and not about the mix. Three things follow, and each is a "
                     + "decision rather than an accident. It REPLACES volume rather than "
                     + "multiplying it, so a second call changes nothing (and comes back as "
                     + "\"made no change\", which is that working). It writes the clip's BASE "
                     + "volume even when the playhead is inside an action, since it is about the "
-                    + "whole clip — a clip whose volume is animated is normalised underneath "
+                    + "whole clip — a clip whose volume is animated is normalized underneath "
                     + "and then overridden for the action's span. And it leaves muted alone: a "
                     + "mute is a switch, not a level. In peak mode each clip gets its OWN gain "
                     + "to the same peak, so it does not match levels across a selection; in "
@@ -142,7 +142,7 @@ extension AgentServer {
                     + "step however many clips. The model's volume ceiling is "
                     + "\(AudioNormalize.maxGainName), so a clip quieter than about "
                     + String(format: "%.0f", AudioNormalize.quietestReachableDB)
-                    + " dBFS cannot reach -1: it is still normalised, as loud as it goes, "
+                    + " dBFS cannot reach -1: it is still normalized, as loud as it goes, "
                     + "and result_db says where it landed. In loudness mode a clip whose true "
                     + "peak would pass -1 dBTP at the target, or that already has a limiter, "
                     + "gets the clip's true-peak limiter in the same edit (set_audio's "
@@ -169,8 +169,8 @@ extension AgentServer {
                     + "while it measures nothing changes and the call says so. A clip that "
                     + "plays no sound, one that is silent (or under -70 LUFS, or plays under "
                     + "0.4 s) over the part that plays, and one whose waveform or loudness has "
-                    + "not been analysed yet are each reported by name under skipped and the "
-                    + "rest are still normalised.",
+                    + "not been analyzed yet are each reported by name under skipped and the "
+                    + "rest are still normalized.",
                 [
                     "clips": clipsProperty,
                     "peak_db": [
@@ -257,7 +257,7 @@ extension AgentServer {
                     + "volume), renders, and the volume's figures, result_lufs and "
                     + "result_true_peak_dbtp being the last render's. A clip that plays no "
                     + "sound, is a nest, plays under 0.4 s, is under -70 LUFS, has under 1 s of "
-                    + "speech, whose loudness or speech has not been analysed yet, whose "
+                    + "speech, whose loudness or speech has not been analyzed yet, whose "
                     + "reversed copy is still being made, whose processing cannot be rendered, "
                     + "or that is under -70 LUFS after its processing is reported by name under "
                     + "skipped and the rest are still enhanced.",
@@ -306,7 +306,7 @@ extension AgentServer {
                     + "limited_by) and renders. The renders take seconds on a long clip; if the "
                     + "project changes meanwhile, nothing changes and the call says so. A "
                     + "reference that plays no sound, is a nest, plays under 0.4 s, is under "
-                    + "-70 LUFS, has not been analysed yet or (with eq) has under 1 s of speech "
+                    + "-70 LUFS, has not been analyzed yet or (with eq) has under 1 s of speech "
                     + "or under \(AudioMatchFit.minimumBands) third-octave bands within "
                     + "\(Int(AudioMatchFit.contentRangeDB)) dB of its loudest "
                     + "is refused by name; a clip that cannot be matched for one of those "
@@ -338,7 +338,7 @@ extension AgentServer {
                     + "One clip, the anchor, stays where it is; every other clip moves along "
                     + "its own track by a whole number of frames so its sound plays at the "
                     + "same moment as the anchor's. The match is made on each file's cached "
-                    + "sound features (26 MFCCs per 16 ms, standardised, so gain, microphone "
+                    + "sound features (26 MFCCs per 16 ms, standardized, so gain, microphone "
                     + "and room do not matter) by cross-correlation summed over the "
                     + "coefficients; a lag's confidence is its z-score against every lag. When "
                     + "both stretches hold at least \(speechFloor) s of speech by the cached "
@@ -365,7 +365,7 @@ extension AgentServer {
                     + "clip that would start before 0 is trimmed at its head instead, by just "
                     + "that much, and starts at 0 (the anchor never moves or trims). All or "
                     + "nothing, one undo step: when any clip cannot be matched — no sound, "
-                    + "still being analysed, under \(shortest) s, playing more than 0.2% away from ×1, "
+                    + "still being analyzed, under \(shortest) s, playing more than 0.2% away from ×1, "
                     + "at a rate other than its speed, reversed, or ramping its speed (a speed "
                     + "action changes its rate over its length), two clips on one track, no "
                     + "match chosen, waveforms that do not line up at it, a trim that would "

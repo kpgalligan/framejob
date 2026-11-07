@@ -273,8 +273,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   the standard library answers `[r, g, b, alphaByte / 255]` with integer
   bytes, so it quantises exactly as the core stores. **Refuse, never clamp,
   holds in `interpolateColors` too**: an `rgb(300, 0, 0)` that it clamped
-  to red before now throws `interpolateColors: cannot parse colour
-  "rgb(300, 0, 0)"`. The core's refusal names every form:
+  to red before now throws `interpolateColors: cannot parse color
+  "rgb(300, 0, 0)"` (amended by #526). The core's refusal names every form:
   `props.<key> must be a CSS color (#rgb, #rgba, #rrggbb, #rrggbbaa, rgb(),
   rgba(), hsl(), hsla() or a color name), not <value>` (amended by #526). Nothing stored or
   accepted as hex or `rgb()` decimals changes. A schema's colour DEFAULT is

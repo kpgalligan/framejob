@@ -4662,6 +4662,10 @@ free.
   before `NSApplicationMain`, so every view is built in that look. A live
   switch leaves colours taken at build time in the launch look, which is why
   `snapshot_ui` refuses `appearance` and names this default instead.
+- `DevCaptureScale.swift` — `-RCDevCaptureScale 1|2|3`, a dev-only launch
+  default (spec §11 #539): `snapshot_ui` draws its capture at that scale
+  whatever the window's screen; the answer's and the dump's `scale` are the
+  capture's, `window_facts.scale` the window's.
 - `AgentServer+Assistant.swift` — `assistant_send` and `assistant_answer`
   (road map 12 A1, dev only, wholly under the flag). Both run off main
   (`devOffMainTools`): one `onMain` resolves the target, the editor and the

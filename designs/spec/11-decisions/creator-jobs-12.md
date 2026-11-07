@@ -421,7 +421,7 @@ microphones automatically, the sheet confirming (the sheet is VR6b's).
   58 %, nothing changed, then `mic_faces: [2, 1]` applies and A's segments frame face 2; **P5**
   `get_project`'s `media` byte-identical before and after P1; **P6** the refusals in their
   sentences: `mics: [A]`, `[A, A]`, the two-shot as a microphone, `mic_faces: [1]`, a canned cut
-  inside the clip, Mic A's loudness cache removed (SW-24's "still being analysed"), Mic B's sound
+  inside the clip, Mic A's loudness cache removed (SW-24's "still being analyzed" (amended by #526)), Mic B's sound
   switched off with `mic_faces: [1, 2]` given (the sound-off sentence naming Mic B, nothing
   changed). Canned analyses (CJ-26, `-RCDevAnalysisCanned YES -RCDevAnalysisHold 3600`); the
   expected numbers from F-TURNS' manifest or from `switch_by_speaker`'s answer, never from the

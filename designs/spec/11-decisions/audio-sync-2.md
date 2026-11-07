@@ -36,12 +36,12 @@ of 2026-10-16, SY-22's precedent, and SY-29's fail-closed clause is the orchestr
   after `peaks` and before `speech` (which stays last), clears at its head when stale or when the
   media has no audio, and posts NO `.mediaCacheDidChange`: nothing memoises features. A
   `.bin` is read only under a current-version marker, its size a positive multiple of 26·4 bytes,
-  every value finite; anything else is "still being analysed", never silence. **Its one retry:**
+  every value finite; anything else is "still being analyzed" (amended by #526), never silence. **Its one retry:**
   `retryPeaks` runs the pass once, with that attempt's fresh stamp, straight after an attempt whose
   `peaks` answers true — so a file unreadable on the first pass and readable on a retry gets its
   features in the same session. Nothing else retries it. **The edge:** a file with sound but
   under 512 samples (64 ms) holds no whole frame, so the pass publishes nothing for it and it
-  reads "still being analysed" for good rather than "too short to match" (AS-3's review, finding
+  reads "still being analyzed" (amended by #526) for good rather than "too short to match" (AS-3's review, finding
   6; recorded, not handled). **Amended by SY-17 (AS-3's second fix pass):** the same retry also
   runs `speech` once, straight after the features, with the same stamp, so a file whose speech
   pass failed with its waveform gets its VAD probabilities in the same session too. **Amended by
@@ -51,7 +51,7 @@ of 2026-10-16, SY-22's precedent, and SY-29's fail-closed clause is the orchestr
   marker inside the same publish; a failed write removes both files. A `.pcm` is read only under a
   current-version marker, its size a positive even number of bytes, and the features are current
   only when it is; clearing removes the marker, then both files. A version-1 marker is another
-  version, so its media reads "still being analysed" until the next cache pass rewrites both — no
+  version, so its media reads "still being analyzed" (amended by #526) until the next cache pass rewrites both — no
   migration. **Amended by SY-31 (#301):** a completed read with no whole frame publishes a
   zero-byte `.bin` beside its `.pcm`, read as no frames, so the edge above reads "too short to
   match"; sizes of 0 are read. **Amended by SY-34 (#305):** the pass decodes at the file's own
@@ -191,7 +191,7 @@ of 2026-10-16, SY-22's precedent, and SY-29's fail-closed clause is the orchestr
   or when the model cannot be used this process (`SileroVAD.isAvailable` false), the search is on
   every frame, as SY-12 says. Each `sync_audio` row says which, `matched_on` ("speech" |
   "sound"). With the model available, a clip whose speech cache is not yet written is "still
-  being analysed", as one with no features is. **Why the VAD and not an energy gate:** the app
+  being analyzed" (amended by #526), as one with no features is. **Why the VAD and not an energy gate:** the app
   already caches Silero per media for `detect_silence` (road map 4), so a mask costs no new
   pass, and an energy gate would mark the owner's recorder rumble as sound. **The measurement**
   (a numpy reproduction of `search` over the S20 session's own `cache/sync/` and

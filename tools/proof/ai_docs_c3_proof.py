@@ -30,7 +30,7 @@ Launch 1 (`vr6b_proof.LAUNCH_1`):
   answered, `speaker` [], W `followed` with "it follows its faces, not who is talking, because
   clip W has no turn of its microphones inside it, so there is no speaker to follow".
 - F7 (c) Mic A's loudness cache removed: refused "make_vertical_version was refused: The
-  microphone on track <Mic A> is still being analysed — its loudness has not been measured yet.",
+  microphone on track <Mic A> is still being analyzed — its loudness has not been measured yet.",
   nothing made.
 Launch 2 (`-RCDevAnalysisCanned YES -FrameJobFollowKind speaker`), File ▸ Make Vertical Version…
 read through `snapshot_ui` and closed by `cancel_sheet`:
@@ -243,7 +243,7 @@ def tool_rows(client, manifest):
                 for p in moved:
                     shutil.move(str(aside / p.name), str(p))
             want = (f"make_vertical_version was refused: The microphone on track "
-                    f"{doc.mic_a_track} is still being analysed — its loudness has not been "
+                    f"{doc.mic_a_track} is still being analyzed — its loudness has not been "
                     f"measured yet.")
             check("F7", answer is None and moved and refused is not None and want in refused
                   and before == after,

@@ -416,7 +416,7 @@ impl Project {
             return Ok(Outcome::Refused(format!(
                 "the cut before clip {clip} has no room for an overlap: the {requested} \
                      frames asked for clamp to nothing against the two clips' unused \
-                     material, their neighbours and the overlap rule; pass ripple: true to \
+                     material, their neighbors and the overlap rule; pass ripple: true to \
                      make the overlap by shifting the timeline left instead"
             )));
         }

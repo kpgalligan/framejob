@@ -271,13 +271,13 @@ class Doc:
         return self.call_with("switch_by_speaker", arguments)
 
     def ready(self, **arguments):
-        """Polls `apply: false` until no microphone is still being analysed."""
+        """Polls `apply: false` until no microphone is still being analyzed."""
         deadline = time.monotonic() + CACHE_BOUND
         while True:
             try:
                 return self.switch(apply=False, **arguments)
             except mcp.ToolError as error:
-                if "still being analysed" not in str(error) or time.monotonic() > deadline:
+                if "still being analyzed" not in str(error) or time.monotonic() > deadline:
                     raise
             time.sleep(2)
 

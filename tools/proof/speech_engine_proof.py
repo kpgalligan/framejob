@@ -45,7 +45,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 WORK = os.path.join(HERE, "work", "speech_engine")
 SEC = 600_000
 UNINSTALLED_CANDIDATES = ["fr-FR", "de-DE", "ja-JP", "ko-KR"]
-NOTHING = "No speech was recognised in the audio that was transcribed."
+NOTHING = "No speech was recognized in the audio that was transcribed."
 PANGRAM = [w.strip(".,").lower() for w in re.sub(r"\[\[[^]]*\]\]", "", SPEECH_TEXT).split()]
 
 failures, checks, skips = [], 0, []

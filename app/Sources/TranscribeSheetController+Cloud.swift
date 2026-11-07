@@ -101,7 +101,7 @@ extension TranscribeSheetController {
     {
         switch engine {
         case .apple:
-            return "The words are recognised ON THIS MAC and land as ordinary text clips on a "
+            return "The words are recognized ON THIS MAC and land as ordinary text clips on a "
                 + "track of their own, so they show in the preview and burn into an export "
                 + "with no further step. Nothing is uploaded."
         case .assemblyai:

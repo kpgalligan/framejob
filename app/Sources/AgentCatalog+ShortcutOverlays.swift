@@ -22,7 +22,7 @@ extension AgentServer {
                     + "and never less than (10 × keycaps + 25) frames, the time the template "
                     + "needs to press its last key and exit. The same shortcut pressed again "
                     + "before its overlay ends extends it to duration after the last press, "
-                    + "labelled ×2, ×3 … (merged counts them); a different shortcut pressed "
+                    + "labeled ×2, ×3 … (merged counts them); a different shortcut pressed "
                     + "sooner ends the earlier overlay where it starts, waiting until the "
                     + "earlier one has had its minimum — and if that is more than 0.5 s after "
                     + "its press it is dropped (dropped counts them). Overlays never overlap. "

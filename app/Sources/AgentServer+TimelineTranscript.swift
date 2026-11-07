@@ -259,7 +259,7 @@ extension AgentServer {
     /// TX-18's note for a media read with no voice cache: its on-device
     /// starts are the recogniser's.
     static func unmovedNote(_ name: String) -> String {
-        "The word starts of “\(name)” are where this Mac's recogniser put them, often early: "
+        "The word starts of “\(name)” are where this Mac's recognizer put them, often early: "
             + "it has no voice cache yet. Call again once it has."
     }
 

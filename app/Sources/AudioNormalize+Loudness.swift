@@ -129,7 +129,7 @@ extension AudioNormalize {
                 problems.append(
                     Problem(
                         clip: id,
-                        reason: "is still being analysed — its loudness has not been measured "
+                        reason: "is still being analyzed — its loudness has not been measured "
                             + "yet. Try again in a moment."))
             case .reading(let reading):
                 if reading.playedTicks < ClipLoudness.minimumPlayedTicks {
@@ -151,7 +151,7 @@ extension AudioNormalize {
                         Problem(
                             clip: id,
                             reason: "is under −70 LUFS over the part of it that plays, so "
-                                + "there is no loudness to normalise."))
+                                + "there is no loudness to normalize."))
                 }
             }
         }

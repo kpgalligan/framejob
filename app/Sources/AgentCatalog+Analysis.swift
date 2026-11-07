@@ -23,7 +23,7 @@ extension AgentServer {
                 "Answers an analysis of one media file, or of the part of it one clip plays, "
                     + "made ON THIS MAC — no network request, no upload, no API key — and kept "
                     + "per media in the project's cache, so a later call over a window already "
-                    + "analysed answers at once. kind \"shots\" finds the hard cuts: cuts is "
+                    + "analyzed answers at once. kind \"shots\" finds the hard cuts: cuts is "
                     + "[{frame, source}] sorted by time, frame the media's frame index and "
                     + "source its presentation time in the media's own SOURCE ticks (600000 "
                     + "per second, of the file played forwards), with count. A cut inside a "
@@ -34,7 +34,7 @@ extension AgentServer {
                     + "pixels: mask_size [w, h] (the masks' own size), frames (frames held in "
                     + "the window), subject_found (whether any frame holds a person: at least "
                     + "0.5 % of the mask above half), count and runs [{from, to, subject_found, "
-                    + "frames}] in SOURCE ticks — a run is consecutive analysed frames that "
+                    + "frames}] in SOURCE ticks — a run is consecutive analyzed frames that "
                     + "agree on subject_found. Remove Background (Clip ▸ Remove Background, the "
                     + "Clip tab's Picture ▸ Background section, set_video cutout) draws them, "
                     + "and analyze_cutout makes a cut-out clip's masks and says where they "
@@ -77,7 +77,7 @@ extension AgentServer {
                     + "row with one person and one salient box is about 177 bytes (222 with "
                     + "clip), so one answer holds about 294 s of samples (235 s with clip). "
                     + "View ▸ Show Subjects draws the selected clip's faces and subjects at the "
-                    + "playhead from what is cached and never analyses. With "
+                    + "playhead from what is cached and never analyzes. With "
                     + "clip, from and to default to and are held inside "
                     + "the clip's played window, and each cut, sample or window also has clip_time "
                     + "(ticks from "
@@ -96,12 +96,12 @@ extension AgentServer {
                 [
                     "media": [
                         "type": "integer",
-                        "description": "The media whose picture or sound to analyse — exactly "
+                        "description": "The media whose picture or sound to analyze — exactly "
                             + "one of media and clip.",
                     ],
                     "clip": [
                         "type": "integer",
-                        "description": "A media clip: its media analysed over the part the "
+                        "description": "A media clip: its media analyzed over the part the "
                             + "clip plays — exactly one of media and clip.",
                     ],
                     "kind": [
