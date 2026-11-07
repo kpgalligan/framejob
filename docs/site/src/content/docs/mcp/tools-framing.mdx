@@ -319,6 +319,7 @@ With `follow: speaker`, a movie clip of two to four people, playing beside two o
 - Each clip in `mics` stands for its track. Under a shot, the clip used is the one on that track with its sound on that overlaps the shot most. A clip with its sound off is used only when nothing else on that track plays under the shot, and then the shot follows its faces.
 - A clip on a microphone's track is never framed this way, and neither is a screen recording with a cursor file.
 - Faces are matched by Frame Job, or named with `mic_faces`.
+- A microphone with no speech under a clip counts as that person not talking there. When none of a clip's microphones has speech, the clip follows its faces and its `reason` says why.
 - When one clip can't be framed on the speaker, such as a clip that changes shot, it follows its faces instead and its `reason` says why. The rest of the call goes ahead.
 
 See [Follow the speaker in a vertical](/framing/follow-speaker/).
@@ -369,7 +370,7 @@ It's refused, with nothing made, when:
 - a clip can't be framed even with `keep`
 - `follow: speaker` has no `mics`, or a clip id in `mics` isn't a clip
 - `follow: speaker` finds no movie clip playing beside two of the microphones
-- a microphone is still being analysed or never speaks
+- a microphone is still being analysed
 - the analysis fails or is stopped, or the project or the open nest changes during the wait
 
 ## Related

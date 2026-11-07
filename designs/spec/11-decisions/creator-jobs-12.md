@@ -484,9 +484,12 @@ anywhere, so nothing is keyed (CJ-3).
   talking, because " + the core's sentence, joined with `followedEntry`'s reasons by " and "; a
   refused `face` is retried as `keep` (VR-34), its entry `not_followed` with the face's sentence.
   (d) **Turns.** `withTurns` fills each speaker clip's `subjects.turns` through
-  `FramingSpeaker.turns` on the last main hop (the sheet's refresh, the tool's last hop); a
-  `FramingSpeaker.Refusal` refuses the tool "make_vertical_version was refused: " + its sentence,
-  nothing made.
+  `FramingSpeaker.turns` with `silence: .notTalking` on the last main hop (the sheet's refresh,
+  the tool's last hop): a microphone with no speech under the shot gets no turn, that person not
+  talking there, and a shot with no turn at all is the core's to refuse and (c)'s to retry as
+  `face`; a `FramingSpeaker.Refusal` (a microphone still being analysed, no speech detection, an
+  unreadable plan) refuses the tool "make_vertical_version was refused: " + its sentence, nothing
+  made (amended by #527).
   (e) **Refusals**, after VR-36's, in order: the `follow` sentence names speaker ("follow must be
   subject, face, person, salient, speaker or center, not X."); `follow: speaker` without `mics`:
   "make_vertical_version's follow speaker needs mics: two to four clips, one on each microphone's
@@ -528,7 +531,8 @@ anywhere, so nothing is keyed (CJ-3).
   `speakerReading` (main) fills the turns (`withTurns`) and asks the match on the reference clip
   with its own microphones; only a `.ready` reading is cached, per ticked set, and a `.refused`
   one is read again at each `refresh()`, so a loudness cache landing while the sheet is open
-  clears it. `.refused` shows its sentence (SW-24's, or with no speaker clip "No full-frame movie
+  clears it. `.refused` shows its sentence (SW-24's still-being-analysed sentence (#527), or
+  with no speaker clip "No full-frame movie
   clip plays beside two of the ticked microphones, so nobody can be framed by who is talking."),
   Make off.
   (d) **The confirmation.** A `sure` match presets the pop-ups to its assignment, the note "Each

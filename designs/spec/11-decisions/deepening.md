@@ -1811,3 +1811,23 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `parse_timecode` inverts it. It moves every reading at such a rate: the
   toolbar, the export sheet's readout, a burn-in, a layout name and an image
   sequence's or Save Frame's name. The milliseconds form is unchanged.
+- **#527 — Make Vertical's Follow Speaker reads a microphone with no
+  speech under a shot as that person not talking there** (the owner,
+  2026-11-06, "Silent mic, Face if none"). `withTurns` reads each speaker
+  clip's turns through `FramingSpeaker.turns(…, silence: .notTalking)`:
+  SW-24's no-speech sentence (`SpeakerSwitch.silentMicrophones`) no longer
+  refuses, the silent microphone gets no turn and stays in the clip's `mics`
+  with its `mic_faces` entry, so VR-61 (e)'s segments frame whoever else
+  talks. `read`'s problems (a microphone still being analysed, speech
+  detection unavailable) and an unreadable plan still refuse the tool,
+  "make_vertical_version was refused: …", and still show on the sheet. A
+  shot none of whose microphones has a turn is handed `turns: []`; the core
+  refuses it "clip C has no turn of its microphones inside it, so there is
+  no speaker to follow" (VR-60 (d)) and VR-64 (c)'s retry frames it `face`,
+  its entry `followed` with "it follows its faces, not who is talking,
+  because " + that sentence. With no `mic_faces`, a silent microphone's
+  agreement is 0, so the match is not `sure`: the tool's shot follows its
+  faces with the weak match's sentence, and the sheet leaves its pop-ups on
+  "Choose a face" with its not-sure note. `reframe_clip {follow: speaker}`
+  is unchanged (`silence: .refuses`, VR-60 (c)). Amends VR-64 (d) and
+  VR-66 (c).

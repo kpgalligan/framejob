@@ -30548,3 +30548,35 @@ make app-debug && python3 tools/proof/ai_docs_c2_proof.py [--only W1,S5,G1,F2]
 make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_c2_proof.py
 RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_c2_proof.py --expect-red
 ```
+
+## ai-docs c3 — a silent microphone under a Follow Speaker shot (`ai_docs_c3_proof.py`)
+
+ai-docs batch c3 (#527, spec §11 #527, amending VR-64 (d) and VR-66 (c)). The built app under a
+scratch home, driven over MCP, over F-TURNS (`vr6b_proof.py`'s `Doc`, W's analyses canned) with
+Mic A split at the last utterance's end + 0.6 s on the 30 fps grid, so its short piece holds only
+room tone, and its long piece's sound off. Launch 1 (`vr6b_proof.LAUNCH_1`) runs the F rows through
+`make_vertical_version` (`copy: false`): F1 the filed case framed on Mic B with A not talking, F6
+the same with no `mic_faces` falling back to faces on the weak match, F2 both microphones silent
+under the shot falling back to faces with the core's no-turn sentence, and the controls F3 (nothing
+muted), F4 (both A pieces muted), F5 (`reframe_clip` still refusing the silent microphone) and F7 (a
+microphone still being analysed still refusing). Launch 2 (`-RCDevAnalysisCanned YES
+-FrameJobFollowKind speaker`) reads File ▸ Make Vertical Version…'s sheet: S1 the filed fixture with
+no no-speech sentence, a summary and the not-sure note, S2 (control) the unmuted fixture's summary.
+Z1 is each launch's parity grep. The docstring lists every row and marks the controls; every other
+row is red on the frozen base app (`main` at `d40d1f81`), and `--expect-red` exits 0 only when that
+holds. Three mutants by `--mutant`: `vertical-refuses-silence` (F1), `reframe-allows-silence` (F5),
+`not-talking-drops-problems` (F7).
+
+```sh
+make app-debug && python3 tools/proof/ai_docs_c3_proof.py [--only F1,S1]
+make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_c3_proof.py
+python3 tools/proof/ai_docs_c3_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_c3_proof.py --expect-red
+```
+
+| Run | Result |
+|---|---|
+| The frozen base app, `--expect-red` | exit 0: F1, F2, F6 refused "make_vertical_version was refused: The microphone on track 3 has no speech between 00:00:00:00 and 00:02:37:00, …"; S1 showed that sentence and no summary; the controls F3, F4, F5, F7, S2 and Z1 passed |
+| The fix, Debug | 10/10: F1 `speaker` [{clip 5, mics [10, 7], mic_faces [1, 2]}], no reason, no cut, face 2 framed and face 1 not at W's middle; F2 W `followed`, "… because clip 5 has no turn of its microphones inside it, so there is no speaker to follow"; F6 the weak match's sentence (agrees only 0.00) |
+| Release | 10/10, the same answers as on Debug |
+| The three mutants, each on a tree copy | `vertical-refuses-silence` CAUGHT (F1 refused with the no-speech sentence), `reframe-allows-silence` CAUGHT (F5 answered "made no change"), `not-talking-drops-problems` CAUGHT (F7 answered and edited) |

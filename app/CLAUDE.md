@@ -980,12 +980,13 @@ detail there.
   `FramingSpeaker` (main, names no `rc_*`) `follow: speaker`'s `turns` — `SpeakerSwitch.read`
   over the `mics` clips (each its track's speaker, no angle, no wide, the framed clip's span,
   `Settings()`), `SpeakerSwitch.turns`, each track named back as its clip id, `read`'s
-  problems and `silentMicrophones` thrown as a `FramingSpeaker.Refusal` (the bare sentence; the
-  handler answers "reframe_clip was refused: …", `make_vertical_version` "make_vertical_version
-  was refused: …" and Make Vertical's sheet shows it as it is, VR6b); a microphone
-  `read` drops gets no turn and the core names it. The handler passes `mics` and `mic_faces`,
-  refuses `speaker` addressed to a container other than the open one, and adds the turns on
-  its last hop.
+  problems, and with `silence: .refuses` (`reframe_clip`) `silentMicrophones`, thrown as a
+  `FramingSpeaker.Refusal` (the bare sentence; the handler answers "reframe_clip was refused:
+  …", `make_vertical_version` "make_vertical_version was refused: …" and Make Vertical's sheet
+  shows it as it is, VR6b); with `.notTalking` (Make Vertical's `withTurns`, spec §11 #527) a
+  microphone with no speech gets no turn; a microphone `read` drops gets no turn and the core
+  names it. The handler passes `mics` and `mic_faces`, refuses `speaker` addressed to a
+  container other than the open one, and adds the turns on its last hop.
 - `FollowSubject.swift` · `FollowSubjectSheetController.swift` ·
   `EditorViewController+FollowSubject.swift` — Clip ▸ Follow Subject… (road map
   creator-jobs VR2b2, spec §11 VR-29): `reframe_clip` with `replace: true` on each selected
@@ -1064,12 +1065,12 @@ detail there.
   tool), `remembered` (the sheet's opening Follow and Where Empty, a stored `speaker` kept) and
   `VerticalSettings.mics` / `micFaces`; `+Speaker` (names no `rc_*`) the microphone tracks
   (`microphones`), the speaker clips and each one's own microphones (`speakerClips`),
-  `withTurns` (main; `FramingSpeaker.turns` per speaker clip) and the sheet's `speakerReading`
-  (the turns, then `ReelProject.speakerMatch` on the longest speaker clip); `+Plan` frames a
-  speaker clip `speaker`, every other analysed picture `face`, a refused `speaker` retried as
-  `face` with its reason and `Plan.speaker`; `+Summary`'s " Follows whoever is talking in N
-  clip(s).", `pendingSummary(…speaker:)` and the answer's `speaker`; the tool's `mics` /
-  `mic_faces`, its three refusals and the turns on the last hop.
+  `withTurns` (main; `FramingSpeaker.turns` per speaker clip, `.notTalking`) and the sheet's
+  `speakerReading` (the turns, then `ReelProject.speakerMatch` on the longest speaker clip);
+  `+Plan` frames a speaker clip `speaker`, every other analysed picture `face`, a refused
+  `speaker` retried as `face` with its reason and `Plan.speaker`; `+Summary`'s " Follows
+  whoever is talking in N clip(s).", `pendingSummary(…speaker:)` and the answer's `speaker`;
+  the tool's `mics` / `mic_faces`, its three refusals and the turns on the last hop.
   `ProjectDocument+VerticalCopy`: `verticalCopy` (the
   derived door handed the source's handle, the plan as one `performGroupedEdit("Make Vertical", …)`, a copy left
   unchanged closed, its package removed, and refused). `AgentServer+VerticalVersion`: the
