@@ -219,7 +219,10 @@ extension AgentServer {
     /// spec §11 AU-88). `off`'s `video.qualifier.<range>` is the Color
     /// sub-tab's Qualifier section with an action selected: a range's
     /// checkbox unticked, its Set end value to default and a near-grey Pick
-    /// from Canvas (`ReelOp.setActionEnd`, spec §11 GR-36).
+    /// from Canvas (`ReelOp.setActionEnd`, spec §11 GR-36). An inspector
+    /// value on a clip with a first-frame cut sends `set_video` and
+    /// `set_action_end` together, with the cut selected or with no action
+    /// selected (`InspectorBinding.keepingCuts`, spec §11 #530).
     ///
     /// **The patch goes to the core UNREAD** (deepening D1·5,
     /// `archive/roadmap-7.md` §2.5) — the LAST door of the six, and

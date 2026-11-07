@@ -143,22 +143,59 @@ extension InspectorBinding {
 
     /// One clip's ops for a video patch: the action's end state when the
     /// playhead is inside one, the base props otherwise — and the base props
-    /// for whatever `structural(video:for:)` pulls out, either way.
+    /// for whatever `structural(video:for:)` pulls out, either way. A clip
+    /// with a first-frame cut keeps the cut and the base together
+    /// (`keepingCuts`, spec §11 #530).
     func ops(video patch: VideoPatch, for clip: ClipSnapshot) -> [ReelOp] {
-        split(
-            [clip], patch, patch.isEmpty, base: { .setVideo(clips: $0, patch: $1) },
-            action: { ActionPatch(video: $0) },
-            structural: { self.structural(video: $0, for: $1) })
+        keepingCuts(
+            split(
+                [clip], patch, patch.isEmpty, base: { .setVideo(clips: $0, patch: $1) },
+                action: { ActionPatch(video: $0) },
+                structural: { self.structural(video: $0, for: $1) }),
+            video: patch, clips: [clip])
     }
 
     /// The selection's ops for a video patch. Clips outside an action share
     /// ONE `set_video` with several ids (§4.3); the ones inside get their own
-    /// `set_action_end`, less the structural part.
+    /// `set_action_end`, less the structural part; and a clip with a
+    /// first-frame cut keeps the cut and the base together (`keepingCuts`).
     func ops(video patch: VideoPatch) -> [ReelOp] {
-        split(
-            videoClips, patch, patch.isEmpty, base: { .setVideo(clips: $0, patch: $1) },
-            action: { ActionPatch(video: $0) },
-            structural: { self.structural(video: $0, for: $1) })
+        keepingCuts(
+            split(
+                videoClips, patch, patch.isEmpty, base: { .setVideo(clips: $0, patch: $1) },
+                action: { ActionPatch(video: $0) },
+                structural: { self.structural(video: $0, for: $1) }),
+            video: patch, clips: videoClips)
+    }
+
+    /// #530 (amending CI-2): `ops` plus, for each clip of `clips` with a first-frame cut (CI-17):
+    /// the cut selected → `set_video` of the write's animatable half to the base, since the cut's
+    /// end got it and the structural half is already on the base; no action selected →
+    /// `set_action_end` on the cut of the keys its end already names (`VideoPatch.held(by:)`),
+    /// beside the base write; either one only when its patch is non-empty; another action
+    /// selected → nothing (CI-2). The same list, so the same undo step, as a drag on a cut.
+    private func keepingCuts(_ ops: [ReelOp], video patch: VideoPatch, clips: [ClipSnapshot])
+        -> [ReelOp]
+    {
+        guard !ops.isEmpty else { return ops }
+        let frame = canvas.fps.frameDuration
+        var kept = ops
+        for clip in clips {
+            guard let cut = clip.firstFrameCut(frame: frame) else { continue }
+            let selected = action(clip)
+            if selected?.id == cut.id {
+                if let animatable = structural(video: patch, for: clip).animatable {
+                    kept.append(.setVideo(clips: [clip.id], patch: animatable))
+                }
+            } else if selected == nil {
+                let held = patch.held(by: cut.end.video)
+                if !held.isEmpty {
+                    kept.append(
+                        .setActionEnd(clip: clip.id, action: cut.id, patch: ActionPatch(video: held)))
+                }
+            }
+        }
+        return kept
     }
 
     /// Spec §11 AU-88 (amending CI-3, AU-21, AU-37, AU-46, AU-50): with an

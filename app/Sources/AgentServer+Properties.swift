@@ -21,7 +21,10 @@ extension AgentServer {
     /// canvas gestures — write `set_action_end` instead, because that is
     /// what editing an action's end state means. The agent still chooses —
     /// `set_video` changes the clip's BASE props, `set_action_end` an
-    /// action's end state.
+    /// action's end state. An inspector value on a clip with a first-frame
+    /// cut sends `set_video` and `set_action_end` together, so the cut and
+    /// the base move as one (`InspectorBinding.keepingCuts`, spec §11 #530);
+    /// an agent sends the two itself.
     ///
     /// **The patch goes to the core UNREAD** (deepening D1·3,
     /// `archive/roadmap-7.md` §2.3). Decoding the object into a

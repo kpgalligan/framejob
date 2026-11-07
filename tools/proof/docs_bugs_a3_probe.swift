@@ -1,5 +1,5 @@
 // Docs-bugs batch a3: #469, #476, #471, #481 and #485 (and batch a5's CI-19 rows, D7, D11 and
-// D14–D27) through the app's own sources on real
+// D14–D27, and ai-docs a2's #529 and #530 rows, F1–F14) through the app's own sources on real
 // .framejob packages the app made and saved (`docs_bugs_a3_proof.py` makes them and scores what
 // this prints). Compiled AS main.swift over every file of app/Sources but the app's main.swift,
 // -D FRAMEJOB_DEV_TOOLS, against libframejob_core.a, through swift_build.py. It names no symbol the
@@ -525,6 +525,8 @@ row("D12", "cam", at: 4) { e in
     select(e, [CAM, SCREEN])
     var out = dragCamera(e)
     out["end_x"] = J(endVideo(e, CAM)?.x)
+    out["end_y"] = J(endVideo(e, CAM)?.y)
+    out["base_y"] = J(clip(e, CAM)?.videoProps.y)
     return out
 }
 row("D13", "shapecut", at: 4) { e in
@@ -634,6 +636,209 @@ row("D27", "pairzoom", at: 5) { e in
     }
     out["other_before"] = otherBefore
     out["other_after"] = stored(e, b)
+    return out
+}
+
+// MARK: - ai-docs a2: #529, a multi-selection's gesture, and #530, a typed value (spec §11 #529, #530)
+
+/// A clip's base and its first action's end (on a landed clip, its first-frame cut), as stored.
+func placement(_ e: Editor, _ id: UInt32) -> [String: Any] {
+    let base = clip(e, id)?.videoProps
+    let end = endVideo(e, id)
+    return [
+        "base_x": J(base?.x), "base_y": J(base?.y), "base_scale": J(base?.scale),
+        "base_rotation": J(base?.rotation), "base_blur": J(base?.motionBlur),
+        "end_x": J(end?.x), "end_y": J(end?.y), "end_scale": J(end?.scale),
+        "end_rotation": J(end?.rotation), "end_blur": J(end?.motionBlur),
+    ]
+}
+
+/// `key`'s state at frame 0, frame 1 and 4 s, read without moving the playhead: a move through
+/// frame 0 enters the cut, and the entry rule (CI-1) then selects it.
+func states(_ e: Editor, _ id: UInt32, _ key: String) -> [Any] {
+    [Ticks(0), FRAME, T(4)].map { J(stateAt(e, id, $0, key)) }
+}
+
+func inspectorSections(_ e: Editor) -> [InspectorSection] {
+    walk(e.inspector.view).compactMap { $0 as? InspectorSection }
+}
+
+func rowView(_ section: InspectorSection, _ label: String) -> InspectorRowView? {
+    walk(section).compactMap { $0 as? InspectorRowView }.first { row in
+        row.arrangedSubviews.contains { ($0 as? InspectorRowLabel)?.stringValue == label }
+    }
+}
+
+func storedField(_ control: OptionFieldControl) -> NSTextField? {
+    Mirror(reflecting: control).children.first { $0.label == "field" }?.value as? NSTextField
+}
+
+/// Types `text` into the Picture sub-tab's Transform ▸ `label` field and commits it the way a
+/// click-away does (`controlTextDidEndEditing`, the control's own commit path). Answers what the
+/// field showed before and after, or a failure.
+func typeInTransform(_ e: Editor, _ label: String, _ text: String) -> [String: Any] {
+    e.inspector.select(.clip)
+    spin(0.3)
+    e.inspector.selectClipSubTab(.picture)
+    spin(0.4)
+    guard let section = inspectorSections(e).first(where: { $0.id == "video.transform" }) else {
+        return ["failed": "no Transform section; sections: \(inspectorSections(e).map { $0.id })"]
+    }
+    section.reveal()
+    spin(0.3)
+    guard let row = rowView(section, label),
+          let control = walk(row).compactMap({ $0 as? OptionFieldControl }).first,
+          let field = storedField(control)
+    else { return ["failed": "no \(label) field"] }
+    let shown = field.stringValue
+    field.stringValue = text
+    control.controlTextDidEndEditing(
+        Notification(name: NSControl.textDidEndEditingNotification, object: field))
+    spin(0.5)
+    return ["field_before": shown, "field_after": field.stringValue]
+}
+
+/// `text` typed in Transform ▸ `label`: `id`'s placement, `key`'s states, the undo step and the
+/// selected action; then the package saved (for the read-back), one Undo and what it left.
+func typed(_ e: Editor, _ id: UInt32, _ label: String, _ text: String, key: String)
+    -> [String: Any]
+{
+    let selectedBefore = J(e.document.selectedAction.map { Double($0) })
+    var out = typeInTransform(e, label, text)
+    guard out["failed"] == nil else { return out }
+    out["after"] = placement(e, id)
+    out["states"] = states(e, id, key)
+    out["undo"] = undoName(e)
+    out["selected_before"] = selectedBefore
+    out["selected"] = J(e.document.selectedAction.map { Double($0) })
+    save(e)
+    undo(e)
+    out["undone"] = placement(e, id)
+    return out
+}
+
+func clickCamera(_ e: Editor) -> Bool {
+    guard let from = centre(e, CAM) else { return false }
+    clickAt(e, view: from)
+    return true
+}
+
+// #529: {C, S}, C dragged at 4 s; S, the undo and (the proof's read-back) the saved package.
+row("F1", "cam", at: 4) { e in
+    select(e, [CAM, SCREEN])
+    let screenBefore = states(e, SCREEN, "x")
+    var out = dragCamera(e)
+    out["camera"] = placement(e, CAM)
+    out["screen"] = placement(e, SCREEN)
+    out["screen_before"] = screenBefore
+    out["screen_xs"] = states(e, SCREEN, "x")
+    save(e)
+    undo(e)
+    out["undone"] = frames(e, CAM)
+    out["undone_screen"] = states(e, SCREEN, "x")
+    return out
+}
+row("F2", "cam", at: 4) { e in
+    select(e, [CAM, SCREEN])
+    guard let box = e.canvas.box(for: CAM) else { return ["failed": "no box"] }
+    let corner = view(e, box.handlePoint(.topLeft))
+    let hit = e.canvas.hit(at: corner)
+    drag(e, from: corner, to: offset(e, corner, dx: -200, dy: -112))
+    var out = placement(e, CAM)
+    out["hit"] = "\(hit)"
+    out["scales"] = states(e, CAM, "scale")
+    out["undo"] = undoName(e)
+    out["selection"] = e.document.selection.sorted().map { Int($0) }
+    return out
+}
+row("F3", "cam", at: 4) { e in
+    select(e, [CAM, SCREEN])
+    let screenBefore = states(e, SCREEN, "x")
+    e.window.makeFirstResponder(e.overlay)
+    press(e, scalar(NSLeftArrowFunctionKey), 123, ARROW)
+    var out = frames(e, CAM)
+    out["screen_before"] = screenBefore
+    out["screen_xs"] = states(e, SCREEN, "x")
+    out["undo"] = undoName(e)
+    return out
+}
+row("F4", "cam", at: 4) { e in
+    select(e, [CAM, SCREEN])
+    var out = rotateGrip(e, CAM)
+    out["camera"] = placement(e, CAM)
+    out["states"] = states(e, CAM, "rotation")
+    out["undo"] = undoName(e)
+    return out
+}
+row("F5", "pairzoom", at: 5) { e in
+    let a = id("pairzoom", "a")
+    let b = id("pairzoom", "b")
+    select(e, [a, b])
+    let aBefore = clip(e, a)?.videoProps.x
+    let bBefore = clip(e, b)?.videoProps.x
+    let bEnd = endVideo(e, b)?.x
+    var out = dragBy(e, a, dx: -400)
+    out["a_before"] = J(aBefore)
+    out["a_after"] = J(clip(e, a)?.videoProps.x)
+    out["b_before"] = J(bBefore)
+    out["b_after"] = J(clip(e, b)?.videoProps.x)
+    out["b_end_before"] = J(bEnd)
+    out["b_end_after"] = J(endVideo(e, b)?.x)
+    out["strip"] = strip(e)
+    out["undo"] = undoName(e)
+    return out
+}
+row("F6", "cam", at: 4) { e in
+    guard clickCamera(e) else { return ["failed": "no box"] }
+    return typed(e, CAM, "Position X", "-500", key: "x")
+}
+row("F7", "cam", at: 0) { e in
+    guard clickCamera(e) else { return ["failed": "no box"] }
+    return typed(e, CAM, "Position X", "-500", key: "x")
+}
+row("F8", "cam", at: 0) { e in
+    guard clickCamera(e) else { return ["failed": "no box"] }
+    return typed(e, CAM, "Position Y", "-300", key: "y")
+}
+row("F9", "cam", at: 4) { e in
+    guard clickCamera(e) else { return ["failed": "no box"] }
+    return typed(e, CAM, "Scale", "50", key: "scale")
+}
+row("F10", "cam", at: 4) { e in
+    guard clickCamera(e) else { return ["failed": "no box"] }
+    return typed(e, CAM, "Rotation", "30", key: "rotation")
+}
+row("F11", "cam", at: 0) { e in
+    guard clickCamera(e) else { return ["failed": "no box"] }
+    return typed(e, CAM, "Motion Blur", "50", key: "motion_blur")
+}
+row("F12", "late", at: 4) { e in
+    let late = id("late", "clip")
+    guard let from = centre(e, late) else { return ["failed": "no box"] }
+    clickAt(e, view: from)
+    return typed(e, late, "Position X", "-400", key: "x")
+}
+row("F13", "cam", at: 4) { e in
+    select(e, [CAM, SCREEN])
+    var out = typeInTransform(e, "Position X", "-500")
+    out["camera"] = placement(e, CAM)
+    out["screen"] = placement(e, SCREEN)
+    out["xs"] = states(e, CAM, "x")
+    out["screen_xs"] = states(e, SCREEN, "x")
+    out["undo"] = undoName(e)
+    return out
+}
+row("F14", "cam", at: 4) { e in
+    guard let cut = clip(e, CAM)?.actions.first?.id else { return ["failed": "no cut"] }
+    e.document.applyEdit("Setup", [
+        .setVideo(clips: [CAM], patch: VideoPatch(motionBlur: 0.3)),
+        .setActionEnd(clip: CAM, action: cut, patch: ActionPatch(video: VideoPatch(motionBlur: 0.3))),
+    ])
+    spin(0.3)
+    let setup = placement(e, CAM)
+    guard clickCamera(e) else { return ["failed": "no box"] }
+    var out = typed(e, CAM, "Motion Blur", "50", key: "motion_blur")
+    out["setup"] = setup
     return out
 }
 

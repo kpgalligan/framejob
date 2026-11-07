@@ -321,9 +321,9 @@ the same way.
 - **Source:** #463, #474.
 
 **TL-19 — A recording's camera drags on a real canvas**
-- **Do:** Land a screen recording with a camera. With the playhead past the first frame, drag the camera on the canvas, resize it by a corner, press ←, then Undo each. Play from the first frame after a drag.
-- **Expect:** The camera follows the pointer. Each is one undo step, and playback has no one-frame jump at the start.
-- **Source:** #469, spec §11 CI-17.
+- **Do:** Land a screen recording with a camera. With the playhead past the first frame, drag the camera on the canvas, resize it by a corner, press ←, then Undo each. Play from the first frame after a drag. Then ⇧-click the screen so both are selected and drag the camera again. Then click the camera alone, with no action selected, and type a Position X in the Picture tab's Transform rows. Play from the first frame after each.
+- **Expect:** The camera follows the pointer. Each is one undo step, and playback has no one-frame jump at the start. With the screen selected too, the camera moves on every frame, and so does the screen. The typed Position X moves the camera on every frame, with no one-frame jump.
+- **Source:** #469, #529, #530, spec §11 CI-17, #529, #530.
 
 **TL-20 — A nest clip by hand**
 - **Do:** Nest a clip in a corner of the picture over a full-size clip. Click the corner picture, drag it, scale it by a corner, rotate it, then press Z and draw a band. Click elsewhere on the picture. Press C and double-click the nest.

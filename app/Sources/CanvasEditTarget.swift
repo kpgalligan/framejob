@@ -5,11 +5,13 @@ import Foundation
 /// make (CI-2), so a drag, a nudge and a typed value all write one place.
 /// The one exception is a clip's first-frame CUT (CI-17): a one-frame layout
 /// action at clip time 0 holds the placement for every frame after the
-/// first, so with one clip and no action selected a gesture goes to the cut
-/// (`holding`) where a typed value still writes the base, and a gesture on a
-/// cut writes the base as well (`ops(video:clip:)`). Past any other finished
-/// action whose end holds a key the gesture writes, the same single clip's
-/// gesture refuses, naming that action (CI-19): `heldRefusal`.
+/// first, so with no action selected a gesture goes to the cut (`holding`;
+/// for a multi-selection each written clip's cut, in `held`, spec §11 #529),
+/// and a gesture on a cut writes the base as well (`ops(video:clip:)`). A
+/// typed value keeps the cut and the base together the same way
+/// (`InspectorBinding.keepingCuts`, #530). Past any other finished action
+/// whose end holds a key the gesture writes, a single clip's gesture
+/// refuses, naming that action (CI-19): `heldRefusal`.
 ///
 /// It reaches the canvas as a value on two channels: the refresh that already
 /// follows a selection (`EditorViewController.refreshCanvas`) and the
@@ -17,8 +19,8 @@ import Foundation
 /// an action without a refresh). A gesture captures it at mouse-down as
 /// `PreviewCanvasView.gestureTarget` and writes through that for every tick,
 /// and the sessions in `CanvasSessions.swift` ask it for their ops rather
-/// than naming `set_video` themselves. A multi-selection is always `.base`:
-/// no action is selected then (CI-1).
+/// than naming `set_video` themselves. A multi-selection has no action
+/// selected (CI-1), so it writes the base but for its clips' cuts (`held`).
 ///
 /// **The box on screen is still the frame at the PLAYHEAD.** A gesture
 /// STARTS from `start(of:in:)` — the end state, for the selected action's
@@ -50,6 +52,9 @@ struct CanvasEditTarget: Equatable {
 
     /// nil: base props.
     let selected: Selected?
+    /// #529: a multi-selection's clips written on their first-frame cut and their base, by clip id.
+    /// Always empty for a single clip and for `current(_:)`.
+    var held: [UInt32: Selected] = [:]
 
     static let base = CanvasEditTarget(selected: nil)
 
@@ -69,7 +74,7 @@ struct CanvasEditTarget: Equatable {
     /// A first-frame cut (CO-61, CO-80 (b)): a layout action at clip time 0,
     /// at most one canvas frame long. Any longer and it is a move a person
     /// can see, which keeps CI-13's base.
-    private static func isCut(_ action: ActionSnapshot, frame: Ticks) -> Bool {
+    static func isCut(_ action: ActionSnapshot, frame: Ticks) -> Bool {
         action.start == 0 && action.duration <= frame && VerticalVersion.isLayoutAction(action)
     }
 
@@ -84,6 +89,17 @@ struct CanvasEditTarget: Equatable {
         else { return self }
         return CanvasEditTarget(
             selected: Selected(clip: clip.id, action: cut.id, endTime: cut.endTime, cut: true))
+    }
+
+    /// `holding(_:clip:frame:)` for each clip of a multi-selection: `held` names every clip whose cut
+    /// holds a key `gesture` writes (`holds`). With `selected` non-nil, answers `self`.
+    func holding(_ gesture: Gesture, clips: [ClipSnapshot], frame: Ticks) -> CanvasEditTarget {
+        guard selected == nil else { return self }
+        var next = self
+        for clip in clips {
+            if let cut = holding(gesture, clip: clip, frame: frame).selected { next.held[clip.id] = cut }
+        }
+        return next
     }
 
     /// Whether an end patch names any key `gesture` writes.
@@ -104,11 +120,17 @@ struct CanvasEditTarget: Equatable {
         }
     }
 
+    /// What this target writes on `clip`: `selected` for its clip, else the
+    /// clip's entry in `held`; nil when `clip` is written at its base.
+    private func written(_ clip: UInt32) -> Selected? {
+        if let selected, selected.clip == clip { return selected }
+        return held[clip]
+    }
+
     /// The action this target writes on `clip`, nil when `clip` is written
     /// at its base.
     private func action(on clip: UInt32) -> UInt32? {
-        guard let selected, selected.clip == clip else { return nil }
-        return selected.action
+        written(clip)?.action
     }
 
     /// `set_action_end` for the selected action's clip, `set_video` for any
@@ -140,14 +162,15 @@ struct CanvasEditTarget: Equatable {
         return [edit, .setText(clips: [clip], patch: patch)]
     }
 
-    private func onCut(_ clip: UInt32) -> Bool { selected?.clip == clip && selected?.cut == true }
+    private func onCut(_ clip: UInt32) -> Bool { written(clip)?.cut == true }
 
     /// `clip_state` at `clip.start + endTime` decoded through
     /// `InspectorBinding.decode` — the inspector's own read of an END state,
-    /// video and text from ONE call — for `selected.clip`; the clip's base
-    /// props otherwise. A group the core does not answer falls back to base.
+    /// video and text from ONE call — for `selected.clip` and a clip in
+    /// `held`; the clip's base props otherwise. A group the core does not
+    /// answer falls back to base.
     func start(of clip: ClipSnapshot, in project: ReelProject?) -> Start {
-        guard let selected, selected.clip == clip.id,
+        guard let selected = written(clip.id),
               let raw = project?.clipState(clip.id, at: clip.start + selected.endTime)
         else { return Start(video: clip.videoProps, text: clip.text) }
         return Start(
@@ -280,10 +303,16 @@ extension PreviewCanvasView {
 
 extension PreviewCanvasView {
     /// The target a gesture starts from and writes: `editTarget` with an
-    /// action selected or anything but one clip selected, otherwise that
-    /// clip's `holding` (CI-17). Asked at mouse-down and never written back:
-    /// `editTarget` stays the document's mode, and the selection stays as it is.
+    /// action selected or nothing selected, otherwise the clip's `holding`
+    /// (CI-17), or each selected clip's for a multi-selection (#529). Asked at
+    /// mouse-down and never written back: `editTarget` stays the document's
+    /// mode, and the selection stays as it is.
     func heldTarget(_ gesture: CanvasEditTarget.Gesture) -> CanvasEditTarget {
+        if editTarget.selected == nil, selection.count > 1 {
+            return editTarget.holding(
+                gesture, clips: selection.sorted().compactMap { snapshot.clip($0) },
+                frame: snapshot.canvas.fps.frameDuration)
+        }
         guard editTarget.selected == nil, selection.count == 1, let id = selection.first,
               let clip = snapshot.clip(id)
         else { return editTarget }
@@ -298,6 +327,53 @@ extension VideoProps {
     var uncropped: VideoProps {
         var next = self
         next.crop = .zero
+        return next
+    }
+}
+
+extension ClipSnapshot {
+    /// The clip's first-frame cut (CI-17), the first action `CanvasEditTarget.isCut` answers; nil when none.
+    func firstFrameCut(frame: Ticks) -> ActionSnapshot? {
+        actions.first { CanvasEditTarget.isCut($0, frame: frame) }
+    }
+}
+
+extension VideoPatch {
+    /// This patch's keys whose `dictionary` name `end?.dictionary` also has (a sparse part such as
+    /// `cutoutPart` counts under its parent's name, `cutout`); every other key nil. nil `end` → empty.
+    /// #530's write to a cut: only what the cut already holds goes there.
+    func held(by end: VideoPatch?) -> VideoPatch {
+        guard let end else { return VideoPatch() }
+        let names = Set(end.dictionary.keys)
+        func kept<T>(_ value: T?, _ name: String) -> T? { names.contains(name) ? value : nil }
+        var next = VideoPatch()
+        next.x = kept(x, "x")
+        next.y = kept(y, "y")
+        next.scale = kept(scale, "scale")
+        next.rotation = kept(rotation, "rotation")
+        next.opacity = kept(opacity, "opacity")
+        next.crop = kept(crop, "crop")
+        next.cornerRadius = kept(cornerRadius, "corner_radius")
+        next.shadow = kept(shadow, "shadow")
+        next.color = kept(color, "color")
+        next.chroma = kept(chroma, "chroma")
+        next.filters = kept(filters, "filters")
+        next.reflection = kept(reflection, "reflection")
+        next.spotlight = kept(spotlight, "spotlight")
+        next.obscure = kept(obscure, "obscure")
+        next.blend = kept(blend, "blend")
+        next.motion = kept(motion, "motion")
+        next.look = kept(look, "look")
+        next.wheels = kept(wheels, "wheels")
+        next.curves = kept(curves, "curves")
+        next.qualifier = kept(qualifier, "qualifier")
+        next.cursor = kept(cursor, "cursor")
+        next.cursorPart = kept(cursorPart, "cursor")
+        next.cutout = kept(cutout, "cutout")
+        next.cutoutPart = kept(cutoutPart, "cutout")
+        next.behindSubject = kept(behindSubject, "behind_subject")
+        next.motionBlur = kept(motionBlur, "motion_blur")
+        next.hideSilent = kept(hideSilent, "hide_silent")
         return next
     }
 }

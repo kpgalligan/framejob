@@ -30148,9 +30148,9 @@ RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a2_proof.py --tree <a b
 python3 tools/proof/docs_bugs_a2_proof.py --mutant <name>
 ```
 
-## Docs-bugs batch a3 — canvas selection and the inspector around it (`docs_bugs_a3_proof.py`, `docs_bugs_a3_probe.swift`; twenty-one mutants by `--mutant`; spec §11 CI-17, CI-18, CI-19)
+## Docs-bugs batch a3 — canvas selection and the inspector around it (`docs_bugs_a3_proof.py`, `docs_bugs_a3_probe.swift`; twenty-eight mutants by `--mutant`; spec §11 CI-17, CI-18, CI-19, #529, #530)
 
-#469, #476, #471, #481 and #485, and batch a5's CI-19 rows. **`docs_bugs_a3_proof.py`** has the app under test make seventeen
+#469, #476, #471, #481 and #485, batch a5's CI-19 rows and ai-docs a2's F rows. **`docs_bugs_a3_proof.py`** has the app under test make seventeen
 projects over MCP (a recording with a camera through `land_recording`), then runs every row but Z1
 through **`docs_bugs_a3_probe.swift`**, the app's own sources on those packages: a drag, a click and
 a key press can't be sent over MCP. The app is `.prohibited` and its windows alpha 0, so nothing
@@ -30173,6 +30173,23 @@ width only), D27 (a ⇧-press that takes the dragged clip out of a pair) and V1 
 MCP, in the fixtures' launch). A grip off the overlay's bounds, such as a zoomed box's corner, is
 pressed through the overlay's own `mouseDown(with:)`, and the row prints which door it used. The
 nine `held-*` mutants each break one CI-19 decision.
+
+ai-docs a2 (#529 and #530, the owner's "Both follow the drag", spec §11 #529, #530) rescored D12,
+which had pinned a multi-selection's base write past the camera's first-frame cut as a CONTROL, and
+added F1–F14. On the `cam` fixture the camera C and the screen S both land with a cut (CO-80); each
+row reads the stored base and cut end and the state at frame 0, frame 1 and 4 s without moving the
+playhead. #529's rows select {C, S} with no action: F1 a drag of C (S moves on every frame, its base
+x its cut end x, one Undo puts both back), F2 a corner scale, F3 a ← nudge. #530's rows type into the
+Picture sub-tab's Transform fields and commit through the field's own click-away path
+(`controlTextDidEndEditing`): F6 X with no action selected, F7 X and F8 Y with the cut selected by a
+click at frame 0, F9 Scale, F11 Motion Blur with the cut selected, F13 X on {C, S}, F14 Motion Blur
+where the base and the cut already hold 0.3. F1, F6, F7 and F8's saved packages are rendered by the
+app under test against the untouched fixture where the camera went, at all three times. The
+CONTROLs are F4 (a rotate: the cut holds no rotation), F5 (`pairzoom` {a, b}: a finished zoom that is
+not a cut keeps its end, no refusal), F10 (Rotation typed: the base alone) and F12 (the `late`
+fixture: a one-frame layout action past clip time 0 is not a cut). Its seven mutants are
+`multi-no-held`, `multi-front-only`, `typed-no-cut`, `typed-no-base`, `typed-any-key`,
+`typed-cut-placement-only` and `typed-held-placement-only`, and `cut-any-start` now fails F12 too.
 
 ```sh
 make app-debug && python3 tools/proof/docs_bugs_a3_proof.py [--only D1,N3]

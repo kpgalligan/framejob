@@ -1724,9 +1724,10 @@ the key map behind it.
   `start(of:in:)` — one `clip_state` at the action's end, decoded through
   `InspectorBinding.decode`. A shape's box scale is `.base` whole
   (`forScale(of:)`): `set_shape` has no action form. With no action
-  selected a single clip's gesture goes to its first-frame cut when the cut
-  holds a key it writes, and a cut also writes the base (`heldTarget`, spec
-  §11 CI-17); past a finished action that is not a cut and holds a key the
+  selected a gesture goes to each written clip's first-frame cut when the
+  cut holds a key it writes (`holding`; a multi-selection's in `held`, spec
+  §11 CI-17, #529), and a cut also writes the base (`heldTarget`); past a
+  finished action that is not a cut and holds a key the
   gesture writes (a text clip's side handle writes only its width), a
   gesture whose clip is the whole selection refuses, on its first drag tick
   (a nudge at once), naming the action's lane number, through `onRefuse` →
@@ -1849,7 +1850,9 @@ the key map behind it.
   keep-pitch there (CI-3);
   `ops(graphic:entries:clips:schema:)` / `ops(graphic:for:clips:schema:)` are G-34 (l)'s split: the base
   write keeps G-15 (b)'s nulls (`patchProps`), the end write carries the values and the module's schema,
-  and an asset is the base's, by CI-3's mechanism; `split` forwards `schema`) ·
+  and an asset is the base's, by CI-3's mechanism; `split` forwards `schema`; on a clip
+  with a first-frame cut a video write keeps the cut and the base together (`keepingCuts`,
+  spec §11 #530)) ·
   `InspectorSection.swift` (`InspectorSection` with its `id`, `title`,
   `header` and folded `marks` readable — `differs` from an explicit closure
   else the rows' defaults, `editing` the selected action's number when a

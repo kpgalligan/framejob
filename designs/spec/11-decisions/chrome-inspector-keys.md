@@ -52,7 +52,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   edit lands, so fields do not move with it. Selecting an action parks the
   playhead at its end (one frame short when the action ends with the clip,
   whose end tick composes nothing), so the preview shows the state the
-  fields show.
+  fields show. **Amended by #530:** on a clip with a first-frame cut
+  (CI-17), a video value written with the cut selected goes to the base
+  too, and one written with no action selected goes to the cut too for
+  every key the cut's end already names.
 - **CI-3 — Pan, mono, compressor, noise reduction, duck and keep-pitch go
   to the BASE props whatever is selected.** The app routes them there
   (`InspectorBinding.structural(audio:for:)`, beside
@@ -264,7 +267,11 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   does not move the drag's writes. **Amended by CI-17:** a single clip's
   gesture on a first-frame cut goes to the cut, and writes the base too.
   **Amended by CI-19:** past a finished action holding a key it writes, a
-  single clip's gesture refuses.
+  single clip's gesture refuses. **Amended by #529:** with no action
+  selected, a multi-selection's gesture goes to each written clip's
+  first-frame cut where the cut holds a key the gesture writes, and to its
+  base as well. **Amended by #530:** a typed value on a clip with a
+  first-frame cut writes the cut and the base together.
 - **CI-14 — `set_action_end.off` keys an optional property OFF at the end**
   (phase 5, P10). The end state holding `null` at an optional key is the
   property switched off when the action finishes: the evaluator already
@@ -470,7 +477,12 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   not name; the inspector's fields keep CI-2 and their ◇. A cut is therefore
   the one case where a drag and a typed value write different places.
   **Amended by CI-19:** past a finished action holding a key it writes, a
-  single clip's gesture refuses.
+  single clip's gesture refuses. **Amended by #529:** a multi-selection's
+  gesture follows the same rule for each clip it writes, so its
+  "multi-selection stays on the base" holds only past an action that is not
+  a cut. **Amended by #530:** a typed value keeps the cut and the base
+  together too, so a drag and a typed value no longer write different
+  places.
 - **CI-18 — A list's add and remove buttons carry the boxed "clip" tag**
   (#481, 2026-11-05). Add Filter, Add Region with Place on Canvas (one tag
   for the row) and each Remove take `InspectorClipTag`, #102's mark for a
@@ -501,13 +513,15 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   does not let it: before the action starts, or while it runs with no
   action selected (after Esc), the gesture writes CI-13's base, and a clip
   whose only holder is its cut keeps CI-17. Unchanged: a multi-selection
-  (CI-13; #529), including a scale, rotate or crop on its primary box; a
+  past an action that is not a cut (CI-13; #529), including a scale, rotate or crop on its primary box; a
   ⇧-press that takes the dragged clip out of the selection; a shape's box
   scale and an endpoint drag (`set_shape` has no action form, so selecting
   the action would not help); obscure grips (CI-16); the inspector's fields
   (CI-2, ◇); and `set_video`, `set_text` and `set_action_end` over MCP — no
   tool reaches a canvas gesture, so no agent mirror changes. CI-2 and CI-13
-  stand: the refusal only says where the write would go.
+  stand: the refusal only says where the write would go. **Amended by
+  #529:** a multi-selection's gesture on a clip whose first-frame cut holds
+  a key it writes goes to the cut and the base (CI-17), and never refuses.
 - **SH-4 — `StickerButton` is Rasterize's square block, drawn in place;
   supersedes SH-1** (kpgalligan/framejob#100, the owner, 2026-09-30). The
   class, its name, its `init(title:style:target:action:)` and all 28 calls
@@ -555,3 +569,33 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   rate there. The popup used to fall back to its first item, so it drew and
   checked 24 for any unlisted rate. `Fps.common` and the Export sheet's
   rates are unchanged.
+- **#529 — A multi-selection's canvas gesture moves each written clip's
+  first-frame cut with its base; amends CI-13 and CI-17** (2026-11-06, the
+  owner: "Both follow the drag"). With no action selected and several clips
+  selected, a gesture writes each clip it writes as CI-17 writes one clip.
+  A move or an arrow-key nudge writes every selected clip, and a scale,
+  rotate or crop writes the pressed (front-most) clip. Where that clip's
+  first-frame cut holds a key the gesture writes, the gesture starts from
+  the cut's end and writes the cut and the base together, one undo step
+  named as before ("Move", "Nudge", "Scale"). The owner's words name the
+  front-most selected clip, the one a scale, rotate or crop writes; a move
+  and a nudge write every selected clip, so each moved clip's cut moves
+  with it: writing only the front clip's cut would leave every other moved
+  clip jumping after its frame 0, which is #529's bug. Unchanged: past an
+  action that is not a cut, a multi-selection writes the base and never
+  refuses (CI-19 stays a single clip's); a shape's box scale stays on the
+  base; a rotate stays on the base unless the cut holds `rotation`.
+- **#530 — A video value typed or set in the inspector on a clip with a
+  first-frame cut writes the cut and the base together; amends CI-2**
+  (2026-11-06, the owner: "Both follow the drag"). It covers every write
+  through `InspectorBinding.ops(video:)`: a typed field, a slider, Reset and
+  the row menu. With the clip's cut (CI-17) selected, every value written
+  to the cut's end goes to the base too. With no action selected, every key
+  of the write that the cut's end already names goes to the cut too,
+  beside the base; a `null` there, such as Shadow turned off, is keyed off
+  at the cut's end (CI-14's `off`, which the typed builder lifts it into),
+  so frame 0 and the rest agree. A key
+  the cut's end does not name, such as a rotation on a landed camera, goes
+  to the base only. Unchanged: with another action selected, CI-2; text,
+  audio and graphic values; the marks (◆ ◇ ⊘). No MCP change: an agent
+  sends `set_video` and `set_action_end` itself.
