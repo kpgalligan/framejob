@@ -385,7 +385,7 @@ Concat is opened, at design time or build time.
     until opened, summary "off" or the ranges on ("hue · sat · luma", plus " · inverted"), Reset
     clears every range and Invert (undo "Qualifier"). Per range two rows: a checkbox (Hue,
     Saturation, Luma) in the 76 pt label column then the strip; then three captioned 40 pt fields
-    (Centre, Width, Soft in whole degrees; Low, High, Soft to 2 decimals). Then Invert, then
+    (Center (amended by #526), Width, Soft in whole degrees; Low, High, Soft to 2 decimals). Then Invert, then
     `[Pick from Canvas]  ☐ Show Selection`. The strip is 14 pt tall and square-framed: the hue
     spectrum (full saturation), a neutral → red ramp, or black → white; outside the range and its
     softness dimmed 60 %, the soft bands 30 %; the edges are the slider's 7 × 11 block knobs, the

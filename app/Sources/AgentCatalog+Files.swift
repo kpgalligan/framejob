@@ -141,7 +141,7 @@ extension AgentServer {
             opTool(
                 "set_media_color",
                 "Sets how a video file's camera log footage is converted to the project's "
-                    + "colour, Rec. 709 or HLG in an HDR project — the "
+                    + "color, Rec. 709 or HLG in an HDR project — the "
                     + "Media tab's Camera Log popup. Every clip of the file, and its reverse, "
                     + "follows it; it is converted before the chroma key and every grade, and "
                     + "Show Ungraded keeps it. color is {log, gamut?}: log apple_log (gamut "

@@ -437,7 +437,8 @@ governs a module now.
   `round(Δ × speed)` mover the six placement sites used to write out. Cut
   out of `model_query.rs` by road map 7 §10's phase A.
 - `time.rs` — `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode
-  format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`). Snapping keeps
+  format/parse (`HH:MM:SS:FF`, non-drop at an NTSC rate and in real seconds
+  at any other fractional rate (spec §11 #532), and `HH:MM:SS.mmm`). Snapping keeps
   frame indices wide through directional adjustment and saturates only at the
   public tick/index result. `frames_in` (whole grid frames in a length),
   `frames_back` (the grid position k frames before the frame nearest a

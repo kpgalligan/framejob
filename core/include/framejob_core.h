@@ -491,8 +491,9 @@ int64_t rc_snap_resolve(const char *candidates_json, int64_t t, int64_t threshol
  * `t` unchanged for a degenerate rate. */
 int64_t rc_time_snap_to_frame(int64_t t, uint32_t fps_num, uint32_t fps_den);
 
-/* Non-drop timecode: "HH:MM:SS:FF" when `frames`, else "HH:MM:SS.mmm".
- * Negative times get a leading '-'. */
+/* Timecode: "HH:MM:SS:FF" when `frames` (non-drop at an NTSC rate, real
+ * seconds at any other fractional rate, spec §11 #532), else
+ * "HH:MM:SS.mmm". Negative times get a leading '-'. */
 char *rc_timecode_format(int64_t t, uint32_t fps_num, uint32_t fps_den, bool frames);
 
 /* Parses "HH:MM:SS:FF", "MM:SS", "SS.sss" and "HH:MM:SS.mmm" into ticks.

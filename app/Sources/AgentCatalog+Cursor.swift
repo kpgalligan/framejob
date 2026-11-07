@@ -40,7 +40,7 @@ extension AgentServer {
                     + "times are the file's own SOURCE ticks (time \"media\"); with clip, "
                     + "they are ticks from the clip's start (time \"clip\", through its speed "
                     + "and ramp), and each click and scroll also has q [qx, qy]: its position "
-                    + "in the clip's region frame — an offset in source pixels from the centre "
+                    + "in the clip's region frame — an offset in source pixels from the center "
                     + "of the clip's cropped picture, the frame add_zoom_action's region "
                     + "takes, so a region around a click is {x: qx, y: qy, w, h}. x and y are "
                     + "the movie's own pixels from its top-left; size is [w, h]. clicks "

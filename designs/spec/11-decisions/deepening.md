@@ -1775,3 +1775,39 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   preview's item, both export passes and the offline frame — so an export
   of such a timeline runs to its end too. A missing `Blank.mp4` still
   leaves the composition as it was, never a crash.
+- **#521 — The Transcript tab's overlap sentence names an overlap, not a
+  transition** (the owner, 2026-11-06, "Reword"). A word TX-11 holds back
+  for meeting a `SilenceDetector.overlapWalls(snapshot)` wall reads "Near an
+  overlap between two clips: a cut here would leave one clip's tail under
+  the other." The rule is unchanged: `overlapWalls` is any overlap on an
+  unlocked track, with or without a transition, widened by its own length
+  each side, so a word up to one overlap length outside it is held back too.
+  The old sentence ("Under a transition: …") showed by an overlap with no
+  transition and on words outside the overlap. Amends TX-11's quoted
+  sentence.
+- **#526 — The app's own strings spell color and center the American way**
+  (the owner, 2026-11-06, "American", matching the Color tab, Key Color,
+  Normalize and macOS). Every string a person reads (a label, tooltip,
+  note, readout, hint or plan note) or a caller reads (a tool's, argument's
+  or declaration's text, an app or core refusal or error sentence) spells
+  color, colors, colored, center, centers and centered. Identifiers, JSON
+  keys and values (`ScopeTraces`' `"centre"`), FFI names
+  (`rc_normalise_color`), cache keys, Matroska element names and code
+  comments keep theirs. The documentation's prose stays British; a quoted
+  label, and an alt text quoting one, follows the app. Amends GR-13's
+  caption ("Center"), GR-38's tip and its "Centre stays", HD-13 (k)'s
+  "Color row", VR-34's two notes, and G-12's and CU-30's quoted sentences.
+  Other British forms in the app's strings (analysed, normalised,
+  recognised, neighbour, grey and the rest) are a separate issue.
+- **#532 — A frames timecode counts real seconds at a fractional rate that
+  is not NTSC.** At an NTSC rate (`Fps::counts_nominal_seconds`: the rate's
+  denominator over the gcd of its numerator and denominator is 1001, so
+  `[60000, 2002]` is `[30000, 1001]`) `HH:MM:SS:FF` stays non-drop, a second
+  of `ceil(num/den)` frames, and drifts from the clock as §7.3b says. At
+  every other rate SS is the whole second the frame starts in,
+  `floor(index·den/num)`, and FF counts frames since that second's first
+  frame, `index − ceil(SS·num/den)`. So at 12.5 fps a second holds 13 frames
+  then 12, 500 frames read `00:00:40:00`, and a whole rate reads as before.
+  `parse_timecode` inverts it. It moves every reading at such a rate: the
+  toolbar, the export sheet's readout, a burn-in, a layout name and an image
+  sequence's or Save Frame's name. The milliseconds form is unchanged.

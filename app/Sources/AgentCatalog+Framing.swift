@@ -52,7 +52,7 @@ extension AgentServer {
                     + "place across the picture: name them with mic_faces. A clip that changes "
                     + "shot is refused (split it at its shot changes first), and so is a call "
                     + "addressed to a nest that is not the open one. center holds the window "
-                    + "on the picture's centre, fit shows the whole picture for the whole clip, "
+                    + "on the picture's center, fit shows the whole picture for the whole clip, "
                     + "and keep rescales the clip from the canvas it was made for "
                     + "(from_width × from_height) as Change Canvas does, its actions' "
                     + "positions and scales with it. The framing is composed into the clip: "
@@ -157,7 +157,7 @@ extension AgentServer {
                     + "mic_faces or matched by Frame Job), falling back to following its "
                     + "faces with the reason when that is refused, and every other movie clip "
                     + "follows its faces; a still "
-                    + "picture or a nest is centred); a camera and the screen behind it laid "
+                    + "picture or a nest is centered); a camera and the screen behind it laid "
                     + "out with Clip ▸ Camera Layout ▸ are re-laid, not reframed (reframe_clip "
                     + "with follow layout, one per camera): each switch solved again for the "
                     + "new canvas at its old time, length and curve, Side by Side becoming "
@@ -219,8 +219,8 @@ extension AgentServer {
                         "description": "What a movie clip follows: subject (the default), face, "
                             + "person or salient, speaker (whoever is talking, from mics; the "
                             + "other movie clips follow their faces), or center to hold the "
-                            + "picture's centre. A screen recording with a cursor file follows "
-                            + "its cursor with any but center, and is centred with center.",
+                            + "picture's center. A screen recording with a cursor file follows "
+                            + "its cursor with any but center, and is centered with center.",
                     ],
                     "mics": [
                         "type": "array", "items": ["type": "integer"],

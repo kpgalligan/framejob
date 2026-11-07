@@ -417,8 +417,8 @@ left to JOB-35.
   for a following kind; a media picture whose media file is missing (no URL in `mediaURLs()`)
   under a following kind takes `keep` and is not followed, "its media file is missing, so it
   is kept as placed" (under `center` it is centred as any media picture); a still or image
-  picture takes `center` and is not followed, "it is a still picture, so it is centred"; a
-  nest takes `center`, "it is a nest, so it is centred"; an other clip takes `keep` and is
+  picture takes `center` and is not followed, "it is a still picture, so it is centered"; a
+  nest takes `center`, "it is a nest, so it is centered" (amended by #526); an other clip takes `keep` and is
   kept. Only the op's answer decides an entry. **Applied:** a following kind or `center` on a
   media picture is **whole** only when the op added a "Blurred Background" clip to the trial
   (any track) AND `FollowSubject.framing` (k = s′/s, dx = x′ − k·x, dy = y′ − k·y from both

@@ -302,7 +302,8 @@ enum ReelTime {
         return rc_time_snap_to_frame(t, rate.num, rate.den)
     }
 
-    /// Non-drop timecode: "HH:MM:SS:FF" when `frames`, else "HH:MM:SS.mmm".
+    /// Timecode: "HH:MM:SS:FF" when `frames` (non-drop at an NTSC rate, real
+    /// seconds at any other fractional rate, spec §11 #532), else "HH:MM:SS.mmm".
     static func format(_ t: Ticks, fps: Fps, frames: Bool) -> String {
         guard let rate = fps.ffiPair,
               let text = takeString(rc_timecode_format(t, rate.num, rate.den, frames))

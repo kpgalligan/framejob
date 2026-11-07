@@ -753,7 +753,7 @@
     {
      "id": "document-summary",
      "name": "Document summary rows",
-     "summary": "Read-only rows show Resolution, Frame rate, Duration, Tracks, Background and Colour.",
+     "summary": "Read-only rows show Resolution, Frame rate, Duration, Tracks, Background and Color.",
      "page": "projects/document-tab",
      "anchor": "the-document-summary",
      "where": "Document tab ▸ Document"
@@ -12165,11 +12165,11 @@
     },
     {
      "id": "project-colour-row",
-     "name": "Colour row in the Document section",
-     "summary": "The Document section's Colour row shows the project's dynamic range.",
+     "name": "Color row in the Document section",
+     "summary": "The Document section's Color row shows the project's dynamic range.",
      "page": "hdr/dynamic-range",
-     "anchor": "the-colour-row",
-     "where": "Document tab ▸ Document ▸ Colour"
+     "anchor": "the-color-row",
+     "where": "Document tab ▸ Document ▸ Color"
     },
     {
      "id": "hlg-working-space",

@@ -457,17 +457,17 @@ extension AgentServer {
                     "at": "Where, \(ticks) Default: the playhead.",
                     "name": "Marker name. Default: Marker <n>.",
                     "chapter": "Also a chapter of the exported movie (default false).",
-                    "color": "Colour NAME, e.g. \"red\" — not a hex string.",
+                    "color": "Color NAME, e.g. \"red\" — not a hex string.",
                 ]),
             opTool(
                 "set_marker",
-                "Moves or renames a marker, or changes its colour or chapter flag.",
+                "Moves or renames a marker, or changes its color or chapter flag.",
                 [
                     "marker": "Marker id.",
                     "time": "New time, \(ticks)",
                     "name": "New marker name.",
                     "chapter": "Make it a chapter of the exported movie, or stop being one.",
-                    "color": "Colour name.",
+                    "color": "Color name.",
                 ]),
             opTool("remove_marker", "Removes a marker.", ["marker": "Marker id."]),
 
@@ -490,7 +490,7 @@ extension AgentServer {
                     "height": "Canvas height in pixels.",
                     "fps": "Frame rate as [numerator, denominator]: [30, 1], "
                         + "[30000, 1001] for 29.97, [24000, 1001] for 23.976.",
-                    "background": colorDescription("Colour behind every layer"),
+                    "background": colorDescription("Color behind every layer"),
                     "rescale_clips": "Scale every clip's placement with the canvas "
                         + "(default false).",
                     "fit_new_clips": "Give a new clip Fit scale when its source is bigger "
@@ -498,7 +498,7 @@ extension AgentServer {
                     "timecode_frames": "Show times as HH:MM:SS:FF rather than HH:MM:SS.mmm.",
                     "output": "The project's dynamic range: \"sdr\" (Rec. 709, the default) or "
                         + "\"hlg\" (HDR, Rec. 2100 HLG). Switching keeps every grade's settings, "
-                        + "and a chroma key keeps keying the colour it was picked on; a "
+                        + "and a chroma key keeps keying the color it was picked on; a "
                         + "qualifier's ranges read the HLG signal, so re-pick them after "
                         + "switching. UI: Document tab ▸ Canvas ▸ Dynamic Range.",
                     "blending": "How layers blend: \"encoded\" (the default) or \"linear\" "

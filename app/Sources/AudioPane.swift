@@ -521,7 +521,7 @@ final class AudioPane: InspectorPaneView {
             id: "audio.mix", title: "Mix",
             summary: {
                 let pan = binding.audioProps.pan
-                if abs(pan) < 0.005 { return binding.audioProps.mono ? "mono" : "centre" }
+                if abs(pan) < 0.005 { return binding.audioProps.mono ? "mono" : "center" }
                 return String(format: "%@ %.0f", pan < 0 ? "left" : "right", abs(pan) * 100)
             },
             reset: { binding.apply("Mix", audio: AudioPatch(mono: false, pan: 0)) },
@@ -538,7 +538,7 @@ final class AudioPane: InspectorPaneView {
                     [
                         inspectorReadout {
                             let pan = binding.audioProps.pan
-                            if abs(pan) < 0.005 { return "centre" }
+                            if abs(pan) < 0.005 { return "center" }
                             return String(
                                 format: "%@ %.0f", pan < 0 ? "left" : "right", abs(pan) * 100)
                         }

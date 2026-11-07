@@ -275,8 +275,8 @@ fn set_errs_naming_the_clip_the_key_and_the_value() {
     let project = project();
     let name_rule = "is not a module name (lowercase letters, digits and -, starting with a \
                      letter or a digit, at most 63 characters)";
-    let colour = "must be a CSS colour (#rgb, #rgba, #rrggbb, #rrggbbaa, rgb(), rgba(), hsl(), \
-                  hsla() or a colour name)";
+    let colour = "must be a CSS color (#rgb, #rgba, #rrggbb, #rrggbbaa, rgb(), rgba(), hsl(), \
+                  hsla() or a color name)";
     // Laid out by hand, one case a line, as `op_table.rs`'s rows are.
     #[rustfmt::skip]
     let cases = [
@@ -381,8 +381,8 @@ fn a_colour_is_stored_as_lowercase_hex() {
         assert_eq!(
             project.errors(&set(json!({"props": {"accent": sent}}))),
             format!(
-                "props.accent must be a CSS colour (#rgb, #rgba, #rrggbb, #rrggbbaa, rgb(), \
-                 rgba(), hsl(), hsla() or a colour name), not {sent}"
+                "props.accent must be a CSS color (#rgb, #rgba, #rrggbb, #rrggbbaa, rgb(), \
+                 rgba(), hsl(), hsla() or a color name), not {sent}"
             ),
         );
     }

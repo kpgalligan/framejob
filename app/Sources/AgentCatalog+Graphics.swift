@@ -187,7 +187,7 @@ extension AgentServer {
                     "background": [
                         "type": "string",
                         "description": "What the png sheet is painted on: transparent (the "
-                            + "default), checker, or a hex colour (#rgb, #rrggbb, #rrggbbaa). Not "
+                            + "default), checker, or a hex color (#rgb, #rrggbb, #rrggbbaa). Not "
                             + "with format svg.",
                     ],
                     "format": [

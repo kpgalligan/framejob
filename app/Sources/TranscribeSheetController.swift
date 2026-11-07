@@ -313,7 +313,7 @@ final class TranscribeSheetController: NSViewController {
         enginePopup.widthAnchor.constraint(equalToConstant: 200).isActive = true
         populateLanguages()
 
-        speakersCheckbox.title = "split by speaker, coloured in Subtitles"
+        speakersCheckbox.title = "split by speaker, colored in Subtitles"
         speakersCheckbox.font = DS.sans(12)
         speakersCheckbox.target = self
         speakersCheckbox.action = #selector(controlChanged(_:))

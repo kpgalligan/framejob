@@ -9,7 +9,7 @@ extension TimelineTranscript {
 
     /// Why cutting a word would break something, or nil when it may be cut.
     /// The first rule that applies: inside a nest (naming the OUTERMOST
-    /// enclosing nest); under a transition (the word's [start, max(end,
+    /// enclosing nest); near an overlap between two clips (the word's [start, max(end,
     /// start + 1)) meets one of the container's `overlapWalls`); on a locked
     /// track (the word's container track). A ramped clip's words are
     /// editable (SR-18 (e)).
@@ -22,8 +22,8 @@ extension TimelineTranscript {
         }
         let wordEnd = max(end, start + 1)
         if walls.contains(where: { $0.start < wordEnd && $0.end > start }) {
-            return "Under a transition: a cut here would leave one clip's tail under its "
-                + "neighbour."
+            return "Near an overlap between two clips: a cut here would leave one clip's "
+                + "tail under the other."
         }
         if let row = snapshot.track(track), row.locked {
             let name = row.name.isEmpty ? "\(row.id)" : row.name

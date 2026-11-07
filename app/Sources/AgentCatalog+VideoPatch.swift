@@ -19,8 +19,8 @@ extension AgentServer {
         ", obscure (an ARRAY of {shape: rect|ellipse, x, y, width, height, feather, kind, "
         + "amount} that HIDES what is under each one, at most \(ObscureProps.max) — kind is "
         + "\(obscureNames.joined(separator: "|")) and amount is 0–1, feather is the source "
-        + "px the effect ramps in over, and the centre and the box are SOURCE px from the "
-        + "cropped rect's centre, the same frame the spotlight uses. Like filters it is "
+        + "px the effect ramps in over, and the center and the box are SOURCE px from the "
+        + "cropped rect's center, the same frame the spotlight uses. Like filters it is "
         + "replaced whole rather than merged, so send the whole array and [] to clear it)"
     // `video.blend`'s clause, its own explicitly-typed local for the
     // reason `obscureClause` is: the mode names are a non-literal operand
@@ -91,7 +91,7 @@ extension AgentServer {
     // field for is exact here.
     private static let wheelsClause: String =
         ", wheels ({lift, gamma, gain}, each {x, y, master}, each -1 to 1 and 0 = unchanged: "
-        + "x, y is the colour push, its angle the hue (0° red, 120° green, 240° blue) and its "
+        + "x, y is the color push, its angle the hue (0° red, 120° green, 240° blue) and its "
         + "length the strength, and must lie inside the unit circle (x² + y² ≤ 1); master is "
         + "the brightness; refused outside, never clamped. Any subset MERGES, so {wheels: "
         + "{lift: {x: 0.2, y: -0.1}}} keeps lift's master and the other two wheels. Applied "
@@ -105,7 +105,7 @@ extension AgentServer {
         + "strictly rising, x and y 0–1 inclusive; refused outside, never clamped. A list "
         + "REPLACES that channel whole, null removes it, and a curve with every y = x from x "
         + "0 to x 1 is the identity, stored as no curve. Each channel is a monotone spline "
-        + "(Fritsch–Carlson) through its points, flat outside its first and last x; a colour "
+        + "(Fritsch–Carlson) through its points, flat outside its first and last x; a color "
         + "is red(master(v)). Applied after wheels and before look. In an action's end an "
         + "identity curve animates to neutral (an identity on either side takes the other "
         + "curve's x's); two curves of different point counts blend their values across "
@@ -115,7 +115,7 @@ extension AgentServer {
         + "value is a shift in degrees -180–180 (0 none) and hue_sat's a saturation gain "
         + "0–2 (1 none); a curve whose every value is its none is the identity, stored as "
         + "no curve. Each is a periodic spline that wraps at 0/360. Applied after the "
-        + "channel curves and before look, at the colour's HSV hue read once: a positive "
+        + "channel curves and before look, at the color's HSV hue read once: a positive "
         + "shift turns HSV hue red → yellow → green keeping Rec. 709 luma, the gain scales "
         + "saturation about that luma; a grey or near-grey (chroma at most 0.02) is left "
         + "alone, and the effect fades in up to chroma 0.06)"
@@ -124,8 +124,8 @@ extension AgentServer {
         + "which pixels the clip's grade reaches, read from the picture behind it BEFORE the "
         + "grade: {hue: {center, width, softness}, saturation: {low, high, softness}, luma: "
         + "{low, high, softness}, invert, blur}. hue is in degrees: center 0–360 (wraps), width "
-        + "0–360 fully selected about the centre, softness 0–180 of fall-off outside each "
-        + "edge; a colour with chroma under about 0.06 has no hue and is never selected by "
+        + "0–360 fully selected about the center, softness 0–180 of fall-off outside each "
+        + "edge; a color with chroma under about 0.06 has no hue and is never selected by "
         + "it. saturation is HSV saturation (chroma / max, and near-black reads as 0) and "
         + "luma Rec. 709 Y′, each low ≤ high and softness 0–1. A range MERGES: {hue: {}} "
         + "turns hue on at {30, 50, 25} (saturation and luma at {0, 1, 0.1}), a partial "
@@ -133,7 +133,7 @@ extension AgentServer {
         + "on, inverted by invert: true. blur 0–1 (0 off) softens that weight by a Gaussian "
         + "of 24·blur canvas pixels, never the matte; it draws nothing with no range on. "
         + "Refused outside the bounds, never clamped. In an "
-        + "action the numbers animate, the hue centre the short way round (350 to 10 passes "
+        + "action the numbers animate, the hue center the short way round (350 to 10 passes "
         + "0); a range turned on or off and invert switch at the end. render_frame "
         + "{selection: clip} shows what it selects)"
     // `video.cursor`'s clause (format 38, spec §11 CU-30), its own
@@ -149,7 +149,7 @@ extension AgentServer {
         + "\(cursorStyleNames.joined(separator: "|")) (default recorded); smoothing 0–1 "
         + "(default 0); hide_idle null (never hidden, the default) or 0.5–30 seconds of no "
         + "activity before it hides; clicks \(cursorClicksNames.joined(separator: "|")) "
-        + "(default none); click_color a CSS colour (default #ffffffcc); click_size 0.25–4 "
+        + "(default none); click_color a CSS color (default #ffffffcc); click_size 0.25–4 "
         + "(default 1). Refused outside the ranges, never clamped; "
         + "{cursor: {}} stores all eight defaults, and an object MERGES. In an action's end "
         + "scale and click_size animate and show, style, clicks and click_color switch at "
@@ -234,7 +234,7 @@ extension AgentServer {
     // type checker's budget.
     static let videoPatchDescription: String =
         "Video properties to merge into the clip's base props. Keys: x, y (canvas px from "
-        + "the canvas centre, y DOWN), scale (1 = native pixels, 0.01–10), rotation "
+        + "the canvas center, y DOWN), scale (1 = native pixels, 0.01–10), rotation "
         + "(degrees, positive turns clockwise on screen), opacity (0–1), crop "
         + "({l, t, r, b} in SOURCE px — cropping never shifts the content), corner_radius "
         + "(source px), shadow (null or {color, opacity, blur, angle, distance}), color "
@@ -242,7 +242,7 @@ extension AgentServer {
         + "shadows, whites, blacks, vibrance, fade}, each 0 = unchanged and any subset "
         + "merging — exposure is -3 to 3 (EV), fade 0–1 and the other seven tone keys -1 "
         + "to 1, refused outside; a positive temperature is warmer, a positive tint more "
-        + "magenta; hue is in degrees, and a positive hue turns every colour's HSV hue that "
+        + "magenta; hue is in degrees, and a positive hue turns every color's HSV hue that "
         + "far, red → yellow → green, keeping its Rec. 709 luma), chroma (null or "
         + "{key: [r, g, b], tolerance, softness, spill}), filters (an ARRAY of "
         + "{kind, amount}, at most 4; sepia, noir, vignette and invert apply in list order, "
@@ -252,8 +252,8 @@ extension AgentServer {
         + "(null or {opacity, height, gap, falloff} — height is a fraction of the layer's "
         + "cropped height, falloff how far it fades across that height (0 not at all, 1 "
         + "transparent at its end), gap is source px), spotlight (null or "
-        + "{shape: rect|ellipse, x, y, width, height, feather, dim, zoom} — the centre and "
-        + "the box are SOURCE px from the cropped rect's centre, dim is how much darker it "
+        + "{shape: rect|ellipse, x, y, width, height, feather, dim, zoom} — the center and "
+        + "the box are SOURCE px from the cropped rect's center, dim is how much darker it "
         + "is OUTSIDE and zoom 1–2 magnifies what is inside)"
         + obscureClause
         + blendClause
@@ -267,7 +267,7 @@ extension AgentServer {
         + behindSubjectClause
         + motionBlurClause
         + hideSilentClause
-        + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
+        + ". A color is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
         + "length and a component outside the range is refused by name, neither "
         + "filled in nor clamped. chroma's key is the one exception, three numbers "
         + "with no alpha."

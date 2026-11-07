@@ -47,7 +47,7 @@ pub(crate) fn check_cursor(cursor: &Option<CursorProps>) -> Result<(), String> {
     )?;
     if normalise_color(&cursor.click_color).is_none() {
         return Err(format!(
-            "video.cursor.click_color must be a CSS colour (spec §11 G-12), not \"{}\"",
+            "video.cursor.click_color must be a CSS color (spec §11 G-12), not \"{}\"",
             cursor.click_color
         ));
     }

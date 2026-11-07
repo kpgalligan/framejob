@@ -37,7 +37,7 @@ extension AgentServer {
 
     private static let captureArguments = ["view", "path", "fill_preview", "layout"]
     private static let appearanceRefusal = "appearance is refused: switched on a live window it "
-        + "left colours built in the launch appearance, a mix the app never draws. Launch the "
+        + "left colors built in the launch appearance, a mix the app never draws. Launch the "
         + "instance with -RCDevAppearance light or -RCDevAppearance dark instead."
 
     func snapshotUI(_ a: [String: Any]) throws -> String {
@@ -240,7 +240,7 @@ extension AgentServer {
                     let panel = NSStringFromClass(type(of: sheet))
                     throw ToolError(
                         message: "The attached sheet is a file panel (\(panel)), drawn out of "
-                            + "process: it would capture as one colour.")
+                            + "process: it would capture as one color.")
                 }
                 return (
                     UISnapshot.Subject(

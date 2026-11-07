@@ -40,7 +40,7 @@ extension AgentServer {
         + "the next word starts sooner, instead of jumping; active_fill (true|false) fills the "
         + "active word left to right from its start to its end, taking 0.6 s at most — the "
         + "part said in active_color and the rest in upcoming_color, or not yet drawn in build "
-        + "mode; in highlight mode it shows only where those two colours differ; pause_dim "
+        + "mode; in highlight mode it shows only where those two colors differ; pause_dim "
         + "fades the words and the pill to 1 − pause_dim of their opacity in a pause of 0.25 s "
         + "or more — after one word's end until the next one's start, before a late first "
         + "word, and after the last word until the clip ends — over 0.1 s each way, and outside "
@@ -268,7 +268,7 @@ extension AgentServer {
                         "type": "boolean",
                         "description": "engine \"assemblyai\" only. Ask for speaker labels "
                             + "(default false); a change of speaker then starts a new cue, and "
-                            + "with style subtitles each speaker's cues take their own colour "
+                            + "with style subtitles each speaker's cues take their own color "
                             + "(white, yellow, cyan, green in order of first appearance, then "
                             + "again; a speaker is a label within one media file). "
                             + "Refused by name with engine \"apple\".",

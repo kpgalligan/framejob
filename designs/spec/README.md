@@ -30,7 +30,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`04.3e-inspector-transcript-tab.md`](04.3e-inspector-transcript-tab.md) | 153 | The inspector's Transcript tab (road map "creator-jobs" TX2a, TX2b, TX3a, TX1b, TX3b): the timeline's words in paragraphs, the bar (Words from, Language, the status with Stop or Read, the notes), the highlight that follows the playhead, a click to seek, the keys, selecting words as the in/out range and deleting them as one "Delete Words" (where a cut falls, the refusals), pause tokens shortened as one "Delete Pause", the reading on this Mac and the rebuilds. |
 | [`04.4-timeline.md`](04.4-timeline.md) | 283 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
-| [`05.1-time.md`](05.1-time.md) | 23 | Ticks (600 000 per second), frame rates, snapping to the grid. |
+| [`05.1-time.md`](05.1-time.md) | 32 | Ticks (600 000 per second), frame rates, snapping to the grid, frames timecode. |
 | [`05.2a-project-schema-canvas-media-video.md`](05.2a-project-schema-canvas-media-video.md) | 468 | The project JSON schema (format version 34): what a patch means, the example document, `source`, `canvas`, `media[]`, `graphic`, an action end's graphic and speed, `enabled`, and every `video.*` field. |
 | [`05.2b-project-schema-audio-text-shape-tracks.md`](05.2b-project-schema-audio-text-shape-tracks.md) | 317 | The schema's `audio.*`, `text.*` and `shape.*` fields, `actions[].end` and `transition_in`, a clip's `name` and `label`, `tracks[].solo` and `matte`, `nests`, ids, and what is not in the model. |
 | [`05.3-placement.md`](05.3-placement.md) | 81 | Where a layer lands on the canvas: position, scale, crop, regions, reflection, motion, nests flattened. |
@@ -47,7 +47,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 227 | The `rc_*` exports and their contracts. |
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 325 | The composition plan: A/B assignment, speed and freeze, audio envelopes, the tap's isolation and voice pass, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 468 | The per-frame recipe the compositor draws: layers, mattes, nests, the cursor, cutout and blur keys. |
-| [`07.3b-frame-recipe-options.md`](07.3b-frame-recipe-options.md) | 107 | §7.3 continued: the recipe options — burn-in, ungraded, selection and behind, the SDR version — and how an option reaches a frame. |
+| [`07.3b-frame-recipe-options.md`](07.3b-frame-recipe-options.md) | 108 | §7.3 continued: the recipe options — burn-in, ungraded, selection and behind, the SDR version — and how an option reaches a frame. |
 | [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 108 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5a-compositor-step-0-output.md`](07.5a-compositor-step-0-output.md) | 204 | The Metal compositor's pixel formats, step 0 (per composition) and camera log, the request and the scopes' tap (the shown set, the kernels, the counting rule), the HLG working space, the output pass and linear light. |
 | [`07.5b-compositor-passes-grades.md`](07.5b-compositor-passes-grades.md) | 434 | The compositor's per-layer passes and pipelines, the cursor and the cutout, the adjustment pass and its qualifier, the encoded-sRGB blend, transitions, mattes, tone, wheels, curves, looks and `.cube` LUTs, and the frame budget. |
@@ -67,7 +67,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 326 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 24287 in 46 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 24326 in 46 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

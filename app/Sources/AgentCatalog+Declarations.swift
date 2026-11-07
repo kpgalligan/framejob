@@ -284,7 +284,7 @@ extension AgentServer {
                 + "not."),
         AgentDeclaration(
             .argument("focus", of: "switch_layout"), alsoTypes: ["null"],
-            why: "spec §11 CO-70: the op centres an absent focus on the source; the TOOL "
+            why: "spec §11 CO-70: the op centers an absent focus on the source; the TOOL "
                 + "fills an omitted or null one with the camera's focus from its cached person "
                 + "masks, exactly as Clip ▸ Camera Layout ▸ and the Layout section do. The "
                 + "masks and their cache are app state the core has not got, and null is "

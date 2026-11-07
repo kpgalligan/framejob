@@ -110,7 +110,7 @@ KEY = "proof-key"
 TOOL = "get_timeline_transcript"
 CANCELLED = "The transcription was cancelled."
 NEST_WHY = "Inside nest {}: open it (⌘↓) to cut its words."
-WALL_WHY = "Under a transition: a cut here would leave one clip's tail under its neighbour."
+WALL_WHY = "Near an overlap between two clips: a cut here would leave one clip's tail under the other."
 LOCK_WHY = ("Track {} is locked: a cut would leave these words in place and move everything "
             "after them.")
 

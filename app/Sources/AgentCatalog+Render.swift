@@ -50,7 +50,8 @@ extension AgentServer {
             "description": "Draw the project timecode over the picture, topmost — the export "
                 + "sheet's Burn in timecode checkbox. Default: false. It is a review copy's "
                 + "reference, so it reads the DOCUMENT'S timecode in the document's own "
-                + "spelling (the toolbar's, non-drop, HH:MM:SS:FF or HH:MM:SS.mmm), and it "
+                + "spelling (the toolbar's, HH:MM:SS:FF — non-drop at an NTSC rate, real "
+                + "seconds at any other fractional rate — or HH:MM:SS.mmm), and it "
                 + "shows PROJECT time even in a file written from the in/out range: a range "
                 + "export starting at 00:00:10:00 begins at 00:00 carrying a burn-in that "
                 + "reads 00:00:10:00, which is the number a note about that frame needs.",
@@ -218,7 +219,7 @@ extension AgentServer {
                         "type": "boolean",
                         "description": "Also measure the frame's vectorscope, View ▸ Scopes' "
                             + "Vectorscope: Rec. 709 Cb and Cr of the encoded values in "
-                            + "256 × 256 bins centred on neutral (bin 128). The text says what "
+                            + "256 × 256 bins centered on neutral (bin 128). The text says what "
                             + "share of pixels is neutral, and <image path>.vectorscope.json "
                             + "holds the counts (256 arrays by Cr bin, indexed by Cb bin), the "
                             + "zoom, off_plot (the pixels left off the plot at a zoom, 0 at 1), "

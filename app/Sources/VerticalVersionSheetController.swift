@@ -193,7 +193,7 @@ final class VerticalVersionSheetController: NSViewController, NSTextFieldDelegat
             hint: "Makes a version of the timeline for a tall or square canvas. Each full-frame "
                 + "movie clip follows its subject with eased moves (with Speaker, whoever is "
                 + "talking on the ticked microphones), stills and nests are "
-                + "centred, and everything else is kept as placed, with a blurred copy behind a "
+                + "centered, and everything else is kept as placed, with a blurred copy behind a "
                 + "clip where it shows the whole picture. With Make a copy it opens as a new "
                 + "project and this one does not change. One undo step.",
             content: sheetColumn([grid, picker.view, summaryLabel]),

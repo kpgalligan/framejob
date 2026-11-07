@@ -30505,3 +30505,29 @@ hold medians; W3 the runs at the loop start):
 Neither ships. Two mutants, each by hand and reverted: M1 the guard back to `plan.videoTracks.isEmpty`
 (P1–P7 fail; X1 passes, as it does on the base); M2 `placeholderTrackID` back to the audio ids alone
 (P1 and P7 never scored: the instance stopped answering at the id clash and was stopped by its pid).
+
+## ai-docs c2 — what the app prints (`ai_docs_c2_proof.py`)
+
+ai-docs batch c2 (#521, #526, #532, #533, spec §11 #521, #526, #532). The built app under a scratch
+home, driven over MCP, on projects built from media made into `work/ai-docs-c2/media/` (two
+`say`-voiced WAVs and a 40 s and a 3 s ffmpeg test clip with sound). Launch 1 is plain: W rows are
+the Transcript tab's overlap sentence on a bare 1 s overlap (a word outside it held back with
+"Near an overlap between two clips: …", Edit ▸ Delete refused in the inspector's strip, far words
+editable); S rows are `snapshot_ui` layout dumps of the Document tab, the Sound, Shape, Picture and
+Color sub-tabs and the Generate Captions sheet (hidden views included) and `tools/list`, holding no
+word-bounded British colour or centre form; G3, G5 and G6 the toolbar's timecode on a 25/2, a
+30000/1001 and a `[60000, 2002]` canvas; G7 `tools/list`'s `burn_in_timecode` description on
+`render_frame` and `export` (non-drop at an NTSC rate only); F rows the Document tab's rate (`Fps.displayName`).
+Launches 2 and 3 put Animated GIF in the argument domain (`-FrameJobExportChoice`, nothing
+persisted, Export never pressed) and read the export sheet's readout at Project rate (12.5 fps, G1
+and G2) and at 24 fps (G4). Z1 is each launch's parity grep. The docstring lists every row and
+marks the controls; every other row is red on the frozen base app (`main` at `d40d1f81`), and
+`--expect-red` exits 0 only when that holds. The timecode mutants are the core's:
+`core/tests/timecode_rates.rs` catches each; `displayName`'s two (one zero stripped, the trailing
+"." kept) turn F1 and F2 red.
+
+```sh
+make app-debug && python3 tools/proof/ai_docs_c2_proof.py [--only W1,S5,G1,F2]
+make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_c2_proof.py
+RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_c2_proof.py --expect-red
+```

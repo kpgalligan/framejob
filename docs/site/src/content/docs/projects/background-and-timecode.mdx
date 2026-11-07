@@ -45,7 +45,9 @@ See [Transparent exports](/export/transparency/).
 | **Frames** | `HH:MM:SS:FF` |
 | **Milliseconds** | `HH:MM:SS.mmm` |
 
-**Frames** doesn't drop frames, so at 29.97 fps the count runs slightly behind the clock over a long timeline.
+**Frames** doesn't drop frames. At 29.97 or 23.976 fps a second counts 30 or 24 frames, so the count runs slightly behind the clock over a long timeline.
+
+At any other rate that isn't a whole number, such as 12.5 fps, the seconds are real seconds. A frame reads the second it starts in, and its frame number counts from that second's first frame, so a 12.5 fps second holds 13 frames and then 12. 500 frames at 12.5 fps read `00:00:40:00`.
 
 The count starts at zero, and there's no start-timecode setting. Frame Job doesn't read a file's source timecode, and an export has no timecode track. To put the timecode in a file, [burn it in](/export/burn-in-timecode/).
 

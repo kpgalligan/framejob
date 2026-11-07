@@ -168,8 +168,8 @@ extension AgentServer {
         guard let raw = a[key] else {
             throw ToolError(
                 message: "Missing required argument: \(key) — the rectangle to zoom to, as "
-                    + "{x, y, width, height} in SOURCE pixels, where x and y are its CENTRE "
-                    + "measured from the centre of the clip's cropped rect. Pass null to zoom "
+                    + "{x, y, width, height} in SOURCE pixels, where x and y are its CENTER "
+                    + "measured from the center of the clip's cropped rect. Pass null to zoom "
                     + "BACK to the clip's own scale and position.")
         }
         return raw

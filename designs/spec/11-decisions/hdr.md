@@ -412,7 +412,7 @@ fixture is written by a script. Nothing of Concat is opened, at design time or b
     `kVTHDRMetadataInsertionMode_None`. Every other video row is refused: "{id} cannot carry an
     HLG project's picture; export it as hevc_10bit, prores_422 or prores_4444". Audio rows are
     unchanged.
-  - **(k) The words.** The Document tab's Colour row reads "SDR — Rec. 709" or "HDR — Rec. 2100
+  - **(k) The words.** The Document tab's Color row (amended by #526) reads "SDR — Rec. 709" or "HDR — Rec. 2100
     HLG"; the Canvas section's Dynamic Range popup offers "SDR" and "HDR (HLG)"; the Look
     section warns "This project is HDR (HLG): a .cube LUT reads its values as Rec. 709."
   - **(l) Known limits, each filed as an issue:** a still image labelled HLG or PQ is drawn as SDR

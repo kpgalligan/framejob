@@ -19,7 +19,7 @@
     {"call": "perform_menu_item", "args": {"path": ["View", "Show Selection"]}}
   ],
   "expect": [
-    {"capture": "inspector", "visible_text": "Centre"},
+    {"capture": "inspector", "visible_text": "Center"},
     {"capture": "preview", "visible_text": "Selection"}
   ]
 }
@@ -50,7 +50,7 @@ strip, the hue spectrum from red through green and blue back to red, dimmed
 except the band near the left end — two block knobs either side of orange at
 10° and 40°, a small square at 55° where the fall-off ends, and a second small
 square at the strip's right end, the fall-off's other edge wrapped round to
-355°. Under it "Centre 25°", "Width 30°" and "Soft 15°". The Saturation row: a
+355°. Under it "Center 25°", "Width 30°" and "Soft 15°". The Saturation row: a
 ticked checkbox and a white-to-red ramp, dimmed left of a knob at 0.15, with
 its fall-off square just left of it and the high knob at the red end; under it
 "Low 0.15", "High 1.00", "Soft 0.05". The Luma row is unticked: its black-to-white

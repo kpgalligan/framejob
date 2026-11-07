@@ -35,7 +35,7 @@ extension AgentServer {
                     + "the clip's; frames the frames of its file the clip plays (1 for a "
                     + "picture) and covered how many are analysed; ready whether covered equals "
                     + "frames; subject_found whether a subject was found; centroid {x, y}, the "
-                    + "subject's mean centre over those frames in the media's upright pixels "
+                    + "subject's mean center over those frames in the media's upright pixels "
                     + "(origin top left, y down), null unless ready; error, when failed, the "
                     + "sentence saying why. Refused, nothing done: wait outside 0–60, a clip "
                     + "that does not exist, a named clip with no cutout, and, with clips left "

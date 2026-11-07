@@ -130,7 +130,7 @@ extension AgentServer {
         + "tracking, outline (null or {width, color}), backdrop (null or {color, padding, "
         + "radius}), width (null for auto-sizing, or a wrap width in px)"
         + animationClause + AgentServer.textWordsClause
-        + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
+        + ". A color is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
         + "length and a component outside the range is refused by name, neither "
         + "filled in nor clamped."
     // `shape.gradient`'s clause, its own local for the budget reason the
@@ -144,7 +144,7 @@ extension AgentServer {
         ", gradient (null, or {kind: \(gradientKindNames.joined(separator: "|")), "
         + "stops: [{at, color}], angle} — a gradient FILL, which takes precedence over "
         + "fill while it is set and leaves it in place, so {\"gradient\": null} restores "
-        + "the colour underneath. 2 to \(Gradient.maxStops) stops, each at 0–1 along the "
+        + "the color underneath. 2 to \(Gradient.maxStops) stops, each at 0–1 along the "
         + "ramp; the stops need NOT be sorted, and the renderer sorts them. angle is "
         + "degrees from the RIGHT turning counter-clockwise, the convention shadow's angle "
         + "uses, and means nothing for radial, which is an ellipse inscribed in the box. "
@@ -157,11 +157,11 @@ extension AgentServer {
     static let shapePatchDescription: String =
         "Shape properties to merge. Keys: kind "
         + "(\(shapeNames.joined(separator: "|"))), width, height (the box, in source px), "
-        + "stroke (null or {width, color}), fill (null or a colour), radius (rectangle "
+        + "stroke (null or {width, color}), fill (null or a color), radius (rectangle "
         + "corners), arrow_start, arrow_end, and from / to — the endpoints of a line or "
         + "arrow as UNIT coordinates in its box, e.g. from [0, 1] to [1, 0]"
         + gradientClause
-        + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
+        + ". A color is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
         + "length and a component outside the range is refused by name, neither "
         + "filled in nor clamped."
     // The fifth patch, `set_clip`'s. The label names are `ClipLabel`'s —
@@ -169,7 +169,7 @@ extension AgentServer {
     // restated, and typed for the same budget reason as the four above.
     private static let labelNames: [String] = ClipLabel.allCases.map { $0.rawValue }
     private static let clipPatchDescription: String =
-        "name and/or label; a key set to null clears it. Labels are the marker colours: "
+        "name and/or label; a key set to null clears it. Labels are the marker colors: "
         + "\(labelNames.joined(separator: ", "))."
 
     /// The five property rows of `clipAndActionTools`' array, in its order.
@@ -184,19 +184,19 @@ extension AgentServer {
             opTool(
                 "set_video",
                 "Changes the clips' BASE video properties — position, scale, rotation, opacity, "
-                    + "crop, corner radius, shadow, colour, chroma key, filters, reflection, "
+                    + "crop, corner radius, shadow, color, chroma key, filters, reflection, "
                     + "spotlight and motion (what the clip does on its way in, on its way out "
                     + "and all the way through). The patch MERGES AT EVERY DEPTH: keys you "
                     + "leave out keep their values, inside a nested object too — a patch of "
-                    + "just {shadow: {blur: 20}} keeps the shadow's colour, angle and "
+                    + "just {shadow: {blur: 20}} keeps the shadow's color, angle and "
                     + "distance — and shadow, chroma, reflection, spotlight or motion set to "
                     + "null clears it. A LIST is the exception: filters and obscure each "
                     + "replace whole, so send the whole stack and [] to clear it. A key or a "
                     + "value the vocabulary does not have is an error naming its dotted path "
                     + "(array indices included) and the value you sent; nothing is dropped, "
                     + "corrected or clamped. "
-                    + "Placement is spec §5.3: the source rectangle is centred at the "
-                    + "canvas centre plus (x, y), scaled, then rotated about that centre, and "
+                    + "Placement is spec §5.3: the source rectangle is centered at the "
+                    + "canvas center plus (x, y), scaled, then rotated about that center, and "
                     + "crop removes edges in place without shifting the content. To animate a "
                     + "property instead, add_action and then set_action_end. On an adjustment "
                     + "clip only color, wheels, curves, look, the point filters and opacity (the "
@@ -243,7 +243,7 @@ extension AgentServer {
                     + "The patch merges like set_video: a key left out keeps its value, null "
                     + "clears it, and so does an empty or blank name (names are trimmed). A "
                     + "split, duplicate, detach or paste carries both along; paste_attributes "
-                    + "never does. The label is a colour name drawn as a dot on the clip, "
+                    + "never does. The label is a color name drawn as a dot on the clip, "
                     + "stored as given, so keep to the six names.",
                 ["clips": clipsDescription, "patch": clipPatchDescription]),
         ]

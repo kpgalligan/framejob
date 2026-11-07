@@ -390,7 +390,7 @@ extension AgentServer {
                     + "check, is refused as not one recording — features alone can match two "
                     + "takes of similar words. The refinement never changes the confidence, "
                     + "and the move stays a whole number of frames. The answer reports each moved "
-                    + "clip's offset (anchor source minus clip source at the overlap's centre, "
+                    + "clip's offset (anchor source minus clip source at the overlap's center, "
                     + "refined, in ticks), coarse_offset (the match before the refinement), "
                     + "refined (\"phat\" or \"coarse\"), refine_confidence (the PHAT peak's "
                     + "z-score; null when none ran), delta, new start, "

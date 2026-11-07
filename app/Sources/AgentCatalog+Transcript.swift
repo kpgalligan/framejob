@@ -20,7 +20,7 @@ extension AgentServer {
                     + "then the front track first. A clip that is muted, soloed out or at volume "
                     + "0 is not heard and gives no words. track is the timeline track the word "
                     + "plays on (a nested word's is its nest clip's). editable is false, with "
-                    + "why, for a word inside a nest, under a transition or on a locked track. "
+                    + "why, for a word inside a nest, near an overlap between two clips or on a locked track. "
                     + "id {nest_path, media, source, k} names the word across edits: the nest "
                     + "clips it plays through, its media, its start in the media's SOURCE ticks "
                     + "as the recogniser put it and k, counting earlier words with the same "

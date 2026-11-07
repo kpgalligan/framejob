@@ -106,7 +106,7 @@ extension AgentServer {
             opTool(
                 "add_text_clip",
                 "Adds a text clip — a title. It has no source, so it can be any length; the "
-                    + "default is 5 s of white, centred text in Source Sans 3 Bold at 72 px. "
+                    + "default is 5 s of white, centered text in Source Sans 3 Bold at 72 px. "
                     + "Style it afterwards with "
                     + "set_text and place it with set_video (x, y, scale).",
                 [
@@ -148,7 +148,7 @@ extension AgentServer {
                 "Adds an adjustment clip — Insert ▸ Adjustment Clip. It has no picture of its "
                     + "own: while it lasts it grades everything drawn BEHIND it (every lower "
                     + "track and the canvas background, never a track in front) with the "
-                    + "colour and the point filters (sepia, noir, vignette, invert) that "
+                    + "color and the point filters (sepia, noir, vignette, invert) that "
                     + "set_video gives it, and its opacity is the grade's strength. On a track "
                     + "cut by a matte it grades only inside the matte; on a matte track it does "
                     + "nothing. Refused inside a nest and in any transition or overlap — fade "
@@ -166,7 +166,7 @@ extension AgentServer {
                     + "is a canvas-sized WHITE rectangle, which is what the menu's Solid Color "
                     + "row sends: white rather than black because the canvas is already black, "
                     + "so a black plate would be a command that appears to do nothing. Give it "
-                    + "a color to paint the plate another colour, or a media to put that "
+                    + "a color to paint the plate another color, or a media to put that "
                     + "picture there instead, at FILL scale — where add_clip would Fit it, "
                     + "because a plate that leaves the canvas showing down one side has "
                     + "failed at that. A video or audio plate stops where its file does, an "
@@ -175,10 +175,10 @@ extension AgentServer {
                     + "is an error, as is a sub-frame duration or media, or one with no pictures.",
                 [
                     "media": "Media id to show as the background — get_project lists "
-                        + "them and import_media adds a file. Omit for a colour plate. A "
+                        + "them and import_media adds a file. Omit for a color plate. A "
                         + "timed media is clamped to its own file's length, so a short movie "
                         + "stops where its file does; only an image runs the whole timeline.",
-                    "color": colorDescription("The plate's colour; white when omitted"),
+                    "color": colorDescription("The plate's color; white when omitted"),
                     "duration": "Length \(ticks) Default: the whole timeline's length, "
                         + "and never less than one frame.",
                 ]),
@@ -187,7 +187,7 @@ extension AgentServer {
                 "The screencast backdrop — Clip ▸ Add Blurred Background. `clip` is copied "
                     + "onto a NEW back-most track at the same start, duration, speed and "
                     + "source window, so the two play exactly the same frames, and the copy is "
-                    + "scaled to FILL the canvas, centred, uncropped, blended normal and "
+                    + "scaled to FILL the canvas, centered, uncropped, blended normal and "
                     + "blurred at full strength. It is MUTED — its enabled becomes {video: "
                     + "true, audio: false}, or the mix would play one recording twice — and it "
                     + "drops the original's audio.duck along with its transition, actions and "

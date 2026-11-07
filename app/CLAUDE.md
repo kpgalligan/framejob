@@ -2045,7 +2045,7 @@ the key map behind it.
   `GraphicSchema` (with `orderedKeys`), a pure move out of it ·
   `DocumentPane.swift` (reads `documentSnapshot`, never the scoped one: its
   ops are document-level; its transparency note names one or two alpha
-  export formats and counts three or more, spec §11 G-33; the Colour row
+  export formats and counts three or more, spec §11 G-33; the Color row
   and its Dynamic Range popup, SDR or HLG, spec §11 HD-2; the Blending row,
   Encoded or Linear light, spec §11 HD-16) ·
   `CanvasOutput.swift` (the project's dynamic range, `sdr` or `hlg`, on the

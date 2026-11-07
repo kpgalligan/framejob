@@ -339,8 +339,8 @@ final class ShapePane: InspectorPaneView {
                 },
                 enabled: { area() && list().count > 2 }, onEdit: {})
             remove.toolTip =
-                "Take this colour off the ramp — two stops is the floor, because one "
-                + "colour is a fill and Fill above already spells that"
+                "Take this color off the ramp — two stops is the floor, because one "
+                + "color is a fill and Fill above already spells that"
             rows.append(
                 inspectorRow(
                     "Stop \(index + 1)", [swatch, position, remove],
@@ -363,7 +363,7 @@ final class ShapePane: InspectorPaneView {
             enabled: { area() && on() && list().count < Gradient.maxStops }, onEdit: {})
         add.toolTip =
             "Put a handle on the ramp where the ramp already is — the widest gap, "
-            + "at the colour that is already there"
+            + "at the color that is already there"
         rows.append(
             inspectorRow(
                 nil, [add, InspectorRowLabel("\(Gradient.maxStops) at most")],
@@ -378,10 +378,10 @@ final class ShapePane: InspectorPaneView {
             note: {
                 guard area() else {
                     return "Fills the rectangle or ellipse; a line or arrow keeps its "
-                        + "stroke colour."
+                        + "stroke color."
                 }
                 guard on(), binding.shapeProps.fill != nil else { return nil }
-                return "The gradient covers the Fill colour above; Reset brings it back."
+                return "The gradient covers the Fill color above; Reset brings it back."
             },
             reset: { binding.apply("Gradient", shape: ShapePatch(gradient: .some(nil))) },
             defaultExpanded: false,

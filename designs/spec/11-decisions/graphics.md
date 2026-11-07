@@ -275,8 +275,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   holds in `interpolateColors` too**: an `rgb(300, 0, 0)` that it clamped
   to red before now throws `interpolateColors: cannot parse colour
   "rgb(300, 0, 0)"`. The core's refusal names every form:
-  `props.<key> must be a CSS colour (#rgb, #rgba, #rrggbb, #rrggbbaa, rgb(),
-  rgba(), hsl(), hsla() or a colour name), not <value>`. Nothing stored or
+  `props.<key> must be a CSS color (#rgb, #rgba, #rrggbb, #rrggbbaa, rgb(),
+  rgba(), hsl(), hsla() or a color name), not <value>` (amended by #526). Nothing stored or
   accepted as hex or `rgb()` decimals changes. A schema's colour DEFAULT is
   still not checked against the grammar (G-15 (b)).
 - **G-13 — The revision is a content hash, and an export pins it** (road

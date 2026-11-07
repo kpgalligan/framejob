@@ -452,7 +452,7 @@ EXPECTED = {
     "E": ("followed", None),
     "F": ("followed", "it is shown whole on a blurred copy where no subject is found"),
     "G": ("not_followed", "its media file is missing, so it is kept as placed"),
-    "H": ("not_followed", "it is a nest, so it is centred"),
+    "H": ("not_followed", "it is a nest, so it is centered"),
     "I": ("followed", None), "Ibd": ("removed", None),
     "J": ("not_followed", "cut by the matte"),
     "K": ("kept", None), "title": ("kept", None), "pip": ("kept", None),

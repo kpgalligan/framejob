@@ -138,11 +138,11 @@ extension VerticalVersion {
                     }
                 } else {
                     follow = .center
-                    note = "it is a still picture, so it is centred"
+                    note = "it is a still picture, so it is centered"
                 }
             case .nest:
                 follow = .center
-                note = "it is a nest, so it is centred"
+                note = "it is a nest, so it is centered"
             case .other:
                 break
             case .backdrop, .shapePlate, .imagePlate, .graphic, .layoutCamera, .layoutScreen,
