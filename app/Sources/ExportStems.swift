@@ -16,8 +16,13 @@ import AVFoundation
 /// made and started on the main thread, and the job's completion, the last
 /// stem's, precedes `Exporter.finish`, which releases the key.
 ///
-/// **Nothing is left by a failure or a cancel**: the mix and every stem that
-/// finished are removed here, and the part-written one by its writer.
+/// **Every file is written aside** (spec §11 #531): the mix at the hidden
+/// sibling `Exporter` gave it (`mixWriting`), each stem at its own
+/// (`ExportAside.temporary`). When every write has succeeded, each stem is
+/// renamed over its path in order, and then `Exporter.finish` renames the mix.
+/// **Nothing is left by a failure or a cancel**: every sibling that finished is
+/// removed here, the part-written one by its writer, and every path keeps the
+/// file it had.
 ///
 /// **The names** are the core's (`export_stems.rs`); a stem's file is
 /// `<mix name> - <stem name>.<mix extension>` beside the mix, replacing a file
@@ -38,6 +43,8 @@ final class ExportStemsPipeline: ExportPipeline, ExportAudioNormalizing {
     private let stems: [ExportStem]
     private let settings: ExportSettings
     private let mixURL: URL
+    /// The mix's hidden sibling, which `Exporter.finish` renames over `mixURL`.
+    private let mixWriting: URL
     private let rebuild: () throws -> BuiltComposition
     /// The stems' builds, one at a time.
     private let queue = DispatchQueue(
@@ -50,14 +57,17 @@ final class ExportStemsPipeline: ExportPipeline, ExportAudioNormalizing {
     /// Writes finished, the mix included.
     private var finishedCount = 0
     private var cancelRequested = false
-    /// Files this job finished, removed if it does not end well. Main thread.
+    /// Siblings this job finished, removed if it does not end well. Main thread.
     private var written: [URL] = []
+    /// Each finished stem's sibling and its path, renamed in order by
+    /// `complete` once every write has succeeded. Main thread.
+    private var stemFiles: [(writing: URL, path: URL)] = []
     /// Called once, on the main thread, and then dropped.
     private var completion: ((Result<URL, any Error>) -> Void)?
 
     init(
         mix: ExportWriter, stems: [ExportStem], settings: ExportSettings, mixURL: URL,
-        sources: [URL], rebuild: @escaping () throws -> BuiltComposition
+        mixWriting: URL, sources: [URL], rebuild: @escaping () throws -> BuiltComposition
     ) throws {
         if let clash = Self.collision(stems: stems, mix: mixURL, sources: sources) {
             throw SourceCollision(url: clash)
@@ -66,6 +76,7 @@ final class ExportStemsPipeline: ExportPipeline, ExportAudioNormalizing {
         self.stems = stems
         self.settings = settings
         self.mixURL = mixURL
+        self.mixWriting = mixWriting
         self.rebuild = rebuild
         current = mix
     }
@@ -118,7 +129,7 @@ final class ExportStemsPipeline: ExportPipeline, ExportAudioNormalizing {
 
     func start(completion: @escaping (Result<URL, any Error>) -> Void) {
         self.completion = completion
-        mix.start { [weak self] result in self?.ended(result, at: self?.mixURL, next: 0) }
+        mix.start { [weak self] result in self?.ended(result, at: self?.mixWriting, next: 0) }
     }
 
     /// Sets the flag and stops the write running now; a stem not yet started
@@ -159,7 +170,7 @@ final class ExportStemsPipeline: ExportPipeline, ExportAudioNormalizing {
     /// Builds stem `index` on the queue, then writes it on the main thread.
     private func write(_ index: Int) {
         guard !isCancelled else { return fail(Exporter.ExportError.cancelled) }
-        guard index < stems.count else { return complete(.success(mixURL)) }
+        guard index < stems.count else { return swapStems() }
         let stem = stems[index]
         queue.async { [weak self] in
             guard let self else { return }
@@ -170,16 +181,18 @@ final class ExportStemsPipeline: ExportPipeline, ExportAudioNormalizing {
 
     private func writeBuilt(_ built: Result<BuiltComposition, any Error>, stem: ExportStem, index: Int) {
         guard !isCancelled else { return fail(Exporter.ExportError.cancelled) }
-        let url = Self.url(for: stem, mix: mixURL)
+        let path = Self.url(for: stem, mix: mixURL)
+        // The save panel asked about the mix; a stem's file is replaced, by
+        // `swapStems` once every write has succeeded.
+        let url = ExportAside.temporary(for: path)
         let writer: ExportWriter
         do {
             let composition = try built.get()
-            // The save panel asked about the mix; a stem's file is replaced.
-            try? FileManager.default.removeItem(at: url)
             writer = try ExportWriter(built: composition, settings: settings, chapters: [], to: url)
         } catch {
             return fail(error)
         }
+        stemFiles.append((writing: url, path: path))
         lock.lock()
         current = writer
         let cancelled = cancelRequested
@@ -188,10 +201,31 @@ final class ExportStemsPipeline: ExportPipeline, ExportAudioNormalizing {
         writer.start { [weak self] result in self?.ended(result, at: url, next: index + 1) }
     }
 
-    /// Removes every file this job wrote, then reports `error`.
-    private func fail(_ error: any Error) {
-        for url in written { try? FileManager.default.removeItem(at: url) }
+    /// Every write succeeded: each stem's sibling renamed over its path in
+    /// order, then the job's success (the mix is `Exporter.finish`'s). A rename
+    /// that fails removes its sibling and those not yet renamed, and fails the
+    /// job with its sentence; the stems already renamed stay.
+    private func swapStems() {
+        for (index, file) in stemFiles.enumerated() {
+            do {
+                try ExportAside.swap(file.writing, into: file.path)
+            } catch {
+                for rest in stemFiles[index...] { ExportAside.discard(rest.writing) }
+                stemFiles = []
+                written = []
+                return complete(.failure(error))
+            }
+        }
+        stemFiles = []
         written = []
+        complete(.success(mixURL))
+    }
+
+    /// Removes every sibling this job wrote, then reports `error`.
+    private func fail(_ error: any Error) {
+        for url in written { ExportAside.discard(url) }
+        written = []
+        stemFiles = []
         complete(.failure(error))
     }
 

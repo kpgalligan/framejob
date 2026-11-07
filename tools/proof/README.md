@@ -30324,14 +30324,16 @@ python3 tools/proof/docs_bugs_b2_proof.py --mutant <name>
 RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_b2_proof.py --base-sources <its app/Sources> --expect-red
 ```
 
-## Docs bugs b3 — what an export does and answers (`docs_bugs_b3_proof.py`, `docs_bugs_b3_probe.swift`; eight mutants by `--mutant`, with `log_proof.py`'s `hevc-read-always` and `vp9_alpha_export_proof.py`'s `no-shape-guard`; spec §11 #470, #486, #504, PR-14)
+## Docs bugs b3 — what an export does and answers (`docs_bugs_b3_proof.py`, `docs_bugs_b3_probe.swift`; six mutants by `--mutant`, with `log_proof.py`'s `hevc-read-always` and `vp9_alpha_export_proof.py`'s `no-shape-guard`; spec §11 #470, #486, #504, PR-14)
 
 #470, #486, #488, #493 and #504. **`docs_bugs_b3_proof.py`** makes its own fixtures under
 `work/docs-bugs-b3/` (ffmpeg with libx264, libx265 and prores_ks, and `sips`) on a scratch
 `CFFIXED_USER_HOME`. The R, S, C, D and W rows run in one instance. A cancel row polls
 `export_status` every 20 ms and cancels on the phase it wants, so the phase is measured, not timed.
 The G rows launch an instance a card, with the choice in the argument domain, so nothing persists
-and nothing presses Export….
+and nothing presses Export…. C2 (a cancel while writing leaving nothing at the path) and the
+`no-put-back` and `cancel-removes` mutants were retired by spec §11 #531, which keeps the file:
+`ai_docs_b2_proof.py`'s K1 and mutants hold it now, and R4 also finds no `.framejob-export-*`.
 
 **`docs_bugs_b3_probe.swift`** reads what a layout dump cannot say: `exportButton` and `queueButton`
 on a real `ExportSheetController`, its view loaded and never shown, and `Exporter().export` called
@@ -30377,7 +30379,8 @@ RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a4_proof.py --base-sour
 `work/docs-bugs-b4/` (ffmpeg with libx264, and ffprobe) on a scratch `CFFIXED_USER_HOME`. One
 instance, launched with `-RCDevRampRenderHold 8`, saves the two packages the probe opens and runs
 A1/A2: an `h264` export of a speed ramp at once, `export_status` polled every 0.1 s beside whether
-the file exists.
+the file exists. Since spec §11 #531 an export writes a hidden `.framejob-export-*` sibling until it
+lands, so A1/A2 and the probe's R1/R2 count that sibling as the file too.
 
 **`docs_bugs_b4_probe.swift`** runs the real controllers off-screen (activation policy
 `.prohibited`, a window 20,000 pt off every display), one process per mode, built with
@@ -30580,3 +30583,38 @@ RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_c3_proof.py --expect-red
 | The fix, Debug | 10/10: F1 `speaker` [{clip 5, mics [10, 7], mic_faces [1, 2]}], no reason, no cut, face 2 framed and face 1 not at W's middle; F2 W `followed`, "… because clip 5 has no turn of its microphones inside it, so there is no speaker to follow"; F6 the weak match's sentence (agrees only 0.00) |
 | Release | 10/10, the same answers as on Debug |
 | The three mutants, each on a tree copy | `vertical-refuses-silence` CAUGHT (F1 refused with the no-speech sentence), `reframe-allows-silence` CAUGHT (F5 answered "made no change"), `not-talking-drops-problems` CAUGHT (F7 answered and edited) |
+## ai-docs b2 — an export keeps its file, an exception fails one call (`ai_docs_b2_proof.py`, `ai_docs_b2_probe.swift`, `ai_docs_b2_inject.m`; nine mutants by `--mutant`; spec §11 #531, #525)
+
+ai-docs batch b2 (#531, #525). **`ai_docs_b2_proof.py`** makes its own fixtures under
+`work/ai-docs-b2/` (ffmpeg with libx264) on a scratch `CFFIXED_USER_HOME`. One instance runs the
+#531 rows over MCP on a 60 s 1080p clip, each export over a file a `done` export made first, in a
+folder of its own: K1–K3 cancel `h264`, `gif` and `vp9_webm` while they write, S1 cancels an
+`audio_wav` with two stems past the mix, G1 is a graphic that throws from frame 30, L1 an export over
+a file locked with `chflags uchg` (unlocked again whatever happens), N1 and C0 the controls. A
+second instance with `-RCDevExportFault video@40` runs F1. A cancel row polls `export_status` every
+10 ms and cancels on the state it wants, so the stage is measured, not timed.
+
+**`ai_docs_b2_probe.swift`** runs the real controllers off-screen, one process per mode, built
+with `FRAMEJOB_DEV_TOOLS` and a `default.metallib` like `docs_bugs_b4_probe.swift`: the Export…
+progress sheet's Cancel over an existing file (P1), three queue jobs to one path (Q1, Q2), and
+`AgentLane.shared.submit` with arguments that raise (A1, under lldb with the inject dylib). It names
+only symbols the base has and builds over `--base-sources`.
+
+**#525's E rows** need an Objective-C exception inside a tool call, and none is known in the app,
+so **`ai_docs_b2_inject.m`** (built with `cc -dynamiclib -fobjc-arc -framework Foundation` into
+`work/ai-docs-b2/`) wraps two methods: `+[NSJSONSerialization JSONObjectWithData:options:error:]`
+raises on data holding `FRAMEJOB_RAISE_525` (the server thread for `open_project`, the main hop for
+`get_project`), and `-[NSString stringByExpandingTildeInPath]` raises on main only, for a string
+holding `FRAMEJOB_RAISE_HOP_525`, which `new_project` reaches inside `onMainWhenIdle`. Every
+instance that can abort runs under `lldb --batch -k bt -k "process kill"`, so an abort stops in the
+debugger and no crash dialog comes up; the proof stops only the app pids it launched. A hardened
+build (Release) is copied with `ditto` and re-signed ad hoc without `runtime`, keeping its
+entitlements, and the E rows run on the copy once `codesign -dv` shows no `runtime` and the two
+executables match with their signatures removed; they are skipped by name only if that fails.
+
+```sh
+make app-debug && python3 tools/proof/ai_docs_b2_proof.py [--only K1,P1,Q1,A1,E1]
+make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_b2_proof.py
+python3 tools/proof/ai_docs_b2_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_b2_proof.py --base-sources <its app/Sources> --expect-red
+```

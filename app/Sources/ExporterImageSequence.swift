@@ -96,18 +96,23 @@ extension Exporter {
     ///
     /// `graphics` goes the same way for the same reason: the export's pin is
     /// on the export's key, and each image frame pins it on its own.
+    ///
+    /// Every writer writes `temporary`, the hidden sibling `Exporter` renames
+    /// over `url` on a success (spec §11 #531); `url` itself is only what the
+    /// stems are named from.
     static func pipeline(
         built: BuiltComposition, project: ReelProject, urls: [UInt32: URL],
         settings: ExportSettings, chapters: [ExportChapter], options: RecipeOptions,
-        graphics: GraphicSet?, to url: URL
+        graphics: GraphicSet?, to url: URL, writing temporary: URL
     ) throws -> any ExportPipeline {
         // A WebM is the core's to write (spec §11 CX-15 (2)): the second writer.
         if settings.container.lowercased() == "webm" {
             return try ExportWebMWriter(
-                built: built, settings: settings, chapters: chapters, to: url)
+                built: built, settings: settings, chapters: chapters, to: temporary)
         }
         guard settings.isImageSequence else {
-            let mix = try ExportWriter(built: built, settings: settings, chapters: chapters, to: url)
+            let mix = try ExportWriter(
+                built: built, settings: settings, chapters: chapters, to: temporary)
             guard !settings.stems.isEmpty, let plan = project.plan else { return mix }
             // An audio row's stems (spec §11 AU-108): each a fresh build of the
             // same plan on the export's key, beside the mix.
@@ -115,7 +120,7 @@ extension Exporter {
             let key = built.recipeKey
             return try ExportStemsPipeline(
                 mix: mix, stems: settings.stems, settings: settings, mixURL: url,
-                sources: Array(urls.values),
+                mixWriting: temporary, sources: Array(urls.values),
                 rebuild: {
                     try CompositionBuilder.build(
                         plan: plan, planJSON: planJSON, urls: urls, recipeKey: key)
@@ -123,7 +128,7 @@ extension Exporter {
         }
         return try ImageSequenceWriter(
             project: project, urls: urls, settings: settings, options: options,
-            graphics: graphics, to: url)
+            graphics: graphics, to: temporary)
     }
 }
 

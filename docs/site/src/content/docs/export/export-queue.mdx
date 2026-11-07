@@ -53,7 +53,7 @@ Each row shows the file's name and where the job has got to.
 | `Measuring loudness… · 12 %` | The job is measuring the mix before it writes. | **Cancel** |
 | `Stopping…` | You cancelled the job and it hasn't stopped yet. | **Cancel** |
 | `Exported “Board.mp4”.` | The file was written. Any stems, graphic warnings and cursor warnings are counted after the name, then come the [loudness figures](/export/progress-and-report/). | **Show**, **Remove** |
-| `Overwritten by a later export to the same file.` | The job finished, but a later job has since started writing to the same path. | **Remove** |
+| `Overwritten by a later export to the same file.` | The job finished, but a later job to the same path has since finished and replaced its file. | **Remove** |
 | `Cancelled.` | You stopped it while it ran. | **Remove** |
 | `Cancelled before it started.` | You stopped it while it waited. | **Remove** |
 | The reason it failed | The job stopped with an error. | **Remove** |
@@ -62,7 +62,7 @@ Hold the pointer over a row for its tooltip: the full path, the container, the s
 
 | Button | What it does |
 | --- | --- |
-| **Cancel** | Stops that job and removes its partly written file. A waiting job is cancelled before it starts. A file you chose to replace in the save panel stays as it was if you cancel before the row says `Writing`, and is gone once it does. |
+| **Cancel** | Stops that job and removes its partly written file. A waiting job is cancelled before it starts. A file you chose to replace in the save panel stays as it was, even if the row says `Writing`. |
 | **Remove** | Takes a finished row out of the list. The file stays where it is. |
 | **Show** | Reveals the finished file in the Finder. If the file has since been moved or deleted, Frame Job beeps. |
 
@@ -72,7 +72,7 @@ Hold the pointer over a row for its tooltip: the full path, the container, the s
 
 **Cancel All** stops the running job and every waiting one. It's dimmed when nothing is running or waiting.
 
-A cancelled job's partly written file is removed. A failed job can leave one where you saved it. See [Failures](/export/progress-and-report/#failures).
+A cancelled or failed job's partly written file is removed, and the file you chose to replace stays as it was. See [Failures](/export/progress-and-report/#failures).
 
 ## A queued job's snapshot
 
@@ -116,7 +116,7 @@ The figures are measured, not a guarantee: a heavier timeline can use more.
 ## Good to know
 
 - **Export…** doesn't join the queue. It writes straight away behind its [own progress sheet](/export/progress-and-report/), and it can run while a queued job runs.
-- Two jobs can name the same file. The save panel asks about replacing a file only if it's already on disk, so two quick **Add to Queue** choices with one name may not ask at all. The later job replaces the file as it starts writing, whether or not it goes on to finish, and the earlier row stops offering **Show**.
+- Two jobs can name the same file. The save panel asks about replacing a file only if it's already on disk, so two quick **Add to Queue** choices with one name may not ask at all. The later job replaces the file only when it finishes, and then the earlier row stops offering **Show**. A later job that fails or is cancelled leaves the earlier file and its row as they were.
 
 ## With an agent
 

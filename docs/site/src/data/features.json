@@ -16938,7 +16938,7 @@
     {
      "id": "export-stems-overwrite",
      "name": "Overwriting and clean-up",
-     "summary": "A stem replaces a file of its name without asking, but never the project's media, and a cancelled or failed export removes what it wrote.",
+     "summary": "A stem replaces a file of its name without asking, but never the project's media, and only once every file is written; a cancelled or failed export removes what it wrote and leaves existing files as they were.",
      "page": "export/stems",
      "anchor": "overwriting-and-clean-up",
      "where": "Export sheet ▸ Stems"
@@ -17072,7 +17072,7 @@
     {
      "id": "export-cancel",
      "name": "Cancel a running export",
-     "summary": "Cancel stops the export and removes the half-written file.",
+     "summary": "Cancel stops the export and removes the half-written file, and a file it was replacing stays as it was.",
      "page": "export/progress-and-report",
      "anchor": "cancel-a-running-export",
      "where": "Exporting sheet ▸ Cancel"
@@ -18798,7 +18798,7 @@
     {
      "id": "mcp-export-path",
      "name": "Export paths",
-     "summary": "An existing file at the path is replaced, and the file always ends in the preset's extension.",
+     "summary": "An existing file at the path is replaced only when the job finishes, and the file always ends in the preset's extension.",
      "page": "mcp/export",
      "anchor": "path-handling"
     },

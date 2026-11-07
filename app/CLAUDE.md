@@ -2985,7 +2985,11 @@ the key map behind it.
   stems, WebM and the measurement read through it) · `ExportAudioMaster.swift` ·
   `ExportStraightAlpha.swift` · `ExportStraightAlphaHalf.swift` ·
   `ExporterImageSequence.swift` · `ExportAudioEnd.swift` ·
-  `ExporterErrors.swift` · `ExporterGraphics.swift` · `ExporterWriter+Time.swift` ·
+  `ExporterErrors.swift` · `ExportAside.swift` (spec §11 #531: the hidden
+  `.framejob-export-<UUID>` sibling every export writes, `swap` — `rename(2)` over
+  the path, only from `Exporter.finish` on a success — and `discard`, which also
+  removes ImageIO's `.<name>-XXXX` part-file) · `ExporterGraphics.swift` ·
+  `ExporterWriter+Time.swift` ·
   `Exporter+Frame.swift` (the offline single frame, `renderFrame` /
   `renderFrameReported`, a pure move out of `Exporter.swift`, road map creator-jobs
   CU3a2's toll; it carries the `copyCGImage` warning) · `Exporter+Cursor.swift`
@@ -4353,8 +4357,9 @@ free.
   binary (ad-hoc signed in place first) this way to put
   `Contents/Resources/agent-catalog.json` in the bundle, which `framejob-mcp`
   lists from while no Frame Job runs; `dist_check.py` D21–D24 check it.
-- `AgentLane.swift` — every tool call's one door (road map 12 A1, spec §11
-  AI-2, AI-3, AI-5, AI-12): the MCP trampoline's `serve` (server thread,
+- `AgentLane.swift` · `ObjCException.swift` — every tool call's one door
+  (road map 12 A1, spec §11 AI-2, AI-3, AI-5, AI-12): the MCP trampoline's
+  `serve` (server thread,
   synchronous) and the assistant session's `submit` (returns at once; one
   completion, on its document's serial queue — one per document with a call
   outstanding, so a pending question holds only its own window, #148). One
@@ -4385,6 +4390,17 @@ free.
   `AgentCallCancel` is NSLock-guarded: `cancel()` is main only and idempotent,
   and runs each handler once, outside the lock; `onCancel` on a token already
   cancelled runs the handler at once, on the caller's thread.
+  **An Objective-C exception inside a call fails that call, not the app** (spec
+  §11 #525): `route` runs `execute` inside `ObjCException.catching` (the `@try`
+  shim `app/Bridging/FrameJobObjCCatch.h`) on the server thread and in the main
+  hop, as does `serve`'s main fallback; `onMainWhenIdle` runs its body through
+  `ObjCException.shielding` on main (typed throws, so its `rethrows` signature
+  stands) and raises a caught exception again on the waiting thread, where
+  `route`'s catch answers it; `submit`'s `answer` and `answer`'s question hop are
+  wrapped. Each catch sits inside the lock's `defer`; the answer is `<tool> failed
+  on an internal exception (<name>: <reason>). Frame Job is still running, but
+  part of the call may have happened.` and the log line `framejob agent: <tool>
+  raised …`, never the `Frame Job: ` prefix.
 - `AssistantToolTable.swift` — spec §11 AI-7's ONE table: withheld
   (`record_screen`; `close_project`; `transcribe` only with
   `engine: "assemblyai"`; every dev tool, from `AgentServer.devToolNames`) and ask-first (`export`,

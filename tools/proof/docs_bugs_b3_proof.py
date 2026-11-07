@@ -19,12 +19,13 @@ only when that holds. The fixtures are made here, so ffmpeg (with libx264, libx2
   `hevc_alpha`, `prores_4444`, `vp9_alpha_webm` at `[1000, 1000]` over a file: the same with the shape
   sentence. R3 (c) each at 960×540, `apng` and `h264` at `[1000, 1000]`, a 600-frame GIF: `done`. R4
   (c) good re-exports over an existing file for `h264`, `gif`, `apng`, `vp9_webm`: the new file, no
-  `.framejob-replaced-*` left.
+  `.framejob-replaced-*` or `.framejob-export-*` left.
 - S1 `audio_wav` with `stems` over an existing mix, one stem's name a project media: `failed` with the
   stem sentence, the mix byte-identical, the folder listing unchanged: a real pipeline throw, past the
   doors.
 - C1 `cancel_export` during `Measuring loudness…` over an existing file: `cancelled`, byte-identical.
-  C2 (c) a cancel while writing: nothing at the path. C3 (c) a cancel on a fresh path: nothing there.
+  C3 (c) a cancel on a fresh path: nothing there. (C2, a cancel while writing leaving nothing at the
+  path, stated the rule spec §11 #531 replaced; `ai_docs_b2_proof.py`'s K1 holds the file now.)
 - Depth, `render_frame`, each layout back to front, levels the distinct greens in row 288: D1 H.264
   then HEVC 10. D2 H.264 then ProRes. D3 HEVC 8 then HEVC 10. D4 H.264, H.264, HEVC 10. D5 H.264 at
   0 s, HEVC 10 above at 6 s, the frame at 7 s. Each 16-bit, levels above 256. D6 HEIC of H.264 under
@@ -90,21 +91,20 @@ CLAUSE = "Shorten the range, or lower the export frame rate."
 SHAPE = "An export that keeps transparency has to have the canvas's own shape."
 ALPHA = (("hevc_alpha", "mov"), ("prores_4444", "mov"), ("vp9_alpha_webm", "webm"))
 ASIDE = ".framejob-replaced-"
+SIBLING = ".framejob-export-"
 
 DOOR_ROWS = ["R1", "R2", "R3", "R4"]
 STEM_ROWS = ["S1"]
-CANCEL_ROWS = ["C1", "C2", "C3"]
+CANCEL_ROWS = ["C1", "C3"]
 DEPTH_ROWS = ["D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8"]
 PATH_ROWS = ["W1", "W2"]
 SHEET_ROWS = ["G1", "G2", "G3", "G4", "G5", "G6"]
 PROBE_ROWS = ["B1", "B2", "PB"]
 ROWS = (DOOR_ROWS + STEM_ROWS + CANCEL_ROWS + DEPTH_ROWS + PATH_ROWS + SHEET_ROWS + PROBE_ROWS
         + ["Z1"])
-CONTROLS = {"R3", "R4", "C2", "C3", "D8", "W2", "G6", "PB", "Z1"}
+CONTROLS = {"R3", "R4", "C3", "D8", "W2", "G6", "PB", "Z1"}
 
 EXPORT = "app/Sources/AgentServer+Export.swift"
-EXPORTER = "app/Sources/Exporter.swift"
-QUEUE = "app/Sources/ExportQueueController.swift"
 SEQUENCE = "app/Sources/ExporterImageSequence.swift"
 RESOLVE = "app/Sources/ExportSheetResolve.swift"
 FRAME = "app/Sources/Exporter+Frame.swift"
@@ -115,11 +115,8 @@ MUTANTS = {
     "no-door": (["R1", "R2"], [(
         EXPORT, "        if let refusal = Exporter.settingsRefusal(settings, project: project) {",
         "        if let refusal = Exporter.settingsRefusal(settings, project: project), false {")]),
-    "no-put-back": (["S1", "B2"], [(
-        EXPORTER, "            Exporter.putBack(aside, at: url)\n", "")]),
-    "cancel-removes": (["C1"], [(
-        QUEUE, "if replaced { try? FileManager.default.removeItem(at: jobs[index].destination) }",
-        "try? FileManager.default.removeItem(at: jobs[index].destination)")]),
+    # `no-put-back` and `cancel-removes` were retired with the code they broke (spec §11 #531);
+    # `ai_docs_b2_proof.py`'s mutants hold the file now.
     "clause-always": (["R1", "G1"], [(
         SEQUENCE, "+ (aboveOwn ? \", or lower the export frame rate.\" : \".\"))",
         "+ \", or lower the export frame rate.\")")]),
@@ -343,7 +340,7 @@ def door_rows(client):
                         range="in_out", size=first)
             old = digest(path)
             word, _ = run_export(project, preset=preset, path=path, range="in_out", size=second)
-            left = [name for name in listing(folder) if name.startswith(ASIDE)]
+            left = [name for name in listing(folder) if name.startswith((ASIDE, SIBLING))]
             check("R4", word == "done" and digest(path) not in (None, old) and not left,
                   f"{preset}: {word}, {old} → {digest(path)}, asides {left}")
 
@@ -399,11 +396,6 @@ def measuring(status):
     return status.get("phase") == "Measuring loudness…"
 
 
-def writing(status):
-    return status.get("status") == "running" and not status.get("phase") \
-        and status.get("progress", 0) > 0.15
-
-
 def cancel_rows(client):
     project = Project(client, "cancel", [FILES / "long60.mov"])
     project.place(FILES / "long60.mov")
@@ -419,16 +411,6 @@ def cancel_rows(client):
               f"cancelled while measuring {hit}, {status.get('status')}; {before} → {digest(path)}")
 
     attempt(["C1"], c1)
-
-    def c2():
-        path = made(project, preset="h264", path=str(folder / "writing.mp4"), range="in_out",
-                    size=[640, 360])
-        status, hit = cancel_when(project, writing, preset="h264", path=path)
-        check("C2", hit and status.get("status") == "cancelled" and not Path(path).exists(),
-              f"cancelled while writing {hit}, {status.get('status')}; exists "
-              f"{Path(path).exists()}, {listing(folder)}")
-
-    attempt(["C2"], c2)
 
     def c3():
         path = str(folder / "fresh.mp4")

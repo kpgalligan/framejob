@@ -1646,6 +1646,11 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   so it is the owner's call and not this decision. The queue's `superseded`
   mark stays at launch, as its comment's "being early is the honest direction"
   says, for a job that then leaves the file. Amends AU-108 (f).
+  **Amended by #531** (ai-docs b2, the owner's answer of 2026-11-06): the
+  move aside, the put back and the cancel's removal are gone. Every export
+  is written to a hidden sibling and renamed over the path only when it
+  succeeds, so the accepted risk above is closed, and the `superseded` mark
+  moves to the later job's success.
 - **#504 — The 600-frame sentence offers a lower frame rate only when the
   chosen rate is above the format's own.** A GIF at its own 12.5 fps has no
   lower row in the Frame rate popup, and `export` has no rate argument, so
@@ -1831,3 +1836,55 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   "Choose a face" with its not-sure note. `reframe_clip {follow: speaker}`
   is unchanged (`silence: .refuses`, VR-60 (c)). Amends VR-64 (d) and
   VR-66 (c).
+- **#531 — An export is written beside its destination and renamed over it
+  only when it succeeds** (the owner, 2026-11-06, "Write aside, swap").
+  Amends #470 and AU-108 (f) as #470 amended it. Every export, through the
+  Export… sheet, the Export Queue or `export`, is written to a hidden sibling
+  `.framejob-export-<UUID>.<ext>` in the destination's folder
+  (`ExportAside.temporary`), whether or not a file is at the path.
+  `Exporter.startWriting` makes the name and hands it to `Exporter.pipeline`
+  as `writing`. The writer, the WebM writer and the image writer write it, and
+  `encoderOutcome` cleans it. Only `finish` touches the path. When
+  `graphicOutcome` leaves a success, it renames the sibling over the path with
+  `rename(2)` (`ExportAside.swap`) and answers the path, never the sibling. Any
+  other end — a refusal, a failure, a cancel at any stage, a failed graphic
+  (G-13) or #378's dev fault — removes the sibling and leaves the path as it
+  was. An existing file stays byte for byte, and a partly written file is never
+  at the path. A rename that fails is a failure,
+  `“<name>” could not be replaced with the new export: <strerror>. The file
+  there is as it was.`, and the sibling is removed. **Stems** are written the
+  same way: the mix at its sibling, each stem at its own. When every write has
+  succeeded, each stem is renamed over its path in order, before the mix. A
+  stem rename that fails removes the siblings not yet renamed and fails with
+  its sentence; stems already renamed stay renamed. A mix rename that
+  fails after every stem is renamed (`Exporter.finish`) leaves the new stems
+  in place beside the old mix. The stem collision
+  (AU-108 (d)) still refuses before anything is written. **The queue**: a
+  completed row naming the same path is marked `superseded` when a later job
+  SUCCEEDS, not when it launches, because until then the earlier file is
+  still there. The cancel's removal of the path in both `finished` methods is
+  gone, because nothing an export writes is ever at the path before it
+  succeeds. **Accepted:** the folder needs room for both files until the
+  export finishes. A crash or a forced quit during the write leaves a hidden
+  `.framejob-export-*` partial beside the path; nothing removes it at launch.
+  Leftover `.framejob-replaced-*` files from #470 are not touched.
+- **#525 — An Objective-C exception inside a tool call fails that call, not
+  the app.** An `NSException` raised by a tool's handler crossed Rust's
+  `catch_unwind` in `agent::serve` (off main, where Rust aborts on a foreign
+  exception) or AppKit's uncaught-exception handler (inside
+  `onMainWhenIdle`'s `DispatchQueue.main.sync`), and both ended the process.
+  The catch is Objective-C: `app/Bridging/FrameJobObjCCatch.h`'s
+  `static inline` `framejob_catch_objc` runs a block inside `@try`, and
+  `ObjCException.catching` is Swift's door to it. It sits in four places in
+  `AgentLane.swift`: around `execute` on the server thread and in the main
+  fallback (`executeCatching`), around `onMainWhenIdle`'s body on main (an
+  exception caught there is raised again on the calling thread, where
+  `executeCatching` answers it), around `submit`'s `answer`, and around
+  `answer`'s question hop. The call answers `isError` with `<tool> failed on
+  an internal exception (<name>: <reason>). Frame Job is still running, but
+  part of the call may have happened.`, and the log has `framejob agent:
+  <tool> raised <name>: <reason>`. Every catch sits inside the lane lock's
+  `defer`, so the lock is always released. **Accepted:** a raise skips the
+  `defer`s and releases of the Swift frames between it and the catch, so a
+  handler's own lock or half-made state is not restored. A raise on a queue a
+  handler starts itself still ends the app.

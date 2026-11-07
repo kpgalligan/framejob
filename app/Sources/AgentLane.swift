@@ -32,6 +32,15 @@ typealias AssistantAskFirst = (AssistantQuestion, @escaping (Bool) -> Void) -> V
 /// is never held across a call, a wait or a completion; a document's queue is
 /// dropped once none of its calls is outstanding, so a new one is made only
 /// when there is nothing left to keep in order.
+///
+/// **The catch (#525).** An Objective-C exception inside a call answers that
+/// call `isError` and the app keeps running (`ObjCException`): `route` runs
+/// `execute` inside the `@try` shim on the server thread and inside the main
+/// hop, `serve`'s main fallback does too, `onMainWhenIdle` shields its body on
+/// main and raises a caught exception again on the waiting thread, where
+/// `route`'s catch answers it, and `submit` and `answer`'s question hop are
+/// wrapped. Each catch sits inside the lock's `defer`, so the lane is always
+/// released.
 final class AgentLane {
     static let shared = AgentLane()
 
@@ -76,7 +85,7 @@ final class AgentLane {
         guard !Thread.isMainThread else {
             // The core header says the server thread calls this, never main.
             assertionFailure("AgentLane.serve was called on the main thread")
-            return server.execute(tool: tool, argumentsJSON: argumentsJSON)
+            return executeCatching(tool, argumentsJSON)
         }
         lock.lock()
         defer { lock.unlock() }
@@ -97,7 +106,15 @@ final class AgentLane {
     ) {
         let key = ObjectIdentifier(document)
         enter(key).async { [self] in
-            completion(answer(tool, argumentsJSON, document, cancel, askFirst))
+            let answered = ObjCException.catching {
+                answer(tool, argumentsJSON, document, cancel, askFirst)
+            }
+            switch answered {
+            case .success(let result): completion(result)
+            case .failure(let raised):
+                ObjCException.log(tool, raised)
+                completion(errorResult(ObjCException.toolSentence(tool, raised)))
+            }
             leave(key)
         }
     }
@@ -135,8 +152,17 @@ final class AgentLane {
             return errorResult(refusal)
         }
         if AssistantToolTable.row(for: tool)?.rule == .askFirst {
-            let question = DispatchQueue.main.sync {
-                AssistantToolTable.question(tool: tool, arguments: arguments, document: document)
+            let asked = DispatchQueue.main.sync {
+                ObjCException.catching {
+                    AssistantToolTable.question(tool: tool, arguments: arguments, document: document)
+                }
+            }
+            let question: AssistantQuestion?
+            switch asked {
+            case .success(let made): question = made
+            case .failure(let raised):
+                ObjCException.log(tool, raised)
+                return errorResult(ObjCException.toolSentence(tool, raised))
             }
             if let question = question, !ask(question, askFirst) {
                 return errorResult("The person declined: \(question.sentence).")
@@ -163,12 +189,24 @@ final class AgentLane {
     }
 
     /// `execute` in place for an `offMainTools` member, else on main once no
-    /// gesture is live. The caller holds the lock.
+    /// gesture is live; either way inside the `@try` shim (#525). The caller
+    /// holds the lock.
     private func route(_ tool: String, _ argumentsJSON: String) -> String {
         if AgentServer.offMainTools.contains(tool) {
-            return server.execute(tool: tool, argumentsJSON: argumentsJSON)
+            return executeCatching(tool, argumentsJSON)
         }
-        return onMainWhenIdle { server.execute(tool: tool, argumentsJSON: argumentsJSON) }
+        return onMainWhenIdle { executeCatching(tool, argumentsJSON) }
+    }
+
+    /// `execute` on this thread, an Objective-C exception it raised answered
+    /// as the call's error (#525) and logged.
+    private func executeCatching(_ tool: String, _ argumentsJSON: String) -> String {
+        switch ObjCException.catching({ server.execute(tool: tool, argumentsJSON: argumentsJSON) }) {
+        case .success(let result): return result
+        case .failure(let raised):
+            ObjCException.log(tool, raised)
+            return errorResult(ObjCException.toolSentence(tool, raised))
+        }
     }
 
     private func errorResult(_ message: String) -> String {
@@ -194,12 +232,19 @@ final class AgentLane {
     /// sleep (what `onMain` always did there; a gesture can only end on main,
     /// so a wait here would never end). Off main: `body` on main once no open
     /// document is mid-gesture, retried every 20 ms with no bound. Never locks.
+    ///
+    /// Off main, `body` runs inside the `@try` shim (#525): an Objective-C
+    /// exception it raises on main would end the app there, so it is caught on
+    /// main and raised again HERE, on the waiting thread, where `route`'s catch
+    /// answers the call.
     func onMainWhenIdle<T>(_ body: () throws -> T) rethrows -> T {
         if Thread.isMainThread { return try body() }
         while true {
+            var raised: NSException?
             let outcome: T? = try DispatchQueue.main.sync {
-                Self.gestureInProgress() ? nil : try body()
+                Self.gestureInProgress() ? nil : try ObjCException.shielding(body, raised: &raised)
             }
+            if let raised = raised { raised.raise() }
             if let outcome = outcome { return outcome }
             Thread.sleep(forTimeInterval: 0.02)
         }

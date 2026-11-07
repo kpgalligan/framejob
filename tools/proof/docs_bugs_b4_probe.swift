@@ -14,7 +14,8 @@
 //          the button is live again.
 // queue    R1, R2: one job through the real ExportQueueController.shared.enqueue, sampled
 //          straight after it returns and every 20 ms: its state, `ExportQueueRowView.status` and
-//          whether the destination exists.
+//          whether the destination or the hidden `.framejob-export-*` sibling an export writes
+//          until it lands (spec §11 #531) exists.
 // quit     T1 (and T2 when it survives): an H.264 sheet past 40 % "Writing", then the real
 //          AppDelegate's applicationShouldTerminate; on .terminateNow the probe exits as
 //          NSApplication.terminate would. Otherwise it waits for the finish and asks again.
@@ -297,7 +298,9 @@ func queueRows(_ o: Open) {
     while Date().timeIntervalSince(start) < 600 {
         guard let job = q.jobs.first(where: { $0.id == id }) else { break }
         let row = ExportQueueRowView.status(job)
+        let siblings = (try? FileManager.default.contentsOfDirectory(atPath: scratch.path)) ?? []
         let onDisk = FileManager.default.fileExists(atPath: destination.path)
+            || siblings.contains { $0.hasPrefix(".framejob-export-") }
         let word = row.components(separatedBy: " · ").first ?? row
         let key = "\(job.state)|\(word)|\(onDisk)"
         if key != last {

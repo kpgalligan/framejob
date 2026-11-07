@@ -145,7 +145,8 @@ app/
                        SDR picture, 8-bit I420) conversion, and `vp9_alpha_webm`'s alpha as a
                        second 8-bit picture (`framejob_export_alpha8`)
   Resources/Models/    silero_vad.mlmodelc, vendored compiled (PROVENANCE.md)
-  Bridging/            the bridging header importing core/include/framejob_core.h
+  Bridging/            the bridging header importing core/include/framejob_core.h,
+                       and FrameJobObjCCatch.h, the `@try` shim (spec §11 #525)
 designs/             the spec, adr/ (condensed records), the handoffs — the table above
 samples/             the owner's real recordings for real-material work; README.md says what
                      each is and how it measures
