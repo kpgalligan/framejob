@@ -75,8 +75,9 @@ const href = (feature: Feature) => `/${feature.page}/${feature.anchor ? `#${feat
 ))}
 
 <style is:global>
-  /* This page's table wants more room than prose does. */
-  :root {
+  /* This page's table wants more room than prose does. The theme sets the width on an unlayered
+     `:root`, so this selector has to outrank it. */
+  :root:has(.fj-features) {
     --sl-content-width: 68rem;
   }
 </style>

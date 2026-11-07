@@ -12,9 +12,13 @@ sidebar.mjs             every page's place in the navigation, in order
 src/content/docs/       the pages: <section>/<page>.mdx
 src/data/features.json  THE FEATURE LIST: what /features/ renders and what the proof reads
 src/components/         AtAGlance (a page's facts), Shot (a screen in both looks),
-                        FeatureIndex (the filterable list)
+                        FeatureIndex (the filterable list); SiteTitle, ThemeSelect,
+                        PageTitle and Hero are the theme's Starlight overrides
 src/assets/screens/     WebP captures, written only by scripts/import-screens.mjs
-src/styles/             the brand: the mark's inks, the app's faces, square chrome
+src/styles/             boppa-llewyn.css (the theme, shared with Doctored's site) and
+                        frame-job.css (this site's components in it); README "Theme"
+src/fonts/, public/fonts/  the theme's self-hosted faces and their licence
+src/site.ts             the header badge's version, read from the repository's VERSION
 ```
 
 ## The rule that matters
@@ -96,6 +100,8 @@ Limits, edge cases and what stops it, in plain words.
 
 Every section is optional except the opening. Order the task sections as a reader needs them.
 
+- **Eyebrow:** the mono label above a page's title is the name of its sidebar group. Set
+  `eyebrow:` in the frontmatter only when that name is wrong for the page.
 - **Headings** start at `##`, are sentence case, and name the job: "Add a marker", not "Adding".
   A feature in `src/data/features.json` with an `anchor` needs a heading that makes that anchor.
 - **Menus** are bold with `▸`, spelled as the app spells them: **Clip ▸ Split**.
