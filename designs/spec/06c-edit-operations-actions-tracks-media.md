@@ -52,7 +52,11 @@ The rules every op shares are §6a; the clip ops are §6b.
   clip in the reach with a non-layout action that moves it and ends after `at` — `The {screen|
   camera} clip {id} at {timecode} {zooms|moves} (action {a}); nest the {role}'s clips so the
   layout moves the nest and the {zoom|action} stays inside it.` (a screen at its full placement
-  is exempt in corner, camera_full and screen_only) — then `add_action`'s own. `nest: true`
+  is exempt in corner, camera_full and screen_only) — then, checked once every placement is
+  solved and before anything is written, a shape or graphic clip under `at` or in the reach that
+  the layout would give a corner radius, or a crop off a matte track: `clip {id} is a shape clip
+  and cannot take a camera layout's crop or corner radius` (§11 #524) — then `add_action`'s own.
+  `nest: true`
   nests the moving role's clips first and lays out the nest clip, refused `clip {id} is already
   laid out; a nest would lay it out twice.` when one is. One undo step.
 - **`reframe_clip {clip, follow, zoom=1, where_empty="fit", from_width?, from_height?, backdrop?,
@@ -338,6 +342,9 @@ The rules every op shares are §6a; the clip ops are §6b.
   record (§11, #63). The descriptor and the probe both carry `original`,
   the WebM or Matroska file a `.mov` copy was made from (§11 #228-O): `add_media` stores it, a
   probe with one replaces the stored one, a probe without one clears it, and no probe keeps it.
+  Every path — `add_media`'s, `original`'s, `relink_media`'s and a pasted media row's — is stored
+  and compared as given, never trimmed, so `A.mov ` (ending in a space) and `A.mov` are two files;
+  a blank one, or one of only spaces, is an **error** (§11 #534).
   They carry `cursor` the same way (format 38, §11 CU-39): `{path, bookmark?, in_picture}`, the
   cursor file recorded beside a video, stored, replaced, cleared and kept as `original` is; an
   empty path and any media but a video with a picture are errors in `check_media_fields`' words.

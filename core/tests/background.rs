@@ -611,9 +611,11 @@ fn a_crop_on_a_degenerate_shape_is_accepted_now_the_two_size_readers_are_one() {
     // less than the source width 0". Reachable only through a file like
     // this one, since no op will build a shape of width 0; the refusal that
     // MATTERS about a degenerate shape is the test above's, and it still
-    // stands.
+    // stands. Track 6 is made a matte track first: off one, a shape clip
+    // takes no crop at all (spec §11 #524), and that is not what this pins.
     let project = backdrop_project();
     let after = project
+        .apply(&json!({"op": "set_track", "track": 6, "matte": "alpha"}))
         .apply(&json!({"op": "set_video", "clips": [23], "patch": {"crop": {"l": 10, "r": 10}}}));
     let after = after.value();
     let clip = by_id(&after, "/clips", 23);

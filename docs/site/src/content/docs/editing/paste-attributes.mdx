@@ -32,13 +32,13 @@ If you copied several clips, only one of them counts: the one that starts earlie
 
 ## What travels
 
-Settings travel in four groups, and a group is only copied when both clips have it. A movie's settings pasted onto a text clip bring its picture settings and leave the text styling alone, and its sound settings go nowhere.
+Settings travel in four groups, and a group is only copied when both clips have it. A movie's settings pasted onto a text clip bring its picture settings, apart from its crop, corner radius and chroma key, and leave the text styling alone. Its sound settings go nowhere.
 
 Each group replaces the target's whole group, so it isn't a merge. A shadow on the target disappears if the copied clip had none.
 
 | Group | What travels | What the target keeps |
 | --- | --- | --- |
-| **Video** | Everything about the picture: position, scale, rotation, opacity, crop, corner radius, blend mode, shadow, reflection, filters, spotlight, obscure regions, chroma key, Remove Background, Text Behind Subject, Hide While Silent, motion presets, motion blur, the grade and its look, and the [drawn cursor's](/recording/cursor-settings/) settings | Nothing, apart from an adjustment clip's [qualifier](#adjustment-clips-and-qualifiers) |
+| **Video** | Everything about the picture: position, scale, rotation, opacity, crop, corner radius, blend mode, shadow, reflection, filters, spotlight, obscure regions, chroma key, Remove Background, Text Behind Subject, Hide While Silent, motion presets, motion blur, the grade and its look, and the [drawn cursor's](/recording/cursor-settings/) settings | Nothing, apart from an adjustment clip's [qualifier](#adjustment-clips-and-qualifiers), and a text, shape or graphic clip's own crop, corner radius and chroma key, which it has no section for |
 | **Audio** | Everything about the sound: volume, Mute, fades and their shapes, pan, Mix to mono, channels, Keep pitch, ducking, noise reduction, voice isolation, EQ, hum removal, gate, de-esser, leveller, compressor, limiter and voice effects | Nothing |
 | **Text** | Font, size, colours, alignment, spacing, case, outline, backdrop, text box width, reveal animation and word caption style | Its own words and their timings |
 | **Shape** | Fill, stroke, gradient, corner radius and arrowheads | Its kind, its size and the end points of a line |

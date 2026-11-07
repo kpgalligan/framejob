@@ -1,6 +1,6 @@
 //! A media's `original` (spec §11 #228-O), through the FFI: the WebM or
 //! Matroska file a playable copy was made from. `add_media` stores it with
-//! its path trimmed and a blank bookmark dropped, and refuses an empty path
+//! its path as given (#534) and a blank bookmark dropped, and refuses an empty path
 //! in its own words; a relink's probe carries it, so a probe with one sets
 //! it, a probe without one clears it, and no probe keeps it; a paste brings
 //! the media row along with it. The schema and key order are
@@ -72,13 +72,13 @@ fn add_media_stores_the_original() {
 }
 
 #[test]
-fn add_media_trims_the_original_path() {
+fn add_media_keeps_the_original_path_as_given() {
     let project = Handle::new(1920, 1080, 30, 1)
         .apply(&add(json!({"path": "  /m/talk.webm \n"})))
         .value();
     assert_eq!(
         at(&project, "/media/0/original"),
-        &json!({"path": ORIGINAL, "bookmark": null})
+        &json!({"path": "  /m/talk.webm \n", "bookmark": null})
     );
 }
 

@@ -1715,3 +1715,41 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   Background, `relink_media` and `open_project`. **Risks accepted:** for a
   drop, the listing and its header sniff run on the main thread; a tool call
   on a large folder waits `probeCeiling` per file.
+- **#524 — `set_video` refuses crop, corner radius and chroma key on a
+  text, shape or graphic clip, and Paste Attributes leaves such a clip's
+  own** (the owner, 2026-11-06, "Refuse and skip"). These kinds have no Crop,
+  Corner Radius or Chroma Key section, so a value written there had no field
+  to show it and no Reset. The rule reads the PATCH, as AU-111 reads
+  `duck.mode`: a key fires only when the patch names it and the merged value
+  is not neutral (a crop other than all zero, a radius other than 0, a
+  chroma key other than `null`). So clearing is always allowed, and a value a
+  clip already holds (a full `paste` keeps what its payload holds) is kept by
+  every other edit and cleared by a neutral one. `crop` is taken on a matte
+  track, because there crop shapes the matte (K-7, MT-4). The answer is an
+  `Err`, the tier of `check_blend` and CO-20's kind refusals, in one of three
+  sentences: `clip {id} is a text clip and cannot take a crop off a matte
+  track`, `… cannot take a corner radius`, `… cannot take a chroma key`
+  (`a shape clip`, `a graphic clip` likewise). Paste Attributes copies the
+  video group onto such a target and keeps the target's own crop, corner
+  radius and chroma key, beside the qualifier rule (GR-13); onto any other
+  clip the three travel as before. `switch_layout`, and every replay through
+  its composition (`reframe_clip {follow: layout}`, Make Vertical Version),
+  refuses up front, before any write and as a refusal, when a shape or
+  graphic clip under `at` or in the reach would be given a non-zero radius or
+  a crop off a matte track: `clip {id} is a shape clip and cannot take a
+  camera layout's crop or corner radius`. One rule covers the base
+  `set_video` and the layout action's end, so the answer does not depend on
+  where `at` falls in the clip. This amends CO-64's refusal order: after the
+  movers, before `add_action`'s own. A text clip has no source size, so it is
+  never a layout role (CO-64). `paste` and plain `set_action_end` are
+  unchanged.
+- **#534 — A media path is stored and compared as given, never trimmed.**
+  `add_media`'s `path`, every `original.path` (#228-O), `relink_media`'s
+  `path` and a pasted media row's `path` are kept byte for byte, and the
+  check for a file already in the media list compares them that way. A blank
+  path, or one of only spaces, is still `media path must not be empty`.
+  Trimming stored a file whose name ends in a space (`A.mov `, or a WebM
+  `talk.webm ` that the built-in copy takes with no question) under its
+  sibling's path: the import of the converted copy recorded the sibling as
+  its original, and a raw `add_media` of the spaced name answered for the
+  sibling's row. A bookmark's blank check is unchanged.

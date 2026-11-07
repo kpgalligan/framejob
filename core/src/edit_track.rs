@@ -104,14 +104,14 @@ pub(crate) fn clip_list(ids: &[u32]) -> String {
     }
 }
 
-/// A media's `original` as it is stored (spec §11 #228-O): the path
-/// trimmed, and a blank bookmark dropped, for the reason `add_media` drops
-/// a blank media bookmark. An empty path is left for `check_media_fields`
+/// A media's `original` as it is stored (spec §11 #228-O): the path as
+/// given (#534), and a blank bookmark dropped, for the reason `add_media`
+/// drops a blank media bookmark. An empty path is left for `check_media_fields`
 /// to refuse by name. `add_media`, a relink's probe and a media row
 /// `paste` or `paste_attributes` appends (`edit_paste.rs`) all read it.
 pub(crate) fn normalize_original(original: Option<MediaOriginal>) -> Option<MediaOriginal> {
     original.map(|given| MediaOriginal {
-        path: given.path.trim().to_string(),
+        path: given.path,
         bookmark: given.bookmark.filter(|b| !b.trim().is_empty()),
     })
 }
@@ -481,7 +481,7 @@ impl Project {
     /// key, a value that does not match the schema, an empty path, a
     /// negative duration, a media with pixels whose size or rate is not
     /// usable, or an `original` with an empty path. An `original` (spec §11
-    /// #228-O) is stored with its path trimmed and a blank bookmark dropped.
+    /// #228-O) is stored with a blank bookmark dropped; every path as given.
     /// A `color` (spec §11 GR-16) is an `Err` in `set_media_color`'s
     /// sentences wherever that op would refuse it, `detected` aside.
     pub fn add_media(&self, descriptor: &Value) -> Result<Outcome, String> {
@@ -520,15 +520,13 @@ impl Project {
         // A descriptor's `color` is the probe's detected Camera Log (spec §11
         // GR-16), held to the rules `set_media_color` holds a setting to.
         self.check_media_color(&media)?;
-        let path = media.path.trim().to_string();
-        if self.media.iter().any(|m| m.path == path) {
+        if self.media.iter().any(|m| m.path == media.path) {
             return Ok(Outcome::Identity);
         }
 
         let mut next = self.clone();
         let mut record = media;
         record.id = next.allocate_id();
-        record.path = path;
         // An empty bookmark is not a bookmark; storing one would make
         // `relink` think the file had been located once.
         record.bookmark = record.bookmark.filter(|b| !b.trim().is_empty());

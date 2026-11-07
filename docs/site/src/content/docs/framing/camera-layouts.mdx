@@ -78,6 +78,8 @@ The clip drawing behind the camera is the front-most one playing at the playhead
 
 With no screen, the corner layouts, Camera Full and Screen Only lay out the camera alone. Side by Side and Stacked won't.
 
+A shape or graphic clip can be laid out only where the layout neither crops it nor rounds its corners, because it has no Crop or Corner Radius section. As the camera that means Corner, Camera Full or Screen Only; as the screen, any layout but Side by Side and Stacked, which round the screen's corners. The same goes for a later clip in the layout's reach. On a [matte track](/canvas/matte-tracks/) a crop is fine, but rounded corners still aren't.
+
 The items are dimmed when:
 
 - the camera doesn't play at the playhead. A selected clip the playhead isn't on doesn't fall back to the "Camera" track
@@ -136,6 +138,7 @@ A switch that can't be made changes nothing. Frame Job beeps, and [the foot of t
 | "no clip draws behind clip 12 at 00:00:04:10 to be the screen" | Side by Side or Stacked found no screen. Pick another layout, or put a clip behind the camera. |
 | "clip 12 is a nest clip, which cannot draw a rounded corner or a circle." | A nest clip shows square corners only, so a nest can't take Rounded Corner or Circle as the camera. That goes for a later camera clip in the layout's reach too. Use Corner. |
 | "The screen clip 8 at 00:00:00:00 zooms (action 10); nest the screen's clips…" | The clip holds a zoom or another moving action after the playhead. See [A layout meets a zoom](/framing/layout-section/#a-layout-meets-a-zoom), which also covers the sheet Frame Job usually offers here. |
+| "clip 14 is a graphic clip and cannot take a camera layout's crop or corner radius" | The layout would crop or round a shape or graphic clip, as the camera, the screen or a later clip in the reach. Pick a layout that doesn't, move that clip to another track, or end the reach before it with another switch. |
 | "action 10 on clip 8 already runs from …, and two actions on one clip may not overlap" | Two actions on one clip can't overlap, and the switch's span runs into another action, such as a volume change. Move the playhead, shorten the switch in the [Layout section](/framing/layout-section/), or move that action. |
 
 ## Good to know

@@ -41,7 +41,11 @@ extension AgentServer {
                     + "camera_full and screen_only, since its zooms keep playing. Send nest: "
                     + "true to nest that role's clips first, in the same step, so the layout "
                     + "moves the nest and the zoom stays inside it (refused when one of them is "
-                    + "already laid out). Inside a nest (scope) the nest's canvas is the canvas.",
+                    + "already laid out). Also refused, before anything is written: a shape or "
+                    + "graphic clip the layout would crop or round, as the camera, the screen or "
+                    + "a clip in the reach (a crop alone is allowed on a matte track); move it "
+                    + "to another track, or end the reach before it with `through`. Inside a "
+                    + "nest (scope) the nest's canvas is the canvas.",
                 [
                     "camera": "The camera clip's id: a clip with a picture playing at `at`.",
                     "screen": "The screen clip's id, on a track behind the camera's. Absent: "

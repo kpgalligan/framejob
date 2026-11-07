@@ -408,7 +408,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   its kind, because crop shapes the matte (MT-4) and MT-7 has it handled like
   any clip; the owner kept it (#475, 2026-11-05, 'Keep it'): no Crop section
   is added, so such a crop has no field and no Reset. `set_video` and
-  `paste_attributes` are unchanged.
+  `paste_attributes` were unchanged by K-7 (amended by #524).
 - **SH-3 — An inspector name field is the inspector's value field**
   (kpgalligan/framejob#171, 2026-09-30). `InspectorNameField` — the Graphic
   sub-tab's string rows, the Document tab's marker name and the clip

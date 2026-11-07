@@ -43,7 +43,7 @@ use crate::edit_adjustment::{check_adjustment_video, check_qualifier_clip};
 use crate::edit_clip_timing::{SPEED_MAX, SPEED_MIN};
 use crate::export::describe;
 use crate::lut::normalise_look;
-use crate::model::{BlendMode, Clip, Project, Source, TextProps, VideoProps};
+use crate::model::{BlendMode, Clip, Crop, Project, Source, TextProps, VideoProps};
 use crate::outcome::Outcome;
 use crate::patch::{merge_group, Group, GROUPS};
 use crate::props_check::{check_audio, check_shape, check_text, check_video};
@@ -88,6 +88,19 @@ fn check_blend(clip: &Clip, props: &VideoProps) -> Result<(), String> {
     Ok(())
 }
 
+/// The kind of a clip drawn from a description rather than source pixels —
+/// "a text clip", "a shape clip" or "a graphic clip" — the clips with no
+/// Crop, Corner Radius or Chroma Key section (spec §11 #524); `None` for
+/// every other source.
+pub(crate) fn described_kind(clip: &Clip) -> Option<&'static str> {
+    match clip.source {
+        Source::Text => Some("a text clip"),
+        Source::Shape => Some("a shape clip"),
+        Source::Graphic => Some("a graphic clip"),
+        _ => None,
+    }
+}
+
 /// `set_audio`'s one refusal of a legal value (spec §11 AU-111).
 const NEEDS_SPEECH: &str =
     "audio.duck.mode speech needs the clip's media to carry speech spans (set_media_speech)";
@@ -115,6 +128,44 @@ impl Project {
     /// media clip or whose media has no `speech` (spec §11 AU-111).
     pub fn set_audio(&self, clips: &[u32], patch: &Value) -> Result<Outcome, String> {
         self.patch_clips(clips, patch, Group::Audio)
+    }
+
+    /// `set_video`'s refusal of a crop, corner radius or chroma key on a
+    /// text, shape or graphic clip (spec §11 #524), read from the PATCH as
+    /// [`sets_speech_duck`] is: a key fires only when the patch names it and
+    /// the merged value is not neutral, so clearing is always allowed and a
+    /// value the clip already holds is kept by every other edit. A crop is
+    /// taken on a matte track, where it shapes the matte (K-7, MT-4).
+    fn check_pixel_keys(
+        &self,
+        clip: &Clip,
+        patch: &Value,
+        props: &VideoProps,
+    ) -> Result<(), String> {
+        let Some(kind) = described_kind(clip) else {
+            return Ok(());
+        };
+        let names = |key: &str| patch.get(key).is_some();
+        let on_matte = self.track(clip.track).is_some_and(|t| !t.matte.is_none());
+        if names("crop") && props.crop != Crop::default() && !on_matte {
+            return Err(format!(
+                "clip {} is {kind} and cannot take a crop off a matte track",
+                clip.id
+            ));
+        }
+        if names("corner_radius") && props.corner_radius != 0.0 {
+            return Err(format!(
+                "clip {} is {kind} and cannot take a corner radius",
+                clip.id
+            ));
+        }
+        if names("chroma") && props.chroma.is_some() {
+            return Err(format!(
+                "clip {} is {kind} and cannot take a chroma key",
+                clip.id
+            ));
+        }
+        Ok(())
     }
 
     /// Whether `clip` is a media clip whose media carries `speech`.
@@ -401,6 +452,7 @@ impl Project {
                     let mut props = merge_group(&base, patch, group)?;
                     normalise_look(&mut props, patch)?;
                     self.settle_video(&clip, &mut props)?;
+                    self.check_pixel_keys(&clip, patch, &props)?;
                     if let Some(slot) = next.clip_mut(id) {
                         slot.video = Some(props);
                     }

@@ -180,7 +180,7 @@ eased in and out; the nest is offered, not made automatically.
   {c} at {timecode} to be the screen"; the other three lay out the camera alone. `through` not
   after `at`, a non-positive `duration` and a non-finite `focus` are errors. The refusal order is
   the camera, the screen, the nest-clip shape, the movers (with `nest`, the laid-out refusal in
-  their place), then `add_action`'s own.
+  their place), then a drawn clip's crop or radius (amended by #524), then `add_action`'s own.
 - **CO-65 — `focus`.** A point in the camera's source pixels measured from the UNCROPPED
   source's centre, y down; a layout's crop is centred on it and clamped inside the source; absent
   is (0, 0). CO7 fills it from the masks.

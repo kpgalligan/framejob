@@ -30446,3 +30446,24 @@ make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_c4_proof.py
 python3 tools/proof/docs_bugs_c4_proof.py --mutant <name>
 RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_c4_proof.py --base-rev <its sha> --expect-red
 ```
+
+## ai-docs b1 — drawn clips' pixel keys and exact media paths (`ai_docs_b1_proof.py`)
+
+ai-docs batch b1 (#524, #534, spec §11 #524, #534). The built app under a scratch home, driven over
+MCP, on projects built from `media/A.mov` (CoW-copied under `work/ai-docs-b1/media/` beside a copy
+named `A.mov ` with a trailing space) and a VP9 WebM `talk.webm` made with ffmpeg (with its own
+spaced copy). Launch 1 is plain: V rows are `set_video`'s crop, corner radius and chroma key on a
+text, shape and graphic clip (refused, cleared, a matte track's crop), L rows `switch_layout`
+refusing a camera layout that would crop or round a shape or graphic clip, P rows Paste Attributes
+leaving such a clip's own, M1–M3 and M5 `add_media`, `paste` and `import_media` keeping a path's
+spaces. Launch 2 (`-RCFFmpegImport always -RCFFmpegPath <ffmpeg>`) runs M4, a converted import's
+`original.path`. Z1 is each launch's parity grep. The docstring lists every row and marks the
+controls; every other row is red on the frozen base app (`main` at `d40d1f81`), and `--expect-red`
+exits 0 only when that holds. Its mutants are the core's: `core/tests/pixel_keys.rs` and
+`media_path_exact.rs` catch each.
+
+```sh
+make app-debug && python3 tools/proof/ai_docs_b1_proof.py [--only V1,L2,M4]
+make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_b1_proof.py
+RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_b1_proof.py --expect-red
+```

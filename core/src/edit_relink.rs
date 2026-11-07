@@ -67,8 +67,8 @@ impl Project {
         probe: Option<&Value>,
     ) -> Result<Outcome, String> {
         let old_kind = self.require_media(media)?.kind;
-        let path = path.trim();
-        if path.is_empty() {
+        // Stored as given, never trimmed (spec §11 #534).
+        if path.trim().is_empty() {
             return Err("media path must not be empty".to_string());
         }
         let probed = match probe {

@@ -664,7 +664,10 @@ governs a module now.
   cannot blend), and `snap_motion` / `snap_animation`, which put the ticks a
   patch or checked copied group carries on the frame grid AFTER the range
   check, so a refusal names what the caller sent. What a patch may CARRY is
-  `patch.rs`'s and nothing here restates it.
+  `patch.rs`'s and nothing here restates it. `check_pixel_keys` (#524) is
+  `set_video`'s alone, read from the patch: crop, corner radius or chroma on
+  a text, shape or graphic clip is an `Err`, crop allowed on a matte track
+  (K-7).
 - `patch.rs` — reading a caller-authored patch, cut out of `edit_props.rs`
   under the size rule: `Group` — the four PATCH groups; `paste_attributes` takes these four and
   `graphic` as `edit_paste_attributes.rs`'s `PasteGroup`, and a patch has no
@@ -896,7 +899,8 @@ governs a module now.
   G-32 (e)). `skip_missing` drops a named group the payload
   clip lacks and skips a target that cannot take one. **The copied props are
   shape-checked once, the first time a target takes them**: a paste nothing
-  takes never reads the map. `patch::Group` gains no variant for it.
+  takes never reads the map. `patch::Group` gains no variant for it. A text,
+  shape or graphic target keeps its own crop, corner radius and chroma (#524).
 - `edit_zoom.rs` — `add_zoom_action`, the screencast zoom, and `ZoomRegion`,
   the one op ARGUMENT that is a caller-authored object: its `Deserialize` is
   written out rather than derived so it answers as a patch does — an object
@@ -941,7 +945,9 @@ governs a module now.
   and `nest_clips`, each refusal inherited; `edit_layout_reach.rs` a `Role` and its reach
   (to the next later layout action on the track, `through` or the track's end),
   `mover_refusal` (a non-layout mover ending after `at`, a full-placement screen exempt in
-  corner, camera_full and screen_only) and `laid_out`.
+  corner, camera_full and screen_only) and `laid_out`. `compose_switch` refuses up front a
+  shape or graphic role or reach clip the layout would crop (off a matte track) or round
+  (#524), so every `at` and every replay answers alike.
 - `edit_adjustment.rs` — `Source::Adjustment`'s rules (spec §11 GR-6):
   `add_adjustment_clip`, and the refusals every other door asks it for — a
   transition (from `add_transition`, `set_transition`, `set_transition_style`

@@ -237,6 +237,7 @@ A negative `at`, a `duration` that isn't positive, a `through` not after `at`, o
 - the camera is a nest clip and the shape is `rounded` or `circle`
 - a clip in the layout's reach holds a zoom or another action that moves it after `at`. A screen still at its full placement isn't asked in `corner`, `camera_full` and `screen_only`, since its zooms keep playing. Send `nest: true` to nest those clips first, in the same step, so the layout moves the nest and the zoom stays inside it.
 - with `nest: true`, one of the clips to nest is already laid out, or nesting would make the camera a nest clip in a `rounded` or `circle` corner
+- the layout would crop or round the corners of a shape or graphic clip, as the camera, the screen or a later clip in the reach: "clip 14 is a graphic clip and cannot take a camera layout's crop or corner radius". A crop alone is allowed on a matte track. Move that clip to another track, or end the reach before it with `through`.
 - the project or the open nest changes while the tool reads the person masks. Call again.
 
 ## `make_vertical_version`

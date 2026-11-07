@@ -21,8 +21,10 @@
 //! - **The refusals** (CO-62), in order: the camera, the screen, a nest
 //!   clip asked for a radius it cannot draw, a mover — a non-layout action
 //!   that moves a role clip and ends after `at` (a full-placement screen
-//!   exempt in the three layouts that leave it full) — then whatever the
-//!   composed ops say. `nest: true` nests the moving role's clips first and
+//!   exempt in the three layouts that leave it full) — then a shape or
+//!   graphic role or reach clip the layout would crop (off a matte track)
+//!   or round, checked once every placement is solved and before any write
+//!   (spec §11 #524) — then whatever the composed ops say. `nest: true` nests the moving role's clips first and
 //!   lays out the nest clip, unless one of them is already laid out.
 //!
 //! Composed from `remove_action`, `set_action`, `add_action`,
@@ -37,11 +39,12 @@ use crate::action_class::is_layout;
 use crate::edit_adjustment::is_adjustment;
 use crate::edit_clip::clip_end;
 use crate::edit_layout_reach::{Role, RoleKind};
+use crate::edit_props::described_kind;
 use crate::layout::{
     camera_placement, screen_placement, CameraLayout, LayoutChoice, LayoutCorner, LayoutShape,
     Placement, DEFAULT_SWITCH,
 };
-use crate::model::{Clip, Curve, Project, Source};
+use crate::model::{Clip, Crop, Curve, Project, Source};
 use crate::outcome::Outcome;
 use crate::time::{format_timecode, Ticks};
 
@@ -249,6 +252,18 @@ impl Project {
             writes.push((role.clip.id, t, end, bases));
         }
 
+        // A shape or graphic clip given a crop or a radius (spec §11 #524),
+        // refused up front so every `at` and every replay answers alike.
+        for (id, _, end, bases) in &writes {
+            let placed = std::iter::once((*id, end)).chain(bases.iter().map(|(c, p)| (*c, p)));
+            for (id, placed) in placed {
+                let clip = self.require_clip(id)?;
+                if let Some(why) = self.drawn_layout_refusal(clip, placed) {
+                    return Ok(Outcome::Refused(why));
+                }
+            }
+        }
+
         let frame = self.frame();
         let mut next = self.clone();
         for (id, t, end, bases) in &writes {
@@ -298,6 +313,22 @@ impl Project {
             }
         }
         self.finish(next)
+    }
+
+    /// The refusal for a shape or graphic clip `placed` would crop (off a
+    /// matte track) or round (spec §11 #524): such a clip has no Crop or
+    /// Corner Radius section. A text clip never reaches it: it has no source
+    /// size, so it is never a role (CO-64).
+    fn drawn_layout_refusal(&self, clip: &Clip, placed: &Placement) -> Option<String> {
+        let kind = described_kind(clip)?;
+        let on_matte = self.track(clip.track).is_some_and(|t| !t.matte.is_none());
+        let cropped = placed.crop != Crop::default() && !on_matte;
+        (placed.corner_radius != 0.0 || cropped).then(|| {
+            format!(
+                "clip {} is {kind} and cannot take a camera layout's crop or corner radius",
+                clip.id
+            )
+        })
     }
 
     /// The camera's (or a given screen's) refusal: no picture, or not
