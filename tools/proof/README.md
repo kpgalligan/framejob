@@ -30467,3 +30467,41 @@ make app-debug && python3 tools/proof/ai_docs_b1_proof.py [--only V1,L2,M4]
 make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_b1_proof.py
 RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_b1_proof.py --expect-red
 ```
+
+## ai-docs a1 — the playhead past the last media clip and the Loop's wrap hold (`ai_docs_a1_proof.py`; spec §11 #523)
+
+#523: a timeline whose last stretch held only text, shape, graphic or image clips got a composition
+only as long as its media, because `CompositionBuilder.addPlaceholderIfNeeded` added its
+`Blank.mp4` track only to a plan with no video track. `AVPlayer` clamped every seek past the media's
+end — `set_playhead`, `play_preview`'s `seek_to` (the ruler's `Playback.seek`) and the restore after
+an edit — and the item ended there, so the playhead went back to the media's end and the titles
+never played. The placeholder now runs after the audio tracks and also fires when the composition
+ends a tick or more short of the plan, its id one past every plan id. #520: every wrap of a Loop
+holds the player's clock for about 0.7 s, and so does every seek made while playing. Measured, not
+fixed; the issue stays open: the hold needs sound (a clip with its sound off, or a movie with no
+audio stream, holds about 0.02 s), and neither a forward-playing seek that does not wait for the
+compositor's frame (F1) nor a preview built with no audio taps (A1) brought it under 0.25 s.
+
+`python3 tools/proof/ai_docs_a1_proof.py [--only P1,W1,…] [--app PATH]` makes `vonly.mov` under
+`work/ai-docs-a1/` with ffmpeg, uses `media/A.mov` and `media/AV.mov`, and drives one launch on a
+scratch home; its docstring has the rows. It takes about eight minutes, most of it the W rows. W1–W3
+and W5–W7 are MEASURE rows, printed and never scored. It prints the default output device first.
+
+| Run | Result |
+|---|---|
+| The fix, Debug (output: AirPods Max, Bluetooth) | 12/12: P1 16.0 ×6; P2 11, 14, 20, 20; P3 16.0 after each edit and undo; P4 `to` 17.003; P5 `to` 11.981; P6 start 20.0; P7 6.5, `to` 7.005; W1 per-wrap hold median 0.724 s, W2 0.706 s, W3 0.681–0.699 s, W5 0.510 s; W6 0.015 / 0.022 s; W7 0.015 / 0.024 s |
+| The frozen base app (output: AirPods Max, Bluetooth) | 5/12: P1 10.0 ×6; P2 10.0 ×4; P3 9.999998 after each edit; P4 `to` 10.000; P5 `to` 10.000; P6 start 10.0; P7 read 5.0, `to` 5.000; the controls X1 (20.000 s), C1, C2, W4 and Z1 pass; W1 0.738 s, W2 0.712 s, W3 0.679–0.695 s, W5 0.536 s |
+| Release (output: AirPods Max, Bluetooth) | 12/12: the P rows as on Debug; W1 0.734 s, W2 0.699 s, W3 0.692–0.716 s, W5 0.562 s; W6 0.013 / 0.176 s (one wrap trial 0.445 s); W7 0.038 / 0.024 s |
+
+The #520 spike, W rows on Debug builds over the #523 fix with the built-in speakers (seek hold / per-wrap
+hold medians; W3 the runs at the loop start):
+
+| Build | W1 | W2 | W3 | W5 | W6 | W7 |
+|---|---|---|---|---|---|---|
+| The frozen base app | 0.695 | — | — | 0.552 | 0.019 / 0.024 | 0.024 / 0.016 |
+| F1: `seekingWaitsForVideoCompositionRendering = player.rate <= 0` in `startSeek` | 0.657 | 0.661 | 0.587–0.663 | 0.546 | 0.038 / 0.029 | 0.050 / 0.028 |
+| A1: `metering: false` in `Playback.startRebuild` | 0.447 | 0.277 | 0.406–0.414 | 0.196 | 0.010 / 0.022 | 0.018 / 0.016 |
+
+Neither ships. Two mutants, each by hand and reverted: M1 the guard back to `plan.videoTracks.isEmpty`
+(P1–P7 fail; X1 passes, as it does on the base); M2 `placeholderTrackID` back to the audio ids alone
+(P1 and P7 never scored: the instance stopped answering at the id clash and was stopped by its pid).

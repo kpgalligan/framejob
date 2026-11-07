@@ -128,8 +128,6 @@ enum CompositionBuilder {
             videoTracks.append(track)
         }
 
-        try addPlaceholderIfNeeded(to: composition, plan: plan)
-
         // The sample-level audio settings the plan cannot carry (pan, the
         // compressor, noise reduction). Resolved once per build and frozen
         // into the taps: they are not in the plan, so `Playback` treats a
@@ -155,6 +153,7 @@ enum CompositionBuilder {
                 metering: metering, assets: &audioAssets, reversedAssets: &reversedAssets,
                 ramps: ramps, isolated: isolated, voiced: voiced)
         }
+        try addPlaceholderIfNeeded(to: composition, plan: plan)
 
         // Source orientation is read once per media and then attached per
         // instruction, so the compositor can turn a rotated source's sampling
@@ -220,7 +219,14 @@ enum CompositionBuilder {
     private static let placeholderName = "Blank"
 
     /// Gives a timeline of nothing but graphics, text, shapes and images a
-    /// video track to tick against — for the preview's item and the exports.
+    /// video track to tick against — for the preview's item and the exports —
+    /// and a timeline whose last stretch holds only those clips a
+    /// composition as long as its plan (#523): with media to 10 s and titles
+    /// to 20 s the composition would end at 10 s, and `AVPlayer` clamps every
+    /// seek past it and ends the item there. So it runs after the audio
+    /// tracks, and fires when the plan has no video track or when the
+    /// composition, audio and silence included, ends a tick or more short of
+    /// the plan; within a tick it is left to `+InstructionRanges`.
     ///
     /// Those layers need no decoding, so §7.2 gives them no composition
     /// track — and a composition with no track renders nothing offline. An
@@ -235,14 +241,18 @@ enum CompositionBuilder {
     /// names no track for these layers — so it costs one decoded 16×16 frame
     /// and contributes no pixels.
     ///
-    /// Its track id is one past the plan's own numbering, so it can never
-    /// collide with a track a recipe names. If the resource is missing the
-    /// composition keeps no track: exports fail and the preview's item does
-    /// not play — never a crash (road map 10 §10.8).
+    /// Its track id is one past every plan id, video and audio, so it can
+    /// never collide with a track a recipe names, and it is never one of
+    /// `videoTracks`, so `convertsSources` sees the plan's tracks only. If
+    /// the resource is missing the composition is left as it was — a
+    /// media-less one keeps no track: exports fail and the preview's item
+    /// does not play — never a crash (road map 10 §10.8).
     private static func addPlaceholderIfNeeded(
         to composition: AVMutableComposition, plan: CompositionPlan
     ) throws {
-        guard plan.videoTracks.isEmpty, plan.duration > 0,
+        guard plan.duration > 0,
+            plan.videoTracks.isEmpty
+                || composition.duration <= time(plan.duration - 1),
             let url = Bundle.main.url(forResource: placeholderName, withExtension: "mp4")
         else { return }
         let asset = AVURLAsset(url: url)

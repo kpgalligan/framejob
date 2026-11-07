@@ -45,11 +45,12 @@ extension CompositionBuilder {
             bitsPerChannel: asbd.mBitsPerChannel)
     }
 
-    /// One placeholder video track id, one past the plan's audio numbering —
-    /// `addPlaceholderIfNeeded`'s own expression, named so the audio tracks
-    /// can number past it.
+    /// One placeholder video track id, one past every plan id, video and
+    /// audio — `addPlaceholderIfNeeded`'s own expression, named so the audio
+    /// tracks can number past it. With no video track it is one past the
+    /// audio ids, as before #523 let the placeholder sit beside media.
     static func placeholderTrackID(_ plan: CompositionPlan) -> Int {
-        (plan.audioTracks.map(\.id).max() ?? 0) + 1
+        ((plan.videoTracks.map(\.id) + plan.audioTracks.map(\.id)).max() ?? 0) + 1
     }
 
     /// The first id an extra audio family may take: past the placeholder and

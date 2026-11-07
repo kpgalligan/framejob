@@ -133,6 +133,11 @@ the same way.
 - **Expect:** while dragging, the pointer shows the copy badge; the two movies are added in the Finder's order as one undo step, "Add 2 Media Files", with no alert; the undo takes both out; the mixed drop adds three.
 - **Source:** #497; `docs_bugs_b5_proof.py`'s D rows reach the drop's handler through a stub drag, not a Finder drag.
 
+**PB-18 — A title after the last video plays, and the playhead stays on it**
+- **Do:** 1. Put a 10 s movie on the timeline, then a text clip from 10 s to 15 s on the same track. 2. Click the ruler at 12 s. 3. Press Space, and let it play. 4. Click the ruler at 12 s again, and change the text's position in the inspector while paused there.
+- **Expect:** the playhead stays at 12 s after the click and after the edit, the title shows there, and playback runs on to 15 s.
+- **Source:** #523; `ai_docs_a1_proof.py` P1–P7 seek over MCP (`set_playhead`, `play_preview`'s `seek_to`), never with a mouse.
+
 **JOB-60 — Remove Background's edges**
 - **Do:** On S-TH1, S-TH2 and S-TH5 (`samples/README.md`; until they exist, any recording of yourself in a busy room with hair, glasses and moving hands), turn Remove Background on and wait for Status to read Ready. Step through hair, hands in motion, glasses and the outline against the room at Edge −0.5, 0 and 0.5.
 - **Expect:** the outline stays on the person; Edge moves it in and out.

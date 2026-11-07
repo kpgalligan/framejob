@@ -1753,3 +1753,25 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   sibling's path: the import of the converted copy recorded the sibling as
   its original, and a raw `add_media` of the spaced name answered for the
   sibling's row. A bookmark's blank check is unchanged.
+- **#523 — a timeline whose last stretch holds only generated clips gets a
+  composition as long as its plan.** Text, shape, graphic and image clips
+  need no decoding, so §7.2 gives them no composition track; with a movie to
+  10 s and titles to 20 s the composition ended at 10 s, and `AVPlayer`
+  clamped every seek past it — the asked seek, `play_preview`'s `seek_to`,
+  the restore after an edit — and the item ended there: the playhead went
+  back to 10 s and the titles never played. `addPlaceholderIfNeeded` now
+  runs after the audio tracks are filled, and gives the composition its
+  one-frame `Blank.mp4` track, scaled across `plan.duration`, when the plan
+  has a duration and either has no video track (as before) or its
+  composition, audio and #336's silence included, ends a tick or more short
+  of the plan (compared as `CMTime` against the plan's duration less one
+  tick, never subtracted). A composition within a tick of its plan builds as
+  before and is left to `+InstructionRanges`' sub-tick correction. The
+  placeholder's id is one past every plan id, video and audio
+  (`placeholderTrackID`), so it can sit beside media tracks; a plan with no
+  video track keeps its old id, one past the audio ids. The placeholder is
+  never one of `videoTracks`, so `convertsSources` and every recipe see the
+  plan's tracks only. It applies to the builder's every caller alike — the
+  preview's item, both export passes and the offline frame — so an export
+  of such a timeline runs to its end too. A missing `Blank.mp4` still
+  leaves the composition as it was, never a crash.

@@ -2468,10 +2468,12 @@ the key map behind it.
   segment (one whose source resolved) from time 0: AVFoundation starts an
   input at 1.0 and slews every change at full scale per 1200 frames (#87,
   §11 #87).
-  `addPlaceholderIfNeeded` gives a plan with no video track but a duration
-  a one-frame `Blank.mp4` track scaled across it. The preview's item, both
-  export passes and the offline frame all rely on it for a media-less
-  timeline.
+  `addPlaceholderIfNeeded` gives a plan with a duration a one-frame
+  `Blank.mp4` track scaled across it when it has no video track, or when its
+  composition, audio included, ends a tick or more short of the plan (only
+  generated clips after the last media, #523); its id is one past every plan
+  id. The preview's item, both export passes and the offline frame all rely
+  on it.
 - `RecipeSource.swift` — the process-wide registry the compositor reads a
   recipe from (§7.6): a slot per document (`ProjectDocument.recipeKey`) and
   per export (`Exporter` mints its own), the project published under `set`
