@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """The clip tools, checked against the core's own op table (road map 7's D3·3).
 
-The forty-three clip and action tools stopped describing their own arguments
-and started printing the core's. What this measures is the identity that
+The clip and action tools (forty-three at D3·3, forty-six now) stopped
+describing their own arguments and started printing the core's. What this measures is the identity that
 makes that safe, from two independent sides:
 
   * **the CATALOG**, read over MCP off `tools/list` from the running binary;
@@ -69,9 +69,10 @@ WORK = os.path.join(ROOT, "tools", "proof", "work", "clip-catalog-probe")
 # it was cut from, and these are its two ends. They are OP names, not
 # argument names, and both are checked against the core's op list below.
 FIRST, LAST = "add_clip", "remove_action"
-# The two rows inside that run which are composites rather than ops
-# (`detect_silence`, `normalize_clip`) are found by asking the core which
-# names it calls ops, never by being listed here.
+# The seven rows inside that run which are composites rather than ops
+# (`detect_silence`, `normalize_clip`, `enhance_voice`, `match_audio`,
+# `sync_audio`, `detect_fillers`, `transcribe_for_fillers`) are found by
+# asking the core which names it calls ops, never by being listed here.
 
 passed = 0
 failed = 0
@@ -226,8 +227,16 @@ def expected_input(op, table, declarations):
         return [d for d in declarations
                 if covers(d, op, argument, published.get("type"))]
 
+    # An argument a row says the app fills (`.filledByTheApp`: a graphic's
+    # `schema`, `relink_media`'s `probe`, `reframe_clip`'s `subjects`) is
+    # neither published nor required: the app writes it before the op runs.
+    def filled(argument):
+        return any(d["requirement"] == "filledByTheApp" for d in rows(argument))
+
     properties = {}
     for argument, fragment in table[op]["properties"].items():
+        if filled(argument):
+            continue
         property = fragment
         for declaration in rows(argument):
             property = widened(declaration, property)
@@ -235,6 +244,7 @@ def expected_input(op, table, declarations):
     required = [
         argument for argument in table[op]["required"]
         if not any(d["requirement"] == "optional" for d in rows(argument))
+        and not filled(argument)
     ]
     for argument in sorted(properties):
         if argument in required:
@@ -295,7 +305,7 @@ def main():
     group = [name for name in run if name in ops]
     check(f"the run holds {len(group)} op tools — the clip and action rows — and "
           f"{len(run) - len(group)} composites the core calls no op",
-          len(group) == 43 and len(run) - len(group) == 2,
+          len(group) == 46 and len(run) - len(group) == 7,
           f"run of {len(run)}: {run}")
 
     print("\n2 — every migrated tool is the core's table plus what is declared")

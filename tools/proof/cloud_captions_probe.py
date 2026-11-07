@@ -78,9 +78,11 @@ Sections, by the name after `section_`:
   `wholeAsset` against an explicit range (Q).
 
 Both baselines (W's and SP's) are built by `reference_build.build_reference`
-(issue batch B93, #246): the tree object's own `app/Sources`, core, header
-and `graphic/`, each into its own `work/cloudprobe/baseline-ref-*` with a
-stamped cache, as the meter and welcome comparisons are. A baseline that
+(issue batch B93, #246): the baseline commit's own `app/Sources`, core,
+header and `graphic/`, each into its own `work/cloudprobe/baseline-ref-*`
+with a stamped cache, as the meter and welcome comparisons are. Each baseline
+is a COMMIT on main (#528): the pipelines' working trees first named were
+tree objects no commit held, and garbage collection took all three. A baseline that
 will not build is a scored FAILURE (W's build row, SP3), never a skip.
 `--control missing-baseline` names both by an id no object has, so W's
 build row, SP3 and SP4·off must FAIL.
@@ -208,17 +210,24 @@ STATICLIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a"
 BRIDGING = os.path.join(ROOT, "app", "Bridging", "FrameJob-Bridging-Header.h")
 FONTS = os.path.join(ROOT, "app", "Resources", "Fonts")
 
-# Pipeline 1's final working tree — this pipeline's baseline, and what the
-# WAV byte-identity row compares against.
-BASELINE_TREE = "515e6a8032071626f8c2a77030db4b249495602b"
+# The three baselines are COMMITS on main, which garbage collection cannot
+# take (#528). Each first named a pipeline's working tree, a tree object no
+# commit held (515e6a80, c9b80435 and ef54f48e), and all three were collected.
 
-# Pipeline 3's final working tree — c1-chrome's baseline, and what the
+# C1 pipeline 1's last commit, "C1's tolls, recorded" (pipeline 1's final
+# working tree was 515e6a80) — what the WAV byte-identity row compares against.
+BASELINE_TREE = "9337a7c87a1a242c6df7ea1fd3b728789a9de00d"
+
+# C1 pipeline 3's commit, "C1's run" — c1-chrome's baseline (pipeline 3's final
+# working tree was c9b80435; every removed line the row's diff named against
+# that tree is in this commit's `project.yml` as written), and what the
 # `project.yml` row compares against.
-BASELINE_TREE_C1CHROME = "c9b8043522c5a91b6045102d182758fd5859d153"
+BASELINE_TREE_C1CHROME = "0773a5a08f79944e7c746067ee53d9f809fedb6f"
 
-# B46's starting working tree — the speakers section's baseline, and what
-# SP3 and SP4's off arm compare today's placement against.
-BASELINE_TREE_SPEAKERS = "ef54f48e08e72bf6e3e6a48a78bf4431cae83018"
+# B46's parent commit, "The reader refuses a clip speed outside ×0.1–×10
+# (#41)" (B46's starting working tree was ef54f48e) — the speakers section's
+# baseline, and what SP3 and SP4's off arm compare today's placement against.
+BASELINE_TREE_SPEAKERS = "a0f39e0406d34c4a7a242778fe6de2c16626ae6e"
 
 # `--control missing-baseline` (issue batch B93, #246): both baseline ids
 # above replaced by this well-formed id no object has, so W's build row, SP3
@@ -1943,9 +1952,15 @@ func chromeSheet(_ request: [String: Any]) -> [String: Any] {
         "hintCloudEU": TranscribeSheetController.hint(for: .assemblyai, region: .eu),
         "openingHint": sheet.hintLabel.stringValue,
         "openingEngine": sheet.engine.rawValue,
-        "noKeyNote": ModelKeys.sentence(.assemblyAI),
         "maxKeyterms": AssemblyAIClient.maxKeyterms,
     ]
+    #if CLOUD_PROBE_BEFORE_SPEAKERS
+    // B46's baseline has no `ModelKeys` (CJ1 added it); SP3 and SP4 never
+    // ask for this op, so that build answers no note.
+    answer["noKeyNote"] = ""
+    #else
+    answer["noKeyNote"] = ModelKeys.sentence(.assemblyAI)
+    #endif
     // The Engine popup, switched the way AppKit switches it: select the row,
     // then send the action the item carries.
     let changed = NSSelectorFromString("engineChanged:")
@@ -7590,10 +7605,18 @@ def section_chrome(binary, sources):
         # 0576acf), the two name strings and the document type's handler rank
         # read from build settings, defaulting to the Release values (one hunk
         # with the version strings and the minimum: the five lines are adjacent).
+        # Then (#528, the first run of this row since its baseline was lost):
+        # Sparkle's feed and key, set in Distribution alone (spec §11 PUB-6,
+        # PUB-8; 117687d6); the camera's usage string and entitlement (CAM-3,
+        # camera recording CR1a; 7d4f0eeb); the `.fjgraphic` type and its
+        # Viewer document type (G-46 (d), G-47; 9a77cadf, d4537dc9); and the
+        # microphone string, which no longer speaks of a screen recording or a
+        # movie (#518; af778ff7).
         check("18: `project.yml`'s `info:` and `entitlements:` blocks changed in the two "
               "name strings, the two version strings, the macOS 26 minimum, the deleted "
-              "Speech usage string, the microphone comment's aside and the handler rank, "
-              "and NOWHERE else",
+              "Speech usage string, Sparkle's feed and key, the microphone comment's aside "
+              "and string, the camera's usage string and entitlement, the `.fjgraphic` "
+              "type and document type, and the handler rank, and NOWHERE else",
               diff == ['-        CFBundleName: Frame Job',
                        '-        CFBundleDisplayName: Frame Job',
                        '-        CFBundleShortVersionString: "0.1.0"',
@@ -7613,6 +7636,12 @@ def section_chrome(binary, sources):
                        "-          Frame Job transcribes the audio of clips you choose, on this Mac, "
                        "to write captions.",
                        "-          Nothing is sent anywhere.",
+                       "+        # Sparkle's feed and EdDSA public key (spec §11 PUB-6, PUB-8): set in",
+                       "+        # Distribution alone, empty in Debug and Release (PUB-7). No",
+                       "+        # SUEnableAutomaticChecks and no SUAutomaticallyUpdate: Sparkle's own",
+                       "+        # defaults apply (PUB-9).",
+                       '+        SUFeedURL: "$(RC_SPARKLE_FEED_URL:default=)"',
+                       '+        SUPublicEDKey: "$(RC_SPARKLE_PUBLIC_KEY:default=)"',
                        "-        # recording, which speech never needed (an "
                        "SFSpeechURLRecognitionRequest",
                        "-        # reads a file). The microphone takes TWO things, and this key "
@@ -7620,8 +7649,47 @@ def section_chrome(binary, sources):
                        "+        # recording, which speech never needed (the speech engine reads an",
                        "+        # extracted file). The microphone takes TWO things, and this key "
                        "is one:",
+                       "-          Frame Job records the microphone you choose alongside a screen "
+                       "recording, into",
+                       "-          a file of its own beside the movie. Nothing is sent anywhere.",
+                       "+          Frame Job records the microphone you choose,",
+                       "+          into a file of its own. Nothing is sent anywhere.",
+                       "+        # The camera half of a recording (camera-recording CR1a, spec §11 "
+                       "CAM-3)",
+                       "+        # takes the same two things as the microphone: this key, without "
+                       "which",
+                       "+        # AVCaptureDevice.requestAccess(for: .video) and the first camera",
+                       "+        # AVCaptureDeviceInput CRASH the app, and the entitlement",
+                       "+        # com.apple.security.device.camera (`entitlements` below). No",
+                       "+        # NSCameraUseContinuityCameraDeviceType: CR0's D2 listed the "
+                       "iPhone's",
+                       "+        # Continuity Camera without it.",
+                       "+        NSCameraUsageDescription:",
+                       "+          Frame Job records the camera you choose, into a file of its own. "
+                       "Nothing is",
+                       "+          sent anywhere.",
+                       "+          # The Graphic dialog's Export… (spec §11 G-46 (d)). Data and "
+                       "content,",
+                       "+          # not a zip (spec §11 G-47 (g)), so a browser's \"open safe "
+                       "files\" and",
+                       "+          # the Finder leave it whole for Frame Job to import.",
+                       "+          - UTTypeIdentifier: com.kgalligan.framejob-graphic",
+                       "+            UTTypeDescription: Frame Job Graphic",
+                       "+            UTTypeConformsTo: [public.data, public.content]",
+                       "+            UTTypeTagSpecification:",
+                       "+              public.filename-extension: [fjgraphic]",
                        "-            LSHandlerRank: Owner",
-                       '+            LSHandlerRank: "$(RC_PROJECT_HANDLER_RANK:default=Owner)"'],
+                       '+            LSHandlerRank: "$(RC_PROJECT_HANDLER_RANK:default=Owner)"',
+                       "+          # A .fjgraphic is imported into a project, not opened as one "
+                       "(spec §11",
+                       "+          # G-47 (a), (h)): a Viewer with no NSDocumentClass, whose open",
+                       "+          # ProjectDocumentController routes; ranked as the project type is",
+                       "+          # (V-5), so a Debug build never takes it from the installed app.",
+                       "+          - CFBundleTypeName: Frame Job Graphic",
+                       "+            LSItemContentTypes: [com.kgalligan.framejob-graphic]",
+                       "+            CFBundleTypeRole: Viewer",
+                       '+            LSHandlerRank: "$(RC_PROJECT_HANDLER_RANK:default=Owner)"',
+                       "+        com.apple.security.device.camera: true"],
               f"got {diff!r}")
     check("18: and it still carries no NSAppTransportSecurity key — C0's q3 measured that it "
           "needs none",

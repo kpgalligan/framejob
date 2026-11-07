@@ -938,9 +938,13 @@ historical compile is a scored failure, even if the error names
 harness. Host-state skips in recording's granted tier remain separate.
 
 `cloud_captions_probe.py` is the third caller (issue batch B93, #246): row
-W's reference entry against tree `515e6a80` and SP3/SP4's probe against tree
-`ef54f48e`, each with its own `-D` define and its own `before/`
-(`work/cloudprobe/baseline-ref-w`, `…-speakers`). The id may name a commit or
+W's reference entry against commit `9337a7c8` (C1's tolls, recorded) and
+SP3/SP4's probe against commit `a0f39e04` (B46's parent), each with its own
+`-D` define and its own `before/` (`work/cloudprobe/baseline-ref-w`,
+`…-speakers`); row 18's `project.yml` reads commit `0773a5a0` (C1's run).
+Until #528 the three were pipelines' working trees (`515e6a80`, `ef54f48e`,
+`c9b80435`), tree objects no commit held, and garbage collection took them;
+a baseline is a commit now. The id may name a commit or
 a tree object, and a tree that has `graphic/` gets it archived beside its
 core, which names it as a path dependency.
 
@@ -1781,7 +1785,9 @@ on Debug its render_frame took 2.04 s of the 3 s bound, so it was pinned), and
 the app's memory", and `--measure ab`'s MA beside it; its rows, `capture` and
 `compare` run on either), and `reader_wedge_proof.py`'s app group ("W1 and W2
 bound decode work in wall seconds, and a Debug decode runs about 17x slower";
-its probe group runs on either, spec §11 #367); the
+its probe group runs on either, spec §11 #367), and `transcript_tab_proof.py`'s
+T6 alone (`T6_RELEASE_ONLY`: "its 100 ms median rebuild is a Release number";
+on a Debug app it is a named SKIP and every other row runs, #522); the
 18 app-driving proofs changed since issue batch B80 each scored their full
 score on Debug, the two with a recorded Release time (agent_socket_proof
 135 s, export_cancel_proof 256 s) faster on Debug (`archive/build-velocity.md`'s
@@ -5795,8 +5801,9 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --mutant sp
   has no `color` key; every expectation is computed in Python. SP2: each of
   the five word styles places the same ops with speakers as with them
   stripped. SP3: the same `PROBE_SOURCE` built against
-  `BASELINE_TREE_SPEAKERS` (`ef54f48e`, B46's starting working tree, a tree
-  object written with a temporary index) with
+  `BASELINE_TREE_SPEAKERS` (commit `a0f39e04`, B46's parent, since #528;
+  until then `ef54f48e`, B46's starting working tree, a tree object written
+  with a temporary index, which garbage collection took) with
   `-D CLOUD_PROBE_BEFORE_SPEAKERS`: nil-speaker cues, Subtitles and
   Highlight, place byte-identical ops; CONTROL, SP1's speaker cues do not.
   A baseline that will not build is a scored FAIL. SP4: the Generate
@@ -28364,7 +28371,10 @@ the parity log; M1 View ▸ Transcript and the hidden-tab refusal; T2 the tab's
 tokens against `get_timeline_transcript` on TX1's `say` fixtures (two tracks,
 a nest, a locked track, a clip with its audio off); T3 the highlight after
 `play_preview`; T4 a click; T6 27,000 words served by the fake for a 3,600 s
-silent AAC (`ffmpeg anullsrc`), five `split`s and the median rebuild; T12 the
+silent AAC (`ffmpeg anullsrc`), five `split`s and the median rebuild under
+100 ms, the one Release-only row (#522: a named SKIP on an app whose
+`CFBundleIdentifier` is Debug's, where the same rebuild takes about 250 ms;
+`RC_PROOF_APP=release` runs it); T12 the
 playhead's media read first and shown while the long WAV (`long_fixture`)
 still reads, then the tab hidden and shown again with the long run started
 over. T11 runs `view_spike.py --measure`.

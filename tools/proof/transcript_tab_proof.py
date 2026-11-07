@@ -42,7 +42,10 @@ App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
   T6  a 3,600 s silent AAC with 27,000 words in 900 paragraphs (1.6 s gaps)
       served by the fake through `transcribe {engine: assemblyai, place:
       false}`: 900 paragraphs, and over 5 `split`s the median
-      `last_rebuild_ms` is under 100.
+      `last_rebuild_ms` is under 100. RELEASE ONLY (spec §11 V-4, #522): on
+      a Debug app (its `CFBundleIdentifier` is Debug's) T6 is a named SKIP,
+      because the 100 ms bound is a Release number and a Debug rebuild of
+      the same tab takes about 250 ms; the rest of the proof runs on either.
   T11 `transcript_spike/view_spike.py --measure` meets TX-S2's rule.
   T12 A (under the playhead) and the long WAV, both read on this Mac: A's
       tokens appear while `fill.media` is still the long WAV's; a hidden tab
@@ -97,6 +100,7 @@ import contextlib
 import json
 import os
 from pathlib import Path
+import plistlib
 import shutil
 import statistics
 import subprocess
@@ -123,6 +127,11 @@ SEC = 600_000
 KEY = "proof-key"
 TOOL = "transcript_view"
 HIDDEN = 'transcript_view: select_inspector_tab {tab: "transcript"} first.'
+# T6 alone is pinned to Release (spec §11 V-4; #522): the root CLAUDE.md's
+# `release_only=` for one row of a proof whose other rows run on Debug, so
+# `git grep release_only= tools/proof` finds it here.
+T6_RELEASE_ONLY = ("its 100 ms median rebuild is a Release number: a Debug build "
+                   "rebuilds the same 27,000 tokens in about 250 ms")
 
 TT = "TranscriptTokens.swift"
 TH = "TranscriptView+Highlight.swift"
@@ -321,6 +330,22 @@ def snap(ticks, fps):
     return round(round(ticks / frame) * frame)
 
 
+def is_debug_app(app_path):
+    """True when `app_path` (a bundle or its executable) is a Debug build:
+    its `CFBundleIdentifier` is Debug's own (spec §11 V-5). A path outside a
+    products folder is read the same way, so a frozen Debug copy counts."""
+    import proof_app
+    bundle = Path(app_path)
+    if bundle.parent.name == "MacOS":
+        bundle = bundle.parents[2]
+    try:
+        with open(bundle / "Contents/Info.plist", "rb") as handle:
+            identifier = plistlib.load(handle).get("CFBundleIdentifier")
+    except (OSError, plistlib.InvalidFileException):
+        return False
+    return identifier == proof_app.DOMAINS["debug"]
+
+
 def app_rows(results, wanted, app_path, files):
     import assistant_session_proof as sp
     import cloud_captions_probe
@@ -461,6 +486,9 @@ def app_rows(results, wanted, app_path, files):
                 close(state["t2"])
 
             def t6():
+                if is_debug_app(app_path):
+                    return None, (f"release_only: {T6_RELEASE_ONLY}; run it with "
+                                  "RC_PROOF_APP=release")
                 words = cloud_words()
                 cloud.scenario(aai, words=words, disfluent_words=words)
                 s = session_of("t6")
