@@ -1,0 +1,23 @@
+Check the worktrees for help-docs and creator-jobs and merge commits into main if they aren't already
+
+---
+
+To deploy 'docs/site' on Netlify, what should these settings be? [Image #1]
+
+---
+
+the project doctored has its web docs in '/Users/kevingalligan/devel/doctored/public-docs'. It is also built with astro starlight, although probably an older version. It's style has been customized to match our Boppa Llewyn style. I want the Frame Job docs to match this style.
+
+---
+
+<task-notification>
+<task-id>bntnuhkhv</task-id>
+<tool-use-id>toolu_01BeVZ4YtexfxCpERUj6PDsW</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kevingalligan-devel-framejob/8630fd0e-5317-4e91-9dec-6fc83ef75d1d/tasks/bntnuhkhv.output</output-file>
+<status>completed</status>
+<summary>Background command "Stop preview servers and run the full gate" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+commit and push

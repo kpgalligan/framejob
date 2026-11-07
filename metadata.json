@@ -1,0 +1,68 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M6SRG340DBSYC4GDQ690JXK1",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 4,
+  "files_touched": [
+    "docs/site/CLAUDE.md",
+    "docs/site/README.md",
+    "docs/site/astro.config.mjs",
+    "docs/site/package.json",
+    "docs/site/pnpm-lock.yaml",
+    "docs/site/public/fonts/CormorantGaramond-Italic-Variable-latin-ext.woff2",
+    "docs/site/public/fonts/CormorantGaramond-Italic-Variable-latin.woff2",
+    "docs/site/public/fonts/CormorantGaramond-Variable-latin-ext.woff2",
+    "docs/site/public/fonts/CormorantGaramond-Variable-latin.woff2",
+    "docs/site/public/fonts/IBMPlexMono-Medium-latin-ext.woff2",
+    "docs/site/public/fonts/IBMPlexMono-Medium-latin.woff2",
+    "docs/site/public/fonts/IBMPlexMono-Regular-latin-ext.woff2",
+    "docs/site/public/fonts/IBMPlexMono-Regular-latin.woff2",
+    "docs/site/public/fonts/IBMPlexSans-Italic-Variable-latin-ext.woff2",
+    "docs/site/public/fonts/IBMPlexSans-Italic-Variable-latin.woff2",
+    "docs/site/public/fonts/IBMPlexSans-Variable-latin-ext.woff2",
+    "docs/site/public/fonts/IBMPlexSans-Variable-latin.woff2",
+    "docs/site/public/fonts/OFL.txt",
+    "docs/site/src/components/FeatureIndex.astro",
+    "docs/site/src/components/Hero.astro",
+    "docs/site/src/components/PageTitle.astro",
+    "docs/site/src/components/SiteTitle.astro",
+    "docs/site/src/components/ThemeSelect.astro",
+    "docs/site/src/content.config.ts",
+    "docs/site/src/content/docs/index.mdx",
+    "docs/site/src/fonts/font-face.css",
+    "docs/site/src/site.ts",
+    "docs/site/src/styles/boppa-llewyn.css",
+    "docs/site/src/styles/frame-job.css"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 126,
+    "cache_creation_tokens": 348022,
+    "cache_read_tokens": 7752932,
+    "output_tokens": 40676,
+    "api_call_count": 59
+  },
+  "redaction": {
+    "replacements": 0,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}
