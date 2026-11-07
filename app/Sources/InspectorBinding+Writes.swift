@@ -171,7 +171,7 @@ extension InspectorBinding {
     /// #530 (amending CI-2): `ops` plus, for each clip of `clips` with a first-frame cut (CI-17):
     /// the cut selected → `set_video` of the write's animatable half to the base, since the cut's
     /// end got it and the structural half is already on the base; no action selected →
-    /// `set_action_end` on the cut of the keys its end already names (`VideoPatch.held(by:)`),
+    /// `set_action_end` on the cut of the keys its end already names (`VideoPatch.held(by:cutoutBase:)`),
     /// beside the base write; either one only when its patch is non-empty; another action
     /// selected → nothing (CI-2). The same list, so the same undo step, as a drag on a cut.
     private func keepingCuts(_ ops: [ReelOp], video patch: VideoPatch, clips: [ClipSnapshot])
@@ -188,7 +188,7 @@ extension InspectorBinding {
                     kept.append(.setVideo(clips: [clip.id], patch: animatable))
                 }
             } else if selected == nil {
-                let held = patch.held(by: cut.end.video)
+                let held = patch.held(by: cut.end.video, cutoutBase: clip.video?.cutout)
                 if !held.isEmpty {
                     kept.append(
                         .setActionEnd(clip: clip.id, action: cut.id, patch: ActionPatch(video: held)))

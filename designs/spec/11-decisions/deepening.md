@@ -1746,8 +1746,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `set_video` and the layout action's end, so the answer does not depend on
   where `at` falls in the clip. This amends CO-64's refusal order: after the
   movers, before `add_action`'s own. A text clip has no source size, so it is
-  never a layout role (CO-64). `paste` and plain `set_action_end` are
-  unchanged.
+  never a layout role (CO-64). `paste` is unchanged; `set_action_end`
+  refuses the same keys (amended by #535), and an adjustment clip joins
+  these kinds (amended by #536).
 - **#534 — A media path is stored and compared as given, never trimmed.**
   `add_media`'s `path`, every `original.path` (#228-O), `relink_media`'s
   `path` and a pasted media row's `path` are kept byte for byte, and the
@@ -1888,3 +1889,32 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `defer`s and releases of the Swift frames between it and the catch, so a
   handler's own lock or half-made state is not restored. A raise on a queue a
   handler starts itself still ends the app.
+- **#535 — `set_action_end` refuses crop, corner radius and chroma key on a
+  clip `set_video` refuses them on** (the owner, 2026-11-06, #524's "Refuse
+  and skip", which 2026-11-07's answer to #536 extends to an action's end).
+  The kinds, the sentences, the matte rule and the patch-read rule are #524's
+  as #536 amends them, judged on the end the op would store: a key fires
+  when the op's `patch.video` names it (any value, `null` included) and the
+  merged, pruned end's value is not neutral (a crop with a side other than
+  0, a radius other than 0, a chroma key present and not `null`). So
+  removing a key (`null`), animating it to neutral, `off`, and `video: null`
+  stay allowed. The answer is an `Err`, as #524's. A crop at the end of an
+  action on a matte track's text, shape or graphic clip stays allowed: K-7's
+  crop handles write the end there with an action selected. An end already
+  in a file, or brought by a full `paste`, is kept by every other end edit.
+  `switch_layout` never reaches it: #524 refuses a shape or graphic role up
+  front, a text clip is never a role, and an adjustment clip has no source
+  size and is never a role (CO-64).
+- **#536 — An adjustment clip takes no crop, corner radius or chroma key**
+  (the owner, 2026-11-07, "Refuse and skip, as #524"). It has no Crop,
+  Corner Radius or Chroma Key section, and on the base app none of the three
+  drew on it. `set_video` and `set_action_end` (#535) refuse them in #524's
+  sentences with `an adjustment clip` as the kind, and clearing stays
+  allowed; Paste Attributes leaves the target's own. There is no matte
+  exception: on a matte track an adjustment clip is inert (GR-6), so a crop
+  there is refused too, `clip {id} is an adjustment clip and cannot take a
+  crop`. Amends GR-6's "kept and do nothing" for these three; one already
+  stored in a file is kept and does nothing. **Nest clips are held for the
+  owner**: a crop draws on a nest and camera layouts write a crop and a
+  panel radius on nest roles (CO-62), so a nest keeps all three until the
+  owner chooses.

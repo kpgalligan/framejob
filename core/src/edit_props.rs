@@ -88,17 +88,40 @@ fn check_blend(clip: &Clip, props: &VideoProps) -> Result<(), String> {
     Ok(())
 }
 
-/// The kind of a clip drawn from a description rather than source pixels —
-/// "a text clip", "a shape clip" or "a graphic clip" — the clips with no
-/// Crop, Corner Radius or Chroma Key section (spec §11 #524); `None` for
-/// every other source.
-pub(crate) fn described_kind(clip: &Clip) -> Option<&'static str> {
+/// The kind of a clip with no Crop, Corner Radius or Chroma Key section —
+/// "a text clip", "a shape clip", "a graphic clip" (spec §11 #524) or "an
+/// adjustment clip" (#536); `None` for every other source. A nest clip is
+/// not one of them: its half of #536 is held for the owner.
+pub(crate) fn sectionless_kind(clip: &Clip) -> Option<&'static str> {
     match clip.source {
         Source::Text => Some("a text clip"),
         Source::Shape => Some("a shape clip"),
         Source::Graphic => Some("a graphic clip"),
+        Source::Adjustment => Some("an adjustment clip"),
         _ => None,
     }
+}
+
+/// Which of the three keys a write puts ON a clip: the write names the key
+/// AND its resulting value is not neutral (spec §11 #524, #535).
+pub(crate) struct PixelKeys {
+    pub crop: bool,
+    pub corner_radius: bool,
+    pub chroma: bool,
+}
+
+/// Whether an end's `crop` (a stored end, so a sparse object) has a side
+/// that is a number other than 0.
+fn end_crop_on(crop: Option<&Value>) -> bool {
+    let Some(Value::Object(sides)) = crop else {
+        return false;
+    };
+    ["l", "t", "r", "b"].iter().any(|side| {
+        sides
+            .get(*side)
+            .and_then(Value::as_f64)
+            .is_some_and(|v| v != 0.0)
+    })
 }
 
 /// `set_audio`'s one refusal of a legal value (spec §11 AU-111).
@@ -130,42 +153,88 @@ impl Project {
         self.patch_clips(clips, patch, Group::Audio)
     }
 
-    /// `set_video`'s refusal of a crop, corner radius or chroma key on a
-    /// text, shape or graphic clip (spec §11 #524), read from the PATCH as
-    /// [`sets_speech_duck`] is: a key fires only when the patch names it and
-    /// the merged value is not neutral, so clearing is always allowed and a
-    /// value the clip already holds is kept by every other edit. A crop is
-    /// taken on a matte track, where it shapes the matte (K-7, MT-4).
-    fn check_pixel_keys(
-        &self,
-        clip: &Clip,
-        patch: &Value,
-        props: &VideoProps,
-    ) -> Result<(), String> {
-        let Some(kind) = described_kind(clip) else {
+    /// The one refusal of a crop, corner radius or chroma key on a
+    /// [`sectionless_kind`] clip (spec §11 #524, #535, #536), checked crop,
+    /// corner radius, chroma key. A crop is taken on a matte track, where it
+    /// shapes the matte (K-7, MT-4), but never on an adjustment clip, which
+    /// is inert there (GR-6).
+    pub(crate) fn pixel_keys_refusal(&self, clip: &Clip, on: PixelKeys) -> Result<(), String> {
+        let Some(kind) = sectionless_kind(clip) else {
             return Ok(());
         };
-        let names = |key: &str| patch.get(key).is_some();
+        let adjustment = matches!(clip.source, Source::Adjustment);
         let on_matte = self.track(clip.track).is_some_and(|t| !t.matte.is_none());
-        if names("crop") && props.crop != Crop::default() && !on_matte {
+        if on.crop && adjustment {
+            return Err(format!(
+                "clip {} is an adjustment clip and cannot take a crop",
+                clip.id
+            ));
+        }
+        if on.crop && !on_matte {
             return Err(format!(
                 "clip {} is {kind} and cannot take a crop off a matte track",
                 clip.id
             ));
         }
-        if names("corner_radius") && props.corner_radius != 0.0 {
+        if on.corner_radius {
             return Err(format!(
                 "clip {} is {kind} and cannot take a corner radius",
                 clip.id
             ));
         }
-        if names("chroma") && props.chroma.is_some() {
+        if on.chroma {
             return Err(format!(
                 "clip {} is {kind} and cannot take a chroma key",
                 clip.id
             ));
         }
         Ok(())
+    }
+
+    /// `set_video`'s refusal (spec §11 #524, #536), read from the PATCH as
+    /// [`sets_speech_duck`] is: a key fires only when the patch names it and
+    /// the merged value is not neutral, so clearing is always allowed and a
+    /// value the clip already holds is kept by every other edit.
+    fn check_pixel_keys(
+        &self,
+        clip: &Clip,
+        patch: &Value,
+        props: &VideoProps,
+    ) -> Result<(), String> {
+        let names = |key: &str| patch.get(key).is_some();
+        let on = PixelKeys {
+            crop: names("crop") && props.crop != Crop::default(),
+            corner_radius: names("corner_radius") && props.corner_radius != 0.0,
+            chroma: names("chroma") && props.chroma.is_some(),
+        };
+        self.pixel_keys_refusal(clip, on)
+    }
+
+    /// `set_action_end`'s refusal (spec §11 #535): `patch` is the op's
+    /// patch and `end` the merged, pruned, keyed-off end it would store. A
+    /// key fires when `patch.video` names it (any value, `null` included)
+    /// and the end's value is not neutral — a crop with a side other than
+    /// 0, a radius other than 0, a chroma key present and not `null` — so
+    /// removing, animating to neutral, `off` and `video: null` all pass, and
+    /// an end already holding one (from a file or a `paste`) is kept by
+    /// every edit that does not name it.
+    pub(crate) fn check_end_pixel_keys(
+        &self,
+        clip: &Clip,
+        patch: &Value,
+        end: &Value,
+    ) -> Result<(), String> {
+        let names = |key: &str| patch.get("video").and_then(|v| v.get(key)).is_some();
+        let stored = |key: &str| end.get("video").and_then(|v| v.get(key));
+        let on = PixelKeys {
+            crop: names("crop") && end_crop_on(stored("crop")),
+            corner_radius: names("corner_radius")
+                && stored("corner_radius")
+                    .and_then(Value::as_f64)
+                    .is_some_and(|v| v != 0.0),
+            chroma: names("chroma") && stored("chroma").is_some_and(|v| !v.is_null()),
+        };
+        self.pixel_keys_refusal(clip, on)
     }
 
     /// Whether `clip` is a media clip whose media carries `speech`.

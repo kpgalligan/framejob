@@ -598,4 +598,20 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   the cut's end does not name, such as a rotation on a landed camera, goes
   to the base only. Unchanged: with another action selected, CI-2; text,
   audio and graphic values; the marks (◆ ◇ ⊘). No MCP change: an agent
-  sends `set_video` and `set_action_end` itself.
+  sends `set_video` and `set_action_end` itself. **Amended by #540:** a cutout's
+  presence never goes to the cut.
+- **#540 — A cutout's presence never goes to a first-frame cut; amends
+  #530.** With no action selected and the cut's end naming `cutout`, a
+  write of a whole `cutout` sends to the cut only those of its
+  `background`, `edge` and `feather` that differ from the clip's base
+  cutout before the write: all three when the clip had none (Remove
+  Background ticked), none for a Subject change, which leaves the cut's
+  own Background, Edge and Feather. A `null` cutout (Remove Background
+  unticked, the Background header's Reset) sends nothing to the cut: the
+  base's `null` already removes the cutout on every frame
+  (`restore_base_cutout`, CO-20). Before, the cut was sent the whole or
+  null cutout, which the core answers with an `Err` (CO-20, CO-30 (b)), so
+  the whole edit failed with an error sheet and Remove Background could not
+  be turned off from the inspector on such a clip. A sparse cutout part
+  (the Background, Edge or Feather control) goes to the cut as #530 says.
+  Lists (`filters`, `obscure`) are unchanged.

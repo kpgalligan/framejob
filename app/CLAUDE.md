@@ -1732,7 +1732,10 @@ the key map behind it.
   gesture writes (a text clip's side handle writes only its width), a
   gesture whose clip is the whole selection refuses, on its first drag tick
   (a nudge at once), naming the action's lane number, through `onRefuse` →
-  `canvasRefused` (spec §11 CI-19).
+  `canvasRefused` (spec §11 CI-19). `VideoPatch.held(by:cutoutBase:)`
+  never sends a whole or null cutout to a cut, only those of its
+  background, edge and feather that differ from the clip's base cutout
+  (spec §11 #540).
 - `CanvasLayerBox.swift` — a pure move out of `CanvasSessions.swift`; a nest
   clip's one box from the recipe's `nest`, hit on the pictures inside it.
 

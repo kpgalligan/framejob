@@ -341,8 +341,11 @@ extension ClipSnapshot {
 extension VideoPatch {
     /// This patch's keys whose `dictionary` name `end?.dictionary` also has (a sparse part such as
     /// `cutoutPart` counts under its parent's name, `cutout`); every other key nil. nil `end` → empty.
-    /// #530's write to a cut: only what the cut already holds goes there.
-    func held(by end: VideoPatch?) -> VideoPatch {
+    /// #530's write to a cut: only what the cut already holds goes there. `cutout` is never set
+    /// (spec §11 #540, CO-20): a whole cutout sends those of its background, edge and feather that
+    /// differ from `cutoutBase` (the clip's base cutout before the write) as `cutoutPart`, nil when
+    /// none does; a null cutout sends nothing, since the base's null removes it on every frame.
+    func held(by end: VideoPatch?, cutoutBase: CutoutProps?) -> VideoPatch {
         guard let end else { return VideoPatch() }
         let names = Set(end.dictionary.keys)
         func kept<T>(_ value: T?, _ name: String) -> T? { names.contains(name) ? value : nil }
@@ -369,8 +372,15 @@ extension VideoPatch {
         next.qualifier = kept(qualifier, "qualifier")
         next.cursor = kept(cursor, "cursor")
         next.cursorPart = kept(cursorPart, "cursor")
-        next.cutout = kept(cutout, "cutout")
-        next.cutoutPart = kept(cutoutPart, "cutout")
+        if names.contains("cutout") {
+            switch cutout {
+            case .some(.some(let whole)):
+                let part = whole.animatable(changedFrom: cutoutBase)
+                next.cutoutPart = part.isEmpty ? nil : part
+            case .some(.none): break
+            case .none: next.cutoutPart = cutoutPart
+            }
+        }
         next.behindSubject = kept(behindSubject, "behind_subject")
         next.motionBlur = kept(motionBlur, "motion_blur")
         next.hideSilent = kept(hideSilent, "hide_silent")

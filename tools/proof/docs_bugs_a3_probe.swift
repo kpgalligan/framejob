@@ -1,7 +1,7 @@
 // Docs-bugs batch a3: #469, #476, #471, #481 and #485 (and batch a5's CI-19 rows, D7, D11 and
-// D14–D27, and ai-docs a2's #529 and #530 rows, F1–F14) through the app's own sources on real
-// .framejob packages the app made and saved (`docs_bugs_a3_proof.py` makes them and scores what
-// this prints). Compiled AS main.swift over every file of app/Sources but the app's main.swift,
+// D14–D27, ai-docs a2's #529 and #530 rows, F1–F14, and ai-docs r2b's #540 rows, G1–G7) through
+// the app's own sources on real .framejob packages the app made and saved (`docs_bugs_a3_proof.py`
+// makes them and scores what this prints). Compiled AS main.swift over every file of app/Sources but the app's main.swift,
 // -D FRAMEJOB_DEV_TOOLS, against libframejob_core.a, through swift_build.py. It names no symbol the
 // base lacks, so the same source builds against the base tree.
 //
@@ -1316,6 +1316,201 @@ paneRow("S4") {
     }
     close(e)
     return ["hidden": hidden, "next": next]
+}
+
+// MARK: - ai-docs r2b: #540 (spec §11 #540), the G rows
+
+// An inspector write on a clip with a first-frame cut and no action selected
+// (`InspectorBinding.keepingCuts`, `VideoPatch.held`). Each row selects the clip at the playhead
+// (no action there), presses the control through its own handler (`mouseDown(with:)`, a popup's
+// `itemPicked:`), wraps `inspector.onEdit` to record the ops the binding built, and reads each op's
+// answer alone and the list's (`ReelProject.applying`, as `commitEdit` applies it) against the
+// project before the press, then the stored base and cut end, `clip_state` at frame 0, frame 1
+// and the playhead, the undo step and the window's sheet. Ported from ai-docs r2b's confirm stage.
+
+let BG_CAM = id("bg", "camera")
+let BG_CUT = id("bg", "cut")
+let IMG_CLIP = id("img", "clip")
+let IMG_CUT = id("img", "cut")
+
+func anyJSON(_ value: Any?) -> Any {
+    guard let value else { return NSNull() }
+    if JSONSerialization.isValidJSONObject(["v": value]) { return value }
+    return "\(value)"
+}
+
+/// `clip`'s cutout, filters and obscure count at frame 0, frame 1 and `at` (`clip_state`).
+func cutStates(_ e: Editor, _ clip: UInt32, at: Ticks) -> [String: Any] {
+    var out: [String: Any] = [:]
+    for (name, t) in [("f0", Ticks(0)), ("f1", FRAME), ("at", at)] {
+        let video = e.document.editedProject.clipState(clip, at: t)?["video"] as? [String: Any]
+        out[name] = [
+            "cutout": anyJSON(video?["cutout"]),
+            "filters": anyJSON(video?["filters"]),
+            "obscure_count": (video?["obscure"] as? [Any])?.count ?? 0,
+        ]
+    }
+    return out
+}
+
+/// The cut's end as the core stores it (the snapshot's lenient decode fills a cutout's keys).
+func rawEnd(_ e: Editor, _ id: UInt32, cut: UInt32) -> Any {
+    guard let object = try? JSONSerialization.jsonObject(
+            with: Data(e.document.editedProject.json.utf8)) as? [String: Any],
+          let clips = object["clips"] as? [[String: Any]],
+          let c = clips.first(where: { ($0["id"] as? NSNumber)?.uint32Value == id }),
+          let actions = c["actions"] as? [[String: Any]],
+          let action = actions.first(where: { ($0["id"] as? NSNumber)?.uint32Value == cut })
+    else { return NSNull() }
+    return action["end"] ?? NSNull()
+}
+
+func storedCut(_ e: Editor, _ id: UInt32, cut: UInt32) -> [String: Any] {
+    guard let c = clip(e, id) else { return [:] }
+    return [
+        "base_cutout": encoded(c.videoProps.cutout), "base_filters": encoded(c.videoProps.filters),
+        "base_obscure_count": c.videoProps.obscure.count,
+        "end": rawEnd(e, id, cut: cut),
+    ]
+}
+
+func mouseEvent(_ e: Editor) -> NSEvent {
+    NSEvent.mouseEvent(
+        with: .leftMouseDown, location: .zero, modifierFlags: [], timestamp: 0,
+        windowNumber: e.window.windowNumber, context: nil, eventNumber: 0, clickCount: 1,
+        pressure: 1)!
+}
+
+func pictureSection(_ e: Editor, _ sectionID: String) -> InspectorSection? {
+    e.inspector.select(.clip)
+    spin(0.3)
+    e.inspector.selectClipSubTab(.picture)
+    spin(0.4)
+    guard let s = inspectorSections(e).first(where: { $0.id == sectionID }) else { return nil }
+    s.reveal()
+    spin(0.3)
+    return s
+}
+
+func titled(_ view: NSView, _ title: String) -> OptionButtonControl? {
+    walk(view).compactMap { $0 as? OptionButtonControl }.first {
+        (Mirror(reflecting: $0).children.first { $0.label == "title" }?.value as? String) == title
+    }
+}
+
+func answer(_ edit: () throws -> ReelEdit) -> String {
+    do {
+        switch try edit() {
+        case .applied: return "applied"
+        case .identity: return "identity"
+        case .refused(let r): return "refused: \(r.op): \(r.reason)"
+        }
+    } catch {
+        return "throws: \(error.localizedDescription)"
+    }
+}
+
+/// `press` on `id` at the playhead with no action selected: the ops the binding sent, each one's
+/// answer alone and the list's against the project before, and the state after.
+func pressRow(_ e: Editor, _ id: UInt32, cut: UInt32, at: Ticks, _ press: (Editor) -> String?)
+    -> [String: Any]
+{
+    select(e, [id])
+    let before = e.document.editedProject
+    var sent: [(String, [ReelOp])] = []
+    let original = e.inspector.onEdit
+    e.inspector.onEdit = { name, ops in
+        sent.append((name, ops))
+        original?(name, ops)
+    }
+    var out: [String: Any] = [
+        "selected_action_before": J(e.document.selectedAction.map { Double($0) }),
+        "before": storedCut(e, id, cut: cut), "states_before": cutStates(e, id, at: at),
+    ]
+    if let failed = press(e) {
+        out["failed"] = failed
+        return out
+    }
+    spin(0.6)
+    out["edits"] = sent.map { name, ops -> [String: Any] in
+        [
+            "name": name,
+            "ops": ops.map { op in ["op": op.json, "alone": answer { try before.applying(op) }] },
+            "list": answer { try before.applying(ops) },
+        ]
+    }
+    out["sheet"] = e.window.attachedSheet.map { sheet -> Any in
+        walk(sheet.contentView ?? NSView()).compactMap { ($0 as? NSTextField)?.stringValue }
+            .filter { !$0.isEmpty }
+    } ?? NSNull()
+    out["after"] = storedCut(e, id, cut: cut)
+    out["states_after"] = cutStates(e, id, at: at)
+    out["undo"] = undoName(e)
+    out["strip"] = strip(e)
+    out["selected_action"] = J(e.document.selectedAction.map { Double($0) })
+    return out
+}
+
+func removeBackgroundBox(_ e: Editor) -> String? {
+    guard let s = pictureSection(e, "video.cutout") else {
+        return "no video.cutout section; sections \(inspectorSections(e).map { $0.id })"
+    }
+    guard let box = walk(s).compactMap({ $0 as? OptionCheckboxControl }).first else {
+        return "no checkbox"
+    }
+    box.mouseDown(with: mouseEvent(e))
+    return nil
+}
+
+func sectionButton(_ e: Editor, _ sectionID: String, _ title: String, header: Bool = false)
+    -> String?
+{
+    guard let s = pictureSection(e, sectionID) else {
+        return "no \(sectionID) section; sections \(inspectorSections(e).map { $0.id })"
+    }
+    let root: NSView = header ? s.header : s
+    guard let b = titled(root, title) else { return "no \(title) button in \(sectionID)" }
+    if b.isHidden { return "\(title) is hidden" }
+    b.mouseDown(with: mouseEvent(e))
+    return nil
+}
+
+/// The Background section's `label` popup, picked at `index` through its own menu handler.
+func cutoutPopup(_ e: Editor, _ label: String, _ index: Int) -> String? {
+    guard let s = pictureSection(e, "video.cutout"), let row = rowView(s, label),
+          let popup = walk(row).compactMap({ $0 as? OptionPopupControl }).first
+    else { return "no \(label) popup" }
+    let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    item.tag = index
+    popup.perform(Selector(("itemPicked:")), with: item)
+    return nil
+}
+
+func bgRow(_ name: String, _ fixture: String, _ press: @escaping (Editor) -> String?) {
+    row(name, fixture, at: 4) { e in pressRow(e, BG_CAM, cut: BG_CUT, at: T(4), press) }
+}
+
+// G1: Remove background unticked (the base cutout on, the cut's end naming cutout
+// {background: keep}).
+bgRow("G1", "bg", removeBackgroundBox)
+// G2: the Background section header's Reset (`offOps`, G1's ops).
+bgRow("G2", "bg") { sectionButton($0, "video.cutout", "Reset", header: true) }
+// G3: Remove background ticked where the base has no cutout and the cut's end names cutout (the
+// state Clip > Remove Background leaves).
+bgRow("G3", "bgoff", removeBackgroundBox)
+// G4: Filters > Add Filter (one filter on the base, one on the cut's end).
+bgRow("G4", "bg") { sectionButton($0, "video.filters", "Add Filter") }
+// G5: Obscure > Add Region (one region on the base, one on the cut's end).
+bgRow("G5", "bg") { sectionButton($0, "video.obscure", "Add Region") }
+// G6: the Background popup set to Remove (index 0), a sparse `cutoutPart`.
+bgRow("G6", "bg") { cutoutPopup($0, "Background", 0) }
+// G7: an image clip's Subject popup set to Foreground (index 1) at 2 s, the cut's end holding
+// cutout {background: keep}. The cut must be one `firstFrameCut` finds, or the row fails.
+row("G7", "img", at: 2) { e in
+    guard clip(e, IMG_CLIP)?.firstFrameCut(frame: FRAME)?.id == IMG_CUT else {
+        return ["failed": "firstFrameCut does not find action \(IMG_CUT) on clip \(IMG_CLIP)"]
+    }
+    return pressRow(e, IMG_CLIP, cut: IMG_CUT, at: T(2)) { cutoutPopup($0, "Subject", 1) }
 }
 
 say("END", [:])

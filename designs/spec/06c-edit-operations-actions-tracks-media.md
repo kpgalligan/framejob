@@ -247,7 +247,13 @@ The rules every op shares are §6a; the clip ops are §6b.
   `video.cutout` object naming `subject` or `quality` — a `null` included, `subject` first — is an
   **error** (format 39, §11 CO-20: `video.cutout.subject is not an animation target`): which
   subject and which masks are the clip's own, and the evaluator restores the base's; `edge`,
-  `feather` and `background` animate. A `graphic` object
+  `feather` and `background` animate. On a clip `set_video` refuses them on (a text, shape, graphic
+  or adjustment clip, §11 #524, #536), a `video.crop`, `video.corner_radius` or `video.chroma` the
+  patch names — a `null` included — whose value in the end it would store is not neutral (a crop
+  with a side other than 0, a radius other than 0, a chroma key present and not `null`) is an
+  **error** in `set_video`'s sentences, a crop on a matte track's text, shape or graphic clip
+  allowed as there (§11 #535, K-7); removing one, ending it at neutral and `off` are allowed, and
+  an end already holding one is kept by every edit that does not name it. A `graphic` object
   is a graphic clip's props as a fourth target (format version 13, §11 G-34): `{props: {<key>:
   <value>}}`, each non-null prop checked as `set_graphic` checks it against `schema` — the module's
   CURRENT revision, which the app fills and never takes from a caller (G-4) — and refused under

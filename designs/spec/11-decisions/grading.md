@@ -177,8 +177,10 @@ Frame Job's own numbers, and nothing of Concat is opened, at design time or buil
   - **Reach.** Everything drawn behind it at that instant in its container: every lower track
     and the canvas background, the whole frame; never a track in front. Its stored transform,
     crop, corner, shadow, reflection, chroma, spotlight, obscure and motion placement are kept
-    and do nothing (refusing them would make Paste Attributes fail from any moved clip); a
-    motion preset's fades fade the grade.
+    and do nothing (refusing them would make Paste Attributes fail from any moved clip) —
+    amended by #536: a crop, corner radius or chroma key is refused by `set_video` and
+    `set_action_end` and left by Paste Attributes; one already stored is kept and does
+    nothing; a motion preset's fades fade the grade.
   - **The pass.** The compositor's eighth pipeline, `framejob_adjust_fragment`, reads the target
     it is drawing into (`[[color(0)]]`) with blending OFF and writes `mix(dst, graded, w)`, where
     `graded` is the un-premultiplied destination through step 4c's colour and tone and the point

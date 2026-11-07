@@ -665,10 +665,11 @@ governs a module now.
   cannot blend), and `snap_motion` / `snap_animation`, which put the ticks a
   patch or checked copied group carries on the frame grid AFTER the range
   check, so a refusal names what the caller sent. What a patch may CARRY is
-  `patch.rs`'s and nothing here restates it. `check_pixel_keys` (#524) is
-  `set_video`'s alone, read from the patch: crop, corner radius or chroma on
-  a text, shape or graphic clip is an `Err`, crop allowed on a matte track
-  (K-7).
+  `patch.rs`'s and nothing here restates it. `check_pixel_keys` (#524) and
+  `check_end_pixel_keys` (#535) share `pixel_keys_refusal`: crop, corner
+  radius or chroma on a `sectionless_kind` clip (text, shape, graphic,
+  adjustment, #536) is an `Err`, read from the patch, crop allowed on a
+  matte track but for an adjustment clip (K-7).
 - `patch.rs` — reading a caller-authored patch, cut out of `edit_props.rs`
   under the size rule: `Group` — the four PATCH groups; `paste_attributes` takes these four and
   `graphic` as `edit_paste_attributes.rs`'s `PasteGroup`, and a patch has no
@@ -842,6 +843,8 @@ governs a module now.
   read of a `null` for an unknown or a required key) and `key_off` (written
   after the merge and the prune; a non-object group slot is replaced by `{}`,
   never indexed). `END_PATCH` is `edit_action_graphic.rs`'s too.
+  `set_action_end` also asks `edit_props.rs`'s `check_end_pixel_keys` of the
+  merged end (#535).
 - `speed_map.rs` — a media clip's SPEED MAP (speed ramps SR-10): the
   clip-time → source-time function its speed actions make (the ease
   integrals of `actions.rs`'s curves), `is_ramped` (media clips only),
@@ -901,7 +904,8 @@ governs a module now.
   clip lacks and skips a target that cannot take one. **The copied props are
   shape-checked once, the first time a target takes them**: a paste nothing
   takes never reads the map. `patch::Group` gains no variant for it. A text,
-  shape or graphic target keeps its own crop, corner radius and chroma (#524).
+  shape, graphic or adjustment target keeps its own crop, corner radius and
+  chroma (#524, #536).
 - `edit_zoom.rs` — `add_zoom_action`, the screencast zoom, and `ZoomRegion`,
   the one op ARGUMENT that is a caller-authored object: its `Deserialize` is
   written out rather than derived so it answers as a patch does — an object

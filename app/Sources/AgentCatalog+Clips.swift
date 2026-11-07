@@ -509,8 +509,8 @@ extension AgentServer {
                     + "a target takes them. Speed, enabled, actions, the transition and the clip's "
                     + "own name and label stay. A video qualifier follows the clip kind: dropped "
                     + "onto a picture clip, an adjustment clip's own kept when the payload clip is "
-                    + "not an adjustment clip, copied between two. A text, shape or graphic clip "
-                    + "keeps its own crop, corner radius and chroma key. Refused when nothing changes.",
+                    + "not an adjustment clip, copied between two. A text, shape, graphic or "
+                    + "adjustment clip keeps its own crop, corner radius and chroma key. Refused when nothing changes.",
                 [
                     "clips": clipsDescription,
                     "payload": "What Copy wrote, {\"clips\": [...], \"media\": [...], "

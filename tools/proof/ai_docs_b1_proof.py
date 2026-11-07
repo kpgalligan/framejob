@@ -2,7 +2,9 @@
 """ai-docs batch b1 (#524 #534, spec §11 #524, #534): crop, corner radius and chroma key are
 refused on a text, shape or graphic clip and Paste Attributes leaves such a clip's own; a camera
 layout that would crop or round a shape or graphic clip is refused up front; a media path is stored
-and compared as given, never trimmed.
+and compared as given, never trimmed. Batch r2b (#535 #536, spec §11 #535, #536) adds the E rows
+(`set_action_end` refuses the same keys at an action's end) and the A rows (an adjustment clip
+takes none of the three, and Paste Attributes leaves its own).
 
     python3 tools/proof/ai_docs_b1_proof.py [--only V1,L2,M4,…] [--app PATH] [--expect-red]
     RC_PROOF_APP=release python3 tools/proof/ai_docs_b1_proof.py
@@ -38,6 +40,24 @@ Launch 1 (plain):
 - M3 `import_media` of `talk.webm ` (the built-in copy): its media's `original.path` ends in the
   space.
 - M5 (c) `import_media` of `A.mov ` is still the probe's error.
+- E1 on one project (A.mov on Track 1, a text, a shape and a graphic clip and an adjustment clip,
+  each on a front track of its own and each with an action at 0 for 1 s): `set_action_end`
+  `{video: {crop: {l: 100}}}`, `{video: {corner_radius: 40}}` and `{video: {chroma: …}}` on the
+  text, shape and graphic clips: nine errors, each with the core's sentence, ends unchanged.
+- E2 the same on the adjustment clip: three errors (`… an adjustment clip and cannot take a
+  crop`).
+- E3 (c) on each of the four, an end crop of all 0, `corner_radius: 0`, `chroma: null` and
+  `off: ["video.chroma"]`: no error.
+- E4 a text clip on a track `set_track {matte: alpha}`: an end crop l100 applies; an end
+  corner_radius 40 is the error.
+- E5 (c) the media clip's action end takes all three.
+- A1 `set_video` crop l100, corner_radius 40 and a chroma key on the adjustment clip: three
+  errors, the clip unchanged.
+- A2 (c) clearing each on it: no error.
+- A3 the adjustment clip's track `set_track {matte: alpha}`: `set_video` crop l100 is the error.
+- A4 `paste_attributes` (default groups) from the media clip holding crop l120/t10, radius 30, a
+  chroma key and opacity 0.5 onto the adjustment clip: its three stay neutral and its opacity is
+  0.5.
 Launch 2 (`-RCFFmpegImport always -RCFFmpegPath <ffmpeg>`):
 - M4 `import_media` of `A.mov ` then `A.mov`, and the reverse order, each in a fresh project: the
   converted media's `original.path` keeps the space.
@@ -66,9 +86,12 @@ MEDIA = WORK / "media"
 CALL_BOUND = 600
 SEC = 600_000
 
-ROWS = ["V1", "V2", "V3", "V4", "L1", "L2", "L3", "P1", "P2", "M1", "M2", "M3", "M5", "M4", "Z1"]
-CONTROLS = {"V2", "V4", "L3", "P2", "M5", "Z1"}
-LAUNCH_ONE = {"V1", "V2", "V3", "V4", "L1", "L2", "L3", "P1", "P2", "M1", "M2", "M3", "M5"}
+ROWS = ["V1", "V2", "V3", "V4", "L1", "L2", "L3", "P1", "P2", "M1", "M2", "M3", "M5",
+        "E1", "E2", "E3", "E4", "E5", "A1", "A2", "A3", "A4", "M4", "Z1"]
+CONTROLS = {"V2", "V4", "L3", "P2", "M5", "E3", "E5", "A2", "Z1"}
+END_ROWS = {"E1", "E2", "E3", "E4", "E5", "A1", "A2", "A3", "A4"}
+LAUNCH_ONE = {"V1", "V2", "V3", "V4", "L1", "L2", "L3", "P1", "P2", "M1", "M2", "M3",
+              "M5"} | END_ROWS
 LAUNCH_TWO = {"M4"}
 
 MODULE = """export const schema = { title: { type: "string", default: "Hello" } };
@@ -251,6 +274,145 @@ def video_rows(client):
               and v.get("corner_radius") == 30 and v.get("chroma") is not None,
               f"onto a media clip: {said or 'applied'}, crop {v.get('crop')}, radius "
               f"{v.get('corner_radius')}, chroma {'set' if v.get('chroma') else None}")
+    finally:
+        d.close()
+
+
+def action_on(d, cid):
+    """Adds an action at 0 for 1 s to clip `cid`; answers its id."""
+    before = {a["id"] for a in d.clip(cid).get("actions") or []}
+    d.call("add_action", clip=cid, at=0, duration=SEC)
+    return next(a["id"] for a in d.clip(cid).get("actions") or [] if a["id"] not in before)
+
+
+def end_of(d, cid, aid):
+    return next(a for a in d.clip(cid).get("actions") or [] if a["id"] == aid).get("end") or {}
+
+
+def end_rows(client):
+    """#535 and #536: the E and A rows, on one project."""
+    d, media, vclip, ids = kinds_doc(client, "ends")
+    try:
+        adj_track = d.track("adjustment")
+        adj = d.new_clip("add_adjustment_clip", track=adj_track, at=0, duration=4 * SEC)
+        clips = {kind: cid for kind, (cid, _) in ids.items()}
+        clips["adjustment"] = adj
+        words = {kind: kind_word(kind) for kind in ids} | {"adjustment": "an adjustment clip"}
+        actions = {kind: action_on(d, cid) for kind, cid in clips.items()}
+        media_action = action_on(d, vclip)
+
+        def end_errors(kinds):
+            wrong, seen = [], 0
+            for kind in kinds:
+                cid, aid = clips[kind], actions[kind]
+                crop = "a crop" if kind == "adjustment" else "a crop off a matte track"
+                for patch, what in (({"crop": {"l": 100}}, crop),
+                                    ({"corner_radius": 40}, "a corner radius"),
+                                    ({"chroma": CHROMA}, "a chroma key")):
+                    seen += 1
+                    said = error_of(lambda: d.call("set_action_end", clip=cid, action=aid,
+                                                   patch={"video": patch}))
+                    want = f"clip {cid} is {words[kind]} and cannot take {what}"
+                    if said is None or want not in said:
+                        wrong.append(f"{kind} {list(patch)[0]}: {said or 'applied'}")
+                    if said is None:
+                        d.call("undo")
+            return wrong, seen
+
+        before = d.state()
+        wrong, seen = end_errors(["text", "shape", "graphic"])
+        same = d.state()["clips"] == before["clips"]
+        check("E1", not wrong and same, f"{seen - len(wrong)}/{seen} end errors in the sentence, "
+              f"project unchanged {same}" + (f"; {wrong[:3]}" if wrong else ""))
+        wrong, seen = end_errors(["adjustment"])
+        same = d.state()["clips"] == before["clips"]
+        check("E2", not wrong and same, f"{seen - len(wrong)}/{seen} end errors on the adjustment "
+              f"clip, project unchanged {same}" + (f"; {wrong[:3]}" if wrong else ""))
+
+        bad = []
+        for kind, cid in clips.items():
+            aid = actions[kind]
+            for patch, off in (({"video": {"crop": CLEAR["crop"]}}, None),
+                               ({"video": {"corner_radius": 0}}, None),
+                               ({"video": {"chroma": None}}, None),
+                               ({}, ["video.chroma"])):
+                args = {"clip": cid, "action": aid, "patch": patch}
+                if off:
+                    args["off"] = off
+                said = error_of(lambda: d.call("set_action_end", **args))
+                if said is not None and "made no change" not in said:
+                    bad.append(f"{kind} {off or list(patch['video'])[0]}: {said}")
+        check("E3", not bad, "clearing at the end on each kind: " + (f"{bad}" if bad else "no error"))
+
+        text, track = ids["text"]
+        d.call("set_track", track=track, matte="alpha")
+        crop_err = error_of(lambda: d.call("set_action_end", clip=text, action=actions["text"],
+                                           patch={"video": {"crop": {"l": 100}}}))
+        cropped = ((end_of(d, text, actions["text"]).get("video") or {}).get("crop") or {}).get("l")
+        radius_err = error_of(lambda: d.call("set_action_end", clip=text, action=actions["text"],
+                                             patch={"video": {"corner_radius": 40}}))
+        if radius_err is None:
+            d.call("undo")
+        want = f"clip {text} is a text clip and cannot take a corner radius"
+        check("E4", crop_err is None and cropped == 100 and radius_err and want in radius_err,
+              f"matte-track text end: crop error {crop_err!r}, end crop l {cropped}; radius error "
+              f"{radius_err!r}")
+        d.call("set_track", track=track, matte="none")
+
+        said = error_of(lambda: d.call("set_action_end", clip=vclip, action=media_action,
+                                       patch={"video": {"crop": {"l": 100}, "corner_radius": 40,
+                                                        "chroma": CHROMA}}))
+        ev = end_of(d, vclip, media_action).get("video") or {}
+        check("E5", said is None and (ev.get("crop") or {}).get("l") == 100
+              and ev.get("corner_radius") == 40 and ev.get("chroma") is not None,
+              f"media clip's end: {said or 'applied'}, crop {ev.get('crop')}, radius "
+              f"{ev.get('corner_radius')}, chroma {'set' if ev.get('chroma') else None}")
+
+        adj_before = d.video(adj)
+        wrong = []
+        for patch, what in (({"crop": {"l": 100}}, "a crop"),
+                            ({"corner_radius": 40}, "a corner radius"),
+                            ({"chroma": CHROMA}, "a chroma key")):
+            said = error_of(lambda: d.call("set_video", clips=[adj], patch=patch))
+            want = f"clip {adj} is an adjustment clip and cannot take {what}"
+            if said is None or want not in said:
+                wrong.append(f"{list(patch)[0]}: {said or 'applied'}")
+            if said is None:
+                d.call("undo")
+        same = d.video(adj) == adj_before
+        check("A1", not wrong and same, f"{3 - len(wrong)}/3 set_video errors on the adjustment "
+              f"clip, unchanged {same}" + (f"; {wrong}" if wrong else ""))
+
+        bad = []
+        for patch in ({"crop": CLEAR["crop"]}, {"corner_radius": 0}, {"chroma": None}):
+            said = error_of(lambda: d.call("set_video", clips=[adj], patch=patch))
+            if said is not None and "made no change" not in said:
+                bad.append(f"{list(patch)[0]}: {said}")
+        check("A2", not bad, "clearing each on the adjustment clip: "
+              + (f"{bad}" if bad else "no error"))
+
+        d.call("set_track", track=adj_track, matte="alpha")
+        said = error_of(lambda: d.call("set_video", clips=[adj], patch={"crop": {"l": 100}}))
+        if said is None:
+            d.call("undo")
+        want = f"clip {adj} is an adjustment clip and cannot take a crop"
+        check("A3", said is not None and want in said,
+              f"an adjustment clip on a matte track, crop l100: {said or 'applied'}")
+        d.call("set_track", track=adj_track, matte="none")
+
+        d.call("set_video", clips=[vclip], patch={"crop": {"l": 120, "t": 10}, "corner_radius": 30,
+                                                  "chroma": CHROMA, "opacity": 0.5})
+        payload_clip = dict(d.clip(vclip))
+        payload_clip["track"] = 0
+        payload_clip["actions"] = []
+        payload = {"clips": [payload_clip],
+                   "media": [m for m in d.state()["media"] if m["id"] == media]}
+        said = error_of(lambda: d.call("paste_attributes", clips=[adj], payload=payload))
+        v = d.video(adj)
+        check("A4", said is None and neutral(v) and v.get("opacity") == 0.5,
+              f"paste_attributes onto the adjustment clip: {said or 'applied'}, crop "
+              f"{v.get('crop')}, radius {v.get('corner_radius')}, chroma "
+              f"{'set' if v.get('chroma') else None}, opacity {v.get('opacity')}")
     finally:
         d.close()
 
@@ -465,6 +627,8 @@ def main():
                 layout_rows(client)
             if first & {"M1", "M2", "M3", "M5"}:
                 media_rows(client)
+            if first & END_ROWS:
+                end_rows(client)
         launch(binary, [], first, body, "launch-1")
     second = selected & LAUNCH_TWO
     if second:

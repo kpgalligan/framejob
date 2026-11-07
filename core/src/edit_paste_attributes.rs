@@ -29,10 +29,11 @@
 //! payload clip is a picture clip, which has none to give. Between two
 //! adjustment clips it is copied like any other video key.
 //!
-//! **A text, shape or graphic target keeps its own crop, corner radius and
-//! chroma key** (spec §11 #524): those clips have no section showing them,
-//! and `set_video` refuses them there. Onto any other clip they travel with
-//! the rest of the group.
+//! **A text, shape, graphic or adjustment target keeps its own crop, corner
+//! radius and chroma key** (spec §11 #524, #536; `edit_props.rs`'s
+//! `sectionless_kind`): those clips have no section showing them, and
+//! `set_video` refuses them there. Onto any other clip they travel with the
+//! rest of the group.
 //!
 //! ### The fifth group
 //!
@@ -61,7 +62,7 @@ use serde_json::{Map, Value};
 use crate::actions_graphic::names_prop;
 use crate::edit_adjustment::is_adjustment;
 use crate::edit_paste::{absorb_media, parse_payload};
-use crate::edit_props::described_kind;
+use crate::edit_props::sectionless_kind;
 use crate::lut::{look_media_ids, remap_look_media};
 use crate::model::{Clip, GraphicProps, Project, Qualifier, ShapeProps, Source, TextProps};
 use crate::model_graphic::{check_count, check_props};
@@ -179,7 +180,7 @@ fn copy_group(target: &mut Clip, source: &Clip, group: Group) {
         Group::Video => {
             let picture_target = !is_adjustment(target);
             let picture_source = !is_adjustment(source);
-            let described = described_kind(target).is_some();
+            let sectionless = sectionless_kind(target).is_some();
             if let (Some(into), Some(from)) = (target.video.as_mut(), &source.video) {
                 let own = into.qualifier;
                 let pixels = (into.crop, into.corner_radius, into.chroma);
@@ -190,8 +191,8 @@ fn copy_group(target: &mut Clip, source: &Clip, group: Group) {
                 } else if picture_source {
                     into.qualifier = own;
                 }
-                // A described clip keeps its own pixel keys (module doc, #524).
-                if described {
+                // A sectionless clip keeps its own pixel keys (module doc, #524, #536).
+                if sectionless {
                     (into.crop, into.corner_radius, into.chroma) = pixels;
                 }
             }

@@ -74,7 +74,7 @@ An adjustment clip's **Color** sub-tab has the same grade a picture clip has, pl
 
 An adjustment clip has nothing to place or crop, so it has no **Picture** sub-tab. Its sub-tabs are **Color** and **Clip**. **Picture** also disappears whenever any adjustment clip is part of the selection.
 
-Placement, crop, corners, shadow, reflection and the like can still arrive on one through [Paste Attributes](/editing/paste-attributes/). They're kept and have no effect.
+Placement, shadow, reflection and the like can still arrive on one through [Paste Attributes](/editing/paste-attributes/). They're kept and have no effect. A crop, corner radius or chroma key doesn't arrive: Paste Attributes leaves the adjustment clip's own, and an agent's `set_video` is refused one.
 
 ## Strength
 
@@ -148,7 +148,7 @@ The point [filters](/effects/filters/), **Sepia**, **Noir**, **Vignette** and **
 
 `add_adjustment_clip` places a clip on the `track` and `at` the time you name, and it lasts 5 seconds unless you give a `duration`. It doesn't work out a span or a track as the menu does, so an agent can put one on a matte track, where it does nothing. It won't add one while a nest is open.
 
-`set_video` then grades it with everything the Color tab offers, and can also give it point filters directly. To an agent, Strength is the clip's `opacity`, from 0 to 1, and `set_action_end` animates it. A blur, sharpen or pixelate filter or a blend mode is an error, such as "clip 7 is an adjustment clip and cannot take the blur filter". See [Tools: adding clips](/mcp/tools-adding-clips/#add_adjustment_clip) and [Tools: picture and grade](/mcp/tools-set-video/#on-an-adjustment-clip).
+`set_video` then grades it with everything the Color tab offers, and can also give it point filters directly. To an agent, Strength is the clip's `opacity`, from 0 to 1, and `set_action_end` animates it. A blur, sharpen or pixelate filter or a blend mode is an error, such as "clip 7 is an adjustment clip and cannot take the blur filter". So is a crop, a corner radius or a chroma key, from `set_video` or at an action's end from `set_action_end`, such as "clip 7 is an adjustment clip and cannot take a crop". Clearing one always works. See [Tools: adding clips](/mcp/tools-adding-clips/#add_adjustment_clip) and [Tools: picture and grade](/mcp/tools-set-video/#on-an-adjustment-clip).
 
 ## Related
 

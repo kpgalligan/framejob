@@ -149,6 +149,7 @@ See [Animate sound with actions](/audio/animate-sound/).
 | `text.words` | Word times belong to speech. Set them with `set_text`. |
 | `video.cutout.subject`, `video.cutout.quality` | They hold for the whole clip. Set them with `set_video`. A cutout's `edge`, `feather` and `background` do animate. |
 | Any `shape` key | Shapes can't be animated, so `shape` isn't a group here. |
+| `video.crop`, `video.corner_radius`, `video.chroma` on a text, shape, graphic or adjustment clip | These clips have no section for them, so the end can't put one on, as `set_video` can't. Only a value the end would keep is an error: a `null`, a crop of all 0, a radius of 0 and `off` all work. A crop is allowed on a text, shape or graphic clip on a [matte track](/canvas/matte-tracks/). |
 
 ### Animating graphic props
 

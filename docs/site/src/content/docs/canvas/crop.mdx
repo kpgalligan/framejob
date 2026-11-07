@@ -110,13 +110,13 @@ While you're editing an action, the section's **Reset** is hidden. **Clear** app
 
 - Crop mode has no menu item. It's <kbd>C</kbd>, a double-click, or the **Crop on Canvas** button.
 - On a [matte track](/canvas/matte-tracks/), crop shapes the matte, so <kbd>C</kbd> still opens crop mode on a text, shape or graphic clip there, and a double-click does on a shape or graphic. Those clips have no Crop section, so there are no fields and no **Reset**. To take that crop off, undo or drag the handles back.
-- Off a matte track, a text, shape or graphic clip can't take a crop. [Paste Attributes](/editing/paste-attributes/) leaves its crop as it was, and an agent's `set_video` gets an error.
+- Off a matte track, a text, shape or graphic clip can't take a crop, and an [adjustment clip](/color/adjustment-clips/) can't take one anywhere. [Paste Attributes](/editing/paste-attributes/) leaves its crop as it was, and an agent's `set_video` or `set_action_end` gets an error.
 - Crop mode doesn't open on a nest clip, so <kbd>C</kbd> and a double-click beep on it, unless it's on a matte track.
 - A clip on a [locked track](/timeline/hide-and-lock-tracks/) shows no crop handles.
 
 ## With an agent
 
-`set_video` sets a crop with `crop`, which holds `l`, `t`, `r` and `b`, each 0 or more, in source pixels. `l` plus `r` must stay under the source's width and `t` plus `b` under its height, or the call gets an error and the crop stays as it was. A crop on a text, shape or graphic clip is an error too, such as "clip 5 is a text clip and cannot take a crop off a matte track", unless the clip is on a matte track. Setting the crop back to all 0 always works. See [Tools: picture and grade](/mcp/tools-set-video/#crop-and-corners).
+`set_video` sets a crop with `crop`, which holds `l`, `t`, `r` and `b`, each 0 or more, in source pixels. `l` plus `r` must stay under the source's width and `t` plus `b` under its height, or the call gets an error and the crop stays as it was. A crop on a text, shape or graphic clip is an error too, such as "clip 5 is a text clip and cannot take a crop off a matte track", unless the clip is on a matte track, and so is a crop on an adjustment clip, wherever it is. An action's end, through `set_action_end`, follows the same rule. Setting the crop back to all 0 always works. See [Tools: picture and grade](/mcp/tools-set-video/#crop-and-corners).
 
 ## Related
 

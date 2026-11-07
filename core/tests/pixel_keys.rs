@@ -1,9 +1,11 @@
-//! Crop, corner radius and chroma key on a text, shape or graphic clip
-//! (spec §11 #524, the owner's "Refuse and skip"), black box through
-//! `rc_project_apply`. Such a clip has no Crop, Corner Radius or Chroma Key
-//! section, so `set_video` refuses a value the patch names there (clearing
-//! allowed, a crop allowed on a matte track, K-7), Paste Attributes leaves
-//! the target's own, and `switch_layout` refuses up front a shape or graphic
+//! Crop, corner radius and chroma key on a text, shape, graphic or
+//! adjustment clip (spec §11 #524, #535, #536, the owner's "Refuse and
+//! skip"), black box through `rc_project_apply`. Such a clip has no Crop,
+//! Corner Radius or Chroma Key section, so `set_video` refuses a value the
+//! patch names there (clearing allowed, a crop allowed on a matte track but
+//! for an adjustment clip, K-7), `set_action_end` refuses the same keys
+//! judged on the end it would store (#535), Paste Attributes leaves the
+//! target's own, and `switch_layout` refuses up front a shape or graphic
 //! role or reach clip the layout would crop or round.
 //!
 //! The fixture: media 1 a 1280 × 720 camera, media 2 a 1920 × 1080 screen;
@@ -365,4 +367,214 @@ fn a_shape_camera_on_a_matte_track_keeps_a_layouts_crop() {
             "{layout}"
         );
     }
+}
+
+// ---- an adjustment clip (#536) ---------------------------------------------------
+
+fn adjustment_on(project: &Handle, track: u32) -> (Handle, u64) {
+    added(
+        project,
+        json!({"op": "add_adjustment_clip", "track": track, "at": 0, "duration": 4 * SEC}),
+    )
+}
+
+#[test]
+fn an_adjustment_clip_refuses_each_key_and_takes_clearing() {
+    let project = base(vec![]);
+    let (project, adj) = adjustment_on(&project, 7);
+    let before = project.value();
+    let cases = [
+        (json!({"crop": {"l": 100}}), "a crop"),
+        (json!({"corner_radius": 40}), "a corner radius"),
+        (json!({"chroma": chroma()}), "a chroma key"),
+    ];
+    for (patch, what) in cases {
+        assert_eq!(
+            project.errors(&set_video(adj, patch)),
+            format!("clip {adj} is an adjustment clip and cannot take {what}")
+        );
+    }
+    assert_eq!(project.value(), before);
+    let clear = json!({"crop": {"l": 0, "t": 0, "r": 0, "b": 0}, "corner_radius": 0,
+                       "chroma": null});
+    assert!(matches!(
+        project.try_apply(&set_video(adj, clear)),
+        Ok(Outcome::Identity)
+    ));
+}
+
+#[test]
+fn an_adjustment_clip_on_a_matte_track_is_still_refused_a_crop() {
+    let project = base(vec![]);
+    let (project, adj) = adjustment_on(&project, 7);
+    let matted = project.apply(&json!({"op": "set_track", "track": 7, "matte": "alpha"}));
+    assert_eq!(
+        matted.errors(&set_video(adj, json!({"crop": {"l": 100}}))),
+        format!("clip {adj} is an adjustment clip and cannot take a crop")
+    );
+}
+
+#[test]
+fn paste_attributes_leaves_an_adjustment_targets_own_pixel_keys() {
+    let project = base(vec![]);
+    let (project, adj) = adjustment_on(&project, 7);
+    let next = project.apply(&json!({"op": "paste_attributes", "clips": [adj],
+                                      "payload": look()}));
+    let v = video(&next, adj);
+    assert!(is_neutral_crop(&v["crop"]), "{v}");
+    assert_eq!(v["corner_radius"].as_f64().unwrap_or(0.0), 0.0);
+    assert!(v["chroma"].is_null(), "{v}");
+    assert_eq!(v["opacity"], json!(0.5));
+}
+
+// ---- set_action_end (#535) ------------------------------------------------------
+
+/// Adds a one-second action at 0 to `clip` and answers its id.
+fn with_action(project: &Handle, clip: u64) -> (Handle, u64) {
+    let next = project.apply(&json!({"op": "add_action", "clip": clip, "at": 0,
+                                      "duration": SEC}));
+    let actions = by_id(&next.value(), "/clips", clip)["actions"].clone();
+    let id = actions.as_array().unwrap().last().unwrap()["id"]
+        .as_u64()
+        .unwrap();
+    (next, id)
+}
+
+fn end_op(clip: u64, action: u64, patch: Value) -> Value {
+    json!({"op": "set_action_end", "clip": clip, "action": action, "patch": patch})
+}
+
+fn end(project: &Handle, clip: u64, action: u64) -> Value {
+    by_id(&project.value(), "/clips", clip)["actions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["id"].as_u64() == Some(action))
+        .unwrap()["end"]
+        .clone()
+}
+
+/// The three described kinds and an adjustment clip, each with an action.
+fn four_with_actions() -> (Handle, Vec<(u64, u64, &'static str)>) {
+    let (project, clips) = three();
+    let mut all: Vec<(u64, &'static str)> = clips;
+    let (mut project, adj) = adjustment_on(&project, 4);
+    all.push((adj, "an adjustment clip"));
+    let mut out = vec![];
+    for (clip, kind) in all {
+        let (next, action) = with_action(&project, clip);
+        project = next;
+        out.push((clip, action, kind));
+    }
+    (project, out)
+}
+
+#[test]
+fn an_end_refuses_each_key_on_each_kind_in_set_videos_sentence() {
+    let (project, clips) = four_with_actions();
+    let before = project.value();
+    for (clip, action, kind) in clips {
+        let crop = if kind == "an adjustment clip" {
+            "a crop"
+        } else {
+            "a crop off a matte track"
+        };
+        let cases = [
+            (json!({"video": {"crop": {"l": 100}}}), crop),
+            (json!({"video": {"corner_radius": 40}}), "a corner radius"),
+            (json!({"video": {"chroma": chroma()}}), "a chroma key"),
+        ];
+        for (patch, what) in cases {
+            assert_eq!(
+                project.errors(&end_op(clip, action, patch)),
+                format!("clip {clip} is {kind} and cannot take {what}")
+            );
+        }
+    }
+    assert_eq!(project.value(), before);
+}
+
+#[test]
+fn an_end_clearing_each_key_is_allowed_on_each_kind() {
+    let (project, clips) = four_with_actions();
+    for (clip, action, kind) in clips {
+        for patch in [
+            json!({"video": {"crop": {"l": 0, "t": 0, "r": 0, "b": 0}}}),
+            json!({"video": {"corner_radius": 0}}),
+            json!({"video": {"chroma": null}}),
+            json!({"video": null}),
+        ] {
+            assert!(
+                project
+                    .try_apply(&end_op(clip, action, patch.clone()))
+                    .is_ok(),
+                "{kind}: {patch}"
+            );
+        }
+        let off = json!({"op": "set_action_end", "clip": clip, "action": action,
+                         "patch": {}, "off": ["video.chroma"]});
+        assert!(project.try_apply(&off).is_ok(), "{kind}: off");
+    }
+}
+
+#[test]
+fn an_end_crop_applies_on_a_matte_tracks_text_clip_and_its_radius_is_refused() {
+    let (project, clips) = three();
+    let (text, _) = clips[0];
+    let matted = project.apply(&json!({"op": "set_track", "track": 5, "matte": "alpha"}));
+    let (matted, action) = with_action(&matted, text);
+    let cropped = matted.apply(&end_op(
+        text,
+        action,
+        json!({"video": {"crop": {"l": 100}}}),
+    ));
+    assert_eq!(
+        end(&cropped, text, action)["video"]["crop"]["l"],
+        json!(100)
+    );
+    assert_eq!(
+        matted.errors(&end_op(
+            text,
+            action,
+            json!({"video": {"corner_radius": 40}})
+        )),
+        format!("clip {text} is a text clip and cannot take a corner radius")
+    );
+}
+
+#[test]
+fn a_media_clips_end_takes_all_three() {
+    let project = base(vec![media_clip(20, 4, 1, 0, 60 * SEC)]);
+    let (project, action) = with_action(&project, 20);
+    let next = project.apply(&end_op(
+        20,
+        action,
+        json!({"video": {"crop": {"l": 100}, "corner_radius": 40, "chroma": chroma()}}),
+    ));
+    let e = end(&next, 20, action);
+    assert_eq!(e["video"]["crop"]["l"], json!(100));
+    assert_eq!(e["video"]["corner_radius"], json!(40));
+    assert!(e["video"]["chroma"].is_object(), "{e}");
+}
+
+/// An end holding a crop from a file is kept by an end edit that does not
+/// name it.
+#[test]
+fn an_end_already_holding_a_crop_is_kept_by_an_end_opacity_edit() {
+    let (project, clips) = three();
+    let (text, _) = clips[0];
+    let (project, action) = with_action(&project, text);
+    let mut value = project.value();
+    let clip = value["clips"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|c| c["id"].as_u64() == Some(text))
+        .unwrap();
+    clip["actions"][0]["end"] = json!({"video": {"crop": {"l": 100}}});
+    let held = Handle::from_value(&value);
+    let next = held.apply(&end_op(text, action, json!({"video": {"opacity": 0.5}})));
+    let e = end(&next, text, action);
+    assert_eq!(e["video"]["crop"]["l"], json!(100));
+    assert_eq!(e["video"]["opacity"], json!(0.5));
 }

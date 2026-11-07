@@ -30148,9 +30148,9 @@ RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a2_proof.py --tree <a b
 python3 tools/proof/docs_bugs_a2_proof.py --mutant <name>
 ```
 
-## Docs-bugs batch a3 — canvas selection and the inspector around it (`docs_bugs_a3_proof.py`, `docs_bugs_a3_probe.swift`; twenty-eight mutants by `--mutant`; spec §11 CI-17, CI-18, CI-19, #529, #530)
+## Docs-bugs batch a3 — canvas selection and the inspector around it (`docs_bugs_a3_proof.py`, `docs_bugs_a3_probe.swift`; thirty-one mutants by `--mutant`; spec §11 CI-17, CI-18, CI-19, #529, #530, #540)
 
-#469, #476, #471, #481 and #485, batch a5's CI-19 rows and ai-docs a2's F rows. **`docs_bugs_a3_proof.py`** has the app under test make seventeen
+#469, #476, #471, #481 and #485, batch a5's CI-19 rows, ai-docs a2's F rows and ai-docs r2b's G rows. **`docs_bugs_a3_proof.py`** has the app under test make twenty
 projects over MCP (a recording with a camera through `land_recording`), then runs every row but Z1
 through **`docs_bugs_a3_probe.swift`**, the app's own sources on those packages: a drag, a click and
 a key press can't be sent over MCP. The app is `.prohibited` and its windows alpha 0, so nothing
@@ -30190,6 +30190,20 @@ not a cut keeps its end, no refusal), F10 (Rotation typed: the base alone) and F
 fixture: a one-frame layout action past clip time 0 is not a cut). Its seven mutants are
 `multi-no-held`, `multi-front-only`, `typed-no-cut`, `typed-no-base`, `typed-any-key`,
 `typed-cut-placement-only` and `typed-held-placement-only`, and `cut-any-start` now fails F12 too.
+
+ai-docs r2b (#540, spec §11 #540) added G1–G7: with no action selected, an inspector write on a clip
+with a first-frame cut sends the cut only those of a whole cutout's background, edge and feather that
+differ from the base cutout, and nothing for a null one. Three fixtures: `bg` (the landed camera with
+a base cutout, filter and region, its cut's end naming cutout {background: keep}, a filter and a
+region), `bgoff` (`bg` with the base cutout null) and `img` (an image clip from a 64 × 64 PNG the
+proof writes, a base cutout and a first-frame cut whose end names cutout {background: keep}). Each
+row presses the control through its own handler (`mouseDown(with:)`, a popup's `itemPicked:`) with
+`inspector.onEdit` wrapped, and prints the ops, each one's answer alone and the list's, the undo
+step, the window's sheet, the base and the cut's end as the core stores them, and `clip_state` at
+frame 0, frame 1 and the playhead. G1 unticks Remove background, G2 presses the Background header's
+Reset, G3 ticks it on `bgoff`, G7 sets an image's Subject to Foreground; G4 (Add Filter), G5 (Add
+Region) and G6 (the Background popup) are CONTROLs. Its three mutants are `held-whole-cutout`,
+`held-part-dropped` and `held-cutout-undiffed`, and `typed-any-key`'s anchor is the new call line.
 
 ```sh
 make app-debug && python3 tools/proof/docs_bugs_a3_proof.py [--only D1,N3]
@@ -30481,6 +30495,13 @@ spaces. Launch 2 (`-RCFFmpegImport always -RCFFmpegPath <ffmpeg>`) runs M4, a co
 controls; every other row is red on the frozen base app (`main` at `d40d1f81`), and `--expect-red`
 exits 0 only when that holds. Its mutants are the core's: `core/tests/pixel_keys.rs` and
 `media_path_exact.rs` catch each.
+
+ai-docs r2b (#535, #536, spec §11 #535, #536) added, in launch 1, the E rows (`set_action_end`
+refusing a crop, corner radius or chroma key at the end of an action on a text, shape, graphic or
+adjustment clip, clearing and `off` allowed, a matte track's text crop allowed, a media clip's end
+taking all three) and the A rows (`set_video` refusing all three on an adjustment clip, clearing
+allowed, a matte track no exception, Paste Attributes leaving its own). Its core mutants are run by
+hand against `core/tests/pixel_keys.rs`.
 
 ```sh
 make app-debug && python3 tools/proof/ai_docs_b1_proof.py [--only V1,L2,M4]

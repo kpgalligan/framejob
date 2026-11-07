@@ -204,10 +204,10 @@ extension AgentServer {
                     + "reach, and blur, sharpen, pixelate or a blend mode is an error. cutout "
                     + "(Remove Background) is taken by media and still clips only, and "
                     + "behind_subject (Text Behind Subject) by any drawing clip but an "
-                    + "adjustment or nest clip. A text, shape or graphic clip has no crop, "
-                    + "corner radius or chroma key: a value other than none for one is an "
-                    + "error (clearing is allowed), except a crop on a matte track, where it "
-                    + "shapes the matte.",
+                    + "adjustment or nest clip. A text, shape, graphic or adjustment clip has "
+                    + "no crop, corner radius or chroma key: a value other than none for one "
+                    + "is an error (clearing is allowed), except a crop on a matte track, "
+                    + "where it shapes the matte (never on an adjustment clip).",
                 ["clips": clipsDescription, "patch": videoPatchDescription]),
             opTool(
                 "set_audio",

@@ -349,8 +349,9 @@ the transition ops are §6d.
   or target carries no rate profile and no window changes (§11 SR-19 (f)). A video group's
   `qualifier` follows the clip kind (§11 GR-13): dropped onto a picture clip (said in the tool's
   description, not its answer — D2-1), an adjustment target's own kept when the payload clip is
-  not an adjustment clip, copied between two adjustment clips. A text, shape or graphic target
-  keeps its own `crop`, `corner_radius` and `chroma` (§11 #524); onto any other clip they travel
+  not an adjustment clip, copied between two adjustment clips. A text, shape, graphic or
+  adjustment target keeps its own `crop`, `corner_radius` and `chroma` (§11 #524, #536); onto any
+  other clip they travel
   with the group. **`graphic` is the
   fifth group, and only when NAMED** (§11 G-32, amending G-10): a side has it when its source is a
   graphic and it has a `graphic` description, and a target TAKES it when it has it and its
@@ -450,14 +451,16 @@ the transition ops are §6d.
   "foreground"` (format 41, §11 CO-100) is an image clip's only: on a `media` or `still` clip it
   is an **error** (`clip 3 is a media clip and cannot take a foreground cutout: only an image clip
   can`), from `set_video`, `paste` and `paste_attributes` alike.
-  `video.crop`, `video.corner_radius` and `video.chroma` on a text, shape or graphic clip (§11
-  #524) are an **error** when the patch names one with a value other than neutral (a crop other
+  `video.crop`, `video.corner_radius` and `video.chroma` on a text, shape, graphic or adjustment
+  clip (§11 #524, #536) are an **error** when the patch names one with a value other than neutral (a crop other
   than all zero, a radius other than 0, a chroma key other than `null`): `clip 5 is a text clip and
   cannot take a crop off a matte track`, `… cannot take a corner radius`, `… cannot take a chroma
   key`. It is read from the patch, as AU-111's duck is, so clearing is allowed and a value the
   clip already holds (a full `paste` keeps what its payload holds) is kept by every other edit;
-  a crop is taken on a matte track, where it shapes the matte (§11 K-7, MT-4). `paste` is
-  unchanged, and Paste Attributes leaves such a target's own (above).
+  a crop is taken on a matte track, where it shapes the matte (§11 K-7, MT-4), but never on an
+  adjustment clip, which is inert there (§11 GR-6): `clip 5 is an adjustment clip and cannot take
+  a crop`. `paste` is unchanged, and Paste Attributes leaves such a target's own (above).
+  `set_action_end` refuses the same keys at an action's end (§11 #535).
   `video.behind_subject` (format 40, §11 CO-52) is a boolean: any drawing clip takes it but an
   adjustment or a nest clip, each an **error** naming what it is (`clip 4 is an adjustment clip and
   cannot be put behind a subject`), from `set_video`, `paste` and `paste_attributes` alike.

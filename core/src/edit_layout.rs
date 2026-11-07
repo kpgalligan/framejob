@@ -39,7 +39,7 @@ use crate::action_class::is_layout;
 use crate::edit_adjustment::is_adjustment;
 use crate::edit_clip::clip_end;
 use crate::edit_layout_reach::{Role, RoleKind};
-use crate::edit_props::described_kind;
+use crate::edit_props::sectionless_kind;
 use crate::layout::{
     camera_placement, screen_placement, CameraLayout, LayoutChoice, LayoutCorner, LayoutShape,
     Placement, DEFAULT_SWITCH,
@@ -320,7 +320,7 @@ impl Project {
     /// Corner Radius section. A text clip never reaches it: it has no source
     /// size, so it is never a role (CO-64).
     fn drawn_layout_refusal(&self, clip: &Clip, placed: &Placement) -> Option<String> {
-        let kind = described_kind(clip)?;
+        let kind = sectionless_kind(clip)?;
         let on_matte = self.track(clip.track).is_some_and(|t| !t.matte.is_none());
         let cropped = placed.crop != Crop::default() && !on_matte;
         (placed.corner_radius != 0.0 || cropped).then(|| {
