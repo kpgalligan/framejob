@@ -30682,3 +30682,48 @@ RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_r2c_proof.py --expect-red
 | The fix, Debug | 18/18: C1 912 × 2157 px for 304 × 719 pt, C2 1440 × 2421 for 480 × 807, `window_facts.scale` 2 in both |
 | Release | 18/18, the same answers (C1 1317 × 2012 px for 439 × 670.5 pt: the Release editor's inspector is wider) |
 | The four mutants, Debug | `pass` ignoring `scale` CAUGHT (C1: 608 × 1438 px at an answered 3); the answer's `scale` left as the window's CAUGHT (C1: scale 2); any value honoured CAUGHT (C3: scale 5, no line); the stderr line dropped CAUGHT (C3) |
+
+## ai-docs r2a — the preview's half-second hold on play, on a wrap and on a mid-play seek (`ai_docs_r2a_proof.py`; #537, #520, held)
+
+#537: playing from paused holds the player's clock about 0.53 s before the playhead moves. #520:
+every Loop wrap holds about 0.5–0.7 s, and every seek made while playing about 0.5 s. Both need
+sound: a clip with its sound off, or a movie with no audio stream, holds about 0.01–0.06 s, and the
+hold is the same on Bluetooth and the built-in speakers. Four candidates were built over the tree,
+each alone, and none cleared a row, so nothing shipped and both issues stay open, held for the
+owner. Moving the taps after the effects (S3) about halves the hold, as round 1's preview with no
+taps did (A1, in "ai-docs a1" above); the time-pitch stage (S1, S2) accounts for under 0.1 s; prerolling
+a settled player (S4) changes nothing. What holds the remaining 0.2–0.4 s is not located.
+
+`python3 tools/proof/ai_docs_r2a_proof.py [--only H1,…] [--trials N] [--app PATH] [--expect-red]`
+imports `ai_docs_a1_proof.py` and re-points its folders under `work/ai-docs-r2a/`, so it measures
+with a1's W1–W7 code; its docstring has the rows and their lines. H1–H6 are HELD: each prints its
+numbers against its line, and none is scored until a fix takes it out of `HELD`. M1 (the meter
+still meters a 4 s play) and Z1 are scored. It prints the default output device first. A whole run
+takes about eleven minutes.
+
+| Run | Result |
+|---|---|
+| The frozen base app, H rows scored (`--expect-red`; built-in speakers) | exit 0, every H row red: H1 D median 0.533 s (`to` 3.491–3.515); H2 0.544 s; H3 seek hold 0.559 s; H4 per-wrap 0.718 s; H5 0.493 s; H6 runs pair 0.501, 0.541 s, lone 0.676, 0.675 s; M1 3.925 s metered, −21.77 LUFS; Z1. C1 (sound off) D 0.023 / seek 0.016 s, wraps [3.423, 0.086, 4.503]; C2 (no audio stream) D 0.013 / seek 0.023 / wrap 0.055 s |
+| This tree, Debug, held (built-in speakers) | 2/2 (M1, Z1); H1 0.532 s; H2 0.534 s; H3 0.492 s; H4 0.660 s; H5 0.648 s; H6 pair 0.674, 0.609 s, lone 0.543, 0.672 s. C1 D 0.011 / seek 0.012 / wrap 0.044 s, one Loop-on trial stalled (D 15.955 s, wrap 21.565 s); C2 D 0.016 / seek 0.010 s, wraps [0.395, 1.524, 4.074], poll runs [0.127, 2.158] |
+| This tree, Release, held (built-in speakers) | 2/2 (M1, Z1); H1 0.538 s; H2 0.531 s; H3 0.540 s; H4 0.698 s; H5 0.620 s; H6 pair 0.671, 0.684 s, lone 0.531, 0.671 s. C1 D 0.022 / seek 0.006 s, wraps [1.500, 0.422, 0.059], one Loop-on D of 20.565 s; C2 D 0.011 / seek 0.011 / wrap 0.041 s |
+
+The spike, H rows on Debug builds of this tree, 3 trials each, built-in speakers (medians in
+seconds; H1–H3 lines 0.10, H4–H5 0.12):
+
+| Build | H1 D | H2 D | H3 seek | H4 wrap | H5 wrap | M1 |
+|---|---|---|---|---|---|---|
+| The frozen base app (5 trials, above) | 0.533 | 0.544 | 0.559 | 0.718 | 0.493 | ok |
+| S1: a family with no scaled segment set to `.varispeed` in `audioParameters` | 0.471 | 0.450 | 0.439 | 0.609 | 0.574 | ok |
+| S2: the item `.varispeed` in `finishRebuild`, every metering mix input left nil | 0.447 | 0.451 | 0.462 | 0.574 | 0.579 | ok |
+| S3: `kMTAudioProcessingTapCreationFlag_PostEffects` in `AudioTap.make` | 0.359 | 0.281 | 0.212 | 0.411 | 0.365 | ok, its frames from −8191 |
+| S4: `preroll(atRate: 1)` after a seek lands paused and after a pause that stopped the player | 0.528 | 0.521 | 0.547 | 0.700 | 0.669 | ok |
+
+None cleared a row, so K1r (S1's shippable form) was not built and there are no mutants: no
+decision was added. S3's meter read its frames from −8191, the one-buffer-early stamp #335
+measured for a PostEffects tap, so shipping it would also teach the meter those stamps.
+
+```sh
+make app-debug && python3 tools/proof/ai_docs_r2a_proof.py [--only H1,H2,M1] [--trials 3]
+make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_r2a_proof.py
+python3 tools/proof/ai_docs_r2a_proof.py --app <a base .app> --expect-red
+```

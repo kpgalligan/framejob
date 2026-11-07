@@ -121,7 +121,7 @@ the same way.
 **PB-15 — Loop goes round at the timeline's end, with its sound**
 - **Do:** 1. Put one clip with sound alone on a timeline. 2. Click **Loop** in the toolbar. 3. Press Home, then Space, and watch at least three passes.
 - **Expect:** playback goes round until you stop it, and the sound plays across each wrap. The picture shows no black flash at the wrap.
-- **Source:** #466 (spec §4.1); `docs_bugs_b1_proof.py` L1–L5 and `playhead_echo_probe.py` `loopend·1`–`·11` score the playhead through Motion Preview, `play_preview` and `editor.toggleLoop`, never the real button, the keys or the sound.
+- **Source:** #466 (spec §4.1); `docs_bugs_b1_proof.py` L1–L5 and `playhead_echo_probe.py` `loopend·1`–`·11` score the playhead through Motion Preview, `play_preview` and `editor.toggleLoop`, never the real button, the keys or the sound. #537, #520 (open, held): the playhead still holds about 0.5 s when playback starts from paused (#537), and about 0.5–0.7 s at each wrap (#520); `ai_docs_r2a_proof.py` H rows time the player's clock as MEASURE rows.
 
 **PB-16 — A package whose project.json is a folder shows a message, and the app stays open**
 - **Do:** 1. With a project open, make a copy of a saved `.framejob` package. In Terminal, replace the copy's `project.json` with a folder of that name. 2. Choose File ▸ Open… and pick the copy. 3. Double-click the copy in the Finder.
