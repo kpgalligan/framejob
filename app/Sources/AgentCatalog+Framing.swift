@@ -36,7 +36,7 @@ extension AgentServer {
                     + "frame, and holds still while the person types. layout re-lays a camera "
                     + "clip's camera layouts (Clip ▸ Camera Layout ▸) and its screen's on the "
                     + "current canvas: each switch, made on from_width × from_height, is "
-                    + "recognized (within 1 px and 0.001) and switched again here at the same "
+                    + "recognized (within 1 px and 0.001; a nest's radius is not compared) and switched again here at the same "
                     + "time, length and curve, Side by Side as Stacked on a canvas taller than "
                     + "wide, the cut pieces of the recording given the new layout and any zoom "
                     + "on them re-based so it shows the same part of the picture; it reads no "

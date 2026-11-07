@@ -74,7 +74,7 @@ The frame never shows the whole picture, so `where_empty` and `backdrop` do noth
 
 Re-lays a camera clip's [camera layouts](/framing/camera-layouts/), and its screen's, on the current canvas. You can name the camera or the screen, and both are re-laid.
 
-Each switch made on `from_width` × `from_height` is recognised and switched again here at the same time, length and curve. To be recognised, its position, crop and corner radius must match what Frame Job would have made to within 1 px, and its scale and opacity to within 0.001.
+Each switch made on `from_width` × `from_height` is recognised and switched again here at the same time, length and curve. To be recognised, its position, crop and corner radius must match what Frame Job would have made to within 1 px, and its scale and opacity to within 0.001. A nest clip's corner radius isn't compared, since a nest shows square corners, and the switch made again writes it as 0.
 
 - **Side by Side** becomes **Stacked** on a canvas taller than wide.
 - The cut pieces of the recording take the new layout.

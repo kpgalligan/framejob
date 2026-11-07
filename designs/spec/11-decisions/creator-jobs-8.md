@@ -109,7 +109,8 @@ eased in and out; the nest is offered, not made automatically.
   `x` and `y` are rounded half away from zero to whole canvas pixels, as CAM-10 (3) rounds them;
   scale, crop and radius are not rounded. A radius is written in source pixels: its canvas length
   ÷ the scale. A role writes all six placement keys — `x`, `y`, `scale`, `crop`,
-  `corner_radius`, `opacity` — always, and nothing else.
+  `corner_radius`, `opacity` — always, and nothing else. On a nest clip the radius is written 0,
+  whatever the layout solves (amended by #536: a nest draws no corner radius and refuses one).
   - **Full placement** is `add_clip`'s: x 0, y 0, `fit_scale(sw, sh)` (honouring
     `canvas.fit_new_clips`, never scaling up), no crop, radius 0, opacity 1. The screen takes it
     in `corner`, `camera_full` and `screen_only`.
@@ -164,8 +165,9 @@ eased in and out; the nest is offered, not made automatically.
   end) never blocks a nest, and an earlier layout action never refuses. A camera clip in the
   reach that is, or would become, a nest clip refuses `circle` and `rounded`: "clip {id} is a
   nest clip, which cannot draw a rounded corner or a circle." `side_by_side` and `stacked` write
-  their 2 % radius on a nest clip, which draws square corners (`nest.rs` folds only x, y, scale,
-  rotation, opacity and crop): a recorded limit.
+  a radius of 0 on a nest clip, in its layout action's end and in a first-frame base, which
+  draws square corners as before (`nest.rs` folds only x, y, scale, rotation, opacity and crop;
+  amended by #536, which refuses a radius on a nest).
 - **CO-63 — Actions are classed by content, with no tag.** CU-73's `action_class.rs` as built
   (CU7): a layout action names all six placement keys in `video`; a zoom names exactly `scale`,
   `x` and `y`, so a layout action is never a zoom and Auto Zoom's Replace never removes one.

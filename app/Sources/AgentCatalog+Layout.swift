@@ -22,7 +22,7 @@ extension AgentServer {
                     + "circle, the screen at its full placement (as Add Clip places it); "
                     + "side_by_side puts the screen fitted in the left two-thirds and the "
                     + "camera cropped to fill the right third, with margins and a small "
-                    + "radius; stacked puts the screen across the top and the camera filling "
+                    + "radius (none on a nest clip); stacked puts the screen across the top and the camera filling "
                     + "the rest below; camera_full fills the canvas with the camera; "
                     + "screen_only hides the camera (opacity 0) where it is. Each role gets one "
                     + "layout action at `at` (all six of x, y, scale, crop, corner_radius and "

@@ -50,7 +50,7 @@ The largest square of the camera's picture, cropped to a circle in the corner yo
 
 ### Side by Side
 
-The screen is fitted in the left two-thirds and the camera is cropped to fill the right third. There's a margin of 4 % of the canvas's shorter side around and between them, and both have their corners rounded by 2 % of that side. It needs a screen.
+The screen is fitted in the left two-thirds and the camera is cropped to fill the right third. There's a margin of 4 % of the canvas's shorter side around and between them, and both have their corners rounded by 2 % of that side. A nest clip is given no corner radius, so it keeps square corners. It needs a screen.
 
 ### Stacked
 
@@ -142,7 +142,7 @@ A switch that can't be made changes nothing. Frame Job beeps, and [the foot of t
 ## Good to know
 
 - A layout sets position, scale, crop, corner radius and opacity on both clips, replacing what you'd set by hand. Rotation and everything else stay as they were.
-- A nest clip in Side by Side or Stacked keeps square corners.
+- A nest clip in Side by Side or Stacked keeps square corners: the layout gives it a corner radius of 0.
 - Side by Side stays side by side on a tall canvas if you choose it there. [Make Vertical Version](/framing/vertical-what-changes/) is what re-lays your switches for a new shape, and it turns Side by Side into Stacked on a canvas taller than wide.
 - The camera's crop in Circle, Side by Side and Stacked can [centre on the person](/framing/layout-section/#the-crop-centred-on-the-person) instead of the picture.
 

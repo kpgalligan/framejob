@@ -1915,7 +1915,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   in a file, or brought by a full `paste`, is kept by every other end edit.
   `switch_layout` never reaches it: #524 refuses a shape or graphic role up
   front, a text clip is never a role, and an adjustment clip has no source
-  size and is never a role (CO-64).
+  size and is never a role (CO-64), and it writes a nest role's radius as 0
+  (#536).
 - **#536 — An adjustment clip takes no crop, corner radius or chroma key**
   (the owner, 2026-11-07, "Refuse and skip, as #524"). It has no Crop,
   Corner Radius or Chroma Key section, and on the base app none of the three
@@ -1925,7 +1926,17 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   exception: on a matte track an adjustment clip is inert (GR-6), so a crop
   there is refused too, `clip {id} is an adjustment clip and cannot take a
   crop`. Amends GR-6's "kept and do nothing" for these three; one already
-  stored in a file is kept and does nothing. **Nest clips are held for the
-  owner**: a crop draws on a nest and camera layouts write a crop and a
-  panel radius on nest roles (CO-62), so a nest keeps all three until the
-  owner chooses.
+  stored in a file is kept and does nothing. **A nest clip takes a crop but
+  no corner radius or chroma key** (the owner, 2026-11-07, round 3: "Refuse
+  corner radius and chroma key; keep the crop", as K-7 keeps a matte
+  track's crop). Before #536 a crop drew on a nest and neither of the
+  other two did, and a nest has no Corner Radius or Chroma Key section.
+  `set_video` and `set_action_end` refuse the two in #524's sentences with
+  `a nest clip` as the kind, `clip {id} is a nest clip and cannot take a
+  corner radius` and `clip {id} is a nest clip and cannot take a chroma
+  key`, on any track, matte or not; clearing stays allowed and the crop is
+  taken. Paste Attributes leaves a nest target's own radius and chroma key
+  and gives it the crop. A camera layout writes a nest role's radius as 0
+  (amends CO-60, CO-62 and VR-53 (b)), so a switch never trips the
+  refusal. A radius or chroma key already stored on a nest in a file, or
+  brought by a full `paste`, is kept and does nothing.

@@ -207,7 +207,9 @@ extension AgentServer {
                     + "adjustment or nest clip. A text, shape, graphic or adjustment clip has "
                     + "no crop, corner radius or chroma key: a value other than none for one "
                     + "is an error (clearing is allowed), except a crop on a matte track, "
-                    + "where it shapes the matte (never on an adjustment clip).",
+                    + "where it shapes the matte (never on an adjustment clip). A nest clip "
+                    + "has no corner radius or chroma key either (an error the same way); a "
+                    + "crop draws on one.",
                 ["clips": clipsDescription, "patch": videoPatchDescription]),
             opTool(
                 "set_audio",

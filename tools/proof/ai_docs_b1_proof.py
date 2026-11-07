@@ -4,7 +4,10 @@ refused on a text, shape or graphic clip and Paste Attributes leaves such a clip
 layout that would crop or round a shape or graphic clip is refused up front; a media path is stored
 and compared as given, never trimmed. Batch r2b (#535 #536, spec §11 #535, #536) adds the E rows
 (`set_action_end` refuses the same keys at an action's end) and the A rows (an adjustment clip
-takes none of the three, and Paste Attributes leaves its own).
+takes none of the three, and Paste Attributes leaves its own). Batch r3 (#536 and #535's nest
+halves, the owner's round-3 answer) adds the N rows: a nest clip takes a crop but no corner radius
+or chroma key, Paste Attributes leaves a nest's own two, a camera layout writes a nest role's
+radius as 0, and `reframe_clip {follow: layout}` does not compare a nest role's radius.
 
     python3 tools/proof/ai_docs_b1_proof.py [--only V1,L2,M4,…] [--app PATH] [--expect-red]
     RC_PROOF_APP=release python3 tools/proof/ai_docs_b1_proof.py
@@ -58,6 +61,27 @@ Launch 1 (plain):
 - A4 `paste_attributes` (default groups) from the media clip holding crop l120/t10, radius 30, a
   chroma key and opacity 0.5 onto the adjustment clip: its three stay neutral and its opacity is
   0.5.
+- N1 on a project of A.mov on Track 1 and on a "Camera" track, each nested alone with `nest`:
+  `set_video` corner_radius 40 and a chroma key on the camera nest: two errors in the sentences
+  (`clip N is a nest clip and cannot take a corner radius`, `… a chroma key`), the clip unchanged.
+- N2 (c) on it, a crop l100 applies; corner_radius 0 and chroma null clear with no error.
+- N3 `set_action_end` corner_radius 40 and a chroma key on an action (0 for 1 s) of the camera
+  nest: two errors in the sentences, the end unchanged.
+- N4 (c) on that action, an end crop l100 applies; its `null` removal, corner_radius 0 and
+  `off: ["video.chroma"]` give no error.
+- N5 `paste_attributes` (default groups) from a media clip holding crop l120/t10, radius 30, a
+  chroma key and opacity 0.5 onto the screen nest: the crop and opacity arrive, radius 0 and
+  chroma null stay.
+- N6 on a fresh project of the two nests: `switch_layout` side_by_side at 1 s writes radius 0 in
+  both nests' layout ends (the camera's end cropped); stacked at 0 writes radius 0 in both bases
+  and both cut ends; and on another project whose (un-nested) camera zooms, side_by_side at 1 s
+  with `nest: true` writes radius 0 in the new nest's layout end.
+- N7 N6's side_by_side at 1 s, `set_canvas` 1080 × 1920 (`rescale_clips: false`), then
+  `reframe_clip {follow: layout, from 1920 × 1080}` on the camera nest: applied, and both
+  replayed layout ends hold radius 0.
+- N8 as N7, but the project is saved, its `project.json` nest layout ends given the panel radius a
+  switch wrote before #536 (21.6 ÷ the end's scale), and reopened: the re-lay applies and both
+  replayed ends hold radius 0.
 Launch 2 (`-RCFFmpegImport always -RCFFmpegPath <ffmpeg>`):
 - M4 `import_media` of `A.mov ` then `A.mov`, and the reverse order, each in a fresh project: the
   converted media's `original.path` keeps the space.
@@ -87,11 +111,13 @@ CALL_BOUND = 600
 SEC = 600_000
 
 ROWS = ["V1", "V2", "V3", "V4", "L1", "L2", "L3", "P1", "P2", "M1", "M2", "M3", "M5",
-        "E1", "E2", "E3", "E4", "E5", "A1", "A2", "A3", "A4", "M4", "Z1"]
-CONTROLS = {"V2", "V4", "L3", "P2", "M5", "E3", "E5", "A2", "Z1"}
+        "E1", "E2", "E3", "E4", "E5", "A1", "A2", "A3", "A4", "N1", "N2", "N3", "N4", "N5",
+        "N6", "N7", "N8", "M4", "Z1"]
+CONTROLS = {"V2", "V4", "L3", "P2", "M5", "E3", "E5", "A2", "N2", "N4", "Z1"}
 END_ROWS = {"E1", "E2", "E3", "E4", "E5", "A1", "A2", "A3", "A4"}
+NEST_ROWS = {"N1", "N2", "N3", "N4", "N5", "N6", "N7", "N8"}
 LAUNCH_ONE = {"V1", "V2", "V3", "V4", "L1", "L2", "L3", "P1", "P2", "M1", "M2", "M3",
-              "M5"} | END_ROWS
+              "M5"} | END_ROWS | NEST_ROWS
 LAUNCH_TWO = {"M4"}
 
 MODULE = """export const schema = { title: { type: "string", default: "Hello" } };
@@ -417,6 +443,235 @@ def end_rows(client):
         d.close()
 
 
+def nest_of(d, cid, name):
+    """Nests clip `cid` alone; answers the nest clip's id."""
+    before = {x["id"] for x in d.state()["clips"]}
+    d.call("nest", clips=[cid], name=name)
+    return next(x["id"] for x in d.state()["clips"]
+                if x["id"] not in before and x["source"]["kind"] == "nest")
+
+
+def nest_pair(client, name):
+    """A.mov on Track 1 (the screen) and on a "Camera" track, each nested alone:
+    (doc, media, screen nest, camera nest)."""
+    d = Doc(client, name)
+    media = d.call("import_media", path=str(MEDIA / "A.mov"))["media"]
+    screen = d.new_clip("add_clip", track=d.state()["tracks"][0]["id"], media=media, at=0)
+    camera = d.new_clip("add_clip", track=d.track("Camera"), media=media, at=0)
+    return d, media, nest_of(d, screen, "Screen"), nest_of(d, camera, "Camera")
+
+
+def radius(video):
+    return (video or {}).get("corner_radius") or 0
+
+
+def layout_ends(d, cid):
+    """The `video` of each layout action's end on `cid` (one naming opacity)."""
+    return [(a.get("end") or {}).get("video") or {} for a in d.clip(cid).get("actions") or []
+            if "opacity" in ((a.get("end") or {}).get("video") or {})]
+
+
+def cropped(video):
+    return sum((video.get("crop") or {}).get(k) or 0 for k in "ltrb") > 1
+
+
+def nest_key_rows(client):
+    """N1–N5: a nest clip's three keys through set_video, set_action_end and Paste Attributes."""
+    d, media, screen, nest = nest_pair(client, "nest-keys")
+    try:
+        before = d.video(nest)
+        wrong = []
+        for patch, what in (({"corner_radius": 40}, "a corner radius"),
+                            ({"chroma": CHROMA}, "a chroma key")):
+            said = error_of(lambda: d.call("set_video", clips=[nest], patch=patch))
+            want = f"clip {nest} is a nest clip and cannot take {what}"
+            if said is None or want not in said:
+                wrong.append(f"{list(patch)[0]}: {said or 'applied'}")
+            if said is None:
+                d.call("undo")
+        same = d.video(nest) == before
+        check("N1", not wrong and same, f"{2 - len(wrong)}/2 set_video errors on nest {nest}, "
+              f"unchanged {same}" + (f"; {wrong}" if wrong else ""))
+
+        crop_err = error_of(lambda: d.call("set_video", clips=[nest], patch={"crop": {"l": 100}}))
+        crop_l = (d.video(nest).get("crop") or {}).get("l")
+        bad = []
+        for patch in ({"corner_radius": 0}, {"chroma": None}):
+            said = error_of(lambda: d.call("set_video", clips=[nest], patch=patch))
+            if said is not None and "made no change" not in said:
+                bad.append(f"{list(patch)[0]}: {said}")
+        check("N2", crop_err is None and crop_l == 100 and not bad,
+              f"crop l100 {crop_err or 'applied'} (l {crop_l}); clearing "
+              + (f"{bad}" if bad else "no error"))
+        d.call("set_video", clips=[nest], patch={"crop": CLEAR["crop"]})
+
+        aid = action_on(d, nest)
+        end_before = end_of(d, nest, aid)
+        wrong = []
+        for patch, what in (({"corner_radius": 40}, "a corner radius"),
+                            ({"chroma": CHROMA}, "a chroma key")):
+            said = error_of(lambda: d.call("set_action_end", clip=nest, action=aid,
+                                           patch={"video": patch}))
+            want = f"clip {nest} is a nest clip and cannot take {what}"
+            if said is None or want not in said:
+                wrong.append(f"{list(patch)[0]}: {said or 'applied'}")
+            if said is None:
+                d.call("undo")
+        same = end_of(d, nest, aid) == end_before
+        check("N3", not wrong and same, f"{2 - len(wrong)}/2 end errors on nest {nest}, end "
+              f"unchanged {same}" + (f"; {wrong}" if wrong else ""))
+
+        crop_err = error_of(lambda: d.call("set_action_end", clip=nest, action=aid,
+                                           patch={"video": {"crop": {"l": 100}}}))
+        end_l = ((end_of(d, nest, aid).get("video") or {}).get("crop") or {}).get("l")
+        bad = []
+        for patch, off in (({"video": {"crop": None}}, None),
+                           ({"video": {"corner_radius": 0}}, None),
+                           ({}, ["video.chroma"])):
+            args = {"clip": nest, "action": aid, "patch": patch}
+            if off:
+                args["off"] = off
+            said = error_of(lambda: d.call("set_action_end", **args))
+            if said is not None and "made no change" not in said:
+                bad.append(f"{off or list(patch['video'])[0]}: {said}")
+        check("N4", crop_err is None and end_l == 100 and not bad,
+              f"end crop l100 {crop_err or 'applied'} (l {end_l}); removal, radius 0, off "
+              + (f"{bad}" if bad else "no error"))
+
+        vclip = d.new_clip("add_clip", track=d.track("Look"), media=media, at=0)
+        d.call("set_video", clips=[vclip], patch={"crop": {"l": 120, "t": 10}, "corner_radius": 30,
+                                                  "chroma": CHROMA, "opacity": 0.5})
+        payload_clip = dict(d.clip(vclip))
+        payload_clip["track"] = 0
+        payload_clip["actions"] = []
+        payload = {"clips": [payload_clip],
+                   "media": [m for m in d.state()["media"] if m["id"] == media]}
+        said = error_of(lambda: d.call("paste_attributes", clips=[screen], payload=payload))
+        v = d.video(screen)
+        crop = v.get("crop") or {}
+        check("N5", said is None and crop.get("l") == 120 and crop.get("t") == 10
+              and v.get("opacity") == 0.5 and radius(v) == 0 and v.get("chroma") is None,
+              f"paste_attributes onto nest {screen}: {said or 'applied'}, crop {v.get('crop')}, "
+              f"radius {v.get('corner_radius')}, chroma {'set' if v.get('chroma') else None}, "
+              f"opacity {v.get('opacity')}")
+    finally:
+        d.close()
+
+
+def relaid(d, camera, screen):
+    """set_canvas 1080 × 1920 and the re-lay on `camera`: (error or None, the two roles' ends)."""
+    d.call("set_canvas", width=1080, height=1920, rescale_clips=False)
+    said = error_of(lambda: d.call("reframe_clip", clip=camera, follow="layout",
+                                   from_width=1920, from_height=1080))
+    return said, {cid: layout_ends(d, cid) for cid in (camera, screen)}
+
+
+def ends_zero(ends):
+    return all(e and all(radius(v) == 0 for v in e) for e in ends.values())
+
+
+def show_ends(ends):
+    return "; ".join(f"clip {cid} radii {[round(radius(v), 3) for v in e]}"
+                     for cid, e in ends.items())
+
+
+def nest_switch_row(client):
+    """N6: side_by_side and stacked on two nests, and `nest: true` on a zoomed camera."""
+    d, _, screen, camera = nest_pair(client, "nest-layout")
+    try:
+        said = error_of(lambda: d.call("switch_layout", camera=camera, screen=screen, at=SEC,
+                                       layout="side_by_side"))
+        ends = {cid: layout_ends(d, cid) for cid in (camera, screen)}
+        side = said is None and ends_zero(ends) and cropped(ends[camera][0])
+        side_detail = f"side_by_side at 1 s: {said or 'applied'}, {show_ends(ends)}"
+        if said is None:
+            d.call("undo")
+        said = error_of(lambda: d.call("switch_layout", camera=camera, screen=screen, at=0,
+                                       layout="stacked"))
+        bases = {cid: radius(d.video(cid)) for cid in (camera, screen)}
+        cuts = {cid: layout_ends(d, cid) for cid in (camera, screen)}
+        stacked = (said is None and all(r == 0 for r in bases.values()) and ends_zero(cuts)
+                   and cropped(d.video(camera)))
+        stacked_detail = (f"stacked at 0: {said or 'applied'}, base radii "
+                          f"{ {k: round(r, 3) for k, r in bases.items()} }, {show_ends(cuts)}")
+    finally:
+        d.close()
+
+    d = Doc(client, "nest-true")
+    try:
+        media = d.call("import_media", path=str(MEDIA / "A.mov"))["media"]
+        screen = d.new_clip("add_clip", track=d.state()["tracks"][0]["id"], media=media, at=0)
+        cam = d.new_clip("add_clip", track=d.track("Camera"), media=media, at=0)
+        d.call("add_action", clip=cam, at=0, duration=3 * SEC)
+        aid = d.clip(cam)["actions"][-1]["id"]
+        d.call("set_action_end", clip=cam, action=aid,
+               patch={"video": {"scale": 1.5, "x": 0, "y": 0}})
+        before = {x["id"] for x in d.state()["clips"]}
+        said = error_of(lambda: d.call("switch_layout", camera=cam, screen=screen, at=SEC,
+                                       layout="side_by_side", nest=True))
+        made = [x["id"] for x in d.state()["clips"]
+                if x["id"] not in before and x["source"]["kind"] == "nest"]
+        new_ends = layout_ends(d, made[0]) if made else []
+        nested = said is None and len(made) == 1 and bool(new_ends) and radius(new_ends[0]) == 0
+        nested_detail = (f"nest: true on a zoomed camera: {said or 'applied'}, new nests {made}, "
+                         f"radii {[round(radius(v), 3) for v in new_ends]}")
+    finally:
+        d.close()
+    check("N6", side and stacked and nested, f"{side_detail} | {stacked_detail} | {nested_detail}")
+
+
+def nest_relay_rows(client):
+    """N7 and N8: a nest layout re-laid on 1080 × 1920, as switched and as an old file holds it."""
+    if "N7" in selected:
+        d, _, screen, camera = nest_pair(client, "nest-relay")
+        try:
+            said = error_of(lambda: d.call("switch_layout", camera=camera, screen=screen, at=SEC,
+                                           layout="side_by_side"))
+            before = {cid: [round(radius(v), 3) for v in layout_ends(d, cid)]
+                      for cid in (camera, screen)}
+            relay, ends = relaid(d, camera, screen)
+            check("N7", said is None and relay is None and ends_zero(ends),
+                  f"side_by_side {said or 'applied'}, radii {before}; re-lay on 1080 × 1920: "
+                  f"{relay or 'applied'}, {show_ends(ends)}")
+        finally:
+            d.close()
+
+    if "N8" in selected:
+        d, _, screen, camera = nest_pair(client, "nest-file")
+        try:
+            d.call("switch_layout", camera=camera, screen=screen, at=SEC, layout="side_by_side")
+            d.call("save_project")
+            d.c.call("close_project", project=str(d.path))
+            path = d.path / "project.json"
+            doc = json.loads(path.read_text())
+            written = {}
+            for c in doc["clips"]:
+                if c["id"] in (camera, screen):
+                    for a in c.get("actions") or []:
+                        v = (a.get("end") or {}).get("video") or {}
+                        if "opacity" in v:
+                            v["corner_radius"] = 0.02 * 1080 / v["scale"]
+                            written[c["id"]] = round(v["corner_radius"], 3)
+            path.write_text(json.dumps(doc, indent=2))
+            d.c.call("open_project", path=str(d.path))
+            held = {cid: [round(radius(v), 3) for v in layout_ends(d, cid)]
+                    for cid in (camera, screen)}
+            relay, ends = relaid(d, camera, screen)
+            check("N8", len(written) == 2 and relay is None and ends_zero(ends),
+                  f"file radii written {written}, read back {held}; re-lay on 1080 × 1920: "
+                  f"{relay or 'applied'}, {show_ends(ends)}")
+        finally:
+            d.close()
+
+
+def nest_layout_rows(client):
+    """N6–N8: camera layouts on nest roles, and their re-lay on a tall canvas."""
+    if "N6" in selected:
+        nest_switch_row(client)
+    if selected & {"N7", "N8"}:
+        nest_relay_rows(client)
+
+
 def switch(d, **a):
     """None when applied (and undone), else the ToolError's text."""
     said = error_of(lambda: d.call("switch_layout", **a))
@@ -629,6 +884,10 @@ def main():
                 media_rows(client)
             if first & END_ROWS:
                 end_rows(client)
+            if first & {"N1", "N2", "N3", "N4", "N5"}:
+                nest_key_rows(client)
+            if first & {"N6", "N7", "N8"}:
+                nest_layout_rows(client)
         launch(binary, [], first, body, "launch-1")
     second = selected & LAUNCH_TWO
     if second:

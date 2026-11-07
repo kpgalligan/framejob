@@ -47,7 +47,9 @@ answer of 2026-11-01: Side by Side becomes Stacked on a tall canvas (*yes*); VR5
   `camera_placement` with `focus` = `focus_of` the camera end (`((l − r)/2, (t − b)/2)` of its
   crop) and `kept` = the camera end, and `screen_placement`; the first candidate `alike` on both
   ends wins. `alike` is x, y, the four crop edges and the radius within `RECOGNISE_PX` (1 px) and
-  scale and opacity within `RECOGNISE_RATIO` (0.001). Then every group clip and piece takes
+  scale and opacity within `RECOGNISE_RATIO` (0.001). On a nest role the radius is not compared
+  (amended by #536): a switch made before #536 holds the panel radius there and one made after
+  holds 0, and both are recognised; the replay writes 0 (CO-60). Then every group clip and piece takes
   `keep`'s per-axis rescale (`rescale_video`, from `from_*`) of its BASE only, the group's layout
   actions are removed, and the switches are replayed in time order through `edit_layout.rs`'s
   composition (`compose_switch`, the body after `switch_layout`'s refusals, extracted unchanged)

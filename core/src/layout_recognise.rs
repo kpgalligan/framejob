@@ -15,6 +15,11 @@
 //! `x` and `y` are whole pixels, its crop and radius are not) and
 //! `RECOGNISE_RATIO` in scale and opacity, so an end moved by hand by more
 //! than a pixel is not a layout Frame Job made.
+//!
+//! On a NEST role the radius is not compared (spec §11 #536, amending VR-53
+//! (b)): a switch made before #536 wrote the panel radius there and one made
+//! after writes 0 (`edit_layout.rs`), a nest draws neither, and both are
+//! recognised.
 
 use crate::edit_layout_reach::RoleKind;
 use crate::layout::{
@@ -64,6 +69,29 @@ pub(crate) fn same_source(a: &Source, b: &Source) -> bool {
     }
 }
 
+/// A role's layout end as [`recognise`] reads it: the end, its clip's
+/// source size, and whether that clip is a nest clip.
+pub(crate) struct RoleEnd {
+    pub end: Placement,
+    pub source: (f64, f64),
+    pub nest: bool,
+}
+
+impl RoleEnd {
+    /// Whether this end is `solved`, its radius not compared on a nest.
+    fn alike(&self, solved: Placement) -> bool {
+        let solved = if self.nest {
+            Placement {
+                corner_radius: self.end.corner_radius,
+                ..solved
+            }
+        } else {
+            solved
+        };
+        alike(&self.end, &solved)
+    }
+}
+
 /// The candidates in their order (the module doc).
 fn candidates(focus: (f64, f64), with_screen: bool) -> Vec<LayoutChoice> {
     let choice = |layout, shape, corner| LayoutChoice {
@@ -106,26 +134,24 @@ fn candidates(focus: (f64, f64), with_screen: bool) -> Vec<LayoutChoice> {
 }
 
 /// The layout a switch made on `authored`'s canvas (only its `canvas` is
-/// read): `camera` the camera's end and its source size, `screen` the
-/// screen's end and source size when the switch has one. `Err(Camera)` when
-/// no candidate gives the camera end; `Err(Screen)` when some do but none
-/// also gives the screen end.
+/// read): `camera` the camera's end, `screen` the screen's when the switch
+/// has one. `Err(Camera)` when no candidate gives the camera end;
+/// `Err(Screen)` when some do but none also gives the screen end.
 pub(crate) fn recognise(
     authored: &Project,
-    camera: &Placement,
-    camera_source: (f64, f64),
-    screen: Option<(&Placement, (f64, f64))>,
+    camera: &RoleEnd,
+    screen: Option<&RoleEnd>,
 ) -> Result<LayoutChoice, RoleKind> {
-    let screen_size = screen.map(|(_, size)| size);
+    let screen_size = screen.map(|role| role.source);
     let mut camera_matched = false;
-    for choice in candidates(focus_of(camera), screen.is_some()) {
-        let solved = camera_placement(authored, &choice, camera_source, screen_size, camera);
-        if !alike(camera, &solved) {
+    for choice in candidates(focus_of(&camera.end), screen.is_some()) {
+        let solved = camera_placement(authored, &choice, camera.source, screen_size, &camera.end);
+        if !camera.alike(solved) {
             continue;
         }
         camera_matched = true;
         let screen_fits = screen
-            .is_none_or(|(end, size)| alike(end, &screen_placement(authored, choice.layout, size)));
+            .is_none_or(|role| role.alike(screen_placement(authored, choice.layout, role.source)));
         if screen_fits {
             return Ok(choice);
         }

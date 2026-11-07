@@ -39,8 +39,8 @@ use crate::action_class::{is_layout, moves};
 use crate::edit_canvas::rescale_video;
 use crate::edit_layout_reach::{Role, RoleKind};
 use crate::layout::{CameraLayout, LayoutChoice, Placement, DEFAULT_SWITCH};
-use crate::layout_recognise::{alike, recognise, same_source};
-use crate::model::{Action, Clip, Curve, Project};
+use crate::layout_recognise::{alike, recognise, same_source, RoleEnd};
+use crate::model::{Action, Clip, Curve, Project, Source};
 use crate::outcome::Outcome;
 use crate::props_check::{SCALE_MAX, SCALE_MIN};
 use crate::time::Ticks;
@@ -164,10 +164,12 @@ impl Project {
         Some((owner, owner.actions.iter().find(|a| a.id == act.action)?))
     }
 
-    /// `act`'s end, and its clip's source size.
-    fn end_of(&self, act: &Act) -> Option<(Placement, (f64, f64))> {
+    /// `act`'s end, its clip's source size and whether that is a nest.
+    fn end_of(&self, act: &Act) -> Option<RoleEnd> {
         let (owner, action) = self.action_of(act)?;
-        Some((Placement::from_end(&action.end)?, self.source_size(owner)?))
+        let nest = matches!(owner.source, Source::Nest { .. });
+        let (end, source) = (Placement::from_end(&action.end)?, self.source_size(owner)?);
+        Some(RoleEnd { end, source, nest })
     }
 
     /// The pieces of `act`'s role (the module doc).
@@ -296,11 +298,7 @@ impl Project {
             let found = match (self.end_of(&camera), screen.map(|s| self.end_of(&s))) {
                 (None, _) => Err(RoleKind::Camera),
                 (Some(_), Some(None)) => Err(RoleKind::Screen),
-                (Some(cam), shown) => {
-                    let shown = shown.flatten();
-                    let shown = shown.as_ref().map(|(end, size)| (end, *size));
-                    recognise(&authored, &cam.0, cam.1, shown)
-                }
+                (Some(cam), shown) => recognise(&authored, &cam, shown.flatten().as_ref()),
             };
             let choice = match found {
                 Ok(choice) => choice,

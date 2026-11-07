@@ -88,7 +88,7 @@ A blend is forced to `normal` for the length of any transition, and on a clip on
 
 The opposite edges have to leave something behind: `l` plus `r` must be less than the source's width, and `t` plus `b` less than its height. See [Crop](/canvas/crop/) and [Corner radius](/canvas/corner-radius/).
 
-A text, shape, graphic or adjustment clip can't take either. A crop other than all 0 or a radius other than 0 there is an error, such as "clip 5 is a shape clip and cannot take a corner radius". The exception is a crop on a text, shape or graphic clip on a [matte track](/canvas/matte-tracks/), where the crop shapes the matte. An adjustment clip has no such exception: "clip 7 is an adjustment clip and cannot take a crop". Setting either back to 0 always works.
+A text, shape, graphic or adjustment clip can't take either. A crop other than all 0 or a radius other than 0 there is an error, such as "clip 5 is a shape clip and cannot take a corner radius". The exception is a crop on a text, shape or graphic clip on a [matte track](/canvas/matte-tracks/), where the crop shapes the matte. An adjustment clip has no such exception: "clip 7 is an adjustment clip and cannot take a crop". A nest clip takes a crop, which shows on it, but not a corner radius: "clip 7 is a nest clip and cannot take a corner radius". Setting either back to 0 always works.
 
 ## Effects: shadow, chroma key, filters, reflection, spotlight and obscure
 
@@ -108,7 +108,7 @@ Each of these is off until you set it. `shadow`, `chroma`, `reflection` and `spo
 
 ### Chroma key
 
-`chroma` is `null` or an object. See [Chroma Key](/effects/chroma-key/). A text, shape, graphic or adjustment clip can't take one: an object there is an error, such as "clip 5 is a graphic clip and cannot take a chroma key", and `null` always works.
+`chroma` is `null` or an object. See [Chroma Key](/effects/chroma-key/). A text, shape, graphic, adjustment or nest clip can't take one: an object there is an error, such as "clip 5 is a graphic clip and cannot take a chroma key" or "clip 7 is a nest clip and cannot take a chroma key", and `null` always works.
 
 | Key | What it does | Range | Default |
 | --- | --- | --- | --- |

@@ -26,6 +26,8 @@
 //!   or round, checked once every placement is solved and before any write
 //!   (spec §11 #524) — then whatever the composed ops say. `nest: true` nests the moving role's clips first and
 //!   lays out the nest clip, unless one of them is already laid out.
+//! - **A nest clip's radius is written 0** (spec §11 #536, amending CO-60):
+//!   a nest draws no corner radius and `set_video` refuses one there.
 //!
 //! Composed from `remove_action`, `set_action`, `add_action`,
 //! `set_action_end`, `set_video` and `nest_clips`, each refusal inherited in
@@ -231,10 +233,15 @@ impl Project {
         for role in roles {
             let solve = |clip: &Clip, kept: Placement| -> Option<Placement> {
                 let source = self.source_size(clip)?;
-                Some(match role.kind {
+                let mut placed = match role.kind {
                     RoleKind::Camera => camera_placement(self, choice, source, screen_size, &kept),
                     RoleKind::Screen => screen_placement(self, choice.layout, source),
-                })
+                };
+                // A nest draws no corner radius and refuses one (#536).
+                if matches!(clip.source, Source::Nest { .. }) {
+                    placed.corner_radius = 0.0;
+                }
+                Some(placed)
             };
             let t = at - role.clip.start;
             let kept = Placement::of(&self.evaluate_clip(role.clip, t).video);

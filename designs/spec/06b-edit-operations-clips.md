@@ -350,7 +350,8 @@ the transition ops are §6d.
   `qualifier` follows the clip kind (§11 GR-13): dropped onto a picture clip (said in the tool's
   description, not its answer — D2-1), an adjustment target's own kept when the payload clip is
   not an adjustment clip, copied between two adjustment clips. A text, shape, graphic or
-  adjustment target keeps its own `crop`, `corner_radius` and `chroma` (§11 #524, #536); onto any
+  adjustment target keeps its own `crop`, `corner_radius` and `chroma` (§11 #524, #536), and a
+  nest target its own `corner_radius` and `chroma`, taking the `crop` (#536); onto any
   other clip they travel
   with the group. **`graphic` is the
   fifth group, and only when NAMED** (§11 G-32, amending G-10): a side has it when its source is a
@@ -459,7 +460,10 @@ the transition ops are §6d.
   clip already holds (a full `paste` keeps what its payload holds) is kept by every other edit;
   a crop is taken on a matte track, where it shapes the matte (§11 K-7, MT-4), but never on an
   adjustment clip, which is inert there (§11 GR-6): `clip 5 is an adjustment clip and cannot take
-  a crop`. `paste` is unchanged, and Paste Attributes leaves such a target's own (above).
+  a crop`. On a nest clip a `video.corner_radius` or `video.chroma` is an **error** the same way,
+  on any track — `clip 7 is a nest clip and cannot take a corner radius`, `… cannot take a chroma
+  key` — and a crop is taken: it draws on a nest (§11 #536, the owner's round-3 answer). `paste`
+  is unchanged, and Paste Attributes leaves such a target's own (above).
   `set_action_end` refuses the same keys at an action's end (§11 #535).
   `video.behind_subject` (format 40, §11 CO-52) is a boolean: any drawing clip takes it but an
   adjustment or a nest clip, each an **error** naming what it is (`clip 4 is an adjustment clip and

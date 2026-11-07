@@ -91,7 +91,8 @@ fn check_blend(clip: &Clip, props: &VideoProps) -> Result<(), String> {
 /// The kind of a clip with no Crop, Corner Radius or Chroma Key section —
 /// "a text clip", "a shape clip", "a graphic clip" (spec §11 #524) or "an
 /// adjustment clip" (#536); `None` for every other source. A nest clip is
-/// not one of them: its half of #536 is held for the owner.
+/// not one of them: a crop draws on a nest and a camera layout writes one
+/// there, so it takes the crop and is [`cornerless_kind`]'s alone.
 pub(crate) fn sectionless_kind(clip: &Clip) -> Option<&'static str> {
     match clip.source {
         Source::Text => Some("a text clip"),
@@ -99,6 +100,16 @@ pub(crate) fn sectionless_kind(clip: &Clip) -> Option<&'static str> {
         Source::Graphic => Some("a graphic clip"),
         Source::Adjustment => Some("an adjustment clip"),
         _ => None,
+    }
+}
+
+/// The kind of a clip that takes no corner radius and no chroma key: a
+/// [`sectionless_kind`] clip, or "a nest clip" (#536's nest half, the owner,
+/// 2026-11-07), whose crop draws and is taken.
+pub(crate) fn cornerless_kind(clip: &Clip) -> Option<&'static str> {
+    match clip.source {
+        Source::Nest { .. } => Some("a nest clip"),
+        _ => sectionless_kind(clip),
     }
 }
 
@@ -154,14 +165,16 @@ impl Project {
     }
 
     /// The one refusal of a crop, corner radius or chroma key on a
-    /// [`sectionless_kind`] clip (spec §11 #524, #535, #536), checked crop,
-    /// corner radius, chroma key. A crop is taken on a matte track, where it
+    /// [`sectionless_kind`] clip, and of a corner radius or chroma key on a
+    /// nest clip (spec §11 #524, #535, #536), checked crop, corner radius,
+    /// chroma key. A crop is taken on a nest, and on a matte track, where it
     /// shapes the matte (K-7, MT-4), but never on an adjustment clip, which
     /// is inert there (GR-6).
     pub(crate) fn pixel_keys_refusal(&self, clip: &Clip, on: PixelKeys) -> Result<(), String> {
-        let Some(kind) = sectionless_kind(clip) else {
+        let Some(kind) = cornerless_kind(clip) else {
             return Ok(());
         };
+        let sectionless = sectionless_kind(clip).is_some();
         let adjustment = matches!(clip.source, Source::Adjustment);
         let on_matte = self.track(clip.track).is_some_and(|t| !t.matte.is_none());
         if on.crop && adjustment {
@@ -170,7 +183,7 @@ impl Project {
                 clip.id
             ));
         }
-        if on.crop && !on_matte {
+        if on.crop && sectionless && !on_matte {
             return Err(format!(
                 "clip {} is {kind} and cannot take a crop off a matte track",
                 clip.id

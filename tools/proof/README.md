@@ -30511,6 +30511,17 @@ taking all three) and the A rows (`set_video` refusing all three on an adjustmen
 allowed, a matte track no exception, Paste Attributes leaving its own). Its core mutants are run by
 hand against `core/tests/pixel_keys.rs`.
 
+ai-docs r3 (#536 and #535's nest halves, spec §11 #536, CO-60, CO-62, VR-53 (b)) added, in launch
+1, the N rows on projects of A.mov twice, each clip nested alone with `nest`: N1 `set_video`
+refusing a corner radius and a chroma key on a nest clip, N2 (c) its crop taken and the two
+cleared, N3 `set_action_end` refusing the two at an action's end, N4 (c) the end's crop, its
+removal, radius 0 and `off`, N5 Paste Attributes giving a nest the crop and leaving its own two,
+N6 `switch_layout` side_by_side at 1 s, stacked at 0 (bases and cut ends) and `nest: true` writing
+a nest role's radius as 0, N7 `reframe_clip {follow: layout}` on 1080 × 1920 recognising such a
+switch and replaying it with radius 0, and N8 the same for a saved file whose nest ends hold the
+pre-#536 panel radius (21.6 ÷ the end's scale), reopened. Its core mutants are run by hand against
+`core/tests/nest_keys.rs`.
+
 ```sh
 make app-debug && python3 tools/proof/ai_docs_b1_proof.py [--only V1,L2,M4]
 make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_b1_proof.py

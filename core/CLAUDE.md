@@ -669,7 +669,9 @@ governs a module now.
   `check_end_pixel_keys` (#535) share `pixel_keys_refusal`: crop, corner
   radius or chroma on a `sectionless_kind` clip (text, shape, graphic,
   adjustment, #536) is an `Err`, read from the patch, crop allowed on a
-  matte track but for an adjustment clip (K-7).
+  matte track but for an adjustment clip (K-7); `cornerless_kind` adds the
+  nest clip, which is refused a corner radius or chroma key on any track
+  and takes the crop (#536's nest half).
 - `patch.rs` — reading a caller-authored patch, cut out of `edit_props.rs`
   under the size rule: `Group` — the four PATCH groups; `paste_attributes` takes these four and
   `graphic` as `edit_paste_attributes.rs`'s `PasteGroup`, and a patch has no
@@ -905,7 +907,8 @@ governs a module now.
   shape-checked once, the first time a target takes them**: a paste nothing
   takes never reads the map. `patch::Group` gains no variant for it. A text,
   shape, graphic or adjustment target keeps its own crop, corner radius and
-  chroma (#524, #536).
+  chroma, and a nest target its own corner radius and chroma, taking the
+  crop (#524, #536).
 - `edit_zoom.rs` — `add_zoom_action`, the screencast zoom, and `ZoomRegion`,
   the one op ARGUMENT that is a caller-authored object: its `Deserialize` is
   written out rather than derived so it answers as a patch does — an object
@@ -935,9 +938,11 @@ governs a module now.
 - `layout_recognise.rs` — a camera layout recognised from the placements it wrote (road map
   creator-jobs VR5b, spec §11 VR-53 (b)), pure, beside `layout.rs` (at its cap):
   `RECOGNISE_PX` 1, `RECOGNISE_RATIO` 0.001, `alike`, `focus_of` (the camera crop's
-  centre), `same_source` (kind and media or nest, `in` ignored) and `recognise` (the first
-  of corner × shapes × corners, side by side, stacked, camera full, screen only whose
-  solves on the authored canvas are `alike` the ends; `Err(Camera)` / `Err(Screen)`).
+  centre), `same_source` (kind and media or nest, `in` ignored), `RoleEnd` (a role's end,
+  its source size and whether it is a nest) and `recognise` (the first of corner × shapes ×
+  corners, side by side, stacked, camera full, screen only whose solves on the authored
+  canvas are `alike` the ends, a nest role's radius not compared, spec §11 #536;
+  `Err(Camera)` / `Err(Screen)`).
 - `edit_layout.rs` · `edit_layout_reach.rs` — `switch_layout` (CO-61, CO-62, CO-64):
   `edit_layout.rs` `LayoutSwitch`, the roles (the camera; a given screen behind it, or the
   front-most shown, non-matte picture clip behind it at `at`), the nest-clip refusal for
@@ -952,7 +957,8 @@ governs a module now.
   `mover_refusal` (a non-layout mover ending after `at`, a full-placement screen exempt in
   corner, camera_full and screen_only) and `laid_out`. `compose_switch` refuses up front a
   shape or graphic role or reach clip the layout would crop (off a matte track) or round
-  (#524), so every `at` and every replay answers alike.
+  (#524), so every `at` and every replay answers alike, and writes a nest clip's radius as
+  0 (#536, amending CO-60).
 - `edit_adjustment.rs` — `Source::Adjustment`'s rules (spec §11 GR-6):
   `add_adjustment_clip`, and the refusals every other door asks it for — a
   transition (from `add_transition`, `set_transition`, `set_transition_style`
