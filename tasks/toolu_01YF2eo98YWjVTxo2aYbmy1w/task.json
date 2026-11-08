@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01YF2eo98YWjVTxo2aYbmy1w",
+  "agent_id": "a5c2ce1b9f0c01e24",
+  "subagent_type": "lc-triage",
+  "task_description": "litecode triage: docs theme",
+  "token_usage": {
+    "input_tokens": 6,
+    "cache_creation_tokens": 36700,
+    "cache_read_tokens": 65224,
+    "output_tokens": 812,
+    "api_call_count": 3
+  },
+  "started_at": "2026-11-07T18:36:47.971806-05:00",
+  "completed_at": "2026-11-07T18:36:57.721438-05:00"
+}
