@@ -1,401 +1,209 @@
 /* =============================================================================
    Boppa Llewyn × Starlight
 
-   The Boppa Llewyn design system on Starlight, the theme Doctored's documentation
-   site wears (its public-docs/src/styles/custom.css), carried over rule for rule so
-   the two sites look like one family; only Prettier's formatting differs. Change it there and here together. Frame Job's own
-   components are styled in frame-job.css, which loads after this file.
+   The Boppa Llewyn design system on Starlight: Geist and Geist Mono, neutral
+   greys with the logo green as the one accent, 6/10/16px corners, hairlines
+   between things and shadows only on cards and the screenshot window. It is the
+   theme Doctored's documentation site wears (its public-docs/src/styles/custom.css),
+   carried over rule for rule so the two sites look like one family; only
+   Prettier's formatting differs. Change it there and here together. Frame Job's
+   own components are styled in frame-job.css, which loads after this file.
+
+   The --bl-* tokens are in tokens.css, copied whole from the design system:
+   Neutral Light under [data-theme='light'] and Neutral Dark under
+   [data-theme='dark']. This file maps them onto Starlight's --sl-* properties
+   and styles the parts those properties cannot reach, so every colour here is
+   a token and both looks come from the one mapping.
 
    This file is unlayered, so it wins over every Starlight cascade layer. The
    @font-face rules are in src/fonts/font-face.css and the Expressive Code settings
    in astro.config.mjs.
    ============================================================================= */
 
-/* --- Boppa Llewyn tokens, verbatim from the design system --------------- */
-:root {
-  --bl-cream: #fbf8f1;
-  --bl-cream-1: #f4efe2;
-  --bl-cream-2: #eae3d2;
-  --bl-ink: #101915;
-  --bl-on-cream-2: #40483f;
-  --bl-on-cream-3: #6b7268;
-
-  --bl-bg-0: oklch(0.16 0.011 70);
-  --bl-bg-1: oklch(0.195 0.012 70);
-  --bl-bg-2: oklch(0.23 0.013 70);
-  --bl-bg-3: oklch(0.275 0.014 70);
-  --bl-line-1: oklch(0.32 0.015 72);
-  --bl-line-2: oklch(0.43 0.018 75);
-  --bl-fg-1: oklch(0.94 0.014 88);
-  --bl-fg-2: oklch(0.74 0.02 82);
-  --bl-fg-3: oklch(0.57 0.018 78);
-
-  --bl-brass: #f2c14e;
-  --bl-brass-strong: #e0ab33;
-  --bl-brass-dim: oklch(0.3 0.05 84);
-  --bl-brass-faint: oklch(0.225 0.028 84);
-
-  --bl-teal: #1f8564;
-  --bl-teal-dim: oklch(0.26 0.04 165);
-  --bl-ember: #f4653f;
-  --bl-ember-dim: oklch(0.27 0.05 40);
-  --bl-danger: oklch(0.63 0.14 25);
-  --bl-danger-dim: oklch(0.25 0.05 25);
-
-  /* darkened brass for cream surfaces — brass itself fails contrast on cream */
-  --bl-brass-deep: #8a6410;
-  --bl-brass-deeper: #5c4208;
-  --bl-brass-pale: #f7e9c5;
-
-  --bl-radius-1: 2px;
-  --bl-radius-2: 4px;
-  --bl-radius-3: 8px;
-  --bl-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --bl-dur-fast: 120ms;
-  --bl-dur-base: 200ms;
-
-  --bl-font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
-}
-
 /* --- Type and layout ---------------------------------------------------- */
+/* Plain `:root`, so FeatureIndex's `:root:has(.fj-features)` still outranks the
+   content width. */
 :root {
-  --sl-font: 'IBM Plex Sans', system-ui, sans-serif;
-  --sl-font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --sl-font: var(--bl-font-sans);
+  --sl-font-mono: var(--bl-font-mono);
 
-  --sl-text-body: 0.9375rem; /* 15px */
-  --sl-text-body-sm: 0.8125rem; /* 13px */
-  --sl-text-code: 0.8125rem;
-  --sl-text-code-sm: 0.75rem;
-  --sl-line-height: 1.55;
-  --sl-line-height-headings: 1.06;
+  --sl-text-body: 1rem; /* 16px, `body` */
+  --sl-text-code: 0.875rem; /* 14px, `code` */
+  --sl-line-height: 1.625; /* 26px */
+  --sl-line-height-headings: 1.1;
 
-  /* Cormorant sits small on its em, so display sizes run large */
-  --sl-text-h1: 2.625rem;
-  --sl-text-h2: 1.875rem;
-  --sl-text-h3: 1.5rem;
-  --sl-text-h4: 1.25rem;
-  --sl-text-h5: 1.0625rem;
+  /* h1 is 32px below 50rem and 40px from it; the others hold at every width. */
+  --sl-text-h1: 2rem;
+  --sl-text-h2: 1.75rem; /* 28px */
+  --sl-text-h3: 1.25rem; /* 20px */
+  --sl-text-h4: 1.0625rem; /* 17px */
 
-  --sl-nav-height: 3.75rem; /* 60px, per the site header */
-  --sl-sidebar-width: 17.5rem;
-  --sl-content-width: 42.5rem; /* --measure-prose, 680px */
+  --sl-nav-height: 4rem; /* 64px */
+  --sl-nav-gap: 1.5rem;
+  --sl-sidebar-width: 17.5rem; /* 280px */
+  --sl-content-width: 42.5rem; /* --bl-prose-width, 680px */
+  --sl-content-gap-y: 1rem;
+  --sl-menu-button-size: 2.25rem; /* 36px */
 }
 
 @media (min-width: 50em) {
   :root {
-    --sl-nav-height: 3.75rem;
+    --sl-nav-height: 4rem;
     --sl-nav-pad-x: 1.5rem;
-    --sl-text-h1: 3.25rem; /* 52px, --text-3xl */
-    --sl-text-h2: 2.375rem; /* 38px */
-    --sl-text-h3: 1.75rem;
-    --sl-text-h4: 1.3125rem;
+    --sl-text-h1: 2.5rem;
+    --sl-text-h2: 1.75rem;
+    --sl-text-h3: 1.25rem;
+    --sl-text-h4: 1.0625rem;
   }
 }
 
-/* --- Colour: dark (default) --------------------------------------------- */
+/* --- Colour: one mapping, both looks (tokens.css switches the values) ---- */
 :root,
 ::backdrop {
-  --sl-color-white: var(--bl-fg-1);
-  --sl-color-gray-1: var(--bl-fg-1);
-  --sl-color-gray-2: var(--bl-fg-2);
-  --sl-color-gray-3: var(--bl-fg-3);
-  --sl-color-gray-4: var(--bl-line-2);
-  --sl-color-gray-5: var(--bl-bg-3);
-  --sl-color-gray-6: var(--bl-bg-1);
-  --sl-color-gray-7: var(--bl-bg-2);
-  --sl-color-black: var(--bl-bg-0);
-
-  --sl-color-accent-low: var(--bl-brass-faint);
-  --sl-color-accent: var(--bl-brass);
-  --sl-color-accent-high: var(--bl-brass);
-
-  --sl-color-text: var(--bl-fg-2);
-  --sl-color-text-accent: var(--bl-brass);
-  --sl-color-text-invert: var(--bl-ink);
-  --sl-color-bg: var(--bl-bg-0);
-  --sl-color-bg-nav: var(--bl-bg-0);
-  --sl-color-bg-sidebar: var(--bl-bg-1);
-  --sl-color-bg-inline-code: var(--bl-bg-2);
-  --sl-color-bg-accent: var(--bl-brass);
-  --sl-color-hairline-light: var(--bl-line-1);
-  --sl-color-hairline: var(--bl-line-1);
-  --sl-color-hairline-shade: var(--bl-line-1);
-  --sl-color-backdrop-overlay: rgba(10, 9, 8, 0.65);
-
-  /* Aside hues remapped onto the palette: note→teal, tip→brass,
-     caution→ember, danger→danger. Starlight has no separate green/blue use. */
-  --sl-color-blue-low: var(--bl-teal-dim);
-  --sl-color-blue: var(--bl-teal);
-  --sl-color-blue-high: #8ad8b9;
-  --sl-color-green-low: var(--bl-teal-dim);
-  --sl-color-green: var(--bl-teal);
-  --sl-color-green-high: #8ad8b9;
-  --sl-color-purple-low: var(--bl-brass-faint);
-  --sl-color-purple: var(--bl-brass);
-  --sl-color-purple-high: var(--bl-brass);
-  --sl-color-orange-low: var(--bl-ember-dim);
-  --sl-color-orange: var(--bl-ember);
-  --sl-color-orange-high: #ffa487;
-  --sl-color-red-low: var(--bl-danger-dim);
-  --sl-color-red: var(--bl-danger);
-  --sl-color-red-high: #f6aa9e;
-
-  /* Shadows exist for true overlays only */
-  --sl-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --sl-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
-  --sl-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.55);
-}
-
-/* --- Colour: cream (light) --------------------------------------------- */
-:root[data-theme='light'],
-[data-theme='light'],
-[data-theme='light'] ::backdrop {
   --sl-color-white: var(--bl-ink);
-  --sl-color-gray-1: #1a2620;
-  --sl-color-gray-2: var(--bl-on-cream-2);
-  --sl-color-gray-3: var(--bl-on-cream-3);
-  --sl-color-gray-4: #98a093;
-  --sl-color-gray-5: var(--bl-cream-2);
-  --sl-color-gray-6: var(--bl-cream-1);
-  --sl-color-gray-7: #f8f5ec;
-  --sl-color-black: var(--bl-cream);
+  --sl-color-gray-1: var(--bl-ink);
+  --sl-color-gray-2: var(--bl-ink-muted);
+  --sl-color-gray-3: var(--bl-ink-subtle);
+  --sl-color-gray-4: var(--bl-line-strong);
+  --sl-color-gray-5: var(--bl-line);
+  --sl-color-gray-6: var(--bl-surface);
+  --sl-color-gray-7: var(--bl-surface-sunken);
+  --sl-color-black: var(--bl-bg);
 
-  --sl-color-accent-low: var(--bl-brass-pale);
-  --sl-color-accent: var(--bl-brass-deep);
-  --sl-color-accent-high: var(--bl-brass-deeper);
+  --sl-color-text: var(--bl-ink);
+  --sl-color-text-accent: var(--bl-accent-ink);
+  --sl-color-text-invert: var(--bl-on-accent);
+  --sl-color-accent-low: var(--bl-accent-soft);
+  --sl-color-accent: var(--bl-accent);
+  --sl-color-accent-high: var(--bl-accent-ink);
 
-  --sl-color-text: var(--bl-on-cream-2);
-  --sl-color-text-accent: var(--bl-brass-deep);
-  --sl-color-text-invert: var(--bl-cream);
-  --sl-color-bg: var(--bl-cream);
-  --sl-color-bg-nav: var(--bl-cream);
-  --sl-color-bg-sidebar: var(--bl-cream-1);
-  --sl-color-bg-inline-code: var(--bl-cream-2);
-  --sl-color-bg-accent: var(--bl-brass-deep);
-  --sl-color-hairline-light: rgba(16, 25, 21, 0.14);
-  --sl-color-hairline: rgba(16, 25, 21, 0.14);
-  --sl-color-hairline-shade: rgba(16, 25, 21, 0.14);
-  --sl-color-backdrop-overlay: rgba(16, 25, 21, 0.5);
+  --sl-color-bg: var(--bl-bg);
+  --sl-color-bg-nav: var(--bl-surface);
+  --sl-color-bg-sidebar: var(--bl-bg);
+  --sl-color-bg-inline-code: var(--bl-surface-sunken);
+  --sl-color-bg-accent: var(--bl-accent);
+  --sl-color-hairline: var(--bl-line);
+  --sl-color-hairline-light: var(--bl-line);
+  --sl-color-hairline-shade: var(--bl-line);
+  --sl-color-backdrop-overlay: rgba(24, 24, 27, 0.4);
 
-  --sl-color-blue-low: #dcefe7;
-  --sl-color-blue: var(--bl-teal);
-  --sl-color-blue-high: #0e5540;
-  --sl-color-green-low: #dcefe7;
-  --sl-color-green: var(--bl-teal);
-  --sl-color-green-high: #0e5540;
-  --sl-color-purple-low: var(--bl-brass-pale);
-  --sl-color-purple: var(--bl-brass-deep);
-  --sl-color-purple-high: var(--bl-brass-deeper);
-  --sl-color-orange-low: #fbded4;
-  --sl-color-orange: var(--bl-ember);
-  --sl-color-orange-high: #8a3116;
-  --sl-color-red-low: #f8ddd7;
-  --sl-color-red: #b03a22;
-  --sl-color-red-high: #8c2a1c;
+  /* The asides' hues: note is neutral, tip the accent, caution and danger
+     their own. Green is Starlight's success badge. */
+  --sl-color-blue-low: var(--bl-surface-sunken);
+  --sl-color-blue: var(--bl-ink-muted);
+  --sl-color-blue-high: var(--bl-ink);
+  --sl-color-purple-low: var(--bl-accent-soft);
+  --sl-color-purple: var(--bl-accent);
+  --sl-color-purple-high: var(--bl-accent-ink);
+  --sl-color-green-low: var(--bl-accent-soft);
+  --sl-color-green: var(--bl-accent);
+  --sl-color-green-high: var(--bl-accent-ink);
+  --sl-color-orange-low: var(--bl-caution-soft);
+  --sl-color-orange: var(--bl-caution);
+  --sl-color-orange-high: var(--bl-caution);
+  --sl-color-red-low: var(--bl-danger-soft);
+  --sl-color-red: var(--bl-danger);
+  --sl-color-red-high: var(--bl-danger);
 
-  --sl-shadow-sm: 0 1px 2px rgba(16, 25, 21, 0.1);
-  --sl-shadow-md: 0 4px 16px rgba(16, 25, 21, 0.12);
-  --sl-shadow-lg: 0 16px 48px rgba(16, 25, 21, 0.18);
+  /* The card shadow; the window shadow is for the search dialog only. */
+  --sl-shadow-sm: var(--bl-shadow-card);
+  --sl-shadow-md: var(--bl-shadow-window);
+  --sl-shadow-lg: var(--bl-shadow-window);
 }
 
-/* --- Display type ------------------------------------------------------- */
-:is(.sl-markdown-content, .content-panel, .hero, .card, .sl-link-card) :is(h1, h2, h3, h4),
-.content-panel h1,
-.hero h1,
-.site-title {
-  font-family: var(--bl-font-display);
-  font-weight: 500;
-  letter-spacing: -0.005em;
-  line-height: 1.06;
+:root[data-theme='dark'],
+[data-theme='dark'] ::backdrop {
+  --sl-color-backdrop-overlay: rgba(0, 0, 0, 0.6);
+}
+
+/* --- Headings: Geist 600, each level its own line height --------------- */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 600;
+  font-style: normal;
   color: var(--sl-color-white);
 }
 
-/* h5/h6 stay in the sans — small serif does not hold up */
-.sl-markdown-content :is(h5, h6) {
-  font-family: var(--sl-font);
-  font-weight: 600;
+h1 {
+  letter-spacing: -0.03em;
+  line-height: 2.75rem; /* 40 / 44 */
+}
+
+@media (width < 50rem) {
+  h1 {
+    line-height: 2.25rem; /* 32 / 36 */
+  }
+}
+
+.sl-markdown-content :is(h2, .sl-heading-wrapper.level-h2) {
+  letter-spacing: -0.02em;
+  line-height: 2.125rem; /* 28 / 34 */
+}
+
+.sl-markdown-content :is(h3, .sl-heading-wrapper.level-h3) {
+  letter-spacing: -0.01em;
+  line-height: 1.75rem; /* 20 / 28 */
+}
+
+.sl-markdown-content :is(h4, .sl-heading-wrapper.level-h4) {
   letter-spacing: 0;
+  line-height: 1.5rem; /* 17 / 24 */
 }
 
-.site-title {
-  font-size: 1.375rem;
-}
-
-/* Mono eyebrows: sidebar group labels, table headers, code captions, ToC label */
+/* Eyebrows: the page eyebrow, sidebar group labels, the ToC label, table
+   headers and the mobile ToC's current section. Mono 500 12/16, uppercase. */
+.page-eyebrow,
 .sidebar-content .group-label .large,
-.right-sidebar h2,
-/* Starlight 0.42 builds the mobile ToC from <details>/<summary>, not the
-   <button> this file was written against, and the host is the custom element
-   itself rather than a class. `.display-current` is the label that carries the
-   current section, which is the one the design sets in mono. */
+.right-sidebar-panel h2,
 mobile-starlight-toc .display-current,
-.sl-markdown-content th,
-.expressive-code figcaption .title,
-.starlight-aside__title {
+.sl-markdown-content th {
   font-family: var(--sl-font-mono);
   font-weight: 500;
   font-size: 0.75rem;
-  letter-spacing: 0.08em;
+  line-height: 1rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-/* Prices, versions, badges, fine print */
-.sl-markdown-content kbd,
-.sl-markdown-content code {
-  font-size: 0.8125rem;
-  border-radius: var(--bl-radius-1);
-}
-
-/* --- Joinery corners, borders over shadows ----------------------------- */
-.card,
-.sl-link-card,
-.starlight-aside,
-.expressive-code .frame,
-.sl-link-button,
-.right-sidebar-panel details {
-  border-radius: var(--bl-radius-2);
-}
-
-input,
-select,
-.search-input,
-site-search button {
-  border-radius: var(--bl-radius-1);
-}
-
-dialog,
-.dialog-frame,
-starlight-toc details {
-  border-radius: var(--bl-radius-3);
-}
-
-.card,
-.sl-link-card {
-  background-color: var(--sl-color-gray-6);
-  border: 1px solid var(--sl-color-hairline-light);
-  box-shadow: none;
-}
-
-.sl-link-card:hover {
-  background-color: var(--sl-color-gray-7);
-  border-color: var(--sl-color-gray-4);
-  box-shadow: none;
-}
-
-/* --- Asides: hairline box + mono eyebrow, not a left accent bar --------- */
-.starlight-aside {
-  border: 1px solid var(--sl-color-asides-border);
-  border-inline-start-width: 1px;
-  padding: 1rem 1.25rem;
-  color: var(--sl-color-gray-1);
-}
-
-.starlight-aside__icon {
-  display: none;
-}
-
-.starlight-aside__title {
-  color: var(--sl-color-asides-text-accent);
-  line-height: 1;
-}
-
-/* --- Code blocks -------------------------------------------------------- */
-.expressive-code .frame {
-  border: 1px solid var(--sl-color-hairline-light);
-  overflow: hidden;
-}
-
-.expressive-code .frame pre {
-  background: var(--sl-color-gray-6);
-  border: 0;
-  font-size: 0.8125rem;
-  line-height: 1.6;
-}
-
-/* --- Tables ------------------------------------------------------------- */
-.sl-markdown-content table {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: 0.875rem;
-}
-
-.sl-markdown-content :is(th, td) {
-  border: 0;
-  border-bottom: 1px solid var(--sl-color-hairline-light);
-  padding: 0.625rem 0.75rem;
-  text-align: start;
-}
-
-.sl-markdown-content th {
-  color: var(--sl-color-gray-3);
-}
-
-/* --- Header: the one blurred surface in the system ---------------------- */
-header.header {
-  background-color: color-mix(in srgb, var(--sl-color-bg) 85%, transparent);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--sl-color-hairline-shade);
-}
-
-/* --- Links, buttons, motion -------------------------------------------- */
-.sl-markdown-content a:not(:where(.sl-link-card, .sl-link-button, .not-content *)) {
+/* --- Links -------------------------------------------------------------- */
+.sl-markdown-content a:not(:where(.sl-link-card *, .sl-link-button, .not-content *)) {
   color: var(--sl-color-text-accent);
   text-decoration: none;
-  text-underline-offset: 0.2em;
-  transition: color var(--bl-dur-fast) var(--bl-ease);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
 
-.sl-markdown-content a:not(:where(.sl-link-card, .sl-link-button, .not-content *)):hover {
-  color: var(--sl-color-accent-high);
+.sl-markdown-content a:not(:where(.sl-link-card *, .sl-link-button, .not-content *)):hover {
+  color: var(--sl-color-text-accent);
   text-decoration: underline;
 }
 
-.sl-link-button.primary {
-  background: var(--bl-brass);
-  color: var(--bl-ink);
-  border: 1px solid transparent;
-  font-weight: 500;
+/* --- Focus: one outline everywhere -------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--bl-focus);
+  outline-offset: 2px;
 }
 
-.sl-link-button.primary:hover {
-  background: var(--bl-brass-strong);
-  color: var(--bl-ink);
-  text-decoration: none;
+/* Full-width rows in a fixed bar keep the ring inside their box. */
+mobile-starlight-toc :is(summary, a):focus-visible {
+  outline-offset: var(--sl-outline-offset-inside);
 }
 
-.sl-link-button.secondary {
-  background: var(--sl-color-gray-6);
-  color: var(--sl-color-white);
-  border: 1px solid var(--sl-color-hairline-light);
-}
-
-.sl-link-button.secondary:hover {
-  background: var(--sl-color-gray-7);
-  border-color: var(--sl-color-gray-4);
-}
-
-.sl-link-button.minimal {
-  color: var(--sl-color-text-accent);
-}
-
-/* Nothing scales or shrinks; opacity and colour only */
+/* --- Motion: colour, background and border only, at 120ms -------------- */
 a,
 button,
 summary,
-.sl-link-card {
+input,
+.sl-link-card,
+.card {
   transition:
-    background-color var(--bl-dur-fast) var(--bl-ease),
-    border-color var(--bl-dur-fast) var(--bl-ease),
-    color var(--bl-dur-fast) var(--bl-ease);
-}
-
-/* --- Focus: 2px page-coloured offset plus a 4px brass ring ------------- */
-:is(a, button, summary, input, select, [tabindex]):focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 2px var(--sl-color-bg),
-    0 0 0 4px var(--sl-color-accent);
-  border-radius: var(--bl-radius-1);
+    color 120ms,
+    background-color 120ms,
+    border-color 120ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -405,17 +213,24 @@ summary,
 }
 
 /* =============================================================================
-   Site layer — the parts of the design the token file above cannot reach.
+   Site layer — the parts of the design the variables above cannot reach,
+   in order down the page.
 
    Everything here is unlayered too, so it beats Starlight's own
    `starlight.core` / `starlight.components` / `starlight.content` layers
-   regardless of specificity. Values come from the handoff's screen notes;
-   where the notes and `starlight-custom.css` disagree, the CSS above wins.
+   regardless of specificity. Values come from the handoff's "The parts, in
+   order down the page".
    ============================================================================= */
 
 /* --- Layout metrics ----------------------------------------------------- */
 :root {
-  --sl-content-pad-x: 1.5rem; /* 24px gutter, the design's container inset */
+  --sl-content-pad-x: 1rem; /* 16px gutter on a phone */
+}
+
+@media (min-width: 50rem) {
+  :root {
+    --sl-content-pad-x: 1.5rem;
+  }
 }
 
 /* Splash pages (no sidebar) run to the design's 1120px container rather than
@@ -425,52 +240,98 @@ html[data-has-hero]:not([data-has-sidebar]) {
   --sl-content-width: 70rem;
 }
 
-/* --- Header controls ---------------------------------------------------- */
-/* The mobile menu button ships as a filled circle with a shadow. The system
-   has no filled circles and no shadows outside true overlays, so it becomes a
-   32px hairline square. 32px is under the 44px minimum touch target, so the
-   hit area is expanded past the visual box with a pseudo-element. */
-.sl-menu-button {
-  border: 1px solid var(--sl-color-hairline-light);
-  border-radius: var(--bl-radius-1);
-  background-color: var(--sl-color-bg);
-  color: var(--sl-color-gray-1);
-  box-shadow: none;
+/* --- Header: 64px, solid surface, one hairline, no blur ----------------- */
+header.header {
+  background-color: var(--sl-color-bg-nav);
+  border-bottom: 1px solid var(--sl-color-hairline-shade);
 }
 
-.sl-menu-button:hover {
-  background-color: var(--sl-color-gray-6);
-  border-color: var(--sl-color-gray-4);
-  color: var(--sl-color-white);
+/* The search field sits at the end of its column, beside the icon buttons. */
+.header .sl-flex:has(> site-search) {
+  justify-content: flex-end;
 }
 
-.sl-menu-button:has(~ :popover-open) {
-  background-color: var(--sl-color-gray-6);
-  border-color: var(--sl-color-gray-4);
-  color: var(--sl-color-white);
-  box-shadow: none;
+/* The theme toggle, then GitHub, 24px apart, with no divider. */
+.header .right-group {
+  gap: 1.5rem;
 }
 
-/* 32px box, 44px target: the pseudo-element is the thing the finger hits. */
-.sl-menu-button::after {
-  content: '';
-  position: absolute;
-  inset: calc((var(--sl-menu-button-size) - 2.75rem) / 2);
+.header .right-group .social-icons {
+  order: 1;
 }
 
-/* Below the sidebar breakpoint the search control is an icon button; the design
-   draws it as a 32px hairline square, again with a 44px hit area. */
-@media (max-width: 50rem) {
+.header .social-icons::after {
+  content: none;
+}
+
+/* --- Search ------------------------------------------------------------- */
+/* A 260 × 36px field on the sunken surface. */
+@media (min-width: 50rem) {
+  site-search button[data-open-modal] {
+    width: 16.25rem;
+    max-width: 100%;
+    height: 2.25rem;
+    gap: 0.5rem;
+    padding-inline: 0.75rem 0.5rem;
+    background-color: var(--bl-surface-sunken);
+    border: 1px solid var(--bl-line);
+    border-radius: var(--bl-radius-md);
+    color: var(--bl-ink-subtle);
+    font-size: 0.875rem;
+  }
+
+  site-search button[data-open-modal]:hover {
+    border-color: var(--bl-line-strong);
+    color: var(--bl-ink-subtle);
+  }
+
+  site-search button[data-open-modal] svg {
+    font-size: 1rem;
+  }
+}
+
+/* The ⌘K hint: two small keys and no box around the pair. Its display is set
+   here because the theme's `kbd` rule would otherwise outrank `sl-hidden`. */
+site-search button > kbd {
+  display: none;
+  gap: 2px;
+  height: auto;
+  min-width: 0;
+  padding: 0;
+  background-color: transparent;
+  border: 0;
+}
+
+@media (min-width: 50rem) {
+  site-search button > kbd {
+    display: flex;
+  }
+}
+
+site-search kbd kbd {
+  height: 1.25rem;
+  min-width: 1.25rem;
+  font-size: 0.75rem;
+}
+
+/* Below the sidebar breakpoint the search control is a 36px ghost button with
+   a 44px hit area. */
+@media (width < 50rem) {
   site-search button[data-open-modal] {
     position: relative;
     width: var(--sl-menu-button-size);
     height: var(--sl-menu-button-size);
     justify-content: center;
     padding: 0;
-    border: 1px solid var(--sl-color-hairline-light);
-    border-radius: var(--bl-radius-1);
+    border: 0;
+    border-radius: var(--bl-radius-md);
     background-color: transparent;
-    color: var(--sl-color-gray-1);
+    color: var(--bl-ink-muted);
+  }
+
+  site-search button[data-open-modal]:hover {
+    background-color: var(--bl-surface-sunken);
+    color: var(--bl-ink);
   }
 
   site-search button[data-open-modal]::after {
@@ -484,9 +345,93 @@ html[data-has-hero]:not([data-has-sidebar]) {
   }
 }
 
+site-search dialog {
+  border-color: var(--bl-line);
+}
+
+@media (min-width: 50rem) {
+  site-search dialog {
+    border-radius: var(--bl-radius-lg);
+  }
+}
+
+#starlight__search {
+  --pagefind-ui-border-radius: var(--bl-radius-md);
+  --pagefind-ui-background: var(--bl-surface);
+  --pagefind-ui-border: var(--bl-line-strong);
+  --pagefind-ui-tag: var(--bl-surface-sunken);
+}
+
+#starlight__search input:focus {
+  --pagefind-ui-border: var(--bl-focus);
+}
+
+/* --- Icon buttons: the theme toggle and GitHub -------------------------- */
+/* ThemeSelect draws the toggle's 36px ghost button; its icons are sized here,
+   because Starlight's Icon sets their size in a later layer than a component's. */
+.theme-toggle svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.header .social-icons a {
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: 0;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--bl-radius-md);
+  color: var(--bl-ink-muted);
+}
+
+.header .social-icons a:hover {
+  background-color: var(--bl-surface-sunken);
+  color: var(--bl-ink);
+}
+
+.header .social-icons a svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+/* --- Menu button -------------------------------------------------------- */
+/* Starlight's filled circle with a shadow becomes the 36px ghost button the
+   other header controls are. 36px is under the 44px minimum touch target, so
+   the hit area is expanded past the visual box with a pseudo-element. */
+.sl-menu-button {
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--bl-radius-md);
+  background-color: transparent;
+  color: var(--bl-ink-muted);
+  box-shadow: none;
+}
+
+.sl-menu-button:hover,
+.sl-menu-button:has(~ :popover-open) {
+  background-color: var(--bl-surface-sunken);
+  color: var(--bl-ink);
+  box-shadow: none;
+}
+
+.sl-menu-button svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+/* 36px box, 44px target: the pseudo-element is the thing the finger hits. */
+.sl-menu-button::after {
+  content: '';
+  position: absolute;
+  inset: calc((var(--sl-menu-button-size) - 2.75rem) / 2);
+}
+
 /* --- Sidebar ------------------------------------------------------------ */
 .sidebar-content {
-  padding: 2rem var(--sl-sidebar-pad-x);
+  padding: 2rem 1rem 3rem 1.5rem;
 }
 
 /* 28px between top-level groups */
@@ -494,60 +439,112 @@ html[data-has-hero]:not([data-has-sidebar]) {
   margin-top: 1.75rem;
 }
 
-.sidebar-content .group-label .large {
-  color: var(--sl-color-gray-3);
-}
-
+/* Group labels: eyebrows 8px above their links (the gap is the open list's,
+   so a closed group adds none). */
 .sidebar-content summary {
-  padding-inline: var(--sl-sidebar-item-padding-inline, 0.5rem);
+  padding: 0 0.625rem;
+  line-height: 1rem;
 }
 
-.sidebar-content a {
-  font-size: var(--sl-text-sm);
-  padding: 0.375rem 0.5rem;
-  border-radius: var(--bl-radius-2);
+/* A group inside a group keeps a link's height, so closed ones don't crowd. */
+.sidebar-content ul ul summary {
+  padding-block: 0.375rem;
 }
 
-/* Guarded against `[aria-current]` so the brass current-page pill survives a
-   hover — an unlayered `a:hover` would otherwise outrank Starlight's rule. */
+.sidebar-content .group-label .large {
+  color: var(--bl-ink-subtle);
+}
+
+.sidebar-content summary .caret {
+  color: var(--bl-ink-subtle);
+}
+
+/* A flat list: no tree line, the links 1px apart. */
+.sidebar-content ul ul {
+  display: grid;
+  gap: 1px;
+  margin-top: 0.5rem;
+}
+
+.sidebar-content ul ul li {
+  margin-inline-start: 0;
+  border-inline-start: 0;
+  padding-inline-start: 0;
+}
+
+.sidebar-content a,
+.sidebar-content a.large {
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 400;
+  line-height: 1.25rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: var(--bl-radius-sm);
+  color: var(--bl-ink-muted);
+}
+
+/* Guarded against `[aria-current]` so the current-page pill survives a hover:
+   an unlayered `a:hover` would otherwise outrank it. */
 .sidebar-content a:not([aria-current='page']):is(:hover, :focus-visible) {
-  background-color: var(--sl-color-gray-6);
-  color: var(--sl-color-white);
+  background-color: var(--bl-surface-sunken);
+  color: var(--bl-ink);
+}
+
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:is(:hover, :focus) {
+  background-color: var(--bl-accent-soft);
+  color: var(--bl-accent-ink);
+  font-weight: 550;
 }
 
 /* --- Table of contents -------------------------------------------------- */
+/* No column rule: the list's own hairline is the ToC's one line. */
+.right-sidebar {
+  border-inline-start: 0;
+}
+
+.right-sidebar-panel {
+  padding-top: 3.5rem;
+}
+
 .right-sidebar-panel h2 {
-  color: var(--sl-color-gray-3);
+  color: var(--bl-ink-subtle);
   margin-bottom: 0.75rem;
 }
 
 .right-sidebar-panel nav > ul {
-  border-inline-start: 1px solid var(--sl-color-hairline-light);
+  border-inline-start: 1px solid var(--bl-line);
 }
 
 .right-sidebar-panel nav a {
-  --pad-inline: 0.75rem; /* + the 2px rail below = the design's 14px */
   border-radius: 0;
   border-inline-start: 2px solid transparent;
   margin-inline-start: -1px; /* sit the rail on top of the list hairline */
-  font-size: var(--sl-text-xs);
   padding-block: 0.3125rem;
+  padding-inline: calc(1rem * var(--depth) + 0.75rem) 0;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--bl-ink-muted);
+}
+
+.right-sidebar-panel nav a:hover {
+  color: var(--bl-ink);
 }
 
 .right-sidebar-panel nav a[aria-current='true'] {
-  border-inline-start-color: var(--sl-color-accent);
-  color: var(--sl-color-white);
+  border-inline-start-color: var(--bl-accent);
+  color: var(--bl-ink);
+  font-weight: 500;
 }
 
-/* Mobile ToC bar: a flat 48px strip, not a bordered pill in a bar. */
+/* Mobile ToC bar: a flat strip under the header, not a bordered pill in a bar. */
 mobile-starlight-toc nav {
-  background-color: var(--sl-color-bg-sidebar);
+  background-color: var(--bl-surface);
   border-top: 0;
 }
 
 mobile-starlight-toc summary {
-  border-bottom: 1px solid var(--sl-color-hairline-light);
-  font-size: var(--sl-text-sm);
+  border-bottom: 1px solid var(--bl-line);
+  font-size: 0.875rem;
   padding-inline: var(--sl-content-pad-x);
 }
 
@@ -555,202 +552,183 @@ mobile-starlight-toc .toggle {
   border: 0;
   border-radius: 0;
   background-color: transparent;
+  color: var(--bl-ink-muted);
   padding-inline: 0;
   gap: 0.5rem;
 }
 
 mobile-starlight-toc .toggle .caret {
-  order: -1; /* chevron leads the label, as drawn */
+  order: -1; /* the chevron leads the label */
 }
 
-mobile-starlight-toc details[open] .toggle {
+mobile-starlight-toc details[open] .toggle,
+mobile-starlight-toc details .toggle:hover {
   border-color: transparent;
-  color: var(--sl-color-white);
+  color: var(--bl-ink);
 }
 
 mobile-starlight-toc .display-current {
-  margin-inline-start: auto; /* the design parks it at the end of the bar */
-  font-size: 0.6875rem; /* 11px */
-  color: var(--sl-color-gray-3);
+  margin-inline-start: auto; /* parked at the end of the bar */
+  color: var(--bl-ink-subtle);
 }
 
 mobile-starlight-toc .dropdown {
-  background-color: var(--sl-color-bg-sidebar);
-  border-color: var(--sl-color-hairline-light);
-  box-shadow: none;
+  background-color: var(--bl-surface);
+  border-color: var(--bl-line);
+  border-radius: 0 0 var(--bl-radius-lg) var(--bl-radius-lg);
+  box-shadow: var(--bl-shadow-card);
+}
+
+mobile-starlight-toc .isMobile a {
+  border-top-color: var(--bl-line);
+  color: var(--bl-ink-muted);
+}
+
+mobile-starlight-toc .isMobile a[aria-current='true'] {
+  color: var(--bl-ink);
 }
 
 /* --- The page opener ---------------------------------------------------- */
-/* Sections breathe: 56px above the title, 144px below the last block. The
-   hairline between the two panels is Starlight's own and is already token'd. */
-.content-panel {
-  padding-block: 2rem;
+/* 56px under the header to the eyebrow (40px on a phone), 16px from the
+   description to the first block, 144px below the last block (96px on a
+   phone). No hairline between the opener and the body. */
+.content-panel:first-of-type {
+  padding-block: 2.5rem 0;
 }
 
-.content-panel:first-of-type {
-  padding-block-start: 3.5rem;
+.content-panel + .content-panel {
+  border-top: 0;
+  padding-top: 1rem;
 }
 
 .content-panel:last-of-type {
-  padding-block-end: 9rem;
+  padding-bottom: 6rem;
+}
+
+@media (min-width: 50rem) {
+  .content-panel:first-of-type {
+    padding-top: 3.5rem;
+  }
+
+  .content-panel:last-of-type {
+    padding-bottom: 9rem;
+  }
 }
 
 .page-eyebrow {
-  font-family: var(--sl-font-mono);
-  font-weight: 500;
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--sl-color-accent);
+  color: var(--bl-accent-ink);
 }
 
+/* `lede`: 17/26 on a phone, 19/30 from 50rem */
 .page-description {
-  font-size: 1.0625rem; /* 17px */
-  line-height: 1.5;
-  color: var(--sl-color-gray-2);
+  font-size: 1.0625rem;
+  line-height: 1.625rem;
+  color: var(--bl-ink-muted);
 }
 
-/* --- Splash ------------------------------------------------------------- */
 @media (min-width: 50rem) {
-  .hero {
-    grid-template-columns: minmax(0, 1fr) 300px;
-    gap: 4rem;
-    padding-block: 7rem 6rem;
-  }
-
-  .hero > img,
-  .hero > .hero-html {
-    width: 300px;
-    margin-inline-start: auto;
+  .page-description {
+    font-size: 1.1875rem;
+    line-height: 1.875rem;
   }
 }
 
-.hero h1 {
-  font-size: clamp(3.25rem, 7vw, 5.5rem);
+/* --- Body --------------------------------------------------------------- */
+/* Blocks 16px apart (--sl-content-gap-y), list items 6px; steps keep their own spacing. */
+.sl-markdown-content li + li:not(:where(.not-content *, .sl-steps > *)) {
+  margin-top: 0.375rem;
 }
 
-.hero .tagline {
-  font-size: 1.1875rem; /* 19px */
-  line-height: 1.5;
-  max-width: 44ch;
+.sl-markdown-content strong {
+  font-weight: 600;
 }
 
-.hero .actions {
-  gap: 1rem;
+/* h2: 48px above, 12px below; h3: 32px above, 8px below. */
+.sl-markdown-content :is(h2, .sl-heading-wrapper.level-h2):not(:where(.not-content *)) {
+  margin-top: 3rem;
 }
 
-/* The hero pads itself 112/96, so the panel contributes nothing above it; the
-   144px below the last block stays with the panel. */
-[data-has-hero] .content-panel {
-  padding-block: 0 9rem;
+.sl-markdown-content :is(h2, .sl-heading-wrapper.level-h2) + :not(.sl-anchor-link) {
+  margin-top: 0.75rem;
 }
 
-/* A hairline, then "Next steps" — 80px above it. */
-[data-has-hero] .content-panel .sl-markdown-content {
+.sl-markdown-content :is(h3, .sl-heading-wrapper.level-h3):not(:where(.not-content *)) {
+  margin-top: 2rem;
+}
+
+.sl-markdown-content :is(h3, .sl-heading-wrapper.level-h3) + :not(.sl-anchor-link) {
+  margin-top: 0.5rem;
+}
+
+.sl-markdown-content > :first-child {
   margin-top: 0;
-  border-top: 1px solid var(--sl-color-hairline-light);
-  padding-block: 5rem 0;
 }
 
-/* --- Cards -------------------------------------------------------------- */
-.card-grid {
-  gap: 1.25rem;
+/* --- Steps: numbered squares on a hairline ------------------------------ */
+.sl-steps {
+  --bullet-size: 1.75rem; /* 28px */
+  --bullet-margin: 0.25rem;
 }
 
-@media (min-width: 50rem) {
-  .card-grid {
-    gap: 1.25rem;
-  }
-
-  .card-grid.stagger {
-    --stagger-height: 3rem;
-  }
+.sl-steps > li {
+  padding-inline-start: 3rem;
 }
 
-.card,
-.sl-link-card {
-  padding: 1.5rem;
-}
-
-.card {
-  gap: 0.75rem;
-}
-
-.sl-link-card .title {
-  font-family: var(--bl-font-display);
+.sl-steps > li::before {
+  line-height: calc(var(--bullet-size) - 2px);
+  font-family: var(--sl-font-mono);
+  font-size: 0.8125rem;
   font-weight: 500;
-  font-size: var(--sl-text-h4);
-  letter-spacing: -0.005em;
-  line-height: 1.06;
+  color: var(--bl-ink);
+  background-color: var(--bl-surface-sunken);
+  border: 1px solid var(--bl-line);
+  border-radius: var(--bl-radius-sm);
+  box-shadow: none;
 }
 
-/* Starlight's Card title is a <p>, so the display-type rule above misses it. */
-.card .title {
-  font-family: var(--bl-font-display);
-  font-weight: 500;
-  font-size: 1.5rem;
-  letter-spacing: -0.005em;
-  line-height: 1.06;
-  gap: 0.75rem;
+.sl-steps > li::after {
+  background-color: var(--bl-line);
 }
 
-/* The stock icon chip cycles four hues by position. The system has one accent,
-   so the chip is a hairline box and the mark is brass. */
-.card .icon {
-  border-color: var(--sl-color-hairline-light);
-  background-color: transparent;
-  border-radius: var(--bl-radius-1);
-  color: var(--sl-color-accent);
+.sl-steps > li:last-child::after {
+  display: none;
 }
 
-.card .body {
-  font-size: var(--sl-text-sm);
-  line-height: 1.55;
-  color: var(--sl-color-gray-2);
+.sl-steps > li:last-child > :last-child {
+  margin-bottom: 0;
 }
 
-/* --- Buttons ------------------------------------------------------------ */
-.sl-link-button {
-  font-size: var(--sl-text-body);
-  padding: 0.6875rem 1.375rem; /* 11px 22px */
-}
-
-@media (min-width: 50rem) {
-  .sl-link-button {
-    font-size: var(--sl-text-body);
-    padding: 0.6875rem 1.375rem;
-  }
-}
-
-.sl-link-button.minimal {
-  padding-inline: 0;
-}
-
-.sl-link-button svg {
-  width: 1rem;
-  height: 1rem;
-}
-
-/* --- Code, tables, kbd -------------------------------------------------- */
-.expressive-code figcaption {
-  background-color: var(--sl-color-gray-6);
-  border-bottom: 1px solid var(--sl-color-hairline-light);
-}
-
-.sl-markdown-content pre:not(:where(.not-content *)) {
-  border-color: var(--sl-color-hairline-light);
-  border-radius: var(--bl-radius-2);
-}
-
-.sl-markdown-content blockquote:not(:where(.not-content *)) {
-  border-inline-start-color: var(--sl-color-hairline-light);
-}
-
+/* --- Tables ------------------------------------------------------------- */
 /* Starlight makes tables `display: block` so wide ones scroll on their own.
    The design asks for a full-width table instead, which needs a real table box. */
 .sl-markdown-content table:not(:where(.not-content *)) {
   display: table;
   width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  line-height: 1.375rem; /* 15 / 22 */
+}
+
+.sl-markdown-content table:not(:first-child) {
+  margin-top: 1.5rem;
+}
+
+.sl-markdown-content :is(th, td):not(:where(.not-content *)) {
+  border: 0;
+  padding: 0.625rem 0.75rem 0.625rem 0;
+  text-align: start;
+  vertical-align: top;
+}
+
+/* Headers: eyebrows 10px above a strong rule. */
+.sl-markdown-content th:not(:where(.not-content *)) {
+  padding-top: 0;
+  color: var(--bl-ink-subtle);
+  border-bottom: 1px solid var(--bl-line-strong);
+}
+
+.sl-markdown-content td:not(:where(.not-content *)) {
+  border-bottom: 1px solid var(--bl-line);
 }
 
 /* Commands and identifiers in tables never break mid-token. */
@@ -758,65 +736,414 @@ mobile-starlight-toc .dropdown {
   white-space: nowrap;
 }
 
-.sl-markdown-content kbd {
-  font-family: var(--sl-font-mono);
-  background-color: var(--sl-color-gray-5);
-  border: 1px solid var(--sl-color-hairline-light);
-  padding: 0.125rem 0.375rem;
+/* --- Asides: a full tint, the icon and the word, no border -------------- */
+.starlight-aside {
+  border: 0;
+  border-radius: var(--bl-radius-md);
+  padding: 1rem 1.25rem;
+  font-size: 0.9375rem;
+  line-height: 1.5rem; /* 15 / 24 */
 }
 
-/* --- Footer ------------------------------------------------------------- */
-/* Footer fine print is mono and factual. Nothing renders here until `editLink`
-   or `lastUpdated` is switched on in the Starlight config; this is so that it
-   arrives already themed when it is. */
-footer .meta,
-footer .kudos {
+.sl-markdown-content .starlight-aside:not(:first-child) {
+  margin-top: 1.5rem;
+}
+
+.starlight-aside__title {
+  gap: 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+  color: var(--sl-color-asides-text-accent);
+}
+
+.starlight-aside__icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: inherit;
+  flex-shrink: 0;
+}
+
+/* The note's icon is the quieter ink; the other three share their title's. */
+.starlight-aside--note .starlight-aside__icon {
+  color: var(--sl-color-blue);
+}
+
+.starlight-aside__title + .starlight-aside__content {
+  margin-top: 0.125rem;
+}
+
+/* The body hangs under the title, clear of the icon (20px + 12px). */
+.starlight-aside__content {
+  padding-inline-start: 2rem;
+  color: var(--bl-ink-muted);
+}
+
+/* --- Code --------------------------------------------------------------- */
+/* Starlight sets these at theme level, past astro.config.mjs's reach: the code
+   on the sunken surface, the title tab one with the bar, and no accent line. */
+.expressive-code {
+  --ec-frm-edBg: var(--bl-surface-sunken);
+  --ec-frm-trmBg: var(--bl-surface-sunken);
+  --ec-frm-edActTabBg: var(--bl-surface);
+  --ec-frm-edActTabIndTopCol: transparent;
+  --ec-frm-frameBoxShdCssVal: none;
+}
+
+.expressive-code figcaption .title {
   font-family: var(--sl-font-mono);
+  font-weight: 500;
   font-size: 0.75rem;
-  color: var(--sl-color-gray-3);
+  line-height: 1rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--bl-ink-subtle);
 }
 
-/* --- Pagination --------------------------------------------------------- */
-/* The prev/next links are cards, and cards take a hairline and no shadow. */
+.sl-markdown-content .expressive-code:not(:first-child) {
+  margin-top: 1.5rem;
+}
+
+.sl-markdown-content code:not(:where(.not-content *, pre *)) {
+  font-size: 0.875em;
+  background-color: var(--bl-surface-sunken);
+  border-radius: var(--bl-radius-sm);
+  padding: 0.125rem 0.3125rem;
+}
+
+.sl-markdown-content blockquote:not(:where(.not-content *)) {
+  border-inline-start-color: var(--bl-line);
+}
+
+/* --- Keys: anywhere a key is shown, search included --------------------- */
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.375rem;
+  font-family: var(--sl-font-mono);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  line-height: 1;
+  color: var(--bl-ink);
+  background-color: var(--bl-surface);
+  border: 1px solid var(--bl-line);
+  border-bottom-width: 2px;
+  border-radius: var(--bl-radius-sm);
+  vertical-align: 1px;
+}
+
+/* --- Buttons ------------------------------------------------------------ */
+.sl-link-button {
+  font-size: 1rem;
+  font-weight: 550;
+  line-height: 1.5rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--bl-radius-md);
+}
+
+.sl-link-button.primary {
+  background: var(--bl-accent);
+  color: var(--bl-on-accent);
+  border: 1px solid transparent;
+}
+
+.sl-link-button.primary:hover {
+  background: var(--bl-accent-hover);
+  color: var(--bl-on-accent);
+  text-decoration: none;
+}
+
+.sl-link-button.secondary {
+  background: var(--bl-surface);
+  color: var(--bl-ink);
+  border: 1px solid var(--bl-line-strong);
+}
+
+.sl-link-button.secondary:hover {
+  background: var(--bl-surface-sunken);
+  color: var(--bl-ink);
+}
+
+.sl-link-button.minimal {
+  color: var(--bl-ink);
+  padding-inline: 0.75rem;
+}
+
+.sl-link-button.minimal:hover {
+  background: var(--bl-surface-sunken);
+  color: var(--bl-ink);
+}
+
+.sl-link-button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* --- Cards and link cards ----------------------------------------------- */
+.card-grid {
+  gap: 1.5rem;
+}
+
+.card,
+.sl-link-card {
+  background-color: var(--bl-surface);
+  border: 1px solid var(--bl-line);
+  border-radius: var(--bl-radius-lg);
+  box-shadow: var(--bl-shadow-card);
+  padding: 1.5rem;
+}
+
+/* A hover only strengthens the border: nothing lifts or changes fill. */
+.card:hover,
+.sl-link-card:hover {
+  background-color: var(--bl-surface);
+  border-color: var(--bl-line-strong);
+}
+
+.sl-link-card {
+  align-items: center;
+  gap: 1rem;
+}
+
+.sl-link-card .stack {
+  gap: 0.25rem;
+}
+
+/* Titles are `heading-3`. */
+.card .title,
+.sl-link-card .title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.75rem;
+  letter-spacing: -0.01em;
+  color: var(--bl-ink);
+}
+
+.card {
+  gap: 0.5rem;
+}
+
+.card .title {
+  gap: 0.75rem;
+}
+
+.card .body,
+.sl-link-card .description {
+  font-size: 0.9375rem;
+  line-height: 1.375rem; /* 15 / 22 */
+  color: var(--bl-ink-muted);
+}
+
+/* The icon chip loses its box. */
+.card .icon {
+  border: 0;
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  color: var(--bl-ink-subtle);
+}
+
+.sl-link-card .icon,
+.sl-link-card:hover .icon {
+  color: var(--bl-ink-subtle);
+}
+
+/* --- Pagination: two cards, 16px apart, 64px below the body ------------- */
+.sl-container > footer {
+  margin-top: 4rem;
+  gap: 2rem;
+}
+
+.pagination-links {
+  gap: 1rem;
+}
+
 .pagination-links a {
-  border-radius: var(--bl-radius-2);
-  border-color: var(--sl-color-hairline-light);
-  box-shadow: none;
+  padding: 1rem 1.25rem;
+  background-color: var(--bl-surface);
+  border: 1px solid var(--bl-line);
+  border-radius: var(--bl-radius-lg);
+  box-shadow: var(--bl-shadow-card);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--bl-ink-subtle);
 }
 
 .pagination-links a:hover {
-  background-color: var(--sl-color-gray-6);
-  border-color: var(--sl-color-gray-4);
+  border-color: var(--bl-line-strong);
+}
+
+.pagination-links br {
+  display: none;
 }
 
 .pagination-links .link-title {
-  color: var(--sl-color-white);
-  font-size: var(--sl-text-h4);
+  display: block;
+  margin-top: 2px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.75rem;
+  letter-spacing: -0.01em;
+  color: var(--bl-ink);
 }
 
-/* --- Search ------------------------------------------------------------- */
-site-search kbd {
-  font-family: var(--sl-font-mono);
-  border-radius: var(--bl-radius-1);
+/* --- Footer meta: under a hairline, 32px below the pagination ----------- */
+/* Starlight puts it above the pagination; `order` moves it below. */
+footer .meta {
+  order: 1;
+  margin-top: 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--bl-line);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--bl-ink-subtle);
 }
 
-site-search button[data-open-modal] {
-  background-color: var(--sl-color-gray-6);
-  border-color: var(--sl-color-hairline-light);
+footer .meta:empty {
+  display: none;
 }
 
-site-search button[data-open-modal]:hover {
-  background-color: var(--sl-color-gray-7);
-  border-color: var(--sl-color-gray-4);
-  color: var(--sl-color-white);
+footer .meta a {
+  color: var(--bl-ink-subtle);
 }
 
-#starlight__search {
-  --pagefind-ui-border-radius: var(--bl-radius-1);
-  --pagefind-ui-background: var(--sl-color-gray-6);
-  --pagefind-ui-border: var(--sl-color-hairline-light);
+footer .meta a:hover {
+  color: var(--bl-ink);
 }
 
-#starlight__search input:focus {
-  --pagefind-ui-border: var(--sl-color-accent);
+/* --- Splash ------------------------------------------------------------- */
+/* The hero band runs the full viewport width on `--bl-band`: a spread shadow
+   paints past the container on both sides and the clip keeps it to the
+   hero's own height. Neither makes the page scroll sideways. */
+.hero {
+  background-color: var(--bl-band);
+  color: var(--bl-on-band);
+  box-shadow: 0 0 0 100vmax var(--bl-band);
+  clip-path: inset(0 -100vmax);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2rem;
+  padding-block: 4rem;
+}
+
+/* The Frame Job mark: 96px above the text on a phone, 192px beside it from
+   50rem. */
+.hero > img,
+.hero > .hero-html {
+  order: -1;
+  width: 6rem;
+  height: 6rem;
+  margin-inline: 0;
+}
+
+.hero .stack {
+  gap: 2rem;
+  text-align: start;
+}
+
+.hero .copy {
+  gap: 0;
+  align-items: flex-start;
+}
+
+.hero .actions {
+  gap: 0.75rem;
+  justify-content: flex-start;
+}
+
+@media (min-width: 50rem) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr) 192px;
+    gap: 3rem;
+    padding-block: 6rem;
+  }
+
+  .hero > img,
+  .hero > .hero-html {
+    order: 2;
+    width: 192px;
+    height: 192px;
+  }
+}
+
+.hero .page-eyebrow {
+  color: var(--bl-on-band);
+  opacity: 0.8;
+}
+
+/* `display`: 40/42 on a phone, 64/64 from 50rem */
+.hero h1 {
+  font-size: 2.5rem;
+  line-height: 2.625rem;
+  letter-spacing: -0.035em;
+  color: var(--bl-on-band);
+}
+
+.hero .page-eyebrow + h1 {
+  margin-top: 0.75rem;
+}
+
+@media (min-width: 50rem) {
+  .hero h1 {
+    font-size: 4rem;
+    line-height: 4rem;
+  }
+}
+
+/* `lede`, 24px below the title */
+.hero .tagline {
+  max-width: 34em;
+  margin-top: 1.5rem;
+  font-size: 1.0625rem;
+  line-height: 1.625rem;
+  color: var(--bl-on-band);
+  opacity: 0.86;
+}
+
+@media (min-width: 50rem) {
+  .hero .tagline {
+    font-size: 1.1875rem;
+    line-height: 1.875rem;
+  }
+}
+
+/* The hero sits right under the header; the panel keeps the space below the
+   last block. */
+html[data-has-hero] .content-panel {
+  padding-block: 0 6rem;
+}
+
+/* The body starts 40px below the band on a phone, 64px from 50rem. */
+html[data-has-hero] .content-panel .sl-markdown-content {
+  margin-top: 2.5rem;
+}
+
+@media (min-width: 50rem) {
+  html[data-has-hero] .content-panel {
+    padding-block: 0 9rem;
+  }
+
+  html[data-has-hero] .content-panel .sl-markdown-content {
+    margin-top: 4rem;
+  }
+}
+
+/* The requirements paragraph under the window: muted, prose-wide, 48px down. */
+[data-has-hero] .sl-markdown-content > .fj-shot + p {
+  max-width: var(--bl-prose-width);
+  margin-top: 3rem;
+  color: var(--bl-ink-muted);
+}
+
+/* Each section heading: a hairline with 64px above it and 64px below it. */
+[data-has-hero] .sl-markdown-content > :is(h2, .sl-heading-wrapper.level-h2) {
+  margin-top: 4rem;
+  padding-top: 4rem;
+  border-top: 1px solid var(--bl-line);
+}
+
+[data-has-hero] .sl-markdown-content > :is(h2, .sl-heading-wrapper.level-h2) + * {
+  margin-top: 1.5rem;
 }

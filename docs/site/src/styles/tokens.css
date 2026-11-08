@@ -1,0 +1,196 @@
+/* Boppa Llewyn design tokens, generated from the design system's tokens.json.
+   Every name is the system's own, prefixed --bl-. The site ships Neutral Light
+   (data-theme="light") and Neutral Dark (data-theme="dark"); the other three palettes
+   are at the end, under data-bl-palette, for comparison only. */
+
+:root,
+:root[data-theme='light'],
+[data-theme='light'] ::backdrop {
+  --bl-brand-cream: #fbf8f1;
+  --bl-brand-green: #1f8564;
+  --bl-brand-yellow: #f2c14e;
+  --bl-brand-coral: #f4653f;
+  --bl-brand-forest: #1d651f;
+  --bl-brand-outline: #101915;
+  --bl-bg: #fafafa;
+  --bl-surface: #ffffff;
+  --bl-surface-sunken: #f1f1f3;
+  --bl-band: #f1f1f3;
+  --bl-on-band: #18181b;
+  --bl-line: #e4e4e7;
+  --bl-line-strong: #85858d;
+  --bl-ink: #18181b;
+  --bl-ink-muted: #56565e;
+  --bl-ink-subtle: #6b6b73;
+  --bl-accent: #1a7a5b;
+  --bl-accent-hover: #146a4e;
+  --bl-on-accent: #ffffff;
+  --bl-accent-soft: #e3f2ec;
+  --bl-accent-ink: #14644a;
+  --bl-focus: #1a7a5b;
+  --bl-caution: #8a5a00;
+  --bl-caution-soft: #fdf3d9;
+  --bl-danger: #b3261e;
+  --bl-danger-soft: #fde8e6;
+  --bl-shadow-card: 0 1px 2px rgba(24, 24, 27, 0.06);
+  --bl-shadow-window: 0 24px 48px -12px rgba(24, 24, 27, 0.18), 0 0 0 1px rgba(24, 24, 27, 0.08);
+}
+
+:root[data-theme='dark'],
+[data-theme='dark'] ::backdrop {
+  --bl-brand-cream: #fbf8f1;
+  --bl-brand-green: #1f8564;
+  --bl-brand-yellow: #f2c14e;
+  --bl-brand-coral: #f4653f;
+  --bl-brand-forest: #1d651f;
+  --bl-brand-outline: #101915;
+  --bl-bg: #131315;
+  --bl-surface: #1b1b1e;
+  --bl-surface-sunken: #0e0e10;
+  --bl-band: #1b1b1e;
+  --bl-on-band: #f2f2f3;
+  --bl-line: #2c2c31;
+  --bl-line-strong: #6e6e78;
+  --bl-ink: #f2f2f3;
+  --bl-ink-muted: #a6a6ae;
+  --bl-ink-subtle: #8c8c95;
+  --bl-accent: #4cc39a;
+  --bl-accent-hover: #6fd4ae;
+  --bl-on-accent: #0a1f17;
+  --bl-accent-soft: #173328;
+  --bl-accent-ink: #6fd4ae;
+  --bl-focus: #4cc39a;
+  --bl-caution: #f2c14e;
+  --bl-caution-soft: #33290f;
+  --bl-danger: #ff8b7e;
+  --bl-danger-soft: #3b1715;
+  --bl-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --bl-shadow-window: 0 24px 48px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+:root {
+  --bl-space-1: 4px;
+  --bl-space-2: 8px;
+  --bl-space-3: 12px;
+  --bl-space-4: 16px;
+  --bl-space-6: 24px;
+  --bl-space-8: 32px;
+  --bl-space-12: 48px;
+  --bl-space-16: 64px;
+  --bl-space-24: 96px;
+  --bl-content-width: 1120px;
+  --bl-prose-width: 680px;
+  --bl-radius-sm: 6px;
+  --bl-radius-md: 10px;
+  --bl-radius-lg: 16px;
+  --bl-radius-pill: 999px;
+  --bl-font-sans: Geist, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  --bl-font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+/* Type styles (size / line height / weight / tracking):
+   display      sans  64px/64px 600 -0.035em  Hero headline only, once per page. 40px/42px below 640px wide.
+   heading-1    sans  40px/44px 600 -0.03em  Page title (docs page H1, app page name).
+   heading-2    sans  28px/34px 600 -0.02em  Section headings.
+   heading-3    sans  20px/28px 600 -0.01em  Card titles, sub-sections.
+   lede         sans  19px/30px 400 0  The paragraph under a hero or page title, in `ink-muted`.
+   body         sans  16px/26px 400 0  All running text.
+   body-strong  sans  16px/26px 550 0  Inline emphasis, nav links, button labels at large size.
+   small        sans  14px/20px 400 0  Card descriptions, footer links, meta.
+   eyebrow      mono  12px/16px 500 0.06em  Uppercase kicker above a heading; app kind and version.
+   code         mono  14px/22px 400 0  Inline code, code blocks, keyboard keys, file formats.
+*/
+
+/* --- Alternate palettes, not shipped ---------------------------------- */
+:root[data-bl-palette='cream'] /* Cream & Coral */ {
+  --bl-brand-cream: #fbf8f1;
+  --bl-brand-green: #1f8564;
+  --bl-brand-yellow: #f2c14e;
+  --bl-brand-coral: #f4653f;
+  --bl-brand-forest: #1d651f;
+  --bl-brand-outline: #101915;
+  --bl-bg: #fbf8f1;
+  --bl-surface: #ffffff;
+  --bl-surface-sunken: #f3efe6;
+  --bl-band: #f2c14e;
+  --bl-on-band: #1d1b17;
+  --bl-line: #e7e1d4;
+  --bl-line-strong: #8a8272;
+  --bl-ink: #1d1b17;
+  --bl-ink-muted: #5a554c;
+  --bl-ink-subtle: #6e685d;
+  --bl-accent: #c2412a;
+  --bl-accent-hover: #a8381f;
+  --bl-on-accent: #ffffff;
+  --bl-accent-soft: #fde4dc;
+  --bl-accent-ink: #a8381f;
+  --bl-focus: #c2412a;
+  --bl-caution: #8a5a00;
+  --bl-caution-soft: #fbefcf;
+  --bl-danger: #a8281a;
+  --bl-danger-soft: #fbe2dc;
+  --bl-shadow-card: 0 1px 2px rgba(29, 27, 23, 0.06);
+  --bl-shadow-window: 0 24px 48px -12px rgba(29, 27, 23, 0.18), 0 0 0 1px rgba(29, 27, 23, 0.08);
+}
+
+:root[data-bl-palette='field'] /* Field Green */ {
+  --bl-brand-cream: #fbf8f1;
+  --bl-brand-green: #1f8564;
+  --bl-brand-yellow: #f2c14e;
+  --bl-brand-coral: #f4653f;
+  --bl-brand-forest: #1d651f;
+  --bl-brand-outline: #101915;
+  --bl-bg: #0f2a22;
+  --bl-surface: #14352b;
+  --bl-surface-sunken: #0b211a;
+  --bl-band: #1f8564;
+  --bl-on-band: #ffffff;
+  --bl-line: #24493d;
+  --bl-line-strong: #5f8a7b;
+  --bl-ink: #fbf8f1;
+  --bl-ink-muted: #bcd0c7;
+  --bl-ink-subtle: #9db8ad;
+  --bl-accent: #f2c14e;
+  --bl-accent-hover: #f5cd6c;
+  --bl-on-accent: #1d1b17;
+  --bl-accent-soft: #2c3f22;
+  --bl-accent-ink: #f2c14e;
+  --bl-focus: #fbf8f1;
+  --bl-caution: #f4653f;
+  --bl-caution-soft: #3a2418;
+  --bl-danger: #ffb4a8;
+  --bl-danger-soft: #4a1f1a;
+  --bl-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --bl-shadow-window: 0 24px 48px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(251, 248, 241, 0.1);
+}
+
+:root[data-bl-palette='mono'] /* Monochrome */ {
+  --bl-brand-cream: #fbf8f1;
+  --bl-brand-green: #1f8564;
+  --bl-brand-yellow: #f2c14e;
+  --bl-brand-coral: #f4653f;
+  --bl-brand-forest: #1d651f;
+  --bl-brand-outline: #101915;
+  --bl-bg: #ffffff;
+  --bl-surface: #ffffff;
+  --bl-surface-sunken: #f4f4f5;
+  --bl-band: #f4f4f5;
+  --bl-on-band: #18181b;
+  --bl-line: #e4e4e7;
+  --bl-line-strong: #85858d;
+  --bl-ink: #18181b;
+  --bl-ink-muted: #52525b;
+  --bl-ink-subtle: #6b6b73;
+  --bl-accent: #18181b;
+  --bl-accent-hover: #3f3f46;
+  --bl-on-accent: #ffffff;
+  --bl-accent-soft: #f4f4f5;
+  --bl-accent-ink: #18181b;
+  --bl-focus: #2f6fe4;
+  --bl-caution: #7a5200;
+  --bl-caution-soft: #fdf3d9;
+  --bl-danger: #b3261e;
+  --bl-danger-soft: #fde8e6;
+  --bl-shadow-card: none;
+  --bl-shadow-window: 0 0 0 1px rgba(24, 24, 27, 0.14);
+}

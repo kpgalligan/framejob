@@ -15,8 +15,11 @@ src/components/         AtAGlance (a page's facts), Shot (a screen in both looks
                         FeatureIndex (the filterable list); SiteTitle, ThemeSelect,
                         PageTitle and Hero are the theme's Starlight overrides
 src/assets/screens/     WebP captures, written only by scripts/import-screens.mjs
-src/styles/             boppa-llewyn.css (the theme, shared with Doctored's site) and
-                        frame-job.css (this site's components in it); README "Theme"
+src/assets/             logo.svg (the Frame Job mark, the splash hero) and
+                        boppa-llewyn-blocks.svg (the company mark, the header)
+src/styles/             tokens.css (the design system's --bl-* tokens, copied whole from the
+                        handoff), boppa-llewyn.css (the theme, shared with Doctored's site)
+                        and frame-job.css (this site's components in it); README "Theme"
 src/fonts/, public/fonts/  the theme's self-hosted faces and their licence
 src/site.ts             the header badge's version, read from the repository's VERSION
 ```

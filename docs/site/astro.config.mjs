@@ -12,26 +12,31 @@ export default defineConfig({
       title: 'Frame Job',
       description:
         'The user documentation for Frame Job, a native macOS video editor that you, the built-in Assistant or any MCP agent can drive.',
-      logo: { src: './src/assets/logo.svg', alt: 'Frame Job' },
+      // The header shows the company mark, Boppa Llewyn's three blocks, with "Boppa Llewyn /
+      // Frame Job" after it (SiteTitle.astro). The Frame Job mark stays the splash's hero image.
+      logo: { src: './src/assets/boppa-llewyn-blocks.svg', alt: 'Boppa Llewyn' },
       favicon: '/favicon.svg',
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/kpgalligan/framejob' }],
       editLink: { baseUrl: 'https://github.com/kpgalligan/framejob/edit/main/docs/site/' },
-      // The Boppa Llewyn theme, as on Doctored's site. The @font-face rules load first so the
-      // families are declared before the theme asks for them; frame-job.css styles this site's
-      // own components with the theme's tokens.
+      // The Boppa Llewyn design system, as on Doctored's site. The @font-face rules load first so
+      // the families are declared before the theme asks for them; tokens.css holds the system's
+      // --bl-* tokens (Neutral Light and Neutral Dark), boppa-llewyn.css maps them onto Starlight,
+      // and frame-job.css styles this site's own components with them.
       customCss: [
         './src/fonts/font-face.css',
+        './src/styles/tokens.css',
         './src/styles/boppa-llewyn.css',
         './src/styles/frame-job.css',
       ],
       head: [
-        // The two faces above the fold. Only the `latin` subsets are preloaded; `latin-ext` is
-        // fetched on demand by unicode-range.
+        // The two faces above the fold, Geist and Geist Mono (the header's version badge and the
+        // page eyebrow are mono). Only the `latin` subsets are preloaded; `latin-ext` is fetched
+        // on demand by unicode-range.
         {
           tag: 'link',
           attrs: {
             rel: 'preload',
-            href: '/fonts/IBMPlexSans-Variable-latin.woff2',
+            href: '/fonts/Geist-Variable-latin.woff2',
             as: 'font',
             type: 'font/woff2',
             crossorigin: 'anonymous',
@@ -41,7 +46,7 @@ export default defineConfig({
           tag: 'link',
           attrs: {
             rel: 'preload',
-            href: '/fonts/CormorantGaramond-Variable-latin.woff2',
+            href: '/fonts/GeistMono-Variable-latin.woff2',
             as: 'font',
             type: 'font/woff2',
             crossorigin: 'anonymous',
@@ -49,18 +54,30 @@ export default defineConfig({
         },
       ],
       // `useStarlightUiThemeColors` makes the code-block chrome (frame, copy button, borders)
-      // follow the theme's tokens instead of the syntax theme's.
+      // follow the theme's tokens instead of the syntax theme's. Starlight then sets the code
+      // background, the active tab's background and the frame's shadow at theme level, which
+      // beats anything here, so those three live in boppa-llewyn.css; the title bars, which it
+      // leaves alone, are set here: `--bl-surface` with a `--bl-line` rule under them.
       expressiveCode: {
         themes: ['github-dark-default', 'github-light'],
         useStarlightUiThemeColors: true,
         styleOverrides: {
-          borderRadius: '4px',
+          borderRadius: '10px',
           borderColor: 'var(--sl-color-hairline-light)',
+          // 14 / 22 px, the system's `code` style.
+          codeLineHeight: 'calc(22 / 14)',
+          frames: {
+            editorTabBarBackground: 'var(--bl-surface)',
+            editorTabBarBorderBottomColor: 'var(--bl-line)',
+            terminalTitlebarBackground: 'var(--bl-surface)',
+            terminalTitlebarForeground: 'var(--bl-ink-subtle)',
+            terminalTitlebarBorderBottomColor: 'var(--bl-line)',
+          },
         },
       },
-      // The four places the theme's CSS cannot reach: the header lockup with its version badge,
-      // a two-state theme toggle, the eyebrow and description around a page title, and the
-      // splash page's eyebrow.
+      // The four places the theme's CSS cannot reach: the header lockup ("Boppa Llewyn / Frame
+      // Job" and its version badge), a two-state theme toggle, the eyebrow and description around
+      // a page title, and the splash page's eyebrow.
       components: {
         SiteTitle: './src/components/SiteTitle.astro',
         ThemeSelect: './src/components/ThemeSelect.astro',

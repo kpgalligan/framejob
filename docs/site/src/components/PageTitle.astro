@@ -1,7 +1,8 @@
 ---
 /* The system's standard page opener: a mono uppercase eyebrow naming the
-   section, the h1, then the page description. Starlight renders the h1 alone
-   and puts the description in <head> only. */
+   section 12px above the h1, then the page description 16px below it.
+   Starlight renders the h1 alone and puts the description in <head> only. The
+   type is boppa-llewyn.css's. */
 import type { StarlightRouteData } from '@astrojs/starlight/route-data';
 
 /** Starlight's id for the top-of-page anchor the skip link targets. */
@@ -41,7 +42,7 @@ const { description } = entry.data;
     }
 
     .page-eyebrow + h1 {
-      margin-top: 1.25rem;
+      margin-top: 0.75rem;
     }
 
     h1 + .page-description {

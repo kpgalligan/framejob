@@ -3,6 +3,8 @@
 // `name` is a capture's file name without its look: `05-clip-picture.inspector` reads
 // src/assets/screens/05-clip-picture.inspector.{light,dark}.webp. An unknown name fails the build.
 // A capture is at 2× and never shows larger than its real size, so a sheet looks like a sheet.
+// `frame` is for a full-window capture (a `*.window` screen): it draws the capture in a window
+// frame, a title bar with the site's title over it, at the full width of its container.
 import { Image } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 
@@ -10,9 +12,11 @@ interface Props {
   name: string;
   alt: string;
   caption?: string;
+  frame?: boolean;
 }
 
-const { name, alt, caption } = Astro.props;
+const { name, alt, caption, frame = false } = Astro.props;
+const { siteTitle } = Astro.locals.starlightRoute;
 
 const screens = import.meta.glob<{ default: ImageMetadata }>('../assets/screens/*.webp', {
   eager: true,
@@ -28,8 +32,26 @@ const light = shot('light');
 const dark = shot('dark');
 ---
 
-<figure class="fj-shot" style={`max-width: ${Math.round(light.width / 2)}px`}>
-  <Image class="fj-light" src={light} alt={alt} />
-  <Image class="fj-dark" src={dark} alt={alt} />
+<figure
+  class:list={['fj-shot', { 'fj-shot--framed': frame }]}
+  style={frame ? undefined : `max-width: ${Math.round(light.width / 2)}px`}
+>
+  {frame ? (
+    <div class="fj-window">
+      <div class="fj-window-bar" aria-hidden="true">
+        <span class="fj-window-dot" />
+        <span class="fj-window-dot" />
+        <span class="fj-window-dot" />
+        <span class="fj-window-title">{siteTitle}</span>
+      </div>
+      <Image class="fj-light" src={light} alt={alt} />
+      <Image class="fj-dark" src={dark} alt={alt} />
+    </div>
+  ) : (
+    <>
+      <Image class="fj-light" src={light} alt={alt} />
+      <Image class="fj-dark" src={dark} alt={alt} />
+    </>
+  )}
   {caption && <figcaption>{caption}</figcaption>}
 </figure>
