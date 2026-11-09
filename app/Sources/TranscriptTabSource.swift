@@ -30,18 +30,12 @@ import Foundation
 /// media's words (`reloadDeviceWords`), kept shown until it merges; a load
 /// that read before a landing (its epoch moved) is read again, not merged.
 final class TranscriptTabSource {
-    enum Status: Equatable {
-        case idle, loading, reading(name: String, fraction: Double, index: Int, of: Int), noModel
-        case failed([String])
-        case stopped(remaining: Int)
-    }
-
     private weak var document: ProjectDocument?
-    private let onChange: () -> Void
+    let onChange: () -> Void
     private(set) var model = TranscriptTokens.empty
     private(set) var noWords: [TimelineTranscript.NoWords] = []
     private(set) var notes: [String] = []
-    private(set) var status: Status = .idle
+    var status: Status = .idle
     private(set) var rebuilds = 0
     /// Every read word of the edited container, before Words from (TX-32).
     private(set) var allWords: [TimelineTranscript.Word] = []
@@ -57,12 +51,6 @@ final class TranscriptTabSource {
     private(set) var languages: [Transcriber.Language]?
     /// Stop was pressed and neither Read nor a show has come since (TX-26).
     private(set) var stopped = false
-
-    /// Whether Stop applies: the tab's waiter reads on this Mac.
-    var canStop: Bool {
-        if case .reading = status { return true }
-        return false
-    }
 
     /// Whether the tab's owner wants a media of the fill now.
     var ownsWant: Bool {
@@ -81,21 +69,21 @@ final class TranscriptTabSource {
     // Main only.
     private var shown = false
     private var read: TimelineTranscript.DocumentRead?
-    private var words: [UInt32: TimelineTranscript.MediaWords] = [:]
+    var words: [UInt32: TimelineTranscript.MediaWords] = [:]
     private var pauseSets: [UInt32: Set<Ticks>] = [:]
     private var speech: [UInt32: [Float]] = [:]
     private var table: TranscriptCut.Table?
-    private var missItems: [UInt32: TranscriptFill.Item] = [:]
-    private var failures: [UInt32: String] = [:]
-    private var loading: Set<UInt32> = []
-    private var noModel = false
+    var missItems: [UInt32: TranscriptFill.Item] = [:]
+    var failures: [UInt32: String] = [:]
+    var loading: Set<UInt32> = []
+    var noModel = false
     private var dirty = false
     private var poll: Timer?
     /// Each `.apple` media's item, and the media with a re-read in flight (TX-18).
     private var deviceItems: [UInt32: TranscriptFill.Item] = [:]
     private var rereading: Set<UInt32> = []
 
-    private let fill: TranscriptFill
+    let fill: TranscriptFill
     private let owner: Int
     private let loadQueue = DispatchQueue(
         label: "com.kgalligan.framejob.transcript-tab-load", qos: .utility)
@@ -103,10 +91,10 @@ final class TranscriptTabSource {
         label: "com.kgalligan.framejob.transcript-tab-wait", qos: .utility)
 
     // Guarded by `lock`.
-    private let lock = NSLock()
-    private var pending: [TranscriptFill.Item] = []
-    private var pendingTotal = 0
-    private var waiting: [TranscriptFill.Item] = []
+    let lock = NSLock()
+    var pending: [TranscriptFill.Item] = []
+    var pendingTotal = 0
+    var waiting: [TranscriptFill.Item] = []
     private var waiterRunning = false
     private var wanting = false
     private var inFlight = 0
@@ -335,7 +323,7 @@ final class TranscriptTabSource {
 
     /// The media the shown words need; with a track chosen, only those with
     /// an instance on it (TX-25).
-    private var needed: [UInt32] {
+    var needed: [UInt32] {
         guard let read else { return [] }
         let instances = read.instances.filter { wordsFrom == nil || $0.track == wordsFrom }
         return TimelineTranscript.neededMedia(instances, window: nil, playhead: read.playhead)
@@ -558,41 +546,4 @@ final class TranscriptTabSource {
             }
         }
     }
-
-    // MARK: - Status
-
-    private func polled() {
-        let before = status
-        refreshStatus()
-        if status != before { onChange() }
-    }
-
-    private func refreshStatus() {
-        lock.lock()
-        let running = waiting.first
-        let remaining = pending.count
-        let total = pendingTotal
-        lock.unlock()
-        let unread = stopped ? needed.filter { words[$0] == nil && missItems[$0] != nil }.count : 0
-        if let running {
-            let progress = fill.progress()
-            let fraction = progress?.media == running.media ? progress?.fraction ?? 0 : 0
-            let of = max(total, 1)
-            status = .reading(
-                name: running.name, fraction: fraction, index: min(max(total - remaining, 1), of), of: of)
-        } else if unread > 0 {
-            status = .stopped(remaining: unread)
-        } else if !failures.isEmpty {
-            status = .failed(failures.keys.sorted().compactMap { failures[$0] })
-        } else if noModel {
-            status = .noModel
-        } else if !loading.isEmpty {
-            status = .loading
-        } else {
-            status = .idle
-        }
-    }
-
-    /// The fill's running media and its fraction, for `transcript_view`.
-    var fillProgress: (media: UInt32, fraction: Double)? { fill.progress() }
 }
