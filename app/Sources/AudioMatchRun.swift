@@ -61,6 +61,8 @@ final class AudioMatchRun: AudioMeasureRunning {
     private let scope: UInt32?
     private let urls: [UInt32: URL]
     private let resolution: ReverseResolution
+    /// The document's `recipeKey`, which the inner run keys R0's memo by (#401).
+    private let recipeKey: Int
     /// Loudness Normalize's jobs for the targets as they are, with EQ off.
     private let plainJobs: [LoudnessMeasureRun.Job]
     private let state = State()
@@ -86,6 +88,7 @@ final class AudioMatchRun: AudioMeasureRunning {
         scope = document.scope
         urls = document.mediaURLs()
         resolution = ReverseSource.shared.resolution(for: document.recipeKey)
+        recipeKey = document.recipeKey
         plainJobs = input.eq
             ? []
             : AudioMeasureDoor.normalizeJobs(
@@ -248,8 +251,8 @@ final class AudioMatchRun: AudioMeasureRunning {
         }
         guard !jobs.isEmpty else { return complete(nil) }
         let inner = LoudnessMeasureRun(
-            base: base, scope: scope, urls: urls, resolution: resolution, jobs: jobs,
-            problems: [], targetLUFS: referenceLUFS)
+            base: base, scope: scope, urls: urls, resolution: resolution, recipeKey: recipeKey,
+            jobs: jobs, problems: [], targetLUFS: referenceLUFS)
         state.set(inner)
         // A cancel raised between the check above and `set` missed the inner run.
         guard !state.cancelled else { return answer(nil) }

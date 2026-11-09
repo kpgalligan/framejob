@@ -106,18 +106,18 @@ extension AudioPane {
     }
 
     /// The Normalize row: Mode (Peak | Loudness) and Target (LUFS, −50…−5,
-    /// quick −14, −16, −23; live only in Loudness). A change re-titles
-    /// `button`'s tooltip and refreshes the pane.
+    /// quick −14, −16, −23; live only in Loudness). A change only stores:
+    /// `NormalizeChoice`'s post re-titles `button`'s tooltip and refreshes
+    /// every open pane (`normalizeChoiceChanged`, #406).
     func normalizeRow(updating button: OptionButtonControl) -> NSView {
+        normalizeButton = button
         button.toolTip = AudioPane.normalizeTip()
         let modes = AudioNormalize.Mode.allCases
         let popup = OptionPopupControl(
             width: 96, items: ["Peak", "Loudness"],
             read: { modes.firstIndex(of: NormalizeChoice.mode) ?? 0 },
-            write: { [weak self, weak button] index in
+            write: { index in
                 NormalizeChoice.mode = modes[max(0, min(index, modes.count - 1))]
-                button?.toolTip = AudioPane.normalizeTip()
-                self?.inspector?.refresh(isLive: false)
             },
             enabled: { true }, onEdit: {})
         let range = AudioNormalize.targetLUFSRange
@@ -126,10 +126,8 @@ extension AudioPane {
             min: range.lowerBound, max: range.upperBound,
             quick: AudioNormalize.targetLUFSQuickPicks,
             read: { NormalizeChoice.targetLUFS },
-            write: { [weak self, weak button] value in
+            write: { value in
                 NormalizeChoice.targetLUFS = min(max(value, range.lowerBound), range.upperBound)
-                button?.toolTip = AudioPane.normalizeTip()
-                self?.inspector?.refresh(isLive: false)
             },
             enabled: { NormalizeChoice.mode == .loudness }, onEdit: {})
         return inspectorRow("Normalize", [popup, target])

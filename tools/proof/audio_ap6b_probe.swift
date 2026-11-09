@@ -463,12 +463,15 @@ do {
 
 // MARK: - L6 the curves' resolution
 
+/// L6's steady fixture, its length and its loudness-and-speech cache, which L10 reuses.
+var l6Fixture: (file: URL, length: Ticks, both: URL)?
 do {
     let file = fixtures.appendingPathComponent("ap6b-steady.wav")
     let length = (duration(file) ?? 0) / 20_000 * 20_000
     let empty = cacheFolder("l6-empty", file, length: length, loudness: false, speech: false)
     let loud = cacheFolder("l6-loudness", file, length: length, loudness: true, speech: false)
     let both = cacheFolder("l6-both", file, length: length, loudness: true, speech: true)
+    l6Fixture = (file, length, both)
     let clips = """
         {"id": 2, "track": 3, "start": 0, "duration": \(30 * SEC),
          "source": {"kind": "media", "media": 1, "in": 0}, "audio": {"leveller": {}}},
@@ -558,6 +561,54 @@ do {
             + "detection unavailable; media.speech used and remembered; no long phrase; nest "
             + "absent; end-only leveller; an end's response; pending in pendingLevels",
           good, detail.joined(separator: "; "))
+}
+
+// MARK: - L10 a Target or cap edit inside an action remakes no curve (#413, AU-66 (e))
+
+do {
+    var detail: [String] = []
+    var good = false
+    /// Clip 2 levelled on its base; clip 4 by action 90's end, `end` its leveller.
+    func levelled(_ end: String, clip4: Ticks = 30 * SEC) -> ReelProject? {
+        guard let fixture = l6Fixture else { return nil }
+        return fileProject(fixture.file, duration: fixture.length, clips: """
+            {"id": 2, "track": 3, "start": 0, "duration": \(30 * SEC),
+             "source": {"kind": "media", "media": 1, "in": 0}, "audio": {"leveller": {}}},
+            {"id": 4, "track": 8, "start": 0, "duration": \(clip4),
+             "source": {"kind": "media", "media": 1, "in": 0}, "audio": {},
+             "actions": [{"id": 90, "start": \(SEC), "duration": \(SEC), "curve": "linear",
+                          "end": {"audio": {"leveller": \(end)}}}]}
+            """)
+    }
+    let levels = AudioDynamicsLevels.shared
+    if let both = l6Fixture?.both, let before = levelled("{}"),
+       let edited = levelled("{\"target_db\": 3, \"max_up_db\": 6}"),
+       let trimmed = levelled("{\"target_db\": 3, \"max_up_db\": 6}", clip4: 29 * SEC)
+    {
+        let first = levels.curves(for: before, cache: both, speechDetection: true)
+        let built = levels.curveBuilds
+        let second = levels.curves(for: edited, cache: both, speechDetection: true)
+        let reused = levels.curveBuilds - built
+        let planMoved = before.planJSON != edited.planJSON
+        let ready = [2, 4].allSatisfy { id -> Bool in
+            if case .ready? = first[UInt32(id)] { return true }
+            return false
+        }
+        let equal = first[2] == second[2] && first[4] == second[4]
+        let builtBefore = levels.curveBuilds
+        _ = levels.curves(for: trimmed, cache: both, speechDetection: true)
+        let control = levels.curveBuilds - builtBefore
+        good = planMoved && ready && reused == 0 && equal && control >= 1
+        detail = [
+            "plan text moved \(planMoved)", "both clips ready \(ready)",
+            "curves made across the Target edit \(reused)", "the curves equal \(equal)",
+            "clip 4 trimmed to 29 s made \(control)",
+        ]
+    } else {
+        detail = ["the projects did not build"]
+    }
+    check("L10", "a Target and cap edit inside an action moves the plan's automation and remakes "
+            + "no curve; a trim remakes them", good, detail.joined(separator: "; "))
 }
 
 // MARK: - L7 interpolation
@@ -742,8 +793,8 @@ do {
          "source": {"kind": "media", "media": 1, "in": 0},
          "audio": {"gate": {}, "leveller": {}}}
         """),
-        let a = ProcessedLoudness.key(clip: 2, project: plain),
-        let b = ProcessedLoudness.key(clip: 2, project: levelled)
+        let a = ProcessedLoudness.key(clip: 2, project: plain, document: 0),
+        let b = ProcessedLoudness.key(clip: 2, project: levelled, document: 0)
     {
         differ = a.plan == b.plan && a.chain != b.chain
     }

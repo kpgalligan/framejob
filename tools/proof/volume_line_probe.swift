@@ -33,6 +33,12 @@
 //  V8  the hit order and `resolvingVolumeLine`, and a ⇧-press on a line.
 //  V9  the clip painted with and without the line differs on it and not 4 pt
 //      off it.
+//  V10 a ⌥-press in a clip's last partial frame (#392, AU-83 as amended): on a
+//      new 30 fps project, clip A over a 2 s + 15,000-tick media (its duration
+//      not a whole number of frames, written into the project's JSON and read
+//      back, since `add_clip` floors it) pressed at 1,212,000 adds `[0, 1,200,000)`,
+//      and clip B over a 2 s media pressed at 1,195,000 adds `[0, 1,180,000)`;
+//      each prefix applies.
 import AVFoundation
 import AppKit
 
@@ -167,7 +173,7 @@ guard let tone = writeTone(), let fx = fixture(tone: tone, eased: false),
       let mainClip = fx.project.snapshot.clip(fx.main),
       let mutedClip = fx.project.snapshot.clip(fx.muted)
 else {
-    for id in ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9"] {
+    for id in ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10"] {
         row(id, false, "the fixture did not build")
     }
     exit(0)
@@ -662,6 +668,89 @@ do {
     row("V9", differs == 3 && same == 3,
         "at 2.6, 5 and 8.5 s: \(differs)/3 pixels on the line differ with the line drawn, "
             + "\(same)/3 pixels 4 pt above it are the same")
+}
+
+// MARK: - V10 a press in the last partial frame (#392)
+
+do {
+    var notes: [String] = []
+    var ok = false
+    func lastFrame() -> Bool {
+        guard var p = ReelProject.new(width: 1920, height: 1080, fps: .thirty),
+              case .applied(let tracked)? = try? p.applying(.addTrack(index: 1))
+        else { notes.append("the project did not build"); return false }
+        p = tracked
+        let tracks = p.snapshot.tracks.map(\.id)
+        let fps = p.snapshot.canvas.fps
+        guard tracks.count == 2, fps.frameDuration == 20_000 else {
+            notes.append("tracks \(tracks.count), frame \(fps.frameDuration) ticks")
+            return false
+        }
+        let mediaA = p.snapshot.nextId
+        guard let withA = apply(p, [.addMedia(descriptor: MediaDescriptor(
+            path: tone.path, kind: .audio, duration: 2 * SEC + 15_000, hasAudio: true))])
+        else { notes.append("media A refused"); return false }
+        p = withA
+        // A second file: the core refuses one path twice as media.
+        let toneB = work.appendingPathComponent("tone-b.caf")
+        try? FileManager.default.removeItem(at: toneB)
+        try? FileManager.default.copyItem(at: tone, to: toneB)
+        let mediaB = p.snapshot.nextId
+        guard let withB = apply(p, [.addMedia(descriptor: MediaDescriptor(
+            path: toneB.path, kind: .audio, duration: 2 * SEC, hasAudio: true))])
+        else { notes.append("media B refused"); return false }
+        p = withB
+        let a = p.snapshot.nextId
+        guard let withClipA = apply(p, [.addClip(track: tracks[0], media: mediaA, at: 0)])
+        else { notes.append("clip A refused"); return false }
+        p = withClipA
+        let b = p.snapshot.nextId
+        guard let withClipB = apply(p, [.addClip(track: tracks[1], media: mediaB, at: 0)])
+        else { notes.append("clip B refused"); return false }
+        p = withClipB
+        // `add_clip` floors a clip onto the frame grid, so A's duration over
+        // its 2 s + 15,000-tick media is written into the file as a project
+        // saved with it would carry it, and the project read back.
+        guard let data = p.json.data(using: .utf8),
+              var root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              var clips = root["clips"] as? [[String: Any]],
+              let index = clips.firstIndex(where: { ($0["id"] as? NSNumber)?.uint32Value == a })
+        else { notes.append("the project's JSON could not be read"); return false }
+        clips[index]["duration"] = 2 * SEC + 15_000
+        root["clips"] = clips
+        guard let out = try? JSONSerialization.data(withJSONObject: root),
+              let text = String(data: out, encoding: .utf8)
+        else { notes.append("the project's JSON could not be written"); return false }
+        do { p = try ReelProject.from(json: text) } catch {
+            notes.append("the project was not read back: \(error)")
+            return false
+        }
+        guard let clipA = p.snapshot.clip(a), let clipB = p.snapshot.clip(b)
+        else { notes.append("the clips are gone"); return false }
+        notes.append("A's duration \(clipA.duration), B's \(clipB.duration)")
+        guard clipA.duration % 20_000 != 0 else {
+            notes.append("A's duration is a whole number of frames")
+            return false
+        }
+        let next = p.snapshot.nextId
+        var good = true
+        for (clip, press, want) in [
+            (clipA, Ticks(1_212_000), ReelOp.addAction(clip: a, at: 0, duration: 1_200_000)),
+            (clipB, Ticks(1_195_000), ReelOp.addAction(clip: b, at: 0, duration: 1_180_000)),
+        ] {
+            let made = VolumeLine.point(on: clip, at: press, project: p, nextId: next, fps: fps)
+            let prefix = made?.prefix.map(\.json) ?? []
+            let applies = made.flatMap { apply(p, $0.prefix) } != nil
+            let match = prefix == [want.json] && made?.action == next && applies
+            notes.append(
+                "⌥ at \(press) on \(clip.id): \(made == nil ? "nil" : prefix.joined(separator: ", ")) "
+                    + "(want \(want.json)), applies \(applies)")
+            good = good && match
+        }
+        return good
+    }
+    ok = lastFrame()
+    row("V10", ok, notes.joined(separator: "; "))
 }
 
 exit(0)

@@ -174,7 +174,7 @@ enum AudioMatch {
                             clip: id, media: media, lufs: reading.lufs ?? 0,
                             truePeak: reading.truePeak, steps: reading.steps,
                             stepPeaks: reading.stepPeaks, limiter: audio?.limiter,
-                            currentVolume: audio?.volume),
+                            currentVolume: audio?.volume, currentLimiter: audio?.limiter),
                         speech: speech, current: audio ?? AudioProps()))
             }
         }

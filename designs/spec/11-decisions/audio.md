@@ -343,7 +343,7 @@ before its code from AP0's spike S1 and the survey's measurements of the owner's
   Right; the summary its word), **EQ** (the drawn curve; Bypass; the three Presets buttons; per slot a checkbox writing
   that slot's default — bands 1, 2 and 3 at 300, 1000 and 4000 Hz — then Frequency (a field in
   Hz with quick picks), Gain (dB, −24…24, quick −6, −3, 0, 3, 6), Q (0.1…10, quick 0.5, 0.7, 1,
-  2, 4) and a Slope popup (12 or 24 dB/oct); the summary "off", "bypassed" or "N on"; Reset
+  2, 4) and a Slope popup (12 or 24 dB/oct); the summary "off" (no EQ, or one with no slot on; amended 2026-11-09, #407), "bypassed" or "N on"; Reset
   clears `eq`), **Hum** (Remove hum, writing the defaults; a Mains popup 50 or 60 Hz; Depth dB
   6…60, quick 12, 24, 30, 48; Harmonics 1…8, quick 1, 2, 4, 8; the summary "60 Hz · 4" or
   "off"), Noise Reduction, Compressor, Mix, Limiter. Each control writes a whole `EqProps` or
@@ -986,7 +986,8 @@ AP8 is built in two parts: AP8a draws a clip's gain envelope and edits it throug
   "−∞ dB" at 0. One undo step, "Set Volume"; none when nothing moved. Live through the
   document's live edit, so `check_audio`'s 0…32 is met by the clamp before the core sees a value.
 - **AU-83 — ⌥-press on the line adds a point, as an action.** At the press's clip time snapped to
-  the frame, t: inside an action A whose end names ONLY `audio.volume` (no other group, no other
+  the frame, t (held to the start of the clip's last frame when the snap would reach the clip's end,
+  so a press in a last partial frame adds its point there; amended 2026-11-09, #392): inside an action A whose end names ONLY `audio.volume` (no other group, no other
   audio key), A is split at t — A shortened to `t − A.start`, a new action `[t, A.end)` ending at
   A's end volume and carrying A's curve when it is not linear — and the point dragged is A's new
   end, starting at the evaluated volume at t; a press under one frame from A's start beeps (a

@@ -72,6 +72,8 @@ final class LoudnessMeasureRun: AudioMeasureRunning {
     private let scope: UInt32?
     private let urls: [UInt32: URL]
     private let resolution: ReverseResolution
+    /// The press's document's `recipeKey`: R0's memo key names it (#401).
+    private let recipeKey: Int
     private let jobs: [Job]
     private let problems: [AudioNormalize.Problem]
     private let targetLUFS: Double
@@ -98,21 +100,22 @@ final class LoudnessMeasureRun: AudioMeasureRunning {
         assert(Thread.isMainThread)
         self.init(
             base: document.project, scope: document.scope, urls: document.mediaURLs(),
-            resolution: ReverseSource.shared.resolution(for: document.recipeKey), jobs: jobs,
-            problems: problems, targetLUFS: targetLUFS)
+            resolution: ReverseSource.shared.resolution(for: document.recipeKey),
+            recipeKey: document.recipeKey, jobs: jobs, problems: problems, targetLUFS: targetLUFS)
     }
 
     /// Main. From pieces a caller already captured from the press's
     /// document (`AudioMatchRun`'s inner run).
     init(
         base: ReelProject, scope: UInt32?, urls: [UInt32: URL], resolution: ReverseResolution,
-        jobs: [Job], problems: [AudioNormalize.Problem], targetLUFS: Double
+        recipeKey: Int, jobs: [Job], problems: [AudioNormalize.Problem], targetLUFS: Double
     ) {
         assert(Thread.isMainThread)
         self.base = base
         self.scope = scope
         self.urls = urls
         self.resolution = resolution
+        self.recipeKey = recipeKey
         self.jobs = jobs
         self.problems = problems
         self.targetLUFS = targetLUFS.isFinite ? targetLUFS : AudioNormalize.defaultTargetLUFS
@@ -175,7 +178,8 @@ final class LoudnessMeasureRun: AudioMeasureRunning {
             skip(job, "its processing could not be measured: its settings were refused.")
             return
         }
-        let key = ProcessedLoudness.key(clip: job.reading.clip, project: trial)
+        let key = ProcessedLoudness.key(
+            clip: job.reading.clip, project: trial, document: recipeKey)
         render(trial, job.reading.clip) { [weak self] rendered in
             guard let self else { return }
             guard case .steps(let steps, let peaks) = rendered else { return self.settle(job, rendered) }
@@ -192,7 +196,8 @@ final class LoudnessMeasureRun: AudioMeasureRunning {
         let processed = AudioNormalize.LoudnessReading(
             clip: job.reading.clip, media: job.reading.media, lufs: lufs, truePeak: peak,
             steps: steps, stepPeaks: peaks, limiter: job.reading.limiter,
-            materialLUFS: job.reading.lufs, currentVolume: job.reading.currentVolume)
+            materialLUFS: job.reading.lufs, currentVolume: job.reading.currentVolume,
+            currentLimiter: job.reading.currentLimiter)
         let planned = AudioNormalize.plan(
             AudioNormalize.LoudnessInput(readings: [processed], problems: []),
             targetLUFS: targetLUFS)

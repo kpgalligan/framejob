@@ -7,7 +7,8 @@ import Foundation
 // AU-10..AU-15; the high band, AP6's AU-63), compiled with app/Sources
 // through swift_build. Arguments: the fixtures folder, a scratch folder.
 // Prints one "ok"/"FAIL" line per row, each row's name first (C1..C12), for
-// loudness_cache_probe.py to score.
+// loudness_cache_probe.py to score. C13 (#406): Normalize's tooltip follows
+// the mode in another window's Volume section with no rebuild.
 
 final class ProbeDocumentController: NSDocumentController {
     override var defaultType: String? { ProjectDocument.projectTypeIdentifier }
@@ -375,7 +376,8 @@ do {
           "\(current != nil) \(stale != nil) \(grain != nil)")
 }
 
-// C10, C11: the memo over a probe document.
+// C10, C11: the memo over a probe document (C13 reuses it).
+var memoDocument: ProjectDocument?
 do {
     let package = scratch.appendingPathComponent("memo.framejob", isDirectory: true)
     try? FileManager.default.removeItem(at: package)
@@ -399,6 +401,7 @@ do {
         check("C10", "the probe document opens", false, "\(error)")
         exit(1)
     }
+    memoDocument = document
     let memo = ClipLoudness.Memo()
     let first = memo.answer(for: 2, in: document)
     let media = snapshot(rodeURL, 91, rodeMedia.duration)
@@ -484,4 +487,74 @@ do {
                   "h − z at most \(String(format: "%.2f", ratio)) dB")
         }
     }
+}
+
+// C13 (#406, AU-15): Normalize's mode changed in one window's Volume section
+// re-titles the Normalize button in another's, with no rebuild of the other.
+
+/// A private stored property, by reflection.
+func reflected<T>(_ object: Any, _ name: String, as: T.Type) -> T? {
+    Mirror(reflecting: object).children.first { $0.label == name }?.value as? T
+}
+
+func walk(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(walk) }
+
+do {
+    let defaults = UserDefaults.standard
+    func clearChoice() {
+        defaults.removeObject(forKey: NormalizeChoice.modeKey)
+        defaults.removeObject(forKey: NormalizeChoice.targetKey)
+    }
+    clearChoice()
+    defer { clearChoice() }
+    guard let document = memoDocument else {
+        check("C13", "the memo document is open", false)
+        exit(1)
+    }
+    document.selection = [2]
+    document.selectAction(nil)
+    /// One window's inspector, its Clip pane on the Sound sub-tab, built and refreshed.
+    func soundPane() -> (InspectorViewController, ClipPane) {
+        let inspector = InspectorViewController()
+        inspector.document = document
+        inspector.binding.invalidate()
+        let pane = ClipPane(inspector: inspector)
+        pane.binding.invalidate()
+        pane.choose(.sound)
+        pane.rebuild()
+        pane.refresh()
+        return (inspector, pane)
+    }
+    func normalizeButton(_ pane: ClipPane) -> OptionButtonControl? {
+        walk(pane).compactMap { $0 as? OptionButtonControl }
+            .first { reflected($0, "title", as: String.self) == "Normalize" }
+    }
+    func modePopup(_ pane: ClipPane) -> OptionPopupControl? {
+        walk(pane).compactMap { $0 as? OptionPopupControl }
+            .first { reflected($0, "items", as: [String].self) == ["Peak", "Loudness"] }
+    }
+    let (inspectorA, paneA) = soundPane()
+    let (inspectorB, paneB) = soundPane()
+    let buttonB = normalizeButton(paneB)
+    // The popup's own menu action (`itemPicked:`, the item's tag the index), as
+    // a person's pick sends it: its `write` called through a reflected closure
+    // is handed the wrong index.
+    let popup = modePopup(paneA)
+    let picked = NSSelectorFromString("itemPicked:")
+    let write = popup?.responds(to: picked) == true ? popup : nil
+    let before = buttonB?.toolTip
+    let old = NormalizeChoice.mode
+    let other = AudioNormalize.Mode.allCases.first { $0 != old } ?? old
+    let item = NSMenuItem()
+    item.tag = AudioNormalize.Mode.allCases.firstIndex(of: other) ?? 0
+    _ = write?.perform(picked, with: item)
+    let after = buttonB?.toolTip
+    let want = AudioPane.normalizeTip()
+    check("C13", "Normalize's mode changed in one window re-titles the other window's Normalize "
+            + "button", buttonB != nil && write != nil && NormalizeChoice.mode == other
+            && before != nil && after == want && after != before,
+          "button B \(buttonB != nil), A's Mode write \(write != nil), mode \(old) → "
+            + "\(NormalizeChoice.mode), B's tooltip changed \(after != before), equals the new "
+            + "tip \(after == want)")
+    withExtendedLifetime((inspectorA, paneA, inspectorB, paneB)) {}
 }

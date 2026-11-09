@@ -7,7 +7,7 @@ import Foundation
 // compiled with app/Sources through swift_build, `app/Resources/Models`
 // beside the binary so the product's own speech pass runs. Arguments: the
 // fixtures folder (`rode.m4a`), a scratch folder. Prints one "ok"/"FAIL" line
-// per row, each row's name first (E1–E3, E6–E11), for audio_ap6_probe.py to
+// per row, each row's name first (E1–E3, E6–E12), for audio_ap6_probe.py to
 // score. Nothing here renders: the processed solve is the proof's (V2, V13).
 
 final class ProbeDocumentController: NSDocumentController {
@@ -309,11 +309,13 @@ do {
     let (r, _) = reading(voice(), lufs: L)
     let limiter = LimiterProps()
     func solvedVolume(_ db: Double, limiter solvedLimiter: LimiterProps? = LimiterProps(),
-                      current: Double = 2) -> Double? {
+                      current: Double = 2, own: LimiterProps? = LimiterProps()) -> Double? {
+        // `limiter` the reading's chosen one (Enhance's, made up when the clip has
+        // none); `own` the clip's own as read, which the keep rule compares (#400).
         let read = AudioNormalize.LoudnessReading(
             clip: 1, media: 1, lufs: L, truePeak: r.truePeak, steps: r.steps,
             stepPeaks: r.stepPeaks, limiter: limiter, materialLUFS: L - 3,
-            currentVolume: current)
+            currentVolume: current, currentLimiter: own)
         let solve = AudioNormalize.Solved(
             volume: current * pow(10, db / 20), limiter: solvedLimiter, resultLUFS: -16,
             resultTruePeakDBTP: -1, limit: nil, renders: 2)
@@ -331,6 +333,13 @@ do {
           "kept \(f3(kept)), moved \(f3(moved))")
     check("E11", "a different solved limiter writes the solve", other.map { $0 != 2 } == true,
           "\(f3(other))")
+    // #400: a first press on a clip with no limiter of its own, whose reading
+    // carries the chosen default one, writes the solve.
+    let unlimited = solvedVolume(0.04, own: nil)
+    check("E11", "a clip with no limiter of its own writes the solve 0.04 dB away, though the "
+            + "chosen limiter equals the solve's",
+          unlimited.map { abs($0 - 2 * pow(10, 0.04 / 20)) < 1e-12 } == true,
+          "\(f3(unlimited))")
     // A cache row whose own volume is 0.02 dB from the plan's: never kept.
     let first = AudioNormalize.plan(
         AudioNormalize.LoudnessInput(readings: [
@@ -459,6 +468,44 @@ do {
     _ = done.wait(timeout: .now() + 300)
 }
 
+// MARK: - E12 the processed memo names its document (#401)
+
+do {
+    // A second document over a copy of the same package: the same clip, plan
+    // and chain, another document.
+    let copy = scratch.appendingPathComponent("enhance-2.framejob", isDirectory: true)
+    try? FileManager.default.removeItem(at: copy)
+    let other = ProjectDocument()
+    var opened = false
+    do {
+        try FileManager.default.copyItem(at: package, to: copy)
+        try other.read(from: copy, ofType: ProjectDocument.projectTypeIdentifier)
+        opened = true
+    } catch {
+        check("E12", "the second document opens", false, "\(error)")
+    }
+    if opened {
+        let deadline = Date().addingTimeInterval(0.2)
+        while Date() < deadline {
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.01))
+        }
+        let steps = [0.25, 0.5, 0.75]
+        let peaks = [0.1, 0.2, 0.3]
+        let key = ProcessedLoudness.key(
+            clip: 2, project: document.editedProject, document: document.recipeKey)
+        if let key { ProcessedLoudness.Memo.shared.store(key, steps: steps, peaks: peaks) }
+        let mine = ProcessedLoudness.Memo.shared.reading(for: 2, in: document)
+        let theirs = ProcessedLoudness.Memo.shared.reading(for: 2, in: other)
+        check("E12", "an R0 stored for one document's clip is not read by another open "
+                + "document's same clip",
+              key != nil && mine?.steps == steps && mine?.peaks == peaks && theirs == nil
+                && document.recipeKey != other.recipeKey,
+              "key \(key != nil), this document's \(mine.map { "\($0.steps)" } ?? "nil"), the "
+                + "other's \(theirs.map { "\($0.steps)" } ?? "nil")")
+    }
+    withExtendedLifetime(other) {}
+}
+
 // MARK: - E7 the skips, by name
 
 do {
@@ -520,7 +567,8 @@ do {
     check("E6", "its job renders through the chosen patch, carrying the limiter and the volume",
           jobs.count == 1 && jobs.first?.chain == choice.patch
             && jobs.first?.reading.limiter == choice.limiter
-            && jobs.first?.reading.currentVolume == owner.current.volume,
+            && jobs.first?.reading.currentVolume == owner.current.volume
+            && jobs.first?.reading.currentLimiter == owner.current.limiter,
           "\(jobs.count) jobs")
     let real = ProcessedLoudness.measurementPlan(document.editedProject.planJSON, clip: 2)
     check("E9", "the owner's clip has a measurement plan of its one track over its span",

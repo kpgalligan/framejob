@@ -33,6 +33,10 @@ pass (Silero VAD) runs for L6, the step-2 figures and R5.
       per 1024 stereo frames.
   L9  a reversed and a ×2 clip of the off-mic fixture get curves on their
       played steps: a quiet phrase played first is boosted first.
+  L10 a Target and cap edit inside an action (clip 4's end `{}` then
+      `{target_db: 3, max_up_db: 6}`, on L6's caches) moves the plan text and
+      makes no curve (`curveBuilds`), the curves equal; clip 4 trimmed to 29 s
+      makes at least one (#413, AU-66 (e)).
   R1  `speechRange`: constant 0; two 10 s halves 12 dB apart 12.0 ±0.1; the
       mask honoured; nil under 300 speech steps.
   R2  `levellerRule` at 5.9 and 6.1 LU and with no range, with each sentence.
@@ -48,7 +52,7 @@ fixtures (`make_fixtures`, shared with audio_ap6b_proof.py), each through a
 probe document's own loudness and speech caches; scored that the off-mic one
 is over 6 LU and the steady one at or under it (else the rule is a STOP).
 
---mutants runs M1–M10, M12–M15 and M17, each over its own copy of app/Sources,
+--mutants runs M1–M10, M12–M15, M17 and M18, each over its own copy of app/Sources,
 scored killed when its named row fails (the step-2 figures and R5 skipped);
 build failures are scored. M11 (`"leveller"` out of `TAP_KEYS`) is by hand
 against core/tests/audio_automation.rs. M16 (the non-repeat's fix reverted)
@@ -73,7 +77,7 @@ RODE = ROOT / "samples/Rode-usb-mic.m4a"
 WORK = ROOT / "tools/proof/work/audio-ap6b-probe"
 FIXTURES = WORK / "fixtures"
 RATE = 48000
-ROWS = [f"L{n}" for n in range(1, 10)] + [f"R{n}" for n in range(1, 6)]
+ROWS = [f"L{n}" for n in range(1, 11)] + [f"R{n}" for n in range(1, 6)]
 
 # The fixtures (spec AP6b's constraints): six 10 s `say` segments, 1.5 s apart,
 # over a −60 dBFS RMS white-noise bed, mono 48 kHz.
@@ -189,6 +193,12 @@ MUTANTS = [
          "let tick = Double(Int64(i)) * ticksPerFrame")]),
     ("M17 no-detection-pending", "L6", [
         (LEVELS, ": .unmeasurable(reason: noSpeechDetection)", ": .pending(what: \"speech\")")]),
+    # #413: the curves keyed by the whole plan text, automation included.
+    ("M18 curves-keyed-by-plan", "L10", [
+        (LEVELS, "        let key = Key(cache: cache.standardizedFileURL.path, plan: memoPlan(project))\n"
+                 "        var result: [UInt32: Curves] = [:]",
+         "        let key = Key(cache: cache.standardizedFileURL.path, plan: project.planJSON)\n"
+         "        var result: [UInt32: Curves] = [:]")]),
 ]
 
 

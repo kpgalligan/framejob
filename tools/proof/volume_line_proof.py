@@ -5,10 +5,10 @@ and its mutants.
     python3 tools/proof/volume_line_proof.py --mutants
 
 No instance: the line is drawing, a hit test and a gesture over ops the core
-already has, so every row is in-process. `--probe` runs V1–V9 over
-`app/Sources`; `--mutants` runs M1–M13, each over its own copy of
-`app/Sources`, killed when its named row fails (a mutant that does not build
-is scored a failure). Output is under `tools/proof/work/volume_line/`.
+already has, so every row is in-process. `--probe` runs V1–V10 over
+`app/Sources`; `--mutants` runs M1–M14 (or only the mutants named after it,
+`--mutants M14`), each over its own copy of `app/Sources`, killed when its
+named row fails (a mutant that does not build is scored a failure). Output is under `tools/proof/work/volume_line/`.
 
 **The probe**, `volume_line_probe.swift`, compiled AS `main.swift` over every
 file in `app/Sources` but the app's own `main.swift` on `swift_build.py`'s
@@ -47,6 +47,12 @@ track C muted with a second clip.
   to the selection and starts no volume session.
 - **V9** the clip painted by `cacheDisplay` with and without the line: the
   pixels differ at three points on it and are equal 4 pt above them.
+- **V10** a ⌥-press in a clip's last partial frame (#392, AU-83 as amended):
+  on a new 30 fps project, a clip whose duration is 2 s + 15,000 ticks
+  (written into the project's JSON and read back, since `add_clip` floors a
+  clip onto the grid) pressed at
+  1,212,000 adds `[0, 1,200,000)`, and one over a 2 s media pressed at
+  1,195,000 adds `[0, 1,180,000)`; each prefix applies.
 
 Rows print `<ID> ok|FAIL — <detail>`, then `n/m`; exit 0 iff all pass.
 """
@@ -62,7 +68,7 @@ import swift_build  # noqa: E402
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 OUT = HERE / "work" / "volume_line"
-PROBE_ROWS = [f"V{n}" for n in range(1, 10)]
+PROBE_ROWS = [f"V{n}" for n in range(1, 11)]
 
 # (name, killing row, file, old, new)
 MUTANTS = [
@@ -108,6 +114,14 @@ MUTANTS = [
     ("M13", "V6", "VolumeLine.swift",
      "t - inside.start >= frame, inside.endTime <= clip.duration\n",
      "t - inside.start >= frame\n"),
+    ("M14", "V10", "VolumeLine.swift",
+     "        guard clipTime >= 0, clipTime < clip.duration else { return nil }\n"
+     "        let t = min(\n"
+     "            ReelTime.snapToFrame(clipTime, fps: fps),\n"
+     "            TimelineTranscript.frameFloor(clip.duration - 1, fps: fps))\n"
+     "        guard let volume = ",
+     "        let t = ReelTime.snapToFrame(clipTime, fps: fps)\n"
+     "        guard t >= 0, t < clip.duration, let volume = "),
 ]
 
 rows = []
@@ -165,10 +179,11 @@ def probe_rows(sources=ROOT / "app/Sources"):
             row(name, found[name][0], found[name][1])
 
 
-def mutants():
+def mutants(only=()):
     killed = 0
     sources = ROOT / "app/Sources"
-    for name, target, file, old, new in MUTANTS:
+    chosen = [m for m in MUTANTS if not only or m[0] in only]
+    for name, target, file, old, new in chosen:
         tree = OUT / f"mutant-{name}" / "Sources"
         shutil.rmtree(tree, ignore_errors=True)
         shutil.copytree(sources, tree)
@@ -187,16 +202,16 @@ def mutants():
         failing = sorted(r for r, (ok, _) in found.items() if not ok)
         print(f"{name} {'killed' if dead else 'SURVIVED'} by {target} — failing rows: "
               f"{', '.join(failing) or 'none'}", flush=True)
-    print(f"{killed}/{len(MUTANTS)} mutants killed", flush=True)
-    return killed == len(MUTANTS)
+    print(f"{killed}/{len(chosen)} mutants killed", flush=True)
+    return bool(chosen) and killed == len(chosen)
 
 
 def main():
     if sys.argv[1:] == ["--probe"]:
         shutil.rmtree(OUT / "probe", ignore_errors=True)
         probe_rows()
-    elif sys.argv[1:] == ["--mutants"]:
-        return 0 if mutants() else 1
+    elif sys.argv[1:2] == ["--mutants"]:
+        return 0 if mutants(set(sys.argv[2:])) else 1
     else:
         print(__doc__.split("\n\n")[1])
         return 2

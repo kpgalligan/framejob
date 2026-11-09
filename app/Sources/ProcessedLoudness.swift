@@ -11,7 +11,7 @@ import Foundation
 /// The pieces, in the order a press uses them: `needsRender` (which clips
 /// render at all, (a)); `measurementPlan` (the trial's plan cut to the clip,
 /// pre-fader, (c)); `render` (the export's waits, the build and one mix read,
-/// (d)); and `Memo`, the last R0 per clip, plan and chain, which At volume
+/// (d)); and `Memo`, the last R0 per document, clip, plan and chain, which At volume
 /// reads (g). The trial handle itself is made on main by the run, (b).
 enum ProcessedLoudness {
     /// One render at a time, off main.
@@ -104,18 +104,21 @@ enum ProcessedLoudness {
 
     // MARK: - The memo's key
 
-    /// What one R0 was measured from: the clip, its measurement plan and its
-    /// chain (the audio props less volume, mute, fades, their shapes, the
-    /// duck and the limiter, which are the fader's or the solve's).
+    /// What one R0 was measured from: the document (its `recipeKey`, so two
+    /// open projects never share one, #401), the clip, its measurement plan
+    /// and its chain (the audio props less volume, mute, fades, their shapes,
+    /// the duck and the limiter, which are the fader's or the solve's).
     struct Key: Hashable {
+        let document: Int
         let clip: UInt32
         let plan: String
         let chain: String
     }
 
-    /// The key of `clip` in `project` (a scoped handle in a nest); nil when it
-    /// has no audio props or no audio segment.
-    static func key(clip: UInt32, project: ReelProject) -> Key? {
+    /// The key of `clip` in `project` (a scoped handle in a nest) of the
+    /// document whose `recipeKey` is `document`; nil when it has no audio
+    /// props or no audio segment.
+    static func key(clip: UInt32, project: ReelProject, document: Int) -> Key? {
         guard let a = project.snapshot.clip(clip)?.audio,
             let measured = measurementPlan(project.planJSON, clip: clip)
         else { return nil }
@@ -128,7 +131,7 @@ enum ProcessedLoudness {
         encoder.outputFormatting = [.sortedKeys]
         guard let data = try? encoder.encode(chain), let text = String(data: data, encoding: .utf8)
         else { return nil }
-        return Key(clip: clip, plan: measured.json, chain: text)
+        return Key(document: document, clip: clip, plan: measured.json, chain: text)
     }
 
     // MARK: - The render
@@ -331,7 +334,8 @@ enum ProcessedLoudness {
                 return held
             }
             let project = document.editedProject
-            let answer = Self.key(clip: clip, project: project).flatMap { entries[$0] }
+            let answer = Self.key(clip: clip, project: project, document: document.recipeKey)
+                .flatMap { entries[$0] }
             heldDocument = document
             heldProject = project
             heldClip = clip
@@ -352,8 +356,8 @@ enum ProcessedLoudness {
             held = nil
         }
 
-        private static func key(clip: UInt32, project: ReelProject) -> Key? {
-            ProcessedLoudness.key(clip: clip, project: project)
+        private static func key(clip: UInt32, project: ReelProject, document: Int) -> Key? {
+            ProcessedLoudness.key(clip: clip, project: project, document: document)
         }
     }
 }

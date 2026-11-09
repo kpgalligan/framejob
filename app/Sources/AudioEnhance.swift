@@ -339,7 +339,8 @@ enum AudioEnhance {
     }
 
     /// Each choice as a measurement job (AU-64 (b)): the clip's cache
-    /// reading carrying the chosen limiter and its current volume, rendered
+    /// reading carrying the chosen limiter, its current volume and its own
+    /// limiter (the keep rule's, AU-64 (f), #400), rendered
     /// through the chosen settings.
     static func jobs(_ input: Input, _ choices: [Choice]) -> [LoudnessMeasureRun.Job] {
         choices.compactMap { choice in
@@ -351,7 +352,8 @@ enum AudioEnhance {
                 reading: AudioNormalize.LoudnessReading(
                     clip: choice.clip, media: choice.media, lufs: m.lufs, truePeak: m.truePeak,
                     steps: reading.loudness.steps, stepPeaks: reading.loudness.stepPeaks,
-                    limiter: choice.limiter, currentVolume: reading.current.volume),
+                    limiter: choice.limiter, currentVolume: reading.current.volume,
+                    currentLimiter: reading.current.limiter),
                 chain: choice.patch)
         }
     }

@@ -31,9 +31,14 @@ audio_ap6_proof.py's V2, V12 and V13.
       limiter, the volume, fades, a bypassed or empty EQ and an inert voice
       false.
   E11 `plan(solved:)` keeps the clip's volume at 0.04 dB and writes the solve
-      at 0.06 dB or with another limiter; a cache row is never kept.
+      at 0.06 dB or with another limiter; a cache row is never kept; the keep
+      rule compares the clip's OWN limiter, so a clip with none whose reading
+      carries the chosen default writes the solve (#400, AU-64 (f)).
+  E12 the processed memo's key names its document: an R0 stored for one
+      document's clip is not read by a second open document over a copy of the
+      same package (#401, AU-64 (g)).
 
---mutants runs M1–M6 and M8–M12 (M7 is the loudness probe's), each over its
+--mutants runs M1–M6 and M8–M14 (M7 is the loudness probe's), each over its
 own copy of app/Sources, scored killed when its named row fails. Build failures
 are scored. Needs samples/Rode-usb-mic.m4a. Output is under
 tools/proof/work/audio-ap6-probe.
@@ -50,7 +55,7 @@ ROOT = Path(__file__).resolve().parents[2]
 RODE = ROOT / "samples/Rode-usb-mic.m4a"
 WORK = ROOT / "tools/proof/work/audio-ap6-probe"
 FIXTURES = WORK / "fixtures"
-ROWS = ["E1", "E2", "E3", "E6", "E7", "E8", "E9", "E10", "E11"]
+ROWS = ["E1", "E2", "E3", "E6", "E7", "E8", "E9", "E10", "E11", "E12"]
 
 MUTANTS = [
     ("M1 noisy-gap", "E1", "AudioEnhance.swift",
@@ -80,6 +85,12 @@ MUTANTS = [
      'track.removeValue(forKey: "ramps")', "_ = track.count"),
     ("M12 keep-zero", "E11", "AudioNormalize+Loudness.swift",
      "static let keepVolumeDB = 0.05", "static let keepVolumeDB = 0.0"),
+    ("M13 keep-against-chosen", "E11", "AudioNormalize+Loudness.swift",
+     "if solve.limiter == reading.currentLimiter, let current",
+     "if solve.limiter == reading.limiter, let current"),
+    ("M14 memo-without-document", "E12", "ProcessedLoudness.swift",
+     "return Key(document: document, clip: clip, plan: measured.json, chain: text)",
+     "return Key(document: 0, clip: clip, plan: measured.json, chain: text)"),
 ]
 
 

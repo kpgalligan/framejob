@@ -35,6 +35,9 @@ final class AudioPane: InspectorPaneView {
     let isolationMemo = IsolationCache.Memo()
     /// Voice Effect's Status read-out (AU-146), dropped with it.
     let voiceMemo = IsolationCache.Memo(compute: VoiceCache.status(of:in:))
+    /// The Volume section's Normalize button, whose tooltip follows the
+    /// chosen mode in every open window (AU-15, #406).
+    weak var normalizeButton: OptionButtonControl?
 
     override init(inspector: InspectorViewController) {
         super.init(inspector: inspector)
@@ -46,6 +49,15 @@ final class AudioPane: InspectorPaneView {
         NotificationCenter.default.addObserver(
             self, selector: #selector(offlineAudioSettled(_:)), name: .reversedMediaDidChange,
             object: nil)
+        // Normalize's mode or target changed in any window (#406).
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(normalizeChoiceChanged(_:)),
+            name: NormalizeChoice.didChangeNotification, object: nil)
+    }
+
+    @objc private func normalizeChoiceChanged(_ note: Notification) {
+        normalizeButton?.toolTip = AudioPane.normalizeTip()
+        inspector?.refresh(isLive: false)
     }
 
     @objc private func offlineAudioSettled(_ note: Notification) {

@@ -18,9 +18,12 @@ cache built by the product's own pass, read back by `ClipLoudness`, against
   C11  the memo through a live edit: the held reading, no file read, no recompute.
   C12  the high band (AU-63): an 8 kHz tone's h within 0.05 dB of its mean square times
        the 6 kHz sections' own |H|², and a 1 kHz tone's h at least 60 dB under its z.
+  C13  Normalize's mode changed through one window's Mode popup re-titles another
+       window's Normalize button to the new tip with no rebuild (#406, AU-15).
 
 Build failures are scored. --sources points at a copied app/Sources tree;
---mutants runs the eight arithmetic mutants (AP6's M7 among them), each over its own copy, and
+--mutants runs the eight arithmetic mutants (AP6's M7 among them) and #406's
+`normalize-tip-unobserved`, each over its own copy, and
 scores each killed when its named row fails. Needs ffmpeg and
 samples/Rode-usb-mic.m4a. All output is under tools/proof/work/loudness-cache-probe.
 """
@@ -57,6 +60,11 @@ MUTANTS = [
     # Road map "audio" AP6's M7 (spec §11 AU-63): h without the high-pass.
     ("M7-high-unfiltered", "C12", "LoudnessBlocks.swift",
      "Self.cascade(&band, highStages, state: &highState[channel])", "_ = highStages"),
+    # #406: no pane observes NormalizeChoice, so another window's tooltip stays.
+    ("normalize-tip-unobserved", "C13", "AudioPane.swift",
+     "        NotificationCenter.default.addObserver(\n"
+     "            self, selector: #selector(normalizeChoiceChanged(_:)),\n"
+     "            name: NormalizeChoice.didChangeNotification, object: nil)\n", ""),
 ]
 
 
@@ -149,9 +157,9 @@ def main():
         check("source probe builds", False, problem)
         return 1
     sys.stdout.write(stdout)
-    expected = [f"C{n}" for n in range(1, 13)]
+    expected = [f"C{n}" for n in range(1, 14)]
     good = all(rows.get(row) for row in expected)
-    good &= check("every row C1..C12 ran", all(row in rows for row in expected),
+    good &= check("every row C1..C13 ran", all(row in rows for row in expected),
                   ", ".join(row for row in expected if row not in rows) or "")
     passed = sum(1 for row in expected if rows.get(row))
     print(f"\n{passed}/{len(expected)} rows passed")

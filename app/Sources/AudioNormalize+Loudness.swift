@@ -47,6 +47,9 @@ extension AudioNormalize {
         /// The clip's base volume as read, which a solved row keeps when the
         /// solve lands within `keepVolumeDB` of it (AU-64 (f)).
         var currentVolume: Double? = nil
+        /// The clip's own limiter as read, nil when it has none: what AU-64
+        /// (f)'s keep rule compares the solve against.
+        var currentLimiter: LimiterProps? = nil
     }
 
     /// One rendered clip's solve (AU-64 (e)): the volume and limiter to
@@ -145,7 +148,8 @@ extension AudioNormalize {
                         LoudnessReading(
                             clip: id, media: media, lufs: lufs, truePeak: reading.truePeak,
                             steps: reading.steps, stepPeaks: reading.stepPeaks,
-                            limiter: audio?.limiter, currentVolume: audio?.volume))
+                            limiter: audio?.limiter, currentVolume: audio?.volume,
+                            currentLimiter: audio?.limiter))
                 } else {
                     problems.append(
                         Problem(
@@ -220,13 +224,14 @@ extension AudioNormalize {
     }
 
     /// A rendered clip's op and row (AU-64 (e), (f)): the solve's volume,
-    /// or the clip's own when it already carries the solved limiter and the
-    /// two are within `keepVolumeDB`, so a second press is an identity.
+    /// or the clip's own when it already carries the solved limiter (its own
+    /// as read, `currentLimiter`, never a chosen one, #400) and the two are
+    /// within `keepVolumeDB`, so a second press is an identity.
     private static func solvedRow(_ reading: LoudnessReading, _ solve: Solved)
         -> (ReelOp, LoudnessResult)
     {
         var volume = solve.volume
-        if solve.limiter == reading.limiter, let current = reading.currentVolume, current > 0,
+        if solve.limiter == reading.currentLimiter, let current = reading.currentVolume, current > 0,
             solve.volume > 0, abs(20 * log10(solve.volume / current)) <= keepVolumeDB
         {
             volume = current
