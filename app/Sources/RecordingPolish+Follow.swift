@@ -72,12 +72,12 @@ extension RecordingPolish {
         guard let follow = follows[id], let command = follow.commands.first else {
             return end(id, document)
         }
-        let clips = screenClips(follow.paths, in: document)
+        let clips = screenClips(follow.paths, in: document, scope: follow.scope)
         // CU-101 (a): the clock restarts when Enhance Voice's follow ends.
         let enhancing = RecordingEnhance.isPending(document)
         if follow.enhancing && !enhancing { follow.started = Date() }
         follow.enhancing = enhancing
-        let media = mediaIDs(clips, in: document)
+        let media = mediaIDs(clips, in: document, scope: follow.scope)
         if !clips.isEmpty, !follow.reading,
             follow.tracks.map({ !media.isSubset(of: Set($0.keys)) }) ?? true
         {
@@ -87,8 +87,10 @@ extension RecordingPolish {
         let busy =
             RecordingEnhance.isBusy(document, scope: follow.scope) || window == nil
             || window?.attachedSheet != nil
+        // `isReady` reads the open container, so only when it is the landing's (#458).
         let ready =
-            follow.tracks.map { tracks in
+            !busy
+            && follow.tracks.map { tracks in
                 media.isSubset(of: Set(tracks.keys))
                     && isReady(
                         command, clips: clips, tracks: tracks,
@@ -115,9 +117,11 @@ extension RecordingPolish {
         }
     }
 
-    /// The media ids of `clips`. Main.
-    private static func mediaIDs(_ clips: [UInt32], in document: ProjectDocument) -> Set<UInt32> {
-        let snapshot = document.editedProject.snapshot
+    /// The media ids of `clips` in the landing's container. Main.
+    private static func mediaIDs(_ clips: [UInt32], in document: ProjectDocument, scope: UInt32?)
+        -> Set<UInt32>
+    {
+        let snapshot = RecordingEnhance.container(of: document, scope: scope).snapshot
         return Set(clips.compactMap { snapshot.clip($0).flatMap { snapshot.media(for: $0)?.id } })
     }
 
@@ -126,7 +130,7 @@ extension RecordingPolish {
     private static func read(
         _ id: Int, _ follow: Follow, _ clips: [UInt32], in document: ProjectDocument
     ) {
-        let snapshot = document.editedProject.snapshot
+        let snapshot = RecordingEnhance.container(of: document, scope: follow.scope).snapshot
         let files: [UInt32: URL]
         do {
             files = try AutoZoom.cursorFiles(clips.compactMap { snapshot.clip($0) }, in: snapshot)

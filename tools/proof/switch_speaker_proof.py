@@ -62,12 +62,16 @@ Rows:
   partner, the project unchanged; the sheet's summary (`snapshot_ui`) shows the same sentence;
   and in the dev-accept instance, whose accept presses Switch only on an edit, the sheet changes
   nothing (the layout dump carries no enabled state, so this is how "Switch disabled" is read).
+- S14 (#457) a document with one camera clip selected, whose plan is refused ("needs at least
+  two angles"): `{mute_cameras: "yes"}` answers exactly "mute_cameras must be true or false."
+  and `{apply: "maybe"}` "apply must be true or false." — the argument errors before any plan —
+  with the project and its undo top unchanged.
 
 `--mutant NAME` edits a `tree_copy.py` copy's Swift, builds its app and runs the named row on it:
-CAUGHT exits 1, SURVIVED 0, a control that could not be performed 2. Ten mutants: min-turn-ignored,
-crosstalk-never-wide, lead-twice, snap-removed (S1); ceiling-removed (S7); whole-track-hidden
-(S8); sheet-min-shot-not-passed (S10); replace-clear-removed (S11); mute-default-inverted (S12);
-linked-refusal-removed (S13).
+CAUGHT exits 1, SURVIVED 0, a control that could not be performed 2. Eleven mutants:
+min-turn-ignored, crosstalk-never-wide, lead-twice, snap-removed (S1); ceiling-removed (S7);
+whole-track-hidden (S8); sheet-min-shot-not-passed (S10); replace-clear-removed (S11);
+mute-default-inverted (S12); linked-refusal-removed (S13); arguments-after-plan (S14).
 """
 
 import argparse
@@ -105,7 +109,7 @@ BUILD_BOUND = 1800
 APPLIED = "b18_f55"
 BLEEDY = "b12_f55"
 COLOURS = {"a": (0xC0, 0x39, 0x2B), "b": (0x29, 0x80, 0xB9), "wide": (0x27, 0xAE, 0x60)}
-ROWS = ["Z0"] + [f"S{i}" for i in range(1, 14)]
+ROWS = ["Z0"] + [f"S{i}" for i in range(1, 15)]
 MAIN_ROWS = {"S1", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S12"}
 REFUSED = "Switch by Speaker was refused: "
 
@@ -113,6 +117,7 @@ SHOTS = "app/Sources/SpeakerSwitch+Shots.swift"
 PLANNER = "app/Sources/SpeakerSwitch.swift"
 EDIT = "app/Sources/SpeakerSwitch+Edit.swift"
 SHEET = "app/Sources/SwitchSpeakerSheetController.swift"
+HANDLER = "app/Sources/AgentServer+Switch.swift"
 # name → (row, [(path, anchor, replacement)])
 MUTANTS = {
     "min-turn-ignored": ("S1", [(SHOTS, "angle = length >= ticks(settings.minTurn)",
@@ -138,6 +143,12 @@ MUTANTS = {
                                        "return input.microphones.contains { angles.contains($0.track) }")]),
     "linked-refusal-removed": ("S13", [(EDIT, "if let partner = clip.linked {",
                                         "if false, let partner = clip.linked {")]),
+    "arguments-after-plan": ("S14", [(
+        HANDLER,
+        "        let mute = try boolArg(a, \"mute_cameras\")\n"
+        "        let apply = try boolArg(a, \"apply\") ?? true\n",
+        "        let mute = try? boolArg(a, \"mute_cameras\")\n"
+        "        let apply = (try? boolArg(a, \"apply\")) ?? true\n")]),
 }
 
 results = {}
@@ -683,6 +694,46 @@ def s13_rows(client, manifest):
         doc.close()
 
 
+def s14(client):
+    """#457: a malformed `mute_cameras` or `apply` is refused before any plan."""
+    path = WORK / "s14.framejob"
+    shutil.rmtree(path, ignore_errors=True)
+
+    def call(tool, **arguments):
+        return client.call_with(tool, {"project": str(path), **arguments})
+
+    def undo_top():
+        try:
+            name = call("undo").get("undone")
+        except mcp.ToolError:
+            return None
+        call("redo")
+        return name
+
+    client.call("new_project", path=str(path))
+    try:
+        track = call("get_project")["project"]["tracks"][0]["id"]
+        media = call("import_media", path=str(FTURNS / "cam_wide.mov"))["media"]
+        clip = call("add_clip", track=track, media=media, at=0)["new_clips"][0]
+        call("set_selection", clips=[clip])
+        before, top = model(call("get_project")["project"]), undo_top()
+        plain = refused(lambda: call("switch_by_speaker"))
+        check("S14", plain is not None and REFUSED + "Switch by Speaker needs at least two angles"
+              in plain, f"the plan itself is refused: {plain!r}")
+        for key, value in (("mute_cameras", "yes"), ("apply", "maybe")):
+            why = refused(lambda k=key, v=value: call("switch_by_speaker", **{k: v}))
+            want = f"switch_by_speaker: {key} must be true or false."
+            after = model(call("get_project")["project"])
+            check("S14", why == want and after == before and undo_top() == top,
+                  f"{{{key}: {value!r}}}: {why!r} (want {want!r}); project unchanged "
+                  f"{after == before}, undo top {top!r}")
+    finally:
+        try:
+            client.call("close_project", project=str(path), discard=True)
+        except mcp.ToolError:
+            pass
+
+
 def summary_text(doc, tag):
     got = doc.call("snapshot_ui", window="sheet", path=str(WORK / f"{tag}.png"))
     path = got.get("layout_path") if isinstance(got, dict) else None
@@ -817,6 +868,8 @@ def rows(client, manifest, binary):
             attempt(lambda v=variant: s1_variant(client, manifest, v), "S1", "S2")
     if "S13" in selected:
         attempt(lambda: s13_rows(client, manifest), "S13")
+    if "S14" in selected:
+        attempt(lambda: s14(client), "S14")
     if selected & {"S10", "S13"}:
         arguments = ["-RCDevSwitchSpeakerAccept", "YES", "-FrameJobSwitchSpeakerMinShot", "3"]
         if not with_instance(binary, "accept", accept_rows, arguments):

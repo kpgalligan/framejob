@@ -76,12 +76,14 @@ enum RecordingPolish {
         }
     }
 
-    /// Every clip of the open container whose media is one of `paths` AND has a cursor file,
-    /// in id order. Main.
-    static func screenClips(_ paths: [String], in document: ProjectDocument) -> [UInt32] {
+    /// Every clip of the landing's container (`RecordingEnhance.container(of:scope:)`, #458)
+    /// whose media is one of `paths` AND has a cursor file, in id order. Main.
+    static func screenClips(_ paths: [String], in document: ProjectDocument, scope: UInt32?)
+        -> [UInt32]
+    {
         let wanted = Set(paths)
         guard !wanted.isEmpty else { return [] }
-        let snapshot = document.editedProject.snapshot
+        let snapshot = RecordingEnhance.container(of: document, scope: scope).snapshot
         return snapshot.clips.filter { clip in
             guard let media = snapshot.media(for: clip) else { return false }
             return wanted.contains(media.path) && media.cursor != nil

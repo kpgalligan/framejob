@@ -27,7 +27,10 @@ makes a miss, and a masks stamp's JSON; P6 a throwing write leaves the store
 as it was; P7 a publish during a save; P8 `runs`, the capped rate's nearest
 slot and `covered`; P9 a marker whose pack is deleted, garbage or another
 size; P10 a publish of a range that made no mask (0 × 0, no frames) keeps the
-pack, its size and every frame, and the coverage becomes the union.
+pack, its size and every frame, and the coverage becomes the union; P11
+`AnalysisMasks.run` over a request whose one range lies wholly past the grid
+(a missing file) answers true with no trap, no progress and nothing published
+(#456).
 
 **App rows** over MCP (`proof_app.binary()`, `RC_PROOF_APP`), each launch on a
 scratch `CFFIXED_USER_HOME`; Z1 is each launch's parity grep:
@@ -98,7 +101,7 @@ LANDSCAPE_MASK = [512, 384]   # CO-10
 # The owner's own talking head (an iPhone HLG recording; `owner-sync`, gitignored,
 # never committed): M4's person. Without it M4 is skipped by name and owed.
 OWNER = ROOT / "tools/proof/media/owner-sync/IMG_0018.MOV"
-P_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10"]
+P_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11"]
 PLAIN = ["M1", "M2", "M3", "M4", "M5", "M6", "M9"]
 JOBS = ["M7", "M8"]
 ROWS = P_ROWS + PLAIN + JOBS + ["Z1"]
@@ -135,6 +138,8 @@ MUTANTS = {
         "            FileManager.default.fileExists(\n"
         "                atPath: payloadURL(kind, media: media, file: file, in: cacheDir).path)\n",
         "marker.answers(for: stamp)\n")]),
+    "masks-crossed-range": (["P11"], [(
+        MASKS, "            guard lo <= hi else { continue }\n", "")]),
 }
 
 results = {}

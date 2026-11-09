@@ -400,7 +400,10 @@ presses its own Follow once it is first enabled (spec §11 VR-29 (h)); and
 with which the Make Vertical Version sheet presses its own Make once it is
 first enabled (spec §11 VR-39 (h)); and `-RCDevDerivedHidden YES`, with which `new_project_from_range` opens its
 document with no window (`display: false`), so a proof can see the windowless
-door (spec §11 CJ-52); and `-RCDevExportFault audio@N|video@N|audio-hold@N`, the same for an
+door (spec §11 CJ-52); and `-RCDevVerticalSaveFault <name>`, with which
+`make_vertical_version`'s save to a `path` whose last component is `<name>` fails,
+so a proof can see the copy closed and its package removed (spec §11 #460); and
+`-RCDevExportFault audio@N|video@N|audio-hold@N`, the same for an
 `ExportWriter` export's pumps, spec §11 #378), which
 Distribution does not. `rc_op_names`
 and the catalog are the authority for the counts; the parity check compares

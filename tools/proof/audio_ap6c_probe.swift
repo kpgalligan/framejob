@@ -343,7 +343,7 @@ do {
             refusals.append(refusal.op + ": " + refusal.reason)
         }
     }
-    let analysed = RecordingEnhance.isAnalysed([3], in: document)
+    let analysed = RecordingEnhance.isAnalysed([3], in: document, scope: document.scope)
     RecordingEnhance.follow(voiceOver(wav.path), in: document)
     let enhanceTimer = RecordingEnhance.timer(of: document)
     let deadline = Date().addingTimeInterval(20)

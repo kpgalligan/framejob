@@ -1,4 +1,4 @@
-// Road map "creator-jobs" CO1 — rows P1–P10 of `co1_proof.py`, driven through
+// Road map "creator-jobs" CO1 — rows P1–P11 of `co1_proof.py`, driven through
 // the app's own `MaskPack`, `AnalysisStore.publishFile`, `AnalysisStamp` and
 // `AnalysisMasks`.
 //
@@ -502,6 +502,31 @@ do {
             + "coverage \(cover) (want [[0, 600]])")
 } catch {
     row("P10", false, "threw \(error.localizedDescription)")
+}
+
+// MARK: - P11 a request range wholly past the grid is skipped (#456)
+
+// A 1 s media at 30 fps has indices 0…29; a range of 100…110 clamps to bounds that cross. The
+// url does not exist: a range that reached the reader would fail, so true with nothing published
+// says it was skipped before any read.
+do {
+    let dir = folder("p11-crossed")
+    let media = MediaSnapshot(
+        id: 1, path: "/nowhere/p11.mov", kind: .video, duration: 600_000, width: 640, height: 360,
+        hasVideo: true, hasAudio: false)
+    let request = AnalysisRequest(
+        kind: .masks, cacheDir: dir, media: media,
+        url: URL(fileURLWithPath: "/nowhere/p11.mov"), stamp: base, input: nil,
+        ranges: [100...110])
+    var heard: [Double] = []
+    let finished = try AnalysisMasks.run(request, cancelled: { false }) { heard.append($0) }
+    let marker = FileManager.default.fileExists(atPath: markerURL(dir).path)
+    let pack = FileManager.default.fileExists(atPath: packURL(dir).path)
+    row("P11", finished && !marker && !pack && heard.isEmpty,
+        "finished \(finished) (want true); marker \(marker), pack \(pack) (want neither); "
+            + "progress heard \(heard.count) (want 0)")
+} catch {
+    row("P11", false, "threw \(error.localizedDescription)")
 }
 
 let answer = try JSONSerialization.data(withJSONObject: ["rows": rows])

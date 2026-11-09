@@ -147,8 +147,12 @@ enum AnalysisMasks {
         var size: (width: Int, height: Int)?
         var before = 0
         for range in request.ranges {
+            // A range past the grid's last index covers none of it (#456).
+            let lo = max(0, range.lowerBound - widen)
+            let hi = min(grid.lastIndex, range.upperBound + widen)
+            guard lo <= hi else { continue }
             var job = Job(range: range, grid: grid)
-            let read = max(0, range.lowerBound - widen)...min(grid.lastIndex, range.upperBound + widen)
+            let read = lo...hi
             var previous: Int64?
             var lastPublish = Date()
             let finished = try AnalysisFrames.read(

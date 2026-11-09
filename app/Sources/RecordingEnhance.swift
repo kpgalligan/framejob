@@ -75,18 +75,31 @@ enum RecordingEnhance {
         }.map(\.id).sorted()
     }
 
-    /// The clips still in the open container. Main.
-    static func present(_ clips: [UInt32], in document: ProjectDocument) -> [UInt32] {
-        let snapshot = document.editedProject.snapshot
+    /// The landing's container: the nest `scope` names, or the top level (#458). A follow-up
+    /// reads its clips here, never in the open container, so a nest opened during its wait is
+    /// busy rather than a drop. The open container's own view when it is the landing's. Main.
+    static func container(of document: ProjectDocument, scope: UInt32?) -> ReelProject {
+        if document.scope == scope { return document.editedProject }
+        return scope.flatMap { document.project.scoped($0) } ?? document.project
+    }
+
+    /// The clips still in the landing's container. Main.
+    static func present(_ clips: [UInt32], in document: ProjectDocument, scope: UInt32?)
+        -> [UInt32]
+    {
+        let snapshot = container(of: document, scope: scope).snapshot
         return clips.filter { snapshot.clip($0) != nil }
     }
 
     /// Each clip's media has a current loudness cache, and its speech saved,
     /// or a current speech cache, or no speech model at all (AU-68 (b)). False
-    /// for no clips, a missing file or no cache folder. Main.
-    static func isAnalysed(_ clips: [UInt32], in document: ProjectDocument) -> Bool {
+    /// for no clips, a missing file or no cache folder. The clips are read in the landing's
+    /// container. Main.
+    static func isAnalysed(_ clips: [UInt32], in document: ProjectDocument, scope: UInt32?)
+        -> Bool
+    {
         guard !clips.isEmpty, let cacheDir = document.cacheDirectory else { return false }
-        let snapshot = document.editedProject.snapshot
+        let snapshot = container(of: document, scope: scope).snapshot
         for id in clips {
             guard let clip = snapshot.clip(id), let media = snapshot.media(for: clip),
                 let url = mediaURL(for: media)
@@ -182,12 +195,13 @@ enum RecordingEnhance {
     /// (the type doc), then act. Main.
     static func tick(_ document: ProjectDocument) {
         guard let follow = follows[document.recipeKey] else { return }
-        let clips = present(follow.clips, in: document)
+        let clips = present(follow.clips, in: document, scope: follow.scope)
         let window = RecorderPanelController.editor(of: document)?.view.window
         let busy =
             isBusy(document, scope: follow.scope) || window == nil || window?.attachedSheet != nil
         let step = decide(
-            clips: clips, analysed: isAnalysed(clips, in: document), busy: busy,
+            clips: clips, analysed: isAnalysed(clips, in: document, scope: follow.scope),
+            busy: busy,
             elapsed: Date().timeIntervalSince(follow.started))
         guard step != .wait else { return }
         end(follow, key: document.recipeKey)

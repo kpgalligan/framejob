@@ -3,7 +3,7 @@ import Foundation
 // Switch by Speaker's faces mode probe (road map "creator-jobs" SW8, spec §11
 // SW-81…SW-84, SW-87), compiled with app/Sources through swift_build.
 // Arguments: `rows [rows]`. Rows print one "ok"/"FAIL" line each, the row's
-// name first (P1–P6), for switch_faces_probe.py to score; every expected value
+// name first (P1–P8), for switch_faces_probe.py to score; every expected value
 // is worked by hand here, never by the code under test.
 
 let arguments = CommandLine.arguments
@@ -300,4 +300,61 @@ if wanted("P6") {
           "2 s \(String(describing: at(2))), 6 s \(String(describing: at(6))), 9.5 s "
             + "\(String(describing: at(9.5))), 13.5 s \(String(describing: at(13.5))), 15.5 s "
             + "\(String(describing: at(15.5)))")
+}
+
+// MARK: - P7 an empty range: the no-speech refusal alone (#456)
+
+if wanted("P7") {
+    // from == to: no step, so the microphone's and both faces' series are empty.
+    let got = S.plan(input(
+        to: 0, angles: [whole(11, 0), whole(12, 0)], mics: [mic(1, [], count: 0)],
+        pairing: S.Pairing(speakers: [sp(1, 11), sp(1, 12)], wide: nil),
+        faces: [S.FaceAngle(track: 11, activity: []), S.FaceAngle(track: 12, activity: [])]))
+    let want = [
+        "The microphone on track 1 has no speech between 00:00:00:00 and 00:00:00:00, so it never "
+            + "says who is talking."
+    ]
+    check("P7", "an empty range in the faces mode: the no-speech refusal alone, no no-face refusal",
+          got == .refused(want), "\(got)")
+}
+
+// MARK: - P8 a stored faces marker range past the grid (#456)
+
+if wanted("P8") {
+    // A 2 s media on the faces grid (10 a second): 20 indices. The marker covers 0–2 and a range
+    // wholly past the grid; indices 0–2 hold one face whose opening is gap / width.
+    let grid = AnalysisGrid(samplesPerSecond: 10, duration: 2 * second)
+    let media = video(7)
+    let cache = FileManager.default.temporaryDirectory
+        .appendingPathComponent("switch-faces-p8-\(getpid())", isDirectory: true)
+    try? FileManager.default.removeItem(at: cache)
+    var samples = [AnalysisFaces.Sample](repeating: .empty, count: grid.count)
+    for k in 0...2 {
+        samples[k] = AnalysisFaces.Sample(
+            pts: Int64(k) * 60_000, faces: [face(0.3, 0.3, gap: 0.06, width: 0.3)])
+    }
+    let marker = AnalysisMarker(
+        stamp: nil, canned: true, source: AnalysisSourceID(size: 1, modified: 1, duration: 2 * second),
+        files: [AnalysisFaces.payloadName],
+        coverage: [[0, 2], [grid.count + 5, grid.count + 9]])
+    let markerURL = AnalysisStore.markerURL(.faces, media: media.id, in: cache)
+    let payloadURL = AnalysisStore.payloadURL(
+        .faces, media: media.id, file: AnalysisFaces.payloadName, in: cache)
+    var wrote = true
+    do {
+        try FileManager.default.createDirectory(
+            at: payloadURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(marker).write(to: markerURL)
+        try AnalysisFaces.encode(samples).write(to: payloadURL)
+    } catch {
+        wrote = false
+    }
+    let got = S.storedActivity(media, grid: grid, cacheDir: cache)
+    // Half 2 at 10 a second: indices 0…3 see three, three, three and two equal openings (std 0);
+    // index 4 sees one, and every later index none.
+    var want = [Double?](repeating: nil, count: grid.count)
+    for k in 0...3 { want[k] = 0 }
+    check("P8", "a marker range past the grid's last index is skipped: \(grid.count) values, "
+            + "indices 0–2 read", wrote && grid.count == 20 && near(got, want), "\(got)")
+    try? FileManager.default.removeItem(at: cache)
 }

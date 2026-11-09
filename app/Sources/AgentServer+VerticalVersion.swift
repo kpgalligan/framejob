@@ -57,6 +57,12 @@ extension AgentServer {
             ))
     }
 
+    #if FRAMEJOB_DEV_TOOLS
+    /// The dev-only launch default naming a `path`'s last component whose save fails, so a proof
+    /// can see the copy closed and its package removed (#460).
+    static let verticalSaveFaultKey = "RCDevVerticalSaveFault"
+    #endif
+
     func makeVerticalVersion(_ a: [String: Any]) throws -> String {
         let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16)
         guard !Thread.isMainThread else {
@@ -136,7 +142,24 @@ extension AgentServer {
         case .copied(let copy): made = copy
         }
         if let url = call.url {
-            try save(made.document, to: url, operation: .saveOperation)
+            // A failed save leaves nothing behind: the copy closed and its package removed, as
+            // `verticalCopy` does for a copy the step did not change (#460).
+            do {
+                #if FRAMEJOB_DEV_TOOLS
+                if let fault = UserDefaults.standard.string(forKey: Self.verticalSaveFaultKey),
+                    !fault.isEmpty, url.lastPathComponent == fault
+                {
+                    throw ToolError(
+                        message: "\(url.lastPathComponent) could not be saved (the "
+                            + "\(Self.verticalSaveFaultKey) fault).")
+                }
+                #endif
+                try save(made.document, to: url, operation: .saveOperation)
+            } catch {
+                onMain { made.document.close() }
+                try? FileManager.default.removeItem(at: url)
+                throw error
+            }
             fields["saved"] = url.path
         }
         return try onMain {

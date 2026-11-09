@@ -589,3 +589,54 @@ anywhere, so nothing is keyed (CJ-3).
   the answer's `speaker`.
 - **VR-39**: Follow gains Speaker with its Microphones and Faces rows (VR-66); `opened` is
   `VerticalVersion.remembered`; a Speaker hand-off that analysed presents the sheet again.
+
+## Fixes batch c1 (2026-11-09)
+
+- **#456 — An empty range gets no no-face refusal, and a marker range past the grid is
+  skipped.** With `from == to` the range has no step, so every read face angle's `activity` has
+  `count == 0` values and none of them is a value: SW-84's loop added "shows no face whose mouth
+  can be read" beside the microphones' own no-speech refusal, which is the range's real reason.
+  The loop now runs only when `count > 0`; `silentMicrophones` is unchanged, so an empty range's
+  refusal is the no-speech sentence alone, and no new empty-range refusal is added. A `faces`
+  marker range clamped to the grid (`max(0, lower)...min(grid.lastIndex, upper)`) crosses when
+  the range begins past the grid's last index — a marker written over a longer media, or a grid
+  read at another rate — and forming that `ClosedRange` traps. `SpeakerSwitch.storedActivity`
+  and `AnalysisMasks.run` skip a range whose clamped bounds cross: it covers no index of this
+  grid, so nothing is read and nothing is published for it. Amends SW-84.
+- **#458 — The landing's follow-ups read the landing's own container.** The voice clips, their
+  presence and readiness (AU-68 (a), (b), (d)), the screen clips, their cursor files and media
+  (CU-101 (b), (c), (j)) are read in `RecordingEnhance.container(of:scope:)`, the landing's
+  container (the nest it landed in, or the top level), never `editedProject`. Before, a nest
+  opened while a follow-up waited made the open container the nest: the landed clips were not in
+  it, `decide`'s first arm answered `.drop`, and the follow-up was lost ("No screen clip with a
+  cursor file landed…") although the scope test was there to wait. Now the clips are still found,
+  the moved scope is busy (AU-68 (c), CU-101 (d)), `decide` answers `.wait`, and the follow-up
+  runs once the person returns, or gives up at 300 s as before. At the tool door,
+  `landAndEnhance` reads `document.scope` and, when the choice asks for Enhance, the voice clips
+  in the main hop that runs `land`, and hands both on; no later hop reads them, so a nest opened
+  between hops cannot empty them. The panel door already reads both in the landing's own hop
+  (`follow`). `isReady` (which reads the open container) is evaluated only when not busy, at both
+  doors; busy reads not ready. `decide`'s arms and order, the sentences, the clocks and the 300 s
+  limit are unchanged. Amends AU-68 (a), (d) and CU-101 (b), (d), (j).
+- **#459 — A cache file that vanishes during the carry is skipped.** The thumbnail pass's
+  `clearThumbnails` (`MediaCacheFiles`) is the one remover of the source's cache not held off by
+  the ledger's save bracket, so a `thumbs/<id>/` tile listed for the carry could be gone when it
+  was cloned, and New Project from Range or Make Vertical then failed ("cache/thumbs/3/40.jpg
+  could not be carried: No such file or directory"). The carry is now two steps,
+  `DerivedCarry.listing` (each listed path that exists: a file as itself, a folder as itself and
+  its regular files; a folder that vanishes while it is enumerated contributes nothing) then
+  `copy(_ listing:from:to:)` (every folder created, then every file cloned). A file whose clone
+  fails while the source no longer exists is skipped and not counted in the report; the
+  derived document's own thumbnail pass makes its tiles again. Every other failure still throws
+  "cache/<path> could not be carried: <reason>". Skipping was chosen over bringing the tiles into
+  the bracket: a vanished tile is a cache the copy rebuilds, and the bracket would hold the
+  thumbnail pass for the whole carry. Amends CJ-51 (c).
+- **#460 — A vertical copy whose save fails is closed and its package removed.** With `path`,
+  `make_vertical_version` saves the copy on the server thread after `verticalCopy` opened it at
+  `path`. When that save threw, the copy stayed open and dirty, its package held the project
+  before the step, and the error had no `project` to name it. Now any throw from the save closes
+  the copy (on main), removes the package at `path`, and answers the save's error unchanged —
+  `ProjectDocument.verticalCopy`'s own shape for a copy the step did not change. A dev-tools build
+  reads `-RCDevVerticalSaveFault <name>`: a save to a `path` whose last component is `<name>`
+  throws before it is attempted, so a proof can see the cleanup; Distribution never reads it.
+  Amends VR-36.

@@ -25,7 +25,8 @@ whose action moves y from 200 to 0 [10, 14); then a matte pair: a still face J
 [44, 48) on its own track with an alpha matte track in front holding a title K.
 
 **Launch 1** (`-RCDevAnalysisCanned YES -RCDevVerticalAccept YES
--FrameJobFollowKind subject -FrameJobFollowWhereEmpty fit`), rows 1–10 and 12:
+-RCDevVerticalSaveFault fault.framejob -FrameJobFollowKind subject
+-FrameJobFollowWhereEmpty fit`), rows 1–10, 12 and 14:
 1. The copies' canvases are 1080 × 1920, 1080 × 1350 and 1080 × 1080; the
    4:5 copy's A passes row 7's corners; the 9:16 copy's picture-in-picture
    placement equals a scratch copy's `set_canvas` + `reframe_clip {keep,
@@ -63,6 +64,11 @@ whose action moves y from 200 to 0 [10, 14); then a matte pair: a still face J
     equal row 1's 9:16 tool copy; `undo` in it answers "Make Vertical" and
     gives back the source's project; the source's `project.json`, saved again,
     is byte-identical and its undo top unchanged.
+14. (#460) `{shape: "9:16", path: …/fault.framejob}`, whose save the dev-only
+    `-RCDevVerticalSaveFault fault.framejob` fails: the call answers the
+    save's error; nothing is at the path; `get_project {project: path}` is
+    refused (no document is open there); the window count, the source's
+    `get_project` project and its undo top are unchanged.
 
 **Launch 2** (`-RCDevAnalysisHold 30 -RCDevVerticalAccept in-place
 -FrameJobFollowKind subject -FrameJobFollowWhereEmpty fit`, uncached
@@ -115,8 +121,9 @@ BLURRED = "Blurred Background"
 MENU = ["File", "Make Vertical Version…"]
 STEP = "Make Vertical"
 PINS = ["-FrameJobFollowKind", "subject", "-FrameJobFollowWhereEmpty", "fit"]
-ROWS = [str(n) for n in range(1, 14)] + ["Z1"]
-LAUNCH_1 = [str(n) for n in range(1, 11)] + ["12"]
+ROWS = [str(n) for n in range(1, 15)] + ["Z1"]
+LAUNCH_1 = [str(n) for n in range(1, 11)] + ["12", "14"]
+FAULT = "fault.framejob"
 LAUNCH_2 = ["11", "13"]
 
 results = {}
@@ -681,6 +688,33 @@ def launch_one(client):
     if "10" in selected:
         attempt(row10, "10")
 
+    def row14():
+        fault_path = WORK / FAULT
+        before = doc.state()
+        top = doc.undo_top()
+        count = windows(client)
+        try:
+            doc.vertical(shape="9:16", path=str(fault_path))
+            why = None
+        except mcp.ToolError as error:
+            why = str(error)
+        left = fault_path.exists()
+        try:
+            project_of(client, fault_path)
+            still_open = True
+        except mcp.ToolError:
+            still_open = False
+        opened = windows(client) - count
+        same = doc.state() == before
+        top_after = doc.undo_top()
+        check("14", why is not None and "could not be saved" in why and not left
+              and not still_open and opened == 0 and same and top_after == top,
+              f"answered {why!r}; a package at the path {left}; the copy still open "
+              f"{still_open}; {opened} windows opened; the source unchanged {same}, undo top "
+              f"{top!r} → {top_after!r}")
+    if "14" in selected:
+        attempt(row14, "14")
+
     if "12" in selected:
         attempt(lambda: menu_row(client, doc, tall_state, bytes_before, undo_before), "12")
 
@@ -878,7 +912,7 @@ def main():
           f"({proof_app.config()} build)", flush=True)
     if selected & set(LAUNCH_1):
         run_launch(binary, ["-RCDevAnalysisCanned", "YES", "-RCDevVerticalAccept", "YES",
-                            *PINS], "canned", LAUNCH_1,
+                            "-RCDevVerticalSaveFault", FAULT, *PINS], "canned", LAUNCH_1,
                    lambda client: attempt_rows(lambda: launch_one(client), LAUNCH_1))
     if selected & set(LAUNCH_2):
         run_launch(binary, ["-RCDevAnalysisHold", "30", "-RCDevVerticalAccept", "in-place",

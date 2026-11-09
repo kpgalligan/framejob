@@ -3,7 +3,8 @@
 SW-81…SW-84, SW-87).
 
 `switch_faces_probe.swift` compiled with app/Sources through swift_build and
-scored here. Every row is pure: no document, no file, no app.
+scored here. Every row is pure but P8, which writes a scratch cache: no
+document, no app.
 
   P1  the largest face and the opening: the larger face second in CJ-31's
       order is the person; equal areas take the first; a NaN gap, a width of
@@ -25,14 +26,18 @@ scored here. Every row is pure: no document, no file, no app.
   P6  `source(atClip:)` trimmed, at speed 2 and reversed, round-tripping
       through `clipTime(ofSource:)`; `faceSeries`' later-starting clip, its
       nearest sample, nil past the media's end and off every clip.
+  P7  an empty range (from == to) in the faces mode: the microphone's
+      no-speech refusal alone, no no-face refusal (#456).
+  P8  `storedActivity` over a faces marker whose second range lies wholly
+      past the grid: no trap, every index answered, indices 0–2 read (#456).
 
 A probe that will not build is a scored failure.
 
     python3 tools/proof/switch_faces_probe.py [--only P1,P3]
     python3 tools/proof/switch_faces_probe.py --mutant NAME   # CAUGHT 1, SURVIVED 0, 2 not run
 
-Four mutants: ratio-removed (P3), voice-gate-removed (P3), first-face (P1),
-wide-in-contest (P4).
+Six mutants: ratio-removed (P3), voice-gate-removed (P3), first-face (P1),
+wide-in-contest (P4), empty-range-no-face (P7), crossed-range-read (P8).
 
 Output under tools/proof/work/switch_faces/.
 """
@@ -47,7 +52,7 @@ import swift_build
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/switch_faces"
-ROWS = ["P1", "P2", "P3", "P4", "P5", "P6"]
+ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"]
 
 # name: (rows that must FAIL, file, anchor, replacement)
 MUTANTS = {
@@ -64,6 +69,13 @@ MUTANTS = {
                         "        let contest = speakers.compactMap(\\.angle)\n",
                         "        let contest = (speakers.compactMap(\\.angle)"
                         " + [input.pairing.wide].compactMap { $0 })\n"),
+    "empty-range-no-face": (["P7"], "SpeakerSwitch.swift",
+                            "for angle in input.faces where count > 0 && angle.activity.count == count",
+                            "for angle in input.faces where angle.activity.count == count"),
+    "crossed-range-read": (["P8"], "SpeakerSwitch+Faces.swift",
+                           "                guard lo <= hi else { continue }\n"
+                           "                for k in lo...hi {",
+                           "                for k in lo...hi {"),
 }
 
 

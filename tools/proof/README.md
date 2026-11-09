@@ -27540,10 +27540,10 @@ python3 tools/proof/cutout_spike/cutout_spike.py --only s1            # then --o
 python3 tools/proof/cutout_spike/cutout_spike.py --only s2 --pack     # the mask pack measured whatever the track answers
 ```
 
-## Road map "creator-jobs" CO1 — person masks on the Mac (`co1_proof.py` P1–P10, M1–M9, Z1; eight mutants; `cutout_spike/` `--only device`; `creator_spike/lane_spike.py --playback --kind masks`; spec §11 CO-10…CO-15)
+## Road map "creator-jobs" CO1 — person masks on the Mac (`co1_proof.py` P1–P11, M1–M9, Z1; nine mutants; `cutout_spike/` `--only device`; `creator_spike/lane_spike.py --playback --kind masks`; spec §11 CO-10…CO-15)
 
 **`co1_proof.py`** builds `co1_probe.swift` from `app/Sources` with `FRAMEJOB_DEV_TOOLS` through `swift_build.py`.
-- **P1–P10** are probe rows: the pack's bytes, the append-merge publish (`AnalysisStore.publishFile`), `shown(at:)`, the found flag, the stamp's `vision` field, a throwing write, a publish during a save, `runs` with the capped rate's nearest slot and `covered`, a marker whose pack is deleted, garbage or another size, and a publish of a range that made no mask (0 × 0, no frames), which keeps the pack and widens its coverage.
+- **P1–P11** are probe rows: the pack's bytes, the append-merge publish (`AnalysisStore.publishFile`), `shown(at:)`, the found flag, the stamp's `vision` field, a throwing write, a publish during a save, `runs` with the capped rate's nearest slot and `covered`, a marker whose pack is deleted, garbage or another size, a publish of a range that made no mask (0 × 0, no frames), which keeps the pack and widens its coverage, and (P11, #456) `AnalysisMasks.run` over a request whose one range lies wholly past the grid, with a missing file: true, no trap, no progress, nothing published. Its mutant `masks-crossed-range` (the guard on the clamped bounds removed) traps, so the probe gives no answer and P11 fails.
 - The probe's `compare` mode is the app rows' mask reader. It answers, for a pair of packs, their sizes, frame counts, the pts both hold, and at those pts the largest byte difference and the IoU above 127. The proof never decompresses LZFSE itself; it parses the tables in Python.
 - **M1–M9** are app rows over `get_media_analysis {kind: "masks"}` and `analysis_job`, each launch on a scratch `CFFIXED_USER_HOME`, with Z1 each launch's parity grep. M9 is Release only (Debug's per-pixel loops are unoptimised; on Debug it prints SKIP). On Debug the third arm reads about half a frame a second, so M4 takes about 20 minutes there.
 
@@ -27557,7 +27557,7 @@ The fixtures are `cutout_spike.fixtures()`'s and the proof's own, all in `tools/
 - `push_640_relinked.mov`: M6's relink target, `push_640.mov` with a title.
 
 ```sh
-python3 tools/proof/co1_proof.py --only P1,P2,P3,P4,P5,P6,P7,P8,P9,P10   # no app
+python3 tools/proof/co1_proof.py --only P1,P2,P3,P4,P5,P6,P7,P8,P9,P10,P11   # no app
 make app-debug && python3 tools/proof/co1_proof.py
 RC_PROOF_APP=release python3 tools/proof/co1_proof.py                 # the recorded run, M9 included
 python3 tools/proof/co1_proof.py --mutant <name>
@@ -27863,12 +27863,13 @@ python3 tools/proof/vr2b_proof.py --only 6,6b,7,7b,9,10     # Debug, in the loop
 python3 tools/proof/screens.py --only 15i-follow-subject-sheet
 ```
 
-## Road map "creator-jobs" VR3a — Make Vertical's step, its copy and `make_vertical_version` (`vr3_proof.py` rows 1–11, Z1 per launch; seven mutants; spec §11 VR-30…VR-37)
+## Road map "creator-jobs" VR3a — Make Vertical's step, its copy and `make_vertical_version` (`vr3_proof.py` rows 1–11 and 14, Z1 per launch; eight mutants; spec §11 VR-30…VR-37, #460)
 
 **`vr3_proof.py`** drives the app (`proof_app.binary()`) on a scratch `CFFIXED_USER_HOME` in two
 launches, its packages under `tools/proof/work/vr3-proof/`. The media is one ffmpeg `testsrc`
 movie (1920 × 1080, 30 fps, 50 s, H.264) copied per media and a `testsrc` PNG (480 × 270); the
-analyses are `canned_framing.py`'s. Launch 1 is `-RCDevAnalysisCanned YES` (rows 1–10) over the
+analyses are `canned_framing.py`'s. Launch 1 is `-RCDevAnalysisCanned YES
+-RCDevVerticalSaveFault fault.framejob` (rows 1–10 and 14) over the
 fixture `src.framejob` (1920 × 1080, 30 fps, magenta background): a white plate [0, 2) s, still
 faces A, C (a zoom-and-volume action), D (a During Drift), E (scale 1.25), I (with an
 `add_blurred_background` copy) and J (on its own track under an alpha matte track holding the
@@ -27892,6 +27893,7 @@ y′ − k·y).
 | 9 | the copy's `cache/analysis/` holds every source file byte for byte; a second run from the source answers `cached` true, `analysis_job`'s `lane_queued` unchanged |
 | 10 | a 64-track source: "Make Vertical was refused at add_track: " and "too many tracks", no window |
 | 11 | (launch 2) `zoom: 5` answers the core's "zoom must be between 1 and 4 times fill, not 5" within 5 s, `lane_queued` unchanged; then the plain call answers `analyzing` past the 60 s bound, no window |
+| 14 | (#460) `{shape: "9:16", path: …/fault.framejob}`, whose save `-RCDevVerticalSaveFault fault.framejob` fails: the call answers the save's error ("… could not be saved …"); nothing is at the path; `get_project {project: path}` refused (the copy closed); the window count, the source's `get_project` project and its undo top unchanged |
 | Z1 | each launch's log has no `Frame Job: ` line |
 
 The mutants, each edited into the tree, a Debug app built with it (`make app-debug`), its row
@@ -27908,6 +27910,8 @@ run and the file restored, every one CAUGHT (its row FAIL, exit 1):
 - **blurred-after-picture** (3): the backdrop class tested after the picture class.
 - **continue-after-add-track** (10): `opening`'s add_track refusal answered with
   `.opened(trial, backgrounds: <the back-most track>)`.
+- **save-cleanup-removed** (14, #460): `makeVerticalVersion`'s catch around the save only
+  rethrows (no `close()`, no `removeItem`), so the package stays at the path and the copy open.
 
 The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 124, and `make_vertical_version` in
 `APP_STATE_TOOLS` of `phase9_proof.py`, `recording_proof.py` and `recording_probe.py`.
@@ -27915,7 +27919,7 @@ The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 124, and `make_verti
 "`make_vertical_version` with `path`".
 
 ```sh
-make app-debug && python3 tools/proof/vr3_proof.py [--only 1,3,8]
+make app-debug && python3 tools/proof/vr3_proof.py [--only 1,3,8,14]
 make app && RC_PROOF_APP=release python3 tools/proof/vr3_proof.py
 ```
 
@@ -28613,7 +28617,7 @@ Mutants: nine are probe mutants on a copy of `app/Sources`
 (U6). `no-replan` builds the app in a tree copy
 (`work/transcript_cut/mutant-app-no-replan/`) and runs C9.
 
-## Road map "creator-jobs" CJ5b — File ▸ New Project from Range… and the derived document (`derived_proof.py` D1–D11, Z1; six mutants; spec §11 CJ-51, CJ-52)
+## Road map "creator-jobs" CJ5b — File ▸ New Project from Range… and the derived document (`derived_proof.py` D1–D12, Z1 with `derived_carry_probe.swift`; eight mutants; spec §11 CJ-51, CJ-52, #459)
 
 **`derived_proof.py`** drives the app (`proof_app.binary()`) on a scratch
 `CFFIXED_USER_HOME` in three launches, its packages saved under
@@ -28641,13 +28645,17 @@ launch's parity grep.
 | D9 | `carried` files, bytes and seconds of two calls over two movies and two sound files, recorded; S-PC1 from `tools/proof/media/creator/` when present, else skipped by name and owed |
 | D10 | the source's `get_project` project and undo top unchanged by the call; File ▸ New Project from Range… (`perform_menu_item`) opens "d1-source (range)" untitled and dirty, the source unchanged again |
 | D11 | an assistant turn calling `new_project_from_range` with `path` waits on "new_project_from_range writes <path>"; `assistant_answer deny` sends the model "The person declined: …" and nothing is at the path |
+| D12 | (#459; a probe row, `derived_carry_probe.swift` built from `app/Sources` through `swift_build.py`, no app) a scratch source cache with `thumbs/3/0.jpg`…`41.jpg`, peaks and a shots marker and payload, listed by `DerivedCarry.listing`; `40.jpg` removed before `copy(_ listing:…)`: no throw, one file fewer carried, every other file byte-identical, no `40.jpg`; then a read-only destination `thumbs/3/`: the throw "cache/thumbs/3/0.jpg could not be carried: Permission denied" |
 
 Mutants (each must fail its row; every one builds a tree copy, `tree_copy.py`; CAUGHT exits 1,
 SURVIVED 0, a control not performed 2): `deleted-transcript-carried` D4 (every cloud transcript
 carried), `reverse-not-carried` D5, `windows-before-caches` D3 (`makeWindowControllers()` before
 the caches land, so a pass starts), `every-module-carried` D6, `caches-in-temp-then-saved` D8
 (the path package opened untitled, its caches in a temporary folder, and saved after),
-`source-edited` D10 (the tool applies `keep_range` to the source first).
+`source-edited` D10 (the tool applies `keep_range` to the source first). D12's two
+(`vanished-throws`, the skip removed; `skip-every-failure`, every failed clone skipped) copy
+only `app/Sources` and rebuild the probe: no tree copy, no app, no Z1. A selection with no app
+row (`--only D12`, either of them) launches nothing.
 
 The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 110, and `new_project_from_range`
 in `APP_STATE_TOOLS` of `phase9_proof.py`, `recording_proof.py` and `recording_probe.py`.
@@ -28655,6 +28663,7 @@ in `APP_STATE_TOOLS` of `phase9_proof.py`, `recording_proof.py` and `recording_p
 with `path`".
 
 ```sh
+python3 tools/proof/derived_proof.py --only D12   # no app
 make app-debug && python3 tools/proof/derived_proof.py [--only D1,D3,D4]
 RC_PROOF_APP=release python3 tools/proof/derived_proof.py [--mutant <name>]
 ```
@@ -29515,7 +29524,7 @@ crosstalk passage never one turn), after SW-22 (a)'s crosstalk bridge its second
 b24_f45's one late cut), and after SW-S4's named limit (the owner's second answer) its third
 (59/75, `CHOSEN bleed_db 15, dominance_db 8, floor_margin_db 6`, the draft). No person check.
 
-## Road map "creator-jobs" SW2b — Switch by Speaker's sheet, tool and Program track (`switch_speaker_proof.py` S1–S13, Z0; ten mutants; spec §11 SW-23, SW-26)
+## Road map "creator-jobs" SW2b — Switch by Speaker's sheet, tool and Program track (`switch_speaker_proof.py` S1–S14, Z0; eleven mutants; spec §11 SW-23, SW-26, #457)
 
 **`switch_speaker_proof.py [SOCKET]`** drives the app over F-TURNS (`creator_spike/f_turns.py`,
 run first and reused while its generator hash holds; without `say -v Samantha` or `Daniel` it
@@ -29556,12 +29565,16 @@ analysed". Packages land under `tools/proof/work/sw2b/`.
 - **S13** Cam B with sound, detached: both `apply` values refused in SW-23 (h)'s sentence, the
   sheet's summary (`snapshot_ui`, `switchspeaker.summary`) the same; in the dev-accept instance
   the refused sheet stays up and changes nothing (the layout dump carries no enabled state).
+- **S14** (#457) one camera clip selected, whose plan is refused ("needs at least two angles"):
+  `{mute_cameras: "yes"}` answers exactly "mute_cameras must be true or false." and `{apply:
+  "maybe"}` "apply must be true or false.", the project and its undo top unchanged.
 - **Z0** `grep "Frame Job: "` of every instance's log is empty.
 
 Mutants (`--mutant NAME`, each on a `tree_copy.py` copy's built app; CAUGHT exits 1):
 min-turn-ignored, crosstalk-never-wide, lead-twice, snap-removed (S1); ceiling-removed (S7);
 whole-track-hidden (S8); sheet-min-shot-not-passed (S10); replace-clear-removed (S11);
-mute-default-inverted (S12); linked-refusal-removed (S13).
+mute-default-inverted (S12); linked-refusal-removed (S13); arguments-after-plan (S14, `mute_cameras`
+and `apply` read with `try?`, so a malformed value reaches the plan's refusal).
 
 ```sh
 python3 tools/proof/switch_speaker_proof.py <dir>/agent.sock [--only S1,S8]
@@ -29632,10 +29645,10 @@ make app && RC_PROOF_APP=release python3 tools/proof/cursor_proof.py
 The recorded runs are in `designs/creator-jobs.md`'s CU3c record. JOB-21, JOB-27 and JOB-28 are
 the person checks.
 
-## Road map "creator-jobs" SW8 — Switch by Speaker with one shared microphone, from faces (`switch_faces_probe.py` P1–P6 with `switch_faces_probe.swift`; `switch_faces_proof.py` M0–M6; five mutants; `creator_spike/mouth_spike.py` SW-S3's head; spec §11 SW-80…SW-88)
+## Road map "creator-jobs" SW8 — Switch by Speaker with one shared microphone, from faces (`switch_faces_probe.py` P1–P8 with `switch_faces_probe.swift`; `switch_faces_proof.py` M0–M6; seven mutants; `creator_spike/mouth_spike.py` SW-S3's head; spec §11 SW-80…SW-88)
 
 **`switch_faces_probe.py [--only P1,P3]`** builds `switch_faces_probe.swift` with `app/Sources`
-through `swift_build` and scores pure rows — no document, file or app:
+through `swift_build` and scores pure rows — no document or app; only P8 writes a scratch file:
 
 - **P1** the largest face (second in CJ-31's order) is the person, equal areas the first; its
   gap/width the opening; a NaN gap, width 0, pts −1 and no face nil.
@@ -29651,9 +29664,15 @@ through `swift_build` and scores pure rows — no document, file or app:
 - **P6** `source(atClip:)` trimmed, at speed 2 and reversed, round-tripping through
   `clipTime(ofSource:)`; `faceSeries`' later-starting clip, nil past the media's end and off
   every clip.
+- **P7** (#456) an empty range (from == to) in the faces mode: the microphone's no-speech
+  refusal alone, no no-face refusal.
+- **P8** (#456) `storedActivity` over a scratch faces marker whose second range lies wholly past
+  the grid: no trap, the grid's count of values, indices 0–2 read.
 
 Mutants (`--mutant NAME`, each on a copy of `app/Sources`; CAUGHT exits 1): ratio-removed (P3),
-voice-gate-removed (P3), first-face (P1), wide-in-contest (P4).
+voice-gate-removed (P3), first-face (P1), wide-in-contest (P4), empty-range-no-face (P7, SW-84's
+loop without `count > 0`), crossed-range-read (P8, the guard on the clamped bounds removed: the
+probe traps).
 
 **`switch_faces_proof.py`** drives the app over F-TURNS' cameras (`creator_spike/f_turns.py`,
 skipped by name without `say`'s voices) and ONE microphone, `mic_a_b12_f55.wav`, with canned
@@ -29690,7 +29709,7 @@ python3 tools/proof/creator_spike/mouth_spike.py
 
 The recorded runs are in `designs/creator-jobs.md`'s SW8 record. Person check: JOB-55.
 
-## Road map "creator-jobs" CU10 — the recorder polishes on landing (`cu10_probe.py` B0, Q1–Q6 with `cu10_probe.swift`; `cu10_proof.py` Z0, P1, P1b, P2, P3, P4; eight mutants; spec §11 CU-100…CU-103)
+## Road map "creator-jobs" CU10 — the recorder polishes on landing (`cu10_probe.py` B0, Q1–Q7 with `cu10_probe.swift`; `cu10_proof.py` Z0, P1, P1b, P2, P3, P4, P5; nine mutants; spec §11 CU-100…CU-103, #458)
 
 **Ungranted, no app.** `cu10_probe.py` builds `cu10_probe.swift` from `app/Sources` on
 `cu3c_probe.py`'s shape and exit rule R (`--sources`, `--mutant`, `--only`). The panel is
@@ -29705,6 +29724,7 @@ The recorded runs are in `designs/creator-jobs.md`'s SW8 record. Person check: J
 | Q4 | `RecordingPolish.commands(of:)` in `allCases` order; the titles; `RecordingChoice()` asks none |
 | Q5 | `decide`: drop with no clips, wait while enhancing (past the limit too), run when ready and not busy, wait at 299 s, give up at 300 s |
 | Q6 | `recordingPolish`'s refusals in CU-102 (b)'s sentences and order, exact; `recordingSourceKind` refusing the three with voice_over (in `voiceOverScreenOnlyArguments` order) and camera |
+| Q7 | (#458) a `ProjectDocument` with a top-level clip of a screen media with a cursor file and a nest, the nest open: `screenClips` and `RecordingEnhance.present` with the landing's scope (nil) still find the landed clip, `isBusy` is true, and both `decide`s answer wait, not drop |
 
 `recording_probe.py`'s 5d and D3 count sixteen keys and 7c's arguments gain the three;
 `camera_recording_probe.swift`'s P3 and its box row count sixteen.
@@ -29718,16 +29738,25 @@ P1b (its own instance, the nine Auto Zoom and Speed Up Typing sheet keys pinned 
 by launch arguments): the panel door with `follow_wait` gives the same names and the same project.
 P2: `speed_up_typing.speech_saved` names the voice. P3: `auto_zoom` refused by name with `source:
 voice_over` and without `movie`. P4: `place: false` and `speed_up_typing` without `keys` refused
-through both tools, the project unchanged.
+through both tools, the project unchanged. P5 (#458; its own instance with P1b's pins): a
+package holding a nest before the landing; the panel door with `enhance` and `auto_zoom`, the
+voice spoken (`say -v Samantha`, padded to 20 s), no `follow_wait`; at once `set_scope` into the
+nest, 3 s, out; within 300 s the screen clip holds Auto Zoom's actions and the undo names read
+Auto Zoom then Add Recording (Enhance Voice allowed between): the polish waited out the nest.
+Enhance is asked for its wait, which holds the polish past the nest; its own step is not
+required, because on a Debug build the panel door's Enhance Voice makes no step on this fixture
+even with no nest open (filed by fixes batch c1; on Release it does).
 
 Mutants (each must fail its row): `cu10_probe.py --mutant place-admitted` and `keys-admitted`
 (Q6), `enhance-ignored` and `ready-ignored` (Q5), `absent-zoom-off` (Q2),
-`shortcuts-without-keys` (Q3); `cu10_proof.py --mutant wrong-order` and `one-step` (P1), each on
-a `tree_copy.py` copy whose app it builds.
+`shortcuts-without-keys` (Q3), `open-container` (Q7: `RecordingEnhance.container(of:scope:)`
+answers the open container); `cu10_proof.py --mutant wrong-order` and `one-step` (P1), each on
+a `tree_copy.py` copy whose app it builds; and by hand `open-container` again for P5 (edited into
+the tree, `make app-debug`, `--only P5` fails, the file restored).
 
 ```sh
 make rust
-python3 tools/proof/cu10_probe.py [--only Q2,Q6]
+python3 tools/proof/cu10_probe.py [--only Q2,Q6,Q7]
 python3 tools/proof/cu10_probe.py --mutant <name>
 make app-debug && python3 tools/proof/cu10_proof.py <dir>/agent.sock
 make app && RC_PROOF_APP=release python3 tools/proof/cu10_proof.py

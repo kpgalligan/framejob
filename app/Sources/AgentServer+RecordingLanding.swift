@@ -124,13 +124,19 @@ extension AgentServer {
     /// CU-101 (j), `polishLanded`). The answer is `land`'s with `enhance`
     /// (that body's answer) or `enhance_error`, the polish's answers or
     /// `…_error` sentences, and `project` read again, last, when any ran.
+    /// The landing's scope, and the voice clips when Enhance is asked for, are read in the hop
+    /// that runs `land`, while the open container is the landing's, and handed on (#458).
     func landAndEnhance(_ result: RecordingResult, place: Bool) throws -> String {
         let stop = AgentLane.shared.callCancel
-        let (answer, document, cutout) = try onMain {
-            () throws -> (String, ProjectDocument, [UInt32]) in
+        let (answer, document, cutout, scope, voice) = try onMain {
+            () throws -> (String, ProjectDocument, [UInt32], UInt32?, [UInt32]) in
             let (answer, document) = try self.land(result, place: place)
+            let voice =
+                result.choice.enhanceMicrophone
+                ? RecordingEnhance.voiceClips(of: result, in: document) : []
             // CO-81: Remove Background, its own step, before Enhance Voice and the polish.
-            return (answer, document, RecordingCutout.apply(result, in: document))
+            let cutout = RecordingCutout.apply(result, in: document)
+            return (answer, document, cutout, document.scope, voice)
         }
         let polish = !RecordingPolish.commands(of: result.choice).isEmpty
         let wantsCutout = result.choice.cameraCutout
@@ -144,29 +150,28 @@ extension AgentServer {
             }
         }
         if result.choice.enhanceMicrophone {
-            try enhanceLanded(result, in: document, stop: stop, into: &fields)
+            try enhanceLanded(voice, in: document, scope: scope, stop: stop, into: &fields)
         }
-        if polish { polishLanded(result, in: document, into: &fields) }
+        if polish { polishLanded(result, in: document, scope: scope, into: &fields) }
         fields["project"] = onMain { self.summary(document) }
         return try jsonResult(fields)
     }
 
-    /// SERVER THREAD. AU-68 (f)'s wait and Enhance Voice, its answer or
-    /// `enhance_error` written into `fields`.
+    /// SERVER THREAD. AU-68 (f)'s wait and Enhance Voice over `clips`, the
+    /// voice clips `landAndEnhance` read in the landing's `scope`, its answer
+    /// or `enhance_error` written into `fields`.
     private func enhanceLanded(
-        _ result: RecordingResult, in document: ProjectDocument, stop: AgentCallCancel?,
+        _ clips: [UInt32], in document: ProjectDocument, scope: UInt32?, stop: AgentCallCancel?,
         into fields: inout [String: Any]
     ) throws {
-        let (clips, scope) = onMain {
-            (RecordingEnhance.voiceClips(of: result, in: document), document.scope)
-        }
         let started = Date()
         var step = RecordingEnhance.Step.wait
         while step == .wait, stop?.isCancelled != true {
             step = onMain { () -> RecordingEnhance.Step in
-                let present = RecordingEnhance.present(clips, in: document)
+                let present = RecordingEnhance.present(clips, in: document, scope: scope)
                 return RecordingEnhance.decide(
-                    clips: present, analysed: RecordingEnhance.isAnalysed(present, in: document),
+                    clips: present,
+                    analysed: RecordingEnhance.isAnalysed(present, in: document, scope: scope),
                     busy: RecordingEnhance.isBusy(document, scope: scope),
                     elapsed: Date().timeIntervalSince(started))
             }

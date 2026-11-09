@@ -53,15 +53,16 @@ extension AgentServer {
     /// answer object under the command's name, or a sentence under `<name>_error`. On `.drop`,
     /// `.giveUp` or the call's cancel, every command not yet run gets its sentence. The cursor
     /// files are read here, once, for the speed-up's readiness; a read that fails counts as
-    /// ready, so the body says why.
+    /// ready, so the body says why. `scope` is the landing's, read in `land`'s hop; the clips
+    /// and cursor files are read in its container (#458).
     func polishLanded(
-        _ result: RecordingResult, in document: ProjectDocument, into fields: inout [String: Any]
+        _ result: RecordingResult, in document: ProjectDocument, scope: UInt32?,
+        into fields: inout [String: Any]
     ) {
         var remaining = RecordingPolish.commands(of: result.choice)
         guard !remaining.isEmpty else { return }
         let stop = AgentLane.shared.callCancel
         let paths = RecordingPolish.screenPaths(of: result)
-        let scope = onMain { document.scope }
         var tracks: [UInt32: ReelCursor]?
         var started = Date()
         func fail(_ sentence: (RecordingPolish.Command) -> String) {
@@ -75,8 +76,8 @@ extension AgentServer {
             }
             if command == .speedUpTyping, tracks == nil {
                 let files = onMain { () -> [UInt32: URL] in
-                    let snapshot = document.editedProject.snapshot
-                    let clips = RecordingPolish.screenClips(paths, in: document)
+                    let snapshot = RecordingEnhance.container(of: document, scope: scope).snapshot
+                    let clips = RecordingPolish.screenClips(paths, in: document, scope: scope)
                     return (try? AutoZoom.cursorFiles(
                         clips.compactMap { snapshot.clip($0) }, in: snapshot)) ?? [:]
                 }
@@ -84,16 +85,17 @@ extension AgentServer {
             }
             let held = tracks ?? [:]
             let step = onMain { () -> RecordingPolish.Step in
-                let clips = RecordingPolish.screenClips(paths, in: document)
+                let clips = RecordingPolish.screenClips(paths, in: document, scope: scope)
+                let busy = RecordingEnhance.isBusy(document, scope: scope)
+                // `isReady` reads the open container, so only when it is the landing's.
                 let ready =
-                    !clips.isEmpty
+                    !clips.isEmpty && !busy
                     && RecordingPolish.isReady(
                         command, clips: clips, tracks: held, speedUp: SpeedUpTypingSettings(),
                         in: document)
                 return RecordingPolish.decide(
                     command: command, clips: clips,
-                    enhancing: RecordingEnhance.isPending(document), ready: ready,
-                    busy: RecordingEnhance.isBusy(document, scope: scope),
+                    enhancing: RecordingEnhance.isPending(document), ready: ready, busy: busy,
                     elapsed: Date().timeIntervalSince(started))
             }
             switch step {

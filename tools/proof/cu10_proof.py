@@ -28,6 +28,16 @@ Rows:
   grant) and without `movie` (`land_recording`).
 - P4 `auto_zoom: true, place: false` and `speed_up_typing: true` without `keys` refused in
   CU-102 (b)'s sentences through both tools; the project unchanged.
+- P5 (#458) its own instance (P1b's pins): a package holding a nest (a clip of the silence at
+  60 s, nested) before the landing; the door panel with `enhance: true` and `auto_zoom: true`,
+  the voice spoken (`say -v Samantha`, padded to 20 s; without the voice the row fails naming
+  it), no `follow_wait`; at once `set_scope` into the nest, 3 s, `set_scope` out. Within 300 s
+  the screen clip holds Auto Zoom's actions, and the undo names read "Auto Zoom" then "Add
+  Recording", with only "Enhance Voice" allowed between them: the polish waited out the nest
+  rather than dropping (Enhance is there for its wait, which holds the polish past the nest;
+  its own step is not required — on a Debug build the panel door's Enhance Voice makes no step
+  on this fixture even with no nest open, filed as its own issue by fixes batch c1; on Release
+  it does, and the undo reads all three).
 
 `--mutant NAME` edits a `tree_copy.py` copy, builds its app and runs P1 on it: `wrong-order`
 (the commands reversed) and `one-step` (the tool door's three runs inside one undo group).
@@ -59,7 +69,11 @@ BUILD_BOUND = 1500
 W, H = 640, 360
 PLAIN = ["P1", "P2", "P3", "P4"]
 PANEL = ["P1b"]
-ROWS = ["Z0"] + PLAIN + PANEL
+NESTED = ["P5"]
+ROWS = ["Z0"] + PLAIN + PANEL + NESTED
+NESTED_STEPS = [["Auto Zoom", "Add Recording"], ["Auto Zoom", "Enhance Voice", "Add Recording"]]
+SPOKEN = ("This is the voice of a screen recording. Each sentence is spoken clearly, so the "
+          "speech is found and the voice can be enhanced once the recording has landed.")
 PANEL_ARGS = [
     "-FrameJobAutoZoomZoom", "2", "-FrameJobAutoZoomLead", "0.6", "-FrameJobAutoZoomStay", "2.5",
     "-FrameJobAutoZoomFollow", "YES", "-FrameJobAutoZoomReplace", "NO",
@@ -137,6 +151,22 @@ def media():
             subprocess.run(["ffmpeg", "-v", "error", "-y", *args, str(out)], check=True,
                            timeout=300, env=bounded.child_env())
     return {name.split(".")[0]: folder / name for name in made}
+
+
+def spoken_voice():
+    """A 20 s spoken voice (`say -v Samantha`, padded), made once; None when `say` cannot."""
+    out = WORK / "media" / "spoken.m4a"
+    if out.exists():
+        return out
+    aiff = WORK / "media" / "spoken.aiff"
+    said = subprocess.run(["say", "-v", "Samantha", "-o", str(aiff), SPOKEN],
+                          capture_output=True, text=True, timeout=120)
+    if said.returncode != 0 or not aiff.exists():
+        return None
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(aiff), "-af", "apad", "-t", "20",
+                    "-ar", "48000", "-ac", "1", "-c:a", "aac", str(out)], check=True,
+                   timeout=300, env=bounded.child_env())
+    return out
 
 
 def us(seconds):
@@ -309,6 +339,47 @@ def p1b(client, files):
           f"P1's {same}")
 
 
+def p5(client, files):
+    """#458: a nest opened while both panel follow-ups wait is busy, not a drop."""
+    spoken = spoken_voice()
+    if spoken is None:
+        check("P5", False, "say -v Samantha could not make the spoken voice")
+        return
+    rec = recording(files)
+    voice = WORK / "rec" / "A (Spoken).m4a"
+    shutil.copyfile(spoken, voice)
+    rec = {**rec, "voice": [str(voice)]}
+    doc = Doc(client, "p5")
+    try:
+        track = doc.state()["tracks"][0]["id"]
+        silence = doc.call("import_media", path=str(files["silence"]))["media"]
+        inner = doc.call("add_clip", track=track, media=silence, at=60 * 600_000)["new_clips"][0]
+        doc.call("nest", clips=[inner])
+        nest = doc.state()["nests"][0]["id"]
+        answer = doc.call("land_recording", door="panel", enhance=True, auto_zoom=True, **rec)
+        doc.call("set_scope", nest=nest)
+        time.sleep(3)
+        doc.call("set_scope")
+        began = time.monotonic()
+        zoomed = False
+        while time.monotonic() - began < 300:
+            state = doc.state()
+            clips = [c for c in state["clips"] if c["id"] in screen_clips(state, rec["movie"])]
+            if clips and any(c.get("actions") for c in clips):
+                zoomed = True
+                break
+            time.sleep(1)
+        took = time.monotonic() - began
+        time.sleep(1)
+        names = doc.undo_names(3)
+    finally:
+        doc.close()
+    upto = names[:names.index("Add Recording") + 1] if "Add Recording" in names else names
+    check("P5", answer.get("landed") == "document" and zoomed and upto in NESTED_STEPS,
+          f"landed {answer.get('landed')!r}; Auto Zoom's actions seen {zoomed} after "
+          f"{took:.0f} s; undo {names} (want one of {NESTED_STEPS} to Add Recording)")
+
+
 def p3_p4(client, files):
     rec = recording(files)
     said = refusal(lambda: client.call("record_screen", seconds=1, source="voice_over",
@@ -452,6 +523,10 @@ def main():
         if not with_instance(binary, PANEL_ARGS, "panel",
                              lambda c: attempt(lambda: p1b(c, files), "P1b")):
             check("P1b", False, "the app did not listen (panel)")
+    if "P5" in selected:
+        if not with_instance(binary, PANEL_ARGS, "nested",
+                             lambda c: attempt(lambda: p5(c, files), "P5")):
+            check("P5", False, "the app did not listen (nested)")
 
     failed = [name for name, runs in results.items() if not all(ok for ok, _ in runs)]
     passed = [name for name in results if name not in failed]

@@ -90,39 +90,67 @@ enum DerivedCarry {
         return names
     }
 
-    /// Each regular file under `paths` cloned from `source` to `destination`
-    /// (`copyfile` with `COPYFILE_CLONE`, which falls back to a copy where
-    /// the volume cannot clone), folders created; throws on the first
-    /// failure, naming the file. Main.
+    /// What a carry copies, both relative to the source and sorted: the folders it creates and
+    /// the regular files it clones.
+    struct Listing: Equatable {
+        let folders: [String]
+        let files: [String]
+    }
+
+    /// Each of `paths` that exists under `source`: a file as itself; a folder as itself and
+    /// every regular file under it. A folder that vanishes while it is enumerated contributes
+    /// nothing. Main.
+    static func listing(_ paths: [String], in source: URL) -> Listing {
+        let files = FileManager.default
+        var folders: [String] = []
+        var regular: [String] = []
+        for relative in paths {
+            var isFolder: ObjCBool = false
+            let from = source.appendingPathComponent(relative)
+            guard files.fileExists(atPath: from.path, isDirectory: &isFolder) else { continue }
+            guard isFolder.boolValue else {
+                regular.append(relative)
+                continue
+            }
+            guard let inner = try? regularFiles(under: from) else { continue }
+            folders.append(relative)
+            regular += inner.map { "\(relative)/\($0)" }
+        }
+        return Listing(folders: folders.sorted(), files: regular.sorted())
+    }
+
+    /// `copy(_:from:to:)` over `listing(paths, in: source)`. Main.
     static func copy(_ paths: [String], from source: URL, to destination: URL) throws -> Report {
+        try copy(listing(paths, in: source), from: source, to: destination)
+    }
+
+    /// Each folder of `listing` created under `destination`, then each file cloned from
+    /// `source` (`copyfile` with `COPYFILE_CLONE`, which falls back to a copy where the volume
+    /// cannot clone). A file gone from the source when it is cloned is skipped and not counted
+    /// — the thumbnail pass prunes its tiles outside the save bracket, and the copy's own pass
+    /// makes them again (#459); any other failure throws, naming the file. Main.
+    static func copy(_ listing: Listing, from source: URL, to destination: URL) throws -> Report {
         let began = Date()
         let files = FileManager.default
         var count = 0
         var bytes: Int64 = 0
-        func clone(_ relative: String) throws {
+        for relative in listing.folders {
+            try files.createDirectory(
+                at: destination.appendingPathComponent(relative), withIntermediateDirectories: true)
+        }
+        for relative in listing.files {
             let from = source.appendingPathComponent(relative)
             let to = destination.appendingPathComponent(relative)
             try files.createDirectory(
                 at: to.deletingLastPathComponent(), withIntermediateDirectories: true)
             guard copyfile(from.path, to.path, nil, copyfile_flags_t(COPYFILE_CLONE)) == 0 else {
                 let why = String(cString: strerror(errno))
+                if !files.fileExists(atPath: from.path) { continue }
                 throw ReelCoreError(message: "cache/\(relative) could not be carried: \(why)")
             }
             count += 1
             let size = (try? files.attributesOfItem(atPath: to.path)[.size] as? NSNumber)
             bytes += size?.int64Value ?? 0
-        }
-        for relative in paths {
-            var isFolder: ObjCBool = false
-            let from = source.appendingPathComponent(relative)
-            guard files.fileExists(atPath: from.path, isDirectory: &isFolder) else { continue }
-            guard isFolder.boolValue else {
-                try clone(relative)
-                continue
-            }
-            try files.createDirectory(
-                at: destination.appendingPathComponent(relative), withIntermediateDirectories: true)
-            for inner in try regularFiles(under: from) { try clone("\(relative)/\(inner)") }
         }
         return Report(files: count, bytes: bytes, seconds: Date().timeIntervalSince(began))
     }

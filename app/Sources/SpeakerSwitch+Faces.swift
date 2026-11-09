@@ -160,7 +160,10 @@ extension SpeakerSwitch {
             let decoded = AnalysisFaces.decode(data), decoded.count == grid.count
         {
             for range in marker.ranges {
-                for k in max(0, range.lowerBound)...min(grid.lastIndex, range.upperBound) {
+                // A range past the grid's last index covers none of it (#456).
+                let lo = max(0, range.lowerBound), hi = min(grid.lastIndex, range.upperBound)
+                guard lo <= hi else { continue }
+                for k in lo...hi {
                     openings[k] = FaceActivity.opening(decoded.samples[k])
                 }
             }

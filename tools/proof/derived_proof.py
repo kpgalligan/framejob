@@ -66,10 +66,22 @@ scratch `-RCSecretFolder`, `assistant_session_proof.py`'s shape):
 
 Z1 is each launch's `grep "Frame Job: "`.
 
-`--mutant NAME`: the named decision broken in a tree copy built by
-`tree_copy.py`, and only its row run (with Z1). CAUGHT exits 1 (its row
-failed), SURVIVED exits 0, and a control that could not be performed (the
-copy did not build, an anchor not found once) exits 2.
+**Probe row** (`derived_carry_probe.swift`, built from `app/Sources` through
+`swift_build.py`; no app):
+- D12 (#459) a scratch source cache with `thumbs/3/0.jpg`…`41.jpg`, peaks and
+  a shots marker and payload, listed by `DerivedCarry.listing`; `40.jpg`
+  removed between the listing and `copy(_ listing:…)`: no throw, one file
+  fewer carried than listed, every other file byte-identical, no `40.jpg`.
+  Then a destination `thumbs/3/` made read-only: the copy throws "cache/
+  thumbs/3/0.jpg could not be carried: Permission denied".
+
+`--mutant NAME`: the named decision broken in a copy — `app/Sources` copied
+for the probe's row (no tree copy, no app build, no Z1), the tree copied and
+built by `tree_copy.py` for the app's — and only its row run (with Z1 for an
+app row). CAUGHT exits 1 (its row failed), SURVIVED exits 0, and a control
+that could not be performed (the copy did not build, an anchor not found
+once) exits 2. A selection with no app row (`--only D12`, `vanished-throws`,
+`skip-every-failure`) launches no app.
 """
 
 import argparse
@@ -89,6 +101,7 @@ sys.path.insert(0, str(HERE / "graphics_spike"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
 import proof_app  # noqa: E402
+import swift_build  # noqa: E402
 import tree_copy  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/derived-proof"
@@ -107,7 +120,9 @@ FROM, TO = 2 * SEC, 6 * SEC
 PLAIN = ["D1", "D2", "D3", "D4", "D5", "D6", "D8", "D9", "D10"]
 HIDDEN = ["D7"]
 ASSISTANT = ["D11"]
-ROWS = PLAIN + HIDDEN + ASSISTANT + ["Z1"]
+P_ROWS = ["D12"]
+ROWS = PLAIN + HIDDEN + ASSISTANT + P_ROWS + ["Z1"]
+APP_ROWS = set(PLAIN + HIDDEN + ASSISTANT)
 F1_ROWS = {"D1", "D3", "D4", "D5", "D6", "D8", "D10"}
 MANUAL = {"API.md", "API.d.ts"}
 CARRIED_KINDS = ["thumbs", "peaks", "loudness", "speech", "sync", "analysis", "transcripts",
@@ -165,6 +180,13 @@ MUTANTS = {
         "                made = try ProjectDocument.derived(\n",
         "                document.applyEdit(\"Keep Range\", [.keepRange(from: from, to: to)])\n"
         "                made = try ProjectDocument.derived(\n")]),
+    "vanished-throws": (["D12"], [(
+        "app/Sources/DerivedCarry.swift",
+        "                if !files.fileExists(atPath: from.path) { continue }\n", "")]),
+    "skip-every-failure": (["D12"], [(
+        "app/Sources/DerivedCarry.swift",
+        "                if !files.fileExists(atPath: from.path) { continue }\n",
+        "                if true { continue }\n")]),
 }
 
 results = {}
@@ -794,6 +816,60 @@ def app_rows(binary):
             fake.stop()
 
 
+# ---- the probe row ----------------------------------------------------------------
+
+def build_probe(sources):
+    out = WORK / "probe"
+    out.mkdir(parents=True, exist_ok=True)
+    entry = out / "main.swift"
+    shutil.copyfile(HERE / "derived_carry_probe.swift", entry)
+    swift = sorted(str(p) for p in Path(sources).glob("*.swift") if p.name != "main.swift")
+    binary = out / "derived-carry-probe"
+    swift_build.build(sources=swift + [str(entry)], output=binary)
+    return binary
+
+
+def probe_rows(sources):
+    rows = [r for r in P_ROWS if r in selected]
+    if not rows:
+        return
+    try:
+        binary = build_probe(sources)
+    except swift_build.SwiftBuildFailed as error:
+        for row in rows:
+            check(row, False, "the probe did not build: " + "; ".join(error.diagnostics[:6]))
+        return
+    try:
+        run = subprocess.run([str(binary), str(WORK / "probe" / "run")], capture_output=True,
+                             text=True, timeout=300)
+        answer = json.loads(run.stdout)["rows"]
+    except (subprocess.TimeoutExpired, ValueError, KeyError) as error:
+        for row in rows:
+            check(row, False, f"the probe gave no answer: {error}")
+        return
+    for row in rows:
+        got = [r for r in answer if r["id"] == row]
+        if not got:
+            check(row, False, "no row")
+        for one in got:
+            check(row, one["pass"], one["detail"])
+
+
+# ---- mutants ---------------------------------------------------------------------
+
+def mutant_sources(name):
+    copy = WORK / "mutant-sources"
+    shutil.rmtree(copy, ignore_errors=True)
+    shutil.copytree(ROOT / "app/Sources", copy)
+    for path, anchor, replacement in MUTANTS[name][1]:
+        target = copy / Path(path).name
+        text = target.read_text()
+        if text.count(anchor) != 1:
+            return None, f"the anchor occurs {text.count(anchor)} times in {path}"
+        target.write_text(text.replace(anchor, replacement))
+    return copy, None
+
+
 def mutant_app(name):
     made, reason = tree_copy.make_copy(str(WORK / "mutant"))
     if made is None:
@@ -816,32 +892,41 @@ def main():
     parser.add_argument("--app")
     args = parser.parse_args()
     if args.mutant:
-        selected = set(MUTANTS[args.mutant][0]) | {"Z1"}
+        selected = set(MUTANTS[args.mutant][0])
     elif args.only:
         selected = {r.strip() for r in args.only.split(",") if r.strip()}
         unknown = selected - set(ROWS)
         if unknown:
             print(f"unknown rows: {sorted(unknown)}")
             return 2
+    if selected & APP_ROWS:
         selected.add("Z1")
     if WORK.exists():
         tree_copy.remove_tree(str(WORK))
     HOME.mkdir(parents=True)
     binary = Path(args.app) if args.app else None
+    sources = ROOT / "app/Sources"
     if args.mutant:
         named = MUTANTS[args.mutant][0]
         print(f"CJ5b — the {args.mutant} MUTANT ({', '.join(named)} must FAIL)", flush=True)
-        binary, why = mutant_app(args.mutant)
+        if set(named) <= set(P_ROWS):
+            sources, why = mutant_sources(args.mutant)
+        else:
+            binary, why = mutant_app(args.mutant)
         if why:
             print(f"mutant {args.mutant}: the control could not be performed — {why}")
             return 2
-    else:
+    elif selected & APP_ROWS:
         print(f"CJ5b — New Project from Range ({proof_app.config()} build)", flush=True)
-    if binary is None:
-        binary = proof_app.binary()
-    if binary.suffix == ".app":
-        binary = proof_app.executable(binary)
-    app_rows(binary)
+    else:
+        print("CJ5b — New Project from Range (probe only, no app)", flush=True)
+    probe_rows(sources)
+    if selected & APP_ROWS:
+        if binary is None:
+            binary = proof_app.binary()
+        if binary.suffix == ".app":
+            binary = proof_app.executable(binary)
+        app_rows(binary)
     failed = [name for name, runs in results.items() if not all(ok for ok, _ in runs)]
     passed = [name for name in results if name not in failed]
     print(f"\n{len(passed)}/{len(results)} rows passed" + (f"; failed {failed}" if failed else ""))
