@@ -22,11 +22,12 @@ extension AgentServer {
     /// patch's keys in `set_audio`'s spelling) and one sentence per rule,
     /// then the solve's figures for the volume (`processed_lufs`, `renders`
     /// and where the last render lands); the skips by name. A second
-    /// identical call is an identity: "Enhance Voice made no change".
+    /// identical call is an identity: "Enhance Voice made no change". One
+    /// main-thread hop reads the arguments and the setup (#412).
     func enhanceVoice(_ a: [String: Any]) throws -> String {
+        let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16)
         try requireServerThread("enhance_voice")
-        let (document, clips, requested) = try onMain {
-            () throws -> (ProjectDocument, [UInt32], Double) in
+        let read = try onMain { () throws -> EnhanceRead in
             let document = try self.target(a)
             let clips = try self.clipsArg(a, "clips", document)
             let range = AudioNormalize.targetLUFSRange
@@ -38,56 +39,68 @@ extension AgentServer {
                         + "\(range.upperBound) LUFS, and the default is "
                         + "\(AudioNormalize.defaultTargetLUFS).")
             }
-            return (document, clips, requested)
+            return try self.enhanceRead(document: document, clips: clips, targetLUFS: requested)
         }
-        return try enhanceVoice(document: document, clips: clips, targetLUFS: requested)
+        return try enhanceMeasured(read, stop: stop)
     }
 
-    /// `enhance_voice`'s body over clips and a target already read — also
-    /// `record_screen {enhance}`'s (spec §11 AU-68 (f)): a read hop, the wait
-    /// here, the commit hop. SERVER THREAD.
-    func enhanceVoice(document: ProjectDocument, clips: [UInt32], targetLUFS requested: Double)
+    /// The body over clips and a target already read, `record_screen
+    /// {enhance}`'s (spec §11 AU-68 (f)): one read hop, the wait here, the
+    /// commit hop. SERVER THREAD.
+    func enhanceVoice(document: ProjectDocument, clips: [UInt32], targetLUFS: Double)
         throws -> String
     {
         let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16)
         try requireServerThread("enhance_voice")
-        struct Read {
-            let document: ProjectDocument
-            let input: AudioEnhance.Input
-            let choices: [AudioEnhance.Choice]
-            let run: LoudnessMeasureRun
-            let target: Double
-            let asked: ReelProject
-            let scope: UInt32?
+        let read = try onMain {
+            try self.enhanceRead(document: document, clips: clips, targetLUFS: targetLUFS)
         }
-        let read = try onMain { () throws -> Read in
-            guard let input = AudioEnhance.read(from: document, clips: clips) else {
-                throw ToolError(
-                    message: "The project's audio plan could not be read, so there is no "
-                        + "voice to measure.")
-            }
-            // Nothing MEASURED is a different answer from nothing CHANGED, as
-            // in `normalize_clip`: every reason, each naming its clip.
-            guard !input.isEmpty else {
-                let reasons = input.problems.map { $0.description }.joined(separator: " ")
-                throw ToolError(message: "Nothing could be enhanced. \(reasons)")
-            }
-            let choices = AudioEnhance.choose(input)
-            let run = LoudnessMeasureRun(
-                document: document, jobs: AudioEnhance.jobs(input, choices),
-                problems: input.problems, targetLUFS: requested)
-            return Read(
-                document: document, input: input, choices: choices, run: run,
-                target: requested, asked: document.project, scope: document.scope)
+        return try enhanceMeasured(read, stop: stop)
+    }
+
+    /// What one read hop holds: the setup the press shares
+    /// (`AudioMeasureDoor.enhanceSetup`), its run, and the project and scope
+    /// the stale test compares.
+    private struct EnhanceRead {
+        let document: ProjectDocument
+        let setup: AudioMeasureDoor.EnhanceSetup
+        let run: LoudnessMeasureRun
+        let asked: ReelProject
+        let scope: UInt32?
+    }
+
+    /// The setup and, after its refusals, its run. MAIN.
+    private func enhanceRead(document: ProjectDocument, clips: [UInt32], targetLUFS: Double)
+        throws -> EnhanceRead
+    {
+        guard
+            let setup = AudioMeasureDoor.enhanceSetup(
+                document: document, clips: clips, targetLUFS: targetLUFS)
+        else {
+            throw ToolError(
+                message: "The project's audio plan could not be read, so there is no "
+                    + "voice to measure.")
         }
+        // Nothing MEASURED is a different answer from nothing CHANGED, as
+        // in `normalize_clip`: every reason, each naming its clip.
+        guard !setup.input.isEmpty else {
+            let reasons = setup.input.problems.map { $0.description }.joined(separator: " ")
+            throw ToolError(message: "Nothing could be enhanced. \(reasons)")
+        }
+        return EnhanceRead(
+            document: document, setup: setup, run: setup.makeRun(document: document),
+            asked: document.project, scope: document.scope)
+    }
+
+    /// The wait for `read`'s run, then the commit hop. SERVER THREAD.
+    private func enhanceMeasured(_ read: EnhanceRead, stop: AgentCallCancel?) throws -> String {
         let outcome = awaitMeasurement(read.run, stop: stop)
         return try onMain {
             defer { read.run.finish() }
             let outcome = try self.measuredOutcome(
                 outcome, document: read.document, asked: read.asked, scope: read.scope,
                 tool: "enhance_voice")
-            let plan = AudioEnhance.plan(
-                read.input, choices: read.choices, outcome: outcome, targetLUFS: read.target)
+            let plan = read.setup.plan(outcome)
             guard !plan.enhanced.isEmpty else {
                 let reasons = plan.skipped.map { $0.description }.joined(separator: " ")
                 throw ToolError(message: "Nothing could be enhanced. \(reasons)")

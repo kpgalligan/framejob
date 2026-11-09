@@ -17,7 +17,7 @@ audio_ap12_proof.py's.
       weighted mean of D removed, against this probe's own arithmetic; under
       12 weighted bands nil.
   P4  the smoothing, [1, 2, 1]/4 inside and (2, 1)/3 at the ends, through
-      `target`.
+      `target` (P3's curve, with dropped bands, is renormalised as P10 says).
   P5  a curve made by `responseDB` of a known five-slot EQ on the band
       centres recovered to rms ≤ 0.1 dB.
   P6  an off-grid curve (low shelf 250 Hz +4, bell 2.5 kHz +3 Q 1, high shelf
@@ -30,10 +30,24 @@ audio_ap12_proof.py's.
   P9  a one-sided tilt (reference flat, target + a 4 kHz −6 dB high shelf)
       through `target` then `fit`: a +6 ±0.3 dB shelf at 4 ±0.5 kHz, no bell or
       low shelf above 0.5 dB, rms ≤ 0.1 dB.
+  P10 a dropped band beside a tilted one (#411; reference flat, target
+      −10 + 0.5·b with band 10 at −80): band 9 is (c8 + 2c9)/3, band 11
+      (2c11 + c12)/3, band 10 reads 0, and band 9 is more than 0.1 dB from the
+      old (c8 + 2c9)/4.
+  P11 a refusal said once (#410, AU-128): `AudioMeasureDoor.matchAnswer`
+      answers a reference's refusal and "Nothing could be matched." as
+      `.refused` and a match as one op; `land` of a refusal on the menu path
+      beeps once and posts its sentence once as `match_audio`, the project
+      untouched; `land` of no ops beeps once and posts nothing.
+  P12 the menu path's wiring, read from the sources by this runner (so a
+      mutant's copy is what it reads): `pressMatch` hands `matchAnswer` to
+      `measure` once and says and beeps nothing after it; `measure` neither
+      beeps nor posts a refusal itself — every landing goes through `land`.
 
---mutants runs M1–M12 (one per independent decision of the speech gate, the
-curve, the fit and the write; M12 the shelves' tilt start), each over its own copy of app/Sources, scored
-killed when its named row fails. Build failures are scored. Output is under
+--mutants runs M1–M16 (one per independent decision of the speech gate, the
+curve, the fit and the write; M12 the shelves' tilt start; M13–M16 #411's and
+#410's fixes), each over its own copy of app/Sources, scored killed when its
+named row fails. Build failures are scored. Output is under
 tools/proof/work/audio-ap12-probe.
 """
 import argparse
@@ -46,11 +60,11 @@ import swift_build
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/audio-ap12-probe"
-ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"]
+ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12"]
 
 MUTANTS = [
     ("M1 no-smoothing", "P4", "AudioMatchFit.swift",
-     "return (smoothed(difference), weights)", "return (difference, weights)"),
+     "return (smoothed(difference, weights: weights), weights)", "return (difference, weights)"),
     ("M2 weights-ignored", "P3", "AudioMatchFit.swift",
      "var weights = [Double](repeating: 0, count: count)",
      "var weights = [Double](repeating: 1, count: count)"),
@@ -87,7 +101,55 @@ MUTANTS = [
     ("M12 tilt-start-never", "P9", "AudioMatchFit.swift",
      "if left.indices.allSatisfy({ weights[$0] == 0 || abs(left[$0]) < minimumBellDB }) {",
      "if left.isEmpty {"),
+    ("M13 smoothing-reads-dropped", "P10", "AudioMatchFit.swift",
+     "        let weighted = { (b: Int) in b >= 0 && b < count && weights[b] > 0 }\n",
+     "        let weighted = { (b: Int) in b >= 0 && b < count }\n"),
+    ("M14 match-beeps-twice", "P11", "AudioMeasureDoor.swift",
+     "            say(reason, command: command, document: document, beep: beep)\n",
+     "            say(reason, command: command, document: document, beep: beep)\n"
+     "            beep()\n"),
+    ("M15 refusal-as-empty", "P11", "AudioMeasureDoor.swift",
+     "if let refusal = outcome.refusal { return .refused(refusal.sentence) }",
+     "if outcome.refusal != nil { return .ops([]) }"),
+    ("M16 match-refuses-in-closure", "P12", "AudioMeasureDoor.swift",
+     "answer: { matchAnswer(input, $0) }",
+     "answer: { let a = matchAnswer(input, $0); if case .refused(let s) = a { "
+     "say(s, command: .matchAudio, document: document, beep: { NSSound.beep() }) }; return a }"),
 ]
+
+
+def between(text, start, end):
+    """The text from `start` up to the next `end` after it, or None."""
+    at = text.find(start)
+    if at < 0:
+        return None
+    stop = text.find(end, at + len(start))
+    return text[at:] if stop < 0 else text[at:stop]
+
+
+def wiring(sources):
+    """P12's checks over `sources`' AudioMeasureDoor.swift: [(name, good, detail)]."""
+    path = Path(sources) / "AudioMeasureDoor.swift"
+    text = path.read_text() if path.exists() else ""
+    checks = []
+    press = between(text, "static func pressMatch(", "static func ")
+    hand = "answer: { matchAnswer(input, $0) }"
+    checks.append(("pressMatch hands matchAnswer to measure once",
+                   press is not None and press.count(hand) == 1,
+                   f"{press.count(hand) if press else 'no pressMatch'} time(s)"))
+    after = press[press.find("measure("):] if press and "measure(" in press else None
+    checks.append(("pressMatch says and beeps nothing after its measure",
+                   after is not None and "say(" not in after and "beep" not in after,
+                   "no measure( in pressMatch" if after is None else
+                   f"say( {after.count('say(')}, beep {after.count('beep')}"))
+    measure = between(text, "private static func measure<", "static func ")
+    checks.append(("measure neither beeps nor posts: every landing is land's",
+                   measure is not None and "NSSound.beep" not in measure
+                   and "projectDocumentDidRefuse" not in measure,
+                   "no measure" if measure is None else
+                   f"NSSound.beep {measure.count('NSSound.beep')}, "
+                   f"projectDocumentDidRefuse {measure.count('projectDocumentDidRefuse')}"))
+    return checks
 
 
 def check(name, good, detail=""):
@@ -122,9 +184,15 @@ def run(sources, name, quiet=False):
         parts = line.split()
         if len(parts) >= 2 and parts[0] in ("ok", "FAIL"):
             rows[parts[1]] = rows.get(parts[1], True) and parts[0] == "ok"
+    lines = []
+    for name, good, detail in wiring(sources):
+        rows["P12"] = rows.get("P12", True) and bool(good)
+        lines.append(("  ok   " if good else "  FAIL ") + "P12 " + name
+                     + (f": {detail}" if detail else ""))
+    stdout = result.stdout + "".join(line + "\n" for line in lines)
     if not quiet:
-        sys.stdout.write(result.stdout)
-    return rows, result.stderr[-600:], result.stdout
+        sys.stdout.write(stdout)
+    return rows, result.stderr[-600:], stdout
 
 
 def main():
@@ -137,6 +205,8 @@ def main():
     rows, problem, _ = run(args.sources, "probe")
     if rows is None:
         check("source probe builds", False, problem)
+        for name, good, detail in wiring(args.sources):
+            check("P12 " + name, good, detail)
         return 1
     good = all(rows.get(row) for row in ROWS)
     good &= check("every row ran", all(row in rows for row in ROWS),

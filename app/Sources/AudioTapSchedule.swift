@@ -136,7 +136,9 @@ struct AudioDSPParameters: Equatable {
     /// plan's automation (AU-88).
     private let isolation: [UInt32: Double]
     /// The clips whose isolated render is wanted: the base asks, or any
-    /// action end's `audio.isolation` is above 0 (AU-88). Never a nest clip.
+    /// action end's `audio.isolation` is above 0 on a clip with no voice
+    /// effect (AU-88; a voiced clip plays its voice render, made from the
+    /// base amount, AU-143). Never a nest clip.
     private let wantedIsolation: Set<UInt32>
     /// Each non-nest clip's base volume (the limiter's divisor, AU-22) and
     /// measured level (AU-41), which its automation's settings keep.
@@ -250,8 +252,14 @@ struct AudioDSPParameters: Equatable {
                 guard clip.source.nestID == nil else { continue }
                 let audio = clip.audio ?? AudioProps()
                 if audio.isolation > 0 { isolation[clip.id] = min(audio.isolation, 1) }
+                // A voiced clip plays its voice render, made from the BASE
+                // amount (AU-143): an end's isolation alone would ask for a
+                // render nothing reads (#397).
+                let voiced = audio.voice.map { !VoiceChain.isInert(VoiceChain.settings($0)) }
+                    ?? false
                 if audio.isolation > 0
-                    || clip.actions.contains(where: { ($0.end.audio?.isolation ?? 0) > 0 })
+                    || (!voiced
+                        && clip.actions.contains(where: { ($0.end.audio?.isolation ?? 0) > 0 }))
                 {
                     wanted.insert(clip.id)
                 }
@@ -407,8 +415,8 @@ struct AudioDSPParameters: Equatable {
     /// voiced clip's render is made from it (AU-143).
     func isolation(for clip: UInt32) -> Double { isolation[clip] ?? 0 }
 
-    /// Whether the clip's isolated render is wanted: its base or any action
-    /// end asks (AU-88).
+    /// Whether the clip's isolated render is wanted: its base asks, or an
+    /// action end does on an unvoiced clip (AU-88).
     func wantsIsolation(_ clip: UInt32) -> Bool { wantedIsolation.contains(clip) }
 
     /// Whether any clip wants isolation.

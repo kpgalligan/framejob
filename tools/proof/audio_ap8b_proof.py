@@ -7,7 +7,7 @@
 
 The caller owns the instance at that socket; nothing is launched or killed.
 Needs `ffmpeg` and numpy. `--probe` runs A1–A8 alone, with no instance;
-`--mutants` runs M1–M13: M4–M12 each over its own copy of `app/Sources`,
+`--mutants` runs M1–M14: M4–M12 and M14 each over its own copy of `app/Sources`,
 killed when its named probe row fails, and M1–M3 and M13 each in one copy of
 `core/` (`graphic/` beside it as a symlink, the target folder
 `work/audio_ap8b-core-target/`, seeded from `core/target` and kept), killed
@@ -116,6 +116,9 @@ MUTANTS = [
     ("M12", "A8", "ReelOps.swift",
      "            if group == \"audio\", var eq = fields[\"eq\"] as? [String: Any] {",
      "            if group == \"nothing\", var eq = fields[\"eq\"] as? [String: Any] {"),
+    ("M14", "A7", "AudioTapSchedule.swift",
+     "|| (!voiced\n                        && clip.actions.contains",
+     "|| (clip.actions.contains"),
 ]
 
 # (name, test file, test name, file under core/src, anchor, replacement).

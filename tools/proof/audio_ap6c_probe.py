@@ -24,8 +24,15 @@ and ask nothing, the eighteen `FrameJobRecording…` values put back at the end:
       follow's own timer, a silent voice measured in a document with its
       editor window, refused at the inspector's foot under −70 LUFS), not
       pending and the timer invalid, one refusal.
+  P6  the follow IS the press (AU-68 (e), #412), read from the sources by this
+      runner (so a mutant's copy is what it reads): `AudioEnhance.choose(` and
+      `AudioEnhance.jobs(` each appear once across the sources, both in
+      `AudioMeasureDoor.swift`; `enhance_voice`'s `enhanceVoice(_ a:)` makes
+      one `onMain` hop and never calls `enhanceVoice(document:`; in
+      `enhanceLanded` and `enhanceRead` the run is made only after the
+      `isEmpty` refusal.
 
---mutants runs M1–M9, each over its own copy of app/Sources, scored killed when
+--mutants runs M1–M10, each over its own copy of app/Sources, scored killed when
 its named row fails. Build failures are scored. Output is under
 tools/proof/work/audio-ap6c-probe.
 """
@@ -39,7 +46,38 @@ import swift_build
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/audio-ap6c-probe"
-ROWS = ["P1", "P2", "P3", "P4", "P5"]
+ROWS = ["P1", "P2", "P3", "P4", "P5", "P6"]
+
+# M10's anchor: `enhanceVoice(_ a:)`'s one hop through to its measured call.
+ONE_HOP = (
+    "        let read = try onMain { () throws -> EnhanceRead in\n"
+    "            let document = try self.target(a)\n"
+    "            let clips = try self.clipsArg(a, \"clips\", document)\n"
+    "            let range = AudioNormalize.targetLUFSRange\n"
+    "            let requested = try self.doubleArg(a, \"target_lufs\")\n"
+    "                ?? AudioNormalize.defaultTargetLUFS\n"
+    "            guard requested.isFinite, range.contains(requested) else {\n"
+    "                throw ToolError(\n"
+    "                    message: \"target_lufs must be a loudness from \\(range.lowerBound) to \"\n"
+    "                        + \"\\(range.upperBound) LUFS, and the default is \"\n"
+    "                        + \"\\(AudioNormalize.defaultTargetLUFS).\")\n"
+    "            }\n"
+    "            return try self.enhanceRead(document: document, clips: clips, "
+    "targetLUFS: requested)\n"
+    "        }\n"
+    "        return try enhanceMeasured(read, stop: stop)\n")
+TWO_HOPS = (
+    ONE_HOP
+    .replace("        let read = try onMain { () throws -> EnhanceRead in\n",
+             "        let (document, clips, requested) = try onMain {\n"
+             "            () throws -> (ProjectDocument, [UInt32], Double) in\n")
+    .replace("            return try self.enhanceRead(document: document, clips: clips, "
+             "targetLUFS: requested)\n",
+             "            return (document, clips, requested)\n")
+    .replace("        return try enhanceMeasured(read, stop: stop)\n",
+             "        _ = stop\n"
+             "        return try enhanceVoice(document: document, clips: clips, "
+             "targetLUFS: requested)\n"))
 
 MUTANTS = [
     ("M1 absent-key-on", "P1", "RecorderPanelController+Choices.swift",
@@ -65,7 +103,45 @@ MUTANTS = [
      "        guard place else {\n", "        guard place || true else {\n"),
     ("M9 follow-kept", "P5", "RecordingEnhance.swift",
      "        end(follow, key: document.recipeKey)\n", "        _ = follow\n"),
+    ("M10 two-hops", "P6", "AgentServer+EnhanceVoice.swift", ONE_HOP, TWO_HOPS),
 ]
+
+
+def between(text, start, end):
+    """The text from `start` up to the next `end` after it, or None."""
+    at = text.find(start)
+    if at < 0:
+        return None
+    stop = text.find(end, at + len(start))
+    return text[at:] if stop < 0 else text[at:stop]
+
+
+def one_setup(sources):
+    """P6's checks over `sources`: [(name, good, detail)]."""
+    files = {p.name: p.read_text() for p in Path(sources).glob("*.swift")}
+    checks = []
+    for call in ("AudioEnhance.choose(", "AudioEnhance.jobs("):
+        where = {name: text.count(call) for name, text in files.items() if call in text}
+        checks.append((f"{call} once, in AudioMeasureDoor.swift",
+                       where == {"AudioMeasureDoor.swift": 1}, f"{where}"))
+    server = files.get("AgentServer+EnhanceVoice.swift", "")
+    entry = between(server, "func enhanceVoice(_ a:", "func ")
+    checks.append(("enhanceVoice(_ a:) makes one onMain hop, never enhanceVoice(document:",
+                   entry is not None and entry.count("onMain") == 1
+                   and "enhanceVoice(document:" not in entry,
+                   "no enhanceVoice(_ a:)" if entry is None else
+                   f"onMain {entry.count('onMain')}, enhanceVoice(document: "
+                   f"{entry.count('enhanceVoice(document:')}"))
+    door = files.get("AudioMeasureDoor.swift", "")
+    for name, body in (("enhanceLanded", between(door, "static func enhanceLanded(",
+                                                  "static func ")),
+                       ("enhanceRead", between(server, "private func enhanceRead(", "func "))):
+        empty = body.find("isEmpty") if body else -1
+        made = body.find("makeRun(") if body else -1
+        checks.append((f"{name} makes its run only after the isEmpty refusal",
+                       0 <= empty < made,
+                       f"isEmpty at {empty}, makeRun( at {made}"))
+    return checks
 
 
 def check(name, good, detail=""):
@@ -113,8 +189,13 @@ def run(sources, name, quiet=False):
     if result.returncode != 0:
         for row in ROWS:
             rows.setdefault(row, False)
+    lines = []
+    for name, good, detail in one_setup(sources):
+        rows["P6"] = rows.get("P6", True) and bool(good)
+        lines.append(("  ok   " if good else "  FAIL ") + "P6 " + name
+                     + (f": {detail}" if detail else ""))
     if not quiet:
-        sys.stdout.write(result.stdout)
+        sys.stdout.write(result.stdout + "".join(line + "\n" for line in lines))
     return rows, result.stderr[-600:]
 
 

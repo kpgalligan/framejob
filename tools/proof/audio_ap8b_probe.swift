@@ -28,7 +28,9 @@
 //      and the voice to the base, the rest to the end; a nest clip's mono to
 //      the base.
 //  A7  `AudioDynamicsLevels.wanting` counts a gate keyed on at an end alone;
-//      `isolates` and `wantsIsolation` from an end alone, the base amount 0.
+//      `isolates` and `wantsIsolation` from an end alone, the base amount 0;
+//      a voiced clip (pitch 2) wants no render from an end alone, and does
+//      from a base amount of 0.3 (#397, AU-88).
 //  A8  `ReelOp.setActionEnd` with an EQ whose high-pass is off: `off` is
 //      exactly `["audio.eq.high_pass"]` and the patch's `eq` has no
 //      `high_pass`.
@@ -360,6 +362,24 @@ do {
         tests.append(("the base amount stays 0", wanted.isolation(for: 2) == 0))
         tests.append(("not empty", !wanted.isEmpty))
         tests.append(("a pan does not isolate", !AudioDSPParameters(snapshot: plain.snapshot).isolates))
+    } else {
+        tests.append(("the projects built", false))
+    }
+    // #397: a voiced clip plays its voice render, made from the base amount
+    // (AU-143), so an end's isolation alone wants no isolated render.
+    let voice = #""voice": {"kind": "pitch", "pitch": 2}"#
+    if let voicedEnd = project(
+        audio: "{\(voice)}", curve: "linear", end: #"{"audio": {"isolation": 0.5}}"#),
+        let voicedBase = project(
+            audio: "{\(voice), \"isolation\": 0.3}", curve: "linear",
+            end: #"{"audio": {"isolation": 0.5}}"#)
+    {
+        let end = AudioDSPParameters(snapshot: voicedEnd.snapshot)
+        tests.append(("a voiced clip's end alone wants no render", !end.wantsIsolation(2)))
+        tests.append(("a voiced clip's end alone does not isolate", !end.isolates))
+        tests.append((
+            "a voiced clip's base amount still wants its render",
+            AudioDSPParameters(snapshot: voicedBase.snapshot).wantsIsolation(2)))
     } else {
         tests.append(("the projects built", false))
     }

@@ -456,7 +456,10 @@ AU-50…AU-57 are AP5's (voice isolation; survey A4, and B4's verdict), recorded
 - **AU-51 — The render is S2's recipe.** `AVAudioUnitEffect` (`aufx`/`vois`/`appl`), parameter 1
   = 0 (High Quality Voice) and parameter 0 = 100, in offline manual rendering at 48 kHz mono, one
   engine per channel in lockstep over one `RampSourceReader` (per-channel feeders shaped as
-  `TimePitchFeeder`, dropping what the slowest has read), at most 4096 frames a block. A unit whose
+  `TimePitchFeeder`, dropping what the slowest has read), at most 4096 frames a block; a block
+  whose engines answer different frame counts fails the render naming both counts ("the channels
+  rendered different frame counts, 4096 and 4095"), carried by `isolationFailed` and the Status
+  (`IsolationRenderer.roundFrames`; amended 2026-11-09, #409). A unit whose
   `latency × 48000` rounds to anything but 4440 fails the render. 4 s of the media is fed before the
   window (from frame 0 when the window starts sooner), then the media and zeros past the window's
   end until its last frame is out; the first preroll + 4440 output frames are discarded. The source
@@ -846,7 +849,10 @@ recorded before its code.
   (Debug and Release only) hands fixture files to the product's own code after `onFinish` — the
   panel's `recordingEnded` or the tool's landing — because the recorder needs the Microphone grant
   and a voice at the microphone, while a proof's instance records room tone under the terminal's
-  grants. (f) The proof is `audio_ap6c_probe.py` (P1–P5, mutants M1–M9) and `audio_ap6c_proof.py`
+  grants. (f) The proof is `audio_ap6c_probe.py` (P1–P6, mutants M1–M10; P6, read from the
+  sources by its runner, holds the follow to the press's one setup,
+  `AudioMeasureDoor.enhanceSetup`, which `enhance_voice` reads in one main-thread hop, and M10
+  restores the tool's second hop; amended 2026-11-09, #412) and `audio_ap6c_proof.py`
   (V1–V8, over MCP, `land_recording` and exports); how a real voice-over on the RØDE sounds is
   manual check REC-19.
 
@@ -1054,7 +1060,9 @@ landed (`git log` at `e55de46` has no AP6).
   render and a gate or de-esser level are wanted when the base or any action end asks
   (`AudioDSPParameters.wantsIsolation`, `AudioDynamicsLevels.wanting`), so a clip whose base
   isolation is 0 is requested, loaded and crossfaded by its automation's amounts. A voiced clip
-  keeps its base isolation (AU-143); the limiter keeps its base volume as its divisor (AU-22),
+  keeps its base isolation (AU-143), and an action end alone never makes its isolation render
+  wanted: its segments play the voice render, made from the base Amount, so only a base Amount
+  above 0 wants it (amended 2026-11-09, #397); the limiter keeps its base volume as its divisor (AU-22),
   and the level L keeps the base pan, fold and pick (AU-41). Inside an action the inspector sends
   pan, mono, compressor, noise reduction, limiter, isolation, EQ, hum, channels, gate and
   de-esser to the action's end, and a switch turned off there becomes `off` (CI-14). The duck,
@@ -1075,8 +1083,9 @@ landed (`git log` at `e55de46` has no AP6).
   pan, the track-wide stages from a point, the Amount per frame, the routing, the wanted sets,
   the EQ lift); MCP rows E1–E6 against 24-bit WAV exports (a pan, an EQ gain, a compressor
   threshold, a limiter switched on at an end, isolation's Amount from base 0, an EQ slot keyed
-  off), V1 the live meter against the export, U1 one undo step; thirteen mutants, each killed by
-  a named row or core test; manual check SE-37.
+  off), V1 the live meter against the export, U1 one undo step; fourteen mutants, each killed by
+  a named row or core test (M14, a voiced clip's end wanting a render, A7's; amended 2026-11-09,
+  #397); manual check SE-37.
 
 AP9's decisions, split edits (J- and L-cuts) and a reversible Detach Audio (`archive/audio.md`
 AP9, survey A10), recorded before its code.
@@ -1398,8 +1407,11 @@ AU-120…AU-129 are AP12's (match one clip to another; survey B6), recorded befo
 - **AU-125 — The curve.** D_b = Lref_b − Ltgt_b. A band's weight is 1 where both levels are
   within 50 dB of their own loudest band, else 0; under 12 weighted bands skips the target (a
   reference with under 12 bands within 50 dB of its own loudest is refused). The weighted mean of
-  D is removed (the level is Match Loudness's), and the curve is smoothed [1, 2, 1]/4 inside and
-  (2, 1)/3 at the ends.
+  D is removed (the level is Match Loudness's), and the curve is smoothed [1, 2, 1] over each
+  weighted band and its weighted neighbours, renormalised to the taps present: [1, 2, 1]/4
+  between two weighted bands, (2, 1)/3 at an end or beside a dropped band, the band alone between
+  two. A dropped band (weight 0) reads 0 and contributes nothing to its neighbours (amended
+  2026-11-09, #411).
 - **AU-126 — The fit.** The model is `AudioEQDesign.responseDB` of the five tonal slots at
   48 kHz at the band centres, the drawn curve's own function. Every residual is offset-invariant:
   r = (curve − model) − the weighted mean of (curve − model); the cost is Σ w·r², and the shelf
@@ -1426,8 +1438,9 @@ AU-120…AU-129 are AP12's (match one clip to another; survey B6), recorded befo
   0.05 dB keep rule (AU-64 (f)) holds the volume: an identity, "Match Audio made no change".
 - **AU-128 — The chrome and the tool.** The menu item, the Match Audio sheet, then the Measuring
   Sound sheet (always: the reference renders); the stale test and its sentence, "… Choose Match
-  Audio again." and "… Call match_audio again."; a reference refusal beeps and puts its sentence
-  at the inspector's foot. `match_audio` takes no `scope` (it follows the open container) and is
+  Audio again." and "… Call match_audio again."; a reference refusal, or nothing matched after
+  the renders, beeps once and puts its sentence at the inspector's foot once
+  (`AudioMeasureDoor.land`; amended 2026-11-09, #410). `match_audio` takes no `scope` (it follows the open container) and is
   an off-main tool (`awaitMeasurement`'s pattern, generic over the run). `loudness: false, eq:
   false` is refused by name; a target that cannot be matched is skipped by name and the rest are
   matched; with nothing matched, "Nothing could be matched." with every reason. It answers
@@ -1439,7 +1452,10 @@ AU-120…AU-129 are AP12's (match one clip to another; survey B6), recorded befo
 - **AU-129 — The proof.** `audio_ap12_probe.py` P1–P9 over `app/Sources` with twelve mutants
   (M1–M11, one per independent decision of the speech gate, the curve, the fit and the write;
   the eleventh, M11, the offset-invariant residual, which only a one-sided tilt (P9) can see; the
-  twelfth, M12, AU-126 (a)'s shelf start, added with it at the build, P9's too), and
+  twelfth, M12, AU-126 (a)'s shelf start, added with it at the build, P9's too), and since
+  2026-11-09 P1–P12 with sixteen mutants: P10 a dropped band beside a tilted one (#411, M13),
+  P11 `matchAnswer` and `land`'s one beep and one sentence (#410, M14, M15), and P12, read from
+  the sources by the runner, the menu path landing through `land` alone (#410, M16); and
   `audio_ap12_proof.py` A1–A8 over MCP and exports (third-octave bands by the proof's own numpy,
   loudness by `phase5_proof.integrated`): pink noise tilted by a known EQ matched back within
   ±1 dB a band from 100 Hz to 10 kHz and ±0.5 LU. How a match sounds on a real voice is manual

@@ -56,7 +56,8 @@ enum AudioMatchFit {
     /// The curve to fit and its weights: D = reference − target, weight 1
     /// where both are within `contentRangeDB` of their own loudest band; the
     /// weighted mean of D removed (a band of weight 0 reads 0); smoothed
-    /// [1, 2, 1]/4 inside and (2, 1)/3 at the ends. nil under `minimumBands`
+    /// [1, 2, 1] over the weighted bands, renormalised to the taps present
+    /// (`smoothed`). nil under `minimumBands`
     /// weighted bands, or for spectra of different lengths.
     static func target(reference: [Double], target: [Double])
         -> (curve: [Double], weights: [Double])?
@@ -77,17 +78,25 @@ enum AudioMatchFit {
         var difference = (0..<count).map { weights[$0] > 0 ? reference[$0] - target[$0] : 0 }
         let mean = weightedMean(difference, weights)
         difference = (0..<count).map { weights[$0] > 0 ? difference[$0] - mean : 0 }
-        return (smoothed(difference), weights)
+        return (smoothed(difference, weights: weights), weights)
     }
 
-    /// [1, 2, 1]/4 inside, (2, 1)/3 at each end.
-    static func smoothed(_ values: [Double]) -> [Double] {
+    /// [1, 2, 1] over a weighted band and its weighted neighbours,
+    /// renormalised to the taps present: (2, 1)/3 at an end or beside a band
+    /// of weight 0, the band alone when both neighbours are dropped. A band
+    /// of weight 0 reads 0 and gives nothing to its neighbours (AU-125, #411).
+    static func smoothed(_ values: [Double], weights: [Double]) -> [Double] {
         let count = values.count
-        guard count >= 2 else { return values }
+        let weighted = { (b: Int) in b >= 0 && b < count && weights[b] > 0 }
         return (0..<count).map { b in
-            if b == 0 { return (2 * values[0] + values[1]) / 3 }
-            if b == count - 1 { return (2 * values[b] + values[b - 1]) / 3 }
-            return (values[b - 1] + 2 * values[b] + values[b + 1]) / 4
+            guard weighted(b) else { return 0 }
+            var total = 2 * values[b]
+            var taps = 2.0
+            for n in [b - 1, b + 1] where weighted(n) {
+                total += values[n]
+                taps += 1
+            }
+            return total / taps
         }
     }
 

@@ -2,8 +2,8 @@
 over `app/Sources`, its mutants, and exports from an instance of its own.
 
     python3 tools/proof/audio_ap5_proof.py             # P rows, then I rows on an own instance
-    python3 tools/proof/audio_ap5_proof.py --probe     # P1–P9 and P2b, no instance
-    python3 tools/proof/audio_ap5_proof.py --mutants   # the ten mutants, each against its row
+    python3 tools/proof/audio_ap5_proof.py --probe     # P1–P10 and P2b, no instance
+    python3 tools/proof/audio_ap5_proof.py --mutants   # the eleven mutants, each against its row
     python3 tools/proof/audio_ap5_proof.py --instance  # I0–I10 and I1b alone
 
 The instance is `proof_app`'s app (Debug by default, `RC_PROOF_APP=release`
@@ -22,7 +22,9 @@ the placement, alone and with the noise reducer's lead; P2b the wet offset off
 the 48 kHz grid; P3 Amount 0.5 and 0.25 as a crossfade; P4 no request for a
 time-scaled, ramped, freeze or pending-reverse segment; P5 the render's lag 0
 on the recording; P6 a window against the whole file's render ≤ −40 dB; P7 the
-name; P8 the export waits; P9 a failure reaches the owner once, on main.
+name; P8 the export waits; P9 a failure reaches the owner once, on main; P10
+a round whose lanes answer different frame counts fails the render naming both
+(#409).
 
 **Instance rows:**
 - I0: the instance's log has no `Frame Job: ` line (the parity check).
@@ -56,7 +58,7 @@ name; P8 the export waits; P9 a failure reaches the owner once, on main.
 its named row fails): latency-kept (P5), no-preroll (P6), amount-swapped
 (P3), no-track-lead (P2), pending-silent (P1), scaled-isolated (P4),
 export-no-wait (P8), window-not-keyed (P7), split-rounding (P2b),
-failure-silent (P9). split-rounding is also I1b's; the instance rows are not
+failure-silent (P9), lanes-cut-to-shorter (P10). split-rounding is also I1b's; the instance rows are not
 re-run per mutant.
 
 Rows print `<ID> ok|FAIL — <detail>`, then `n/m`; exit 0 iff all pass.
@@ -89,7 +91,7 @@ SEC = 600_000
 HOLD_S = 2
 CALL_BOUND = 600
 VOLUME = 4.0
-PROBE_ROWS = ["P1", "P2", "P2b", "P3", "P4", "P5", "P6", "P7", "P8", "P9"]
+PROBE_ROWS = ["P1", "P2", "P2b", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10"]
 OCTAVES = [63, 125, 250, 500, 1000, 2000, 4000, 8000]
 
 rows = []
@@ -227,6 +229,11 @@ MUTANTS = [
          "                failures[request.destination.path] = message\n"
          "                called = settledOwnersLocked(request.destination)\n",
          "                failures[request.destination.path] = message\n")]),
+    ("lanes-cut-to-shorter", ["P10"], [
+        ("IsolationRenderer.swift",
+         "        guard let first = counts.first else { return 0 }\n",
+         "        guard let first = counts.min() else { return 0 }\n"
+         "        if first >= 0 { return first }\n")]),
 ]
 
 

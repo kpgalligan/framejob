@@ -3635,6 +3635,9 @@ free.
   commit. And `pressMatch`, Clip ▸ Match Audio…'s press from its sheet's
   hand-back (spec §11 AU-128), and `enhanceLanded`, a landing's follow (spec
   §11 AU-68), through the same `measure` with refusals in place of beeps.
+  `land`, the one landing of a measured answer (a refusal said once, #410),
+  and `enhanceSetup`, Enhance Voice's read, choices, run builder and plan,
+  which `enhance_voice` shares (#412).
 - `AudioMeasureSheetController.swift` — the Measuring Sound sheet (a bar,
   "Clip n of N…", Cancel), in `AudioSyncSheetController`'s shape. Generic
   over `AudioMeasureRunning`.

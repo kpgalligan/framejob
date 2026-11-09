@@ -34,6 +34,8 @@
 //      exists.
 //  P9  a forced failure: the owner's `settled` runs exactly once, on the main
 //      queue; `failure(for:)` and `IsolationCache.status(of:)` carry the message.
+//  P10 a round's frame count (#409): lanes that agree give their count; lanes
+//      that differ fail the render naming both counts; one lane its own.
 import AVFoundation
 import Accelerate
 import AppKit
@@ -628,4 +630,28 @@ do {
     row("P9", ok,
         "settled ran \(calls) time(s), on main: \(onMain); failure: \(failure ?? "nil"); "
             + "status: \(status)")
+}
+
+// =========================================================================
+// P10 — lanes that disagree fail the render (#409)
+
+do {
+    let agree = try? IsolationRenderer.roundFrames([4096, 4096])
+    let one = try? IsolationRenderer.roundFrames([4096])
+    var message = "no error"
+    var named = false
+    do {
+        let got = try IsolationRenderer.roundFrames([4096, 4095])
+        message = "answered \(got)"
+    } catch let error as IsolationRenderer.RenderError {
+        if case .failed(let why) = error {
+            named = why.contains("4096") && why.contains("4095")
+        }
+        message = error.localizedDescription
+    } catch {
+        message = "another error: \(error.localizedDescription)"
+    }
+    row("P10", agree == 4096 && one == 4096 && named,
+        "[4096, 4096] → \(agree.map(String.init) ?? "threw"); [4096] → "
+            + "\(one.map(String.init) ?? "threw"); [4096, 4095] → \(message)")
 }

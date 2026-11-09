@@ -1,8 +1,10 @@
+import AppKit
 import Foundation
 
-// Match Audio's probe (road map "audio" AP12, spec §11 AU-124…AU-127),
+// Match Audio's probe (road map "audio" AP12, spec §11 AU-124…AU-128),
 // compiled with app/Sources through swift_build. No arguments. Prints one
-// "ok"/"FAIL" line per check, each row's name first (P1–P9), for
+// "ok"/"FAIL" line per check, each row's name first (P1–P11; P12 is the
+// runner's own, read from the sources), for
 // audio_ap12_probe.py to score. Nothing renders: the speech spectrum is fed
 // synthetic buffers, the fit synthetic curves made by the EQ's own response.
 
@@ -163,18 +165,31 @@ func expectedCurve(_ reference: [Double], _ target: [Double]) -> ([Double], [Dou
     let m = sum / n
     var c: [Double] = []
     for b in d.indices { c.append(w[b] > 0 ? d[b] - m : 0) }
-    let k = c.count
+    return (renormalised(c, w), w)
+}
+
+/// [1, 2, 1] over a weighted band and its weighted neighbours, divided by the
+/// taps present; a band of weight 0 reads 0 (AU-125 as amended, #411).
+func renormalised(_ c: [Double], _ w: [Double]) -> [Double] {
     var s: [Double] = []
-    for b in 0..<k {
-        if b == 0 {
-            s.append((2 * c[0] + c[1]) / 3)
-        } else if b == k - 1 {
-            s.append((2 * c[b] + c[b - 1]) / 3)
-        } else {
-            s.append((c[b - 1] + 2 * c[b] + c[b + 1]) / 4)
+    for b in c.indices {
+        guard w[b] > 0 else {
+            s.append(0)
+            continue
         }
+        var total = 2 * c[b]
+        var taps = 2.0
+        if b > 0, w[b - 1] > 0 {
+            total += c[b - 1]
+            taps += 1
+        }
+        if b + 1 < c.count, w[b + 1] > 0 {
+            total += c[b + 1]
+            taps += 1
+        }
+        s.append(total / taps)
     }
-    return (s, w)
+    return s
 }
 
 do {
@@ -383,4 +398,112 @@ do {
     check("P9", "a high shelf at 4 kHz −6 dB alone is matched by a +6 dB shelf",
           good && (fit?.rmsDB ?? .infinity) <= 0.1,
           "shelf mean \(f3(mean)) dB; rms \(f3(fit?.rmsDB)): \(s.map(describe) ?? "nil")")
+}
+
+// MARK: - P10 a dropped band beside a tilted one (#411)
+
+do {
+    let reference = [Double](repeating: 0, count: bands)
+    var target = (0..<bands).map { -10 + 0.5 * Double($0) }
+    target[10] = -80
+    var weights = [Double](repeating: 1, count: bands)
+    weights[10] = 0
+    let d = (0..<bands).map { weights[$0] > 0 ? reference[$0] - target[$0] : 0 }
+    var sum = 0.0
+    for b in d.indices where weights[b] > 0 { sum += d[b] }
+    let mean = sum / weights.reduce(0, +)
+    let c = (0..<bands).map { weights[$0] > 0 ? d[$0] - mean : 0 }
+    let got = AudioMatchFit.target(reference: reference, target: target)
+    let curve = got?.curve ?? []
+    let ok = curve.count == bands
+    let nine = (c[8] + 2 * c[9]) / 3
+    let eleven = (2 * c[11] + c[12]) / 3
+    let old = (c[8] + 2 * c[9]) / 4
+    check("P10", "band 10 is dropped", got?.weights == weights,
+          "weights \(got.map { list($0.weights) } ?? "nil")")
+    check("P10", "band 9 is (c8 + 2c9)/3, its dropped neighbour no tap",
+          ok && abs(curve[9] - nine) < 1e-9, "\(f3(ok ? curve[9] : nil)), expected \(f3(nine))")
+    check("P10", "band 11 is (2c11 + c12)/3",
+          ok && abs(curve[11] - eleven) < 1e-9,
+          "\(f3(ok ? curve[11] : nil)), expected \(f3(eleven))")
+    check("P10", "the dropped band reads 0", ok && curve[10] == 0, "\(f3(ok ? curve[10] : nil))")
+    check("P10", "band 9 differs from the old (c8 + 2c9)/4 by more than 0.1 dB",
+          abs(nine - old) > 0.1, "\(f3(nine)) against \(f3(old))")
+}
+
+// MARK: - P11 a refusal said once (#410)
+
+_ = NSApplication.shared
+NSApplication.shared.setActivationPolicy(.prohibited)
+
+do {
+    let reading = ClipLoudness.Reading(
+        lufs: -20, truePeak: 0.1, playedTicks: 600_000, steps: [], stepPeaks: [],
+        stepSources: [], stepHighs: [])
+    let target = AudioMatch.Target(
+        clip: 2, media: 1,
+        loudness: AudioNormalize.LoudnessReading(clip: 2, media: 1, lufs: -30, truePeak: 0.05),
+        speech: nil, current: AudioProps())
+    let reference = AudioMatch.Reference(clip: 1, media: 1, loudness: reading, speech: nil)
+    let input = AudioMatch.Input(
+        reference: reference, targets: [target], problems: [], loudness: true, eq: true)
+    let fit = AudioMatchFit.Fit(
+        slots: EqProps(band1: EqBandProps(frequency: 1000, gainDb: -3, q: 1)), rmsDB: 0.2)
+    let measured = LoudnessMeasureRun.Outcome(
+        input: AudioNormalize.LoudnessInput(readings: [target.loudness], problems: []),
+        solved: [:])
+    let sentence = "The reference, clip 1, holds no speech."
+    let refused = AudioMeasureDoor.matchAnswer(
+        input,
+        AudioMatchRun.Outcome(
+            referenceLUFS: -20, fits: [:], loudness: measured, problems: [],
+            refusal: .reference(sentence)))
+    var refusedSays = ""
+    if case .refused(let s) = refused { refusedSays = s }
+    check("P11", "a reference's refusal is the answer's sentence", refusedSays == sentence,
+          "\(refused)")
+    let eqOnly = AudioMatch.Input(
+        reference: reference, targets: [target], problems: [], loudness: false, eq: true)
+    let nothing = AudioMeasureDoor.matchAnswer(
+        eqOnly,
+        AudioMatchRun.Outcome(
+            referenceLUFS: -20, fits: [:], loudness: measured, problems: [], refusal: nil))
+    var nothingSays = ""
+    if case .refused(let s) = nothing { nothingSays = s }
+    check("P11", "nothing matched is refused with the tool's sentence",
+          nothingSays.hasPrefix("Nothing could be matched."), "\(nothing)")
+    let matched = AudioMeasureDoor.matchAnswer(
+        input,
+        AudioMatchRun.Outcome(
+            referenceLUFS: -20, fits: [2: fit], loudness: measured, problems: [], refusal: nil))
+    var count = -1
+    if case .ops(let ops) = matched { count = ops.count }
+    check("P11", "a match is one op", count == 1, "\(matched)")
+
+    let document = ProjectDocument()
+    let before = document.project
+    var beeps = 0
+    var posted: [ReelRefusal] = []
+    let token = NotificationCenter.default.addObserver(
+        forName: .projectDocumentDidRefuse, object: document, queue: nil
+    ) { note in
+        if let r = note.userInfo?["refusal"] as? ReelRefusal { posted.append(r) }
+    }
+    AudioMeasureDoor.land(
+        .refused(sentence), command: .matchAudio, document: document, inEvent: false,
+        refuse: nil, empty: "empty", beep: { beeps += 1 })
+    check("P11", "a refusal on the menu path beeps once and posts its sentence once",
+          beeps == 1 && posted.count == 1 && posted.first?.op == "match_audio"
+              && posted.first?.reason == sentence && document.project === before,
+          "\(beeps) beep(s), \(posted.count) refusal(s): "
+              + posted.map { "\($0.op): \($0.reason)" }.joined(separator: "; "))
+    beeps = 0
+    posted = []
+    AudioMeasureDoor.land(
+        .ops([]), command: .matchAudio, document: document, inEvent: false, refuse: nil,
+        empty: "empty", beep: { beeps += 1 })
+    check("P11", "an empty answer on a press is one bare beep",
+          beeps == 1 && posted.isEmpty && document.project === before,
+          "\(beeps) beep(s), \(posted.count) refusal(s)")
+    NotificationCenter.default.removeObserver(token)
 }
