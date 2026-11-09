@@ -185,7 +185,7 @@ enum AnalysisShots {
                 range: range, grid: grid, source: source, longSide: longSide,
                 cancelled: cancelled
             ) { k, pts, picture in
-                let signature = signature(picture)
+                let signature = try picture.picture { Self.signature($0) }
                 if k >= range.lowerBound {
                     records[k] = Record(
                         pts: pts, d1: p1.map { distance(signature, $0) } ?? 0,
@@ -204,7 +204,15 @@ enum AnalysisShots {
                     lastPublish = Date()
                 }
             }
-            guard finished else { return false }
+            guard finished else {
+                // What was stored before the cancel is kept (CJ-21 as amended by #435).
+                if lastIndex >= coveredFrom {
+                    AnalysisStore.publishCancelled(request) {
+                        try publish(request, grid: grid, covered: coveredFrom...lastIndex, records)
+                    }
+                }
+                return false
+            }
             if coveredFrom <= range.upperBound {
                 try publish(request, grid: grid, covered: coveredFrom...range.upperBound, records)
             }

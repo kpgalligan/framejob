@@ -22,7 +22,7 @@ extension AnalysisFrames {
 
     static func decodeThroughInputPass(
         _ source: Source, input: ThumbnailInput, longSide: Int, range: CMTimeRange,
-        cancelled: () -> Bool, each: (Int64, AnalysisPicture) throws -> Bool
+        cancelled: () -> Bool, each: (Int64, LazyAnalysisPicture) throws -> Bool
     ) throws -> Bool {
         let asset = AVURLAsset(
             url: source.url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
@@ -53,11 +53,18 @@ extension AnalysisFrames {
         var upright = Upright(transform: transform)
         var scratch: [UInt8] = []
         return try pump(reader, output, cancelled: cancelled) { pts, buffer in
-            let half = try pass.convert(buffer)
-            return try halfToBGRA(half, into: &scratch) { picture in
-                let bgra = try pass.bgra(picture)
-                return try upright.picture(of: bgra) { try each(pts, $0) }
-            }
+            try each(
+                pts,
+                LazyAnalysisPicture { body in
+                    let half = try pass.convert(buffer)
+                    _ = try halfToBGRA(half, into: &scratch) { picture in
+                        let bgra = try pass.bgra(picture)
+                        return try upright.picture(of: bgra) {
+                            try body($0)
+                            return true
+                        }
+                    }
+                })
         }
     }
 }

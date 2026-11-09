@@ -54,8 +54,10 @@ scratch `CFFIXED_USER_HOME`; Z1 is each launch's parity grep:
 - M7 `save_project` five times during a running job: after each, the pack
   absent or parsing whole with the marker's coverage matching its frames; no
   save refused.
-- M8 `close_project` during a running job: outcome `cancelled`, marker and pack
-  bytes unchanged 3 s later.
+- M8 `close_project` during a running job: outcome `cancelled`; the marker and
+  pack read after the run ended are byte-identical 3 s later, and a marker
+  written (the cancelled job's publish, spec §11 CJ-21 as amended by #435)
+  covers one range from index 0.
 - M9 (Release only: Debug's per-pixel loops are unoptimised) the M1 window's
   realtime factor, median of three cold runs, ≥ 0.8 × CO-11's Standard factor.
 
@@ -659,16 +661,18 @@ def job_rows(client):
         def snapshot():
             return tuple(p.read_bytes() if p.exists() else None
                          for p in (doc.marker(media), doc.pack(media)))
-        before = snapshot()
         doc.close()
         row = job(dev(wait=5), doc.path, media) or {}
         held = snapshot()
         time.sleep(3)
         later = snapshot()
-        check("M8", row.get("outcome") == "cancelled" and held == before == later,
-              f"outcome {row.get('outcome')}; marker and pack "
-              f"{'unchanged' if held == before == later else 'CHANGED'} 3 s after the close "
-              f"({'none written' if before == (None, None) else 'as they were'})")
+        cover = json.loads(held[0]).get("coverage") if held[0] is not None else None
+        from_zero = cover is None or (len(cover) == 1 and cover[0][0] == 0)
+        check("M8", row.get("outcome") == "cancelled" and held == later and from_zero,
+              f"outcome {row.get('outcome')}; marker and pack read after the run ended "
+              f"{'unchanged' if held == later else 'CHANGED'} 3 s later "
+              f"({'none written' if held == (None, None) else f'coverage {cover}'}; want one "
+              f"range from 0 when written)")
     if "M8" in selected:
         attempt(m8, "M8")
 

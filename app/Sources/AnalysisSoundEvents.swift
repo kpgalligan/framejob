@@ -20,7 +20,8 @@ import SoundAnalysis
 ///
 /// **Publication**, through `AnalysisStore.publishFile`: every
 /// `publishInterval` and at the range's end, mid-range only through the
-/// contiguous answered prefix. At the end, once the reader `.completed` at
+/// contiguous answered prefix, and so when the job is cancelled (spec §11
+/// CJ-21 as amended by #435). At the end, once the reader `.completed` at
 /// the media's end (its window reaches the media's duration, or the track
 /// ran out first), every window of the range with no result that overhangs
 /// the decoded sound (k·hop + window past the last decoded sample) is stored
@@ -180,7 +181,9 @@ enum AnalysisSoundEvents {
             while let sample = output.copyNextSampleBuffer() {
                 if cancelled() {
                     reader.cancelReading()
+                    let answered = collector.snapshot.windows
                     analyzer.removeAllRequests()
+                    publishPrefix(request, &job, range: range, found: answered, grid: grid)
                     return false
                 }
                 guard let floats = MediaImporter.monoFloats(of: sample), !floats.isEmpty,
@@ -210,8 +213,12 @@ enum AnalysisSoundEvents {
             let why = reader.error?.localizedDescription
             reader.cancelReading()
             guard status == .completed else {
+                let answered = collector.snapshot.windows
                 analyzer.removeAllRequests()
-                if cancelled() { return false }
+                if cancelled() {
+                    publishPrefix(request, &job, range: range, found: answered, grid: grid)
+                    return false
+                }
                 throw SoundError.reader(why ?? "the decode stopped (status \(status.rawValue))")
             }
             analyzer.completeAnalysis()
@@ -239,6 +246,22 @@ enum AnalysisSoundEvents {
         var from: Int
 
         init(range: ClosedRange<Int>) { from = range.lowerBound }
+    }
+
+    /// A cancelled range's last publish (spec §11 CJ-21 as amended by #435):
+    /// the contiguous answered prefix from `job.from` in `found`, read before
+    /// the analyzer's requests were removed; nothing when none is answered.
+    private static func publishPrefix(
+        _ request: AnalysisRequest, _ job: inout Job, range: ClosedRange<Int>,
+        found: [Int: SoundEvents.Window], grid: AnalysisGrid
+    ) {
+        let prefix = coverage(
+            range: range, from: job.from, answered: Set(found.keys), decodedEnd: nil, grid: grid)
+        guard let answered = prefix.covered.first else { return }
+        AnalysisStore.publishCancelled(request) {
+            try publish(request, &job, through: answered.upperBound, tail: [], found: found,
+                        grid: grid)
+        }
     }
 
     /// Publishes `job.from…through` (`covered` when given, else that one

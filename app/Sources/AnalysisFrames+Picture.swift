@@ -1,6 +1,51 @@
 import AVFoundation
 
+/// One kept frame's picture inside `AnalysisFrames.read`'s callback (#437):
+/// made only when `picture` is called (again on each call) — turned upright,
+/// rounded or converted then, so a frame the kind skips is never copied;
+/// valid only inside the callback.
+struct LazyAnalysisPicture {
+    private let make: (_ body: (AnalysisPicture) throws -> Void) throws -> Void
+
+    init(_ make: @escaping (_ body: (AnalysisPicture) throws -> Void) throws -> Void) {
+        self.make = make
+    }
+
+    /// `body` over the picture. Throws `ReadError.reader` when the decoded
+    /// buffer had no pixels to hand.
+    func picture<R>(_ body: (AnalysisPicture) throws -> R) throws -> R {
+        var result: R?
+        var made = false
+        try make { picture in
+            result = try body(picture)
+            made = true
+        }
+        guard made, let result else {
+            throw AnalysisFrames.ReadError.reader("a decoded frame had no pixels")
+        }
+        return result
+    }
+}
+
 extension AnalysisFrames {
+
+    #if FRAMEJOB_DEV_TOOLS
+    private static let uprightLock = NSLock()
+    private static var uprightCount = 0
+
+    /// How many times `Upright.picture(of:)` has run since launch. Any thread.
+    static func uprightsMade() -> Int {
+        uprightLock.lock()
+        defer { uprightLock.unlock() }
+        return uprightCount
+    }
+
+    fileprivate static func countUpright() {
+        uprightLock.lock()
+        uprightCount += 1
+        uprightLock.unlock()
+    }
+    #endif
 
     /// A half-float RGBA buffer rounded to 8-bit BGRA in `scratch`.
     static func halfToBGRA(
@@ -54,6 +99,9 @@ extension AnalysisFrames {
         mutating func picture(
             of buffer: CVPixelBuffer, _ body: (AnalysisPicture) throws -> Bool
         ) throws -> Bool {
+            #if FRAMEJOB_DEV_TOOLS
+            AnalysisFrames.countUpright()
+            #endif
             CVPixelBufferLockBaseAddress(buffer, .readOnly)
             defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
             guard let base = CVPixelBufferGetBaseAddress(buffer) else { return true }

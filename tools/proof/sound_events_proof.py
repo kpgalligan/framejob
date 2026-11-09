@@ -28,7 +28,10 @@ whole run (FC-30: the values move in the third decimal under load); P7 two
 half runs against a whole run within 0.01, NaN against a value a failure; P8
 `soundEventsAnswer`'s decimals, nulls and cap; P9 the NaN tail — a cut-short
 decode covers no tail, and a completed run over 9.0, 9.1 and 9.4 s of speech
-covers every window, the overhanging ones NaN, and a whole lookup hits.
+covers every window, the overhanging ones NaN, and a whole lookup hits; P10 a
+run at the default publish interval cancelled at half keeps its answered
+prefix (spec §11 CJ-21 as amended by #435): one range from 0, short of the
+end, every covered window answered, within 0.01 of a whole run.
 
 **App rows** over MCP (`proof_app.binary()`, `RC_PROOF_APP`), on a scratch
 `CFFIXED_USER_HOME`; Z1 is each launch's parity grep:
@@ -91,7 +94,7 @@ HOP = 450_000
 HOP_S = 0.75
 GROUPS = ["laughter", "applause", "cheering", "crowd", "music", "speech"]
 HOLD = ["-RCDevAnalysisHold", "3"]
-P_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"]
+P_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10"]
 PLAIN = ["E1", "E2", "E3", "E4", "E6", "E7", "E8", "E9", "E10"]
 HELD = ["E5", "E11"]
 ROWS = P_ROWS + PLAIN + HELD + ["Z1"]
@@ -127,6 +130,10 @@ MUTANTS = {
          "        case .soundEvents: return 1"),
         ("app/Sources/SoundEvents.swift",
          "    static let tableVersion = 1", "    static let tableVersion = 2")]),
+    "cancel-unpublished-sound": (["P10"], [(
+        "app/Sources/AnalysisSoundEvents.swift",
+        "        guard let answered = prefix.covered.first else { return }\n",
+        "        guard let answered = prefix.covered.first, answered.isEmpty else { return }\n")]),
     "sound-holds-picture": (["E11"], [(
         "app/Sources/AnalysisLane.swift",
         "        while running.keys.filter({ !$0.kind.usesSoundQueue }).count < width,",

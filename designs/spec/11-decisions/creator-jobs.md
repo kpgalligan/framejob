@@ -407,6 +407,16 @@ CJ-20…CJ-27 are CJ2a's (the analysis lane, its store and reader, `shots`, the 
   while another document's ten-minute `shots` job ran (medians of 600 / 580 / 598 and
   593 / 588 / 599), a drop of 0.84 %, under 2 %: the picture queue does not pause while a
   transport plays, and `BackgroundRender.anyPlaying` is not added.
+  **Amended by #435 (2026-11-09):** A job that is cancelled — its owner released (a tool call past
+  its wait), its want replaced, its document closed, or Stop pressed — publishes what it had
+  decided before it ends, by its kind's own mid-range rule (shots through the last stored index,
+  `faces` and `subjects` through the samples decided, masks through `covered`, `sound_events`
+  through the contiguous answered prefix). That publish only merges: when, under the publish lock,
+  a marker is on disk that does not answer for the job's stamp (another stamp, canned, or its
+  payload gone), it writes nothing and leaves that cache as it is, so a want replaced by a stamp
+  already cached never loses it. A job cancelled before its first frame (in
+  `-RCDevAnalysisHold`, or in the pre-roll) publishes nothing. A failed publish there is logged
+  and the job still ends cancelled.
 - **CJ-22 — The store.** A kind's results for one media are a marker `cache/analysis/<kind>/<media
   id>.json` and a payload folder `cache/analysis/<kind>/<media id>/` holding the files the kind
   names (`shots` a `frames.bin`, `faces` a `samples.bin`, CO's masks one movie per chunk and its

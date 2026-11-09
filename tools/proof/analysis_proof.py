@@ -26,6 +26,14 @@ cache's marker and `frames.bin`.
   and at once, both kept.
 - P9 a publish started while `CacheLedger.saveBegan` holds the folder writes no
   marker or payload until `saveEnded`, then both (CJ-22's one door).
+- P10 `AnalysisShots.run` over `shots.mov`'s whole grid cancelled at half
+  answers false and keeps what it stored (spec §11 CJ-21 as amended by #435):
+  one range [0, k], 0 < k < the last index, records 0…k byte-equal to a whole
+  run's.
+- P11 the cancel publish only merges: (a) inside `publishCancelled` under
+  another stamp over a cache leaves marker and `frames.bin` byte-identical;
+  (b) under the cache's own stamp it merges; (c) on an empty cache it writes;
+  (d) an ordinary publish under another stamp still replaces (CJ-22).
 
 **App rows** over MCP (`proof_app.binary()`, `RC_PROOF_APP`), each launch on a
 scratch `CFFIXED_USER_HOME`; Z1 is each launch's parity grep:
@@ -63,6 +71,10 @@ scratch `CFFIXED_USER_HOME`; Z1 is each launch's parity grep:
 - A12 with `clip`: a trimmed, a ×2 and a reversed placement each answer every
   cut in its window once, at `clip_time` and `timeline` as the clip's in,
   speed, start and the media's duration put it.
+- A13 (its own launch, hold 50 s) `get_media_analysis {media, kind: masks}` on
+  `hlg_4k.mov` (the third arm) refuses with "call again to continue"; within
+  15 s the masks marker covers one range [0, k], k < 599, and `masks.pack`
+  exists: a call past its wait keeps what the job analysed (#435).
 
 `--mutant NAME`: the named decision broken in a copy — `app/Sources` copied
 for the probe's rows, the tree copied and built (`tree_copy.py`,
@@ -97,11 +109,13 @@ HOME = WORK / "home"
 CALL_BOUND = 300
 BUILD_BOUND = 1500
 FRAME = 20_000  # ticks a frame at 30 fps
-P_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"]
+P_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11"]
 PLAIN = ["A1", "A2", "A3", "A4", "A8", "A9", "A10", "A12"]
 HELD = ["A5", "A6", "A7", "A11"]
-ROWS = P_ROWS + PLAIN + HELD + ["Z1"]
+TIMED_OUT = ["A13"]
+ROWS = P_ROWS + PLAIN + HELD + TIMED_OUT + ["Z1"]
 HOLD = ["-RCDevAnalysisHold", "3"]
+LONG_HOLD = ["-RCDevAnalysisHold", "50"]   # A13: the job runs about 10 s inside the call's 60 s
 CANNED = ["-RCDevAnalysisCanned", "YES"]
 
 MUTANTS = {
@@ -121,8 +135,8 @@ MUTANTS = {
         ": .miss(missing)")]),
     "margin-unread": (["A9"], [(
         "app/Sources/ProjectDocument+Analysis.swift",
-        "let need = grid.need(indices, margin: kind.margin)",
-        "let need = grid.need(indices, margin: 0)")]),
+        ".map { [grid.need($0, margin: kind.margin)] } ?? []",
+        ".map { [grid.need($0, margin: 0)] } ?? []")]),
     "width-wrong": (["A7"], [(
         "app/Sources/AnalysisLane.swift", "static let pictureWidth = 1",
         "static let pictureWidth = 2")]),
@@ -135,6 +149,18 @@ MUTANTS = {
     "hold-no-cancel-poll": (["A6"], [(
         "app/Sources/AnalysisLane.swift", "while Date() < until, !cancelled() {",
         "while Date() < until {")]),
+    "cancel-unpublished-shots": (["P10"], [(
+        "app/Sources/AnalysisShots.swift",
+        "                if lastIndex >= coveredFrom {\n                    AnalysisStore.publishCancelled",
+        "                if false, lastIndex >= coveredFrom {\n                    AnalysisStore.publishCancelled")]),
+    "cancel-replaces-stamp": (["P11"], [(
+        "app/Sources/AnalysisStore.swift",
+        "        if replaces, Thread.current.threadDictionary[mergeOnlyKey] != nil { return false }\n",
+        "")]),
+    "cancel-unpublished-masks": (["A13"], [(
+        "app/Sources/AnalysisMasks.swift",
+        "                    done.upperBound >= job.from\n",
+        "                    done.upperBound >= job.from, false\n")]),
     "preroll-by-index": (["P7"], [(
         "app/Sources/AnalysisFrames.swift", "guard kept.count < 2 else { break }", "break")]),
 }
@@ -550,10 +576,48 @@ def parity(log, tag):
     check("Z1", not lines, f"{tag}: grep 'Frame Job: ' printed {lines[:3] or 'nothing'}")
 
 
+def timed_out_rows(client):
+    """A13: a masks call past its wait keeps what its job analysed (#435)."""
+    doc = Doc(client, "timed-out")
+
+    def a13():
+        hlg = WORK / "media" / "hlg_4k.mov"
+        hlg.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(fixtures.hlg_4k(), hlg)
+        media = doc.call("import_media", path=str(hlg))["media"]
+        marker = doc.path / "cache/analysis/masks" / f"{media}.json"
+        pack = doc.path / "cache/analysis/masks" / str(media) / "masks.pack"
+        began = time.monotonic()
+        try:
+            answer = doc.call("get_media_analysis", media=media, kind="masks")
+            check("A13", False, f"the call landed inside its wait after "
+                  f"{time.monotonic() - began:.1f} s ({answer.get('cached')}, frames "
+                  f"{len(answer.get('frames') or [])}), so no job was cancelled past it")
+            return
+        except mcp.ToolError as error:
+            refused = str(error)
+        waited = time.monotonic() - began
+        coverage = None
+        for _ in range(150):
+            if marker.exists() and pack.exists():
+                coverage = json.loads(marker.read_text()).get("coverage")
+                break
+            time.sleep(0.1)
+        one = (coverage is not None and len(coverage) == 1 and coverage[0][0] == 0
+               and coverage[0][1] < 599)
+        check("A13", "call again to continue" in refused and one,
+              f"the call refused after {waited:.1f} s: {refused[:160]!r}; within 15 s the marker "
+              f"covers {coverage} (want one range [0, k], k < 599), masks.pack "
+              f"{'exists' if pack.exists() else 'MISSING'}")
+    attempt(a13, "A13")
+    doc.close()
+
+
 def app_rows(binary):
     plans = [("plain", [], plain_rows, set(PLAIN)),
              ("canned", CANNED, canned_rows, {"A8"}),
-             ("held", HOLD, held_rows, set(HELD))]
+             ("held", HOLD, held_rows, set(HELD)),
+             ("timed-out", LONG_HOLD, timed_out_rows, set(TIMED_OUT))]
     for tag, arguments, body, rows in plans:
         if not selected & rows:
             continue
@@ -614,7 +678,7 @@ def main():
         if unknown:
             print(f"unknown rows: {sorted(unknown)}")
             return 2
-        if selected & set(PLAIN + HELD):
+        if selected & set(PLAIN + HELD + TIMED_OUT):
             selected.add("Z1")
     remove_work()
     if not args.mutant:
@@ -637,7 +701,7 @@ def main():
     else:
         print(f"CJ2a — the analysis lane ({proof_app.config()} build)", flush=True)
     probe_rows(sources)
-    if selected & set(PLAIN + HELD):
+    if selected & set(PLAIN + HELD + TIMED_OUT):
         if binary is None:
             binary = proof_app.binary()
         if binary.suffix == ".app":

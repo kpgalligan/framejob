@@ -92,7 +92,7 @@ You can keep working while an analysis runs, except while the Analyzing sheet is
 
 - Picture analysis runs at low priority, one job at a time across all your open projects.
 - Sound analysis has its own queue, so one sound job can run beside one picture job.
-- Frame Job saves what it has found every 30 seconds, and at the end of each stretch of the file it reads. If a job stops part-way, everything saved so far is kept and the next request continues from there.
+- Frame Job saves what it has found every 30 seconds, at the end of each stretch of the file it reads, and when a job is stopped or cancelled part-way. Everything it saved is kept, and the next request continues from there.
 - A job that nothing wants any more is dropped if it hasn't started, and cancelled if it has. Closing a project does this to its jobs.
 
 ## What each analysis finds

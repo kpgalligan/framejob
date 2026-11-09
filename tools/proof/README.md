@@ -27346,7 +27346,7 @@ python3 tools/proof/audio_ap6b_proof.py <dir>/agent.sock
 
 The recorded runs are in `archive/audio.md`'s AP6b record.
 
-## Road map "creator-jobs" CJ2a — the analysis lane, its store and reader, and `shots` (`analysis_proof.py` P1–P9, A1–A12, Z1; ten mutants; `creator_spike/` CJ-S3, CJ-S4; spec §11 CJ-20…CJ-27)
+## Road map "creator-jobs" CJ2a — the analysis lane, its store and reader, and `shots` (`analysis_proof.py` P1–P11, A1–A13, Z1; thirteen mutants; `creator_spike/` CJ-S3, CJ-S4; spec §11 CJ-20…CJ-27, CJ-21 as amended by #435)
 
 **`analysis_fixtures.py`** makes every fixture with ffmpeg into `tools/proof/media/analysis/`
 (gitignored), reused while present (`--force` remakes them, `--flattened <socket>` also makes
@@ -27369,10 +27369,11 @@ frames composed over 20 s of a 1080p30 timeline idle and while another document'
 job runs (wanted through `analysis_job`).
 
 **`analysis_proof.py`** builds `analysis_probe.swift` from `app/Sources` with
-`FRAMEJOB_DEV_TOOLS` for P1–P9 (no app), then drives the app (`proof_app.binary()`) on a
-scratch `CFFIXED_USER_HOME` in three launches: plain (A1–A4, A8 without the flag, A9, A10,
-A12), `-RCDevAnalysisCanned YES` (A8 with it) and `-RCDevAnalysisHold 3` (A5–A7, A11, acting
-during a held job through the dev tool `analysis_job`). Z1 is each launch's parity grep.
+`FRAMEJOB_DEV_TOOLS` for P1–P11 (no app), then drives the app (`proof_app.binary()`) on a
+scratch `CFFIXED_USER_HOME` in four launches: plain (A1–A4, A8 without the flag, A9, A10,
+A12), `-RCDevAnalysisCanned YES` (A8 with it), `-RCDevAnalysisHold 3` (A5–A7, A11, acting
+during a held job through the dev tool `analysis_job`) and `-RCDevAnalysisHold 50` (A13, a
+call that gives up at its 60 s wait about 10 s into its job). Z1 is each launch's parity grep.
 
 | Row | What it holds |
 |---|---|
@@ -27385,6 +27386,8 @@ during a held job through the dev tool `analysis_job`). Z1 is each launch's pari
 | P7 | the VFR twin: the 21 records after each gap equal from a whole-file job and from one starting just after the gap; the cut at 4 s found by both |
 | P8 | two disjoint publishes from one on-disk state, in either order and at once, both kept |
 | P9 | a publish started during a save (`CacheLedger.saveBegan`) writes no marker or payload until `saveEnded`, then both |
+| P10 | a shots job cancelled at half answers false and keeps what it stored: one range [0, k], records 0…k byte-equal to a whole run's (#435) |
+| P11 | a cancelled job's publish only merges: under another stamp it leaves the cache byte-identical, under its own it merges, on an empty cache it writes; an ordinary publish still replaces |
 | A1 | exactly the fixture's cuts (60, 120, 180, 240): none at the flash or in the dissolve; a job ran |
 | A2 | a second call `cached: true`, no `run`, marker and payload bytes unchanged |
 | A3 | a window inside the coverage is a hit; one past it runs only the missing range, the coverage the union |
@@ -27397,19 +27400,21 @@ during a held job through the dev tool `analysis_job`). Z1 is each launch's pari
 | A10 | `set_media_color` S-Log3: a miss whose stamp names the converted reader; cleared, another miss, raw |
 | A11 | `relink_media` to the same bytes during a held job: the job lands after it |
 | A12 | a trimmed, a ×2 and a reversed clip: every cut in its window once, at its `clip_time` and `timeline` |
+| A13 | `get_media_analysis {kind: masks}` on `hlg_4k.mov` past its 60 s wait refuses "call again to continue", and within 15 s the masks marker covers one range [0, k], k < 599, with `masks.pack` there (#435) |
 
 Mutants (each must fail its row): `stamp-no-os-build` P1, `stamp-no-reader` A10,
 `write-outside-publish` P9, `partial-taken-covered` A3, `margin-unread` A9, `width-wrong` A7,
 `flash-rule-removed` A1, `canned-without-flag` A8, `hold-no-cancel-poll` A6,
-`preroll-by-index` P7. A probe row's mutant edits a copy of `app/Sources`; an app row's builds
-a tree copy (`tree_copy.py`).
+`preroll-by-index` P7, `cancel-unpublished-shots` P10, `cancel-replaces-stamp` P11,
+`cancel-unpublished-masks` A13. A probe row's mutant edits a copy of `app/Sources`; an app
+row's builds a tree copy (`tree_copy.py`).
 
 ```sh
 python3 tools/proof/analysis_fixtures.py
 python3 tools/proof/creator_spike/shots_spike.py [--socket <sock>]
 python3 tools/proof/creator_spike/lane_spike.py
 python3 tools/proof/creator_spike/lane_spike.py --playback --socket <dir>/agent.sock
-python3 tools/proof/analysis_proof.py --only P1,P2,P3,P4,P5,P6,P7,P8,P9
+python3 tools/proof/analysis_proof.py --only P1,P2,P3,P4,P5,P6,P7,P8,P9,P10,P11
 make app-debug && python3 tools/proof/analysis_proof.py
 python3 tools/proof/analysis_proof.py --mutant <name>
 ```
@@ -27545,7 +27550,7 @@ python3 tools/proof/cutout_spike/cutout_spike.py --only s2 --pack     # the mask
 **`co1_proof.py`** builds `co1_probe.swift` from `app/Sources` with `FRAMEJOB_DEV_TOOLS` through `swift_build.py`.
 - **P1–P11** are probe rows: the pack's bytes, the append-merge publish (`AnalysisStore.publishFile`), `shown(at:)`, the found flag, the stamp's `vision` field, a throwing write, a publish during a save, `runs` with the capped rate's nearest slot and `covered`, a marker whose pack is deleted, garbage or another size, a publish of a range that made no mask (0 × 0, no frames), which keeps the pack and widens its coverage, and (P11, #456) `AnalysisMasks.run` over a request whose one range lies wholly past the grid, with a missing file: true, no trap, no progress, nothing published. Its mutant `masks-crossed-range` (the guard on the clamped bounds removed) traps, so the probe gives no answer and P11 fails.
 - The probe's `compare` mode is the app rows' mask reader. It answers, for a pair of packs, their sizes, frame counts, the pts both hold, and at those pts the largest byte difference and the IoU above 127. The proof never decompresses LZFSE itself; it parses the tables in Python.
-- **M1–M9** are app rows over `get_media_analysis {kind: "masks"}` and `analysis_job`, each launch on a scratch `CFFIXED_USER_HOME`, with Z1 each launch's parity grep. M9 is Release only (Debug's per-pixel loops are unoptimised; on Debug it prints SKIP). On Debug the third arm reads about half a frame a second, so M4 takes about 20 minutes there.
+- **M1–M9** are app rows over `get_media_analysis {kind: "masks"}` and `analysis_job`, each launch on a scratch `CFFIXED_USER_HOME`, with Z1 each launch's parity grep. M8 closes the document during a running job: the outcome `cancelled`, the marker and pack read after the run ended unchanged 3 s later, and a marker the cancelled job wrote covering one range from 0 (spec §11 CJ-21 as amended by #435). M9 is Release only (Debug's per-pixel loops are unoptimised; on Debug it prints SKIP). On Debug the third arm reads about half a frame a second, so M4 takes about 20 minutes there.
 
 The fixtures are `cutout_spike.fixtures()`'s and the proof's own, all in `tools/proof/media/cutout/`:
 - `push_60.mov`: `push_1080.mov` looped three times, `-c copy`.
@@ -27564,7 +27569,7 @@ python3 tools/proof/co1_proof.py --mutant <name>
 python3 tools/proof/creator_spike/lane_spike.py --playback --kind masks --socket <dir>/agent.sock   # CO-12, Release
 ```
 
-## Road map "creator-jobs" CJ3 — face samples on the Mac (`faces_proof.py` P1–P5, F1–F7, Z1; five mutants; `creator_spike/faces_spike.py`; `creator_spike/lane_spike.py --playback --kind faces`; spec §11 CJ-30…CJ-35)
+## Road map "creator-jobs" CJ3 — face samples on the Mac (`faces_proof.py` P1–P7, F1–F7, Z1; seven mutants; `creator_spike/faces_spike.py`; `creator_spike/lane_spike.py --playback --kind faces`; spec §11 CJ-30…CJ-35)
 
 **`face_fixtures.py`** makes the face fixtures in `tools/proof/media/analysis/` (gitignored) and
 `faces.json` beside them. The pictures are read in place from Photos' FlexAudio covers
@@ -27595,7 +27600,14 @@ through `swift_build.py`.
 - **P1–P5** are probe rows: `samples.bin`'s round trip, the merge in either order, a damaged
   file written fresh; CJ-31's order and `topLeft`; the sample a frame serves (25 fps at 10 a
   second, a gap); the stamp; `facesAnswer`'s 4 decimals, nulls, row bytes (printed for CJ-34)
-  and cap.
+  and cap; P6 a faces job over samples 0…99 cancelled at half keeps the samples decided, byte-equal
+  to a whole run's (#435); P7 on the rotation-tagged portrait, a `read` that never asks turns no
+  picture upright and the sample job turns exactly one per analysed sample (#437).
+- F3's detail prints the rotated media's last job's seconds, its calls' seconds and both
+  `samples.bin` files' SHA-256, #437's before and after on one build class.
+- Mutants: `device-unpinned` (P4), `orientation-ignored` (F3), `y-not-flipped` (P2),
+  `source-in-clip-ticks` (F1), `nearest-frame` (P3), `cancel-unpublished-sample-job` (P6),
+  `eager-upright` (P7).
 - **F1–F7** are app rows over `get_media_analysis {kind: "faces"}` on one launch with a scratch
   `CFFIXED_USER_HOME`, and Z1 its parity grep. F5 (S-TH1's mouth gap) is skipped by name and owed.
 
@@ -27603,14 +27615,14 @@ through `swift_build.py`.
 python3 tools/proof/face_fixtures.py
 python3 tools/proof/creator_spike/faces_spike.py --selftest
 python3 tools/proof/creator_spike/faces_spike.py                      # CJ-S2, on AC
-python3 tools/proof/faces_proof.py --only P1,P2,P3,P4,P5             # no app
+python3 tools/proof/faces_proof.py --only P1,P2,P3,P4,P5,P6,P7       # no app
 make app-debug && python3 tools/proof/faces_proof.py
 RC_PROOF_APP=release python3 tools/proof/faces_proof.py              # the recorded run
 python3 tools/proof/faces_proof.py --mutant <name>
 python3 tools/proof/creator_spike/lane_spike.py --playback --kind faces --socket <dir>/agent.sock   # CJ-35, Release
 ```
 
-## Road map "creator-jobs" FC3 — sound events heard on the Mac (`sound_events_proof.py` P1–P9, E1–E11, Z1; six mutants; `creator_spike/sound_spike.py`; spec §11 FC-30…FC-34)
+## Road map "creator-jobs" FC3 — sound events heard on the Mac (`sound_events_proof.py` P1–P10, E1–E11, Z1; seven mutants; `creator_spike/sound_spike.py`; spec §11 FC-30…FC-34)
 
 **`creator_spike/sound_spike.py`** is spike FC-S1: `sound_spike.swift` (built over
 `swift_build.app_sources()`, optimised; modes `labels` and `run <file> <window> file|stream`)
@@ -27632,25 +27644,27 @@ Results in `tools/proof/work/creator_spike/FC-S1/results.json` (`agreement_metri
 MP3, a test-picture movie with that sound, a picture with none, and 9.0, 9.1 and 9.4 s cuts), and
 builds `sound_events_probe.swift` from `app/Sources` with `FRAMEJOB_DEV_TOOLS` through
 `swift_build.py`.
-- **P1–P9** are probe rows: `windows.bin`'s round trip with NaN, the merge in either order, a
+- **P1–P10** are probe rows: `windows.bin`'s round trip with NaN, the merge in either order, a
   damaged file written fresh; the hop grid; the stamp (reader `raw` with `color.log` set); the
   MP3's windowed read past its encoder delay against the WAV; ×2 and ramped placement against
   `MediaPeaks.sourceTick`, a reversed clip none; a run cancelled once four windows are covered;
   halves against a whole run within 0.01 (FC-30: the values move in the third decimal under
   load); `soundEventsAnswer`'s decimals, nulls and cap; the NaN tail against the decoded sound's
-  end on the three cuts, and a whole lookup's hit.
+  end on the three cuts, and a whole lookup's hit; a run at the default publish interval
+  cancelled at half keeping its answered prefix (#435).
 - **E1–E11** are app rows over `get_media_analysis {kind: "sound_events"}` and `analysis_job`
   on a plain launch (E1–E4, E6–E8) and one with `-RCDevAnalysisHold 3` (E5, E11), each with a
   scratch `CFFIXED_USER_HOME` and Z1 its parity grep. E9 (S-EV recall) and E10 (S-MU
   confusion) are skipped by name and owed.
 - Mutants: `window-start` (P2, E6), `mp3-trim-skipped` (P4), `early-publish` (P6),
-  `cover-whole-range` (P9, P7), `table-version` (P3), `sound-holds-picture` (E11); one with an
+  `cover-whole-range` (P9, P7), `table-version` (P3), `sound-holds-picture` (E11),
+  `cancel-unpublished-sound` (P10); one with an
   app row builds a copy of the tree with `make app-debug` (`tree_copy.py`).
 
 ```sh
 python3 tools/proof/creator_spike/sound_spike.py --selftest
 python3 tools/proof/creator_spike/sound_spike.py                         # FC-S1, on AC
-python3 tools/proof/sound_events_proof.py --only P1,P2,P3,P4,P5,P6,P7,P8,P9   # no app
+python3 tools/proof/sound_events_proof.py --only P1,P2,P3,P4,P5,P6,P7,P8,P9,P10   # no app
 make app-debug && python3 tools/proof/sound_events_proof.py
 RC_PROOF_APP=release python3 tools/proof/sound_events_proof.py           # the recorded run
 python3 tools/proof/sound_events_proof.py --mutant <name>

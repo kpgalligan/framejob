@@ -133,10 +133,11 @@ enum AnalysisFrames {
 
     /// Reads every kept frame of `range` (index, pts in ticks, picture),
     /// preceded by the pre-roll's frames (indices below the range), in
-    /// presentation order. False when `cancelled()` stopped it.
+    /// presentation order. False when `cancelled()` stopped it. The picture
+    /// is made only when the callback asks for it (#437).
     static func read(
         range: ClosedRange<Int>, grid: AnalysisGrid, source: Source, longSide: Int,
-        cancelled: () -> Bool, frame: (Int, Int64, AnalysisPicture) throws -> Void
+        cancelled: () -> Bool, frame: (Int, Int64, LazyAnalysisPicture) throws -> Void
     ) throws -> Bool {
         let first = range.lowerBound
         let firstTick = grid.ticks(of: first)
@@ -177,7 +178,7 @@ enum AnalysisFrames {
     /// whether to go on. False when `cancelled()` stopped it.
     private static func decode(
         _ source: Source, longSide: Int, from: Ticks, to: Ticks, cancelled: () -> Bool,
-        each: (Int64, AnalysisPicture) throws -> Bool
+        each: (Int64, LazyAnalysisPicture) throws -> Bool
     ) throws -> Bool {
         let range = CMTimeRange(
             start: CMTime(value: from, timescale: 600_000),
@@ -198,7 +199,7 @@ enum AnalysisFrames {
 
     private static func decodeDirect(
         _ source: Source, longSide: Int, range: CMTimeRange, cancelled: () -> Bool,
-        each: (Int64, AnalysisPicture) throws -> Bool
+        each: (Int64, LazyAnalysisPicture) throws -> Bool
     ) throws -> Bool {
         let asset = AVURLAsset(
             url: source.url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
@@ -225,13 +226,20 @@ enum AnalysisFrames {
         reader.add(output)
         var upright = Upright(transform: transform)
         return try pump(reader, output, cancelled: cancelled) { pts, buffer in
-            try upright.picture(of: buffer) { try each(pts, $0) }
+            try each(
+                pts,
+                LazyAnalysisPicture { body in
+                    _ = try upright.picture(of: buffer) {
+                        try body($0)
+                        return true
+                    }
+                })
         }
     }
 
     private static func decodeConverted(
         _ source: Source, input: ThumbnailInput, longSide: Int, range: CMTimeRange,
-        cancelled: () -> Bool, each: (Int64, AnalysisPicture) throws -> Bool
+        cancelled: () -> Bool, each: (Int64, LazyAnalysisPicture) throws -> Bool
     ) throws -> Bool {
         let key = RecipeSource.shared.register()
         defer { RecipeSource.shared.unregister(key) }
@@ -261,7 +269,14 @@ enum AnalysisFrames {
         reader.add(output)
         var scratch: [UInt8] = []
         return try pump(reader, output, cancelled: cancelled) { pts, buffer in
-            try halfToBGRA(buffer, into: &scratch) { try each(pts, $0) }
+            try each(
+                pts,
+                LazyAnalysisPicture { body in
+                    _ = try halfToBGRA(buffer, into: &scratch) {
+                        try body($0)
+                        return true
+                    }
+                })
         }
     }
 

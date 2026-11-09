@@ -24,6 +24,11 @@ import Foundation
 /// rather than overwrite one another (P8). `publish(…merge:)` is the same
 /// door for a kind that edits its payload's bytes in memory (`shots`). Each
 /// publish that lands posts `.analysisDidPublish` on main (spec §11 CO-22 (d)).
+///
+/// **A cancelled job's publish** (`publishCancelled`, spec §11 CJ-21 as
+/// amended by #435) only merges: when the on-disk marker would be replaced
+/// (another stamp, canned, undecodable, or its payload gone) it writes
+/// nothing and leaves that cache as it is.
 enum AnalysisStore {
 
     enum StoreError: LocalizedError {
@@ -145,6 +150,28 @@ enum AnalysisStore {
 
     // MARK: - The publish
 
+    /// The thread mark `publishCancelled` sets around its body.
+    private static let mergeOnlyKey = "FrameJobAnalysisMergeOnly"
+
+    /// A cancelled job's last publish (spec §11 CJ-21 as amended by #435):
+    /// runs `publish` with the calling thread marked merge-only, so every
+    /// `store` inside it is merge-only. A throw is logged and swallowed, so
+    /// the job still ends cancelled. A cache folder already removed (an
+    /// untitled document's, at its close) is not made again.
+    static func publishCancelled(_ request: AnalysisRequest, _ publish: () throws -> Void) {
+        guard FileManager.default.fileExists(atPath: request.cacheDir.path) else { return }
+        let thread = Thread.current.threadDictionary
+        thread[mergeOnlyKey] = true
+        defer { thread.removeObject(forKey: mergeOnlyKey) }
+        do {
+            try publish()
+        } catch {
+            NSLog(
+                "AnalysisLane: %@ of media %u: the cancelled job's publish failed: %@",
+                request.kind.rawValue, request.media.id, error.localizedDescription)
+        }
+    }
+
     private static let locksLock = NSLock()
     private static var locks: [String: NSLock] = [:]
 
@@ -193,9 +220,10 @@ enum AnalysisStore {
         perMedia.lock()
         defer { perMedia.unlock() }
         var failure: Error?
+        var wrote = false
         func body() {
             do {
-                try store(
+                wrote = try store(
                     kind: kind, cacheDir: cacheDir, mediaID: mediaID, stamp: stamp,
                     covered: covered, files: files, write: write)
             } catch {
@@ -205,6 +233,7 @@ enum AnalysisStore {
         let published = MediaImporter.CacheLedger.shared.publish(in: cacheDir, for: nil) { body() }
         guard published else { throw StoreError.saveInFlight }
         if let failure { throw failure }
+        guard wrote else { return }
         // A paused preview redraws with what just landed (spec §11 CO-22 (d)).
         let name = kind.rawValue, folder = cacheDir.standardizedFileURL.path
         DispatchQueue.main.async {
@@ -215,21 +244,26 @@ enum AnalysisStore {
     }
 
     /// The publish's body; the per-media lock and the ledger are held.
+    /// Answers whether it wrote: false only on a merge-only thread
+    /// (`publishCancelled`) whose on-disk marker would be replaced, and then
+    /// nothing on disk is touched.
     private static func store(
         kind: AnalysisKind, cacheDir: URL, mediaID: UInt32, stamp: AnalysisStamp,
         covered: [ClosedRange<Int>], files: [String],
         write: (_ onDisk: URL?, _ partial: URL) throws -> Bool
-    ) throws {
+    ) throws -> Bool {
         let fm = FileManager.default
         let marker = markerURL(kind, media: mediaID, in: cacheDir)
         let folder = payloadFolder(kind, media: mediaID, in: cacheDir)
         guard let file = files.first else { throw StoreError.write("the kind names no file") }
         let target = folder.appendingPathComponent(file)
         var onDisk = readMarker(kind, media: mediaID, in: cacheDir)
-        if fm.fileExists(atPath: marker.path),
-            onDisk?.canned == true || onDisk?.stamp?.matches(stamp) != true
-                || !fm.fileExists(atPath: target.path)
-        {
+        let replaces = fm.fileExists(atPath: marker.path)
+            && (onDisk?.canned == true || onDisk?.stamp?.matches(stamp) != true
+                || !fm.fileExists(atPath: target.path))
+        // A cancelled job's publish never replaces another stamp's cache (#435).
+        if replaces, Thread.current.threadDictionary[mergeOnlyKey] != nil { return false }
+        if replaces {
             try? fm.removeItem(at: marker)
             try? fm.removeItem(at: folder)
             onDisk = nil
@@ -257,6 +291,7 @@ enum AnalysisStore {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys]
             try encoder.encode(next).write(to: marker, options: .atomic)
+            return true
         } catch let error as StoreError {
             throw error
         } catch {

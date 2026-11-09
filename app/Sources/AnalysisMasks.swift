@@ -24,7 +24,9 @@ import Vision
 /// **A mask** is the size Vision answers, the job's first setting it; no
 /// observation is an all-zero mask; `found` is `MaskPack.found`. A job
 /// publishes at each range's end and every `publishInterval`, mid-range
-/// covering only through the last analysed frame done (`covered`).
+/// covering only through the last analysed frame done (`covered`), and so
+/// when it is cancelled (spec §11 CJ-21 as amended by #435). A frame's
+/// picture is made only when it is analysed (#437).
 enum AnalysisMasks {
     static let publishInterval: TimeInterval = 30
 
@@ -165,7 +167,9 @@ enum AnalysisMasks {
                     progress(Double(before + k - range.lowerBound + 1) / Double(total))
                 }
                 guard analysed(pts, after: previous, rate: capped) else { return }
-                let mask = try autoreleasepool { try self.mask(picture, pts: pts, size: &size) }
+                let mask = try autoreleasepool {
+                    try picture.picture { try self.mask($0, pts: pts, size: &size) }
+                }
                 job.masks.append(mask)
                 job.analysedDone.append(k)
                 if Date().timeIntervalSince(lastPublish) >= publishInterval,
@@ -176,7 +180,17 @@ enum AnalysisMasks {
                     lastPublish = Date()
                 }
             }
-            guard finished else { return false }
+            guard finished else {
+                // Through the last analysed frame done (CJ-21 as amended by #435).
+                if let done = covered(range, analysedDone: job.analysedDone, finished: false),
+                    done.upperBound >= job.from
+                {
+                    AnalysisStore.publishCancelled(request) {
+                        try publish(request, &job, through: done, size: size)
+                    }
+                }
+                return false
+            }
             try publish(request, &job, through: range, size: size)
             before += range.count
         }

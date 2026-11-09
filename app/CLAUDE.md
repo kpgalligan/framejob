@@ -505,7 +505,7 @@ detail there.
   and `expand`. `ProjectDocument.importMedia` and
   `AgentServer+MediaFolder.swift` (`import_media` on a folder) share it.
 - `AnalysisStamp.swift` · `AnalysisStore.swift` · `AnalysisLane.swift` ·
-  `AnalysisFrames.swift` · `AnalysisFrames+InputPass.swift` ·
+  `AnalysisFrames.swift` · `AnalysisFrames+Picture.swift` · `AnalysisFrames+InputPass.swift` ·
   `AnalysisShots.swift` · `AnalysisMasks.swift` · `AnalysisMasks+Image.swift` ·
   `MaskPack.swift` · `AnalysisVision.swift` · `AnalysisFaces.swift` · `AnalysisFaces+Samples.swift` ·
   `AnalysisSampleJob.swift` · `AnalysisSubjects.swift` · `AnalysisSubjects+Samples.swift` ·
@@ -537,7 +537,12 @@ detail there.
   stamp is compared field by field (`AnalysisStamp.matches`).
   `AnalysisFrames` reads direct (turned upright) or converted through
   `MediaImporter.oneClip` and step 0 when a `ThumbnailInput` exists, its
-  pre-roll two DECODED frames.
+  pre-roll two DECODED frames. Its callback gets a `LazyAnalysisPicture`
+  (`AnalysisFrames+Picture.swift`, beside `Upright` and `halfToBGRA`): the
+  picture is turned upright, rounded or converted only when the kind asks
+  (#437). A job that is cancelled publishes what it had decided before it
+  ends, merging only into a cache of its own stamp
+  (`AnalysisStore.publishCancelled`, CJ-21 as amended by #435).
   The `masks` kind (road map creator-jobs CO1, spec §11 CO-10…CO-14):
   `AnalysisMasks` makes a fresh person `.balanced` request (revision 1) per
   frame, pinned to the GPU, and refuses one that reads back another device.

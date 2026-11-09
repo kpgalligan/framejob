@@ -194,10 +194,15 @@ do {
             previous = pts
             lastFrameEnd = now()
         }
-        readSize = [picture.width, picture.height]
         let ks = served(pts, after: previous)
         guard !ks.isEmpty else { return }
-        let (people, salient) = try autoreleasepool { try analyse(picture) }
+        // The picture is made only for a served frame (#437).
+        let (people, salient) = try autoreleasepool {
+            try picture.picture { made in
+                readSize = [made.width, made.height]
+                return try analyse(made)
+            }
+        }
         for k in ks { samples[k] = (pts, people, salient) }
     }
 } catch { die("read: \(error.localizedDescription)") }
