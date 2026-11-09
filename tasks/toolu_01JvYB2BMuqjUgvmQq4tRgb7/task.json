@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01JvYB2BMuqjUgvmQq4tRgb7",
+  "agent_id": "a3d427f835caf6af2",
+  "subagent_type": "lc-adversary",
+  "task_description": "litecode adversary for #394",
+  "token_usage": {
+    "input_tokens": 14,
+    "cache_creation_tokens": 48931,
+    "cache_read_tokens": 268703,
+    "output_tokens": 5871,
+    "api_call_count": 7
+  },
+  "started_at": "2026-11-09T15:55:49.671518-05:00",
+  "completed_at": "2026-11-09T15:56:51.036817-05:00"
+}

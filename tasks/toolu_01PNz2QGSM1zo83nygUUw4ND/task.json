@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01PNz2QGSM1zo83nygUUw4ND",
+  "agent_id": "a0c422f420353e610",
+  "subagent_type": "lc-triage",
+  "task_description": "litecode triage for #394",
+  "token_usage": {
+    "input_tokens": 6,
+    "cache_creation_tokens": 35057,
+    "cache_read_tokens": 65928,
+    "output_tokens": 673,
+    "api_call_count": 3
+  },
+  "started_at": "2026-11-09T15:52:05.134442-05:00",
+  "completed_at": "2026-11-09T15:52:12.284029-05:00"
+}
