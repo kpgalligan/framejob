@@ -189,15 +189,19 @@ final class TranscriptPane: InspectorPaneView {
 
     /// A voice or peaks cache landed: that media's on-device words are read
     /// again, their starts moved to their sound (TX-18); a voice cache also
-    /// remakes the table and its pauses, whatever engine heard the words
-    /// (TX-34).
+    /// drops the media's kept voice cache (`reloadSpeech`, which reads a
+    /// cloud media's pause set again, #444) and then remakes the table and
+    /// its pauses, whatever engine heard the words (TX-34).
     @objc private func cacheLanded(_ note: Notification) {
         let kind = note.userInfo?[MediaImporter.cacheKindKey] as? String
         guard kind == MediaImporter.speechKind || kind == MediaImporter.peaksKind,
             let media = note.userInfo?[MediaImporter.mediaIDKey] as? UInt32
         else { return }
         source.reloadDeviceWords(media: media)
-        if kind == MediaImporter.speechKind { source.update() }
+        if kind == MediaImporter.speechKind {
+            source.reloadSpeech(media: media)
+            source.update()
+        }
     }
 
     // MARK: - Selecting and deleting words (TX-31, TX-32)

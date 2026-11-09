@@ -620,7 +620,8 @@ detail there.
   `get_media_analysis` and `split_at_shots` (`AgentServer+Analysis.swift`,
   off main) wait holding the agent lane's lock, at most
   `AnalysisLane.callWaitLimit` (60 s). `-RCDevAnalysisHold <s>` and
-  `-RCDevAnalysisCanned YES` are dev only, and `analysis_job`
+  `-RCDevAnalysisCanned YES` are dev only, as is the probes'
+  `AnalysisLane.devSetProgress`, and `analysis_job`
   (`AgentServer+AnalysisJob.swift`) is the dev tool proofs act through.
   Clip ▸ Split at Shot Changes (road map creator-jobs CJ2b, CJ-28, CJ-29):
   `ShotSplit` is the planner both doors call — targets, one request per
@@ -662,7 +663,8 @@ detail there.
   clip's status — `CutoutState`, `CutoutClipStatus` and the internal
   `Detail` it was read from: its windows over `[project]` (with a nest open,
   `[project, editedProject]`), the needed and stored indices for the
-  analysis's stamp (memoised per cache folder, media and URL, main only),
+  analysis's stamp (a non-nil stamp memoised per cache folder, media and URL,
+  main only; a nil one read again, #438),
   CO-26's subject over the clip's hull, then in order off → no picture →
   ready, no person or — a foreground picture — no subject (`noSubject`,
   before any failure) → failed (no file, no cache
@@ -677,7 +679,9 @@ detail there.
   the handles and `ReverseSource` resolution are unchanged) and its 0.5 s
   main-run-loop ticker while analysing or failed, which re-reads only the
   lane's runs and progress and recomputes on a changed run or a `masks`
-  publish. `ProjectDocument+Masks.swift`'s `maskOwner` (main only) and
+  publish; a tick that leaves the state's kind refreshes the read-out's whole
+  section, its header summary included. `ProjectDocument+Masks.swift`'s
+  `maskOwner` (main only) and
   `analyzeMasksNow()` (`ensureMasks()`, then `AnalysisLane.retry(owner:)` on
   `CutoutWants.queue`): `retry` clears a `.failed` or `.cancelled` outcome
   of the owner's requests that are neither running nor queued, and
@@ -686,7 +690,9 @@ detail there.
   any cut-out clip since CO10b, CO-103 lifted, `no_subject` their found-false
   state — then
   `CutoutWants.queue.sync {}`, then polls every 0.25 s up to `wait` or Stop,
-  never a timeout refusal; the centroid is read off main);
+  re-reading only the clips not yet settled while the document's handles are
+  unchanged (`cutoutDetails`), never a timeout refusal; the centroid is read
+  off main);
   `AgentCatalog+Cutout.swift` holds its row, spliced in by
   `creatorTools()` after the retime rows, before Text Behind Subject's.
 - `BehindSubjectPlan.swift` · `EditorViewController+BehindSubject.swift` ·
@@ -2215,14 +2221,19 @@ the key map behind it.
   re-read through `loadStored` (one in flight per media, `rereading`) and stay shown until that
   merges, and a load that read before a landing is read again instead of merged.
   `TranscriptTabSource+Statics` holds `resolve`, `pauses`, `Read` and the probes' `loadHold`.
+  `TranscriptTabSource+Status` holds `Status`, `canStop` and the status line (`polled`,
+  `refreshStatus`, `fillProgress`).
   Since TX3b (spec §11 TX-34): `TranscriptCut+Pause` is pure — a voice-cache silence over 1 s of
   timeline time between two shown words of one instance (the source words matched on
   `identityTick`), the longest non-speech run from the word before's end, extended back
   (`quietStart`) to no earlier than its start; its cut keeps 0.2 s each end, snapped, never a shown
   word's start (no two-range cut), dropped when it meets another shown word or an unread clip;
   `planPause` refuses on a locked track's words, then the peak ceiling. The pane computes the
-  pauses once per rebuild from `cutTable()` and passes them to `show`, and calls `source.update()`
-  when a `speech` cache lands so the table and pauses are remade; the view shows each as
+  pauses once per rebuild from `cutTable()` and passes them to `show`, and, when a `speech` cache
+  lands, calls `source.reloadSpeech(media:)` (the media's voice cache and the table dropped; a
+  media no TX-18 re-read covers has its pause set and voice cache re-read on the load queue at its
+  epoch, and a cloud load that read before the landing is read again after it merges, #444), then
+  `source.update()`, so the table, pauses and paragraphs are remade; the view shows each as
   " [x.x s]" after its word, a click selects it exclusively of the word selection (`onSelectPause`)
   and the pane sets its cut as the range and seeks to it; ⌫ and the delete family send one
   "Delete Pause" (`transcriptDelete(_:name:)`).

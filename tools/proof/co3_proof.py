@@ -16,6 +16,12 @@ CO-30, CO-31, CO-32).
   edge kept), one undo step.
 - I6p the probe's own centroid over a hand-made pack is the value worked by hand.
 - I8 `CutoutStatus.progress`'s three cases, each 0.400.
+- I9 (#438, the probe's `header` mode, a process of its own under a 3,600 s analysis hold) the
+  shut Background section's Status and header summary both read "Analyzing 0 %", and both read
+  "Analyzing 50 %" within 1.5 s of the running request's fraction set to 0.5.
+- I10 (#438) `CutoutStatus.stamp` answers nil for an absent file and a stamp once it is written.
+- I11 (#438) `AgentServer.cutoutDetails` reads every clip with nothing kept or under another
+  handle, and only the unsettled clip under the same handles, keeping the settled details.
 
 **App rows** over MCP (`proof_app.binary()`, `RC_PROOF_APP`, or `--app`), on a scratch
 `CFFIXED_USER_HOME`, with the Background section pinned open in the argument domain
@@ -47,7 +53,7 @@ Launch N (no hold):
 
 A row needing `tools/proof/media/cutout/`'s fixtures fails naming the fixture's error.
 
-`--mutant NAME`: CO-30's or CO-31's decision broken in a tree copy (`tree_copy.py`), the copy
+`--mutant NAME` (M1–M12): CO-30's or CO-31's decision broken in a tree copy (`tree_copy.py`), the copy
 built as the proof's configuration (and the probe from the copy's `app/Sources`), and only its
 rows run; CAUGHT (exit 0) when one of them fails. The tree's mutated file's SHA-256 is read before
 and after and must be unchanged.
@@ -93,11 +99,14 @@ I7_BOUND = 2.0
 WAIT_CALLS = 3
 PIN = ["-FrameJobInspectorSection.video.cutout", "<false/>"]
 HOLD = ["-RCDevAnalysisHold", "3600"]
-PROBE_ROWS = ["I1", "I3", "I5", "I6p", "I8"]
+PROBE_ROWS = ["I1", "I3", "I5", "I6p", "I8", "I9", "I10", "I11"]
+# The probe's `header` mode runs these rows, in a process of their own.
+HEADER_ROWS = ["I9"]
 APP_ROWS = ["I2", "I4", "I6", "I7", "Z1"]
 ROWS = PROBE_ROWS + APP_ROWS
 
 STATUS = "app/Sources/CutoutStatus.swift"
+MEMO = "app/Sources/CutoutStatus+Memo.swift"
 SERVER = "app/Sources/AgentServer+Cutout.swift"
 MUTANTS = {
     "M1-unregistered": (["I1"], [(
@@ -138,6 +147,19 @@ MUTANTS = {
     "M8-progress-over": (["I8"], [(
         STATUS, "        let cOut = c - count(intersect(coveredNeed, running))\n",
         "        let cOut = c\n")]),
+    # #438's three fixes, each restored to the old behaviour.
+    "M9-header-stale": (["I9"], [(
+        MEMO, "kind: held.kind)\n            refreshShown(readout)\n",
+        "kind: held.kind)\n            readout.refresh()\n")]),
+    "M10-nil-memoised": (["I10"], [(
+        STATUS, "        guard let stamp else {\n            stamps[key] = nil  // read again next "
+        "time: the file may only be absent now (#438)\n            return nil\n        }\n", "")]),
+    "M11-reread-settled": (["I11"], [(
+        SERVER, "            if let held, held.status.clip == clip, held.status.state.isSettled "
+        "{ return held }\n", "")]),
+    "M12-held-across-edit": (["I11"], [(
+        SERVER, "        guard let kept, kept.project === project, kept.edited === edited else {\n",
+        "        guard let kept else {\n")]),
 }
 
 results = {}
@@ -190,31 +212,34 @@ def build_probe(root=ROOT):
 
 def probe_rows(root=ROOT):
     global PROBE
-    rows = [r for r in PROBE_ROWS if r in selected]
-    if not rows and "I6" not in selected:
+    rows = [r for r in PROBE_ROWS if r in selected and r not in HEADER_ROWS]
+    header = [r for r in HEADER_ROWS if r in selected]
+    if not rows and not header and "I6" not in selected:
         return
     try:
         PROBE = build_probe(root)
     except swift_build.SwiftBuildFailed as error:
-        for row in rows + (["I6"] if "I6" in selected else []):
+        for row in rows + header + (["I6"] if "I6" in selected else []):
             check(row, False, "the probe did not build: " + "; ".join(error.diagnostics[:6]))
         return
-    if not rows:
-        return
-    request = WORK / "probe" / "request.json"
-    request.write_text(json.dumps({"work": str(WORK / "probe" / "work")}))
-    try:
-        run = subprocess.run([str(PROBE), str(request)], capture_output=True, text=True,
-                             timeout=300)
-        lines = [line for line in run.stdout.splitlines() if line.startswith("{")]
-        answer = {r["id"]: r for r in json.loads(lines[-1])["rows"]}
-    except (subprocess.TimeoutExpired, ValueError, KeyError, IndexError) as error:
-        for row in rows:
-            check(row, False, f"the probe gave no answer: {error}")
-        return
-    for row in rows:
-        got = answer.get(row)
-        check(row, got is not None and got["pass"], (got or {}).get("detail", "no row"))
+    for mode, wanted in ((None, rows), ("header", header)):
+        if not wanted:
+            continue
+        folder = WORK / "probe" / (mode or "rows")
+        request = WORK / "probe" / f"request-{mode or 'rows'}.json"
+        request.write_text(json.dumps({"work": str(folder)}))
+        try:
+            run = subprocess.run([str(PROBE)] + ([mode] if mode else []) + [str(request)],
+                                 capture_output=True, text=True, timeout=300)
+            lines = [line for line in run.stdout.splitlines() if line.startswith("{")]
+            answer = {r["id"]: r for r in json.loads(lines[-1])["rows"]}
+        except (subprocess.TimeoutExpired, ValueError, KeyError, IndexError) as error:
+            for row in wanted:
+                check(row, False, f"the probe gave no answer: {error}")
+            continue
+        for row in wanted:
+            got = answer.get(row)
+            check(row, got is not None and got["pass"], (got or {}).get("detail", "no row"))
 
 
 def probe_centroid(pack, need, coverage, width, height):

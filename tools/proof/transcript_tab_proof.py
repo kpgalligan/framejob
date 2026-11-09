@@ -22,7 +22,13 @@ a line's end or before its start maps to the line's last or first character
 (the line answers NSNotFound off its glyphs) and never traps; T15p eighteen
 drags along a line (the middle, top or bottom line shown; straight, wobbling ±3
 pt, or 80 pt past the edge; paused, then looping while playing) move the scroll
-by no more than 0.5 pt (TX-22 at CP1).
+by no more than 0.5 pt (TX-22 at CP1). T16 (#444) a voice cache replaced under
+shown `.assemblyai` words (alpha [10.0, 10.4) s, beta [12.9, 13.3) s, preloaded
+with an all-voiced cache) and announced as `word_onset_probe.swift`'s U9 does:
+within 5 s one pause token follows clip 3's alpha and beta starts a paragraph.
+T17 (#444) the same landing while the tab's cloud load of a planted transcript
+is held (`TranscriptTabSource.loadHold`, as U10): after the release the cloud
+words show with the new cache's pause and paragraph break.
 
 App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
   Z0  no `Frame Job: ` line; `transcript_view` takes exactly click, focus,
@@ -91,6 +97,12 @@ a mutant is caught when every row it names fails.
                          the words (B1; a tree copy)
   stop-cancels-all       the bar's Stop drops every owner's want
                          (`TranscriptFill.drop()`) (B3; a tree copy)
+  speech-kept            the pane's `reloadSpeech` call removed: a landed voice
+                         cache leaves the kept one in the table (T16)
+  paragraphs-kept        `reloadSpeech` ends after its drop: the pause set is
+                         not read again (T16's paragraph half)
+  cloud-epoch-unchecked  a cloud load that read before a landing merges what
+                         it read (T17)
 
 Exit: 0 iff every row passed or was a named host SKIP (a mutant run: 0 when
 caught, 1 when it survived, 2 when the control could not be performed).
@@ -119,7 +131,8 @@ ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/transcript_tab"
 PROBE = ROOT / "tools/proof/transcript_tab_probe.swift"
 FONTS = ROOT / "app/Resources/Fonts"
-PROBE_ROWS = ["T0", "T1", "T3p", "T4p", "T5", "T7", "T8", "T9", "T10", "T13p", "T14p", "T15p"]
+PROBE_ROWS = ["T0", "T1", "T3p", "T4p", "T5", "T7", "T8", "T9", "T10", "T13p", "T14p", "T15p",
+              "T16", "T17"]
 APP_ROWS = ["Z0", "M1", "T2", "T3", "T4", "T6", "T12", "B1", "B2", "B3"]
 OTHER_ROWS = ["T11", "B4"]
 ROWS = PROBE_ROWS + APP_ROWS + OTHER_ROWS
@@ -141,6 +154,7 @@ TF = "TranscriptFill.swift"
 IV = "InspectorViewController.swift"
 TL = "TranscriptView+Layout.swift"
 TD = "TranscriptView+Delete.swift"
+TP = "TranscriptPane.swift"
 MUTANTS = {
     "highlight-containment": ("probe", ["T3p"], [
         (TT, "        return low == 0 ? nil : low - 1\n",
@@ -166,6 +180,15 @@ MUTANTS = {
     "drag-follows": ("probe", ["T15p"], [
         (TK, "        personScrolled()  // a press pauses the follow, as a scroll does (TX-22 at CP1)\n", ""),
         (TD, "        personScrolled()  // the follow waits while the person selects (TX-22 at CP1)\n", "")]),
+    "speech-kept": ("probe", ["T16"], [
+        (TP, "            source.reloadSpeech(media: media)\n", "")]),
+    "paragraphs-kept": ("probe", ["T16"], [
+        (TS, "        guard shown, let heard = words[media], deviceItems[media] == nil,\n",
+         "        if true { return }\n"
+         "        guard shown, let heard = words[media], deviceItems[media] == nil,\n")]),
+    "cloud-epoch-unchecked": ("probe", ["T17"], [
+        (TS, "                    if epochs[media] != self.epoch(media) "
+             "{ self.reloadSpeech(media: media) }\n", "")]),
     "one-wait": ("app", ["T12"], [(TS, "let take = 1\n", "let take = pending.count\n")]),
     "words-from-ignored": ("app", ["B1"], [
         (TS, "        let instances = read.instances.filter { wordsFrom == nil || $0.track == wordsFrom }\n",

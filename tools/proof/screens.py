@@ -292,6 +292,9 @@ NOT_SHOWN = {
                     "for codecs_proof.py; no screen launches with it",
     "RCDevExportFault": "a dev launch default that puts a fault in an export's pumps "
                         "(spec §11 #378); no screen exports",
+    "RCDevVerticalSaveFault": "a dev launch default naming the copy whose save "
+                              "make_vertical_version fails (#460), read only with `path`; "
+                              "no screen launches with it",
     "RCDevGraphicImportAccept": "a dev launch default with which the Import Graphic sheet "
                                 "presses its own Import (spec §11 G-47); no screen launches "
                                 "with it",

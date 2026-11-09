@@ -244,6 +244,33 @@ final class TranscriptTabSource {
         if let item = deviceItems[media] { reread(item) }
     }
 
+    /// A voice cache of `media` landed (TX-34 as amended by #444): its kept voice cache and the
+    /// table dropped, so the next `cutTable()` reads the landed file; shown words no TX-18
+    /// re-read covers have their pause set and voice cache read again on the load queue at the
+    /// media's epoch, and read once more when another landing came during the read. Main.
+    func reloadSpeech(media: UInt32) {
+        speech[media] = nil
+        table = nil
+        guard shown, let heard = words[media], deviceItems[media] == nil,
+            let cacheDir = read?.cacheDir ?? document?.cacheDirectory
+        else { return }
+        _ = begin()
+        let epoch = self.epoch(media)
+        loadQueue.async { [weak self] in
+            let pauses = Self.pauses(heard, cacheDir: cacheDir)
+            Self.holdLoad()
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.end()
+                guard self.shown, self.words[media]?.engine == heard.engine else { return }
+                guard epoch == self.epoch(media) else { return self.reloadSpeech(media: media) }
+                self.pauseSets[media] = pauses.0
+                self.speech[media] = pauses.1
+                self.rebuild()
+            }
+        }
+    }
+
     /// `media`'s epoch, read before its caches are.
     private func epoch(_ media: UInt32) -> Int {
         lock.lock()
@@ -424,6 +451,8 @@ final class TranscriptTabSource {
                     self.words[media] = pair.0
                     self.pauseSets[media] = pair.1.0
                     self.speech[media] = pair.1.1
+                    // Read before a voice cache landed: read again (#444).
+                    if epochs[media] != self.epoch(media) { self.reloadSpeech(media: media) }
                 }
                 self.missItems.merge(missed) { _, new in new }
                 self.failures.merge(unreadable) { _, new in new }

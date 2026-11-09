@@ -11,9 +11,9 @@ extension CutoutStatus {
     /// requests' runs (outcome and `endedAt`) and the running job's progress. A changed run — a
     /// job ending, `AnalysisLane.retry` clearing a failure, a re-run failing again — or a `masks`
     /// or `foreground` `.analysisDidPublish` for the document's cache folder recomputes the
-    /// status: `onChange` when its state changed, else the read-out refreshed alone. Otherwise an
-    /// analysing status takes the new progress from the held ranges. One per `ClipPane`; main
-    /// only.
+    /// status: `onChange` when its state changed, else the read-out's section refreshed, its
+    /// header summary included (#438). Otherwise an analysing status takes the new progress from
+    /// the held ranges, and the section is refreshed the same way. One per `ClipPane`; main only.
     final class Memo {
         /// The pane's refresh, when a tick changed the state.
         var onChange: (() -> Void)?
@@ -133,7 +133,7 @@ extension CutoutStatus {
                 invalidate()
                 let next = status(of: clip, in: document)
                 if next.state.sameKind(as: before) {
-                    readout.refresh()
+                    refreshShown(readout)
                     watch(readout, clip: clip, document: document)
                 } else {
                     onChange?()
@@ -159,7 +159,21 @@ extension CutoutStatus {
                     subjectFound: status.subjectFound, error: status.error),
                 media: held.media, need: held.need, coverage: held.coverage, pack: held.pack,
                 owner: held.owner, cacheDir: held.cacheDir, kind: held.kind)
-            readout.refresh()
+            refreshShown(readout)
+        }
+
+        /// The read-out's section, its rows and its header summary (which repeats the Status
+        /// words, #438), refreshed; the read-out alone when no section holds it.
+        private func refreshShown(_ readout: OptionDisplayControl) {
+            var view = readout.superview
+            while let candidate = view, !(candidate is InspectorSection) {
+                view = candidate.superview
+            }
+            if let section = view as? InspectorSection {
+                section.refresh()
+            } else {
+                readout.refresh()
+            }
         }
     }
 }

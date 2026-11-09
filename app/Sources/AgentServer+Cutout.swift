@@ -5,7 +5,8 @@ import Foundation
 /// in CO-31 (b)'s order and runs `analyzeMasksNow()`; `CutoutWants.queue.sync {}` lets that
 /// want and its retry run before the first read; then the statuses are read every 0.25 s on
 /// main until every clip settles, `wait` passes or the assistant's Stop — never a timeout
-/// refusal. The centroid is read here, off main, from the values captured on it.
+/// refusal. A settled clip's detail is kept while the document's handles are unchanged
+/// (`cutoutDetails`, #438). The centroid is read here, off main, from the values captured on it.
 extension AgentServer {
 
     static let cutoutPollInterval: TimeInterval = 0.25
@@ -54,10 +55,15 @@ extension AgentServer {
         CutoutWants.queue.sync {}
         let deadline = Date().addingTimeInterval(wait)
         var read: (details: [CutoutStatus.Detail], qualities: [String], project: [String: Any])
+        var kept: CutoutPoll?
         while true {
             read = onMain {
                 let snapshot = document.editedProject.snapshot
-                let details = clips.map { CutoutStatus.detail(of: $0, in: document) }
+                let poll = Self.cutoutDetails(
+                    clips, kept: kept, project: document.project, edited: document.editedProject,
+                    read: { CutoutStatus.detail(of: $0, in: document) })
+                kept = poll
+                let details = poll.details
                 let qualities = clips.map {
                     snapshot.clip($0)?.video?.cutout?.quality.rawValue
                         ?? CutoutQuality.standard.rawValue
@@ -73,6 +79,31 @@ extension AgentServer {
         }
         let rows = zip(read.details, read.qualities).map { Self.cutoutRow($0, quality: $1) }
         return try jsonResult(["ok": true, "clips": rows, "project": read.project])
+    }
+
+    /// One poll's details and the document handles they were read under.
+    struct CutoutPoll {
+        let details: [CutoutStatus.Detail]
+        let project: ReelProject
+        let edited: ReelProject
+    }
+
+    /// One poll's details (#438). When `kept` was read under the handles `project` and `edited`
+    /// (`===`), a clip whose kept detail is settled keeps it and every other clip is `read`.
+    /// Otherwise, including when `kept` is nil, every clip is `read`. Main thread.
+    static func cutoutDetails(
+        _ clips: [UInt32], kept: CutoutPoll?, project: ReelProject, edited: ReelProject,
+        read: (UInt32) -> CutoutStatus.Detail
+    ) -> CutoutPoll {
+        guard let kept, kept.project === project, kept.edited === edited else {
+            return CutoutPoll(details: clips.map(read), project: project, edited: edited)
+        }
+        let details = clips.enumerated().map { index, clip -> CutoutStatus.Detail in
+            let held = kept.details.indices.contains(index) ? kept.details[index] : nil
+            if let held, held.status.clip == clip, held.status.state.isSettled { return held }
+            return read(clip)
+        }
+        return CutoutPoll(details: details, project: project, edited: edited)
     }
 
     /// One clip's answer (CO-31 (c)), its centroid read from the pack here.

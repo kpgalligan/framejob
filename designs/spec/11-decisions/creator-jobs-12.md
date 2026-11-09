@@ -640,3 +640,41 @@ anywhere, so nothing is keyed (CJ-3).
   reads `-RCDevVerticalSaveFault <name>`: a save to a `path` whose last component is `<name>`
   throws before it is attempted, so a proof can see the cleanup; Distribution never reads it.
   Amends VR-36.
+
+## Fixes batch c2 (2026-11-09)
+
+- **#444 — A voice cache replaced under shown cloud words is read again at once.** TX-34 said a
+  voice cache REPLACED under a shown cloud-transcribed media kept the old one in the tab's table
+  until the tab showed again (filed). That clause is replaced. A `speech` landing now calls
+  `TranscriptTabSource.reloadSpeech(media:)` after TX-18's `reloadDeviceWords` (which moves the
+  media's epoch) and before `update()`. It always drops the media's kept voice cache and the
+  table, so the next `cutTable()` reads the landed file, as it already did for a media with none
+  kept: the word cuts (TX-30) and the pause tokens follow the new cache. When the tab is shown,
+  the media's words are there and no TX-18 re-read covers it (its words are not this Mac's), its
+  pause set and voice cache are read again on the load queue at the media's epoch. They are
+  merged and rebuilt only while the tab still shows words of the same engine; when a landing came
+  during the read (the epoch moved), the media is read again instead. So the paragraph breaks
+  (TX-22) follow the new cache too. A cloud load that read the media before a landing and merges
+  after it (its epoch moved) merges its words and then calls `reloadSpeech(media:)`, so it never
+  keeps the voice cache or pause set it read before the landing. An `.apple` media is unchanged:
+  TX-18's re-read reads its words, pause set and voice cache. A peaks landing also moves the
+  epoch; a cloud load that crosses one is read once more, which is harmless. Amends TX-34.
+- **#438 — Remove Background's status: the shut header follows, no nil stamp is memoised, and
+  `analyze_cutout` re-reads only what is still analysing.**
+  - (1) A tick of `CutoutStatus.Memo` that does not change the state's kind (a recompute of the
+    same kind, or a progress-only tick) refreshes the read-out's enclosing `InspectorSection` —
+    its rows and its header summary — not the read-out alone. The Background section is shut by
+    default and its summary repeats the Status words for one clip, so before it kept showing the
+    first "Analyzing N %". The section's `summary` reads the memo's held status, so this refresh
+    reads nothing again and starts no second ticker. Amends CO-30 (d).
+  - (2) `CutoutStatus.stamp` memoises only a non-nil stamp; a nil one is answered and its key's
+    entry removed, so it is read again on the next call. Before, a transient "Failed: the media
+    file cannot be read" (the file briefly absent) stayed for that media, URL and LUT for the
+    rest of the process, Analyze Now included. `analyzeMasksNow()` is unchanged. Amends
+    CO-31 (a).
+  - (3) `analyze_cutout`'s poll keeps the details it read with the document's `project` and
+    `editedProject` handles (`AgentServer.cutoutDetails`, `CutoutPoll`). While both handles are
+    the same (`===`), a clip whose kept detail is settled (anything but analysing) keeps it and
+    only the others are read again; any change of either handle, an edit during `wait`, reads
+    every clip again, as the pane's memo does. The quality and the project summary are still read
+    in each hop. The answer's shape and the refusals are unchanged. Amends CO-31 (b).
