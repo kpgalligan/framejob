@@ -237,6 +237,56 @@ fn a_release_meeting_the_next_attack_takes_the_minimum() {
     }
 }
 
+/// The fixture's duck with no pre-roll and no hold, so a span is exactly
+/// its source speech moved to project time (the voice starts at 2 s).
+fn unwidened(speech: Value) -> Vec<Value> {
+    let mut d = duck("speech");
+    d["pre_roll"] = json!(0);
+    d["hold"] = json!(0);
+    let handle = Handle::from_value(&fixture(speech, json!({"audio": {"duck": d}})));
+    ramps_of(&handle.plan(), 20)
+}
+
+/// The gain against the oracle every millisecond from 4.0 s to 4.4 s.
+fn assert_dense(ramps: &[Value], spans: &[(i64, i64)]) {
+    let mut t = 4 * SEC;
+    while t <= 44 * SEC / 10 {
+        let (got, want) = (gain(ramps, t), oracle(spans, t));
+        assert!((got - want).abs() < TOL, "gain at {t}: {got} vs {want}");
+        t += SEC / 1000;
+    }
+}
+
+#[test]
+fn a_short_span_s_own_release_crossing_an_earlier_one_is_a_corner() {
+    // #386: 4.05–4.08 s ends inside its 0.1 s attack, held at 0.76; its
+    // release (to 4.28 s) meets the first span's (4.0–4.2 s) near 4.1657 s,
+    // past its attack's end, where no release/attack crossing lies.
+    let spans = [(3 * SEC, 4 * SEC), (405 * SEC / 100, 408 * SEC / 100)];
+    let bed = unwidened(json!([[SEC, 2 * SEC], [205 * SEC / 100, 208 * SEC / 100]]));
+    assert_follows(&bed, &spans);
+    assert_dense(&bed, &spans);
+}
+
+#[test]
+fn a_release_outlasting_the_next_span_crosses_the_one_after() {
+    // #386: 4.04–4.05 s's whole curve lies above the first span's release,
+    // which then meets 4.07–4.10 s's release near 4.1571 s: spans 1 and 3,
+    // not neighbours.
+    let spans = [
+        (3 * SEC, 4 * SEC),
+        (404 * SEC / 100, 405 * SEC / 100),
+        (407 * SEC / 100, 410 * SEC / 100),
+    ];
+    let bed = unwidened(json!([
+        [SEC, 2 * SEC],
+        [204 * SEC / 100, 205 * SEC / 100],
+        [207 * SEC / 100, 210 * SEC / 100]
+    ]));
+    assert_follows(&bed, &spans);
+    assert_dense(&bed, &spans);
+}
+
 #[test]
 fn a_reversed_ducker_reads_its_spans_reflected() {
     // Media 20 s, speech 1–3 s forward = 17–19 s of the reversed stream. A

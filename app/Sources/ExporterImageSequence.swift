@@ -111,9 +111,10 @@ extension Exporter {
                 built: built, settings: settings, chapters: chapters, to: temporary)
         }
         guard settings.isImageSequence else {
+            let stemsPlan = try ExportStemsPipeline.plan(for: settings, from: project.plan)
             let mix = try ExportWriter(
                 built: built, settings: settings, chapters: chapters, to: temporary)
-            guard !settings.stems.isEmpty, let plan = project.plan else { return mix }
+            guard let plan = stemsPlan else { return mix }
             // An audio row's stems (spec §11 AU-108): each a fresh build of the
             // same plan on the export's key, beside the mix.
             let planJSON = project.planJSON

@@ -101,6 +101,18 @@ final class ExportStemsPipeline: ExportPipeline, ExportAudioNormalizing {
         }
     }
 
+    /// The plan the stems are rebuilt from (#393): nil when no stems are
+    /// asked for. Stems asked for with no plan fail the job (`.noPlan`),
+    /// asked before the mix's writer is made, rather than writing only the
+    /// mix while the answer lists stems no one wrote.
+    static func plan(for settings: ExportSettings, from plan: CompositionPlan?) throws
+        -> CompositionPlan?
+    {
+        guard !settings.stems.isEmpty else { return nil }
+        guard let plan else { throw Exporter.ExportError.noPlan }
+        return plan
+    }
+
     /// The first stem URL that is one of `sources` — symlinks resolved,
     /// standardized, compared case-insensitively — or nil.
     static func collision(stems: [ExportStem], mix: URL, sources: [URL]) -> URL? {

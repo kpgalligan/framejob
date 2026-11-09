@@ -5,7 +5,7 @@ measured on exports over MCP, and the probe behind it.
     python3 tools/proof/audio_ap10b_proof.py --probe
 
 The caller owns the instance at that socket; nothing is launched or killed.
-Needs `ffmpeg`, `ffprobe` and numpy. `--probe` runs B1–B2 alone, with no
+Needs `ffmpeg`, `ffprobe` and numpy. `--probe` runs B1–B3 alone, with no
 instance. Every project is a new one, closed with `close_project` (discarded).
 Output is under `tools/proof/work/audio_ap10b/`.
 
@@ -43,11 +43,14 @@ Audio is decoded to PCM integers at the file's own depth. Rows:
   seen stems 1 and 2 on disk; then `cancelled`, and no mix or stem file
   remains. Fails, never skips, when the job finishes first or the first poll in
   that window finds stems 1–2 absent.
-- **B1–B2** (the probe `audio_ap10b_probe.swift`, compiled AS `main.swift`
+- **B1–B3** (the probe `audio_ap10b_probe.swift`, compiled AS `main.swift`
   over `app/Sources` on `swift_build.py`'s line; a probe that will not build is
   a scored failure): `ExportAudioMaster(limits: false)` writes `round(input)`
   frame for frame with no tail; `url(for:mix:)`, `summary` and `collision`
-  (exact, case-only, a symlink, none).
+  (exact, case-only, a symlink, none); B3 `plan(for:from:)`, which
+  `Exporter.pipeline` asks before the mix's writer (#393): stems with no plan
+  throw `.noPlan`, so the job fails rather than writing only the mix while
+  its answer lists the stems; stems with a plan answer it; no stems, nil.
 
 The queue row's success line is not read here: `export_status`'s `done` answer
 carries no line and `snapshot_ui` cannot capture the Export Queue window. Its
@@ -77,7 +80,7 @@ OUT = HERE / "work" / "audio_ap10b"
 RODE = ROOT / "samples" / "Rode-usb-mic.m4a"
 RATE = 48000
 SEC = 600_000
-PROBE_ROWS = ["B1", "B2"]
+PROBE_ROWS = ["B1", "B2", "B3"]
 MCP_ROWS = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "C1"]
 
 rows = []

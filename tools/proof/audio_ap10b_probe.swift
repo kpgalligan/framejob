@@ -19,6 +19,11 @@
 //      `collision` answers an exact match, a match differing only in case, and
 //      a stem path that is a symlink to a source, and nil when no stem path is
 //      a source.
+//  B3  `ExportStemsPipeline.plan(for:from:)` (#393), which `Exporter.pipeline`
+//      asks before it makes the mix's writer: stems asked for with no plan
+//      throw `.noPlan` ("The project could not be prepared for export."), so
+//      the job fails rather than writing only the mix; with a plan it answers
+//      the plan; with no stems it answers nil, plan or not.
 import AVFoundation
 import AppKit
 
@@ -239,4 +244,38 @@ do {
             + "sentence \"\(sentence)\"")
 } catch {
     row("B2", false, "\(error)")
+}
+
+// MARK: - B3
+
+do {
+    let two = settings(stems: 2)
+    let none = settings(stems: 0)
+    var thrown = "nothing thrown"
+    var noPlanThrown = false
+    if let two {
+        do {
+            let answered = try ExportStemsPipeline.plan(for: two, from: nil)
+            thrown = "answered \(answered == nil ? "nil" : "a plan")"
+        } catch let error as Exporter.ExportError {
+            if case .noPlan = error { noPlanThrown = true }
+            thrown = error.localizedDescription
+        } catch {
+            thrown = "\(error)"
+        }
+    }
+    let sentenceOK = thrown == "The project could not be prepared for export."
+    let blank = ReelProject.new(width: 1920, height: 1080, fps: .thirty)
+    let plan = blank?.plan
+    let withPlan = try two.flatMap { try ExportStemsPipeline.plan(for: $0, from: plan) }
+    let noStems = try none.flatMap { try ExportStemsPipeline.plan(for: $0, from: plan) }
+    let noStemsNoPlan = try none.flatMap { try ExportStemsPipeline.plan(for: $0, from: nil) }
+    row("B3", two != nil && none != nil && noPlanThrown && sentenceOK && plan != nil
+        && withPlan != nil && noStems == nil && noStemsNoPlan == nil,
+        "stems 2, no plan: \(noPlanThrown ? ".noPlan" : "not .noPlan") \"\(thrown)\"; "
+            + "stems 2, a plan: \(withPlan == nil ? "nil" : "the plan") (want the plan); "
+            + "no stems: \(noStems == nil ? "nil" : "a plan"), no stems and no plan: "
+            + "\(noStemsNoPlan == nil ? "nil" : "a plan") (want nil both)")
+} catch {
+    row("B3", false, "\(error)")
 }

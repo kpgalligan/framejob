@@ -208,6 +208,7 @@ Above ×12 the clip's audio is left out, and the call that takes it there answer
 - Only optional keys can go off. A required key such as `video.opacity` is refused.
 - `video.qualifier` on its own is refused too, and so are its `invert` and `blur`, which aren't ranges. A range set to `null` in `patch` only leaves the end state.
 - A path can't also be named in `patch`.
+- `audio.eq` and one of its slots can't both be named: switching the whole EQ off already switches every slot off.
 - `graphic` paths are refused: name the value a prop ends at in `patch`.
 - `video.cutout` is refused: `set_video` with `{cutout: null}` removes a cutout.
 - `video.motion`, `video.hide_silent` and `text.words` are refused here too.

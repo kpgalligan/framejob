@@ -233,8 +233,10 @@ The rules every op shares are §6a; the clip ops are §6b.
   at an action's end; set_video {cutout: null} removes it`), `video.hide_silent` (format 43,
   §11 CO-92: `video.hide_silent is not an animation target`, as a `patch` naming it — a `null`
   included — is too),
-  `text.words`, a required key (`video.opacity`), a key the group does not have and a path the patch
-  also names are each an **error**. Absent or `null` is none. The patch is walked like every other
+  `text.words`, a required key (`video.opacity`), a key the group does not have, a path the patch
+  also names and `audio.eq` beside one of its slots (§11 AU-88, #398: `off names both "audio.eq"
+  and "audio.eq.{slot}": keying the whole EQ off keys every slot off, so name one or the other`)
+  are each an **error**. Absent or `null` is none. The patch is walked like every other
   one (§5.4): the three groups it may name are `video`, `audio` and `text`, and an unknown key, a
   value of the wrong JSON kind or a misspelt variant anywhere in it is an **error** naming the
   dotted path with the group in it — `unknown key "video.filters[1].kindd" in an action end patch` —

@@ -1230,8 +1230,8 @@ governs a module now.
   `Project::speech_spans` (`Project::played_speech` — the media's speech on
   the played part in project time, unwidened, which `video_gate.rs` reads
   too — then `widened(spans, before, after)`, merged), `speech_gain` (the MINIMUM over spans of `audio_duck.rs`'s
-  `extent_gain`), `speech_breaks` (each span's four edges and the
-  release/attack crossings) and `duck_ramps` (the plan's `ducks`). Nothing
+  `extent_gain`), `speech_breaks` (each span's four edges and every
+  crossing of two overlapping spans' curves, #386) and `duck_ramps` (the plan's `ducks`). Nothing
   here edits.
 - `clip_source_time.rs` — source time to clip time, the one mapping (road
   map "creator-jobs" VR2a1, spec §11 VR-20): `clip_time_of_source` (a

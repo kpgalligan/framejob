@@ -142,9 +142,12 @@ pub(crate) fn speech_gain(ducker: &Ducker, spans: &[(Ticks, Ticks)], t: Ticks, s
 }
 
 /// The ticks a speech ducker's curve has to be sampled at: each span's four
-/// edges (its start, the attack's end, its end, the release's end), and the
-/// tick where one span's release crosses the next one's attack, which is
-/// where the minimum turns from one to the other.
+/// edges (its start, the attack's end, its end, the release's end), and
+/// every tick where two spans' curves cross, which is where the minimum
+/// turns from one to the other (#386): a span's release meeting a later
+/// span's attack, or that later span's own release when it ends inside its
+/// attack. Every pair whose curves overlap is asked, not only neighbours,
+/// because a short span's release can be outlasted by an earlier one's.
 pub(crate) fn speech_breaks(ducker: &Ducker, spans: &[(Ticks, Ticks)]) -> Vec<Ticks> {
     let duck = &ducker.duck;
     let (attack, release) = (duck.attack.max(0), duck.release.max(0));
@@ -160,26 +163,55 @@ pub(crate) fn speech_breaks(ducker: &Ducker, spans: &[(Ticks, Ticks)]) -> Vec<Ti
     if attack == 0 || release == 0 {
         return out;
     }
-    for pair in spans.windows(2) {
-        let (Some(&(s1, e1)), Some(&(s2, _))) = (pair.first(), pair.get(1)) else {
-            continue;
-        };
-        // The release rises from `held` at e1 with slope a; the attack falls
-        // from 1 at s2 with slope b. They meet where the two lines agree.
-        let held = extent_gain(duck, s1, e1, e1, Side::Left);
-        let a = (1.0 - held) / release as f64;
-        let b = (1.0 - level) / attack as f64;
-        if a + b <= 0.0 {
-            continue;
-        }
-        let t = (1.0 - held + a * e1 as f64 + b * s2 as f64) / (a + b);
-        let lo = e1.max(s2) as f64;
-        let hi = e1.saturating_add(release).min(s2.saturating_add(attack)) as f64;
-        if t.is_finite() && t > lo && t < hi {
-            out.push(t.round() as Ticks);
+    // A span's release rises from `held` at its end; its attack falls from
+    // 1 at its start. Each is a line (tick, gain there, slope per tick).
+    let held = |s: Ticks, e: Ticks| extent_gain(duck, s, e, e, Side::Left);
+    let rise = |s: Ticks, e: Ticks| {
+        let h = held(s, e);
+        (e as f64, h, (1.0 - h) / release as f64)
+    };
+    let fall = -(1.0 - level) / attack as f64;
+    for (i, &(s1, e1)) in spans.iter().enumerate() {
+        let gone = e1.saturating_add(release);
+        let first = rise(s1, e1);
+        // The spans are sorted by start, so the first one starting after
+        // this release is over ends the pairs it overlaps.
+        for &(s2, e2) in spans.iter().skip(i + 1).take_while(|&&(s2, _)| s2 < gone) {
+            let attack_end = s2.saturating_add(attack).min(e2);
+            out.extend(crossing(
+                first,
+                (s2 as f64, 1.0, fall),
+                e1.max(s2),
+                gone.min(attack_end),
+            ));
+            out.extend(crossing(
+                first,
+                rise(s2, e2),
+                e1.max(e2),
+                gone.min(e2.saturating_add(release)),
+            ));
         }
     }
     out
+}
+
+/// Where two lines — each `(tick, gain at that tick, slope per tick)` —
+/// meet, rounded to a tick, when that is finite and strictly inside
+/// `(lo, hi)`; parallel lines never meet.
+fn crossing(
+    first: (f64, f64, f64),
+    second: (f64, f64, f64),
+    lo: Ticks,
+    hi: Ticks,
+) -> Option<Ticks> {
+    let (t1, g1, m1) = first;
+    let (t2, g2, m2) = second;
+    let slopes = m1 - m2;
+    if slopes == 0.0 {
+        return None;
+    }
+    let t = (g2 - g1 + m1 * t1 - m2 * t2) / slopes;
+    (t.is_finite() && t > lo as f64 && t < hi as f64).then(|| t.round() as Ticks)
 }
 
 /// A speech ducker's own multiplier as ramps over its widened extent — its

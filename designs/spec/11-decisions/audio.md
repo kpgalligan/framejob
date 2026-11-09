@@ -1066,6 +1066,9 @@ landed (`git log` at `e55de46` has no AP6).
   both-sentence. `ReelOp.setActionEnd` lifts an `NSNull` slot inside `audio.eq` into that path.
   Agents use `set_action_end`; there is no new tool, op or format.
   Extended by GR-36: `off` also accepts `video.qualifier.<range>`, a second three-part path.
+  `off` naming `audio.eq` beside one of its slots is refused in its own sentence (#398):
+  `off names both "audio.eq" and "audio.eq.{slot}": keying the whole EQ off keys every slot
+  off, so name one or the other`, `{slot}` the path's third part, in either order.
 - **AU-89 — The proof.** `audio_ap8b_proof.py`: probe rows A1–A8 over `app/Sources` (the
   interpolation and its held numbers, an automated EQ and pan block-size invariant, the per-sample
   pan, the track-wide stages from a point, the Amount per frame, the routing, the wanted sets,
@@ -1318,8 +1321,9 @@ recorded before its code.
   or touch. Each merged span ducks exactly as an extent duck over it would (the attack from its
   start, the level held, the release after its end); the ducker's multiplier is the MINIMUM over
   its spans, so overlapping releases and attacks never multiply into a deeper dip. The envelope
-  is sampled at each span's four edges and where one span's release crosses the next one's
-  attack. `pre_roll` and `hold` default to 0.5 s (300,000 ticks) each, are ≥ 0, and are BASE-only like the rest
+  is sampled at each span's four edges and wherever two spans' curves cross — a release meeting
+  a later span's attack, or that span's own release when it ends inside its attack — for every
+  pair whose curves overlap, not only neighbours (#386). `pre_roll` and `hold` default to 0.5 s (300,000 ticks) each, are ≥ 0, and are BASE-only like the rest
   of the duck (CI-3); level, attack and release keep their meaning and defaults.
 - **AU-113 — The speech duck is drawn on the ducking clip.** The plan carries `ducks`: one entry
   per Speech ducker, `{clip, ramps}`, its multiplier alone over its expanded extent (omitted
