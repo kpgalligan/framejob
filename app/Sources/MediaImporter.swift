@@ -98,10 +98,15 @@ enum MediaImporter {
             fps = await frameRate(of: track)
             let descriptions = (try? await track.load(.formatDescriptions)) ?? []
             hasAlpha = hasAlphaChannel(descriptions)
-            color = detectedColor(descriptions) ?? detectedPQ(descriptions, track: track, asset: asset)
-            // One frame through the decoder: `isPlayable` says yes to files
-            // nothing here decodes (spec §11 #216).
-            guard DecoderSupport.decodesFirstFrame(of: track, in: asset) else {
+            // The PQ sample read, then one frame through the decoder
+            // (`isPlayable` says yes to files nothing here decodes, spec §11
+            // #216), in one hop off the pool (#369).
+            let (detected, decodes) = await offPool {
+                (detectedColor(descriptions) ?? detectedPQ(descriptions, track: track, asset: asset),
+                 DecoderSupport.decodesFirstFrame(of: track, in: asset))
+            }
+            color = detected
+            guard decodes else {
                 throw ImportError.undecodable(url, sentence: DecoderSupport.refusal(
                     fileName: url.lastPathComponent, descriptions: descriptions))
             }
@@ -221,6 +226,11 @@ enum MediaImporter {
     /// `body` on `CacheLane.shared`, awaited (spec §11 #367).
     static func onCacheLane<T>(_ body: @escaping () -> T) async -> T {
         await withCheckedContinuation { cont in CacheLane.shared.submit { cont.resume(returning: body()) } }
+    }
+
+    /// `body` on `readQueue`, awaited: a synchronous `AVAssetReader` read reached from a task (spec §11 #367, #369).
+    static func offPool<T>(_ body: @escaping () -> T) async -> T {
+        await withCheckedContinuation { cont in readQueue.async { cont.resume(returning: body()) } }
     }
 
     /// The waits between a failed waveform pass and its in-session retries.
@@ -378,7 +388,8 @@ enum MediaImporter {
         if let track, let frame = await lastFrameTime(of: track) { lastTime = frame }
         let (held, times) = thumbnailRequests(seconds: seconds, lastTime: lastTime)
 
-        let reader = thumbnailReader(for: media, asset: asset, track: track, input: input)
+        // Built off the pool: a converted strip's one-clip build may write a 48 kHz audio copy (#369).
+        let reader = await offPool { thumbnailReader(for: media, asset: asset, track: track, input: input) }
         defer { reader.finish() }
         let generator = reader.generator
 

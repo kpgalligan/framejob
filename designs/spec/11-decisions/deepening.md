@@ -1514,6 +1514,48 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   comes, as a running pass already did; and on a host whose cooperative
   pool is two threads or fewer, guard 2 alone would not hold, so there
   guard 1 is the only one.
+
+  **Audited app-wide (#369).** Every `AVAssetReader` user in `app/Sources`
+  was traced to the thread its loop runs on. `async`/`await` lives only in
+  `MediaImporter.swift` and `SpeechEngine.swift` (W-8), so a reader is on
+  the pool only when a `Task` body there reaches it; every agent tool call
+  runs on the core's socket thread, an `AgentLane` queue or main, none of
+  them the pool. Three reads were reached from a task and now run on
+  `MediaImporter.readQueue` (`com.kgalligan.framejob.import-reads`, a
+  concurrent `.userInitiated` GCD queue, neither the cache lane nor the
+  serial import queue) through `MediaImporter.offPool`: the import probe's
+  PQ sample read (`MediaImporter.firstSample` under `detectedPQ`) and its
+  first-frame decode (`DecoderSupport.decodesFirstFrame`), one hop in
+  `probeAsset` inside `waitForProbe`'s task, in their old order before the
+  #216 refusal; and a thumbnail pass's `thumbnailReader` build, whose
+  one-clip composition writes `AudioRateCopy`'s 48 kHz copy for an HLG, PQ
+  or Camera Log video whose audio is not 48 kHz. The rest were already off
+  it: the cache passes' peaks, loudness, sync and speech readers on this
+  lane; `AnalysisFrames`, its input pass and `AnalysisSoundEvents` on the
+  `AnalysisLane` picture and sound queues; `Transcriber+Extract` on
+  `Transcriber.work`, `CloudTranscriber.work`, `TranscriptFill.queue` and
+  the agent tools' threads; `ReverseRenderer`'s reads on the reverse sheet's
+  global queue; `ExporterLoudness` on the export's `buildQueue`;
+  `ExporterWriter`, `ExportEncodePump` (the camera and codec export pumps)
+  and `ExportWebMWriter` on their own export queues; `ProcessedLoudness` on
+  its queue; `RampAudioRenderer` on `ramp-audio`; `ScrubGrains` on
+  `scrub-audio`; `DeepStillFrame` on the frame queues, the agent thread or
+  main; and `AudioRateCopy` from every other `CompositionBuilder.build`
+  caller (playback's rebuild queue, the export's `buildQueue`, the frame
+  and analysis queues, `ProcessedLoudness`, `scrub-audio`) and
+  `RampAudioCache` on `ramp-audio`. Synchronize Audio's analysis reads the
+  sync and speech caches, not media, and `SpeechEngine`, camera recording
+  and the thumbnail generator use no `AVAssetReader`. The witness is
+  `ReaderPool.swift` (await-free, always compiled): `note` at the three moved
+  sites records, only while a probe records, whether each ran on a thread
+  whose queue label ends `.cooperative`. `cache_lane_probe.swift`'s L5 (the
+  hop's queue), R0 (the witness's control), R1 (the probe's two reads) and
+  R2 (a converted strip's audio copy) are each red under their mutant
+  (`pool-blind`, `probe-inline`, `thumbs-inline`). **Risk accepted:**
+  `readQueue` is unbounded; its callers bound it (one probe per waiting
+  caller, one hop per thumbnail pass), and `AudioRateCopy`'s process-wide
+  lock serialises the copies. A reader on the main thread is a different
+  rule and out of this audit.
 - **#378 — One reader per output in `ExportWriter`, each cancelled only by
   its own pump on its own queue after its own last read.** It amends G-17
   and applies CX-15 (2) and (6) to `ExportWriter`. The video composition

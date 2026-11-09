@@ -1,6 +1,18 @@
 import Foundation
 
 extension MediaImporter {
+    /// The queue `MediaImporter.offPool` runs a synchronous `AVAssetReader`
+    /// read on when a task reaches one: the import probe's PQ sample read and
+    /// first-frame decode, and a converted strip's one-clip build, whose 48 kHz
+    /// audio copy reads (spec §11 #367, #369). Concurrent and `.userInitiated`,
+    /// never the cache lane (a thumbnail hop must not queue behind its decodes,
+    /// and thumbnails are not on the lane) and never the serial import queue.
+    /// Unbounded: its callers bound it, one probe per waiting caller and one
+    /// hop per thumbnail pass.
+    static let readQueueLabel = "com.kgalligan.framejob.import-reads"
+    static let readQueue = DispatchQueue(
+        label: readQueueLabel, qos: .userInitiated, attributes: .concurrent)
+
     /// The lane a media cache pass's three synchronous audio decodes run on —
     /// `writePeaks`, `writeSyncFeatures` and `writeSpeech`, each reached
     /// through `MediaImporter.onCacheLane` (spec §11 #367). At most `width`

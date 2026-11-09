@@ -1,13 +1,21 @@
 // Issue #367 — the cache lane (`MediaImporter.CacheLane`,
 // `app/Sources/MediaCacheLane.swift`): at most two bodies at a time, FIFO, on
-// the lane's own queue and never on the submitting thread.
+// the lane's own queue and never on the submitting thread. Issue #369 — the
+// reads a task reaches outside the lane run off the cooperative pool too:
+// `MediaImporter.offPool` on `MediaImporter.readQueue` (L5), the witness
+// `ReaderPool` (R0), the import probe's PQ read and first-frame decode (R1)
+// and a converted strip's 48 kHz audio copy (R2).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `FrameJob`, against `libframejob_core.a`, through
 // `swift_build.build` (`reader_wedge_proof.py`'s probe group). One process
 // answers every row:
 //
-//   cache_lane_probe [<audio file>]
+//   cache_lane_probe [--pq <path>] [--hlg <path>] [<audio file>]
+//
+// `--pq` is an HEVC PQ movie with no mastering or content-light metadata (R1);
+// `--hlg` an HEVC HLG movie with 44.1 kHz audio (R2). A row whose flag is
+// absent answers FAIL with "not performed: no fixture".
 //
 // With an audio file it also answers C1 (reported, never scored): 30 s of the
 // file read on a GCD queue alone, then again while one blocking task per core
@@ -22,6 +30,22 @@ import AVFoundation
 import Foundation
 
 var rows: [[String: Any]] = []
+
+/// The arguments by flag: `--pq` and `--hlg` each take the next argument; the
+/// audio file is the one argument that is neither a flag nor a flag's value.
+var pqPath: String?
+var hlgPath: String?
+var audioPath: String?
+do {
+    var rest = CommandLine.arguments.dropFirst()
+    while let argument = rest.popFirst() {
+        switch argument {
+        case "--pq": pqPath = rest.popFirst()
+        case "--hlg": hlgPath = rest.popFirst()
+        default: if audioPath == nil { audioPath = argument }
+        }
+    }
+}
 func row(_ id: String, _ pass: Bool, _ detail: String) {
     rows.append(["id": id, "pass": pass, "detail": detail])
 }
@@ -161,6 +185,153 @@ do {
             : "onCacheLane did not answer within 10 s")
 }
 
+// MARK: - L5: `offPool` runs its body on the import reads queue
+
+do {
+    let box = Box()
+    let finished = DispatchSemaphore(value: 0)
+    Task.detached {
+        let label = await MediaImporter.offPool {
+            String(cString: __dispatch_queue_get_label(nil))
+        }
+        box.value = label
+        finished.signal()
+    }
+    let answered = finished.wait(timeout: .now() + 60) == .success
+    let label = box.value
+    row("L5", answered && label == MediaImporter.readQueueLabel,
+        answered
+            ? "the body ran on queue \"\(label ?? "nil")\" (want \"\(MediaImporter.readQueueLabel)\")"
+            : "offPool did not answer within 60 s")
+}
+
+// MARK: - R0 (control): the witness tells a task from a GCD queue
+
+func describe(_ notes: [ReaderPool.Note]) -> String {
+    notes.isEmpty
+        ? "no notes"
+        : notes.map { "\($0.site) on \"\($0.label)\" (pool \($0.onPool))" }.joined(separator: "; ")
+}
+
+do {
+    ReaderPool.startRecording()
+    let fromTask = DispatchSemaphore(value: 0)
+    Task.detached {
+        ReaderPool.note("probe.task")
+        fromTask.signal()
+    }
+    let taskAnswered = fromTask.wait(timeout: .now() + 60) == .success
+    let fromQueue = DispatchSemaphore(value: 0)
+    DispatchQueue(label: "com.kgalligan.framejob.probe.serial").async {
+        ReaderPool.note("probe.queue")
+        fromQueue.signal()
+    }
+    let queueAnswered = fromQueue.wait(timeout: .now() + 60) == .success
+    let notes = ReaderPool.takeNotes()
+    let task = notes.first { $0.site == "probe.task" }
+    let queue = notes.first { $0.site == "probe.queue" }
+    row("R0", taskAnswered && queueAnswered && task?.onPool == true && queue?.onPool == false,
+        "a note from a Task.detached and one from a serial GCD queue (want pool true, then "
+            + "false): \(describe(notes))"
+            + (taskAnswered && queueAnswered ? "" : "; a note did not answer within 60 s"))
+}
+
+/// A probe's answer, set on one thread and read on another.
+final class DescriptorBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Result<MediaDescriptor, Error>?
+    var value: Result<MediaDescriptor, Error>? {
+        get { lock.lock(); defer { lock.unlock() }; return stored }
+        set { lock.lock(); stored = newValue; lock.unlock() }
+    }
+}
+
+/// `MediaImporter.waitForProbe(url)` on a thread of its own, bounded to 60 s.
+func probed(_ url: URL) -> Result<MediaDescriptor, Error>? {
+    let box = DescriptorBox()
+    let done = DispatchSemaphore(value: 0)
+    Thread {
+        box.value = Result { try MediaImporter.waitForProbe(url) }
+        done.signal()
+    }.start()
+    return done.wait(timeout: .now() + 60) == .success ? box.value : nil
+}
+
+// MARK: - R1: the import probe's PQ read and first-frame decode run off the pool
+
+if let pqPath {
+    ReaderPool.startRecording()
+    let answer = probed(URL(fileURLWithPath: pqPath))
+    let notes = ReaderPool.takeNotes()
+    let sites = Set(notes.map(\.site))
+    let pq: Bool
+    let what: String
+    switch answer {
+    case .success(let descriptor)?:
+        pq = descriptor.color?.pq != nil
+        what = "color.pq \(pq ? "present" : "absent")"
+    case .failure(let error)?:
+        pq = false
+        what = "the probe threw: \(error)"
+    case nil:
+        pq = false
+        what = "the probe did not answer within 60 s"
+    }
+    let ok = pq && sites.contains("DecoderSupport.decodesFirstFrame")
+        && sites.contains("MediaImporter.firstSample") && !notes.contains(where: \.onPool)
+    row("R1", ok, "waitForProbe(\(pqPath)): \(what); \(describe(notes)) "
+        + "(want both sites, none on the pool)")
+} else {
+    row("R1", false, "not performed: no fixture")
+}
+
+// MARK: - R2: a converted strip's 48 kHz audio copy runs off the pool
+
+if let hlgPath {
+    let scratch = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        .appendingPathComponent("cache-lane-probe-\(UUID().uuidString)", isDirectory: true)
+    let cacheDir = scratch.appendingPathComponent("cache", isDirectory: true)
+    let copy = scratch.appendingPathComponent("\(UUID().uuidString).mov")
+    var detail = ""
+    var ok = false
+    do {
+        try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+        try FileManager.default.copyItem(at: URL(fileURLWithPath: hlgPath), to: copy)
+        guard case .success(let descriptor)? = probed(copy) else {
+            throw NSError(domain: "probe", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "the copy did not probe"])
+        }
+        guard let blank = ReelProject.new(
+            width: descriptor.width, height: descriptor.height, fps: descriptor.fps),
+            let added = (try? blank.applying(.addMedia(descriptor: descriptor)))?.project,
+            let media = added.snapshot.media.last
+        else {
+            throw NSError(domain: "probe", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "add_media did not apply"])
+        }
+        ReaderPool.startRecording()
+        let finished = DispatchSemaphore(value: 0)
+        Task.detached {
+            await MediaImporter.thumbnails(
+                for: media, url: copy, stamp: nil, into: cacheDir, pass: nil, input: nil)
+            finished.signal()
+        }
+        let answered = finished.wait(timeout: .now() + 60) == .success
+        let notes = ReaderPool.takeNotes()
+        ok = answered && notes.contains { $0.site == "AudioRateCopy.write" }
+            && !notes.contains(where: \.onPool)
+        detail = "thumbnails of a fresh copy of \(hlgPath): \(describe(notes))"
+            + (answered ? "" : "; the pass did not end within 60 s")
+            + " (want AudioRateCopy.write, none on the pool)"
+    } catch {
+        detail = "not run: \(error.localizedDescription)"
+    }
+    try? FileManager.default.removeItem(at: scratch)
+    row("R2", ok, detail)
+} else {
+    row("R2", false, "not performed: no fixture")
+}
+
 // MARK: - C1 (reported): a GCD-queue read while blocked tasks hold the cooperative pool
 
 /// Reads the first 30 s of `track` on a GCD `.utility` queue; signals `done`
@@ -186,8 +357,8 @@ func gcdRead(_ asset: AVURLAsset, _ track: AVAssetTrack, into box: Box,
     }
 }
 
-if CommandLine.arguments.count > 1 {
-    let asset = AVURLAsset(url: URL(fileURLWithPath: CommandLine.arguments[1]))
+if let audioPath {
+    let asset = AVURLAsset(url: URL(fileURLWithPath: audioPath))
     let trackBox = TrackBox()
     let loaded = DispatchSemaphore(value: 0)
     Task.detached {
@@ -233,7 +404,7 @@ if CommandLine.arguments.count > 1 {
             "30 s of audio read on a GCD queue: alone \(alone); with \(held) of \(width) "
                 + "cooperative threads held by blocking tasks, \(verdict)")
     } else {
-        row("C1", true, "not measured: no audio track loaded from \(CommandLine.arguments[1])")
+        row("C1", true, "not measured: no audio track loaded from \(audioPath)")
     }
 }
 

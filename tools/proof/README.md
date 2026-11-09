@@ -24457,7 +24457,7 @@ that waits for it, and disk in `cache/ramp-audio/`. Before (a) ships, the cache-
 should be fixed or understood (fixed by #367). It blocked this very render queue, so under (a) every constant
 ×N clip would also go silent behind it.
 
-## Issue #367 — many cache passes in flight (`reader_wedge_proof.py` B0, L1–L4, C1, F0, P1, W1, W2, S0, D0; `cache_lane_probe.swift`; mutants `wide`, `lifo`, `slot-leak`, `inline`, `no-lane`; expected survivors `unbounded`, `app-inline`)
+## Issue #367 — many cache passes in flight (`reader_wedge_proof.py` B0, L1–L5, R0–R2, C1, F0, P1, W1, W2, S0, D0; `cache_lane_probe.swift`; mutants `wide`, `lifo`, `slot-leak`, `inline`, `probe-inline`, `thumbs-inline`, `pool-blind`, `no-lane`; expected survivors `unbounded`, `app-inline`)
 
 Twenty imports of long files that nobody waited for wedged every `AVAssetReader` in the process
 (#334's spike found it: "The cache-pass wedge" above). The cache lane (`MediaImporter.CacheLane`,
@@ -24467,9 +24467,19 @@ cooperative pool. The proof has one owned instance on its own socket, stopped by
 menu item and no `UserDefaults` write. The work folder is `tools/proof/work/reader-wedge/`, and
 the long fixtures are #334's (`constant_render_spike.make_long`).
 
+Issue #369 audited every other `AVAssetReader` user against the same rule (spec §11 #367's
+"Audited app-wide (#369)"): three reads a task reached now run on `MediaImporter.readQueue`
+through `MediaImporter.offPool`, and `ReaderPool.swift` is the witness the R rows read. Their
+two fixtures are built once into `tools/proof/work/reader-wedge/fixtures/` by
+`hevc_videotoolbox` Main 10 (`hdr_proof.hevc10`'s recipe, 320×180 2 s `testsrc2`): `pq.mov`
+(bt2020/smpte2084/bt2020nc, no audio, no HDR10 metadata) and `hlg441.mov`
+(bt2020/arib-std-b67/bt2020nc, a 440 Hz 44.1 kHz AAC sine). They go to the probe as `--pq` and
+`--hlg` on every probe run, plain and mutant; one that cannot be made leaves its row not
+performed (exit 2).
+
 ```sh
-python3 tools/proof/reader_wedge_proof.py --groups probe                     # B0, L1–L4, C1; exit 0
-for m in wide lifo slot-leak inline; do python3 tools/proof/reader_wedge_proof.py --groups probe --mutant $m; done   # each exit 1
+python3 tools/proof/reader_wedge_proof.py --groups probe                     # B0, L1–L5, R0–R2, C1; exit 0
+for m in wide lifo slot-leak inline probe-inline thumbs-inline pool-blind; do python3 tools/proof/reader_wedge_proof.py --groups probe --mutant $m; done   # each exit 1
 make gate
 env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/reader_wedge_proof.py                            # exit 0
 env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/reader_wedge_proof.py --groups app --mutant no-lane     # exit 1
@@ -24487,6 +24497,16 @@ env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/constant_rende
   - **L3**: L1's 40 bodies all finish within 10 s.
   - **L4**: a body through `MediaImporter.onCacheLane` from a `Task.detached` runs on the queue
     labelled `CacheLane.label`.
+  - **L5** (#369): a body through `MediaImporter.offPool` from a `Task.detached` runs on the
+    queue labelled `MediaImporter.readQueueLabel`.
+  - **R0** (#369, the control): `ReaderPool.note` from a `Task.detached` reads as on the
+    cooperative pool, and from a private serial GCD queue as off it.
+  - **R1** (#369): `MediaImporter.waitForProbe` of `pq.mov` answers `color.pq`, and
+    `DecoderSupport.decodesFirstFrame` and `MediaImporter.firstSample` were both noted, neither
+    on the pool.
+  - **R2** (#369): `MediaImporter.thumbnails` of a fresh UUID-named copy of `hlg441.mov`
+    (`AudioRateCopy`'s key is path, size and modification second), awaited in a
+    `Task.detached` with no stamp, noted `AudioRateCopy.write`, and no note was on the pool.
   - **C1** (reported, plain runs only): 30 s of `long-sine` read on a GCD queue alone, then again
     while one blocking `Task.detached` per core holds the cooperative pool (bound 15 s), then
     after the tasks are released. It answers whether a GCD-queue reader stalls while the pool is
@@ -24516,7 +24536,9 @@ found 34 of 60 markers in its 180 s. App mutants are built as Release copies.
 **Mutants.** The lane has two guards, each enough alone on this host (spec §11 #367): guard 1 runs
 the decodes off the cooperative pool, and guard 2 runs at most two at once. The scored set is
 the probe's `wide` (width 64; L1, guard 2), `lifo` (L2), `slot-leak` (L3) and `inline` (the body
-run on the submitting thread; L4, guard 1), and the app's `no-lane` (the three `onCacheLane` call
+run on the submitting thread; L4, guard 1), #369's `probe-inline` (`probeAsset`'s hop back to
+the two direct calls; R1), `thumbs-inline` (`thumbnails`' hop back to a direct `thumbnailReader`;
+R2) and `pool-blind` (`ReaderPool.isCooperative` answers false; R0), and the app's `no-lane` (the three `onCacheLane` call
 sites back to direct calls, which takes away both guards; W1). Two app mutants take away one
 guard each. They survive by design, and are recorded here, not scored
 (`EXPECTED_SURVIVORS`): `unbounded` (width 64, still off the pool) and `app-inline` (width 2, the
@@ -24536,6 +24558,9 @@ the cause is the cooperative pool, not the number of readers.
 | Release, `--groups app --mutant app-inline` | survived as expected, exit 0: W1 1.37 s. A sample of the same build after P1, with all 20 passes in flight: 4 cooperative threads, 2 of them in `copyNextSampleBuffer` (the lane's width), and W1 1.28 s |
 | **Release, plain (recorded)** | exit 0 in 55 s: B0, L1 (peak 2), L2 (offset 0), L3 (3.327 s), L4 ok; C1 alone 0.11 s, with 12 of 12 cooperative threads held STALLED (no finish in 15 s), finished 15.03 s from its start after the release; F0, P1 (3.3 s), W1 (1.37 s), W2 (60 of 60, 4.7 s), D0 ok |
 | **Release, `constant_render_spike.py --runs 1 --groups app --no-settle` (recorded)** | exit 0 in 24 s: all 8 A rows landed, 0.53–4.07 s |
+| #369 (2026-11-09), `--groups probe` | exit 0 in 69 s: L5 on `com.kgalligan.framejob.import-reads`; R0 task `com.apple.root.default-qos.cooperative` (pool true), serial queue (pool false); R1 `color.pq` present, `firstSample` and `decodesFirstFrame` on `import-reads`; R2 `AudioRateCopy.write` on `import-reads` |
+| #369, `--groups probe --mutant probe-inline` / `thumbs-inline` / `pool-blind` | each caught, exit 1: R1 both sites on `com.apple.root.user-initiated-qos.cooperative`; R2 `AudioRateCopy.write` on `com.apple.root.default-qos.cooperative`; R0 the task's note read pool false |
+| **#369, Release, plain (recorded)** | exit 0 in 82 s: B0, L1 (peak 2), L2 (offset 0), L3 (3.117 s), L4, L5, R0, R1, R2 ok; C1 alone 0.01 s, STALLED while held, 15.02 s after the release; F0, P1 (3.7 s), W1 (1.25 s), W2 (60 of 60, 9.9 s), D0 ok |
 
 **The host.** A Mac14,6 (12 cores) with macOS 26.5.1 (25F80), on AC power; the cooperative pool
 there is 12 threads. The Release runs' app came from this change's passing `make gate`.

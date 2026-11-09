@@ -41,6 +41,7 @@ enum DecoderSupport {
     /// track that completes with none, a reader that cannot be made and any
     /// other error all answer true. Reads at most until the first image.
     static func decodesFirstFrame(of track: AVAssetTrack, in asset: AVAsset) -> Bool {
+        ReaderPool.note("DecoderSupport.decodesFirstFrame")
         enable()
         guard let reader = try? AVAssetReader(asset: asset) else { return true }
         let output = AVAssetReaderTrackOutput(

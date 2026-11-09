@@ -410,7 +410,13 @@ detail there.
   lane: every pass's peaks, loudness, sync and speech decodes run on it, at
   most two at a time, first in first out, on a queue of its own and never on
   the Swift cooperative pool, where synchronous reads would stop every
-  `AVAssetReader` in the process (spec §11 #367).
+  `AVAssetReader` in the process (spec §11 #367). It also holds
+  `MediaImporter.readQueue`, the concurrent `.userInitiated` queue that
+  `MediaImporter.offPool` runs the import probe's PQ sample read and
+  first-frame decode and a converted strip's one-clip build on, off the
+  cooperative pool (spec §11 #367, #369). `ReaderPool.swift` (await-free) is
+  the rule's witness: whether a thread is on the cooperative pool, and the
+  read sites a probe records (`cache_lane_probe.swift` R0–R2).
   `async`/`await` is confined to `MediaImporter.swift`; the await-free halves
   are the `+` files, `MediaPeakBuckets`, `LoudnessBlocks`, `MediaCacheFiles`,
   `MediaCacheLedger` and `MediaCacheLane`. A cache is CURRENT when its
@@ -4929,7 +4935,8 @@ inversion and `main.async` allocates; every other cross-thread value is an
 a main hop. `DispatchQueue`
 only at the documented seams: the
 compositor's render queue, the composition rebuild, import, the cache lane's
-queue (`MediaImporter.CacheLane`, spec §11 #367), the export
+queue (`MediaImporter.CacheLane`, spec §11 #367), the import reads queue
+(`MediaImporter.readQueue`, #369), the export
 progress timer, the AV1 encode queue (`ExportEncodePump`'s
 `com.kgalligan.framejob.export.encode`, with its `DispatchSemaphore(3)` between the
 video pump and the encoder, spec §11 CX-12), the WebM writer's two pump queues

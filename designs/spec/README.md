@@ -52,7 +52,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.5a-compositor-step-0-output.md`](07.5a-compositor-step-0-output.md) | 204 | The Metal compositor's pixel formats, step 0 (per composition) and camera log, the request and the scopes' tap (the shown set, the kernels, the counting rule), the HLG working space, the output pass and linear light. |
 | [`07.5b-compositor-passes-grades.md`](07.5b-compositor-passes-grades.md) | 434 | The compositor's per-layer passes and pipelines, the cursor and the cutout, the adjustment pass and its qualifier, the encoded-sRGB blend, transitions, mattes, tone, wheels, curves, looks and `.cube` LUTs, and the frame budget. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 70 | What playback does after every edit: rebuild or refresh. |
-| [`07.7-import.md`](07.7-import.md) | 273 | `MediaImporter.probe`, the formats import accepts, the cursor file attached at import and relink, the WebM/Matroska rewrap and its PQ copy's HDR10 fields, its copy's progress window, the copy's original, and the opt-in ffmpeg step's original and checked VP9 copy. |
+| [`07.7-import.md`](07.7-import.md) | 275 | `MediaImporter.probe`, the formats import accepts, the cursor file attached at import and relink, the WebM/Matroska rewrap and its PQ copy's HDR10 fields, its copy's progress window, the copy's original, and the opt-in ffmpeg step's original and checked VP9 copy. |
 | [`07.8-export.md`](07.8-export.md) | 801 | Export: writers, formats, stems, loudness, the queue, the wait for person masks, ramp audio, isolated voice and voice effects. |
 | [`07.9a-agent-tools.md`](07.9a-agent-tools.md) | 133 | The MCP agent's tools: one tool per op plus `scope`, the parity check and the argument gate, lenient decoding (`set_media_color`, `set_media_speech` and `set_audio`'s `duck.mode` are in §7.9e). |
 | [`07.9b-agent-lane-assistant.md`](07.9b-agent-lane-assistant.md) | 185 | The agent lane every tool call goes through, the bundled helper, the assistant session (its key, prices and spend), its prompt, and the Assistant tab as the session's door. |
@@ -67,7 +67,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 326 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 24678 in 46 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 24720 in 46 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 
