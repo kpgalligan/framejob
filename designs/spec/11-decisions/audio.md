@@ -1249,12 +1249,16 @@ preview's statement) records its decisions from AU-150.
   `audio_aiff`, whose presets list `stems: ["tracks", "names"]`); a movie row refuses (`<id> has
   no stems; stems applies to audio_m4a, audio_wav and audio_aiff`), and a value but the two words
   is refused by name on any row. (b) `tracks`: one stem per heard timeline track; `names`: heard
-  tracks whose trimmed names match case-insensitively are one stem, named by the first's
-  spelling, and an unnamed track is its own. Heard = has a plan audio track labelled with it and
-  is not `silenced` (mute, solo) among the timeline's tracks; none heard is refused (`stems: no
-  track is heard, so there is no stem to write`). Order: timeline order of each stem's first
-  track. (c) A name is the trimmed track name, else `Track N` (N = index + 1, the header's label),
-  `/` and `:` replaced by `-`; a name equal case-insensitively to an earlier stem's gets
+  tracks whose trimmed names match are one stem, named by the first's spelling as typed (not
+  rewritten to NFC), and an unnamed track is its own. Names match when equal once each is
+  decomposed (NFD), lowercased and recomposed (NFC) — Unicode-equivalent, ignoring case — so
+  spellings APFS stores as one file name (a precomposed and a decomposed é; ǰ and J + combining
+  caron) are one name (amended 2026-11-09, #394, the owner choosing the `unicode-normalization`
+  crate). Heard = has a plan audio track labelled with it and is not `silenced` (mute, solo)
+  among the timeline's tracks; none heard is refused (`stems: no track is heard, so there is no
+  stem to write`). Order: timeline order of each stem's first track. (c) A name is the trimmed
+  track name, else `Track N` (N = index + 1, the header's label), `/` and `:` replaced by `-`; a
+  name equal to an earlier stem's under (b)'s comparison (amended 2026-11-09, #394) gets
   ` (Track N)`, and one still equal to an earlier stem's ` (Track N, 2)`, ` (Track N, 3)` and on,
   the first no earlier stem holds, so no two stems share a file. The settings end with `stems: [{name, tracks}]` only when asked. (d) Files
   `<mix name without extension> - <name>.<mix extension>` beside the mix; an existing file at a

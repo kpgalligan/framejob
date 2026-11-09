@@ -10,20 +10,21 @@
 //!   pictures, or nothing, is not) and it is not `silenced` among the
 //!   timeline's tracks (mute, solo). None heard is refused.
 //! - **Grouping.** `tracks`: one stem per heard track. `names`: heard tracks
-//!   whose trimmed names match case-insensitively are one stem, named by the
-//!   first's spelling; an unnamed track is its own.
+//!   whose trimmed names match, Unicode-equivalent and ignoring case, are
+//!   one stem, named by the first's spelling; an unnamed track is its own.
 //! - **Order.** Timeline order of each stem's first track; a stem's tracks
 //!   in timeline order.
 //! - **Names.** The trimmed track name, else `Track N` (N = its index + 1,
 //!   the header's label), with `/` and `:` replaced by `-`; a name equal
-//!   case-insensitively to an earlier stem's gets ` (Track N)` of its first
-//!   track, and one still equal to an earlier stem's then gets
-//!   ` (Track N, 2)`, ` (Track N, 3)` and on, the first no earlier stem
-//!   holds, so no two stems share a file.
+//!   (Unicode-equivalent, ignoring case) to an earlier stem's gets
+//!   ` (Track N)` of its first track, and one still equal to an earlier
+//!   stem's then gets ` (Track N, 2)`, ` (Track N, 3)` and on, the first no
+//!   earlier stem holds, so no two stems share a file.
 
 use std::collections::BTreeSet;
 
 use serde_json::{Map, Value};
+use unicode_normalization::UnicodeNormalization;
 
 use crate::audio::silenced;
 use crate::export_overrides::StemsMode;
@@ -113,7 +114,19 @@ impl Project {
     }
 }
 
-/// Two names the same but for case.
+/// Two names Unicode-equivalent, ignoring case: one file name to APFS.
 fn same(a: &str, b: &str) -> bool {
-    a.to_lowercase() == b.to_lowercase()
+    fold(a) == fold(b)
+}
+
+/// `name` decomposed, lowercased and recomposed. Lowercasing comes before
+/// the recomposing: a letter precomposed only in lowercase (ǰ, U+01F0) has
+/// no precomposed capital, so `J` + U+030C lowercased after NFC would stay
+/// two characters.
+fn fold(name: &str) -> String {
+    name.nfd()
+        .collect::<String>()
+        .to_lowercase()
+        .nfc()
+        .collect()
 }

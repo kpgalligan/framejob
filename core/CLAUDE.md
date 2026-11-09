@@ -1409,8 +1409,8 @@ governs a module now.
   no partial value — never "the canvas is translucent".
 - `export_stems.rs` — an audio export's stems (spec §11 AU-107, AU-108):
   `Stem` and `Project::export_stems(StemsMode)` — heard tracks (labelled by
-  `CompTrack::track`, not `silenced`) grouped per track or per trimmed name
-  ignoring case, ordered, named (`Track N`, `/` and `:` as `-`, ` (Track N)`
+  `CompTrack::track`, not `silenced`) grouped per track or per trimmed name,
+  Unicode-equivalent and ignoring case, ordered, named (`Track N`, `/` and `:` as `-`, ` (Track N)`
   then ` (Track N, k)` until unique), none heard refused; read by `export.rs`.
 - `agent.rs` — embedded MCP server (streamable HTTP, tools only).
   **Generic** — knows nothing about video; the host registers the catalog
@@ -1530,7 +1530,12 @@ dependency, so the core's `serde_json` has it too; `Cargo.toml` spells it
 out. `svgtypes` 0.16.1 (usvg's own pin, already in the lock) for its
 named-colour table only, so a stored name agrees with what usvg draws
 (`model_color.rs`). `sha2` for the `.fjgraphic` manifest's checksums
-(G-46; also `graphic_ffi.rs`'s revision oracle).
+(G-46; also `graphic_ffi.rs`'s revision oracle). `unicode-normalization`
+(with `tinyvec`, already in the lock through `graphic`) for
+`export_stems.rs`'s name comparison only: stem names compare decomposed,
+lowercased and recomposed (NFD, lowercase, NFC), because APFS treats
+canonically equivalent spellings, in any case, as one file name (spec §11
+AU-108, #394).
 
 **One implementation per algorithm.** Before writing time math, find the
 existing implementation and route through it. Shared constants have exactly

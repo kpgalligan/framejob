@@ -27,6 +27,9 @@ graphic = { path = "../graphic" }
 # `graphic_ffi.rs`'s and `graphic_package.rs`'s test oracles. Already in the
 # lock through `graphic`.
 sha2 = "0.10"
+# `export_stems.rs`'s name comparison (spec §11 AU-108, #394): stem names
+# compare decomposed, lowercased and recomposed, as APFS compares file names.
+unicode-normalization = "0.1.24"
 
 [profile.release]
 # No LTO: cargo skips it for a staticlib+rlib unit anyway, and asking for it
