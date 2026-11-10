@@ -6,8 +6,8 @@
     python3 tools/proof/audio_ap8b_proof.py --mutants
 
 The caller owns the instance at that socket; nothing is launched or killed.
-Needs `ffmpeg` and numpy. `--probe` runs A1–A8 alone, with no instance;
-`--mutants` runs M1–M14: M4–M12 and M14 each over its own copy of `app/Sources`,
+Needs `ffmpeg` and numpy. `--probe` runs A1–A9 alone, with no instance;
+`--mutants` runs M1–M15: M4–M12, M14 and M15 each over its own copy of `app/Sources`,
 killed when its named probe row fails, and M1–M3 and M13 each in one copy of
 `core/` (`graphic/` beside it as a symlink, the target folder
 `work/audio_ap8b-core-target/`, seeded from `core/target` and kept), killed
@@ -53,7 +53,7 @@ Rows:
   loudness over the same frames.
 - **U1**: one `set_action_end {audio: {pan}}` is one undo step, and the
   instance's log holds no `Frame Job: ` line.
-- **A1–A8** (the probe `audio_ap8b_probe.swift`, compiled AS `main.swift` over
+- **A1–A9** (the probe `audio_ap8b_probe.swift`, compiled AS `main.swift` over
   `app/Sources` on `swift_build.py`'s line; a probe that will not build is a
   scored failure): its head lists them.
 
@@ -84,7 +84,7 @@ SEC = 600_000
 WINDOW = 1200
 LSB = 1 / 2 ** 23
 LIMITER_FRAMES = 158  # the clip limiter's delay and lookahead at 48 kHz (AU-20)
-PROBE_ROWS = ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8"]
+PROBE_ROWS = ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9"]
 
 # (name, row, file, anchor, replacement): each anchor exactly once.
 MUTANTS = [
@@ -119,6 +119,12 @@ MUTANTS = [
     ("M14", "A7", "AudioTapSchedule.swift",
      "|| (!voiced\n                        && clip.actions.contains",
      "|| (clip.actions.contains"),
+    # #396: the base standing in for a segment whose every point is inert.
+    ("M15", "A9", "AudioTapSchedule.swift",
+     "            let automation = parameters.automation(for: segment)\n"
+     "            if let automation, automation.isInert { continue }\n",
+     "            let automation = parameters.automation(for: segment)\n"
+     "                .flatMap { $0.isInert ? nil : $0 }\n"),
 ]
 
 # (name, test file, test name, file under core/src, anchor, replacement).

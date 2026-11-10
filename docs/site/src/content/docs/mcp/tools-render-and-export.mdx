@@ -77,7 +77,7 @@ Every result has `export_id`, `status`, `path` and `elapsed`, the seconds since 
 | `queued` | `waiting`, the queue row's text, while the job waits for memory behind other AV1 and VP9 exports. |
 | `queued` or `running` | `estimated_seconds` on `av1`, `av1_webm`, `vp9_webm` and `vp9_alpha_webm`. |
 | `running` | `progress`, 0 to 1, and `phase` while the job has one: "Preparing…" until the file's writer exists, and "Measuring loudness…" during the loudness measurement. |
-| `done` | What the file holds: its size, the settings used, the `loudness` measured, and any `graphic_warnings` and `cursor_warnings`. |
+| `done` | `message`, the queue row's text, and what the file holds: its size, the settings used, the `loudness` measured, and any `graphic_warnings` and `cursor_warnings`. |
 | `failed`, `cancelled` | `reason`, the queue row's text. |
 
 [Export status](/mcp/export/#export-status) lists every key of a `done` result, and [The loudness report](/mcp/export/#the-loudness-report) explains `loudness`.

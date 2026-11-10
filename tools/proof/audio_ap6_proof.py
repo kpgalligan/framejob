@@ -23,9 +23,12 @@ samples/Rode-usb-mic.m4a, and `say` speech made here — one low-passed at
   V6   the low-passed `say` speech: the de-esser off.
   V7   the high-shelved `say` speech: the de-esser on at its defaults.
   V8   Clip ▸ Enhance Voice through perform_menu_item, on an instance launched
-       with the −16 target in its argument domain, waiting for the Measuring
-       Sound sheet to go: writes what the tool writes (the volume within
-       0.05 dB, its isolation window rendered again there).
+       with a −18 target in its argument domain (`<real>-18</real>`: a bare
+       −18 is read as a flag and never arrives, #404; −18 because −16 is the
+       default, which an argument that did not arrive would also give). On
+       that instance enhance_voice {target_lufs: −18} first, its `set` kept
+       and undone; then the menu, waiting for the Measuring Sound sheet to
+       go: it writes what the tool wrote (the volume within 0.05 dB).
   V9   two clips in one call: a row each, each clip its own settings, one undo.
   V10  a silent clip skipped by name beside an enhanced one; alone, "Nothing
        could be enhanced"; target_lufs −51 and −4 and an unknown key refused by
@@ -358,16 +361,32 @@ def sibilance_rows(m):
 
 # ---- V8 the menu --------------------------------------------------------------
 
-def menu_rows(m, tool_row):
-    print("\nV8 — Clip ▸ Enhance Voice writes what the tool writes")
+# V8's target: not the default (−16), so a launch argument that never reached
+# the app is a volume about 2 dB from the tool's (#404).
+MENU_TARGET = -18
+MENU_ARGUMENT = f"<real>{MENU_TARGET}</real>"
+
+
+def menu_rows(m):
+    print(f"\nV8 — Clip ▸ Enhance Voice writes what the tool writes, at {MENU_TARGET} LUFS")
     launched = mcp_module.launch(
-        proof_app.binary(), arguments=["-FrameJobNormalizeTargetLUFS", "-16"])
+        proof_app.binary(), arguments=["-FrameJobNormalizeTargetLUFS", MENU_ARGUMENT])
     try:
-        if not check(launched.client is not None, "V8 an instance with the −16 target comes up"):
+        if not check(launched.client is not None,
+                     f"V8 an instance with the {MENU_TARGET} target comes up"):
             return
         other = launched.client
         s = Session(other, "ap6-menu")
         clip = place(s, "ap6-rode.wav")
+        before = audio(s, clip)
+        answer = enhance(s, [clip], target_lufs=MENU_TARGET)
+        tool_row = answer["enhanced"][0]
+        undone = s.undo()
+        check(answer.get("target_lufs") == MENU_TARGET and undone == "Enhance Voice"
+              and audio(s, clip) == before,
+              f"V8 the tool at target_lufs {answer.get('target_lufs')} (volume "
+              f"{tool_row['set']['volume']}), then one undo ({undone!r}) back to the clip "
+              f"as placed")
         s.op("set_selection", clips=[clip])
         menu = s.op("perform_menu_item", path=["Clip", "Enhance Voice"])
         gone = wait_no_sheet(s)
@@ -567,7 +586,6 @@ def main():
     # run sets nothing and runs them all.
     only = set(filter(None, os.environ.get("AP6_ONLY", "").split(",")))
     errors = (ToolError, KeyError, IndexError, RuntimeError, OSError, ValueError, TypeError)
-    tool_row = None
     parts = (("owner", owner_rows), ("sibilance", sibilance_rows),
              ("selection", selection_rows), ("speed", speed_rows),
              ("normalize", normalize_rows))
@@ -577,18 +595,15 @@ def main():
         try:
             result = part(m)
             if part is owner_rows:
-                tool_row, first = result
+                _tool_row, first = result
                 timing_rows(m, first)
         except errors as error:
             check(False, f"{part.__name__} aborted: {type(error).__name__}: {error}")
     if not only or "menu" in only:
-        if tool_row is not None:
-            try:
-                menu_rows(m, tool_row)
-            except errors as error:
-                check(False, f"menu_rows aborted: {type(error).__name__}: {error}")
-        else:
-            check(False, "V8 skipped: no tool row to compare with")
+        try:
+            menu_rows(m)
+        except errors as error:
+            check(False, f"menu_rows aborted: {type(error).__name__}: {error}")
     if not only or "hold" in only:
         try:
             hold_rows()

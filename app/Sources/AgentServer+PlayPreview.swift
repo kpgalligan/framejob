@@ -19,6 +19,15 @@ import AppKit
 /// `seek_to`, half way through it notes the playhead (`seek_from`) and seeks
 /// there through the asked door. It ends paused where the play reached.
 ///
+/// **`await_start`** (issue #368, spec §11 #368) times the play from the
+/// playhead's first move and not from `setRate`: the player's start-up
+/// varies with the host's load, and a caller that scores how far the preview
+/// went must not score that. After `setRate` the playhead is polled every
+/// 10 ms, a main hop each, until it is past `from`; that position is
+/// `playing_from`, the time it took `start_seconds`, and the sleep is
+/// `seconds` from that read. Refused, after pausing and ending the trial,
+/// when the playhead has not moved after 30 s.
+///
 /// **`stale_ticks`** (issue #329) hands the prefetch requests the seek's
 /// session must not follow, through `GraphicPrefetch.reach`, the
 /// compositor's own call: in the seek's hop, before the session is armed,
@@ -52,6 +61,12 @@ extension AgentServer {
         let staleTicks = try intsArg(a, "stale_ticks").map { $0.map(Ticks.init) }
         let staleArmed = try boolArg(a, "stale_armed")
         let asksSeek = a["seek_to"].map { !($0 is NSNull) } ?? false
+        let awaitsStart = try boolArg(a, "await_start") ?? false
+        if awaitsStart, asksSeek {
+            throw ToolError(
+                message: "await_start cannot be used with seek_to: a seek's two halves are "
+                    + "timed from the seek.")
+        }
         if let staleTicks {
             guard asksSeek else {
                 throw ToolError(
@@ -110,7 +125,12 @@ extension AgentServer {
         }
         var seekFrom: Ticks?
         var staleReached: [Ticks]?
-        if let seekTo = run.seekTo {
+        var playingFrom: (ticks: Ticks, seconds: Double)?
+        if awaitsStart {
+            let moved = try awaitStart(run, from: from, since: started)
+            playingFrom = (moved.ticks, moved.at.timeIntervalSince(started))
+            Thread.sleep(forTimeInterval: max(0, seconds - Date().timeIntervalSince(moved.at)))
+        } else if let seekTo = run.seekTo {
             Thread.sleep(forTimeInterval: seconds / 2)
             let armed = staleArmed ?? false
             let (here, before) = onMain { () -> (Ticks, Int) in
@@ -155,6 +175,12 @@ extension AgentServer {
         var fields: [(String, Any)] = [
             ("from", from), ("to", to), ("rate", rate),
             ("wall_seconds", Self.rounded(wall, 3)),
+        ]
+        if let playingFrom {
+            fields.append(("start_seconds", Self.rounded(playingFrom.seconds, 3)))
+            fields.append(("playing_from", playingFrom.ticks))
+        }
+        fields += [
             ("frame_ticks", f),
             ("frames_expected", expected),
             ("frames_composed", composed.count),
@@ -172,6 +198,33 @@ extension AgentServer {
             fields.append(("digests", table))
         }
         return try orderedResult(fields)
+    }
+
+    /// How long `await_start` waits for the playhead's first move.
+    static let awaitStartLimit: TimeInterval = 30
+
+    /// `await_start`'s wait (#368): polls the playhead every 10 ms, a main
+    /// hop each, until it is past `from`, and answers that position and the
+    /// instant it was read. Past `awaitStartLimit` from `started` it pauses,
+    /// ends the trial and throws. On the server thread.
+    private func awaitStart(_ run: PlayRun, from: Ticks, since started: Date) throws
+        -> (ticks: Ticks, at: Date)
+    {
+        let playback = run.playback
+        while true {
+            let (here, at) = onMain { (playback.currentTime, Date()) }
+            if here > from { return (here, at) }
+            guard at.timeIntervalSince(started) < Self.awaitStartLimit else {
+                onMain {
+                    playback.pause()
+                    _ = PlaybackTrials.shared.end(run.key)
+                }
+                throw ToolError(
+                    message: "The preview did not start: its playhead had not moved "
+                        + "\(Int(Self.awaitStartLimit)) s after play_preview set the rate.")
+            }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
     }
 
     /// `stale_armed`'s wait: polls every 10 ms, until `deadline`, for a frame
@@ -244,6 +297,10 @@ extension AgentServer {
                 + "from seek_to — up to to), frames_composed (how many of those the compositor "
                 + "finished), composed_ratio, and compose_ms {mean, p95, worst} over every "
                 + "frame it served. It pauses first and waits up to 5 s for a seek to land. "
+                + "await_start: true times the play from the playhead's first move instead of "
+                + "from the rate change, so the player's start-up is not part of it: it adds "
+                + "start_seconds (how long the start took) and playing_from (the playhead "
+                + "then, ticks), and to is read seconds after that. "
                 + "digests: true adds a tick → SHA-256 table of each served frame's pixels "
                 + "(slower). seek_to seeks there half way through, as a click on the ruler "
                 + "would, and adds seek_from, where the play was. stale_ticks (with seek_to) "
@@ -254,9 +311,10 @@ extension AgentServer {
                 + "or half of seconds, whichever is less). Either adds stale_reached, the ticks "
                 + "actually reported ([] when the armed wait ran out). Refused, changing "
                 + "nothing: stale_ticks without seek_to, an empty or negative stale_ticks, "
-                + "stale_armed without stale_ticks, "
+                + "stale_armed without stale_ticks, await_start with seek_to, "
                 + "a project with no editor window and a preview with nothing to play. "
-                + "Refused after pausing the preview: a preview still seeking after 5 s.",
+                + "Refused after pausing the preview: a preview still seeking after 5 s, and "
+                + "with await_start a playhead that has not moved after 30 s.",
             [
                 "seconds": [
                     "type": "number", "minimum": 0.5, "maximum": 60,
@@ -270,6 +328,12 @@ extension AgentServer {
                     "type": "boolean",
                     "description": "Answer each served frame's SHA-256 by its tick. Default "
                         + "false.",
+                ],
+                "await_start": [
+                    "type": "boolean",
+                    "description": "Time the play from the playhead's first move, not from "
+                        + "the rate change, and answer start_seconds and playing_from. Not "
+                        + "with seek_to. Default false.",
                 ],
                 "seek_to": [
                     "type": "integer",

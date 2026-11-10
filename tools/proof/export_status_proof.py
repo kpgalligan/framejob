@@ -17,7 +17,9 @@ A2  `MCP.wait_export` on that id reaches `done` within A2_BOUND s, with the
     same `export_id` and path and every key `export` answered before #326
     (ok, bytes, preset, container, codec, width, height, fps, start,
     duration, burn_in_timecode, and — the AV clip has sound — loudness with
-    its summary); `bytes` equals the file's size.
+    its summary); `bytes` equals the file's size; and `message`, the Export
+    Queue row's sentence (spec §11 #395), starts "Exported “a1.mp4”." (no
+    stems, so no count).
 A3  P2 — a 240 s text clip: its `export h264` answers within 5 s with
     `running`, and `export_status` then reads `running` with
     0 ≤ progress ≤ 1.
@@ -217,8 +219,10 @@ def run_rows(client):
     check("A2", done.get("status") == "done" and done.get("export_id") == a1_id
           and done.get("path") == str(a1_path) and not missing and done.get("ok") is True
           and done.get("bytes") == size and size and isinstance(loudness, dict)
-          and bool(loudness.get("summary")),
-          f"done {done.get('status')!r} id {done.get('export_id')} (want {a1_id}), missing "
+          and bool(loudness.get("summary"))
+          and str(done.get("message", "")).startswith(f"Exported “{a1_path.name}”."),
+          f"done {done.get('status')!r} id {done.get('export_id')} (want {a1_id}), message "
+          f"{done.get('message')!r}, missing "
           f"{missing}, bytes {done.get('bytes')} vs file {size}, loudness "
           f"{sorted(loudness) if isinstance(loudness, dict) else loudness!r}, elapsed "
           f"{done.get('elapsed')} {why!r}")

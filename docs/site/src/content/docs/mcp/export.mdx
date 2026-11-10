@@ -86,6 +86,7 @@ A `done` result adds these keys.
 
 | Key | What it holds |
 | --- | --- |
+| `message` | The queue row's sentence, such as "Exported “cut.mp4”. Peak −1.0 dBTP · −16.0 LUFS." It names the file, then counts the stems when there are any ("and 2 stems"), then gives any warning and the loudness figures. |
 | `ok` | `true`. |
 | `bytes` | The file's size. |
 | `preset`, `container`, `codec` | What was written. |
@@ -284,7 +285,7 @@ A track is heard when it has sound in it and isn't muted or silenced by another 
 
 A stem holds its tracks' sound before the master, with no loudness gain and no limiter, so the stems add up to the mix wherever the master changed nothing. Any file already at a stem's name is replaced when the job finishes.
 
-The `done` result lists each one as `stems [{name, tracks, path}]`. `tracks` holds the ids of the timeline tracks in that stem.
+The `done` result lists each one as `stems [{name, tracks, path}]`. `tracks` holds the ids of the timeline tracks in that stem. Its `message` counts them, as the queue row does: "Exported “mix.wav” and 2 stems."
 
 - On any other preset `export` returns the error "h264 has no stems; stems applies to audio_m4a, audio_wav and audio_aiff", naming the preset.
 - With no track heard, the error is "stems: no track is heard, so there is no stem to write".

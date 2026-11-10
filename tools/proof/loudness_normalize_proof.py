@@ -26,8 +26,11 @@ BS.1770-4 Annex 2).
        volume-1 export of the same window (0.5 LU, 0.5 dB).
   N9   a second identical call "made no change".
   N10  Clip > Normalize on an instance launched with -FrameJobNormalizeMode
-       loudness (and target -16) lands at -16 +-0.5 LUFS; on one launched with
-       -FrameJobNormalizeMode peak at -1 dBFS peak.
+       loudness and a -20 target lands at -20 +-0.5 LUFS; on one launched with
+       -FrameJobNormalizeMode peak at -1 dBFS peak. The target is passed as
+       `<real>-20</real>`: a bare -20 is read as a flag and never arrives
+       (#404), and -20 is not the default, which is what an argument that did
+       not arrive would give.
   N11  the tool's default (AU-25): no mode is Loudness; peak_db alone is Peak.
   N12  a clip's own limiter is kept (-3 dBTP and its release) and one above -1
        dBTP is lowered to -1; the row's limiter says so.
@@ -272,15 +275,22 @@ def kinds_rows(m):
         m.call("close_project", project=s.path, discard=True)
 
 
+# N10's target: not the default (-16), so a launch argument that never reached
+# the app is 4 LU from the row's figure (#404).
+MENU_TARGET = -20
+MENU_ARGUMENT = f"<real>{MENU_TARGET}</real>"
+
+
 def menu_leg(mode, label):
-    """Clip > Normalize on an instance launched with the mode (and the -16
-    target) in the argument domain, so the row never reads whatever mode the
+    """Clip > Normalize on an instance launched with the mode and MENU_TARGET
+    in the argument domain, so the row never reads whatever mode or target the
     shared defaults domain holds (spec §11 AU-15 makes the choice persist).
     Answers the measured (lufs, peak) of the export, or None when the instance
     did not come up."""
     launched = mcp_module.launch(
         proof_app.binary(),
-        arguments=["-FrameJobNormalizeMode", mode, "-FrameJobNormalizeTargetLUFS", "-16"])
+        arguments=["-FrameJobNormalizeMode", mode, "-FrameJobNormalizeTargetLUFS",
+                   MENU_ARGUMENT])
     try:
         if not check(launched.client is not None, f"N10 a {mode}-mode instance comes up"):
             return None
@@ -304,8 +314,8 @@ def menu_rows(m):
               f"N10 launched in Peak mode: {f(measured[1])} dBFS")
     measured = menu_leg("loudness", "loudness-menu-loudness")
     if measured is not None:
-        check(near(measured[0], -16, 0.5),
-              f"N10 launched in Loudness mode: {f(measured[0])} LUFS")
+        check(near(measured[0], MENU_TARGET, 0.5),
+              f"N10 launched in Loudness mode at {MENU_TARGET}: {f(measured[0])} LUFS")
 
 
 def default_rows(m):
@@ -359,8 +369,13 @@ def main():
     os.makedirs(p5.WORK, exist_ok=True)
     fixtures()
     m = MCP(p5.SOCKET)
+    # LOUDNESS_ONLY=menu_rows,… runs only those parts while iterating; a recorded
+    # run sets nothing and runs them all.
+    only = set(filter(None, os.environ.get("LOUDNESS_ONLY", "").split(",")))
     for part in (schema_rows, refusal_rows, steady_rows, peaky_rows, match_rows, rode_rows,
                  kinds_rows, menu_rows, default_rows, own_limiter_rows, undo_rows):
+        if only and part.__name__ not in only:
+            continue
         try:
             part(m)
         except (ToolError, KeyError, IndexError, RuntimeError, OSError) as error:

@@ -211,11 +211,17 @@ final class RampAudioRenders: @unchecked Sendable {
                 _ = try RampAudioRenderer.render(job, cancelled: cancelled)
             case .isolation(let window):
                 // A reversed file is 48 kHz LPCM already; a forward one is
-                // read from what the composition plays (AU-51).
+                // read from what the composition plays (AU-51), a refusal in
+                // the isolation's own words: the Status row shows it (AU-56).
+                let source: URL
+                do {
+                    source = request.reversed
+                        ? request.source : try RampAudioCache.renderSource(for: request.source)
+                } catch RampAudioRenderer.RenderError.unreadable(let why) {
+                    throw IsolationRenderer.RenderError.unreadable(why)
+                }
                 let job = IsolationRenderer.Job(
-                    source: request.reversed
-                        ? request.source : try RampAudioCache.renderSource(for: request.source),
-                    window: window, destination: landing)
+                    source: source, window: window, destination: landing)
                 _ = try IsolationRenderer.render(job, cancelled: cancelled)
             case .voice(let voice):
                 // The source as `.isolation`'s (AU-142), a refusal in the

@@ -1,8 +1,10 @@
 // tools/proof/audio_ap5_probe.swift — the in-process instrument behind
 // `audio_ap5_proof.py --probe` (road map "audio" AP5, spec §11 AU-50…AU-57).
 // Compiled with every file in `app/Sources` but `main.swift` through
-// `swift_build.py`'s line, copied in as `main.swift`, with `Blank.mp4` beside
-// the binary (the builder's placeholder track for an audio-only plan).
+// `swift_build.py`'s line under `FRAMEJOB_DEV_TOOLS` (P11 and P12 hold a
+// render through `RampAudioRenders.devHoldKey`), copied in as `main.swift`,
+// with `Blank.mp4` beside the binary (the builder's placeholder track for an
+// audio-only plan).
 //
 //     audio_ap5_probe <work-dir> <Rode-usb-mic.m4a>
 //
@@ -36,6 +38,20 @@
 //      queue; `failure(for:)` and `IsolationCache.status(of:)` carry the message.
 //  P10 a round's frame count (#409): lanes that agree give their count; lanes
 //      that differ fail the render naming both counts; one lane its own.
+//  P11 Voice Isolation's Status in the app's own Clip pane (#408): "Off";
+//      after `set_audio {isolation: 1}`, read while the render is held (ten
+//      minutes, so no host can settle it first), "Rendering…"; the hold is
+//      then taken off, the held render dropped and the document wants it
+//      again; after the document's `.reversedMediaDidChange`, "Ready", its
+//      file on disk. A second leg on a media that is not audio:
+//      "Rendering…", then "Not rendered: " and the render's own failure,
+//      which names the isolated voice (not the ramp renderer's "retimed
+//      audio", whose source check a forward clip's isolation shares).
+//      Neither the handles nor the published resolution change when a
+//      render settles, so only the pane's drop of its memo moves the words.
+//  P12 the same landing leg for Voice Effect's Status (its own memo).
+//      P11 and P12 run first, before any other row's document wants a
+//      render, and each leg releases its wants and removes its cache folder.
 import AVFoundation
 import Accelerate
 import AppKit
@@ -516,6 +532,172 @@ do {
     } else {
         row("P6", false, "window: \(partDetail); whole: \(wholeDetail)")
     }
+}
+
+// =========================================================================
+// P11, P12 — the Status memo dropped when a render lands or fails (#408)
+
+var kept: [AnyObject] = []
+
+func walk(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(walk) }
+
+/// The app's Clip pane over `document` with `clip` selected, on the Sound
+/// sub-tab, in no window: the "Status" read-out of the section `id`.
+func statusReadout(_ document: ProjectDocument, _ clip: UInt32, section id: String)
+    -> OptionDisplayControl?
+{
+    let inspector = InspectorViewController()
+    inspector.document = document
+    document.selection = [clip]
+    inspector.binding.invalidate()
+    let pane = ClipPane(inspector: inspector)
+    kept += [inspector, pane]
+    pane.binding.invalidate()
+    pane.choose(.sound)
+    pane.rebuild()
+    pane.refresh()
+    guard let section = pane.sections.first(where: { $0.id == id }) else { return nil }
+    let row = walk(section).compactMap { $0 as? InspectorRowView }.first { row in
+        row.arrangedSubviews.contains { ($0 as? InspectorRowLabel)?.stringValue == "Status" }
+    }
+    return row.flatMap { row in walk(row).lazy.compactMap { $0 as? OptionDisplayControl }.first }
+}
+
+struct StatusLeg {
+    var off = ""
+    var before = ""
+    var after = ""
+    /// Why the "before" read cannot be trusted, when it cannot.
+    var early: String?
+    var settles = 0
+    var fileExists = false
+    var failure: String?
+    var problem: String?
+}
+
+/// The render hold P11 and P12 read under, in seconds: long enough that no
+/// host settles a render before the first read.
+let statusHold = 600.0
+
+/// `seconds` as `-RCDevRampRenderHold`, in the registration domain: nothing
+/// is written to disk.
+func holdRenders(_ seconds: Double) {
+    UserDefaults.standard.register(defaults: [RampAudioRenders.devHoldKey: seconds])
+}
+
+/// One leg: a 1 s clip of `file`, the pane built while the section is off,
+/// `patch` applied through the document (which wants the render, held
+/// `statusHold` seconds), the Status read; then the hold taken off, the held
+/// render dropped (waited for through `keptNames`, which names a running
+/// render) and wanted again by the document's own `ensureRampAudio()`; and
+/// the Status read again after the document's `.reversedMediaDidChange`. No
+/// sleep decides a read: each wait is for a state, bounded at 120 s.
+func statusLeg(_ file: URL, section id: String, patch: AudioPatch, voice: Bool) -> StatusLeg {
+    var leg = StatusLeg()
+    let document = ProjectDocument()
+    guard let clip = place(document, file, seconds: 12, at: 0) else {
+        leg.problem = "the clip was not placed"
+        return leg
+    }
+    edit(document, "Trim", [.trimEnd(clip: clip, to: SEC)])
+    guard let readout = statusReadout(document, clip, section: id) else {
+        leg.problem = "the pane has no \(id) Status read-out"
+        return leg
+    }
+    func read() -> String {
+        readout.refresh()
+        return readout.text
+    }
+    leg.off = read()
+    var settles = 0
+    let observer = NotificationCenter.default.addObserver(
+        forName: .reversedMediaDidChange, object: document, queue: nil
+    ) { _ in settles += 1 }
+    defer {
+        NotificationCenter.default.removeObserver(observer)
+        RampAudioRenders.shared.release(owner: document.recipeKey)
+        if let cache = document.temporaryCacheDirectory {
+            try? FileManager.default.removeItem(at: cache)
+        }
+    }
+    holdRenders(statusHold)
+    defer { holdRenders(0) }
+    edit(document, "Set", [.setAudio(clips: [clip], patch: patch)])
+    let dsp = AudioDSPParameters(snapshot: document.project.snapshot)
+    let reverse = ReverseSource.shared.resolution(for: document.recipeKey)
+    let urls = document.mediaURLs()
+    let segment = document.project.plan?.audioTracks.flatMap(\.segments).first { $0.clip == clip }
+    let request = segment.flatMap { s in
+        voice
+            ? VoiceCache.request(for: s, dsp: dsp, urls: urls, reverse: reverse)
+            : IsolationCache.request(for: s, dsp: dsp, urls: urls, reverse: reverse)
+    }
+    guard let request else {
+        leg.problem = "the clip has no render request"
+        return leg
+    }
+    leg.before = read()
+    if settles > 0 {
+        leg.early = "the render settled before the first read, under the hold"
+    } else if FileManager.default.fileExists(atPath: request.destination.path) {
+        leg.early = "the render's file was there before the first read"
+    } else if let failure = RampAudioRenders.shared.failure(for: request.destination) {
+        leg.early = "the render had failed before the first read: \(failure)"
+    }
+    // The hold off, and the held render dropped: `release` cancels it, and
+    // it is gone from `keptNames` once it has stopped. Wanting it again
+    // sooner would only un-cancel the held one.
+    holdRenders(0)
+    let folder = request.destination.deletingLastPathComponent()
+    RampAudioRenders.shared.release(owner: document.recipeKey)
+    let deadline = Date().addingTimeInterval(120)
+    while !RampAudioRenders.shared.keptNames(in: folder).isEmpty, Date() < deadline {
+        RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+    }
+    guard RampAudioRenders.shared.keptNames(in: folder).isEmpty, settles == 0 else {
+        leg.problem = "the held render did not stop (settled \(settles))"
+        return leg
+    }
+    document.ensureRampAudio()
+    while settles == 0, Date() < deadline {
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+    }
+    leg.settles = settles
+    leg.after = read()
+    leg.fileExists = FileManager.default.fileExists(atPath: request.destination.path)
+    leg.failure = RampAudioRenders.shared.failure(for: request.destination)
+    return leg
+}
+
+func told(_ leg: StatusLeg) -> String {
+    if let problem = leg.problem { return problem }
+    return "\"\(leg.off)\" → \"\(leg.before)\" → \"\(leg.after)\" (settled \(leg.settles), file "
+        + "\(leg.fileExists), failure \(leg.failure ?? "none")"
+        + (leg.early.map { "; \($0)" } ?? "") + ")"
+}
+
+func landed(_ leg: StatusLeg) -> Bool {
+    leg.problem == nil && leg.early == nil && leg.off == "Off" && leg.before == "Rendering…"
+        && leg.settles > 0 && leg.after == "Ready" && leg.fileExists && leg.failure == nil
+}
+
+do {
+    let lands = statusLeg(
+        dryA, section: "audio.isolation", patch: AudioPatch(isolation: 1), voice: false)
+    let text = work.appendingPathComponent("p11-not-audio.txt")
+    try? "not audio".write(to: text, atomically: true, encoding: .utf8)
+    let fails = statusLeg(
+        text, section: "audio.isolation", patch: AudioPatch(isolation: 1), voice: false)
+    let failed = fails.problem == nil && fails.early == nil && fails.off == "Off"
+        && fails.before == "Rendering…" && fails.settles > 0 && fails.failure != nil
+        && fails.after == "Not rendered: " + (fails.failure ?? "") && !fails.fileExists
+        && (fails.failure ?? "").hasPrefix("The isolated voice's source cannot be read: ")
+    row("P11", landed(lands) && failed, "lands: \(told(lands)); fails: \(told(fails))")
+
+    let voiced = statusLeg(
+        dryA, section: "audio.voice",
+        patch: AudioPatch(voice: .some(VoiceProps(kind: .pitch, pitch: 2))), voice: true)
+    row("P12", landed(voiced), "lands: \(told(voiced))")
 }
 
 // =========================================================================

@@ -5,7 +5,7 @@ proof drives (proof_app.py)" is the long form.
 
     python3 tools/proof/proof_app.py launch [--app debug|release|PATH] [-- ARG…]
     python3 tools/proof/proof_app.py check [--app debug|release|PATH]
-    python3 tools/proof/proof_app.py --selftest | --mutant exe-marker|md-counted|exe-mtime-running
+    python3 tools/proof/proof_app.py --selftest | --mutant exe-marker|md-counted|exe-mtime-running|bare-number
 
 `RC_PROOF_APP`: `debug` (`make app-debug`, spec §11 V-4, V-5; the default
 while unset), `release` (`make app`) or a `.app` or executable path. The marker of
@@ -14,7 +14,8 @@ override variable. Imports nothing from `tools/proof` (`mcp.py` imports it)
 but in the `launch` command. A `--mutant` must fail exactly its rows:
 `exe-marker` (the executable's mtime as the marker) F3 F4; `md-counted`
 (every `*.md` an input) F5; `exe-mtime-running` (an instance refused when its
-executable is newer than its start) R1 R2.
+executable is newer than its start) R1 R2; `bare-number` (a bare negative
+number let through as a launch argument, #404) A1.
 """
 
 import argparse
@@ -46,7 +47,10 @@ SKIPPED_DIRS = {"node_modules", "target", "build", ".git", "__pycache__"}
 SKIPPED_FILES = {"app/Info.plist", "app/FrameJob.entitlements"}
 KEPT_MD = "docs/graphics-api.md"
 EXPECTED = {"exe-marker": {"F3", "F4"}, "md-counted": {"F5"},
-            "exe-mtime-running": {"R1", "R2"}}
+            "exe-mtime-running": {"R1", "R2"}, "bare-number": {"A1"}}
+# A launch argument the argument domain reads as a FLAG, not as the value of the
+# key before it: `-16`, `-.5`. No real flag starts with a digit.
+BARE_NUMBER = re.compile(r"^-\.?\d")
 MUTANT = None
 
 
@@ -72,6 +76,21 @@ def config(release_only=None):
         raise ValueError(f"{ENV}={path} is a Debug build, and this proof is Release-only: "
                          f"{release_only}")
     return chosen if release_only is None else "release"
+
+
+def launch_arguments(arguments):
+    """`arguments` as a list, refusing (`ValueError`) a bare negative number
+    (#404): `-Key -16` leaves `Key` unset in the app's argument domain, so a
+    proof would measure the default. A number is passed as a plist fragment,
+    `'<real>-16</real>'`. Guards `mcp.launch` and `proof_app.py launch` only: a
+    proof that starts the app with its own `Popen` does not pass through here."""
+    arguments = [str(one) for one in arguments]
+    for one in arguments:
+        if BARE_NUMBER.match(one) and MUTANT != "bare-number":
+            raise ValueError(
+                f"launch argument {one!r} is a bare negative number: the argument domain reads "
+                f"it as a flag, so the key before it stays unset; pass '<real>{one}</real>'")
+    return arguments
 
 
 def _bundle_of(path):
@@ -343,6 +362,22 @@ def selftest(mutant=None):
         declared = re.findall(r"^\s*PRODUCT_BUNDLE_IDENTIFIER:\s*(\S+)\s*$",
                               (ROOT / "project.yml").read_text(), re.M)
         row("D2", declared == [DOMAINS["debug"]], f"project.yml's bundle identifiers {declared}")
+
+        def passed(*arguments):
+            try:
+                return launch_arguments(arguments)
+            except ValueError as error:
+                return f"ValueError: {error}"
+
+        seen = [passed("-FrameJobNormalizeTargetLUFS", "-16"), passed("-Key", "-.5")]
+        row("A1", all(isinstance(one, str) and one.startswith("ValueError: launch argument ")
+                      and repr(bare) in one and f"<real>{bare}</real>" in one
+                      for one, bare in zip(seen, ("-16", "-.5"))),
+            f"a bare negative number refused by name: {seen}")
+        kept = ["-FrameJobNormalizeTargetLUFS", "<real>-16</real>", "-Other", "16",
+                "-RCDevRampRenderHold", "3", "-RCDevAppearance", "YES", "-", "-.x"]
+        row("A2", passed(*kept) == kept, f"CONTROL: fragments, positives and flags pass: "
+            f"{passed(*kept)}")
 
         loose = WORK / "loose/Frame Job Debug.app"
         shutil.copytree(debug_app, loose)

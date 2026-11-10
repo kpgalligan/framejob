@@ -1337,6 +1337,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `enqueue`. The 600-frame limit and G-33's same-shape rule now refuse at
   the call, in their own sentences, with no `export_id` (#470). The order
   is arguments, core settings, folder, graphics gate, then this.
+  **Amended by #395** (hygiene a1): `done` also adds `message`, the queue
+  row's sentence.
 - **#336 — A composition audio track none of whose segments has a source
   (missing media, a pending reverse, a pending ramp render) holds bundled
   silence over [0, its last segment's end).** Measured at bb73b35
@@ -1982,3 +1984,20 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   (amends CO-60, CO-62 and VR-53 (b)), so a switch never trips the
   refusal. A radius or chroma key already stored on a nest in a file, or
   brought by a full `paste`, is kept and does nothing.
+- **#395 — `export_status`'s `done` answer carries `message`, the Export
+  Queue row's sentence.** (Amends #326.) Every other state already answered
+  the row's sentence (`waiting` while held, `reason` when failed or
+  cancelled); `done` answered only what the file holds, so nothing over MCP
+  could read the success line ("Exported “Mix.wav” and 2 stems. …", AU-108
+  (f)) and `audio_ap10b_proof.py`'s S1 could not hold its stem count against
+  the result's `stems`. `AgentExports.status` now adds `message` on `done`:
+  the string the row holds, copied at the finish inside the queue's own
+  change notification as the rest of the record is (`AgentExportRecord.message`),
+  so it is the sentence a person reads, with its warning suffixes and its
+  loudness figures. It is present on every finished export, since the queue
+  writes the sentence in the step that completes the job.
+  `AgentServer.exportResult` is untouched: its keys stay the ones `export`
+  answered before #326. `snapshot_ui` of the Export Queue window was the
+  other way to read the row and is not built: it needs the window shown,
+  which an agent export never does. Proofs: `audio_ap10b_proof.py` S1 (two
+  stems) and S6 (one, the singular), `export_status_proof.py` A2 (no stems).

@@ -46,8 +46,14 @@ export's length against it (#366): for C, M, R and T 10 180 000 ticks,
       common length; a missing baseline is a FAIL. Under `--baseline` the row
       writes the baseline instead.
   K2  as K1 for T (toneA on track 1, toneB on track 2, both present).
-  P1  `play_preview {seconds: 2}` on M1's document: `to − from` ≥ 900000
-      ticks, the preview plays rather than stalls.
+  P1  `play_preview {seconds: 2, await_start: true}` on M1's document:
+      `to − playing_from` ≥ 900000 ticks, the preview plays rather than
+      stalls. The 2 s are timed from the playhead's first move (spec §11
+      #368), so the player's start-up, which the host's load stretches, is
+      not in the score: it is printed as `start_seconds`, unscored (the
+      row once scored `to − from` over 2 s from the rate change, which is
+      this play less that start). A preview that never starts is the tool's
+      "did not start" refusal, and the row's FAIL.
 
 "Gone" is the fixture copied to `work/missing-audio/gone-<pid>.<ext>`,
 imported, placed, and the copy then deleted. Fixtures are
@@ -378,10 +384,11 @@ def close_sheet(doc):
 
 
 def p1(doc):
-    """`play_preview {seconds: 2}`, retried while the preview's build is in flight."""
+    """`play_preview {seconds: 2, await_start: true}`, retried while the
+    preview's build is in flight; scored from the playhead's first move (#368)."""
     deadline = time.monotonic() + 60
     while True:
-        got = doc.call("play_preview", seconds=2)
+        got = doc.call("play_preview", seconds=2, await_start=True)
         if got["ok"] or "nothing to play" not in got["error"] or time.monotonic() > deadline:
             break
         time.sleep(0.5)
@@ -389,10 +396,16 @@ def p1(doc):
         check("P1", False, f"play_preview refused: {got['error']}")
         return
     answer = got["reply"]
-    span = answer["to"] - answer["from"]
-    check("P1", span >= PLAY_FLOOR, f"from {answer['from']} to {answer['to']}: {span} ticks "
-                                    f"≥ {PLAY_FLOOR}; {answer.get('frames_composed')} of "
-                                    f"{answer.get('frames_expected')} frames composed")
+    began = answer.get("playing_from")
+    if not isinstance(began, int):
+        check("P1", False, f"play_preview answered no playing_from: {answer}")
+        return
+    span = answer["to"] - began
+    check("P1", span >= PLAY_FLOOR,
+          f"playing from {began} to {answer['to']}: {span} ticks ≥ {PLAY_FLOOR}; the start took "
+          f"{answer.get('start_seconds')} s from {answer['from']} (unscored); "
+          f"{answer.get('frames_composed')} of "
+          f"{answer.get('frames_expected')} frames composed")
 
 
 def control_exports(doc):

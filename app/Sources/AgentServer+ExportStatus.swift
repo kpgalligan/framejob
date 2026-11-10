@@ -171,6 +171,10 @@ final class AgentExports {
                 settings: record.settings, burnInTimecode: record.burnInTimecode,
                 path: record.destination.path, bytes: record.bytes, loudness: record.loudness,
                 graphicWarnings: record.graphicWarnings, cursorWarnings: record.cursorWarnings)
+            // The queue row's own success sentence (spec §11 #395), as the
+            // row held it at the finish; `exportResult`'s keys stay the ones
+            // `export` answered before #326.
+            if let message = record.message { answer["message"] = message }
         case .failed, .cancelled:
             answer["reason"] = record.message ?? ""
         case .waiting:

@@ -2,8 +2,8 @@
 over `app/Sources`, its mutants, and exports from an instance of its own.
 
     python3 tools/proof/audio_ap5_proof.py             # P rows, then I rows on an own instance
-    python3 tools/proof/audio_ap5_proof.py --probe     # P1–P10 and P2b, no instance
-    python3 tools/proof/audio_ap5_proof.py --mutants   # the eleven mutants, each against its row
+    python3 tools/proof/audio_ap5_proof.py --probe     # P1–P12 and P2b, no instance
+    python3 tools/proof/audio_ap5_proof.py --mutants   # the fourteen mutants, each against its row
     python3 tools/proof/audio_ap5_proof.py --instance  # I0–I10 and I1b alone
 
 The instance is `proof_app`'s app (Debug by default, `RC_PROOF_APP=release`
@@ -16,7 +16,8 @@ ffmpeg, left channel. Every project raises the clip's volume ×4 (+12 dB) so a
 after the tap, so it changes no comparison between two exports.
 
 **Probe rows** (`audio_ap5_probe.swift`, compiled AS `main.swift` over
-`app/Sources` on `swift_build.py`'s line; a build failure is a scored FAIL):
+`app/Sources` on `swift_build.py`'s line, under `FRAMEJOB_DEV_TOOLS` for P11's
+render hold; a build failure is a scored FAIL):
 P1 pending is dry with no tap; P2 a synthetic render read sample for sample at
 the placement, alone and with the noise reducer's lead; P2b the wet offset off
 the 48 kHz grid; P3 Amount 0.5 and 0.25 as a crossfade; P4 no request for a
@@ -24,7 +25,11 @@ time-scaled, ramped, freeze or pending-reverse segment; P5 the render's lag 0
 on the recording; P6 a window against the whole file's render ≤ −40 dB; P7 the
 name; P8 the export waits; P9 a failure reaches the owner once, on main; P10
 a round whose lanes answer different frame counts fails the render naming both
-(#409).
+(#409); P11 Voice Isolation's Status in the app's own Clip pane reads
+"Rendering…" while a held render is pending, "Ready" once it lands and "Not
+rendered: …" once one fails, which only the pane's drop of its memo on
+`.reversedMediaDidChange` can move (#408); P12 the same landing for Voice
+Effect's Status.
 
 **Instance rows:**
 - I0: the instance's log has no `Frame Job: ` line (the parity check).
@@ -58,7 +63,9 @@ a round whose lanes answer different frame counts fails the render naming both
 its named row fails): latency-kept (P5), no-preroll (P6), amount-swapped
 (P3), no-track-lead (P2), pending-silent (P1), scaled-isolated (P4),
 export-no-wait (P8), window-not-keyed (P7), split-rounding (P2b),
-failure-silent (P9), lanes-cut-to-shorter (P10). split-rounding is also I1b's; the instance rows are not
+failure-silent (P9), lanes-cut-to-shorter (P10), memo-not-dropped (P11),
+voice-memo-not-dropped (P12), isolation-failure-retimed (P11: an unreadable
+forward source fails in the ramp renderer's words). split-rounding is also I1b's; the instance rows are not
 re-run per mutant.
 
 Rows print `<ID> ok|FAIL — <detail>`, then `n/m`; exit 0 iff all pass.
@@ -91,7 +98,8 @@ SEC = 600_000
 HOLD_S = 2
 CALL_BOUND = 600
 VOLUME = 4.0
-PROBE_ROWS = ["P1", "P2", "P2b", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10"]
+PROBE_ROWS = ["P1", "P2", "P2b", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11",
+              "P12"]
 OCTAVES = [63, 125, 250, 500, 1000, 2000, 4000, 8000]
 
 rows = []
@@ -117,7 +125,9 @@ def build_probe(sources, name):
     if len(swift) < 100:
         return None, "app source set incomplete"
     try:
-        swift_build.build(sources=swift + [str(entry)], output=binary)
+        # FRAMEJOB_DEV_TOOLS: P11 and P12 hold a render (`RampAudioRenders.hold`).
+        swift_build.build(sources=swift + [str(entry)], output=binary,
+                          defines=["FRAMEJOB_DEV_TOOLS"])
     except swift_build.SwiftBuildFailed as error:
         errors = [line for line in error.diagnostics if ": error:" in line]
         return None, "swiftc: " + " | ".join((errors or list(error.diagnostics) or [str(error)])[:6])
@@ -234,6 +244,15 @@ MUTANTS = [
          "        guard let first = counts.first else { return 0 }\n",
          "        guard let first = counts.min() else { return 0 }\n"
          "        if first >= 0 { return first }\n")]),
+    # #408: a render landing or failing no longer drops the Status memo.
+    ("memo-not-dropped", ["P11"], [
+        ("AudioPane.swift", "        isolationMemo.invalidate()\n", "")]),
+    ("voice-memo-not-dropped", ["P12"], [
+        ("AudioPane.swift", "        voiceMemo.invalidate()\n", "")]),
+    ("isolation-failure-retimed", ["P11"], [
+        ("RampAudioRenders.swift",
+         "                    throw IsolationRenderer.RenderError.unreadable(why)\n",
+         "                    throw RampAudioRenderer.RenderError.unreadable(why)\n")]),
 ]
 
 

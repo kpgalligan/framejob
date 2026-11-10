@@ -587,7 +587,10 @@ def launch(binary, arguments=(), env=None, socket_path=None, log_path=None, seco
     `log_path` (else beside the socket), and waits up to `seconds` for its
     listening line. `client` is an `MCP` with `timeout`, or None when the
     instance did not come up. A built product older than its inputs is
-    refused first (`proof_app.StaleApp`), and nothing is started."""
+    refused first (`proof_app.StaleApp`), and so is a bare negative number
+    among `arguments` (`proof_app.launch_arguments`, a `ValueError`, #404);
+    nothing is started."""
+    arguments = proof_app.launch_arguments(arguments)
     proof_app.require_fresh(binary)
     socket_path = str(socket_path or scratch_socket())
     log_path = str(log_path or log_beside(socket_path))

@@ -34,6 +34,13 @@
 //  A8  `ReelOp.setActionEnd` with an EQ whose high-pass is off: `off` is
 //      exactly `["audio.eq.high_pass"]` and the patch's `eq` has no
 //      `high_pass`.
+//  A9  a segment whose automation is inert at every point, over a base with
+//      a compressor (#396): `AudioTrackDSP` keeps no span and is not active,
+//      limits nothing and reduces nothing. Two controls beside it: the same
+//      segment with no automation keeps its one span (the base alone runs),
+//      and an inert base under one point carrying a compressor keeps one
+//      automated span. The segments are the plan's own, their `automation`
+//      replaced through the plan's JSON.
 import AVFoundation
 import Accelerate
 import AppKit
@@ -409,5 +416,66 @@ do {
     }
     row("A8", off == ["audio.eq.high_pass"] && lifted && applied,
         "off \(off); the patch's eq without high_pass \(lifted); applied \(applied)")
+}
+
+// MARK: - A9 a segment inert at every point
+
+/// The project's first audio segment as the plan wrote it, with its
+/// `automation` replaced by `points`: the plan's JSON with that one key
+/// rewritten, decoded as the plan is.
+func segment(of p: ReelProject, automation points: [PlanAudioPoint]) -> PlanSegment? {
+    guard let data = p.planJSON.data(using: .utf8),
+        let plan = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let tracks = plan["audio_tracks"] as? [[String: Any]],
+        var one = (tracks.first?["segments"] as? [[String: Any]])?.first,
+        let encoded = try? ReelJSON.encoder().encode(points),
+        let list = try? JSONSerialization.jsonObject(with: encoded)
+    else { return nil }
+    one["automation"] = list
+    guard let out = try? JSONSerialization.data(withJSONObject: one),
+        let decoded = try? ReelJSON.decoder().decode(PlanSegment.self, from: out),
+        decoded.automation == points
+    else { return nil }
+    return decoded
+}
+
+do {
+    let compressed = project(
+        audio: #"{"compressor": {}}"#, curve: "linear", end: #"{"audio": {"pan": 0.5}}"#)
+    let plain = project(audio: "{}", curve: "linear", end: #"{"audio": {"pan": 0.5}}"#)
+    let inert = [
+        PlanAudioPoint(at: 0, audio: AudioProps()), PlanAudioPoint(at: SEC, audio: AudioProps()),
+    ]
+    let squeezed = [PlanAudioPoint(at: 0, audio: AudioProps(compressor: CompressorProps()))]
+    if let compressed, let plain, let bare = segment(of: compressed, automation: []),
+        let skipped = segment(of: compressed, automation: inert),
+        let pointed = segment(of: plain, automation: squeezed)
+    {
+        let overBase = AudioDSPParameters(snapshot: compressed.snapshot)
+        let overNone = AudioDSPParameters(snapshot: plain.snapshot)
+        let control = AudioTrackDSP(segments: [bare], parameters: overBase)
+        let track = AudioTrackDSP(segments: [skipped], parameters: overBase)
+        let keyed = AudioTrackDSP(segments: [pointed], parameters: overNone)
+        let tests: [(String, Bool)] = [
+            ("the base is not inert", !overBase.dsp(for: bare.clip).isInert),
+            ("control: the base alone keeps its span",
+             control.spans.count == 1 && control.isActive
+                && control.spans.first?.automation == nil),
+            ("the points are inert", overBase.automation(for: skipped)?.isInert == true),
+            ("inert at every point: no span", track.spans.isEmpty),
+            ("inert at every point: not active", !track.isActive),
+            ("inert at every point: no limiter, no reducer",
+             !track.usesLimiter && !track.usesNoiseReduction),
+            ("control: a point alone keeps an automated span",
+             overNone.dsp(for: pointed.clip).isInert && keyed.spans.count == 1
+                && keyed.spans.first?.automation != nil && keyed.isActive),
+        ]
+        let (ok, detail) = summary(tests)
+        row("A9", ok,
+            detail + "; spans \(control.spans.count) with no automation, \(track.spans.count) "
+                + "inert at every point, \(keyed.spans.count) from a point alone")
+    } else {
+        row("A9", false, "a project, its plan or a rewritten segment did not build")
+    }
 }
 exit(0)

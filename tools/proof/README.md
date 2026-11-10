@@ -1755,9 +1755,17 @@ it); only its `launch` command imports `mcp`.
 ```
 python3 tools/proof/proof_app.py launch [--app debug|release|PATH] [-- ARG…]   # prints folder, socket, log, pid
 python3 tools/proof/proof_app.py check [--app debug|release|PATH]
-python3 tools/proof/proof_app.py --selftest                                     # F1–F6, R1–R3, T1, E1, E2, D1, D2, C1 (make test)
-python3 tools/proof/proof_app.py --mutant exe-marker|md-counted|exe-mtime-running
+python3 tools/proof/proof_app.py --selftest                                     # F1–F6, R1–R3, T1, E1, E2, D1, D2, A1, A2, C1 (make test)
+python3 tools/proof/proof_app.py --mutant exe-marker|md-counted|exe-mtime-running|bare-number
 ```
+
+**Launch arguments.** `launch_arguments` refuses a bare negative number (`-16`, `-.5`) with a
+`ValueError` naming it and its plist-fragment spelling: the argument domain reads `-Key -16` as
+two flags, so `Key` stays unset and a proof would measure the default (#404). A number is passed
+as `'<real>-16</real>'`. `mcp.launch` calls it before anything starts, so a proof's `mcp.launch`
+and `proof_app.py launch -- ARG…` are guarded; a proof that starts the app with its own `Popen`
+is not. A1 holds the refusal, A2 that fragments, positive numbers and flags pass, and
+`--mutant bare-number` must fail exactly A1.
 
 **The choice.** `RC_PROOF_APP` is `debug` (the default since build
 velocity's phase 3, spec §11 V-4), `release` or a `.app` or executable path. Debug is `make app-debug`'s
@@ -23603,7 +23611,9 @@ is toneA and toneB on tracks 1 and 2. Each document's canvas is 640×360.
   its own timeline's frames − 1024 (240 000 − 1024).
 - **K1 / K2** — C's and T's `audio_wav` PCM, `prores_422` PCM and video md5 identical to
   `work/missing-audio-baseline/` (written by `--baseline` at bb73b35).
-- **P1** — `play_preview {seconds: 2}` on M1's document moves ≥ 900 000 ticks.
+- **P1** — `play_preview {seconds: 2, await_start: true}` on M1's document: `to − playing_from`
+  ≥ 900 000 ticks, timed from the playhead's first move (#368, in "Hygiene a1" below; until then
+  the row scored `to − from`, which includes the player's start-up).
 
 **The length is scored against control C, not the timeline** (owner, 2026-10-24). C's exports
 end exactly at its 10 180 000-tick timeline (814 400 frames): there is no shortfall, as the #337
@@ -25905,8 +25915,13 @@ MCP and measures every export with `phase5_proof.py`'s own BS.1770-4
 recording) and waits for each media's loudness marker after placing it. N10
 launches two more instances of the chosen app, one with `-FrameJobNormalizeMode
 peak` and one with `-FrameJobNormalizeMode loudness`, each with
-`-FrameJobNormalizeTargetLUFS -16` (the argument domain: nothing persists, and
-the mode the shared defaults domain holds is never read), and stops each.
+`-FrameJobNormalizeTargetLUFS '<real>-20</real>'` (the argument domain: nothing
+persists, and the mode the shared defaults domain holds is never read), and
+stops each. The target is a plist fragment because a bare `-20` is read as a
+flag and never reaches the app, and it is −20 because −16 is the default, which
+an argument that did not arrive would also give (#404; `mcp.launch` refuses a
+bare negative number, `proof_app.py --selftest` A1). `LOUDNESS_ONLY=menu_rows`
+runs only the named parts while iterating.
 
 | Row | What it holds |
 |---|---|
@@ -25919,7 +25934,7 @@ the mode the shared defaults domain holds is never read), and stops each.
 | N7 | a reversed clip and a ×2 Keep pitch clip of a steady fixture land at −16 ±0.5 |
 | N8 | `measured_lufs` / `true_peak_dbtp` against the volume-1 export of the same window, ±0.5 LU / ±0.5 dB |
 | N9 | a second call "made no change" |
-| N10 | Clip ▸ Normalize on the Peak instance lands at −1 dBFS peak; on the Loudness instance at −16 ±0.5 LUFS |
+| N10 | Clip ▸ Normalize on the Peak instance lands at −1 dBFS peak; on the Loudness instance, launched with a −20 target, at −20 ±0.5 LUFS (#404) |
 | N11 | (AP2) no `mode` is Loudness at −16; `peak_db` alone is Peak |
 | N12 | (AP2) a clip's own limiter at −3 dBTP is kept, one at 0 is lowered to −1, each with its release, in the row and on the clip |
 | N13 | (AP2) one undo takes back the volume and the limiter together |
@@ -26428,7 +26443,7 @@ reported); `--mutants` 8/9 killed, each by its named row, `read-by-arrival` surv
 equivalent. Once `read-by-arrival` was marked equivalent in the script, `--mutants` printed
 "8/8 mutants killed (1 equivalent, not scored)", exit 0, with `read-by-arrival` failing no row.
 
-## Road map "audio" AP5 — voice isolation (`audio_ap5_proof.py` P1–P9, P2b, I0–I10, I1b; ten mutants; `core/tests/isolation.rs`, `schema_v31.rs`; spec §11 AU-50…AU-57)
+## Road map "audio" AP5 — voice isolation (`audio_ap5_proof.py` P1–P12, P2b, I0–I10, I1b; fourteen mutants; `core/tests/isolation.rs`, `schema_v31.rs`; spec §11 AU-50…AU-57)
 
 A clip's `audio.isolation` crossfades its dry sound with one cached offline `AUSoundIsolation`
 render of its window, before the tap's chain (`IsolationRenderer.swift`, `IsolationCache.swift`,
@@ -26470,7 +26485,7 @@ row:
   measured max |Δ| 0.095), I8 Paste Attributes, I9 the refusal, I10 0 writes no key and plays
   I2's dry. `--instance` runs the I rows alone.
 
-`--mutants` runs ten, each a replacement in a copied `app/Sources` (every anchor asserted once),
+`--mutants` runs fourteen (the last four are #409's and "Hygiene a1"'s, below), each a replacement in a copied `app/Sources` (every anchor asserted once),
 scored killed when its named row fails:
 
 | Mutant | Edit | Must fail |
@@ -26485,10 +26500,14 @@ scored killed when its named row fails:
 | `window-not-keyed` | the window left out of the name | P7 |
 | `split-rounding` | `r(source_in) − r(at)` instead of `r(source_in − at)` | P2b |
 | `failure-silent` | a failed render calls no owner | P9 |
+| `lanes-cut-to-shorter` | lanes that disagree cut to the shorter count (#409) | P10 |
+| `memo-not-dropped` | a settled render no longer drops Voice Isolation's Status memo (#408) | P11 |
+| `voice-memo-not-dropped` | nor Voice Effect's (#408) | P12 |
+| `isolation-failure-retimed` | an unreadable forward source fails in the ramp renderer's words | P11 |
 
 ```sh
-python3 tools/proof/audio_ap5_proof.py --probe     # P1–P9, P2b
-python3 tools/proof/audio_ap5_proof.py --mutants   # 10 mutants
+python3 tools/proof/audio_ap5_proof.py --probe     # P1–P12, P2b
+python3 tools/proof/audio_ap5_proof.py --mutants   # 14 mutants
 python3 tools/proof/audio_ap5_proof.py             # the probe, then I0–I10, I1b on an own instance
 ```
 
@@ -26925,8 +26944,9 @@ AU-108). No format bump, no new op or FFI export: `export` takes `stems`.
   sample); S6 a tone at ×4 whose stem's true peak is over −1 dBTP by `limiter_probe.py`'s two
   meters while the mix's is under −1 + 0.001; S7 the three refusals by name; S8 a stem path that
   is the project's media failing the job with nothing written and the media byte-identical; C1
-  a cancel inside the last of three 600 s stems, seen past 0.5 + 0.5 × 3/4 of the bar with stems
-  1–2 on disk first, leaving no file.
+  a cancel inside the last of three 600 s stems, seen past 0.5 + 0.5 × 3/4 of the bar with the
+  mix and stems 1–2 whole on disk first (since #531 as three hidden `.framejob-export-*.wav`
+  siblings of one size, nothing at a final name; "Hygiene a1" below), leaving no file.
 - **`audio_ap10b_proof.py --probe`** runs B1–B2 alone (the whole run runs them first): the
   probe `audio_ap10b_probe.swift`, compiled AS `main.swift` over `app/Sources` through
   `swift_build.py`. B1 `ExportAudioMaster(limits: false)` at 24 bits over two buffers past the
@@ -26934,9 +26954,9 @@ AU-108). No format bump, no new op or FFI export: `export` takes `stems`.
   the default master changes them; B2 `url(for:mix:)`, `summary`, `collision` (exact, case-only,
   a symlink, none) and `SourceCollision`'s sentence.
 
-The queue row's success line is not read over MCP — `export_status`'s `done` carries no line and
-`snapshot_ui` cannot capture the Export Queue window — so its wording rests on `summary` (B2),
-which both success lines append, and on SE-36.
+The queue row's success line is `export_status`'s `message` on `done` since #395 (in "Hygiene
+a1" below): S1 holds "Exported “Mix.wav” and 2 stems." and S6 "… and 1 stem." against the
+result's `stems`. Until then it was not readable over MCP and rested on `summary` (B2) and SE-36.
 
 | Mutant | Edit | Killed by |
 |---|---|---|
@@ -26966,7 +26986,7 @@ exports over 1,454,400 frames; S6 the stem −0.4587 / −0.4460 dBTP (Kaiser / 
 C1 cancelled at progress 0.8973 with stems 1–2 on disk, nothing left; B1, B2. The mutants 7/7
 killed (the table). `export_master_proof.py` 11/11 on the same instance.
 
-## Road map "audio" AP8b — every other audio parameter animates (`audio_ap8b_proof.py` A1–A8, E1–E6, V1, U1; thirteen mutants; `core/tests/audio_automation.rs`, `action_off.rs`; spec §11 AU-85…AU-89)
+## Road map "audio" AP8b — every other audio parameter animates (`audio_ap8b_proof.py` A1–A9, E1–E6, V1, U1; fifteen mutants; `core/tests/audio_automation.rs`, `action_off.rs`; spec §11 AU-85…AU-89)
 
 The plan carries each audio segment's `automation` (`core/src/audio_automation.rs`, AU-85): the
 clip's evaluated tap keys at the voice's ends, each tap-key action's ends and the 1/30 s grid
@@ -26974,7 +26994,7 @@ inside an eased one. The tap reads a run's settings at its anchor on an absolute
 moves the pan per sample and isolation's Amount per frame (`AudioAutomation.swift`, AU-87); the
 inspector sends the tap keys to an action's end and `off` takes `audio.eq.<slot>` (AU-88).
 
-- **`audio_ap8b_proof.py <dir>/agent.sock`** (the docstring has each row and bound) runs A1–A8,
+- **`audio_ap8b_proof.py <dir>/agent.sock`** (the docstring has each row and bound) runs A1–A9,
   then makes its fixtures into `tools/proof/media/` (five 6 s stereo 24-bit sines: `ap8b_440`,
   `ap8b_1k`, `ap8b_4k`, `ap8b_200`, `ap8b_hot`) and drives the caller's instance: E1–E6 against
   24-bit `audio_wav` exports, each a new project with one clip and one action over [1 s, 3 s),
@@ -26989,8 +27009,15 @@ inspector sends the tap keys to an action's end and `off` takes `audio.eq.<slot>
   byte-identical; A3 the per-sample pan against `AudioPanLaw.gains(pan(t_n))`; A4
   `usesLimiter` / `usesNoiseReduction` from a point, and a track's lead from an end alone; A5 the
   Amount per frame from a base of 0 over a written wet render; A6 `routedInsideAction`; A7
-  `wanting` and `isolates` from an end; A8 `ReelOp.setActionEnd`'s EQ slot lift.
-- **`audio_ap8b_proof.py --mutants`**: M4–M12 each over its own copy of `app/Sources`, killed
+  `wanting` and `isolates` from an end; A8 `ReelOp.setActionEnd`'s EQ slot lift; A9 (#396) a
+  segment whose automation is inert at every point over a base with a compressor keeps no span
+  (`spans` empty, not active, no limiter, no reducer), beside two controls: the same segment
+  with no automation keeps its one span, and an inert base under one point carrying a
+  compressor keeps one automated span. A9's segments are the plan's own with `automation`
+  rewritten through the plan's JSON, because the core gives a segment's first point the clip's
+  state at its start, so no top-level project reaches "inert at every point over a base that
+  is not".
+- **`audio_ap8b_proof.py --mutants`**: M4–M12, M14 and M15 each over its own copy of `app/Sources`, killed
   when its named row fails; M1–M3 and M13 in one copy of `core/` under
   `work/audio_ap8b/core-mutants/` (`graphic/` beside it as a symlink, the target folder
   `work/audio_ap8b-core-target/`, seeded from `core/target` by `cp -c` and kept), each file
@@ -27011,11 +27038,13 @@ inspector sends the tap keys to an action's end and `off` takes `audio.eq.<slot>
 | M11 | the held slope glided in Swift | A1 |
 | M12 | the lift ignoring a null EQ slot | A8 |
 | M13 | `key_off` ignoring the slot | `action_off.rs` `off_keys_one_eq_slot_off_at_the_end` |
+| M14 | a voiced clip's end alone wanting an isolation render (#397) | A7 |
+| M15 | the base standing in for a segment inert at every point (#396) | A9 |
 
 ```sh
-python3 tools/proof/audio_ap8b_proof.py --probe                # A1–A8
-python3 tools/proof/audio_ap8b_proof.py --mutants              # M1–M13
-python3 tools/proof/audio_ap8b_proof.py <dir>/agent.sock       # A1–A8, then E1–E6, V1, U1
+python3 tools/proof/audio_ap8b_proof.py --probe                # A1–A9
+python3 tools/proof/audio_ap8b_proof.py --mutants              # M1–M15
+python3 tools/proof/audio_ap8b_proof.py <dir>/agent.sock       # A1–A9, then E1–E6, V1, U1
 ```
 
 **The recorded run (2026-10-31, after `make gate` PASS 394 s, against Release):** 16/16. A2 63
@@ -27067,8 +27096,9 @@ renders: the processed solve's figures are the proof's.
 with `phase5_proof.py`'s BS.1770 and `limiter_probe.true_peaks` (ceiling + 0.001 dB); the pause
 floor is `eq_proof.report`'s 10th percentile of 50 ms RMS. Its fixtures are the owner's
 recording and `say` speech (V6 low-passed at 3.5 kHz, V7 high-shelved +15 dB above 5 kHz). V8
-launches a second instance with `-FrameJobNormalizeTargetLUFS -16`, V14 one with
-`-RCDevRampRenderHold 3`; each is stopped. `AP6_ONLY=owner,sibilance,selection,speed,normalize,menu,hold`
+launches a second instance with `-FrameJobNormalizeTargetLUFS '<real>-18</real>'` (a plist
+fragment: a bare `-18` is read as a flag and never arrives, and −18 is not the default, #404),
+V14 one with `-RCDevRampRenderHold 3`; each is stopped. `AP6_ONLY=owner,sibilance,selection,speed,normalize,menu,hold`
 runs only those parts while iterating; a recorded run sets nothing.
 
 | Row | What it holds |
@@ -27079,7 +27109,7 @@ runs only those parts while iterating; a recorded run sets nothing.
 | V4 | a second `enhance_voice` and `normalize_clip` after it: "made no change" |
 | V5 | one undo, "Enhance Voice", then the import's audio group |
 | V6, V7 | the de-esser off and on |
-| V8 | Clip ▸ Enhance Voice (`perform_menu_item`, waiting for the sheet to go) holds the tool's set, the volume within 0.05 dB |
+| V8 | on the instance launched with a −18 target: `enhance_voice {target_lufs: −18}` answers −18 and one undo restores the clip; then Clip ▸ Enhance Voice (`perform_menu_item`, waiting for the sheet to go) holds that tool call's set, the volume within 0.05 dB (#404) |
 | V9 | two clips each their own, one undo |
 | V10 | skips and refused arguments, changing nothing |
 | V11 | the parity log clean |
@@ -30831,4 +30861,86 @@ measured for a PostEffects tap, so shipping it would also teach the meter those 
 make app-debug && python3 tools/proof/ai_docs_r2a_proof.py [--only H1,H2,M1] [--trials 3]
 make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_r2a_proof.py
 python3 tools/proof/ai_docs_r2a_proof.py --app <a base .app> --expect-red
+```
+
+## Hygiene a1 — five audio proof gaps (#404, #408, #396, #395, #368; spec §11 #395, #368)
+
+Five rows that did not measure what they said, or measured nothing. Each was seen red first.
+
+- **#404, a bare negative launch argument.** `-FrameJobNormalizeTargetLUFS -16` never reaches the
+  app: the argument domain reads `-16` as a flag. `audio_ap6_proof.py`'s V8 and
+  `loudness_normalize_proof.py`'s N10 passed only because −16 is Normalize's default. Both now
+  pass a plist fragment and a target that is not the default: V8 `'<real>-18</real>'` (on that
+  instance, `enhance_voice {target_lufs: −18}`, one undo, then the menu, compared with that
+  tool call's set), N10 `'<real>-20</real>'` (the export at −20 ±0.5 LUFS).
+  `proof_app.launch_arguments` refuses a bare negative number for every `mcp.launch`
+  (`proof_app.py --selftest` A1, A2; `--mutant bare-number`).
+- **#408, the Status memo's drop.** `audio_ap5_probe.swift` P11 builds the app's own Clip pane
+  over an untitled document, in no window, and reads Voice Isolation's Status: "Off"; "Rendering…"
+  while the render is held (`RampAudioRenders.devHoldKey` at 600 s, so the probe is built under
+  `FRAMEJOB_DEV_TOOLS`); then the hold is taken off, the held render dropped and wanted again, and
+  after the document's `.reversedMediaDidChange` the Status reads "Ready". A second leg, on a
+  text file declared as audio, ends "Not rendered: The isolated voice's source cannot be read: …".
+  P12 is the landing leg for Voice Effect. Nothing but the pane's `invalidate()` moves the words:
+  a settle changes neither the document's handles nor its published resolution. No sleep decides
+  a read. P11 and P12 run first in the probe, before another row's document wants a render.
+  **Found by P11 and fixed:** a forward clip's isolation whose source cannot be read failed in the
+  ramp renderer's words ("The retimed audio's source cannot be read"), because the two share
+  `RampAudioCache.renderSource`; `RampAudioRenders.perform` now rethrows it as the isolation's,
+  as the voice arm already did.
+- **#396, a segment inert at every point.** `audio_ap8b_probe.swift` A9, with mutant M15 (the
+  AP8b section above has both).
+- **#395, the queue's success line.** `export_status`'s `done` answer now carries `message`, the
+  queue row's sentence (spec §11 #395). `audio_ap10b_proof.py` S1 holds "Exported “Mix.wav” and 2
+  stems." and S6 "… and 1 stem." against the result's `stems`; `export_status_proof.py` A2 holds
+  "Exported “a1.mp4”." with no count.
+  **Found beside it and repaired:** `audio_ap10b_proof.py`'s C1 had failed since #531, which
+  writes every file of a job to a hidden `.framejob-export-*` sibling: the row looked for stems
+  1–2 at their own names during the write. It now requires at least three hidden siblings of one
+  size, the largest (the mix and two whole stems), nothing at a final name, then `cancelled` and
+  an empty folder.
+- **#368, P1's margin.** `play_preview {await_start: true}` (spec §11 #368) times the play from
+  the playhead's first move. `missing_audio_proof.py`'s P1 scores `to − playing_from` against
+  the same 900 000 floor and prints `start_seconds`.
+
+| Run | Result |
+|---|---|
+| `missing_audio_proof.py --only P1`, the old row, base Debug app, 1-minute load 133 | **P1 fail**: 847 841 ticks against 900 000 (43 of 43 frames composed) |
+| the new P1, Debug, load 121 | pass: 1 201 129 ticks, the start 0.741 s |
+| new P1, `Playback.setRate` mutated to `player.rate = 0` (Debug) | **fail**: "The preview did not start: its playhead had not moved 30 s after play_preview set the rate." |
+| new P1, `player.rate = rate * 0.5` (Debug) | **fail**: 603 506 ticks, the start 0.915 s |
+| V8 and N10 with the value bare (`-18`, `-20`) and the guard taken out of `mcp.launch` (base Debug app) | **V8 fail**: the menu's volume 15.781 against the tool's 11.935; **N10 fail**: −16.00 LUFS against −20 |
+| the same with the guard in | `ValueError: launch argument '-18' is a bare negative number: … pass '<real>-18</real>'`, nothing started |
+| V8 and N10 with the fragments (Debug) | 4/4 and 4/4: V8 volume 11.935 both ways; N10 −20.00 LUFS |
+| `proof_app.py --selftest` / `--mutant bare-number` | 17/17 / fails exactly A1 |
+| S1, S6 (`--only S1,S6`) and `export_status_proof.py` with the new checks, base Debug app | **S1, S6 fail** ("the queue row says None"); **A2 fail** ("message None"), 8/9 |
+| the same after the change (Debug) | 2/2; 9/9 |
+| S1, S6 with `ExportStemsPipeline.summary` dropped from the queue's line (Debug, by hand) | **both fail**: "Exported “Mix.wav”. Peak …" |
+| `audio_ap10b_proof.py` whole on Release before C1's repair | 11/12, **C1 fail**: "stems 1–2 on disk [False, False]" |
+| C1 repaired, with AP10b's M6 by hand (`fail` discards nothing; Debug) | **C1 fail**: two `.framejob-export-*.wav` left |
+| `audio_ap5_proof.py --probe` before the sentence fix | P11's fail leg read "Not rendered: The retimed audio's source cannot be read: …" |
+| `audio_ap5_proof.py --probe` | 13/13 |
+| `audio_ap5_proof.py --mutants` | 14/14 killed: `memo-not-dropped` and `isolation-failure-retimed` by P11, `voice-memo-not-dropped` by P12, the eleven older ones by their rows (`failure-silent` also fails P11, whose failing render then never settles) |
+| `audio_ap8b_proof.py --probe` | 9/9 |
+| `audio_ap8b_proof.py --mutants` | 15/15 killed: M15 by A9, M4–M12 and M14 by their rows, M1–M3 and M13 by their core tests |
+| `make gate` | PASS (876 s for the first whole run, under three lanes' load: names 5 s, typecheck 21 s, test 480 s, app 369 s) |
+| Release: `audio_ap6_proof.py` | 38/38 (V8: volume 11.935 by the tool and by the menu) |
+| Release: `loudness_normalize_proof.py` | 37/37 (N10: −1.01 dBFS; −20.00 LUFS) |
+| Release: `audio_ap10b_proof.py` | 12/12 (C1: siblings of 115 197 696, 115 197 696, 115 197 696 and 11 567 104 bytes) |
+| Release: `export_status_proof.py` | 9/9 |
+| Release: `missing_audio_proof.py` | 12/14, P1 pass at 1 200 784 ticks with the start 0.507 s (1-minute load about 190); K1 and K2 fail for want of `work/missing-audio-baseline/`, which only a tree that ran `--baseline` at bb73b35 holds |
+
+Four of AP5's older mutants (`scaled-isolated`, `export-no-wait`, `window-not-keyed`,
+`split-rounding`) were copied while `ExportStems.swift` carried M6's hand edit; those four were
+run again on the clean tree, 4/4 killed by the same rows.
+
+```sh
+python3 tools/proof/proof_app.py --selftest && python3 tools/proof/proof_app.py --mutant bare-number
+python3 tools/proof/audio_ap5_proof.py --probe && python3 tools/proof/audio_ap5_proof.py --mutants
+python3 tools/proof/audio_ap8b_proof.py --probe && python3 tools/proof/audio_ap8b_proof.py --mutants
+AP6_ONLY=menu python3 tools/proof/audio_ap6_proof.py <dir>/agent.sock
+LOUDNESS_ONLY=menu_rows python3 tools/proof/loudness_normalize_proof.py <dir>/agent.sock
+python3 tools/proof/audio_ap10b_proof.py <dir>/agent.sock --only S1,S6,C1
+python3 tools/proof/export_status_proof.py
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/missing_audio_proof.py --only P1
 ```

@@ -20,7 +20,9 @@ Audio is decoded to PCM integers at the file's own depth. Rows:
   "Music" the music at 5 s (overlapping 1 s): two stems at AU-108's names
   (`Mix - Tone.wav`, `Mix - Music.wav`) and nothing else beside the mix; Σ stems
   − mix ≤ 2 LSB on every sample; the result's `stems` names, tracks and paths
-  are those files.
+  are those files; and the result's `message`, the Export Queue row's success
+  sentence (spec §11 #395), starts "Exported “Mix.wav” and 2 stems.", the 2
+  counted from the result's `stems`.
 - **S2** `names`: tracks "Music", "music" and "" → two stems ("Music" holding
   the first two, "Track 3"), Σ = mix as S1.
 - **S3** S1's project with `loudness_lufs -16`: every stem's samples identical
@@ -31,7 +33,8 @@ Audio is decoded to PCM integers at the file's own depth. Rows:
   samples identical to the 24-bit export of the project with only that track
   soloed (skipped by name when the sample is absent).
 - **S6** the tone at clip volume ×4: its stem's true peak above −1 dBTP by
-  `limiter_probe.py`'s two meters; the mix's ≤ −1 + 0.001 by both.
+  `limiter_probe.py`'s two meters; the mix's ≤ −1 + 0.001 by both; its
+  `message` starts "Exported “Mix.wav” and 1 stem." (the singular).
 - **S7** refusals by name: `stems` on `h264`, `stems: "both"`, every track muted.
 - **S8** source collision: track "Dialogue" holds media at `<out>/Mix -
   Dialogue.wav` (a copy of the music); exporting `<out>/Mix.wav` with `stems:
@@ -40,9 +43,14 @@ Audio is decoded to PCM integers at the file's own depth. Rows:
 - **C1** the long tone on three tracks, three stems: `cancel_export` only once
   `export_status`'s progress is past the start of the LAST stem (the write's
   share is the second half of the bar, so past 0.5 + 0.5 × 3/4), having first
-  seen stems 1 and 2 on disk; then `cancelled`, and no mix or stem file
-  remains. Fails, never skips, when the job finishes first or the first poll in
-  that window finds stems 1–2 absent.
+  seen the mix and stems 1 and 2 whole on disk; then `cancelled`, and no mix
+  or stem file remains. Since spec §11 #531 every file of the job is written
+  to a hidden `.framejob-export-<UUID>.wav` sibling and renamed only when
+  every write has succeeded, so "whole on disk" is at least three such
+  siblings of one size, the largest (the mix and two stems hold the same
+  frames at the same depth), and no file at the mix's or a stem's own name.
+  Fails, never skips, when the job finishes first or the first poll in that
+  window finds fewer.
 - **B1–B3** (the probe `audio_ap10b_probe.swift`, compiled AS `main.swift`
   over `app/Sources` on `swift_build.py`'s line; a probe that will not build is
   a scored failure): `ExportAudioMaster(limits: false)` writes `round(input)`
@@ -52,9 +60,10 @@ Audio is decoded to PCM integers at the file's own depth. Rows:
   throw `.noPlan`, so the job fails rather than writing only the mix while
   its answer lists the stems; stems with a plan answer it; no stems, nil.
 
-The queue row's success line is not read here: `export_status`'s `done` answer
-carries no line and `snapshot_ui` cannot capture the Export Queue window. Its
-wording is `summary`'s (B2), appended at both success lines.
+The queue row's success line is `export_status`'s `message` on `done` (spec
+§11 #395), the row's own string: S1 and S6 hold it against the result's
+`stems`. Its count's wording is `summary`'s (B2), which the queue's line
+appends; `said` below is this script's own copy of that wording.
 
 Rows print `<ID> ok|FAIL|skip — <detail>`, then `n/m`; exit 0 iff every row
 asked passed (a skip is not a failure).
@@ -239,6 +248,32 @@ def stems_of(result):
     return [(s["name"], s["tracks"], s["path"]) for s in result.get("stems", [])]
 
 
+def said(result):
+    """The start the Export Queue row's success sentence must have for this
+    result: the mix's file name and its stems counted (AU-108 (f))."""
+    count = len(result.get("stems", []))
+    stems = "" if count == 0 else " and 1 stem" if count == 1 else f" and {count} stems"
+    return f"Exported “{Path(result['path']).name}”{stems}."
+
+
+def says(result):
+    message = result.get("message")
+    return isinstance(message, str) and message.startswith(said(result))
+
+
+def asides(folder):
+    """The sizes of the job's hidden siblings in `folder` (spec §11 #531),
+    largest first."""
+    sizes = []
+    for path in Path(folder).iterdir():
+        if path.name.startswith(".framejob-export-") and path.suffix == ".wav":
+            try:
+                sizes.append(path.stat().st_size)
+            except OSError:
+                pass
+    return sorted(sizes, reverse=True)
+
+
 def files_in(folder):
     return sorted(p.name for p in Path(folder).iterdir())
 
@@ -271,9 +306,11 @@ def s1_s3(mcp, tone, music, only):
         files = files_in(folder)
         if "S1" in only:
             row("S1", got == want and files == ["Mix - Music.wav", "Mix - Tone.wav", "Mix.wav"]
-                and same and worst is not None and worst <= 2,
+                and same and worst is not None and worst <= 2 and len(got) == 2
+                and says(result),
                 f"result stems {got} (want {want}); files {files}; Σ stems − mix worst "
-                f"{worst} LSB at 24 bits (want ≤ 2), lengths equal {same}")
+                f"{worst} LSB at 24 bits (want ≤ 2), lengths equal {same}; the queue row "
+                f"says {result.get('message')!r} (want it to start {said(result)!r})")
         if "S3" not in only:
             return
         loud_folder = project.folder("loud")
@@ -366,9 +403,11 @@ def s6(mcp, tone):
         stems = stems_of(result)
         stem_peaks = true_peaks(stems[0][2]) if stems else (None, None)
         mix_peaks = true_peaks(result["path"])
-        row("S6", len(stems) == 1 and min(stem_peaks) > -1 and max(mix_peaks) <= -1 + 0.001,
+        row("S6", len(stems) == 1 and min(stem_peaks) > -1 and max(mix_peaks) <= -1 + 0.001
+            and says(result),
             f"stem true peak (Kaiser, Annex 2) {stem_peaks} dBTP (want > −1); mix "
-            f"{mix_peaks} dBTP (want ≤ −0.999)")
+            f"{mix_peaks} dBTP (want ≤ −0.999); the queue row says "
+            f"{result.get('message')!r} (want it to start {said(result)!r})")
     finally:
         project.close()
 
@@ -440,7 +479,8 @@ def c1(mcp, long):
         job = answer["export_id"]
         stems = [folder / f"Mix - {n}.wav" for n in ("One", "Two", "Three")]
         threshold = 0.5 + 0.5 * 3 / 4
-        seen, status, progress = None, None, 0.0
+        named = stems + [folder / "Mix.wav"]
+        seen, early, status, progress = None, None, None, 0.0
         deadline = time.monotonic() + 900
         while time.monotonic() < deadline:
             state = mcp.call("export_status", export_id=job)
@@ -449,7 +489,8 @@ def c1(mcp, long):
                 break
             progress = state.get("progress", 0.0) or 0.0
             if status == "running" and progress > threshold:
-                seen = [s.exists() for s in stems[:2]]
+                seen = asides(folder)
+                early = [p.name for p in named if p.exists()]
                 break
             time.sleep(0.02)
         if seen is None:
@@ -464,9 +505,11 @@ def c1(mcp, long):
                 break
             time.sleep(0.05)
         left = files_in(folder)
-        row("C1", seen == [True, True] and status == "cancelled" and left == [],
-            f"at progress {progress:.4f} (> {threshold}) stems 1–2 on disk {seen}; then "
-            f"{status}; files left {left} (want none)")
+        whole = [size for size in seen if size == seen[0] and size > 0]
+        row("C1", len(whole) >= 3 and early == [] and status == "cancelled" and left == [],
+            f"at progress {progress:.4f} (> {threshold}) hidden siblings of {seen} bytes, "
+            f"{len(whole)} whole (want ≥ 3: the mix and stems 1–2), at their own names "
+            f"{early} (want none); then {status}; files left {left} (want none)")
     finally:
         project.close()
 

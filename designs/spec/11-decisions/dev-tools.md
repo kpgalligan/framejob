@@ -64,3 +64,22 @@ V-4 and V-5 come from the build-velocity road map, now closed: `designs/adr/buil
   **Accepted:** in a forced capture, a bitmap a view makes at its window's `backingScaleFactor`
   (`ColorWheelControl`'s disc, `CurvePlotDecor.drawHueStrip`) is drawn at the window's scale and
   scaled up; HS-5 is where a person compares the two.
+- **#368 — `play_preview {await_start: true}` times the play from the playhead's first move.**
+  `play_preview` notes `from`, sets the rate and sleeps `seconds` from that instant, so `to − from`
+  is the play less the player's start-up: about 0.5 s on a timeline with sound (#537), and more
+  under host load (0.74 s and 0.92 s measured under three lanes' builds, 2026-11-09).
+  `missing_audio_proof.py`'s P1 scored `to − from ≥ 900 000` for a 2 s play and so scored that
+  start-up, with 0.5 % of margin on an idle host. With `await_start: true` the tool polls the
+  playhead after `setRate`, every 10 ms and a main hop each, until it is past `from`; it answers
+  that position as `playing_from` and the seconds it took as `start_seconds` (both after
+  `wall_seconds`, and only when asked), and sleeps `seconds` from the instant of that read, so
+  `to − playing_from` is at least `seconds` of play at the transport's rate whatever the load: a
+  late final read only adds ticks. Refused with `seek_to`, before anything moves ("await_start
+  cannot be used with seek_to: a seek's two halves are timed from the seek."). A playhead that has
+  not moved 30 s after the rate was set (`AgentServer.awaitStartLimit`) pauses the preview, ends
+  the trial and is refused: "The preview did not start: its playhead had not moved 30 s after
+  play_preview set the rate." Without the argument nothing changes, so every other proof's
+  numbers stand. P1 passes `await_start` and scores `to − playing_from ≥ 900 000`, the floor
+  unchanged; a preview that never starts is the refusal, and one that plays at half speed after
+  starting moves about 600 000 ticks and fails the floor (both seen, by hand mutants in
+  `Playback.setRate`).

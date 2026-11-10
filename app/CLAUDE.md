@@ -4599,9 +4599,14 @@ free.
   `GraphicPrefetch.reach` as requests reached after the seek, in the seek's
   own step or, with `stale_armed`, once a frame in the seek's first
   `armFrames` frames was composed (waited for at most `min(2 s, seconds /
-  2)`); `stale_reached` answers the ticks reported. Its four refusals are
-  read before the first hop to main. `tools/proof/playback_prefetch_proof.py`
-  drives it.
+  2)`); `stale_reached` answers the ticks reported. `await_start` (#368, spec
+  §11 #368) times the play from the playhead's first move, polled every 10 ms
+  after `setRate`, and answers `start_seconds` and `playing_from`; a playhead
+  that has not moved after `awaitStartLimit` (30 s) is refused, the preview
+  paused and the trial ended. Its five argument refusals (`await_start` with
+  `seek_to` the fifth) are read before the first hop to main.
+  `tools/proof/playback_prefetch_proof.py` drives it, and
+  `missing_audio_proof.py`'s P1 its `await_start`.
 - `AgentServer+GraphicMemory.swift` — `graphic_memory {pressure?}` (dev
   only, wholly under the flag, off main; spec §11 G-37): the graphic
   rasters' budget, held and kept bytes and their peaks, a pass's
