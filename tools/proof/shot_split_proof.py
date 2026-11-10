@@ -82,7 +82,7 @@ MUTANTS = {
         "app/Sources/ShotSplit.swift",
         "                if t - clip.start <= frame || clip.end - t <= frame { continue }\n", "")]),
     "mirror-skipped": (["S2"], [(
-        "app/Sources/AgentServer+Analysis.swift",
+        "app/Sources/AnalysisClipTimes.swift",
         "let played = pivot.map { ReverseMirror.mirrored(source, about: $0) } ?? source",
         "let played = source")]),
     "ceiling-after-first-split": (["S4"], [(
