@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "toolu_01BvYSB3UoMvXdNBgx75LrUc",
+  "agent_id": "ab22061cb2b6a9b40",
+  "subagent_type": "general-purpose",
+  "task_description": "Fix #547 mutant anchor path",
+  "token_usage": {
+    "input_tokens": 12,
+    "cache_creation_tokens": 66572,
+    "cache_read_tokens": 317618,
+    "output_tokens": 1835,
+    "api_call_count": 6
+  },
+  "started_at": "2026-11-09T16:26:05.201962-05:00",
+  "completed_at": "2026-11-09T16:27:07.124757-05:00"
+}
