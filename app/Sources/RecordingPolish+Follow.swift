@@ -73,8 +73,9 @@ extension RecordingPolish {
             return end(id, document)
         }
         let clips = screenClips(follow.paths, in: document, scope: follow.scope)
-        // CU-101 (a): the clock restarts when Enhance Voice's follow ends.
-        let enhancing = RecordingEnhance.isPending(document)
+        // CU-101 (a): the clock restarts when Enhance Voice's follow and its measurement have
+        // ended (#546: the sheet's hand-back comes a turn after the sheet has gone).
+        let enhancing = RecordingEnhance.isUnderWay(document)
         if follow.enhancing && !enhancing { follow.started = Date() }
         follow.enhancing = enhancing
         let media = mediaIDs(clips, in: document, scope: follow.scope)

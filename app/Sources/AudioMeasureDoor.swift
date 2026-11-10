@@ -26,7 +26,11 @@ import AppKit
 /// `enhanceLanded`, Enhance Voice over a recording's voice clips once their
 /// caches exist. It shares `measure`, with a refusal at the inspector's foot
 /// wherever a press beeps, and commits as its own group, since a timer's
-/// firing is not an AppKit event either.
+/// firing is not an AppKit event either. It alone passes `done`, which
+/// `enhanceLanded` and `measure` call exactly once at every exit — a refusal
+/// before the run, the answer or refusal landed with or without the sheet,
+/// the sheet's Cancel, a run with no outcome, the document gone — so
+/// `RecordingEnhance` knows when its measurement is over (#546).
 enum AudioMeasureDoor {
     enum Command {
         case normalize, enhanceVoice, matchAudio
@@ -164,21 +168,27 @@ enum AudioMeasureDoor {
 
     /// Enhance Voice over a landed recording's voice clips (AU-68 (e)), at
     /// Normalize's target: the press's setup and `measure` with refusals in
-    /// place of beeps, nothing called back. Main.
-    static func enhanceLanded(document: ProjectDocument, clips: [UInt32], window: NSWindow) {
+    /// place of beeps. `done` is called exactly once, after whatever this
+    /// call ends in has landed (the type doc, #546). Main.
+    static func enhanceLanded(
+        document: ProjectDocument, clips: [UInt32], window: NSWindow, done: @escaping () -> Void
+    ) {
         let refuse = { (reason: String) in RecordingEnhance.refuse(reason, in: document) }
         guard
             let setup = enhanceSetup(
                 document: document, clips: clips, targetLUFS: NormalizeChoice.targetLUFS)
         else {
-            return refuse(
-                "The project's audio plan could not be read, so there is no voice to measure.")
+            refuse("The project's audio plan could not be read, so there is no voice to measure.")
+            return done()
         }
-        guard !setup.input.isEmpty else { return refuse(nothingReason(setup.input.problems)) }
+        guard !setup.input.isEmpty else {
+            refuse(nothingReason(setup.input.problems))
+            return done()
+        }
         let run = setup.makeRun(document: document)
         measure(
             .enhanceVoice, run: run, document: document, window: window, refuse: refuse,
-            empty: { nothingReason(setup.plan($0).skipped) }
+            empty: { nothingReason(setup.plan($0).skipped) }, done: done
         ) { .ops(setup.plan($0).ops) }
     }
 
@@ -251,11 +261,13 @@ enum AudioMeasureDoor {
     /// Runs `run` at once when nothing renders, else under the sheet, and
     /// lands `answer` of its outcome through `land`. With `refuse` (a
     /// landing's follow) each beep is that refusal instead — `empty` says
-    /// why nothing was planned — and the commit is grouped.
+    /// why nothing was planned — and the commit is grouped. `done` is called
+    /// exactly once, after the last thing this call does: at each return
+    /// below, and from whichever of the sheet's two hand-backs runs (#546).
     private static func measure<Run: AudioMeasureRunning>(
         _ command: Command, run: Run, document: ProjectDocument,
         window: NSWindow?, refuse: ((String) -> Void)? = nil,
-        empty: ((Run.Outcome) -> String)? = nil,
+        empty: ((Run.Outcome) -> String)? = nil, done: (() -> Void)? = nil,
         answer: @escaping (Run.Outcome) -> Answer
     ) {
         let stopped = "\(command.tool) was stopped while its sound was being measured."
@@ -268,18 +280,25 @@ enum AudioMeasureDoor {
                     refuse: refuse, empty: empty?(outcome) ?? stopped)
             }
             run.finish()
+            done?()
             return
         }
         guard let window, window.attachedSheet == nil, let host = window.contentViewController
         else {
             run.finish()
-            return fail(refuse, "A sheet was already up on the project's window, so nothing changed.")
+            fail(refuse, "A sheet was already up on the project's window, so nothing changed.")
+            done?()
+            return
         }
         let asked = document.project
         let scope = document.scope
         host.presentAsSheet(
-            AudioMeasureSheetController(run: run, title: sheetTitle) { [weak document] outcome in
-                defer { run.finish() }
+            AudioMeasureSheetController(run: run, title: sheetTitle, stopped: { done?() }) {
+                [weak document] outcome in
+                defer {
+                    run.finish()
+                    done?()
+                }
                 guard let document else { return }
                 let stale = document.project !== asked || document.scope != scope
                 land(

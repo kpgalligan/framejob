@@ -95,7 +95,7 @@ extension AgentServer {
                         in: document)
                 return RecordingPolish.decide(
                     command: command, clips: clips,
-                    enhancing: RecordingEnhance.isPending(document), ready: ready, busy: busy,
+                    enhancing: RecordingEnhance.isUnderWay(document), ready: ready, busy: busy,
                     elapsed: Date().timeIntervalSince(started))
             }
             switch step {

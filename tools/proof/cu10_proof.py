@@ -32,15 +32,22 @@ Rows:
   60 s, nested) before the landing; the door panel with `enhance: true` and `auto_zoom: true`,
   the voice spoken (`say -v Samantha`, padded to 20 s; without the voice the row fails naming
   it), no `follow_wait`; at once `set_scope` into the nest, 3 s, `set_scope` out. Within 300 s
-  the screen clip holds Auto Zoom's actions, and the undo names read "Auto Zoom" then "Add
-  Recording", with only "Enhance Voice" allowed between them: the polish waited out the nest
-  rather than dropping (Enhance is there for its wait, which holds the polish past the nest;
-  its own step is not required — on a Debug build the panel door's Enhance Voice makes no step
-  on this fixture even with no nest open, filed as its own issue by fixes batch c1; on Release
-  it does, and the undo reads all three).
+  the screen clip holds Auto Zoom's actions, and the undo names read "Auto Zoom", "Enhance
+  Voice", "Add Recording", exactly, on every build: both follow-ups waited out the nest rather
+  than dropping, and the polish waited for Enhance's measurement to land its step (#546).
+- P6, P7 (#546) their own instance (P1b's pins and `-RCDevMeasureHandBackHold 2`, which holds
+  the Measuring Sound sheet's hand-back 2 s after the sheet has gone, so the gap the polish used
+  to run in is four of its checks wide whatever the host's timing), the spoken voice, no nest,
+  the door panel with `follow_wait`. P6 `enhance: true` alone: `enhance_pending` false and undo
+  reads "Enhance Voice", "Add Recording" as soon as the call answers — `follow_wait` waited for
+  the measurement, not only the follow's timer. P7 `enhance: true, auto_zoom: true`:
+  `enhance_pending` and `polish_pending` false and undo reads "Auto Zoom", "Enhance Voice", "Add
+  Recording" — the polish did not commit inside the hold.
 
-`--mutant NAME` edits a `tree_copy.py` copy, builds its app and runs P1 on it: `wrong-order`
-(the commands reversed) and `one-step` (the tool door's three runs inside one undo group).
+`--mutant NAME` edits a `tree_copy.py` copy, builds its app and runs the mutant's rows on it:
+`wrong-order` (the commands reversed) and `one-step` (the tool door's three runs inside one undo
+group), both P1; #546's `polish-ignores-measuring` (the polish's follow reads only Enhance's
+timer, P7) and `wait-ignores-measuring` (`follow_wait` reads only Enhance's timer, P6).
 CAUGHT exits 1, SURVIVED exits 0, a control that could not be performed exits 2.
 """
 
@@ -70,8 +77,10 @@ W, H = 640, 360
 PLAIN = ["P1", "P2", "P3", "P4"]
 PANEL = ["P1b"]
 NESTED = ["P5"]
-ROWS = ["Z0"] + PLAIN + PANEL + NESTED
-NESTED_STEPS = [["Auto Zoom", "Add Recording"], ["Auto Zoom", "Enhance Voice", "Add Recording"]]
+HELD = ["P6", "P7"]
+ROWS = ["Z0"] + PLAIN + PANEL + NESTED + HELD
+ENHANCED_STEPS = ["Enhance Voice", "Add Recording"]
+NESTED_STEPS = ["Auto Zoom"] + ENHANCED_STEPS
 SPOKEN = ("This is the voice of a screen recording. Each sentence is spoken clearly, so the "
           "speech is found and the voice can be enhanced once the recording has landed.")
 PANEL_ARGS = [
@@ -80,6 +89,7 @@ PANEL_ARGS = [
     "-FrameJobAutoZoomMotionBlur", "YES", "-FrameJobSpeedUpTypingRate", "4",
     "-FrameJobSpeedUpTypingShortest", "3", "-FrameJobSpeedUpTypingKeepPitch", "YES",
 ]
+HELD_ARGS = PANEL_ARGS + ["-RCDevMeasureHandBackHold", "2"]
 STEPS = ["Speed Up Typing", "Add Shortcut Overlays", "Auto Zoom", "Add Recording"]
 POLISH = ["auto_zoom", "shortcut_overlays", "speed_up_typing"]
 SENTENCES = {
@@ -93,6 +103,8 @@ SENTENCES = {
 
 POLISH_FILE = "app/Sources/RecordingPolish.swift"
 TOOL_FILE = "app/Sources/AgentServer+RecordingPolish.swift"
+FOLLOW_FILE = "app/Sources/RecordingPolish+Follow.swift"
+LAND_FILE = "app/Sources/AgentServer+LandRecording.swift"
 # name → (rows, [(path, anchor, replacement)])
 MUTANTS = {
     "wrong-order": (["P1"], [(
@@ -112,6 +124,15 @@ MUTANTS = {
         "            }\n"
         "        }\n"
         "        while let command = remaining.first {\n")]),
+    "polish-ignores-measuring": (["P7"], [(
+        FOLLOW_FILE, "        let enhancing = RecordingEnhance.isUnderWay(document)\n",
+        "        let enhancing = RecordingEnhance.isPending(document)\n")]),
+    "wait-ignores-measuring": (["P6"], [(
+        LAND_FILE,
+        "                    RecordingEnhance.isUnderWay(document) || "
+        "RecordingPolish.isPending(document)\n",
+        "                    RecordingEnhance.isPending(document) || "
+        "RecordingPolish.isPending(document)\n")]),
 }
 
 results = {}
@@ -339,16 +360,23 @@ def p1b(client, files):
           f"P1's {same}")
 
 
-def p5(client, files):
-    """#458: a nest opened while both panel follow-ups wait is busy, not a drop."""
+def spoken_recording(files):
+    """`recording` with the spoken voice as its microphone; None when `say` cannot make it."""
     spoken = spoken_voice()
     if spoken is None:
-        check("P5", False, "say -v Samantha could not make the spoken voice")
-        return
+        return None
     rec = recording(files)
     voice = WORK / "rec" / "A (Spoken).m4a"
     shutil.copyfile(spoken, voice)
-    rec = {**rec, "voice": [str(voice)]}
+    return {**rec, "voice": [str(voice)]}
+
+
+def p5(client, files):
+    """#458: a nest opened while both panel follow-ups wait is busy, not a drop."""
+    rec = spoken_recording(files)
+    if rec is None:
+        check("P5", False, "say -v Samantha could not make the spoken voice")
+        return
     doc = Doc(client, "p5")
     try:
         track = doc.state()["tracks"][0]["id"]
@@ -375,9 +403,34 @@ def p5(client, files):
     finally:
         doc.close()
     upto = names[:names.index("Add Recording") + 1] if "Add Recording" in names else names
-    check("P5", answer.get("landed") == "document" and zoomed and upto in NESTED_STEPS,
+    check("P5", answer.get("landed") == "document" and zoomed and upto == NESTED_STEPS,
           f"landed {answer.get('landed')!r}; Auto Zoom's actions seen {zoomed} after "
-          f"{took:.0f} s; undo {names} (want one of {NESTED_STEPS} to Add Recording)")
+          f"{took:.0f} s; undo {names} (want {NESTED_STEPS})")
+
+
+def p6_p7(client, files):
+    """#546: Enhance's measurement holds `follow_wait` (P6) and the polish (P7) until it has
+    landed, on an instance whose hand-back is held past the sheet."""
+    rows = [("P6", {}, ENHANCED_STEPS), ("P7", {"auto_zoom": True}, NESTED_STEPS)]
+    rec = spoken_recording(files)
+    for row, asked, want in rows:
+        if row not in selected:
+            continue
+        if rec is None:
+            check(row, False, "say -v Samantha could not make the spoken voice")
+            continue
+        doc = Doc(client, row.lower())
+        try:
+            answer = doc.call("land_recording", door="panel", enhance=True, follow_wait=330,
+                              **asked, **rec)
+            names = doc.undo_names(len(want))
+        finally:
+            doc.close()
+        pending = {k: answer.get(k) for k in ("enhance_pending", "polish_pending")}
+        check(row, answer.get("landed") == "document" and names == want
+              and all(v is False for v in pending.values()),
+              f"landed {answer.get('landed')!r}; {pending}; undo straight after the answer "
+              f"{names} (want {want})")
 
 
 def p3_p4(client, files):
@@ -425,6 +478,23 @@ def plain_rows(client, files):
         attempt(lambda: p3_p4(client, files), *({"P3", "P4"} & selected))
 
 
+def own_instances(binary, files):
+    """The rows that launch their own instance, each scored failed when it does not listen;
+    answers the tags that did not."""
+    deaf = []
+    launches = [
+        (PANEL, PANEL_ARGS, "panel", lambda c: attempt(lambda: p1b(c, files), "P1b")),
+        (NESTED, PANEL_ARGS, "nested", lambda c: attempt(lambda: p5(c, files), "P5")),
+        (HELD, HELD_ARGS, "held", lambda c: attempt(lambda: p6_p7(c, files), *HELD)),
+    ]
+    for rows, arguments, tag, body in launches:
+        if selected & set(rows) and not with_instance(binary, arguments, tag, body):
+            deaf.append(tag)
+            for row in selected & set(rows):
+                check(row, False, f"the app did not listen ({tag})")
+    return deaf
+
+
 def with_instance(binary, arguments, tag, body):
     log = WORK / f"instance-{tag}.log"
     env = bounded.child_env({"CFFIXED_USER_HOME": str(HOME)})
@@ -468,11 +538,15 @@ def run_mutant(name):
         print(f"mutant {name}: the control could not be performed — {why}")
         return 2
     files = media()
-    if not with_instance(proof_app.executable(app), [], "mutant",
-                         lambda c: attempt(lambda: p1_p2(c, files), "P1")):
+    binary = proof_app.executable(app)
+    if set(named) & set(PLAIN):
+        if not with_instance(binary, [], "mutant", lambda c: plain_rows(c, files)):
+            print(f"mutant {name}: the control could not be performed — the app did not listen")
+            return 2
+    if own_instances(binary, files):
         print(f"mutant {name}: the control could not be performed — the app did not listen")
         return 2
-    if not set(named) & set(results):
+    if not set(named) <= set(results):
         print(f"mutant {name}: the control could not be performed — its rows were never scored")
         return 2
     caught = [r for r in named if r in results and not all(ok for ok, _ in results[r])]
@@ -519,14 +593,7 @@ def main():
         elif not with_instance(binary, [], "plain", lambda c: plain_rows(c, files)):
             for row in selected & set(PLAIN):
                 check(row, False, "the app did not listen (plain)")
-    if "P1b" in selected:
-        if not with_instance(binary, PANEL_ARGS, "panel",
-                             lambda c: attempt(lambda: p1b(c, files), "P1b")):
-            check("P1b", False, "the app did not listen (panel)")
-    if "P5" in selected:
-        if not with_instance(binary, PANEL_ARGS, "nested",
-                             lambda c: attempt(lambda: p5(c, files), "P5")):
-            check("P5", False, "the app did not listen (nested)")
+    own_instances(binary, files)
 
     failed = [name for name, runs in results.items() if not all(ok for ok, _ in runs)]
     passed = [name for name in results if name not in failed]

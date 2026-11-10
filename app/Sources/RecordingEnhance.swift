@@ -22,6 +22,15 @@ import AppKit
 /// the step acts (`tick`): Cancel on the Measuring Sound sheet, no outcome or
 /// a stale answer can never leave a timer that puts the sheet back up, and
 /// `isPending` never depends on the sheet.
+///
+/// **The measurement is held apart from the follow** (#546). `.enhance` ends
+/// the follow and then measures, for seconds, under the Measuring Sound
+/// sheet, which hands its answer back a main-queue turn after it has gone.
+/// From that step until the answer, the refusal or the Cancel has landed the
+/// document `isMeasuring` (`Measurement`), and `isUnderWay` is the follow or
+/// the measurement: what the polish's follow waits on (CU-101 (a)), so it
+/// cannot commit in the gap and make Enhance's answer stale, and what
+/// `land_recording` waits on and answers as `enhance_pending`.
 enum RecordingEnhance {
     /// One check every half second, the landing's own retry interval.
     static let checkInterval: TimeInterval = RecorderPanelController.landingRetryInterval
@@ -185,6 +194,58 @@ enum RecordingEnhance {
         follows[document.recipeKey] != nil
     }
 
+    // MARK: - The measurement
+
+    /// The measurements under way, counted by the document's `recipeKey`.
+    private static var measuring: [Int: Int] = [:]
+
+    /// One `.enhance` step's measurement: counted from its making until
+    /// `end()`, once. Releasing it unended also uncounts it, so a hand-back
+    /// that is dropped without being called cannot hold the polish. Made and
+    /// ended on main.
+    final class Measurement {
+        private let key: Int
+        private var ended = false
+
+        init(_ document: ProjectDocument) {
+            key = document.recipeKey
+            RecordingEnhance.measuring[key, default: 0] += 1
+        }
+
+        func end() {
+            guard !ended else { return }
+            ended = true
+            RecordingEnhance.uncount(key)
+        }
+
+        deinit {
+            guard !ended else { return }
+            let key = self.key
+            if Thread.isMainThread {
+                RecordingEnhance.uncount(key)
+            } else {
+                DispatchQueue.main.async { RecordingEnhance.uncount(key) }
+            }
+        }
+    }
+
+    private static func uncount(_ key: Int) {
+        let left = (measuring[key] ?? 0) - 1
+        measuring[key] = left > 0 ? left : nil
+    }
+
+    /// True from a follow's `.enhance` step until what it measured has
+    /// landed: the step, a refusal, or the sheet's Cancel. Main.
+    static func isMeasuring(_ document: ProjectDocument) -> Bool {
+        measuring[document.recipeKey] != nil
+    }
+
+    /// The follow's timer runs, or its measurement has not landed yet: Enhance
+    /// Voice may still step on `document`. Main.
+    static func isUnderWay(_ document: ProjectDocument) -> Bool {
+        isPending(document) || isMeasuring(document)
+    }
+
     /// The timer of `document`'s follow, nil with none — what the probe reads
     /// back after a step (P5). Main.
     static func timer(of document: ProjectDocument) -> Timer? {
@@ -192,7 +253,8 @@ enum RecordingEnhance {
     }
 
     /// One firing: decide, and on any step but `.wait` end the follow FIRST
-    /// (the type doc), then act. Main.
+    /// (the type doc), then act. `.enhance` holds a `Measurement` until
+    /// `enhanceLanded` calls back. Main.
     static func tick(_ document: ProjectDocument) {
         guard let follow = follows[document.recipeKey] else { return }
         let clips = present(follow.clips, in: document, scope: follow.scope)
@@ -208,7 +270,10 @@ enum RecordingEnhance {
         switch step {
         case .enhance(let ids):
             guard let window else { return refuse(notReadySentence, in: document) }
-            AudioMeasureDoor.enhanceLanded(document: document, clips: ids, window: window)
+            let measurement = Measurement(document)
+            AudioMeasureDoor.enhanceLanded(document: document, clips: ids, window: window) {
+                measurement.end()
+            }
         case .giveUp:
             refuse(notReadySentence, in: document)
         case .drop, .wait:

@@ -27209,7 +27209,7 @@ those parts while iterating; a recorded run sets nothing.
 | V1 | the tool door into a new project: the enhance row's clip `segments[0].clip`; `set` the nine keys (the leveller since AP6b) with isolation 0.8 and a gate, held by `get_project`; `result_lufs` −16 ±0.5; `set` equal to a control `enhance_voice` on an imported copy (the volume within 0.2 dB); one undo "Enhance Voice" back to the landing's audio, then nothing to undo; the landing-to-answer time over 3 runs |
 | V2 | the tool door into a document: undo "Enhance Voice", then "Add Recording" |
 | V3 | `enhance` false on both doors: no `enhance` keys, `enhance_pending` false, no sheet, the audio the landing's after 5 s, undo's top "Add Recording" |
-| V4 | the held instance, the panel door: (a) a new project — the Measuring Sound sheet seen in `snapshot_ui` (else FAIL), the audio-only export −18 ±0.5 LUFS, one undo "Enhance Voice"; (b) into a document — undo "Enhance Voice" then "Add Recording"; (c) `cancel_sheet` during the hold — unchanged, undo's top "Add Recording", `enhance_pending` false, no sheet 2 s and 5 s after |
+| V4 | the held instance, the panel door with no `follow_wait` (it waits the measurement out, #546), the sheet polled for: (a) a new project — the Measuring Sound sheet seen in `snapshot_ui` (else FAIL), the audio-only export −18 ±0.5 LUFS, one undo "Enhance Voice"; (b) into a document — undo "Enhance Voice" then "Add Recording"; (c) `cancel_sheet` during the hold — unchanged, undo's top "Add Recording", no sheet 2 s and 5 s after, and a second panel landing with no enhance answering `enhance_pending` false |
 | V5 | a movie and its microphone: only `mic_clip` enhanced, the movie clip's sound untouched |
 | V6 | `record_screen`'s refusals, exact, the project byte-identical: `enhance` "yes"; true on a screen with no microphone; `voice_over` with `place: false`; `seconds` 0 and `rate` 24 first; `source` camera |
 | V7 | a silent file: `enhance_error` "Nothing could be enhanced. …−70 LUFS…", undo's top "Add Recording"; the panel door with `follow_wait` 30: `enhance_pending` false, the clip untouched |
@@ -29799,15 +29799,20 @@ through both tools, the project unchanged. P5 (#458; its own instance with P1b's
 package holding a nest before the landing; the panel door with `enhance` and `auto_zoom`, the
 voice spoken (`say -v Samantha`, padded to 20 s), no `follow_wait`; at once `set_scope` into the
 nest, 3 s, out; within 300 s the screen clip holds Auto Zoom's actions and the undo names read
-Auto Zoom then Add Recording (Enhance Voice allowed between): the polish waited out the nest.
-Enhance is asked for its wait, which holds the polish past the nest; its own step is not
-required, because on a Debug build the panel door's Enhance Voice makes no step on this fixture
-even with no nest open (filed by fixes batch c1; on Release it does).
+Auto Zoom, Enhance Voice, Add Recording, exactly, on every build: both follow-ups waited out the
+nest, and the polish waited for Enhance's measurement to land its step (#546). P6 and P7 (#546;
+their own instance with P1b's pins and `-RCDevMeasureHandBackHold 2`, the Measuring Sound sheet's
+hand-back held 2 s past the sheet), the spoken voice, no nest, the panel door with `follow_wait`:
+P6 `enhance` alone answers `enhance_pending` false and undo reads Enhance Voice, Add Recording
+straight after the answer; P7 `enhance` and `auto_zoom` answers both pendings false and undo
+reads Auto Zoom, Enhance Voice, Add Recording.
 
 Mutants (each must fail its row): `cu10_probe.py --mutant place-admitted` and `keys-admitted`
 (Q6), `enhance-ignored` and `ready-ignored` (Q5), `absent-zoom-off` (Q2),
 `shortcuts-without-keys` (Q3), `open-container` (Q7: `RecordingEnhance.container(of:scope:)`
-answers the open container); `cu10_proof.py --mutant wrong-order` and `one-step` (P1), each on
+answers the open container); `cu10_proof.py --mutant wrong-order` and `one-step` (P1),
+`polish-ignores-measuring` (P7: the polish's follow reads only Enhance's timer) and
+`wait-ignores-measuring` (P6: `follow_wait` reads only Enhance's timer), each on
 a `tree_copy.py` copy whose app it builds; and by hand `open-container` again for P5 (edited into
 the tree, `make app-debug`, `--only P5` fails, the file restored).
 

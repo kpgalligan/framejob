@@ -678,3 +678,45 @@ anywhere, so nothing is keyed (CJ-3).
     only the others are read again; any change of either handle, an edit during `wait`, reads
     every clip again, as the pane's memo does. The quality and the project summary are still read
     in each hop. The answer's shape and the refusals are unchanged. Amends CO-31 (b).
+
+## Fix #546 (2026-11-09)
+
+- **#546 — The polish waits for Enhance's measurement, not only its timer.** AU-68 (e) ends
+  Enhance's follow before anything is shown, so `RecordingEnhance.isPending` was false for the
+  whole measurement, and the polish's follow (CU-101 (a), (f)) was then held only by the
+  Measuring Sound sheet being attached. The sheet hands its answer back a main-queue turn after
+  it has gone; in that gap the polish's 0.5 s timer could fire and commit Auto Zoom (measured on
+  Debug: 21 ms before the hand-back), and `AudioMeasureDoor.measure`'s stale test then refused
+  Enhance ("…Choose Enhance Voice again."), so its step was lost. No build was exempt: the timer
+  either landed in the gap or did not.
+  - (a) **The measuring state.** `RecordingEnhance.tick`'s `.enhance` step makes a
+    `RecordingEnhance.Measurement`, counted per document, and `AudioMeasureDoor.enhanceLanded`
+    takes a `done` it calls exactly once, after whatever the call ends in has landed: each
+    refusal before the run, the no-render answer, the sheet's hand-back (the commit, a refusal or
+    the stale refusal; the document gone), the sheet's Cancel and a run with no outcome.
+    `AudioMeasureSheetController` gains `stopped`, called in `finished`'s place on the same turn
+    after `viewDidDisappear`, so one of the two always runs for a sheet that was shown. A
+    `Measurement` released without `end()` uncounts itself, so a hand-back dropped uncalled
+    cannot hold the polish. `isMeasuring(document)` reads the count; `isUnderWay` is `isPending`
+    or `isMeasuring`. `isPending` keeps AU-68 (e)'s meaning, the timer, and never depends on the
+    sheet.
+  - (b) **Who reads it.** The polish's panel follow (`enhancing`, and so CU-101 (a)'s clock
+    restart) and the tool door's `polishLanded` read `isUnderWay`. The tool door's own Enhance was
+    never exposed — `enhanceVoice` returns before `polishLanded` starts — but its `decide` read
+    `isPending` for a panel landing's Enhance in the same document, and its busy test has no sheet
+    arm, so it had the same gap, wider; it now waits for that measurement too.
+  - (c) **`land_recording`.** `follow_wait` waits while `isUnderWay` or the polish is pending, and
+    `enhance_pending` answers `isUnderWay`. Before, `follow_wait` returned when the timer ended,
+    about 2.7 s before the step, and an `undo` read then was itself the edit that made the
+    measurement stale.
+  - (d) **The dev hold.** `-RCDevMeasureHandBackHold <s>` (dev tools only) holds the Measuring
+    Sound sheet's hand-back, `finished` or `stopped`, s seconds after `viewDidDisappear`, so a
+    proof makes the gap wider than the polish's check interval instead of relying on where a
+    timer lands.
+  - (e) **The proof.** `cu10_proof.py` P5 requires "Auto Zoom", "Enhance Voice", "Add Recording"
+    exactly, on every build. P6 and P7 run on an instance held 2 s: Enhance alone with
+    `follow_wait` (undo read straight after the answer: "Enhance Voice", "Add Recording";
+    `enhance_pending` false), and Enhance with Auto Zoom (all three names, both pendings false).
+    Mutants: `polish-ignores-measuring` (P7) and `wait-ignores-measuring` (P6).
+    `audio_ap6c_probe.swift`'s P5 also reads `isMeasuring` false after a no-render refusal.
+  Amends AU-68 (e), AU-69 (e) and CU-101 (a), (j).

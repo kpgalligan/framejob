@@ -815,7 +815,10 @@ recorded before its code.
   that puts it back up. `.enhance` runs `AudioMeasureDoor.enhanceLanded`: the press's own
   `measure` under the Measuring Sound sheet at `NormalizeChoice.targetLUFS`, committed with
   `performGroupedEdit` (a timer is not an AppKit event) as "Enhance Voice"; Cancel changes
-  nothing. Nothing to enhance, a stale answer and `.giveUp` are a refusal of `enhance_voice` at
+  nothing. From that step until its answer, its refusal or the Cancel has landed the document is
+  measuring (`RecordingEnhance.isMeasuring`; `isUnderWay` is the timer or the measurement), which
+  the polish waits on, while `isPending` stays the timer alone (amended 2026-11-09, #546).
+  Nothing to enhance, a stale answer and `.giveUp` are a refusal of `enhance_voice` at
   the inspector's foot (`projectDocumentDidRefuse`); nothing beeps and the panel's note is not
   touched. `.giveUp`'s sentence: "Enhance Voice did not run on the recording: its microphone was
   not ready to measure within 5 minutes. Select its clip and choose Clip ▸ Enhance Voice."
@@ -849,7 +852,9 @@ recorded before its code.
   (Debug and Release only) hands fixture files to the product's own code after `onFinish` — the
   panel's `recordingEnded` or the tool's landing — because the recorder needs the Microphone grant
   and a voice at the microphone, while a proof's instance records room tone under the terminal's
-  grants. (f) The proof is `audio_ap6c_probe.py` (P1–P6, mutants M1–M10; P6, read from the
+  grants. Its panel door's `follow_wait` waits for, and its `enhance_pending` answers,
+  `RecordingEnhance.isUnderWay`: the follow's timer or its measurement (amended 2026-11-09,
+  #546). (f) The proof is `audio_ap6c_probe.py` (P1–P6, mutants M1–M10; P6, read from the
   sources by its runner, holds the follow to the press's one setup,
   `AudioMeasureDoor.enhanceSetup`, which `enhance_voice` reads in one main-thread hop, and M10
   restores the tool's second hop; amended 2026-11-09, #412) and `audio_ap6c_proof.py`

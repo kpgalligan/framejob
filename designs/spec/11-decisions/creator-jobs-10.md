@@ -253,8 +253,11 @@ the dev tool count are unchanged.
   `ShortcutOverlays.prepared` and `SpeedUpTyping.resolve`, the menu doors' planners.
 - **CU-101 — Order, the clips, readiness and the two follows.**
   - (a) **Order.** Enhance Voice first, when asked: the polish waits while
-    `RecordingEnhance.isPending(document)`, and its clock restarts when that ends. The tool door
-    polishes after `enhanceVoice` returns. Then Auto Zoom (zooms are planned on unsplit clips),
+    `RecordingEnhance.isUnderWay(document)` — the follow's timer or the measurement its
+    `.enhance` step began, until that has landed its step, its refusal or its Cancel (amended
+    2026-11-09, #546; before, `isPending`, the timer alone) — and its clock restarts when that
+    ends. The tool door polishes after `enhanceVoice` returns, and its `decide` reads the same
+    `isUnderWay`, for a panel landing's Enhance in the same document. Then Auto Zoom (zooms are planned on unsplit clips),
     then Add Shortcut Overlays, then Speed Up Typing (its stretches avoid the overlays, CU-91).
     `RecordingPolish.commands(of:)` answers the chosen commands in that order (`allCases`).
   - (b) **The clips.** `screenPaths(of:)` is each segment's movie path (none for a voice-over or

@@ -3646,7 +3646,9 @@ free.
   which `enhance_voice` shares (#412).
 - `AudioMeasureSheetController.swift` — the Measuring Sound sheet (a bar,
   "Clip n of N…", Cancel), in `AudioSyncSheetController`'s shape. Generic
-  over `AudioMeasureRunning`.
+  over `AudioMeasureRunning`. One of `finished` or `stopped` is called a
+  main-queue turn after it has gone (#546);
+  `-RCDevMeasureHandBackHold <s>` (dev only) holds that call.
 - `AudioEnhance.swift` (+`Reasons`, +`Leveller`) — Enhance Voice's value type
   (spec §11 AU-60…AU-62): `read`, `measure`, `speechMask`, `choose` (the
   rules), `jobs`, `plan` over the run's outcome; `+Reasons` the loudness
@@ -4176,7 +4178,10 @@ free.
   pure `decide`, and the panel's follow (a 0.5 s default-mode timer per
   landing, ended before a step acts, `.enhance` through
   `AudioMeasureDoor.enhanceLanded`). `record_screen {enhance}` polls the same
-  `decide` from `AgentServer+RecordingLanding`'s `landAndEnhance`.
+  `decide` from `AgentServer+RecordingLanding`'s `landAndEnhance`. From
+  `.enhance` until what it measured has landed the document `isMeasuring`
+  (`Measurement`); `isUnderWay`, the timer or that, is what the polish and
+  `land_recording` wait on (spec §11 #546).
 - `RecordingPolish.swift` · `RecordingPolish+Follow.swift` ·
   `RecorderPanelController+Polish.swift` · `AgentServer+RecordingPolish.swift`
   — the recorder polishes on landing (road map creator-jobs CU10, spec §11

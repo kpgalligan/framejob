@@ -403,6 +403,9 @@ document with no window (`display: false`), so a proof can see the windowless
 door (spec §11 CJ-52); and `-RCDevVerticalSaveFault <name>`, with which
 `make_vertical_version`'s save to a `path` whose last component is `<name>` fails,
 so a proof can see the copy closed and its package removed (spec §11 #460); and
+`-RCDevMeasureHandBackHold <s>`, which holds the Measuring Sound sheet's
+hand-back after the sheet has gone, so a proof can act in that gap (spec §11
+#546); and
 `-RCDevExportFault audio@N|video@N|audio-hold@N`, the same for an
 `ExportWriter` export's pumps, spec §11 #378), which
 Distribution does not. `rc_op_names`
