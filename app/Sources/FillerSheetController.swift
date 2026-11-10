@@ -138,6 +138,8 @@ final class FillerSheetController: NSViewController {
         rowsStack.orientation = .vertical
         rowsStack.alignment = .leading
         rowsStack.spacing = 8
+        // As wide as its rows (`rebuildRows`), not stretched to the section.
+        rowsStack.setHuggingPriority(.defaultHigh, for: .horizontal)
         transcribeSection.orientation = .vertical
         transcribeSection.alignment = .leading
         transcribeSection.spacing = 8

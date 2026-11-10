@@ -346,6 +346,14 @@ NOT_SHOWN = {
                            "presses its own Make once it is first enabled (YES), or unticks "
                            "Make a copy first (in-place) (spec §11 VR-39 (h)); no screen "
                            "launches with it",
+    "FrameJobAnalysisMergeOnly": "not a defaults key: the thread-dictionary mark "
+                                 "AnalysisStore.publishCancelled sets around a cancelled job's "
+                                 "publish (#435); nothing on screen reads it",
+    "RCDevMeasureHandBackHold": "a dev launch default that holds the Measuring Sound sheet's "
+                                "hand-back (spec §11 #546); no screen launches with it",
+    "RCDevSaveHold": "a dev launch default that holds each save of a package after it is "
+                     "written and before it is swapped in (spec §11 #429); no screen launches "
+                     "with it",
 }
 
 # Filed layout defects, each named by its issue, and deliberate findings,
@@ -364,6 +372,13 @@ FIXTURES = {
     "demo": {"path": os.path.join(FIXTURE_DIR, "Demo.framejob"),
              "clips": ["video", "text", "graphic", "shape", "tone"],
              "media": ["speech.mov", "toneA.m4a", "toneB.m4a"], "sound": ["video", "tone"]},
+    # `demo`, with a cached filler transcript seeded for speech.mov
+    # (`_seed_filler_transcript`), so Clip ▸ Remove Filler Words… is enabled
+    # on the keyless instance (spec §11 CJ-12; screen 14b, #430).
+    "fillers": {"path": os.path.join(FIXTURE_DIR, "Fillers.framejob"),
+                "clips": ["video", "text", "graphic", "shape", "tone"],
+                "media": ["speech.mov", "toneA.m4a", "toneB.m4a"], "sound": ["video", "tone"],
+                "transcript": "speech.mov"},
     "animated": {"path": os.path.join(FIXTURE_DIR, "Animated.framejob"), "clips": ["graphic"]},
     "matte": {"path": os.path.join(FIXTURE_DIR, "Matte.framejob"),
               "clips": ["video", "window", "stray"], "media": ["speech.mov"],
@@ -534,7 +549,7 @@ def build_fixture(mcp, name):
     ids = {}
     try:
         mcp.call("open_project", path=path)
-        if name == "demo":
+        if name in ("demo", "fillers"):
             ids = _demo_ops(mcp, path)
         elif name == "animated":
             ids = _animated_ops(mcp, path)
@@ -586,6 +601,82 @@ def wait_for_peaks(mcp, path, clips, within=60):
         if time.monotonic() - started > within:
             raise FixtureError(f"{len(pending)} media still pending_peaks after {within} s")
         time.sleep(0.5)
+
+
+# The seeded transcript's words, in AssemblyAI's milliseconds: one run of
+# fillers (2450–2950 ms) between plain words, inside speech.mov's 5.2 s.
+FILLER_WORDS = [
+    {"text": "Hello", "start": 600, "end": 1120, "confidence": 0.98, "speaker": None},
+    {"text": "there", "start": 1180, "end": 1600, "confidence": 0.96, "speaker": None},
+    {"text": "everyone", "start": 1700, "end": 2400, "confidence": 0.91, "speaker": None},
+    {"text": "um,", "start": 2450, "end": 2600, "confidence": 0.71, "speaker": None},
+    {"text": "Uh", "start": 2650, "end": 2750, "confidence": 0.69, "speaker": None},
+    {"text": "er", "start": 2800, "end": 2950, "confidence": 0.64, "speaker": None},
+    {"text": "welcome", "start": 3000, "end": 3600, "confidence": 0.93, "speaker": None},
+    {"text": "back", "start": 3700, "end": 4100, "confidence": 0.95, "speaker": None},
+]
+
+
+def _seed_filler_transcript(mcp, path, name):
+    """Write a cached AssemblyAI transcript with filler words for the media
+    whose file is `name`, into the open package's `cache/transcripts/`: the
+    file (`MediaTranscript.Header`'s keys and `words`) and its marker
+    (`TranscriptStamp`), which serves filler removal for the file as it is
+    now (`FillerDetector.transcriptFile`). The marker's request is the file's
+    own `requested`, so the two cannot differ. Never creates `cache/`: the app
+    made it for the fixture's caches, and making it from outside would move
+    the package's date under the open document. Answers the media's id.
+    Raises FixtureError."""
+    media = [m for m in _project(mcp, path)["media"]
+             if os.path.basename(m.get("path") or "") == name]
+    if len(media) != 1:
+        raise FixtureError(f"seeding the filler transcript: {len(media)} media named {name}, "
+                           "not 1")
+    medium = media[0]
+    source = medium["path"]
+    cache = os.path.join(path, "cache")
+    if not os.path.isdir(cache):
+        raise FixtureError(f"seeding the filler transcript: {cache} is not there after the "
+                           "fixture's caches were waited for")
+    try:
+        stat = os.stat(source)
+    except OSError as error:
+        raise FixtureError(f"seeding the filler transcript: {source}: {error}") from error
+    requested = {"disfluencies": True, "keyterms_prompt": [], "language_code": None,
+                 "speaker_labels": False, "speech_models": ["universal-3-5-pro"]}
+    seconds = medium["duration"] / SECOND
+    document = {
+        "audio_duration": int(seconds) + (0 if seconds == int(seconds) else 1),
+        "audio_track_start_ms": 0, "extracted_seconds": seconds,
+        "fetched_at": "2026-01-01T00:00:00Z", "language_code": "en_us",
+        "language_confidence": 0.99, "provider": "assemblyai",
+        # True, so nothing lists it for a DELETE at AssemblyAI (R6-4).
+        "remote_deleted": True, "requested": requested,
+        "speech_model_used": requested["speech_models"][0],
+        "transcript_id": "t_screens_fillers", "uploaded_format": "flac",
+        "words": FILLER_WORDS,
+    }
+    marker = {
+        # Swift's `.rounded()` is half away from zero; Python's `round` is not.
+        "source": {"size": stat.st_size, "modified": int(stat.st_mtime + 0.5),
+                   "duration": medium["duration"], "hasAudio": True},
+        "provider": document["provider"],
+        "speech_models": requested["speech_models"],
+        "language_code": requested["language_code"],
+        "speaker_labels": requested["speaker_labels"],
+        "keyterms_prompt": requested["keyterms_prompt"],
+        "disfluencies": requested["disfluencies"],
+    }
+    folder = os.path.join(cache, "transcripts")
+    try:
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, f"{medium['id']}.json"), "w") as handle:
+            json.dump(document, handle, sort_keys=True)
+        with open(os.path.join(folder, f"{medium['id']}.complete.json"), "w") as handle:
+            json.dump(marker, handle, sort_keys=True)
+    except OSError as error:
+        raise FixtureError(f"seeding the filler transcript: {error}") from error
+    return medium["id"]
 
 
 def _demo_ops(mcp, path):
@@ -1278,6 +1369,11 @@ class Run:
                     polls, ms = wait_for_peaks(self.mcp, path, [ids[c] for c in sound])
                     print(f"fixture {name}: peaks cached after {polls} poll(s), {ms} ms",
                           flush=True)
+                transcript = FIXTURES[name].get("transcript")
+                if transcript:
+                    seeded = _seed_filler_transcript(self.mcp, path, transcript)
+                    print(f"fixture {name}: a filler transcript seeded for media {seeded} "
+                          f"({transcript})", flush=True)
                 self.fixtures[name] = ("ok", (path, ids))
             except FixtureError as error:
                 self.fixtures[name] = ("fail", str(error))

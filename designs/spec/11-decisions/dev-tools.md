@@ -83,3 +83,33 @@ V-4 and V-5 come from the build-velocity road map, now closed: `designs/adr/buil
   unchanged; a preview that never starts is the refusal, and one that plays at half speed after
   starting moves about 600 000 ticks and fails the floor (both seen, by hand mutants in
   `Playback.setRate`).
+- **#429 — `-RCDevSaveHold <s>` holds each save of a package after it is written and before it
+  is swapped in, so a proof can publish a cache file during one.** Dev tools only
+  (`FRAMEJOB_DEV_TOOLS`; Distribution compiles no override). `ProjectDocument+CacheSaves.swift`
+  overrides `write(to:ofType:for:originalContentsURL:)`: it calls `super` and then, when the
+  launch default is above 0, sleeps the main thread that many seconds. Every save of that
+  instance is held (⌘S, autosave, `save_project`), inside the cache ledger's `saveBegan` …
+  `saveEnded`. Nothing in the product reads it.
+  - **Why there, and not before `super.save`** (where the issue proposed it): a cache file
+    written before the save lists `cache/` is carried by that save, so nothing is lost and a
+    write outside the ledger could be told only by its time. After the new package is written
+    and before the swap is the window the ledger exists for: a file written into the old
+    package then goes with it.
+  - **What a proof reads.** `CacheLedger.publish` takes an optional `waited` out-parameter, set
+    to whether a save of that folder was in flight when the call came. `AnalysisStore.publishFile`
+    passes it and, under dev tools, counts the publishes that waited per (cache folder, kind,
+    media id); `analysis_job` answers the count as each job row's `save_waits`. So a row says
+    that its publish met a save from a fact of that run, not from two clocks.
+  - **Its row.** `analysis_proof.py` A14: a document made and saved on a plain launch is
+    opened on a launch of its own (`-RCDevAnalysisHold 3 -RCDevSaveHold 25`, so the row's is
+    the one save held); a job over the fixture's first 100 frames is wanted, then
+    `save_project`; the row passes when the job landed, its `save_waits` rose by one, the
+    marker and `frames.bin` are in the package after the save, and `get_media_analysis` then
+    answers `cached: true` with that window's cut. A
+    run in which the publish did not meet the save fails by name (`save_waits` unchanged)
+    rather than passing having shown nothing. Mutants, each an app build:
+    `write-outside-publish-app` (the store writes without the ledger) and `save-not-announced`
+    (`saveBegan` not called).
+  - **Not covered.** The other writers through `CacheLedger.publish` (the media passes'
+    markers and waveforms, ramp audio, isolation and voice files, device transcripts) have no
+    MCP row against a held save; the hold is what such a row needs.

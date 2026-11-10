@@ -406,6 +406,10 @@ so a proof can see the copy closed and its package removed (spec §11 #460); and
 `-RCDevMeasureHandBackHold <s>`, which holds the Measuring Sound sheet's
 hand-back after the sheet has gone, so a proof can act in that gap (spec §11
 #546); and
+`-RCDevSaveHold <s>`, which holds each save of a package for s seconds after it is
+written and before it is swapped in, so a proof can publish a cache file during one
+(spec §11 #429; `analysis_job`'s rows answer `save_waits`, the publishes that waited
+a save out); and
 `-RCDevExportFault audio@N|video@N|audio-hold@N`, the same for an
 `ExportWriter` export's pumps, spec §11 #378), which
 Distribution does not. `rc_op_names`

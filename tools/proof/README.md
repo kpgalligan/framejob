@@ -27404,7 +27404,7 @@ python3 tools/proof/audio_ap6b_proof.py <dir>/agent.sock
 
 The recorded runs are in `archive/audio.md`'s AP6b record.
 
-## Road map "creator-jobs" CJ2a — the analysis lane, its store and reader, and `shots` (`analysis_proof.py` P1–P11, A1–A13, Z1; thirteen mutants; `creator_spike/` CJ-S3, CJ-S4; spec §11 CJ-20…CJ-27, CJ-21 as amended by #435)
+## Road map "creator-jobs" CJ2a — the analysis lane, its store and reader, and `shots` (`analysis_proof.py` P1–P11, A1–A14, Z1; fifteen mutants; `creator_spike/` CJ-S3, CJ-S4; spec §11 CJ-20…CJ-27, CJ-21 as amended by #435)
 
 **`analysis_fixtures.py`** makes every fixture with ffmpeg into `tools/proof/media/analysis/`
 (gitignored), reused while present (`--force` remakes them, `--flattened <socket>` also makes
@@ -27432,6 +27432,7 @@ scratch `CFFIXED_USER_HOME` in four launches: plain (A1–A4, A8 without the fla
 A12), `-RCDevAnalysisCanned YES` (A8 with it), `-RCDevAnalysisHold 3` (A5–A7, A11, acting
 during a held job through the dev tool `analysis_job`) and `-RCDevAnalysisHold 50` (A13, a
 call that gives up at its 60 s wait about 10 s into its job). Z1 is each launch's parity grep.
+A14 and its two launches came with hygiene c2 (#429): its record is at the end of this file.
 
 | Row | What it holds |
 |---|---|
@@ -30943,4 +30944,49 @@ LOUDNESS_ONLY=menu_rows python3 tools/proof/loudness_normalize_proof.py <dir>/ag
 python3 tools/proof/audio_ap10b_proof.py <dir>/agent.sock --only S1,S6,C1
 python3 tools/proof/export_status_proof.py
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/missing_audio_proof.py --only P1
+```
+
+## Hygiene c2 — the screen catalog's fixtures and a held save (`screens.py` P2, 14b; `analysis_proof.py` A14 and two mutants; `transcript_tab_proof.py` B4; #443, #430, #429; spec §11 #429)
+
+**#443.** `screens.py`'s `SECTIONS` has held `video.behind_subject` since CO7's commit
+765bd0c1, so the issue's own finding was already done. P2 still failed, one cause later: two
+`static let …Key` literals no row covered, `FrameJobAnalysisMergeOnly` (#435's thread mark) and
+`RCDevMeasureHandBackHold` (#546). Both are now `NOT_SHOWN` rows, with `RCDevSaveHold`'s.
+
+**#430.** The `fillers` fixture is `demo` with a cached AssemblyAI transcript seeded for
+`speech.mov` (`_seed_filler_transcript`: the file and its marker, written into the open
+package's `cache/transcripts/` after the peaks wait, the marker's request copied from the
+file's own `requested`, the source stamped from the media file). Screen 14b names it, has no
+`skip`, and expects "1 cut · removes 00:00:00:16". The restored screen reported the sheet's
+Transcribe row as an ambiguous `NSStackView` (its width 365 pt in one look and 359 pt in the
+other); `FillerSheetController`'s `rowsStack` and each row now hug horizontally, and the
+screen reports no layout problem.
+
+**#429.** `-RCDevSaveHold <s>` (spec §11 #429) and row A14. The document is made, saved and
+closed on a plain launch; a launch with `-RCDevAnalysisHold 3 -RCDevSaveHold 25` opens it,
+wants a `shots` job over the first 100 frames and calls `save_project`. A14 passes when the
+job landed, its `save_waits` rose by one, the marker and `frames.bin` are in the package after
+the save, and `get_media_analysis` answers `cached: true` with cut 60. No clause compares
+clocks; the detail prints them. A run whose publish did not meet the save fails with
+"the publish did NOT wait for a save": it was seen once, on Debug with a 10 s hold and the
+whole file as the window, where the job's publish came after the save had returned.
+
+| Run | Result |
+|---|---|
+| `screens.py --only 11c-transcript-tab`, the base tree (a0b9a829), Debug | exit 1: "P2 fail — keys neither pinned nor in NOT_SHOWN ['FrameJobAnalysisMergeOnly', 'RCDevMeasureHandBackHold']", 5 pass, 1 fail |
+| `screens.py --only 14b-remove-filler-words-sheet` with the seed call disabled, Debug | exit 1: both looks "perform_menu_item: Clip ▸ Remove Filler Words… not found" |
+| the same before the layout fix, Debug | pass, 4 new problems (the two stacks, each look); with the row's hugging alone, 2 |
+| the same on this tree, Debug | 6 pass, 0 fail, 0 skip, 0 new problems |
+| `analysis_proof.py --only A14`, Debug | 2/2 (A14, Z1): `save_waits` 0 → 1 |
+| `--mutant write-outside-publish-app` (the store writes without the ledger), Debug | CAUGHT: `save_waits` 0 → 0, marker and payload MISSING after the save, cached False |
+| `--mutant save-not-announced` (`saveBegan` not called), Debug | CAUGHT: the same three clauses |
+| `--mutant write-outside-publish` (P9, its anchor moved with the call) | CAUGHT: P9 |
+| `RC_PROOF_APP=release analysis_proof.py` | 26/26 |
+| `RC_PROOF_APP=release screens.py` | 52 pass, 0 fail, 0 skip of 52; 0 new problems |
+| `RC_PROOF_APP=release transcript_tab_proof.py --only B4` | 1/1 |
+
+```sh
+make app-debug && python3 tools/proof/analysis_proof.py --only A14
+python3 tools/proof/analysis_proof.py --mutant write-outside-publish-app
+python3 tools/proof/screens.py --only 14b-remove-filler-words-sheet
 ```

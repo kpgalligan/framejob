@@ -230,7 +230,12 @@ enum AnalysisStore {
                 failure = error
             }
         }
-        let published = MediaImporter.CacheLedger.shared.publish(in: cacheDir, for: nil) { body() }
+        var waited = false
+        let published = MediaImporter.CacheLedger.shared.publish(
+            in: cacheDir, for: nil, waited: &waited) { body() }
+        #if FRAMEJOB_DEV_TOOLS
+        if waited { noteSaveWait(kind, media: mediaID, in: cacheDir) }
+        #endif
         guard published else { throw StoreError.saveInFlight }
         if let failure { throw failure }
         guard wrote else { return }
@@ -242,6 +247,27 @@ enum AnalysisStore {
                 userInfo: ["kind": name, "media": mediaID, "cacheDir": folder])
         }
     }
+
+    #if FRAMEJOB_DEV_TOOLS
+    private static var saveWaits: [String: Int] = [:]
+
+    private static func noteSaveWait(_ kind: AnalysisKind, media: UInt32, in cacheDir: URL) {
+        let key = "\(cacheDir.standardizedFileURL.path)|\(kind.rawValue)|\(media)"
+        locksLock.lock()
+        defer { locksLock.unlock() }
+        saveWaits[key, default: 0] += 1
+    }
+
+    /// How many publishes of one (cache folder, kind, media id) since launch
+    /// found a save of the package in flight and waited for it:
+    /// `analysis_job`'s `save_waits` (spec §11 #429).
+    static func devSaveWaits(_ kind: AnalysisKind, media: UInt32, in cacheDir: URL) -> Int {
+        let key = "\(cacheDir.standardizedFileURL.path)|\(kind.rawValue)|\(media)"
+        locksLock.lock()
+        defer { locksLock.unlock() }
+        return saveWaits[key] ?? 0
+    }
+    #endif
 
     /// The publish's body; the per-media lock and the ledger are held.
     /// Answers whether it wrote: false only on a merge-only thread

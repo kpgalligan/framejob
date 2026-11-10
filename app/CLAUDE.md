@@ -294,7 +294,10 @@ detail there.
   `URL`, because `fileURL` still holds the date it cached at open (#138).
   `+CacheSaves` is the `save(to:ofType:for:completionHandler:)` override
   every save funnels through, bracketing it with the cache ledger's
-  `saveBegan` / `saveEnded` (#115, #169).
+  `saveBegan` / `saveEnded` (#115, #169), and, under dev tools only, the
+  `write(to:ofType:for:originalContentsURL:)` override that holds a save
+  `-RCDevSaveHold <s>` seconds after the package is written and before it is
+  swapped in (spec §11 #429).
   `+Import` is File ▸ Add Media… and every drop into an open project
   (`importMedia`, the probe chain and the one grouped commit), the opening
   read's probe (`probeForOpening`, a cancelled copy as `.userCancelled`), and the Media
@@ -634,6 +637,9 @@ detail there.
   `-RCDevAnalysisCanned YES` are dev only, as is the probes'
   `AnalysisLane.devSetProgress`, and `analysis_job`
   (`AgentServer+AnalysisJob.swift`) is the dev tool proofs act through.
+  `CacheLedger.publish`'s optional `waited` says whether a save was in flight
+  when the call came; under dev tools `AnalysisStore.publishFile` counts those
+  per (cache, kind, media) and `analysis_job` answers `save_waits` (spec §11 #429).
   Clip ▸ Split at Shot Changes (road map creator-jobs CJ2b, CJ-28, CJ-29):
   `ShotSplit` is the planner both doors call — targets, one request per
   media over the union of the played windows, cuts mapped to the canvas

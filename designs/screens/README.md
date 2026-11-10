@@ -113,6 +113,15 @@ Built by `screens.py` on the first screen that names one, into
   `demo` is ready once both sound clips' (`video`'s and `tone`'s) peaks are
   cached: `screens.py` polls `detect_silence` in level mode until it answers
   no `pending_peaks`, so every capture draws the Music clip's waveform band.
+- `fillers` — `Fillers.framejob`: `demo`'s tracks, clips and media, and a
+  cached AssemblyAI transcript with filler words for `media/speech.mov`,
+  written by `screens.py` (`_seed_filler_transcript`) into the open package's
+  `cache/transcripts/` once the peaks are cached: the transcript file, whose
+  words hold one run of fillers ("um," "Uh" "er" at 2.45–2.95 s), and its
+  marker, stamped from the media file as it is. So Clip ▸ Remove Filler
+  Words… is enabled on the keyless instance (spec §11 CJ-12) and its sheet
+  finds one cut. `toneA.m4a` has no transcript, so the sheet keeps one row
+  to transcribe.
 - `animated` — `Animated.framejob` (issue batch B87 phase 3): one track,
   "Graphics", holding one clip, `graphic` — `lower-third` at 0, 5 s — with one
   action at clip 1–3 s whose end keys `size` 96, `accent` "#2d7ff9" and

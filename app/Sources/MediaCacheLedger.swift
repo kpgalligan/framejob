@@ -166,12 +166,18 @@ extension MediaImporter {
         /// when no save of `cacheDir` is in flight and `pass` (when given)
         /// is current. Waits up to `waitLimit` for a save to end; answers
         /// false, without running `body`, when that wait runs out or the pass
-        /// is superseded. `body` never calls the ledger.
+        /// is superseded. `body` never calls the ledger. `waited`, when
+        /// given, is set to whether a save was in flight when the call came
+        /// (spec §11 #429), whatever the answer.
         @discardableResult
-        func publish(in cacheDir: URL, for pass: CachePass?, _ body: () -> Void) -> Bool {
+        func publish(
+            in cacheDir: URL, for pass: CachePass?, waited: UnsafeMutablePointer<Bool>? = nil,
+            _ body: () -> Void
+        ) -> Bool {
             let directory = cacheDir.standardizedFileURL.path
             let deadline = Date().addingTimeInterval(Self.waitLimit)
             condition.lock()
+            waited?.pointee = saveExpiryLocked(directory) != nil
             while let expiry = saveExpiryLocked(directory) {
                 guard Date() < deadline else {
                     condition.unlock()

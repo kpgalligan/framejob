@@ -150,6 +150,9 @@ extension AgentServer {
                 "project": wanted.project ?? NSNull(), "media": Int(request.media.id),
                 "kind": request.kind.rawValue,
                 "ranges": request.ranges.map { [$0.lowerBound, $0.upperBound] },
+                // Publishes of this cache, kind and media that waited a save out (#429).
+                "save_waits": AnalysisStore.devSaveWaits(
+                    request.kind, media: request.media.id, in: request.cacheDir),
             ]
             if let run = lane.run(of: request) {
                 row["queued_at"] = run.queuedAt
@@ -211,7 +214,9 @@ extension AgentServer {
                 + "\(Int(AnalysisLane.callWaitLimit))) it then waits until every job a dev "
                 + "owner wanted has ended. Answers {ok, now (process uptime), wanted: "
                 + "{project, media, hit}, lane_queued (requests the lane queued since "
-                + "launch), jobs: [{project, media, kind, ranges, queued_at, "
+                + "launch), jobs: [{project, media, kind, ranges, save_waits (publishes "
+                + "of that cache, kind and media that found a save of the package in flight "
+                + "and waited for it, since launch), queued_at, "
                 + "started_at, ended_at, outcome}], mask_wants: [{role, owner, media, kind, "
                 + "ranges, wanted, outcome, error, queued_at, started_at, ended_at}]}: every "
                 + "job a dev owner wanted since launch, and every want a cutout made (role "
