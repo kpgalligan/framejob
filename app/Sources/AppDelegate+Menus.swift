@@ -381,6 +381,10 @@ extension AppDelegate {
         // half of the Color sub-tab's Look section. No key equivalent, for
         // Remove Silences…' reason above.
         menu.addItem(submenuItem(lookMenu()))
+        // #390 (spec §11 AU-158): Voice ▸ right after Look ▸, the menu half of
+        // the Sound tab's Voice Effect section and a UI path `set_audio`'s
+        // `voice` names. No key equivalent, for Remove Silences…' reason above.
+        menu.addItem(submenuItem(voiceMenu()))
         // Road map "creator-jobs" CO3 (spec §11 CO-30 (e)), right after Look ▸:
         // the UI path `set_video`'s `cutout` and `analyze_cutout` name. No key
         // equivalent (the owner's answer, 2026-11-01).

@@ -95,6 +95,7 @@ extension UIMenu {
         "setMotionDuring:": .plain,
         "previewClipMotion:": .plain,
         "setLook:": .plain,
+        "setVoiceEffect:": .plain,
         "toggleRemoveBackground:": .plain,
         "switchCameraLayout:": .sheet,
         "switchAngle:": .plain,

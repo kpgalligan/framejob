@@ -5,9 +5,13 @@ import Foundation
 /// `VoiceChain.swift`'s, the render `VoiceRenderer.swift`'s.
 
 /// The four groups E8 sorts the kinds into, in its order (AU-146: the popup
-/// carries them in its titles).
+/// carries them in its titles; AU-158: Clip ▸ Voice ▸ carries them as its
+/// section headers).
 enum VoiceGroup: String, CaseIterable {
     case voice, tone, character, space
+
+    /// The group's kinds, in E8's order.
+    var kinds: [VoiceKind] { VoiceKind.allCases.filter { $0.group == self } }
 
     var title: String {
         switch self {
@@ -34,29 +38,31 @@ enum VoiceKind: String, Codable, CaseIterable {
         }
     }
 
-    /// "Voice: Pitch" … "Space: Cathedral" (AU-146).
-    var title: String {
-        let name: String
+    /// "Pitch" … "Cathedral": the kind's name alone, Clip ▸ Voice ▸'s item
+    /// under its group's header (AU-158).
+    var name: String {
         switch self {
-        case .pitch: name = "Pitch"
-        case .high: name = "High"
-        case .deep: name = "Deep"
-        case .robot: name = "Robot"
-        case .bass: name = "Bass"
-        case .treble: name = "Treble"
-        case .bright: name = "Bright"
-        case .telephone: name = "Telephone"
-        case .radio: name = "Radio"
-        case .lofi: name = "Lo-Fi"
-        case .distorted: name = "Distorted"
-        case .echo: name = "Echo"
-        case .room: name = "Room"
-        case .hall: name = "Hall"
-        case .plate: name = "Plate"
-        case .cathedral: name = "Cathedral"
+        case .pitch: return "Pitch"
+        case .high: return "High"
+        case .deep: return "Deep"
+        case .robot: return "Robot"
+        case .bass: return "Bass"
+        case .treble: return "Treble"
+        case .bright: return "Bright"
+        case .telephone: return "Telephone"
+        case .radio: return "Radio"
+        case .lofi: return "Lo-Fi"
+        case .distorted: return "Distorted"
+        case .echo: return "Echo"
+        case .room: return "Room"
+        case .hall: return "Hall"
+        case .plate: return "Plate"
+        case .cathedral: return "Cathedral"
         }
-        return "\(group.title): \(name)"
     }
+
+    /// "Voice: Pitch" … "Space: Cathedral", the popup's titles (AU-146).
+    var title: String { "\(group.title): \(name)" }
 
     /// Whether the kind reads `pitch` (AU-140): pitch, high and deep.
     var usesPitch: Bool { self == .pitch || self == .high || self == .deep }
@@ -100,4 +106,12 @@ struct VoiceProps: Codable, Equatable {
 
     /// The semitones the chain shifts by: `pitch ??` the kind's own.
     var semitones: Double { pitch ?? kind.defaultPitch }
+
+    /// What choosing `kind` writes over `current` — the popup's rule and the
+    /// menu's (AU-146, AU-158): None clears; a kind keeps the amount (1 with
+    /// none) and sends `pitch: null`, so every kind starts at its own pitch.
+    static func choosing(_ kind: VoiceKind?, over current: VoiceProps?) -> VoiceProps? {
+        guard let kind else { return nil }
+        return VoiceProps(kind: kind, amount: current?.amount ?? 1, pitch: nil)
+    }
 }

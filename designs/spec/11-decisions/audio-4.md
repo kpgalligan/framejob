@@ -4,7 +4,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 [`README.md`](README.md).
 
 The IDs continue the AU- series of [`audio.md`](audio.md), so a citation never has to say which
-file; that file names the condensed record and the original. This file holds AU-110…AU-157.
+file; that file names the condensed record and the original. This file holds AU-110…AU-158.
 It is new because `audio.md` had passed the spec's ~500-line split rule (#424, 2026-11-09); the
 entries moved here unchanged, each phase's opening paragraph with its decisions.
 
@@ -333,8 +333,8 @@ AU-140…AU-149 are AP14's (voice effects; survey B10, E8 of `designs/adr/effect
   writes `{kind, amount: current ?? 1, pitch: null}`, so every kind starts at its own pitch, and
   None writes null. An Amount row 0–100 % (quick 25, 50, 100); a Pitch row −12…12 st at one
   decimal (quick −12, −5, 0, 5, 12), enabled only for the kinds that read it, showing `pitch ??`
-  the kind's own; a Status read-out in Voice Isolation's words. Deviation from E8: no Clip ▸
-  Voice ▸ menu in this phase (filed).
+  the kind's own; a Status read-out in Voice Isolation's words. The Clip ▸ Voice ▸ menu E8 names
+  is AU-158's (#390).
 - **AU-147 — Export and agents.** An export wants and waits for its voice renders after its ramp
   and isolation renders ("Preparing…"), and fails `voiceFailed` naming the clip when one cannot be
   rendered. An agent uses `set_audio {voice}`: no new op, tool or FFI, and the render's status is
@@ -435,3 +435,27 @@ recorded before its code, continuing AU-109's block.
   the way back. `is_linked_picture` reads the clip alone, not its partner, because a pair inside
   a nest is out of `Project::clip`'s reach. No format change: the read rule makes a stale duck
   inert, and `set_audio` on a picture half still applies.
+- **AU-158 — Clip ▸ Voice ▸ (#390).** The menu E8 names, the menu half of the Voice Effect section
+  (AU-146) and a second UI path to `set_audio`'s `voice`: no new op, tool, FFI export or
+  persisted field. (1) **Place and title.** "Voice", right after Look ▸ in the Clip menu, no key
+  equivalent. (2) **Shape.** One level: a section header per group in E8's order ("Voice",
+  "Tone", "Character", "Space", `NSMenuItem.sectionHeader`, which has no action), under each its
+  kinds by their bare names ("Pitch" … "Cathedral"), then a separator and None. One level and not
+  a submenu per group, because a submenu's parent item cannot carry the mark. The headers, the
+  names and their order are `VoiceGroup` and `VoiceKind` (`VoiceProps.swift`), which the
+  section's popup titles ("Voice: Pitch") are also built from, so the two cannot drift. The
+  `perform_menu_item` path is `["Clip", "Voice", "Radio"]`; the selector is `setVoiceEffect:`,
+  the tag an index into `VoiceKind.allCases` or −1 for None, any other tag a stranger that beeps.
+  (3) **Targets** are the section's: the selected clips with sound (`InspectorTab.hasAudio`) in
+  the open scope, a nest clip included (where the effect does nothing, AU-140). Every item, None
+  included, is enabled exactly when there is a target. (4) **What a choice writes.** A kind
+  writes `{kind, amount: the clip's own ?? 1, pitch: null}` to each target, one `set_audio` per
+  clip: every clip keeps its own amount (Look ▸'s rule, GR-7 [b]; the popup gives every clip the
+  first clip's, the inspector's model) and every kind starts at its own pitch (AU-146). None is
+  one `set_audio {voice: null}` over the targets. The clip's own value whatever action is
+  selected (AU-140); one undo step "Voice Effect"; a choice that changes nothing is an identity,
+  a beep and no step. (5) **The mark is Look ▸'s** (GR-7 [b] (3)): a kind is checked when every
+  target carries it, dashed when some but not all do, unmarked otherwise; None is checked when no
+  target has an effect, dashed when some have none. Amount and pitch are not read. Proof:
+  `voice_proof.py` V12–V14 (the one list, the mark, what a choice writes), M1–M5 over
+  `perform_menu_item` (`--menu`) and seven mutants; manual check SE-45.

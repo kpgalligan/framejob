@@ -1,9 +1,9 @@
 import AppKit
 
-/// The Clip menu's seven submenus (spec §9): Add Background, Transition,
-/// Motion (with its three slot menus), Look (grading GR5b), Camera Layout
-/// (road map creator-jobs CO6), Switch Angle (SW1) and Label, and the label
-/// dot Label's rows carry.
+/// The Clip menu's eight submenus (spec §9): Add Background, Transition,
+/// Motion (with its three slot menus), Look (grading GR5b), Voice (#390),
+/// Camera Layout (road map creator-jobs CO6), Switch Angle (SW1) and Label,
+/// and the label dot Label's rows carry.
 ///
 /// A pure move out of `AppDelegate+Menus.swift` (grading GR1), which stood
 /// near app/CLAUDE.md's ~600-line cap with grading's own menu rows still to
@@ -74,6 +74,26 @@ extension AppDelegate {
         }
         menu.addItem(.separator())
         menu.addItem(tagged("None", #selector(EditorViewController.setLook(_:)), -1))
+        return menu
+    }
+
+    /// Clip ▸ Voice ▸ (spec §11 AU-158, #390): one level — a section header
+    /// per `VoiceGroup`, under it the group's kinds by name with the index in
+    /// `VoiceKind.allCases` as the tag, then a separator and None as −1
+    /// (`VoiceMenu.noneTag`). The popup of the Sound tab's Voice Effect
+    /// section is built from the same two enums; `validateVoiceAction`
+    /// checks and dashes the items.
+    func voiceMenu() -> NSMenu {
+        let menu = NSMenu(title: "Voice")
+        let action = #selector(EditorViewController.setVoiceEffect(_:))
+        for group in VoiceGroup.allCases {
+            menu.addItem(.sectionHeader(title: group.title))
+            for kind in group.kinds {
+                menu.addItem(tagged(kind.name, action, VoiceMenu.tag(of: kind)))
+            }
+        }
+        menu.addItem(.separator())
+        menu.addItem(tagged("None", action, VoiceMenu.noneTag))
         return menu
     }
 

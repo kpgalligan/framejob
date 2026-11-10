@@ -201,7 +201,14 @@ project's `.cube` LUTs in media-list order and a second separator when there
 are any, then None — §11 GR-8 [b]; a LUT item is named by its file less
 `.cube`; a checkmark on the kind or LUT every grading target carries, a dash
 on one only some carry; for the selected clips that take a grade, off when
-none do; no key equivalent; undo "Look"; §11 GR-7), Remove Background (road map
+none do; no key equivalent; undo "Look"; §11 GR-7), Voice ▸ (§11 AU-158, the menu half of
+the Sound tab's Voice Effect section and a UI path `set_audio`'s `voice` mirrors: the headers
+Voice, Tone, Character and Space, each over its kinds — Pitch, High, Deep, Robot; Bass, Treble,
+Bright, Telephone, Radio; Lo-Fi, Distorted; Echo, Room, Hall, Plate, Cathedral — a separator,
+then None; for the selected clips with sound, off when there are none; a checkmark on the kind
+every such clip carries, a dash on one only some carry, None likewise for no effect; a kind
+keeps each clip's amount (1 with none) and clears a stored pitch; no key equivalent; undo
+"Voice Effect"), Remove Background (road map
 creator-jobs CO3, §11 CO-30 (e): enabled when the selection in the open scope holds a media
 or still clip of a video file with pictures, or an image clip (CO10b, §11 CO-108); checked when every such clip has Remove
 Background on, a dash when some do; all on turns every one off, otherwise the ones without

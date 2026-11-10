@@ -1,12 +1,14 @@
-"""Road map "audio" AP14 — voice effects (spec §11 AU-140…AU-149): the probe
-over `app/Sources`, its mutants, each kind's makeup, and exports from an
-instance of its own.
+"""Road map "audio" AP14 — voice effects (spec §11 AU-140…AU-149), and
+Clip ▸ Voice ▸ (AU-158, #390): the probe over `app/Sources`, its mutants,
+each kind's makeup, and exports and the menu from an instance of its own.
 
-    python3 tools/proof/voice_proof.py             # V rows, then I and K rows on an own instance
-    python3 tools/proof/voice_proof.py --probe     # V1–V11, no instance
+    python3 tools/proof/voice_proof.py             # V rows, then I, K and M rows on an own instance
+    python3 tools/proof/voice_proof.py --probe     # V1–V14, no instance
     python3 tools/proof/voice_proof.py --measure   # each kind's m_k on the owner's recording
-    python3 tools/proof/voice_proof.py --mutants   # the eleven mutants, each against its row
-    python3 tools/proof/voice_proof.py --instance  # I0, K1–K16 and I2–I11 alone
+    python3 tools/proof/voice_proof.py --mutants   # the eighteen mutants, each against its row
+    python3 tools/proof/voice_proof.py --mutants menu-mixed-as-on,menu-pitch-kept  # the named ones
+    python3 tools/proof/voice_proof.py --instance  # I0, K1–K16, I2–I11 and M1–M5 alone
+    python3 tools/proof/voice_proof.py --menu      # I0 and M1–M5 alone
 
 The instance is `proof_app`'s app (Debug by default, `RC_PROOF_APP=release`
 for the record), launched with `-RCDevRampRenderHold 2` on a scratch socket
@@ -26,7 +28,11 @@ render against the reference engine for lofi, radio, robot, pitch +7 and
 hall; V6 the isolation crossfade into the input; V7 mono as (L+R)/2; V8 the
 export's wait and `voiceFailed`; V9 room's and cathedral's tails ≥ 3 s apart;
 V10 sync on tone bursts (lag 0 ± 1 ms, each chain's latency printed); V11 a
-kind change sends `pitch: null`.
+kind change sends `pitch: null`; V12 Clip ▸ Voice ▸'s items against a literal
+list (headers, kinds, tags, the selector, None) and the popup's titles as
+"<header>: <item>"; V13 the mark (`VoiceMenu.state`: on, mixed, off; None
+likewise); V14 what a choice writes (`VoiceMenu.targets`, `ops`, `kind(tag:)`:
+each clip's own amount, no pitch, a text clip no target, None clears).
 
 **Instance rows:**
 - I0: the instance's log has no `Frame Job: ` line (the parity check).
@@ -60,12 +66,28 @@ kind change sends `pitch: null`.
   core's sentence.
 - I11: ×2 with Keep pitch off: no voiced file, and the export equals the
   voice-less export.
+- M1–M5, Clip ▸ Voice ▸ through `perform_menu_item` (AU-158), on two tone
+  clips A and B and a text clip; "the listing" is `perform_menu_item` with no
+  path, whose seventeen `setVoiceEffect:` leaves carry `enabled` and `state`:
+  M1 nothing selected, then only the text clip: all seventeen disabled, Radio
+  refused as disabled, the project unchanged. M2 A selected: Radio writes
+  `{radio, 1}` with no pitch to A alone, the listing reads Radio on and the
+  other sixteen off, Radio again changes nothing, and one `undo` clears A and
+  checks None. M3 A at `{high, 0.4, 8}` and B, both selected: Deep gives
+  `{deep, 0.4}` and `{deep, 1}`, neither with a pitch, and ONE `undo`
+  restores both. M4 A radio and B echo: Radio and Echo mixed, None off; B
+  cleared: Radio and None mixed, Echo off. M5 None on A and B clears both,
+  None reads on, and one `undo` brings both back.
 
 **Mutants** (`--mutants`; each over its own copy of `app/Sources`, killed when
 its named row fails): call-size 1024 (V5), preset via `loadFactoryPreset` (V9),
 pitch-zero-kept (V3), window-not-keyed (V4), isolation-ignored (V6),
 voice-before-isolation (V3), pending-silent (V1), export-no-wait (V8),
-tail-kept +48,000 frames (V5), mono-left (V7), latency-kept (V10). latency-kept
+tail-kept +48,000 frames (V5), mono-left (V7), latency-kept (V10); and the
+menu's seven (AU-158): menu-mixed-as-on, menu-mixed-unmarked and
+menu-none-unmarked (V13), menu-amount-from-first, menu-pitch-kept and
+menu-targets-all (V14), menu-order-flat (V12). `--mutants a,b` runs the named
+ones. latency-kept
 surviving with V10's pitch +7 latency at ≤ 48 frames prints `equivalent` and is
 left out of the count (spec step 9); exit 0 when every other mutant is killed.
 
@@ -100,7 +122,8 @@ FRAME = 20_000
 HOLD_S = 2
 CALL_BOUND = 600
 VOLUME = 4.0
-PROBE_ROWS = ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11"]
+PROBE_ROWS = ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13",
+              "V14"]
 KINDS = ["pitch", "high", "deep", "robot", "bass", "treble", "bright", "telephone", "radio",
          "lofi", "distorted", "echo", "room", "hall", "plate", "cathedral"]
 
@@ -261,6 +284,45 @@ MUTANTS = [
         ("VoiceRenderer.swift",
          "            let discard = Int64(latency)\n",
          "            let discard: Int64 = 0\n")]),
+    # Clip ▸ Voice ▸ (spec §11 AU-158), one per decision.
+    ("menu-mixed-as-on", ["V13"], [
+        ("VoiceMenu.swift",
+         "        return carrying == targets.count ? .on : .mixed\n",
+         "        return .on\n")]),
+    ("menu-mixed-unmarked", ["V13"], [
+        ("VoiceMenu.swift",
+         "        return carrying == targets.count ? .on : .mixed\n",
+         "        return carrying == targets.count ? .on : .off\n")]),
+    ("menu-none-unmarked", ["V13"], [
+        ("VoiceMenu.swift",
+         "        let carrying = targets.filter { $0.audioProps.voice?.kind == kind }.count\n",
+         "        guard kind != nil else { return .off }\n"
+         "        let carrying = targets.filter { $0.audioProps.voice?.kind == kind }.count\n")]),
+    # The popup's rule: every clip gets the first clip's amount.
+    ("menu-amount-from-first", ["V14"], [
+        ("VoiceMenu.swift",
+         "            let voice = VoiceProps.choosing(kind, over: clip.audioProps.voice)\n",
+         "            let voice = VoiceProps.choosing(kind, over: targets[0].audioProps.voice)\n")]),
+    ("menu-pitch-kept", ["V14"], [
+        ("VoiceProps.swift",
+         "        return VoiceProps(kind: kind, amount: current?.amount ?? 1, pitch: nil)\n",
+         "        return VoiceProps(kind: kind, amount: current?.amount ?? 1, pitch: current?.pitch)\n")]),
+    ("menu-targets-all", ["V14"], [
+        ("VoiceMenu.swift",
+         "        clips.filter { InspectorTab.hasAudio($0, in: snapshot) }\n",
+         "        _ = snapshot\n"
+         "        return clips\n")]),
+    ("menu-order-flat", ["V12"], [
+        ("AppDelegate+ClipMenus.swift",
+         "        for group in VoiceGroup.allCases {\n"
+         "            menu.addItem(.sectionHeader(title: group.title))\n"
+         "            for kind in group.kinds {\n"
+         "                menu.addItem(tagged(kind.name, action, VoiceMenu.tag(of: kind)))\n"
+         "            }\n"
+         "        }\n",
+         "        for kind in VoiceKind.allCases {\n"
+         "            menu.addItem(tagged(kind.name, action, VoiceMenu.tag(of: kind)))\n"
+         "        }\n")]),
 ]
 
 
@@ -280,11 +342,14 @@ def equivalence(name, found):
     return None
 
 
-def mutants():
+def mutants(only=None):
     killed = 0
     equivalent = 0
     sources = ROOT / "app/Sources"
-    for name, targets, edits in MUTANTS:
+    chosen = [m for m in MUTANTS if only is None or m[0] in only]
+    for name in sorted(set(only or []) - {m[0] for m in MUTANTS}):
+        row(f"mutant {name}", False, "no mutant has that name")
+    for name, targets, edits in chosen:
         tree = WORK / f"mutant-{name}" / "Sources"
         shutil.rmtree(tree, ignore_errors=True)
         shutil.copytree(sources, tree)
@@ -315,10 +380,10 @@ def mutants():
         killed += dead
         row(f"mutant {name}", dead, f"killed by {'/'.join(targets)}: {dead}; failing rows: "
             + (", ".join(failing) or "none") + f" — {detail[:400]}")
-    scored = len(MUTANTS) - equivalent
+    scored = len(chosen) - equivalent
     print(f"{killed}/{scored} mutants killed"
           + (f", {equivalent} equivalent" if equivalent else ""), flush=True)
-    return killed == scored
+    return killed == scored and all(ok for _, ok in rows)
 
 
 # ---- fixtures --------------------------------------------------------------------
@@ -803,10 +868,139 @@ def i11(client, fx):
         doc.close()
 
 
-APP_ROWS = [kind_rows, i3, i4_i5, i6, i7, i8, i9, i10, i11]
+# ---- Clip ▸ Voice ▸ (spec §11 AU-158) --------------------------------------------
+
+VOICE_SELECTOR = "setVoiceEffect:"
+VOICE_MENU = ["Clip", "Voice"]
+MENU_TITLES = ["Pitch", "High", "Deep", "Robot", "Bass", "Treble", "Bright", "Telephone",
+               "Radio", "Lo-Fi", "Distorted", "Echo", "Room", "Hall", "Plate", "Cathedral",
+               "None"]
+
+
+def menu_items(doc):
+    """{title: leaf} of the listing's `setVoiceEffect:` leaves under Clip ▸ Voice."""
+    listing = doc.must("perform_menu_item")
+    return {item["path"][-1]: item for item in listing["items"]
+            if item.get("selector") == VOICE_SELECTOR and item["path"][:2] == VOICE_MENU}
+
+
+def menu_states(doc):
+    return {title: item["state"] for title, item in menu_items(doc).items()}
+
+
+def expect_states(states, **marks):
+    """Whether `states` has all seventeen titles, each `off` but the ones named."""
+    want = {title: "off" for title in MENU_TITLES}
+    want.update(marks)
+    return states == want
+
+
+def marked(states):
+    return {title: state for title, state in states.items() if state != "off"} or "none marked"
+
+
+def choose(doc, title):
+    return doc.call("perform_menu_item", path=VOICE_MENU + [title])
+
+
+def voice_of(doc, clip):
+    return (doc.clip(clip).get("audio") or {}).get("voice")
+
+
+def menu_rows(client, fx):
+    doc = Doc(client, "menu")
+    try:
+        a, _ = doc.place(fx["tone220"])
+        b, _ = doc.place(fx["tone1k"], at=5 * SEC)
+        before = {c["id"] for c in doc.project()["clips"]}
+        doc.must("add_text_clip", track=doc.project()["tracks"][0]["id"], at=10 * SEC,
+                 duration=2 * SEC)
+        text = next(c["id"] for c in doc.project()["clips"] if c["id"] not in before)
+
+        # M1 — no target.
+        parts, ok = [], True
+        start = doc.project()
+        for label, selection in (("nothing selected", []), ("only the text clip", [text])):
+            doc.must("set_selection", clips=selection)
+            items = menu_items(doc)
+            off = sorted(t for t, item in items.items() if item["enabled"] is False)
+            got = choose(doc, "Radio")
+            refused = not got["ok"] and "is disabled here" in got.get("error", "")
+            ok = ok and sorted(items) == sorted(MENU_TITLES) and len(off) == 17 and refused
+            parts.append(f"{label}: {len(items)} setVoiceEffect: leaves, {len(off)} disabled; "
+                         f"Radio: {str(got.get('error', got))[:120]}")
+        same = doc.project() == start
+        row("M1", ok and same, "; ".join(parts) + f"; the project unchanged: {same}")
+
+        # M2 — one clip, the mark, an identity, one undo.
+        doc.must("set_selection", clips=[a])
+        got = choose(doc, "Radio")
+        va, vb = voice_of(doc, a), voice_of(doc, b)
+        states = menu_states(doc)
+        wrote = got["ok"] and va == {"kind": "radio", "amount": 1} and vb is None
+        mark = expect_states(states, Radio="on")
+        held = doc.project()
+        again = choose(doc, "Radio")
+        identity = doc.project() == held
+        doc.must("undo")
+        after = menu_states(doc)
+        undone = voice_of(doc, a) is None and expect_states(after, **{"None": "on"})
+        row("M2", wrote and mark and identity and undone,
+            f"Radio on A: A {va}, B {vb} (want {{radio, 1}} with no pitch, none); marked "
+            f"{marked(states)} (want Radio on alone); Radio again leaves the project "
+            f"unchanged: {identity} ({'ran' if again['ok'] else again.get('error', '')[:80]}); "
+            f"one undo: A {voice_of(doc, a)}, marked {marked(after)}")
+
+        # M3 — each clip's own amount, no pitch, one undo step.
+        doc.voice(a, {"kind": "high", "amount": 0.4, "pitch": 8})
+        doc.must("set_selection", clips=[a, b])
+        got = choose(doc, "Deep")
+        va, vb = voice_of(doc, a), voice_of(doc, b)
+        wrote = (got["ok"] and va == {"kind": "deep", "amount": 0.4}
+                 and vb == {"kind": "deep", "amount": 1})
+        doc.must("undo")
+        ua, ub = voice_of(doc, a), voice_of(doc, b)
+        undone = ua == {"kind": "high", "amount": 0.4, "pitch": 8} and ub is None
+        row("M3", wrote and undone,
+            f"Deep on A {{high, 0.4, 8}} and B none: A {va}, B {vb} (want {{deep, 0.4}}, "
+            f"{{deep, 1}}, no pitch); one undo: A {ua}, B {ub}")
+
+        # M4 — the dash.
+        doc.voice(a, {"kind": "radio", "pitch": None})
+        doc.voice(b, {"kind": "echo"})
+        doc.must("set_selection", clips=[a, b])
+        two = menu_states(doc)
+        doc.voice(b, None)
+        doc.must("set_selection", clips=[a, b])
+        one = menu_states(doc)
+        row("M4", expect_states(two, Radio="mixed", Echo="mixed")
+            and expect_states(one, Radio="mixed", **{"None": "mixed"}),
+            f"A radio, B echo: marked {marked(two)} (want Radio and Echo mixed); B cleared: "
+            f"{marked(one)} (want Radio and None mixed)")
+
+        # M5 — None.
+        doc.voice(b, {"kind": "echo"})
+        doc.must("set_selection", clips=[a, b])
+        got = choose(doc, "None")
+        va, vb = voice_of(doc, a), voice_of(doc, b)
+        states = menu_states(doc)
+        cleared = (got["ok"] and va is None and vb is None
+                   and expect_states(states, **{"None": "on"}))
+        doc.must("undo")
+        ua, ub = voice_of(doc, a), voice_of(doc, b)
+        back = (ua or {}).get("kind") == "radio" and (ub or {}).get("kind") == "echo"
+        row("M5", cleared and back,
+            f"None on A radio and B echo: A {va}, B {vb}, marked {marked(states)} (want none, "
+            f"none, None on); one undo: A {ua}, B {ub}")
+    finally:
+        doc.close()
+
+
+MENU_ROWS = [menu_rows]
+APP_ROWS = [kind_rows, i3, i4_i5, i6, i7, i8, i9, i10, i11] + MENU_ROWS
 ROW_NAMES = {kind_rows: [f"K{i}" for i in range(1, 17)] + ["I2"], i3: ["I3"],
              i4_i5: ["I4", "I5"], i6: ["I6"], i7: ["I7"], i8: ["I8"], i9: ["I9"],
-             i10: ["I10"], i11: ["I11"]}
+             i10: ["I10"], i11: ["I11"], menu_rows: ["M1", "M2", "M3", "M4", "M5"]}
 
 
 def complaints(log):
@@ -817,11 +1011,12 @@ def complaints(log):
         return [f"the log could not be read: {error}"]
 
 
-def app_rows():
+def app_rows(runners=None):
+    runners = APP_ROWS if runners is None else runners
     try:
         fx = make_fixtures()
     except (OSError, subprocess.SubprocessError) as error:
-        for runner in APP_ROWS:
+        for runner in runners:
             for name in ROW_NAMES[runner]:
                 row(name, False, f"the fixtures could not be made: {error}")
         row("I0", False, "no fixtures")
@@ -834,7 +1029,7 @@ def app_rows():
     try:
         if up:
             print(f"  instance PID {launched.child.pid} at {launched.socket_path}", flush=True)
-        for runner in APP_ROWS:
+        for runner in runners:
             if not up:
                 for name in ROW_NAMES[runner]:
                     row(name, False, f"the app did not listen at {launched.socket_path}")
@@ -862,21 +1057,23 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--probe", action="store_true")
     parser.add_argument("--measure", action="store_true")
-    parser.add_argument("--mutants", action="store_true")
-    parser.add_argument("--instance", action="store_true", help="the I and K rows alone")
+    parser.add_argument("--mutants", nargs="?", const="", default=None, metavar="NAME[,NAME]",
+                        help="every mutant, or the named ones")
+    parser.add_argument("--instance", action="store_true", help="the I, K and M rows alone")
+    parser.add_argument("--menu", action="store_true", help="I0 and M1–M5 alone")
     args = parser.parse_args()
     WORK.mkdir(parents=True, exist_ok=True)
     if args.measure:
         return 0 if measure() else 1
-    if args.mutants:
-        return 0 if mutants() else 1
-    if not args.instance:
+    if args.mutants is not None:
+        return 0 if mutants([n for n in args.mutants.split(",") if n] or None) else 1
+    if not (args.instance or args.menu):
         probe_rows()
     if not args.probe:
         shutil.rmtree(WORK / "projects", ignore_errors=True)
         shutil.rmtree(WORK / "exports", ignore_errors=True)
         (WORK / "framejob.log").unlink(missing_ok=True)
-        app_rows()
+        app_rows(MENU_ROWS if args.menu else None)
     passed = sum(1 for _, ok in rows if ok)
     print(f"{passed}/{len(rows)}", flush=True)
     return 0 if passed == len(rows) else 1

@@ -68,9 +68,9 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.9j-agent-analysis-tools.md`](07.9j-agent-analysis-tools.md) | 117 | The media analysis tools, §7.9e's until #448: `get_media_analysis` (every kind: shots, masks, faces, sound_events, subjects, and its refusals), Split at Shot Changes (`split_at_shots`) and `analyze_cutout`. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 161 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
-| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 326 | The keyboard map and every menu, and keys proposed but not yet bound. |
+| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 333 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 24880 in 49 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 24905 in 49 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

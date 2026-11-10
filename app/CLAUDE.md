@@ -1526,7 +1526,7 @@ the key map behind it.
   `AppDelegate.swift` (+`Menus`, +`ClipMenus` — the Clip menu's submenus, Add
   Background, Transition, Motion, Look and Label, a pure move out of `+Menus`,
   grading GR1, then Camera Layout (CO6) and Switch Angle with
-  `SwitchAngleMenuFiller` (SW1) — +`ViewMenu` — the View menu and its Timeline Track Height
+  `SwitchAngleMenuFiller` (SW1), and Voice (#390, AU-158) — +`ViewMenu` — the View menu and its Timeline Track Height
   and Preview Quality submenus, a pure move out of `+Menus`, creator-jobs
   CJ0c — +`Recording`, +`Updates` — Frame Job ▸ Check for Updates…
   and the Sparkle updater, compiled only under `FRAMEJOB_UPDATER`
@@ -2021,7 +2021,8 @@ the key map behind it.
   through the pane's `IsolationCache.Memo`, dropped on
   `.reversedMediaDidChange`, which the pane observes; +`Voice`: the Voice
   Effect section, spec §11 AU-146, registered right after Voice Isolation,
-  its Status read through the pane's `voiceMemo`; +`HumChannels` and
+  its Status read through the pane's `voiceMemo`; its menu half is Clip ▸
+  Voice ▸ (`VoiceMenu.swift`); +`HumChannels` and
   +`EQ`: the Channels, EQ and Hum sections, spec §11 AU-38, registered after
   Voice Effect and before Noise Reduction, animated through actions (AU-88);
   +`Dynamics`: the Gate, Leveller and De-esser sections, spec §11 AU-48,
@@ -2434,9 +2435,12 @@ the key map behind it.
   A ready voiced segment's render (AU-143) is a span at amount 1 in place
   of its isolation crossfade (`voiced:`).
 - `VoiceProps.swift` — `audio.voice`'s Swift model (AU-140): `VoiceKind` in
-  E8's order, `VoiceGroup`, the popup titles ("Voice: Pitch" … "Space:
-  Cathedral"), each kind's own pitch; `dictionary` always carries `pitch`,
-  `NSNull` when unset, so a kind change drops a stored one.
+  E8's order with its bare `name` ("Pitch" … "Cathedral", Clip ▸ Voice ▸'s
+  items), `VoiceGroup` and its `kinds`, the popup titles ("Voice: Pitch" …
+  "Space: Cathedral", built from the group and the name), each kind's own
+  pitch; `dictionary` always carries `pitch`, `NSNull` when unset, so a kind
+  change drops a stored one; `choosing(_:over:)`, what a chosen kind writes
+  over a clip's voice (the popup's rule and the menu's, AU-158).
 - `VoiceChain.swift` — the AU-141 table: `VoiceSettings` (semitones 0
   unless the kind reads pitch), each kind's chain as `Stage` values
   (TimePitch → EQ → Distortion → Delay → Reverb, scaled by the amount,
@@ -4698,6 +4702,18 @@ free.
   None; a checkmark or a dash; spec §11 GR-7) and its validator arm; the
   dev-only launch default `-RCDevLookGalleryDump <folder>` writes each set of
   thumbnails as PNGs for the proof.
+- `VoiceMenu.swift` · `EditorViewController+Voice.swift` — Clip ▸ Voice ▸
+  (#390, spec §11 AU-158), the menu half of the Voice Effect section.
+  `VoiceMenu` (names no `rc_*`) holds its decisions: `noneTag`, `tag(of:)`
+  and `kind(tag:)`, `targets` (the selected clips with sound,
+  `InspectorTab.hasAudio`), `ops` (None one `set_audio {voice: null}`; a
+  kind one `set_audio` per target through `VoiceProps.choosing`, so each
+  clip keeps its own amount) and `state` (on, mixed, off; Look ▸'s rule).
+  The extension is `setVoiceEffect` ("Voice Effect", `applyEdit`) and
+  `validateVoiceAction`, one line in the frozen file after
+  `validateLookAction`. The menu is `AppDelegate+ClipMenus.swift`'s
+  `voiceMenu()`: a section header per `VoiceGroup`, its kinds, a separator,
+  None.
 - `DevAppearance.swift` — `-RCDevAppearance light|dark`, a dev-only launch
   default (road map 11's V3). It sets `NSApp.appearance` from `main.swift`
   before `NSApplicationMain`, so every view is built in that look. A live

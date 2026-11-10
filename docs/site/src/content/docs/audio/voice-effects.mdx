@@ -9,6 +9,7 @@ import AtAGlance from '@components/AtAGlance.astro';
 Voice Effect changes the character of a clip's sound: pitch a voice up or down, squeeze it into a phone line, or put it in a hall. A clip has one effect at a time.
 
 <AtAGlance
+  menu="Clip ▸ Voice"
   where="Clip tab ▸ Sound ▸ Voice Effect"
   tools="set_audio"
   needs="Nothing. Apple's audio units render the effect on your Mac, with no key and no upload."
@@ -30,9 +31,17 @@ Voice Effect changes the character of a clip's sound: pitch a voice up or down, 
 
 Frame Job renders the effect in the background, and you hear it [when that's done](#when-you-hear-the-effect). Each effect keeps the clip at about the loudness it had, so switching between them doesn't jump in level.
 
-To take the effect off, choose **None**, or choose **Reset** in the section's header. The header shows the effect and its amount, such as "Space: Hall 100%", or "off".
+To take the effect off, choose **None**, or choose **Reset** in the section's header, or choose **Clip ▸ Voice ▸ None**. The header shows the effect and its amount, such as "Space: Hall 100%", or "off".
 
-With several clips selected, a change applies to all of them. **Amount** and **Pitch** give every selected clip the first clip's whole effect, not only the value you changed. See [Edit several clips at once](/audio/sound-tab/#edit-several-clips-at-once).
+With several clips selected, a change applies to all of them. **Effect**, **Amount** and **Pitch** give every selected clip the first clip's whole effect, not only the value you changed. See [Edit several clips at once](/audio/sound-tab/#edit-several-clips-at-once).
+
+## Choose from the Clip menu
+
+**Clip ▸ Voice** lists the same sixteen effects under their four group headings, then **None**. Choose one to put it on every selected clip that has sound. The selection can also hold clips with no sound, such as a title, and those are left alone.
+
+A checkmark marks the effect every one of those clips has, and a dash marks one that only some of them have. **None** is checked when none of them has an effect. No item has a keyboard shortcut.
+
+The menu changes only the effect. Each clip keeps its own Amount, where the **Effect** list gives every selected clip the first clip's, and a clip with no effect starts at 100 %. Pitch goes back to the chosen effect's own. The change is one undo step, **Voice Effect**.
 
 ## The effects
 

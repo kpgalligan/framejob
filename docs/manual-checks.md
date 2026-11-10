@@ -695,6 +695,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Expect:** each time, Frame Job stays open, the Exporting sheet keeps writing, and the finished file plays. In step 3 the window comes back out of the Dock. In step 4 Frame Job is shown again and comes to the front. Step 5 doesn't hang.
 - **Source:** #477 (spec §11 #477); `docs_bugs_b4_proof.py` T1/T2 ask the delegate directly, because no script may minimise a window or hide the app.
 
+**SE-45 — Clip ▸ Voice reads well: its headings, the checkmark and the dash** (provisional)
+- **Do:** 1. Put two clips with sound and a title on the timeline. 2. Select one sound clip and open Clip ▸ Voice. 3. Choose Radio and open the menu again. 4. Give the other sound clip Space: Echo in the Sound tab, select both sound clips and the title, and open the menu. 5. Select only the title and open the menu. 6. Look at the menu in light and dark appearance.
+- **Expect:** the headings Voice, Tone, Character and Space read as headings (dimmed, not selectable) over their effects, with a line and None at the foot; after step 3 Radio has a checkmark; in step 4 Radio and Echo each have a dash and nothing has a checkmark; in step 5 every item is greyed out. No item shows a keyboard shortcut.
+- **Answer:** does the Voice menu read clearly, with its headings, checkmark and dash where expected?
+- **Source:** #390 (spec §11 AU-158); `tools/proof/voice_proof.py` V12–V14 and M1–M5 read the items, their marks and what a choice writes, never how the open menu draws.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

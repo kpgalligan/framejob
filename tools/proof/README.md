@@ -31101,3 +31101,48 @@ python3 tools/proof/co2a_proof.py --mutant unmasked-dimmed
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py --only U1 [--base REV]
 python3 tools/proof/qualifier_proof.py --only MA
 ```
+
+## #390 — Clip ▸ Voice ▸ (`voice_proof.py` V12–V14, M1–M5, `--menu`; seven mutants; `v2_menu.py` H1, H2; spec §11 AU-158)
+
+Clip ▸ Voice ▸ is the menu half of the Sound tab's Voice Effect section: a header per group, the
+sixteen kinds by bare name, a separator and None, built from `VoiceGroup` and `VoiceKind`, the
+list the popup's titles come from. Its decisions are `VoiceMenu.swift`'s and its rows are in the
+voice effects' proof.
+
+- **Probe rows** (no instance): V12 reads `AppDelegate().voiceMenu()` against a literal list
+  (headers, titles, tags, the selector, None at −1) and each popup title as
+  "<header>: <item>"; V13 `VoiceMenu.state` over three sound clips and a text clip (all radio;
+  radio + echo + none; no effect; only the text clip); V14 `targets`, `ops` and `kind(tag:)`
+  (Deep over `{high, 0.4, 8}`, `{echo, 1}` and none; None; tags 99, −1 and 2).
+- **Instance rows** (`--menu` runs I0 and these alone): M1–M5 perform the items through
+  `perform_menu_item` on two tone clips and a text clip, read `audio.voice` back through
+  `get_project`, and read each item's `enabled` and `state` from `perform_menu_item`'s listing.
+- **`--mutants NAME[,NAME]`** runs the named mutants; with no name, all eighteen.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `menu-mixed-as-on` | `state` answers on when only some targets carry the kind | V13 |
+| `menu-mixed-unmarked` | `state` answers off when only some carry it (Label's rule) | V13 |
+| `menu-none-unmarked` | None is never marked | V13 |
+| `menu-amount-from-first` | every target gets the first target's amount (the popup's rule) | V14 |
+| `menu-pitch-kept` | `VoiceProps.choosing` keeps the stored pitch | V14 (and V11) |
+| `menu-targets-all` | every selected clip is a target | V14 (and V13) |
+| `menu-order-flat` | `voiceMenu()` lists the kinds with no headers | V12 |
+
+| Run (2026-11-10) | Result |
+|---|---|
+| Before the Swift change, Debug: `voice_proof.py --probe` | 0/14, the probe does not build: `AppDelegate` has no member `voiceMenu` |
+| Before the Swift change, Debug: `voice_proof.py --menu` | 1/6: M1–M5 fail, "Clip has no item "Voice""; I0 ok |
+| The menu built, no `validateVoiceAction` line in `EditorViewController.swift`, Debug: `--menu` | 2/6: M1 (0 of 17 disabled, Radio ran), M2, M4 and M5 (nothing marked) fail; M3 and I0 ok |
+| With the line, Debug: `--probe`; `--menu` | 14/14; 6/6 |
+| `--mutants` with the seven names | 7/7 mutants killed, each by its row |
+| `v2_menu.py --only H` | 5/5: 223 leaves, 129 selectors, 129 rows, `no_action` 4 (the four headers) |
+| `v2_menu.py --only H` with the `setVoiceEffect:` row taken out of `inventory.json` (put back) | 3/5: H1 "menu selector missing from inventory", H2 differs at `setVoiceEffect:` |
+| Release, whole, after `make gate`: `RC_PROOF_APP=release voice_proof.py` | 46/46 |
+
+```sh
+python3 tools/proof/voice_proof.py --probe
+python3 tools/proof/voice_proof.py --menu
+python3 tools/proof/voice_proof.py --mutants menu-mixed-as-on,menu-mixed-unmarked,menu-none-unmarked,menu-amount-from-first,menu-pitch-kept,menu-targets-all,menu-order-flat
+python3 tools/proof/v2_menu.py --only H
+```

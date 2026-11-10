@@ -100,7 +100,8 @@ extension AgentServer {
         + "clip too short or too quiet to measure plays without them; on a nest clip they "
         + "do nothing"
     // Format 34's voice effect (spec §11 AU-140, AU-141), its own typed
-    // local for the reason `audioEQClause` is.
+    // local for the reason `audioEQClause` is. Its UI paths are the Sound
+    // tab's Voice Effect section (AU-146) and Clip ▸ Voice ▸ (AU-158).
     private static let audioVoiceClause: String =
         ", voice (null or {kind, amount, pitch}: a voice effect rendered offline and played "
         + "in place of the clip's sound, after isolation and before the channel pick; kind "

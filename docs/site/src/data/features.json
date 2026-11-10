@@ -7936,6 +7936,14 @@
      "where": "Clip tab ▸ Sound ▸ Voice Effect ▸ Effect"
     },
     {
+     "id": "audio-voice-menu",
+     "name": "Clip ▸ Voice",
+     "summary": "Choose a voice effect from the Clip menu for every selected clip with sound; each clip keeps its own Amount.",
+     "page": "audio/voice-effects",
+     "anchor": "choose-from-the-clip-menu",
+     "where": "Clip ▸ Voice"
+    },
+    {
      "id": "audio-voice-pitch",
      "name": "Voice: Pitch",
      "summary": "Shifts the voice up or down without changing its speed.",
@@ -19940,6 +19948,14 @@
      "page": "reference/clip-menu",
      "anchor": "look",
      "where": "Clip ▸ Look ▸"
+    },
+    {
+     "id": "ref-clip-voice",
+     "name": "Clip ▸ Voice ▸",
+     "summary": "Puts a voice effect on the clip's sound, or takes it off.",
+     "page": "reference/clip-menu",
+     "anchor": "voice",
+     "where": "Clip ▸ Voice ▸"
     },
     {
      "id": "ref-clip-remove-background",

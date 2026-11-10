@@ -600,6 +600,13 @@
    ],
    "note": "an edit"
   },
+  "setVoiceEffect:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Voice.swift `func setVoiceEffect(`"
+   ],
+   "note": "an edit"
+  },
   "toggleRemoveBackground:": {
    "verdict": "none",
    "code": [

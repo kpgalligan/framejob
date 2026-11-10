@@ -67,7 +67,9 @@ extension AgentServer {
 
     /// `set_audio` — the Audio tab (`AudioPane`), the timeline's fade
     /// handles (`FadeHandleSession`) and a drag on its volume line where the
-    /// clip's base volume is in force (`VolumeLineSession`, spec §11 AU-82).
+    /// clip's base volume is in force (`VolumeLineSession`, spec §11 AU-82);
+    /// its `voice` is also Clip ▸ Voice ▸ (`setVoiceEffect:`,
+    /// `EditorViewController+Voice.swift`, spec §11 AU-158).
     ///
     /// **The patch goes to the core UNREAD**, as `set_video`'s does (D1·4
     /// after D1·3, `archive/roadmap-7.md` §2.4). Its group holds no
