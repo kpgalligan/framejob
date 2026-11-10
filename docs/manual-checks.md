@@ -1479,7 +1479,7 @@ unlocked Mac; paste each score into the issue in the Source.
 
 **HS-1 — The chrome dispatch rows need an unlocked console**
 - **Do:** `python3 tools/proof/phase8_chrome.py` with the screen unlocked.
-- **Expect:** no skipped rows; section 4's six dispatch rows scored (the run is 150/150 unlocked).
+- **Expect:** no skipped rows; section 4's six dispatch rows scored (the run is 151/151 unlocked).
 - **Source:** #57.
 
 **HS-2 — The recorder's microphone rows with a wired or built-in microphone**

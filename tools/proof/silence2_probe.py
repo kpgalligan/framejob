@@ -538,16 +538,24 @@ do {
             // 17. The caches have to land first — the sheet reads them once.
             guard let cacheDir = document.cacheDirectory else { throw ProbeError.noCache }
             let speechBin = MediaImporter.speechURL(for: mediaID, in: cacheDir)
+            let speechMarker = MediaImporter.speechMarkerURL(for: mediaID, in: cacheDir)
             let peaksBin = MediaImporter.peaksURL(for: mediaID, in: cacheDir)
-            let deadline = Date().addingTimeInterval(60)
-            while Date() < deadline,
-                !(manager.fileExists(atPath: speechBin.path)
-                    && manager.fileExists(atPath: peaksBin.path)) {
-                spin(0.25)
+            let peaksMarker = MediaImporter.peaksMarkerURL(for: mediaID, in: cacheDir)
+            // Each pass writes its `.bin` and THEN its marker, and `loadSpeech`
+            // (#351) and `loadPeaks` answer nothing until the marker certifies
+            // the file, so "landed" is all four: a poll between a pass's two
+            // writes must not read a `.bin` whose marker is not there yet.
+            func landed() -> Bool {
+                manager.fileExists(atPath: speechBin.path)
+                    && manager.fileExists(atPath: speechMarker.path)
+                    && manager.fileExists(atPath: peaksBin.path)
+                    && manager.fileExists(atPath: peaksMarker.path)
             }
-            answer["cachesLanded"] = manager.fileExists(atPath: speechBin.path)
-                && manager.fileExists(atPath: peaksBin.path)
+            let deadline = Date().addingTimeInterval(60)
+            while Date() < deadline, !landed() { spin(0.25) }
+            answer["cachesLanded"] = landed()
             let kept = try Data(contentsOf: speechBin)
+            let keptMarker = try Data(contentsOf: speechMarker)
 
             controller.removeSilencesCommand()
             spin(0.6)
@@ -587,9 +595,14 @@ do {
                 controller.removeSilencesCommand()
                 spin(0.6)
                 var row: [String: Any] = ["kind": kind, "pending": sheetState(controller) ?? [:]]
-                // The bytes go back WITHOUT a post: what re-reads the input is
-                // the notification, not the file being there.
+                // The cache goes back WITHOUT a post — the `.bin` and then its
+                // marker, the order the pass writes them, because `clearSpeech`
+                // took both and `loadSpeech` reads nothing a marker does not
+                // certify (#351). So the cache is whole and readable on disk,
+                // and what re-reads the input is the notification, not the
+                // files being there (#542).
                 try kept.write(to: speechBin)
+                try keptMarker.write(to: speechMarker)
                 MediaImporter.postCacheChange(media: mediaID, kind: MediaImporter.thumbsKind)
                 spin(0.5)
                 row["afterThumbs"] = sheetState(controller) ?? [:]
@@ -652,14 +665,18 @@ do {
         guard let cacheDir = document.cacheDirectory else { throw ProbeError.noCache }
         let speechBin = MediaImporter.speechURL(for: mediaID, in: cacheDir)
         let peaksBin = MediaImporter.peaksURL(for: mediaID, in: cacheDir)
-        let deadline = Date().addingTimeInterval(60)
-        while Date() < deadline,
-            !(manager.fileExists(atPath: speechBin.path)
-                && manager.fileExists(atPath: peaksBin.path)) {
-            spin(0.25)
+        // Landed is each `.bin` AND its marker, as in the `sheet` mode: a
+        // marker written after its `.bin` was withheld would certify nothing.
+        let landedFiles = [
+            speechBin, MediaImporter.speechMarkerURL(for: mediaID, in: cacheDir),
+            peaksBin, MediaImporter.peaksMarkerURL(for: mediaID, in: cacheDir),
+        ]
+        func landed() -> Bool {
+            landedFiles.allSatisfy { manager.fileExists(atPath: $0.path) }
         }
-        answer["cachesLanded"] = manager.fileExists(atPath: speechBin.path)
-            && manager.fileExists(atPath: peaksBin.path)
+        let deadline = Date().addingTimeInterval(60)
+        while Date() < deadline, !landed() { spin(0.25) }
+        answer["cachesLanded"] = landed()
         // #107: a SECOND clip of the same file at 12 s, left un-ducked, so
         // the notes must name the clip the mix made quiet rather than hedge
         // about the media both clips share.
