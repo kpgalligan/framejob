@@ -512,7 +512,7 @@ change (CJ-20); no tool is added.
   that does not fit, as masks' runs are. **Measured** (`faces_probe.swift` P5, a one-face row at a
   late source): 176 bytes without `clip` and 221 with it, so a default call holds 2,962 rows, 296 s
   of samples (2,361, 236 s, with `clip`), less with more faces in frame. The catalog's prose and
-  spec §7.9e state that length and tell an agent to read a longer media in `from`/`to` windows of
+  spec §7.9j state that length and tell an agent to read a longer media in `from`/`to` windows of
   at most that (the prose's example is 2 minutes).
 - **CJ-35 — CJ-S3 (b) with a `faces` job: no pause.** `lane_spike.py --playback --kind faces`
   (`rule_sha256` `209c6f01…f0309ce830`, matching) on a Release instance: `play_preview`'s composed

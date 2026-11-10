@@ -8621,6 +8621,8 @@ Power'"), three lanes on the machine (one-minute loads 7.86…125.69 over the sp
 - S-TH4: VR-S1 rule 5, CJ-S2 rule 5 for these requests, and V10.
 - To file: "Split spec §7.9e: `get_media_analysis` and `split_at_shots` into `07.9h`" (§7.9e is
   588 lines).
+  Landed 2026-11-09 as #448: the two, with `analyze_cutout`, live in §7.9j
+  (`07.9j-agent-analysis-tools.md`), `07.9h` and `07.9i` having been taken since.
 
 None is a STOP. No manual check.
 
