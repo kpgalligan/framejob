@@ -53,7 +53,7 @@ Insert keeps everything you've already cut, and the timeline gets longer by the 
 - Every unlocked track opens up by the file's length. Clips that start at or after the point move later, and so do markers.
 - The file lands in the room this makes.
 
-Only the destination track is cut. A clip on another track that spans the point stays whole and where it is, so a music bed plays on unbroken under the new file. The exception is a [detached sound](/audio/detach-and-attach/) linked to the clip that was cut. It's cut at the same point, so the pair stays in step.
+Only the destination track is cut. A clip on another track that spans the point stays whole and where it is, so a music bed plays on unbroken under the new file. The exception is a clip linked to the one that was cut, by [detaching its sound](/audio/detach-and-attach/). Cut the picture and its detached sound is cut at the same point. Cut the sound and its picture is. The pair stays in step either way. A linked clip on a locked track is left whole.
 
 The whole edit is one undo step, Insert.
 
@@ -65,7 +65,7 @@ Overwrite moves nothing, and what was there is gone. The timeline only gets long
 - Whatever lies between the cuts is removed.
 - The file lands in the space.
 
-Nothing shifts and no other track is touched. The exception is again a detached sound linked to a clip that was cut. It's cut at the same points, and its piece under the new file stays, no longer linked.
+Nothing shifts and no other track is touched. The exception is again a clip linked to one that was cut, whether that's a picture's detached sound or a sound's picture. It's cut at the same points, and its piece alongside the new file stays, no longer linked. A linked clip on a locked track is left whole.
 
 The whole edit is one undo step, Overwrite.
 

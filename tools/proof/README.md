@@ -27224,7 +27224,7 @@ python3 tools/proof/audio_ap6c_proof.py <dir>/agent.sock
 
 The recorded runs are in `archive/audio.md`'s AP6c record.
 
-## Road map "audio" AP10 part 2b — track and bus dynamics (`audio_ap10c_proof.py` T1–T6, P1, U1, B1–B5; ten mutants; `core/tests/track_dynamics.rs`, `schema_v36.rs`; spec §11 AU-150…AU-156)
+## Road map "audio" AP10 part 2b — track and bus dynamics (`audio_ap10c_proof.py` T1–T6, P1, U1, B1–B5; eleven mutants; `core/tests/track_dynamics.rs`, `schema_v36.rs`; spec §11 AU-150…AU-156)
 
 A timeline track takes a compressor and a limiter (`tracks[].compressor`, `tracks[].limiter`,
 format 36, `set_track`), run post-fader on its sub-mix. Every export reads its mix through
@@ -27255,14 +27255,16 @@ the master. The preview runs the stage in each composition track's tap with the 
   compiled AS `main.swift` over `app/Sources` through `swift_build.py`. B1 the stage byte-identical
   at 512, 4,096 and irregular buffers, latency 158/0; B2 `ExportMixRead` single and
   byte-identical with no dynamics, sub-mixed and within −140 dB with an identity compressor, and
-  `Exporter.measureLoudness` reading the sub-mixes (> 3 LU from the undynamic project); B3 a nest
+  `Exporter.measureLoudness` reading the sub-mixes (> 3 LU from the undynamic project), and a
+  limited track of 65,600 frames, whose last drain is 4,160, handed back whole in buffers of at
+  most 4,096 (#414); B3 a nest
   bus equal to a fresh stage over its plain read plus the rest; B4 the tap's ×E/÷E — identity
   within 1e-6 (0 under 2⁻²⁰), a released limiter under a 1 → 0.1 step a pure 158-frame delay at
   48 and 44.1 kHz, and a 0.9 sine under E 0.5 passing a −6 dBTP limiter post-fader; B5 the leads
   (1,975 ticks, summed with a clip limiter's), a non-metering build's `trackDynamics`,
   `mixIsSet`, the footer and the meter's flag.
-- **`audio_ap10c_proof.py --mutants`** runs the seven probe mutants over copies of
-  `app/Sources` and prints the three run by hand.
+- **`audio_ap10c_proof.py --mutants`** runs the eight probe mutants over copies of
+  `app/Sources` (`--only M11` runs the ones named) and prints the three run by hand.
 
 | Mutant | Edit | Killed by |
 |---|---|---|
@@ -27276,10 +27278,11 @@ the master. The preview runs the stage in each composition track's tap with the 
 | M8 | the scope refusal removed | `track_dynamics.rs` (by hand) |
 | M9 | `nest` copies the dynamics | `track_dynamics.rs` (by hand) |
 | M10 | the ×E read `trackLead` ahead in ticks, not L frames | B4 (44.1 kHz) |
+| M11 | the last drain handed back as one buffer of whatever is left | B2 |
 
 ```sh
 python3 tools/proof/audio_ap10c_proof.py --probe                    # B1–B5, no app
-python3 tools/proof/audio_ap10c_proof.py --mutants                  # M1–M4, M6, M7, M10
+python3 tools/proof/audio_ap10c_proof.py --mutants                  # M1–M4, M6, M7, M10, M11
 make app-debug && python3 tools/proof/proof_app.py launch
 python3 tools/proof/audio_ap10c_proof.py <dir>/agent.sock           # B1–B5, T1–T6, P1, U1
 python3 tools/proof/audio_ap10c_proof.py <dir>/agent.sock --only T6 # one row

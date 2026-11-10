@@ -17,7 +17,10 @@
 //      compressor (ratio 1, makeup 0) is sub-mixed and within −140 dB of the
 //      single read; and the loudness measurement (`Exporter.measureLoudness`)
 //      of a build whose track is compressed hard reads its sub-mixes, more
-//      than 3 LU from the same project undynamic.
+//      than 3 LU from the same project undynamic. A limited track whose
+//      last drain is longer than a block (65,600 frames) hands back every
+//      frame, in buffers of at most `ExportMixRead.blockFrames` (spec §11
+//      AU-152, #414).
 //  B3  a nest bus: a timeline track holding a nest clip of two simultaneous
 //      tracks, limited at −6 dBTP, beside a plain track — the sub-mixed read
 //      equals a fresh stage over that track's plain read (its latency dropped,
@@ -144,14 +147,22 @@ func build(_ document: ProjectDocument, metering: Bool = false) throws -> BuiltC
         recipeKey: key, metering: metering)
 }
 
+/// The most frames one buffer of the last `place` held, and all it was handed.
+var largestBuffer = 0
+var framesHanded = 0
+
 /// Every buffer `next` hands back, placed by its stamp from 0 at 48 kHz.
 func place(_ built: BuiltComposition, _ next: () throws -> CMSampleBuffer?) throws -> [[Float]] {
     let total = ExportAudioEnd.frames(ofTicks: CompositionBuilder.ticks(built.composition.duration))
     var left = [Float](repeating: 0, count: total)
     var right = [Float](repeating: 0, count: total)
+    largestBuffer = 0
+    framesHanded = 0
     while let sample = try next() {
         guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
         let count = CMBlockBufferGetDataLength(block) / 8
+        largestBuffer = max(largestBuffer, count)
+        framesHanded += count
         var raw = [Float](repeating: 0, count: 2 * count)
         _ = raw.withUnsafeMutableBytes {
             CMBlockBufferCopyDataBytes(
@@ -274,6 +285,16 @@ do {
     let plainSingle = try single(try build(plain))
     let identity = try project(CompressorProps(thresholdDb: -40, ratio: 1, makeupDb: 0))
     let (subRead, subMixed) = try mixRead(try build(identity))
+    // The last drain: one limited track, 41 frames at 30 fps = 65,600 samples
+    // = 16 × 4,096 + 64, so the group holds 4,002 frames when its output ends
+    // and 4,160 once the stage's 158-frame flush lands behind them.
+    let (tail, tailTracks, tailMedia) = try document(tracks: 1, tones: [a])
+    let tailClip = try clip(tail, track: tailTracks[0], media: tailMedia[0])
+    try edit(tail, "Trim", [.trimEnd(clip: tailClip, to: 41 * SEC / 30)])
+    try edit(tail, "Limit", [.setTrack(
+        track: tailTracks[0], limiter: LimiterProps(ceilingDb: -6, release: 60_000).dictionary)])
+    let (_, tailSub) = try mixRead(try build(tail))
+    let (largest, handed) = (largestBuffer, framesHanded)
     let subSingle = try single(try build(identity))
     let reference = max(peak(subSingle[0][...]), peak(subSingle[1][...]))
     let gap = max(worst(subRead[0], subSingle[0]), worst(subRead[1], subSingle[1]))
@@ -286,10 +307,13 @@ do {
     let open = Exporter().measureLoudness(try build(plain), settings: settings)?
         .measured.integratedLUFS
     let apart = (squeezed != nil && open != nil) ? abs(squeezed! - open!) : 0
-    row("B2", !plainSub && plainRead == plainSingle && subMixed && gapDB <= -140 && apart > 3,
+    row("B2", !plainSub && plainRead == plainSingle && subMixed && gapDB <= -140 && apart > 3
+            && tailSub && handed == 65_600 && largest <= ExportMixRead.blockFrames,
         "no dynamics: sub-mixed \(plainSub), byte-identical to the single read "
             + "\(plainRead == plainSingle); identity compressor: sub-mixed \(subMixed), "
             + String(format: "%.1f", gapDB) + " dB from the single read (want ≤ −140); "
+            + "a limited track of 65,600 frames: sub-mixed \(tailSub), \(handed) handed, the largest buffer "
+            + "\(largest) frames (want ≤ \(ExportMixRead.blockFrames)); "
             + "measured \(squeezed.map { String(format: "%.2f", $0) } ?? "nil") LUFS compressed "
             + "against \(open.map { String(format: "%.2f", $0) } ?? "nil") undynamic (want > 3 LU "
             + "apart)")

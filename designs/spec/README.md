@@ -31,7 +31,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`04.4-timeline.md`](04.4-timeline.md) | 283 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
 | [`05.1-time.md`](05.1-time.md) | 32 | Ticks (600 000 per second), frame rates, snapping to the grid, frames timecode. |
-| [`05.2a-project-schema-canvas-media-video.md`](05.2a-project-schema-canvas-media-video.md) | 468 | The project JSON schema (format version 34): what a patch means, the example document, `source`, `canvas`, `media[]`, `graphic`, an action end's graphic and speed, `enabled`, and every `video.*` field. |
+| [`05.2a-project-schema-canvas-media-video.md`](05.2a-project-schema-canvas-media-video.md) | 469 | The project JSON schema (format version 34): what a patch means, the example document, `source`, `canvas`, `media[]`, `graphic`, an action end's graphic and speed, `enabled`, and every `video.*` field. |
 | [`05.2b-project-schema-audio-text-shape-tracks.md`](05.2b-project-schema-audio-text-shape-tracks.md) | 317 | The schema's `audio.*`, `text.*` and `shape.*` fields, `actions[].end` and `transition_in`, a clip's `name` and `label`, `tracks[].solo` and `matte`, `nests`, ids, and what is not in the model. |
 | [`05.3-placement.md`](05.3-placement.md) | 81 | Where a layer lands on the canvas: position, scale, crop, regions, reflection, motion, nests flattened. |
 | [`05.4-actions.md`](05.4-actions.md) | 198 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |

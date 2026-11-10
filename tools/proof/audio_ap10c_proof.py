@@ -8,7 +8,8 @@ probe behind it.
 
 The caller owns the instance at that socket; nothing is launched or killed.
 Needs `ffmpeg`, `ffprobe` and numpy. `--probe` runs B1–B5 alone, with no
-instance. `--mutants` runs M1–M4, M6, M7 and M10, each over its own copy of
+instance. `--mutants` runs M1–M4, M6, M7, M10 and M11 (`--only M11` for the
+ones named), each over its own copy of
 `app/Sources`, killed when its named probe row fails; M5 (killed by T6 on a
 mutated Debug build) and M8, M9 (killed by `core/tests/track_dynamics.rs`) are
 run by hand, and the script prints their anchors. Every project is a new one,
@@ -105,6 +106,10 @@ MUTANTS = [
                    "        trackLead = 0")]),
     ("M10", "B4", [("AudioTap.swift", "fromFrame: first + latency, rate: sampleRate)",
                     "fromFrame: first + leadFrames(track.trackLead), rate: sampleRate)")]),
+    # The last drain handed back as one buffer of whatever is left (#414).
+    ("M11", "B2", [("ExportMixRead.swift",
+                    "                ? min(groups.map(\\.available).max() ?? 0, Self.blockFrames)",
+                    "                ? groups.map(\\.available).max() ?? 0")]),
 ]
 
 BY_HAND = [
@@ -174,10 +179,12 @@ def probe_rows(sources=ROOT / "app/Sources"):
             row(name, found[name][0], found[name][1])
 
 
-def mutants():
+def mutants(only=None):
+    """Every probe mutant, or only the ones named (a fix pass's own)."""
+    chosen = [m for m in MUTANTS if not only or m[0] in only]
     killed = 0
     sources = ROOT / "app/Sources"
-    for name, target, edits in MUTANTS:
+    for name, target, edits in chosen:
         tree = OUT / f"mutant-{name}" / "Sources"
         shutil.rmtree(tree, ignore_errors=True)
         shutil.copytree(sources, tree)
@@ -202,10 +209,10 @@ def mutants():
         failing = sorted(r for r, (ok, _) in found.items() if not ok)
         print(f"{name} {'killed' if dead else 'SURVIVED'} by {target} — failing rows: "
               f"{', '.join(failing) or 'none'}", flush=True)
-    print(f"{killed}/{len(MUTANTS)} probe mutants killed", flush=True)
+    print(f"{killed}/{len(chosen)} probe mutants killed", flush=True)
     for name, killer, file, old, new in BY_HAND:
         print(f"{name} by hand — killed by {killer}: in {file}, {old} → {new}", flush=True)
-    return killed == len(MUTANTS)
+    return bool(chosen) and killed == len(chosen)
 
 
 # ---- fixtures and reading an export ------------------------------------------------
@@ -597,7 +604,7 @@ def main():
     args = parser.parse_args()
     if args.mutants:
         OUT.mkdir(parents=True, exist_ok=True)
-        return 0 if mutants() else 1
+        return 0 if mutants(set(args.only.split(",")) if args.only else None) else 1
     if args.probe:
         shutil.rmtree(OUT, ignore_errors=True)
         probe_rows()

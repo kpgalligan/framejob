@@ -35,10 +35,13 @@
 //!   envelope's `project` and `scope` keys in after reading this, and a
 //!   closed object would refuse the two keys every tool carries. `scope` is
 //!   not an argument of any op (`scope.rs`) and appears nowhere here.
-//! - **Nullability.** `set_transition`'s `kind: null` clears and
-//!   `add_zoom_action`'s `region: null` is a zoom BACK; that a null MEANS
-//!   something is semantics, which is `edit.rs`'s doc table, and the two
-//!   tools that offer it say so in their own prose today.
+//! - **Nullability.** `set_transition`'s `kind: null` clears,
+//!   `add_zoom_action`'s `region: null` is a zoom BACK, and `set_track`'s
+//!   `compressor: null` and `limiter: null` clear — there the op itself
+//!   tells an absent key (keep) from a null one (`track_dynamics::present`,
+//!   spec §11 AU-150). That a null MEANS something is semantics, which is
+//!   `edit.rs`'s doc table, and the three tools that offer it say so in
+//!   their own prose today.
 //!
 //! **Nothing here is the authority either.** `op_table.rs`'s rows are, and
 //! they answer to the decoder in `core/tests/op_table.rs`; this module is

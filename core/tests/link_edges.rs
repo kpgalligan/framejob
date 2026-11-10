@@ -1,7 +1,8 @@
 //! The named edge cases of linked pairs (spec §11 AU-91, AU-93): two
 //! consecutive detached shots, a J-cut near 0, the shift floor's refusal in
-//! each op that shifts, what `delete` and `ripple_delete` take, and whose
-//! duck a pair's is (AU-157).
+//! each op that shifts, what `delete` and `ripple_delete` take, whose
+//! duck a pair's is (AU-157), and an insert or overwrite on the SOUND's track
+//! cutting the linked picture (AU-92, #414).
 //!
 //! Every pair here is made by `detach_audio` itself, so the link under test
 //! is the one the product writes.
@@ -348,4 +349,97 @@ fn an_unlinked_clip_with_its_audio_off_still_ducks() {
     let quiet = ducking().apply(&json!({"op": "set_enabled", "clip": VOICE, "audio": false}));
     assert!(clip(&quiet.value(), 10).get("linked").is_none());
     assert_eq!(gain(&quiet, BED, DUCKED), 0.2);
+}
+
+// ---- insert and overwrite on the sound's track (AU-92, #414) ------------
+
+/// Picture 10 on track 2 and its detached sound 100 on track 1, both
+/// 2 s – 8 s, with media 8, two seconds of roll, to bring in.
+fn pair_and_roll() -> Handle {
+    let pair = detach(project(vec![shot(10, 2, 2 * SEC, 6 * SEC, 0)]), &[10]);
+    let mut value = pair.value();
+    value["media"].as_array_mut().unwrap().push(json!(
+        {"id": 8, "path": "/fixtures/roll.mov", "kind": "video", "duration": 2 * SEC,
+         "width": 1920, "height": 1080, "fps": [30, 1], "has_video": true, "has_audio": true}
+    ));
+    Handle::from_value(&value)
+}
+
+fn span(project: &Value, id: u64) -> (i64, i64) {
+    (start(project, id), int(clip(project, id), "/duration"))
+}
+
+fn linked(project: &Value, id: u64) -> Option<i64> {
+    clip(project, id).get("linked").and_then(Value::as_i64)
+}
+
+#[test]
+fn an_insert_on_the_sounds_track_cuts_the_linked_picture() {
+    let before = pair_and_roll().value();
+    assert_eq!((track(&before, 10), track(&before, 100)), (2, 1));
+    let after = pair_and_roll()
+        .apply(&json!({"op": "insert_clip", "track": 1, "media": 8, "at": 4 * SEC}))
+        .value();
+    // 101 is the sound's second half, 102 the picture's, 103 the new clip.
+    assert_eq!(span(&after, 100), (2 * SEC, 2 * SEC));
+    assert_eq!(
+        span(&after, 10),
+        (2 * SEC, 2 * SEC),
+        "the picture is cut too"
+    );
+    assert_eq!(span(&after, 103), (4 * SEC, 2 * SEC));
+    assert_eq!(span(&after, 101), (6 * SEC, 4 * SEC));
+    assert_eq!(
+        span(&after, 102),
+        (6 * SEC, 4 * SEC),
+        "its tail rides the shift"
+    );
+    assert_eq!((track(&after, 102), track(&after, 103)), (2, 1));
+    assert_eq!(
+        (linked(&after, 10), linked(&after, 100)),
+        (Some(100), Some(10))
+    );
+    assert_eq!(
+        (linked(&after, 102), linked(&after, 101)),
+        (Some(101), Some(102))
+    );
+}
+
+#[test]
+fn an_insert_leaves_a_linked_picture_on_a_locked_track_whole() {
+    let locked = pair_and_roll().apply(&json!({"op": "set_track", "track": 2, "locked": true}));
+    let after = locked
+        .apply(&json!({"op": "insert_clip", "track": 1, "media": 8, "at": 4 * SEC}))
+        .value();
+    assert_eq!(span(&after, 10), (2 * SEC, 6 * SEC), "not cut, not moved");
+    assert_eq!(span(&after, 100), (2 * SEC, 2 * SEC));
+    // 101 is the sound's second half, 102 the new clip.
+    assert_eq!(span(&after, 101), (6 * SEC, 4 * SEC));
+    assert_eq!(span(&after, 102), (4 * SEC, 2 * SEC));
+}
+
+#[test]
+fn an_overwrite_on_the_sounds_track_cuts_the_linked_picture_at_both_ends() {
+    let after = pair_and_roll()
+        .apply(&json!({"op": "overwrite_clip", "track": 1, "media": 8, "at": 4 * SEC}))
+        .value();
+    // The cut at 4 s mints 101 (sound) and 102 (picture); the cut at 6 s
+    // mints 103 (the sound's tail) and 104 (the picture's); 105 is the new
+    // clip.
+    assert!(!has(&after, 101), "the sound under the new clip is gone");
+    assert_eq!(span(&after, 105), (4 * SEC, 2 * SEC));
+    assert_eq!(track(&after, 105), 1);
+    assert_eq!(span(&after, 10), (2 * SEC, 2 * SEC));
+    assert_eq!(span(&after, 102), (4 * SEC, 2 * SEC), "its middle stays");
+    assert_eq!(span(&after, 104), (6 * SEC, 2 * SEC));
+    assert_eq!(span(&after, 103), (6 * SEC, 2 * SEC), "nothing moved");
+    assert_eq!(linked(&after, 102), None, "and is no longer linked");
+    assert_eq!(
+        (linked(&after, 10), linked(&after, 100)),
+        (Some(100), Some(10))
+    );
+    assert_eq!(
+        (linked(&after, 104), linked(&after, 103)),
+        (Some(103), Some(104))
+    );
 }

@@ -99,8 +99,11 @@ final class ExportMixRead {
                 try starved.pull(origin: origin)
                 continue
             }
+            // The last drain is capped too: a group can end holding up to a
+            // block less one frame plus its stage's flush (#414).
             let ready = live.isEmpty
-                ? groups.map(\.available).max() ?? 0 : Self.blockFrames
+                ? min(groups.map(\.available).max() ?? 0, Self.blockFrames)
+                : Self.blockFrames
             guard ready > 0 else { return nil }
             return try emit(ready)
         }
