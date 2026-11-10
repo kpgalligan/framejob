@@ -158,7 +158,7 @@ extension AgentServer {
                     + "compressor, limiter and isolation, beside volume and the fades: numbers "
                     + "ramp, and a "
                     + "switch (a group or an EQ slot turned on, mono, channels, an EQ slope, "
-                    + "hum's frequency and harmonics, the leveller's response) changes when the "
+                    + "hum's frequency and harmonics, the leveler's response) changes when the "
                     + "action ENDS; isolation "
                     + "ramps from 0 on a clip with none. duck, keep_pitch, the fade shapes and "
                     + "voice are stored but never animate. "

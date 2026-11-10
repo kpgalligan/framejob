@@ -145,7 +145,7 @@ TOOLS = {
     "T13": [("normalize_clip", "a stereo clip through its own mono and pan",
              "a stereo clip through its own channel pick, mono and pan"),
             ("normalize_clip", "a gate, a de-esser, a compressor or a voice effect",
-             "a gate, a de-esser, a leveller, a compressor or a voice effect")],
+             "a gate, a de-esser, a leveler, a compressor or a voice effect")],
     "T14": [("detach_audio", "media with no audio, or audio already detached",
              "media with no audio, audio already detached, or a sound that would overlap what is "
              "on the track below"),

@@ -92,7 +92,7 @@ extension AgentServer {
         + "for the clip's speech as well as its loudness, and does nothing where speech "
         + "detection is unavailable or no phrase has 1 s of speech; {leveller: {}} turns it on "
         + "at the defaults), "
-        + "de_esser (null or {frequency, threshold_db, range_db}: after the leveller, turns "
+        + "de_esser (null or {frequency, threshold_db, range_db}: after the leveler, turns "
         + "the band above frequency down on sibilance and never boosts; frequency "
         + "2000–12000 Hz, default 6000; threshold_db relative to the clip's loudness, -30 "
         + "to 20, default 0; range_db 1–24, default 6). The three act only once the clip's "

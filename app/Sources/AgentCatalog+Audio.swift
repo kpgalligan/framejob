@@ -154,7 +154,7 @@ extension AgentServer {
                     + "result_true_peak_dbtp is held at the limiter's ceiling, and "
                     + "measured_lufs and true_peak_dbtp are the Volume section's Loudness "
                     + "readout. In loudness mode a clip with an active EQ, a hum notch, voice "
-                    + "isolation, noise reduction, a gate, a de-esser, a leveller, a compressor "
+                    + "isolation, noise reduction, a gate, a de-esser, a leveler, a compressor "
                     + "or a voice effect is measured THROUGH that processing: its window is rendered "
                     + "offline as the export plays it, pre-fader (waiting for its isolation or "
                     + "voice render; seconds on a long clip), the volume is solved on what comes "
@@ -223,7 +223,7 @@ extension AgentServer {
                     + String(format: "%g", AudioEnhance.gateAbovePausePeakDB)
                     + " dB above the pauses' median true peak (threshold_db re L, held to -40 "
                     + "… -6); with quiet pauses isolation, noise reduction and the gate are off, "
-                    + "and with under 0.5 s of pause they are left as they are; the leveller at "
+                    + "and with under 0.5 s of pause they are left as they are; the leveler at "
                     + "its defaults when the speech's short-term loudness range (3 s windows of "
                     + "the speech alone at a 0.1 s hop, EBU Tech 3342's gating, the 95th "
                     + "percentile less the 10th; speech_range_lu) is over "

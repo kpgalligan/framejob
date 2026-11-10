@@ -47,7 +47,7 @@ Some of what a file holds has to be made first, so the export waits for it:
 
 - The masks of every [Remove Background](/effects/remove-background/#exports) clip in the range, with no time limit.
 - Each clip's cursor, from its [cursor file](/recording/cursor-files/).
-- The measured loudness of every clip with a gate, leveller or de-esser, for up to five minutes.
+- The measured loudness of every clip with a gate, leveler or de-esser, for up to five minutes.
 - The rendered sound of speed changes, Voice Isolation and voice effects.
 
 GIF and APNG files have no sound, so they don't wait for the last two. You can cancel during any of these waits. [Waiting for what it needs](/export/what-an-export-includes/#waiting-for-what-it-needs) lists which clips each wait covers, and what happens if something can't be made.
@@ -87,7 +87,7 @@ The cursor count comes after the graphic count. A finished row in the Export Que
 | --- | --- |
 | "The export was not started: the graphic …" | A graphic in the range doesn't compile or has no module. Fix it and export again. |
 | "The export was stopped at frame … of the graphic …" | A graphic failed at that frame. No file is left. |
-| "Clip …'s loudness or speech has not been measured yet…" | A clip's gate, leveller or de-esser needs that measurement. Wait for the **Status** rows in those sections to show the clip's loudness, then export again. |
+| "Clip …'s loudness or speech has not been measured yet…" | A clip's gate, leveler or de-esser needs that measurement. Wait for the **Status** rows in those sections to show the clip's loudness, then export again. |
 | "Clip …'s retimed audio could not be rendered: …" | The sound of a speed change couldn't be made. |
 | "Clip …'s isolated voice could not be rendered: …" | Voice Isolation couldn't be rendered for that clip. |
 | "Clip …'s voice effect could not be rendered: …" | The voice effect couldn't be rendered for that clip. |

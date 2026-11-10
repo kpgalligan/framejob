@@ -248,7 +248,7 @@ export const sidebar = [
         collapsed: true,
         items: [
           'audio/eq',
-          'audio/leveller',
+          'audio/leveler',
           'audio/compressor',
           'audio/limiter',
           'audio/voice-effects',

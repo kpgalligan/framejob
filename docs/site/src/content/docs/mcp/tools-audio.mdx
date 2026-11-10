@@ -72,7 +72,7 @@ The volume can't go past 32×, so a clip quieter than about −31 dBFS can't rea
 In loudness mode:
 
 - A clip whose true peak would pass −1 dBTP at the target, or that already has a limiter, gets the clip's [limiter](/mcp/tools-set-audio/#compressor-and-limiter) in the same edit. Its own is kept with the ceiling at −1 dBTP at most, otherwise it's the default.
-- A clip with an active EQ, hum notch, voice isolation, noise reduction, gate, leveller, de-esser, compressor or voice effect is measured through that processing, rendered offline as the export plays it. It waits for any isolation or voice render.
+- A clip with an active EQ, hum notch, voice isolation, noise reduction, gate, leveler, de-esser, compressor or voice effect is measured through that processing, rendered offline as the export plays it. It waits for any isolation or voice render.
 - A worked-out volume within 0.05 dB of the clip's own is kept, so a second call still changes nothing.
 
 **Answers**, in peak mode, `peak_db` and a `normalized` list:
@@ -123,7 +123,7 @@ It measures the clip before any of its settings, then writes ordinary settings y
 | --- | --- | --- |
 | EQ | Always | The **Rumble Cut** high-pass, 80 Hz at 24 dB/octave. The EQ's other slots stay. |
 | Voice isolation and gate | When the pauses' floor is less than 45 dB under the clip's loudness | Isolation at 0.8, or noise reduction at 0.5 where isolation can't serve the clip (a speed other than 1, a ramp or a freeze). The gate opens 10 dB above the pauses' median true peak, held to −40 to −6 relative to the loudness. With quiet pauses all three are off, and with under 0.5 s of pause they're left as they are. |
-| Leveller | When the speech's short-term loudness range is over 6 LU | The leveller at its defaults, otherwise off. With under 3 s of speech it's left as it is. |
+| Leveler | When the speech's short-term loudness range is over 6 LU | The leveler at its defaults, otherwise off. With under 3 s of speech it's left as it is. |
 | De-esser | When at least 5% of the speech has its 6 kHz band within 10 dB of the loudness | The de-esser at its defaults, otherwise off. |
 | Compressor | Always | 3:1 at the speech's median true peak, with makeup that gives back what it takes. |
 | Limiter | Always | The clip's own, with its ceiling at −1 dBTP at most, otherwise the default. |

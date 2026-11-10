@@ -7434,10 +7434,10 @@
     },
     {
      "id": "audio-enhance-leveller",
-     "name": "Enhance Voice: leveller",
-     "summary": "Enhance Voice turns on the leveller at its defaults when the speech's short-term loudness range is over 6 LU.",
+     "name": "Enhance Voice: leveler",
+     "summary": "Enhance Voice turns on the leveler at its defaults when the speech's short-term loudness range is over 6 LU.",
      "page": "audio/enhance-voice",
-     "anchor": "leveller",
+     "anchor": "leveler",
      "where": "Clip ▸ Enhance Voice"
     },
     {
@@ -7675,10 +7675,10 @@
     {
      "id": "audio-dynamics-wait-for-analysis",
      "name": "Waiting for the clip's loudness",
-     "summary": "Until a clip's loudness is measured it plays without the gate, leveller and de-esser, and an export waits for it.",
+     "summary": "Until a clip's loudness is measured it plays without the gate, leveler and de-esser, and an export waits for it.",
      "page": "audio/gate",
      "anchor": "before-the-clips-loudness-is-measured",
-     "where": "Clip tab ▸ Sound ▸ Gate, Leveller or De-esser"
+     "where": "Clip tab ▸ Sound ▸ Gate, Leveler or De-esser"
     },
     {
      "id": "audio-reduce-sibilance",
@@ -7803,50 +7803,50 @@
     {
      "id": "audio-ride-the-level",
      "name": "Ride the level",
-     "summary": "Turns the leveller on, evening out a voice that moves on and off the microphone by bringing each phrase toward a target.",
-     "page": "audio/leveller",
+     "summary": "Turns the leveler on, evening out a voice that moves on and off the microphone by bringing each phrase toward a target.",
+     "page": "audio/leveler",
      "anchor": "ride-the-level",
-     "where": "Clip tab ▸ Sound ▸ Leveller ▸ Ride the level"
+     "where": "Clip tab ▸ Sound ▸ Leveler ▸ Ride the level"
     },
     {
      "id": "audio-leveller-target",
-     "name": "Leveller target",
+     "name": "Leveler target",
      "summary": "Where it aims, in dB from the clip's loudness.",
-     "page": "audio/leveller",
+     "page": "audio/leveler",
      "anchor": "target",
-     "where": "Clip tab ▸ Sound ▸ Leveller ▸ Target"
+     "where": "Clip tab ▸ Sound ▸ Leveler ▸ Target"
     },
     {
      "id": "audio-leveller-max-boost",
-     "name": "Leveller Max Boost",
+     "name": "Leveler Max Boost",
      "summary": "The most it turns the clip up.",
-     "page": "audio/leveller",
+     "page": "audio/leveler",
      "anchor": "max-boost",
-     "where": "Clip tab ▸ Sound ▸ Leveller ▸ Max Boost"
+     "where": "Clip tab ▸ Sound ▸ Leveler ▸ Max Boost"
     },
     {
      "id": "audio-leveller-max-cut",
-     "name": "Leveller Max Cut",
+     "name": "Leveler Max Cut",
      "summary": "The most it turns the clip down.",
-     "page": "audio/leveller",
+     "page": "audio/leveler",
      "anchor": "max-cut",
-     "where": "Clip tab ▸ Sound ▸ Leveller ▸ Max Cut"
+     "where": "Clip tab ▸ Sound ▸ Leveler ▸ Max Cut"
     },
     {
      "id": "audio-leveller-response",
-     "name": "Leveller response",
+     "name": "Leveler response",
      "summary": "How smoothly it follows the voice within a phrase: shorter changes are smoothed out.",
-     "page": "audio/leveller",
+     "page": "audio/leveler",
      "anchor": "response",
-     "where": "Clip tab ▸ Sound ▸ Leveller ▸ Response"
+     "where": "Clip tab ▸ Sound ▸ Leveler ▸ Response"
     },
     {
      "id": "audio-leveller-status",
-     "name": "Leveller Status and Loudness readouts",
-     "summary": "Readouts say where the leveller aims on this clip, what it waits for or why it isn't levelling, and the loudness it's measured from.",
-     "page": "audio/leveller",
+     "name": "Leveler Status and Loudness readouts",
+     "summary": "Readouts say where the leveler aims on this clip, what it waits for or why it isn't leveling, and the loudness it's measured from.",
+     "page": "audio/leveler",
      "anchor": "status-and-loudness-readouts",
-     "where": "Clip tab ▸ Sound ▸ Leveller"
+     "where": "Clip tab ▸ Sound ▸ Leveler"
     },
     {
      "id": "audio-compressor",
@@ -19366,11 +19366,11 @@
     },
     {
      "id": "mcp-set-audio-leveller",
-     "name": "set_audio: leveller",
+     "name": "set_audio: leveler",
      "summary": "Evens out a speaker who moves on and off the mic, from a gain curve made ahead of time.",
      "page": "mcp/tools-set-audio",
-     "anchor": "leveller",
-     "where": "Clip tab ▸ Sound ▸ Leveller"
+     "anchor": "leveler",
+     "where": "Clip tab ▸ Sound ▸ Leveler"
     },
     {
      "id": "mcp-set-audio-de-esser",
@@ -20717,7 +20717,7 @@
     {
      "id": "ref-limits-audio",
      "name": "Audio",
-     "summary": "Clip volume reaches 3200 % and track volume +12 dB, and the gate, leveller and de-esser need a measured clip.",
+     "summary": "Clip volume reaches 3200 % and track volume +12 dB, and the gate, leveler and de-esser need a measured clip.",
      "page": "reference/limits",
      "anchor": "audio"
     },

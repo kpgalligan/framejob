@@ -27407,7 +27407,7 @@ stops it. The names after the socket run only those parts (P2 runs P3, P4 runs P
 | P5 | the steady fixture: the leveller null and its reason; presses 2 and 3 "made no change"; three rounds of `set_audio {volume: 1}` then `normalize_clip {mode: loudness}` give `processed_lufs` equal within 0.0005 LU and equal to Enhance's |
 | P6 | the owner's recording: `speech_range_lu`, the decision and its reason printed; the decision matches the rule; a second call "made no change" |
 | P7 | the steady fixture levelled, an action over [21, 23) s taking the target 0 → −6: against the same export with no action, 0 ±0.05 dB over [12, 21) s and −6 ±0.05 dB over [23, 32) s |
-| P8 | `snapshot_ui` on `audio.leveller`: its rows' labels (Target, Max Boost, Max Cut, Response, Status, Loudness), no Holds Under, and the Status part "Aims at …" |
+| P8 | `snapshot_ui` on `audio.leveller`: its rows' labels (Target, Max Boost, Max Cut, Response, Status, Loudness), no Holds Under, and the Status part "Aims at …"; then the clip split at 0.2 s and its first piece selected, Status "Not leveling: it plays for under 0.4 s" (#541) |
 
 ```sh
 python3 tools/proof/audio_ap6b_probe.py             # L1–L9, R1–R5, the step-2 ranges
@@ -30801,7 +30801,7 @@ python3 tools/proof/ai_docs_b2_proof.py --mutant <name>
 RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_b2_proof.py --base-sources <its app/Sources> --expect-red
 ```
 
-## ai-docs r2c — the rest of the British spellings, and captures at a forced scale (`ai_docs_r2c_proof.py`; four mutants; spec §11 #526 as extended by #538, #539)
+## ai-docs r2c — the rest of the British spellings, and captures at a forced scale (`ai_docs_r2c_proof.py`; four mutants, and five for #541; spec §11 #526 as extended by #538 and #541, #539)
 
 ai-docs batch r2c (#538, #539). The built app under a scratch home, driven over MCP, on projects
 built from media made into `work/ai-docs-r2c/media/` (a `say`-voiced WAV and a 3 s ffmpeg clip with
@@ -30823,8 +30823,24 @@ controls and the tree rows; every other row is red on the frozen base app (`main
 and `--expect-red` (which skips the tree rows) exits 0 only when that holds. The four mutants are
 applied by hand to `UISnapshot.swift`, `AgentServer+Snapshot.swift` and `DevCaptureScale.swift`.
 
+**The Leveler's words (#541, spec §11 #526 as extended by #541).** Any `levell…` form, any case and
+with no word boundary, is a hit unless it is the JSON key `leveller`, which is told by its context
+and never by its file (`level_forms`): a string that is only the key or a path through it, or the
+key written as `{leveller:`, `leveller (null or {` or in the list `gate, leveller, de_esser`. S12
+reads `tools/list` with it (no hit, `set_audio` says "after the leveler", and the key still occurs
+there); T1's second scan reads the same three trees' literals with it, and fails too when it finds
+no key at all; T2 (a tree row) reads the site's pages, `sidebar.mjs`, `features.json` and
+`README.md`, where the word may stand only in a code span or a fenced block, or in an `"id"` value
+of `features.json`, and never in a page's path. The rows beside them are
+`clip_inspector2_probe.swift` T4 (the section's title), `audio_ap6b_probe.swift` R2 (Enhance's
+three sentences) and `audio_ap6b_proof.py` P4, P5 and P8 (the reasons over MCP, and the Status
+"Not leveling: it plays for under 0.4 s"). Five mutants, by hand: M1 the title back to
+"Leveller" (T4 and T1), M2 "Not levelling: " back (P8 and T1), M3 one Enhance sentence back (R2 and
+T1), M4 "after the leveller" back in `AgentCatalog+Properties.swift` (S12 and T1), and M5
+`level_forms` without its key contexts (T1 and S12 red on the kept keys).
+
 ```sh
-make app-debug && python3 tools/proof/ai_docs_r2c_proof.py [--only S1,C1,T1]
+make app-debug && python3 tools/proof/ai_docs_r2c_proof.py [--only S1,S12,C1,T1,T2]
 make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_r2c_proof.py
 RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_r2c_proof.py --expect-red
 ```

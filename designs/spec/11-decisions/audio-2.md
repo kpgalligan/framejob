@@ -286,7 +286,7 @@ after a distance change started up to 12 dB off for about 3 s. Both are rewritte
   `media.speech`, no VAD cache) while `SileroVAD.isAvailable` is false — a build without the
   model, or a model marked unavailable this process, after which `MediaImporter.speech` writes no
   cache and never retries — is `.unmeasurable(reason: "speech detection is unavailable")`: the
-  clip plays un-levelled, its Status reads "Not levelling: speech detection is unavailable", it is
+  clip plays un-levelled, its Status reads "Not leveling: speech detection is unavailable" (amended by #526), it is
   not in `pendingLevels`, and an export does not wait for it. The availability is read on each
   call (a pending answer is never memoised, as a missing loudness file is not), so a model
   marked unavailable mid-pass is seen by the export's next 0.1 s poll. **While pending** (no
@@ -294,8 +294,8 @@ after a distance change started up to 12 dB off for about 3 s. Both are rewritte
   un-levelled, Status reads "Waits for its loudness" or "Waits for its speech", and the clip is in
   `pendingLevels`, so an export — and AU-64's render, through `withOfflineAudio` — waits for it up
   to 300 s, then fails `loudnessUnmeasured`: "Clip N's loudness or speech has not been measured
-  yet, so its gate, leveller and de-esser cannot be set. Wait for their Status rows to show the
-  clip's loudness, then export again." An unmeasurable clip plays un-levelled and says why. A
+  yet, so its gate, leveler and de-esser cannot be set. Wait for their Status rows to show the
+  clip's loudness, then export again." (amended by #526) An unmeasurable clip plays un-levelled and says why. A
   nest clip's leveller reaches nothing.
   (f) **The model.** `audio.leveller` `{target_db −20…10 (0), max_up_db 0…24 (12), max_down_db
   0…24 (12), response 300 000…6 000 000 ticks (1 200 000, 2 s)}`, target in dB re L, after
@@ -306,11 +306,11 @@ after a distance change started up to 12 dB off for about 3 s. Both are rewritte
   (amends AU-85's deferral): the target and the limits interpolate, and **`response` joins
   `HELD_AUDIO_NUMBERS`** (amends AU-86): it switches at an action's end, because each response
   is its own curve made ahead of time. `clamp_leveller` holds an evaluated end to the ranges.
-  (g) **The section.** "Leveller", between Gate and De-esser, closed by default: a "Ride the
+  (g) **The section.** "Leveler" (amended by #526), between Gate and De-esser, closed by default: a "Ride the
   level" check (on writes the defaults); Target (dB re loudness, −20…10, quick −6, −3, 0, 3), Max
   Boost (dB 0…24, quick 6, 12, 18), Max Cut (dB 0…24, quick 3, 6, 12), Response (s, 0.5…10, one
   decimal, quick 1, 2, 4); a Status read-out ("Aims at −41.7 LUFS", L + target; "Waits for its
-  loudness"; "Waits for its speech"; "Not levelling: <reason>") and Loudness; the summary the
+  loudness"; "Waits for its speech"; "Not leveling: <reason>", amended by #526) and Loudness; the summary the
   target ("0 dB") or "off". Each control writes the whole group; inside an action Response
   writes the end like the other rows and takes effect at the end.
 - **AU-67 — Enhance turns the leveller on by the speech's short-term loudness range; the proof.**
@@ -322,8 +322,8 @@ after a distance change started up to 12 dB off for about 3 s. Both are rewritte
   interpolated (numpy's default). Under 300 speech steps there is none.
   (b) **The rule.** Enhance owns `leveller` (AU-60's eight keys become nine). Over 6 LU it writes
   `LevellerProps()` (the defaults); at or under 6 LU it writes null; with no range the key is left
-  out of the edit. Each case has its sentence ("Leveller: the speech's short-term loudness range
-  is 9.4 LU, above 6 LU, so the leveller is on at its defaults."). The range is measured
+  out of the edit. Each case has its sentence ("Leveler: the speech's short-term loudness range
+  is 9.4 LU, above 6 LU, so the leveler is on at its defaults.", amended by #526). The range is measured
   pre-chain, so a second press measures the same (AU-61's idempotence holds). `enhance_voice`'s
   rows gain `speech_range_lu` (a number, or null).
   (c) **Rendering (amends AU-64 (a)).** `ProcessedLoudness.needsRender` is true for a

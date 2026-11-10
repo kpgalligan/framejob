@@ -770,11 +770,12 @@ do {
     var overOn = false
     if case .some(.some(let props)) = over.leveller { overOn = props == LevellerProps() }
     let good = underOff && overOn && none.leveller == nil
-        && under.reason == "Leveller: the speech's short-term loudness range is 5.9 LU, at or "
-            + "under 6 LU, so the leveller is off."
-        && over.reason == "Leveller: the speech's short-term loudness range is 6.1 LU, above 6 "
-            + "LU, so the leveller is on at its defaults."
-        && none.reason.hasPrefix("Leveller: under 3 s of speech")
+        && under.reason == "Leveler: the speech's short-term loudness range is 5.9 LU, at or "
+            + "under 6 LU, so the leveler is off."
+        && over.reason == "Leveler: the speech's short-term loudness range is 6.1 LU, above 6 "
+            + "LU, so the leveler is on at its defaults."
+        && none.reason == "Leveler: under 3 s of speech, so there is no short-term loudness "
+            + "range to measure; the leveler is left as it is."
     check("R2", "the rule at 5.9 (off), 6.1 (on at its defaults) and with no range (left out), "
             + "each with its sentence", good,
           [under.reason, over.reason, none.reason].joined(separator: " | "))

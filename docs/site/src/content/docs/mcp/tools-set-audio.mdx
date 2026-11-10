@@ -167,7 +167,7 @@ See [Hum removal](/audio/hum-removal/).
 
 The loudness it's relative to is what [`normalize_clip`](/mcp/tools-audio/#normalize_clip) reports, before the clip's volume. See [Gate](/audio/gate/).
 
-### Leveller
+### Leveler
 
 `leveller` evens out a speaker who moves on and off the microphone, after the gate. It's a gain curve made ahead of time from the clip's measured loudness and its speech, so it sounds the same in the preview and an export.
 
@@ -180,11 +180,11 @@ The loudness it's relative to is what [`normalize_clip`](/mcp/tools-audio/#norma
 
 Each phrase's level is brought to `target_db`, never more than the two limits. A pause holds the gain and glides to the next phrase over its last 0.25 s, and a phrase under 1 s takes its neighbour's gain.
 
-It waits for the clip's speech as well as its loudness. It does nothing where speech detection isn't available or no phrase has 1 s of speech. See [Leveller](/audio/leveller/).
+It waits for the clip's speech as well as its loudness. It does nothing where speech detection isn't available or no phrase has 1 s of speech. See [Leveler](/audio/leveler/).
 
 ### De-esser
 
-`de_esser` comes after the leveller. It turns the band above `frequency` down on sibilance and never boosts it.
+`de_esser` comes after the leveler. It turns the band above `frequency` down on sibilance and never boosts it.
 
 | `de_esser` key | Range | Default |
 | --- | --- | --- |
@@ -192,7 +192,7 @@ It waits for the clip's speech as well as its loudness. It does nothing where sp
 | `threshold_db` | −30 to 20 dB, relative to the clip's loudness | 0 |
 | `range_db` | 1 to 24 dB | 6 |
 
-The gate, leveller and de-esser act only once the clip's loudness is measured. Until then the clip plays without them, and an export waits. A clip too short or too quiet to measure plays without them, and on a nest clip they do nothing. See [De-esser](/audio/de-esser/).
+The gate, leveler and de-esser act only once the clip's loudness is measured. Until then the clip plays without them, and an export waits. A clip too short or too quiet to measure plays without them, and on a nest clip they do nothing. See [De-esser](/audio/de-esser/).
 
 ### Voice effects
 

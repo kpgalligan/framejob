@@ -41,10 +41,12 @@ samples/Rode-usb-mic.m4a.
   P7  the steady fixture levelled, an action over [21, 23) s taking the target
       0 → −6: against the same export with no action, the gain 0 ±0.05 dB
       before 21 s and −6 ±0.05 dB after 23 s.
-  P8  an instance with the Leveller section open (`<false/>` in the argument
+  P8  an instance with the Leveler section open (`<false/>` in the argument
       domain only): snapshot_ui on audio.leveller shows its rows' labels
       (Target, Max Boost, Max Cut, Response, Status, Loudness) and the Status
-      read-out "Aims at …".
+      read-out "Aims at …"; then the clip split at 0.2 s and its first piece
+      selected, the Status reads "Not leveling: it plays for under 0.4 s"
+      (spec §11 #526 as extended by #541).
 """
 
 import json
@@ -319,7 +321,7 @@ def meter_plays(s, export, plays):
 # ---- P4–P6 enhance ----------------------------------------------------------
 
 def leveller_reason(row):
-    return next((r for r in row["reasons"] if r.startswith("Leveller:")), "")
+    return next((r for r in row["reasons"] if r.startswith("Leveler:")), "")
 
 
 def presses_after(s, clip, label):
@@ -362,7 +364,7 @@ def enhance_rows(m):
     print(f"  note P5 speech_range_lu {row.get('speech_range_lu')}; processed {enhanced}; "
           f"{reason}")
     check("leveller" in row["set"] and row["set"]["leveller"] is None
-          and "at or under 6 LU, so the leveller is off" in reason,
+          and "at or under 6 LU, so the leveler is off" in reason,
           f"P5 the leveller null: {row['set'].get('leveller', 'absent')!r}")
     presses_after(s, clip, "P5")
     rounds = []
@@ -417,7 +419,7 @@ def action_rows(m):
 # ---- P8 the section ---------------------------------------------------------
 
 def section_rows():
-    print("\nP8 — the Leveller section in snapshot_ui")
+    print("\nP8 — the Leveler section in snapshot_ui")
     launched = mcp_module.launch(
         proof_app.binary(), arguments=["-FrameJobInspectorSection.audio.leveller", "<false/>"])
     try:
@@ -428,22 +430,38 @@ def section_rows():
         s.op("set_audio", clips=[clip], patch={"leveller": {}})
         s.op("set_selection", clips=[clip])
         s.op("select_inspector_tab", tab="clip", sub_tab="sound", section="audio.leveller")
-        texts = []
-        for _ in range(40):
-            picture = os.path.join(p5.WORK, f"ap6b-section-{os.getpid()}.png")
-            shot = s.op("snapshot_ui", window="editor", path=picture)
-            with open(shot.get("layout_path") or "") as handle:
-                views = json.load(handle)["views"]
-            texts = [v.get("text") or "" for v in views if not v.get("hidden")]
-            if any(t.startswith("Aims at") for t in texts):
-                break
-            time.sleep(0.25)
+
+        def shown(prefix):
+            """The visible texts once one starts with `prefix`, or the last ones read."""
+            texts = []
+            for _ in range(40):
+                picture = os.path.join(p5.WORK, f"ap6b-section-{os.getpid()}.png")
+                shot = s.op("snapshot_ui", window="editor", path=picture)
+                with open(shot.get("layout_path") or "") as handle:
+                    views = json.load(handle)["views"]
+                texts = [v.get("text") or "" for v in views if not v.get("hidden")]
+                if any(t.startswith(prefix) for t in texts):
+                    break
+                time.sleep(0.25)
+            return texts
+
+        texts = shown("Aims at")
         # The rows' labels (the check's title and the header's are drawn, not
         # dumped as text) and the Status read-out's part.
         rows = ["Target", "Max Boost", "Max Cut", "Response", "Status", "Loudness"]
         aims = next((t for t in texts if t.startswith("Aims at")), None)
         check(all(r in texts for r in rows) and aims is not None and "Holds Under" not in texts,
               f"P8 rows {[r for r in rows if r in texts]}; status {aims!r}")
+        # A piece playing under 0.4 s has no loudness reading (AU-14), so its
+        # Status is the unmeasurable sentence, whatever its speech.
+        s.op("split", clips=[clip], at=SEC // 5)
+        s.op("set_selection", clips=[clip])
+        s.op("select_inspector_tab", tab="clip", sub_tab="sound", section="audio.leveller")
+        texts = shown("Not level")
+        short = next((t for t in texts if t.startswith("Not level")), None)
+        played = s.clip(clip)["duration"]
+        check(short == "Not leveling: it plays for under 0.4 s" and played == SEC // 5,
+              f"P8 the first piece ({played} ticks) reads {short!r}")
         launched.client.call("close_project", project=s.path, discard=True)
     finally:
         launched.stop()

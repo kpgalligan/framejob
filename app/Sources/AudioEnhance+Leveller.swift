@@ -70,14 +70,14 @@ extension AudioEnhance {
     static func levellerRule(_ m: Measurement) -> (leveller: LevellerProps??, reason: String) {
         let line = String(format: "%g LU", levellerRangeLU)
         guard let range = m.speechRangeLU else {
-            return (nil, "Leveller: under \(seconds(shortTermSteps)) of speech, so there is no "
-                + "short-term loudness range to measure; the leveller is left as it is.")
+            return (nil, "Leveler: under \(seconds(shortTermSteps)) of speech, so there is no "
+                + "short-term loudness range to measure; the leveler is left as it is.")
         }
         let measured = "the speech's short-term loudness range is \(signed(range, "%.1f LU"))"
         if range > levellerRangeLU {
-            return (.some(LevellerProps()), "Leveller: \(measured), above \(line), so the "
-                + "leveller is on at its defaults.")
+            return (.some(LevellerProps()), "Leveler: \(measured), above \(line), so the "
+                + "leveler is on at its defaults.")
         }
-        return (.some(nil), "Leveller: \(measured), at or under \(line), so the leveller is off.")
+        return (.some(nil), "Leveler: \(measured), at or under \(line), so the leveler is off.")
     }
 }

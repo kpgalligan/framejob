@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """ai-docs batch r2c (#538 #539, spec §11 #526 as extended by #538, and #539): the rest of the
-British spellings in what the app says, and `snapshot_ui` at a forced capture scale.
+British spellings in what the app says, and `snapshot_ui` at a forced capture scale. Since #541
+(spec §11 #526 as extended by #541) the Leveler's words too: S12, T1's second scan and T2.
 
     python3 tools/proof/ai_docs_r2c_proof.py [--only S1,C1,…] [--app PATH] [--expect-red]
     RC_PROOF_APP=release python3 tools/proof/ai_docs_r2c_proof.py
@@ -17,6 +18,12 @@ The word map (spec §11 #526 as extended by #538): analyse, analysed, analysing,
 normalised, normalises, normalising, recognise, recognised, recogniser, neighbour, neighbours,
 grey, greys, labelled, summarise, standardised — whole words, any case. "analyses" is counted
 apart, because the noun is right and only the verb changed.
+
+The Leveler's words (#541): any `levell…` form, any case, with no word boundary (so "un-levelled"
+counts), is a hit unless it is the JSON key `leveller`, which keeps its spelling. The key is told
+by its CONTEXT, never by its file (`level_forms`): a string that is only the key or a path through
+it (`leveller`, `audio.leveller.target_db`, `/audio/leveller/response`), or the key written as
+`{leveller:`, `leveller (null or {` or in the list `gate, leveller, de_esser`.
 
 Launch 1 (`-FrameJobCaptionEngine apple`, so a Release build's remembered engine cannot change
 the Generate Captions sheet):
@@ -41,8 +48,13 @@ the Generate Captions sheet):
   color "bluish"`.
 - S11 (c) an h264 export, `cancel_export` at once, `export_status`: `cancelled` with the reason
   "Cancelled.".
+- S12 `tools/list` holds no `levell…` form that is not the key (with the catalog's four old
+  texts back: 4, in `enhance_voice`, `normalize_clip`, `set_action_end` and `set_audio`),
+  `set_audio`'s text says "after the leveler", and the key `leveller` still occurs in it (a
+  control inside the row: a replace that reached the key fails it).
 - C4 (c) the editor's inspector captured with no capture default: `scale` equals
-  `window_facts.scale` and `width_px` is round(points × scale).
+  `window_facts.scale` and `width_px` is points × scale rounded half away from zero, as Swift's
+  `rounded()` does (a 825.5-point pane at 3× is 2,477 pixels, where Python's `round` says 2,476).
 Launch 2 (`-RCDevCaptureScale 3`, which no host has):
 - C1 the inspector capture answers scale 3, `width_px`/`height_px` are 3 × points (rounded), the
   dump says 3 and the PNG's IHDR holds the same size.
@@ -53,7 +65,11 @@ Launch 3 (`-RCDevCaptureScale 5`):
 Tree:
 - T1 (t) a literal scan of `app/Sources`, `core/src` and `graphic/src` (Swift `"…"`, `\"\"\"…\"\"\"`
   and interpolations, Rust `"…"` and raw strings, JS quotes and templates; comments skipped)
-  finds no map form, and no colour or centre form, outside the survivors spec §11 #526 keeps.
+  finds no map form, and no colour or centre form, outside the survivors spec §11 #526 keeps;
+  and no `levell…` form that is not the key (#541), with the key still found.
+- T2 (t) the documentation site's pages, `sidebar.mjs` and `src/data/features.json`, and
+  `README.md`, hold `levell…` only in a code span or a fenced block (a page) or an `"id"` value
+  (`features.json`), and no page's path holds it (#541).
 - I1 (t) `sips`: the four inspector webps `05h-clip-qualifier` and `11-document-inspector` are
   608 × 1078, `12-export-sheet.sheet.*` 960 × 1614 and `15-generate-captions-sheet.sheet.*`
   840 × 1076.
@@ -86,11 +102,11 @@ MEDIA = WORK / "media"
 CALL_BOUND = 600
 SEC = 600_000
 
-ROWS = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "C4", "C1", "C2",
-        "C3", "T1", "I1", "Z1"]
+ROWS = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S12", "C4", "C1",
+        "C2", "C3", "T1", "T2", "I1", "Z1"]
 CONTROLS = {"S3", "S11", "C4", "Z1"}
-TREE = {"T1", "I1"}
-LAUNCH_ONE = {"S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "C4"}
+TREE = {"T1", "T2", "I1"}
+LAUNCH_ONE = {"S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S12", "C4"}
 LAUNCH_TWO = {"C1", "C2"}
 LAUNCH_THREE = {"C3"}
 
@@ -99,6 +115,10 @@ MAP = re.compile(r"\b(analys(?:e|ed|ing)|normalis(?:e|ed|es|ing)|recognis(?:e|ed
 ANALYSES = re.compile(r"\banalyses\b", re.I)
 CANCELLED = re.compile(r"\bcancelled\b", re.I)
 C2_FORMS = re.compile(r"\b(colour\w*|centre[sd]?)\b", re.I)
+# The Leveler's words (#541). The key `leveller` keeps its spelling and is told by its context.
+LEVEL = re.compile(r"levell\w*", re.I)
+LEVEL_KEY_PATH = re.compile(r"(?:[a-z0-9_./]*[./])?leveller(?:[./][a-z0-9_./]*)?")
+LEVEL_KEY_CONTEXTS = re.compile(r"\{leveller:|leveller \(null or \{|gate, leveller, de_esser")
 BAD_COLOUR_JS = """export const meta = {};
 export function render(frame, props, ctx) {
   const fill = interpolateColors(0, [0, 1], ["bluish", "#000"]);
@@ -179,6 +199,15 @@ def map_forms(strings):
     return sorted({m.group(0) for s in strings for m in MAP.finditer(s)})
 
 
+def level_forms(value):
+    """The `levell…` forms of a string that are not the key `leveller`, and how many times the
+    key was found in one of its contexts."""
+    if LEVEL_KEY_PATH.fullmatch(value):
+        return [], 1
+    rest, keys = LEVEL_KEY_CONTEXTS.subn(" ", value)
+    return [m.group(0) for m in LEVEL.finditer(rest)], keys
+
+
 def descriptions(node, out):
     if isinstance(node, dict):
         for key, value in node.items():
@@ -190,6 +219,12 @@ def descriptions(node, out):
         for value in node:
             descriptions(value, out)
     return out
+
+
+def pixels(points):
+    """A length in pixels as `UISnapshot` rounds it: Swift's `rounded()`, half away from zero.
+    Python's `round` goes to the even neighbour, one pixel under at a half."""
+    return int(points + 0.5)
 
 
 def ihdr(png):
@@ -221,6 +256,22 @@ def catalog_rows(client):
           and "framing analyses to want" in clips, f"'analyses' ×{len(analyses)}: {analyses}")
     cancelled = sum(len(CANCELLED.findall(s)) for strings in texts.values() for s in strings)
     check("S3", cancelled == 5, f"'cancelled' ×{cancelled} (want 5, the base's)")
+    levels, keys = {}, 0
+    for name, strings in texts.items():
+        for s in strings:
+            found, kept = level_forms(s)
+            keys += kept
+            for form in found:
+                levels.setdefault(form, set()).add(name)
+    count = sum(len(level_forms(s)[0]) for strings in texts.values() for s in strings)
+    audio = texts.get("set_audio", [])
+    after = any("after the leveler" in s for s in audio)
+    keyed = sum(level_forms(s)[1] for s in audio)
+    check("S12", count == 0 and after and keyed > 0,
+          f"tools/list: {count} leveller forms outside the key "
+          f"{ {k: sorted(v)[:4] for k, v in sorted(levels.items())} or ''}; set_audio "
+          f"{'says' if after else 'DOES NOT SAY'} 'after the leveler' and holds the key "
+          f"×{keyed} (×{keys} in every tool)")
 
 
 def sheet_rows(client):
@@ -231,7 +282,7 @@ def sheet_rows(client):
             answer, dump, png = d.capture("c4-inspector", window="editor", view="inspector")
             scale, facts = answer.get("scale"), answer.get("window_facts", {}).get("scale")
             points = answer.get("points") or [0, 0]
-            want = [round(points[0] * scale), round(points[1] * scale)] if scale else None
+            want = [pixels(points[0] * scale), pixels(points[1] * scale)] if scale else None
             got = [answer.get("width_px"), answer.get("height_px")]
             check("C4", scale is not None and scale == facts and got == want
                   and dump.get("scale") == scale,
@@ -349,7 +400,7 @@ def forced_rows(client):
             if close:
                 d.call("cancel_sheet")
             points = answer.get("points") or [0, 0]
-            want = [round(points[0] * 3), round(points[1] * 3)]
+            want = [pixels(points[0] * 3), pixels(points[1] * 3)]
             got = [answer.get("width_px"), answer.get("height_px")]
             check(row, answer.get("scale") == 3 and got == want and dump.get("scale") == 3
                   and ihdr(png) == want,
@@ -506,7 +557,7 @@ SCAN_FORMS = re.compile(MAP.pattern + r"|\banalyses\b|" + C2_FORMS.pattern, re.I
 
 
 def tree_scan():
-    hits = []
+    hits, levels, keys = [], [], 0
     files = ([(p, "swift") for p in sorted((ROOT / "app/Sources").glob("*.swift"))]
              + [(p, "rust") for p in sorted((ROOT / "core/src").rglob("*.rs"))]
              + [(p, "rust") for p in sorted((ROOT / "graphic/src").rglob("*.rs"))]
@@ -520,8 +571,51 @@ def tree_scan():
                 if any(rel == f and want in value for f, want in SURVIVORS):
                     continue
                 hits.append(f"{rel}:{number} {m.group(0)!r} in {value[:80]!r}")
+            found, kept = level_forms(value)
+            keys += kept
+            levels += [f"{rel}:{number} {form!r} in {value[:80]!r}" for form in found]
     check("T1", not hits, f"{len(files)} files, {scanned} literals; {len(hits)} map forms "
           f"outside the survivors {hits[:12] or ''}")
+    check("T1", not levels and keys > 0, f"{len(levels)} leveller forms outside the key "
+          f"(the key ×{keys}) {levels[:24] or ''}")
+
+
+CODE_SPANS = re.compile(r"```.*?```|`[^`\n]*`", re.S)
+
+
+def site_scan():
+    """T2: the Leveler's words on the site and in the README (#541)."""
+    site = ROOT / "docs/site"
+    pages = sorted(p for p in (site / "src/content/docs").rglob("*") if p.suffix in (".md", ".mdx"))
+    texts = [(p, CODE_SPANS.sub(" ", p.read_text(encoding="utf-8")))
+             for p in pages + [ROOT / "README.md"]]
+    texts.append((site / "sidebar.mjs", (site / "sidebar.mjs").read_text(encoding="utf-8")))
+    hits = [f"{p.relative_to(ROOT)} (its path)" for p in pages
+            if LEVEL.search(str(p.relative_to(site)))]
+    for path, text in texts:
+        for number, row in enumerate(text.split("\n"), 1):
+            hits += [f"{path.relative_to(ROOT)}:{number} {m.group(0)!r}"
+                     for m in LEVEL.finditer(row)]
+
+    ids = []
+
+    def walk(node, key=None):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                walk(v, k)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v, key)
+        elif isinstance(node, str) and LEVEL.search(node):
+            if key == "id":
+                ids.append(node)
+            else:
+                hits.append(f"docs/site/src/data/features.json {key}: {node[:80]!r}")
+
+    walk(json.loads((site / "src/data/features.json").read_text(encoding="utf-8")))
+    check("T2", not hits and len(pages) > 100,
+          f"{len(pages)} pages, sidebar.mjs, features.json and README.md; {len(hits)} leveller "
+          f"forms outside a code span or an id ({len(ids)} ids keep theirs) {hits[:16] or ''}")
 
 
 def webp_sizes():
@@ -614,6 +708,8 @@ def main():
 
     if "T1" in selected:
         tree_scan()
+    if "T2" in selected:
+        site_scan()
     if "I1" in selected:
         webp_sizes()
 
@@ -630,7 +726,7 @@ def main():
         first = selected & LAUNCH_ONE
         if first:
             def body(client, _log):
-                if first & {"S1", "S2", "S3"}:
+                if first & {"S1", "S2", "S3", "S12"}:
                     catalog_rows(client)
                 if first & {"S4", "S5", "C4"}:
                     sheet_rows(client)

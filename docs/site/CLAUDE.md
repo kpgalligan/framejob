@@ -53,6 +53,10 @@ MCP pages and `tools=` in `AtAGlance` name agent tools, because those are the pr
 - Open with what the feature is for, in a sentence or two, before any steps.
 - British spelling in prose (colour, centre, grey, normalise), and the
   app's exact spelling for its own labels (the **Color** tab, **Normalize**).
+  The Leveler's own words are the one exception in prose: leveler, leveling and leveled follow
+  the app everywhere on the site, so no page spells the feature two ways (spec §11 #526 as
+  extended by #541). The JSON key stays `leveller`, in a code span.
+  `tools/proof/ai_docs_r2c_proof.py --only T2` holds it.
 - Contractions are fine. No marketing: never "powerful", "seamless", "effortless", "robust",
   "simply", "just", "easily", "unleash", "supercharge".
 - Prefer a full stop or a comma to an em dash.

@@ -1860,6 +1860,19 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   identifiers and comments keep their spelling. Amends the quoted strings
   of AU-14, SY-11, SY-17, SY-31, SY-34, SY-38, SW-24, SW-84, VR-63, TX-18
   and G-12.
+  **Extended by #541** (the owner, 2026-11-10): the same strings spell
+  Leveler, leveler and leveling: the Sound tab's section and its rows'
+  names, its Status "Not leveling: <reason>", Enhance Voice's "Leveler: …"
+  reasons, the export's `loudnessUnmeasured` sentence and the tools' prose.
+  The key `leveller` and its paths (`audio.leveller.target_db`), the
+  section id `audio.leveller` and its launch default
+  `-FrameJobInspectorSection.audio.leveller`, `LevellerProps` and every
+  other identifier, file name and comment keep theirs. On the documentation
+  site the Leveler's own words (leveler, leveling, leveled) follow the app
+  in prose too, so that no page spells the feature two ways, and its page
+  is `audio/leveler`; the rest of the site's prose stays British. Amends
+  the quoted strings of AU-66 and AU-67, and §4.3's and §7.8's quotations
+  of them.
 - **#532 — A frames timecode counts real seconds at a fractional rate that
   is not NTSC.** At an NTSC rate (`Fps::counts_nominal_seconds`: the rate's
   denominator over the gcd of its numerator and denominator is 1001, so
