@@ -546,7 +546,11 @@ it. **That rule applies to historical instruments too.** The meter and welcome
 comparisons build old `app/Sources` with the matching old core and header in
 isolated output directories, using the current guarded `harness/main.swift`
 for both paints; `cloud_captions_probe.py`'s W and SP baselines build the
-same way through `reference_build.py`, each in its own folder. A failed current or reference build is a scored failure,
+same way through `reference_build.py`, each in its own folder. A proof that
+compares with the base's built APP (`co2a_proof.py` D15, `ramp_proof.py` U1)
+finds its base with `tree_copy.default_base()` and builds it whole with
+`tree_copy.make_base_copy`; it never pins a commit's `app/` against the
+tree's core. A failed current or reference build is a scored failure,
 including an FFI diagnostic; it is never a historical skip or a reason to
 fall back to the old harness. Only the recording proof's granted tier can
 skip rows for a named host condition such as a locked console.

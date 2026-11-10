@@ -133,6 +133,11 @@ kernel 4σ either side.
   P; each row's sentence is the probe's.
 - **Z1** (CONTROL): the fixtures hold (B, B50 and BD are the fixtures'
   bytes), the projects close and the log holds no `Frame Job: ` line.
+- **MA** (#433; text only, no app, first in a run, not under `--mutant` or
+  `capture`): every anchor of every mutant in `MUTANTS` occurs exactly once
+  in the tree's file (`anchor_count`, which `build_mutant` counts through
+  too), so an anchor a later change moved fails the next plain run by the
+  mutant's name instead of waiting for someone to run that mutant.
 
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`; a `core/`
 mutant makes the copy's `core/` its own through `hevc_alpha_proof.own_core`
@@ -192,7 +197,7 @@ GREY = 128
 SHOW = ["View", "Show Selection"]
 NEUTRAL = ["card", "card-adjusted", "card-matted", "ramp", "hue", "hue-qualified",
            "hue-selection", "movie"]
-ROWS = ["N0", "N1", "N2", "H1", "W1", "G1", "S1", "S1b", "S2", "L1", "I1", "M1", "D1", "E1",
+ROWS = ["MA", "N0", "N1", "N2", "H1", "W1", "G1", "S1", "S1b", "S2", "L1", "I1", "M1", "D1", "E1",
         "V1", "B1", "F1", "A1", "A2", "R1", "P0", "U1", "V2", "Q1", "Q2", "Q3", "Q4", "Q5",
         "Q6", "K1", "K2", "K3", "K4", "K5", "K6", "K7", "K8", "K9", "K10", "Z1"]
 RECORDS = set()
@@ -204,7 +209,11 @@ K_ROWS = {"K1", "K2", "K3", "K4", "K5", "K6", "K7", "K8", "K9", "K10"}
 NC_ROWS = {"Q1", "Q2", "Q3", "Q4", "Q5", "Q6"}
 SHADER = "app/Resources/Shaders/Compositor.metal"
 WEIGHT = "    float w = saturate(u.opacity * coverage * selected);\n"
-SHOWN = "        return float4(float3(saturate(selected * coverage)), 1.0);\n    }\n"
+# Show Selection's return, two lines since HDR H-6 split it (#433): the grey
+# the map shows, and its return (the end of the `q.selection` block).
+SHOWN_GREY = "        float3 grey = float3(saturate(selected * coverage));\n"
+SHOWN_END = ("        return float4(linear ? blendDecode(grey, u.hlgOutput) : grey, 1.0);\n"
+             "    }\n")
 SELECTION = "app/Sources/Compositor+Selection.swift"
 MAP_READ = "    float4 dst = destination.read(uint2(in.position.xy));\n"
 MAP_WEIGHT = "    return float4(qualifierWeight(c, q), 0.0, 0.0, 1.0);\n"
@@ -275,8 +284,9 @@ MUTANTS = {
         "        selected = false ? selectionMap.read(uint2(in.position.xy)).r\n")],
         ["Q1", "Q2", "Q4", "Q5"]),
     "grade-reads-inline-q": ([(
-        SHADER, SHOWN,
-        SHOWN + "    if (q.enabled > 0.5) {\n        selected = qualifierWeight(c, q);\n    }\n")],
+        SHADER, SHOWN_END,
+        SHOWN_END
+        + "    if (q.enabled > 0.5) {\n        selected = qualifierWeight(c, q);\n    }\n")],
         ["Q3"]),
     "sigma-not-scaled": ([(
         "app/Sources/QualifierProps.swift",
@@ -303,9 +313,9 @@ MUTANTS = {
          "    return float4(qualifierWeight(c, q) * matte.sample(edge, uv).r, 0.0, 0.0, 1.0);\n"),
         (SHADER, WEIGHT,
          "    float w = saturate(u.opacity * (q.blurred > 0.5 ? 1.0 : coverage) * selected);\n"),
-        (SHADER, SHOWN,
-         "        return float4(float3(saturate(selected * (q.blurred > 0.5 ? 1.0 : coverage))), "
-         "1.0);\n    }\n"),
+        (SHADER, SHOWN_GREY,
+         "        float3 grey = float3(saturate(selected * (q.blurred > 0.5 ? 1.0 : coverage)));"
+         "\n"),
         (SELECTION, "    struct QualifierSurfaces {\n",
          "    nonisolated(unsafe) static var mutantCoverage: MTLTexture?\n"
          "    struct QualifierSurfaces {\n"),
@@ -1625,6 +1635,25 @@ def remove_work():
         tree_copy.remove_tree(str(WORK))
 
 
+def anchor_count(root, path, anchor):
+    """How many times `anchor` occurs in `root`'s `path`; 0 when it cannot be read."""
+    try:
+        return (Path(root) / path).read_text().count(anchor)
+    except OSError:
+        return 0
+
+
+def anchors_row():
+    """MA: every mutant's every anchor occurs exactly once in the tree."""
+    wrong = [f"{name}: {count} times in {path}: {anchor!r}"
+             for name, (edits, _) in sorted(MUTANTS.items())
+             for path, anchor, _ in edits
+             for count in [anchor_count(ROOT, path, anchor)] if count != 1]
+    total = sum(len(edits) for edits, _ in MUTANTS.values())
+    check(f"MA every anchor of the {len(MUTANTS)} mutants ({total} anchors) occurs exactly "
+          "once in the tree", not wrong, "; ".join(wrong))
+
+
 def build_mutant(name):
     """A copy of the tree with the mutant's edits, built by its own
     `tree_copy.build_app`. (app bundle, copy) or (None, why)."""
@@ -1645,10 +1674,10 @@ def build_mutant(name):
         target = copy / path
         if not target.resolve().is_relative_to(WORK):
             return None, f"{path} in the copy is the tree's own file"
-        text = target.read_text()
-        if text.count(anchor) != 1:
-            return None, f"the anchor occurs {text.count(anchor)} times in {path}: {anchor!r}"
-        target.write_text(text.replace(anchor, replacement))
+        count = anchor_count(copy, path, anchor)
+        if count != 1:
+            return None, f"the anchor occurs {count} times in {path}: {anchor!r}"
+        target.write_text(target.read_text().replace(anchor, replacement))
     print(f"  building the copy ({len(edits)} edit(s), each anchor found once)…", flush=True)
     app, reason = tree_copy.build_app(copy, BUILD_BOUND)
     if app is None:
@@ -1686,6 +1715,8 @@ def main():
             return 2
     if args.mode != "compare":
         selected.discard("N0")
+    if args.mutant or args.mode == "capture":
+        selected.discard("MA")
     remove_work()
     atexit.register(remove_work)
     HOME.mkdir(parents=True)
@@ -1718,6 +1749,10 @@ def main():
     else:
         print(f"grading-2 G2-4 — qualifiers over MCP ({args.mode or 'run'}, {config} build "
               f"{binary})", flush=True)
+        anchors_row()
+        if selected == {"MA"}:      # text only: no app is launched for it alone
+            print(f"{int(rows.get('MA', False))}/1")
+            return 0 if rows.get("MA") else 1
     if not binary.is_file():
         print(f"instrument failure: no app binary at {binary}")
         return 2

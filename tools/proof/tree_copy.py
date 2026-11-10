@@ -70,6 +70,38 @@ The selftest, in a fresh `work/tree_copy/`:
 * T6 — a copy's `build/` is a real directory and its `build/codecs` is a
   symlink whose `realpath` is the tree's `build/codecs`.
 
+* T7 — a base copy of `HEAD` (`make_base_copy`): `core/`, `graphic/`,
+  `mcp-proxy/`, `app/` and `agent/` are real directories, `tools` is a symlink
+  to the tree's, `build/codecs` resolves to the tree's, and
+  `app/Sources/main.swift`, `core/src/format.rs` and `project.yml` are
+  byte-equal to `git show HEAD:…`;
+* T8 (CONTROL) — `make_base_copy` on an id no object has answers a reason and
+  leaves no folder; `default_base` answers a commit and the rule that chose it.
+
+**A base copy is the tree as a commit had it, built whole** (#440, #388).
+A proof that compares this build with "the build before the change" (a base
+app: `co2a_proof.py` D15, `ramp_proof.py` U1) must build the base from its
+OWN Swift, core, header and `project.yml`: a pinned `app/` linked against the
+tree's core stops building the day the core's op table moves (the startup
+parity check traps at Write Agent Catalog). `make_base_copy(dest, rev)` is
+`make_copy(dest)` with every build input but `tools` — the tree's
+`build_inputs()` and the base's own (what ITS `project.yml` names of ITS
+top-level directories), and `COPIED_FILES` — replaced by `git archive
+<sha>`'s; `core/target/release` and `mcp-proxy/target/release` are cloned
+from the tree's (`cp -cRp`, copy-on-write) so cargo compiles the local crates
+only, and a failed clone is a cold build, not a failure. `tools` (`BASE_LINKED`)
+stays the tree's on purpose: `tools/codecs/build_codecs.py` finds the tree
+from its own path, so the base is built with the tree's build tooling and the
+tree's encoders, as with the tree's compiler. It answers `(dest, sha, None)`
+or `(None, None, reason)`.
+
+`default_base()` answers `(sha, rule)`: `HEAD` when the tree's build inputs
+differ from it (uncommitted work is the change under test), else the
+merge-base of `HEAD` and `main` (a lane's commits are), else `HEAD`.
+`inputs_differ(sha)` is whether the tree's build inputs (`base_paths()`:
+tracked or untracked, `tools` apart) differ from `sha`'s; a proof says in its
+row when they do not, because it then compared two builds of one source.
+
 An instrument that cannot run is a FAIL, never an exit.
 """
 
@@ -93,6 +125,7 @@ WORK = os.path.join(ROOT, "tools", "proof", "work", "tree_copy")
 COPIED = ("app", "agent")                      # the build writes into these, so copied
 COPIED_FILES = ("project.yml", "Makefile", "VERSION")   # what `make project` reads
 GENERATED = ("build", "FrameJob.xcodeproj")     # never linked
+BASE_LINKED = ("tools",)                        # a base copy keeps the tree's build tooling
 
 
 def build_inputs(project_yml=None):
@@ -101,11 +134,16 @@ def build_inputs(project_yml=None):
     if project_yml is None:
         with open(os.path.join(ROOT, "project.yml")) as handle:
             project_yml = handle.read()
+    return named_in(project_yml, [name for name in os.listdir(ROOT)
+                                  if os.path.isdir(os.path.join(ROOT, name))])
+
+
+def named_in(project_yml, names):
+    """Those of `names` (top-level directory names) that `project_yml` spells
+    as `NAME/`, sorted; never a dot name or a `GENERATED` one."""
     found = []
-    for name in sorted(os.listdir(ROOT)):
-        if name.startswith(".") or name in GENERATED:
-            continue
-        if not os.path.isdir(os.path.join(ROOT, name)):
+    for name in sorted(names):
+        if not name or name.startswith(".") or name in GENERATED:
             continue
         if re.search(r"(?<![A-Za-z0-9_.-])" + re.escape(name) + "/", project_yml):
             found.append(name)
@@ -183,6 +221,119 @@ def make_copy(dest, agent=True):
     except OSError as error:
         return None, f"the tree copy at {dest} could not be made: {error}"
     return dest, None
+
+
+SHA = re.compile(r"[0-9a-f]{40,64}")
+
+
+def _git(*arguments, text=True, timeout=120):
+    return subprocess.run(["git", "-C", ROOT, *arguments], capture_output=True, text=text,
+                          timeout=timeout)
+
+
+def resolve(rev):
+    """The full sha of the commit `rev` names in the tree's repository, or None."""
+    try:
+        ran = _git("rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}")
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    sha = ran.stdout.strip()
+    return sha if ran.returncode == 0 and SHA.fullmatch(sha) else None
+
+
+def base_paths():
+    """What a base copy takes from its commit, of the tree's own inputs: every
+    build input but `BASE_LINKED`, and `COPIED_FILES`."""
+    return [name for name in build_inputs() if name not in BASE_LINKED] + list(COPIED_FILES)
+
+
+def inputs_differ(sha):
+    """Whether the tree's build inputs (`base_paths()`, tracked or untracked
+    and not ignored) differ from `sha`'s. A question git cannot answer is a
+    difference."""
+    paths = base_paths()
+    try:
+        if _git("diff", "--quiet", sha, "--", *paths).returncode != 0:
+            return True
+        others = _git("ls-files", "--others", "--exclude-standard", "--", *paths)
+    except (OSError, subprocess.TimeoutExpired):
+        return True
+    return others.returncode != 0 or bool(others.stdout.strip())
+
+
+def default_base():
+    """`(sha, rule)`: the commit the change under test started from, and the
+    rule that chose it in words; `(None, reason)` when `HEAD` names none."""
+    head = resolve("HEAD")
+    if head is None:
+        return None, "HEAD names no commit"
+    if inputs_differ(head):
+        return head, "HEAD, which the tree's build inputs differ from"
+    try:
+        merged = _git("merge-base", "HEAD", "main")
+        sha = merged.stdout.strip() if merged.returncode == 0 else ""
+    except (OSError, subprocess.TimeoutExpired):
+        sha = ""
+    if not SHA.fullmatch(sha):
+        return head, "HEAD (main names no commit to take a merge-base with)"
+    if sha == head:
+        return head, "HEAD, which main holds and whose build inputs the tree's are"
+    return sha, "the merge-base of HEAD and main (the tree's build inputs are HEAD's)"
+
+
+def make_base_copy(dest, rev):
+    """A copy of the tree as the commit `rev` had it, that the app builds in
+    WHOLE: `make_copy(dest)`, then every build input but `BASE_LINKED` — the
+    tree's and the base's own — and `COPIED_FILES` replaced by `git archive`'s,
+    and the tree's release artifacts cloned for cargo. Answers `(dest, sha,
+    None)` or `(None, None, reason)`, leaving no folder behind a reason."""
+    sha = resolve(rev)
+    if sha is None:
+        remove_tree(dest)
+        return None, None, f"{rev} names no commit in {ROOT}"
+    made, reason = make_copy(dest)
+    if made is None:
+        return None, None, reason
+    try:
+        listed = _git("ls-tree", "-d", "--name-only", sha)
+        shown = _git("show", f"{sha}:project.yml")
+        if listed.returncode != 0 or shown.returncode != 0:
+            raise OSError(f"git could not read {sha[:8]}'s tree or its project.yml: "
+                          f"{(listed.stderr or shown.stderr).strip()[-300:]}")
+        theirs = named_in(shown.stdout, listed.stdout.split("\n"))
+        names = [name for name in sorted(set(build_inputs()) | set(theirs))
+                 if name not in BASE_LINKED] + list(COPIED_FILES)
+        for name in names:
+            path = os.path.join(dest, name)
+            if os.path.islink(path) or os.path.isfile(path):
+                os.unlink(path)
+            elif os.path.isdir(path):
+                shutil.rmtree(path)
+        present = [name for name in names
+                   if _git("cat-file", "-e", f"{sha}:{name}").returncode == 0]
+        archive = _git("archive", sha, "--", *present, text=False, timeout=600)
+        if archive.returncode != 0:
+            raise OSError(f"git archive {sha[:8]}: "
+                          f"{archive.stderr.decode(errors='replace').strip()[-300:]}")
+        untar = subprocess.run(["tar", "-x", "-C", dest], input=archive.stdout,
+                               capture_output=True, timeout=600)
+        if untar.returncode != 0:
+            raise OSError(f"tar: {untar.stderr.decode(errors='replace').strip()[-300:]}")
+        for crate in ("core", "mcp-proxy"):
+            source = os.path.join(ROOT, crate, "target", "release")
+            if not os.path.isdir(source) or not os.path.isdir(os.path.join(dest, crate)):
+                continue
+            os.makedirs(os.path.join(dest, crate, "target"), exist_ok=True)
+            target = os.path.join(dest, crate, "target", "release")
+            cloned = bounded.run(["cp", "-cRp", source, target], 600)
+            if cloned["rc"] != 0:
+                shutil.rmtree(target, ignore_errors=True)
+                print(f"tree_copy: {crate}'s release artifacts could not be cloned; the base "
+                      "copy builds it cold", flush=True)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        remove_tree(dest)
+        return None, None, f"the base copy of {sha[:8]} at {dest} could not be made: {error}"
+    return dest, sha, None
 
 
 def build_app(dest, seconds, env=None, release_only=None):
@@ -343,6 +494,62 @@ def selftest():
     except Exception as error:
         row("T6", False, f"the build/codecs row raised {error!r}")
 
+    # T7 — a base copy is the commit's own tree, with the tree's tools (#440)
+    try:
+        dest, sha, reason = make_base_copy(os.path.join(WORK, "base"), "HEAD")
+        if dest is None:
+            row("T7", False, reason)
+        else:
+            problems = []
+            for name in ("core", "graphic", "mcp-proxy", "app", "agent"):
+                path = os.path.join(dest, name)
+                if os.path.islink(path) or not os.path.isdir(path):
+                    problems.append(f"{name}/ is not a real directory")
+            for name in BASE_LINKED:
+                path = os.path.join(dest, name)
+                if not os.path.islink(path):
+                    problems.append(f"{name} is not a symlink")
+                elif os.path.realpath(path) != os.path.realpath(os.path.join(ROOT, name)):
+                    problems.append(f"{name} resolves to {os.path.realpath(path)}")
+            codecs = os.path.join(dest, "build", "codecs")
+            if os.path.realpath(codecs) != os.path.realpath(os.path.join(ROOT, "build", "codecs")):
+                problems.append(f"build/codecs resolves to {os.path.realpath(codecs)}")
+            for one in ("app/Sources/main.swift", "core/src/format.rs", "project.yml"):
+                shown = _git("show", f"{sha}:{one}", text=False)
+                try:
+                    with open(os.path.join(dest, one), "rb") as handle:
+                        equal = shown.returncode == 0 and handle.read() == shown.stdout
+                except OSError:
+                    equal = False
+                if not equal:
+                    problems.append(f"{one} is not git show {sha[:8]}:{one}")
+            row("T7", not problems, "; ".join(problems) if problems
+                else f"a base copy of {sha[:8]}: core/, graphic/, mcp-proxy/, app/ and agent/ "
+                     f"real, {list(BASE_LINKED)} and build/codecs the tree's, three files "
+                     "byte-equal to the commit's")
+            remove_tree(dest)       # its cloned artifacts are not kept
+    except Exception as error:
+        row("T7", False, f"the base copy raised {error!r}")
+
+    # T8 (CONTROL) — an id no object has, and the default base
+    try:
+        dest = os.path.join(WORK, "no-base")
+        os.makedirs(dest)
+        made, sha, reason = make_base_copy(dest, "0" * 40)
+        base, rule = default_base()
+        problems = []
+        if made is not None or sha is not None or not reason:
+            problems.append(f"an absent id answered {(made, sha, reason)}")
+        if os.path.lexists(dest):
+            problems.append(f"it left {dest}")
+        if base is None or resolve(base) != base:
+            problems.append(f"default_base answered {(base, rule)}")
+        row("T8", not problems, "; ".join(problems) if problems
+            else f"CONTROL: an absent id answers `{reason}` and no folder; the default base is "
+                 f"{base[:8]}, {rule}")
+    except Exception as error:
+        row("T8", False, f"the control raised {error!r}")
+
     print(f"{sum(rows)}/{len(rows)}")
     return 0 if all(rows) else 1
 
@@ -350,7 +557,7 @@ def selftest():
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--selftest", action="store_true",
-                        help="T1–T6 in a fresh work/tree_copy/")
+                        help="T1–T8 in a fresh work/tree_copy/")
     arguments = parser.parse_args(argv)
     if arguments.selftest:
         return selftest()

@@ -20003,7 +20003,7 @@ RC_PROOF_APP=release python3 tools/proof/curves_proof.py compare tools/proof/wor
 aligned action, whose oracles are the per-point lerp, so they fail by
 construction. **Its record**: `archive/grading-4.md`'s T4-3 section.
 
-## Road map grading-2 — G2-4, the qualifier (`qualifier_proof.py` N0–N2, H1, W1, G1, S1, S1b, S2, L1, I1, M1, D1, E1, V1, B1, F1, A1, A2, R1, P0, U1, V2, Q1–Q6, K1–K10, Z1 and twenty-one mutants; `qualifier_probe.swift`; `core/tests/qualifier.rs`, `core/tests/selection.rs`, `core/tests/schema_v18.rs`, `core/tests/qualifier_blur.rs`; spec §11 GR-13, GR-35)
+## Road map grading-2 — G2-4, the qualifier (`qualifier_proof.py` N0–N2, H1, W1, G1, S1, S1b, S2, L1, I1, M1, D1, E1, V1, B1, F1, A1, A2, R1, P0, U1, V2, Q1–Q6, K1–K10, Z1, MA and twenty-one mutants; `qualifier_probe.swift`; `core/tests/qualifier.rs`, `core/tests/selection.rs`, `core/tests/schema_v18.rs`, `core/tests/qualifier_blur.rs`; spec §11 GR-13, GR-35)
 
 **What it answers.** That `video.qualifier` changes nothing until set (N0:
 six unqualified frames — the card, an adjustment clip at exposure +1 over it,
@@ -20059,7 +20059,10 @@ project it opens, and removes its work folder at the start and at exit.
 `--mutant` builds a tree copy as `curves_proof` does; a core mutant also runs
 `cargo test --release --no-fail-fast --test qualifier --test selection` in the
 copy's core (row CT). MUTANT PASS only when every named row failed and no
-other scored row did; each names every row it was measured to fail.
+other scored row did; each names every row it was measured to fail. Row MA
+(#433), first in a plain run and text only, holds every mutant's every anchor
+to exactly one occurrence in the tree, so an anchor a later change moves fails
+the next run by the mutant's name (`--only MA` launches no app).
 
 | Mutant | Edit | Must fail |
 |---|---|---|
@@ -23187,7 +23190,16 @@ Since spec §11 SR-28, CX2 (×2, Keep pitch off) carries a constant `ramp` and
 plays its offline render, so its plan and audio differ from the baseline by
 design: **U1** scores CX1 and CK05 only and reports CX2's comparison.
 
-`work/` is untracked, so a fresh worktree has no `ramp-baseline/`. For #334's
+`work/` is untracked, so a fresh worktree has no `ramp-baseline/`. **Since
+#388 U1 makes its own**: the base (`--base REV`, else
+`tree_copy.default_base()`) is built whole in `work/ramp-base/`
+(`tree_copy.make_base_copy`), driven as `--baseline` drives it before the
+tree's instance is launched, its plans read by the base's own probe
+(`base_probe`), and `baseline.json` records `base`, `config` and
+`plan_probe: base`, so a later run on the same base and build keeps it; the
+hygiene batch b1
+section at the end of this file has the rule. What follows is how it was made
+by hand before that. For #334's
 batch it was recorded on the batch's base commit (2026-10-26): a detached
 worktree at a34bea5 with `tools/proof/media` and `agent/node_modules` CoW-copied
 in, its `make app`, then from the lane `RC_PROOF_APP=release python3
@@ -23200,7 +23212,9 @@ equal; its `wav_audio` and `prores_audio` PCM differ from the base app's
 varispeed export, as SR-28 means; its video md5 is equal. U1 on the lane's
 Release build then passed: CX1 and CK05 plan, md5 and PCM all equal.
 
-- **`--baseline`** (before any SR2b app edit, on Release): CX1 (×1), CX2 (×2,
+- **`--baseline`** (by hand; alone it builds the base's app as U1 does, with
+  `--app EXECUTABLE` it drives that app, and it records `base` only when
+  `--base` names it, the plans then read by that commit's own probe): CX1 (×1), CX2 (×2,
   keep pitch off) and CK05 (×0.5, keep pitch on), each 4 s of the clicks
   fixture from in 1 s on a 320 × 180 30 fps canvas, saved and exported
   `audio_wav` and `prores_422`; `tools/proof/work/ramp-baseline/baseline.json`
@@ -28550,7 +28564,7 @@ make app-debug && python3 tools/proof/co2a_proof.py [--only IDS] [--app PATH]
 
 The recorded runs are in `designs/creator-jobs.md`'s CO2a1 record.
 
-## Road map "creator-jobs" CO2a2 — Remove Background drawn (`co2a_proof.py` D1p, D1, D2, D3, D4, D6, D7, D11, D12, D15, D16 beside CO2a1's rows; nine mutants; spec §11 CO-24…CO-29)
+## Road map "creator-jobs" CO2a2 — Remove Background drawn (`co2a_proof.py` D1p, D1, D2, D3, D4, D6, D7, D11, D12, D15, D16 and MA beside CO2a1's rows; ten mutants; spec §11 CO-24…CO-29)
 
 The same script, its probe built with `cutout_spike/mask_track_writer.swift` (CO-S2's bar code)
 beside `app/Sources`. Since CO2b it runs two launches: the canned rows' with
@@ -28575,19 +28589,22 @@ first use; `push_1080.mov` and `screen_4k.mov`, `cutout_spike.fixtures()`'s.
 | D6 | a blur-0 shadow's alpha is the cut layer's, shifted 20 px, ±1 |
 | D7 | the HLG project's alpha within 1/255 of the SDR project's |
 | D12 | a 90°-tagged bar-code clip: picture and alpha codes both k |
-| D15 | a cutout-less project's three PNGs and a 2 s `prores_4444` export's frame md5s equal the base's app (`BASE`, built in a tree copy) |
+| D15 | a cutout-less project's three PNGs and a 2 s `prores_4444` export's frame md5s equal the base's app: `--base REV`, else `tree_copy.default_base()`, built WHOLE from its own Swift, core and header in `work/co2a-base/` (`tree_copy.make_base_copy`; #440), the fixture written at the base's format version |
+| MA | every mutant's every anchor occurs exactly once in the tree (text only, first in a plain run) |
 
 Mutants (`--mutant NAME`, each in a tree copy built as the run's configuration): `partner-box`
 (the `partnerBox` cutout clause, D1), `oriented-uv` (the mask sampled through `orientedUV`, D12),
 `one-frame-late` (D1), `nearest-frame` (the source tick rounded to a frame, D1), `miss-transparent`
 (a miss draws the layer at opacity 0, D3), `shadow-placeholder` (D6), `co5-per-range` (a window
 with any analysed run counts as found, D4), `mask-lifted` (the mask's value changed in an HLG
-project, a stand-in for a lift through step 0, D7) and `pivot` (the reversed query at `T − s`,
-D16).
+project, a stand-in for a lift through step 0, D7), `pivot` (the reversed query at `T − s`,
+D16) and `unmasked-dimmed` (CO-27's gate given an off arm that multiplies an unmasked layer's alpha
+by 0.98, D15; removing the gate alone draws the same bytes, because the placeholder mask is white
+and `cutoutCover(1)` is 1).
 
 ```sh
 make app-debug && python3 tools/proof/co2a_proof.py --only B0,D13p,D1p
-make app-debug && python3 tools/proof/co2a_proof.py [--only IDS] [--app PATH]
+make app-debug && python3 tools/proof/co2a_proof.py [--only IDS] [--app PATH] [--base REV]
 RC_PROOF_APP=release python3 tools/proof/co2a_proof.py --mutant NAME
 ```
 
@@ -30989,4 +31006,98 @@ whole file as the window, where the job's publish came after the save had return
 make app-debug && python3 tools/proof/analysis_proof.py --only A14
 python3 tools/proof/analysis_proof.py --mutant write-outside-publish-app
 python3 tools/proof/screens.py --only 14b-remove-filler-words-sheet
+```
+
+## Hygiene batch b1 — instruments that no longer build or anchor (`tree_copy.py` `make_base_copy`, `default_base`, T7, T8; `co2a_proof.py` D15, MA, `--base`, `unmasked-dimmed`; `ramp_proof.py` U1, `--base`; `qualifier_proof.py` MA; `media_less_playback_probe.build_shader`; #433 #440 #388 #431)
+
+Four issues about proofs that had rotted while the product moved. No product file changed.
+
+**A base app is found and built whole** (#440, #388). `co2a_proof.py` D15 and `ramp_proof.py` U1
+both compare this build with "the build before the change", and both had pinned that build to one
+historical commit: D15 to `f82c5b20`'s `app/` linked against the TREE's core, which trapped at Write
+Agent Catalog once the core's op table gained ops that `app/` has no tool for; U1 to a
+`baseline.json` only a hand-run `--baseline` on the right build could write. Now:
+
+- `tree_copy.default_base()` answers the base and the rule that chose it: `HEAD` when the tree's
+  build inputs differ from it (uncommitted work is the change under test), else the merge-base of
+  `HEAD` and `main` (a lane's commits are), else `HEAD`. `--base REV` on either proof names another.
+- `tree_copy.make_base_copy(dest, rev)` is `make_copy` with every build input but `tools` replaced
+  by `git archive`'s — the tree's `build_inputs()` and the base's own, derived from each
+  `project.yml`, never listed by hand — and the tree's `core/` and `mcp-proxy/` release artifacts
+  cloned copy-on-write, so the base's cargo compiles the local crates only. `tools` stays the
+  tree's: `build_codecs.py` finds the tree from its own path, so the base uses the tree's encoders
+  and build tooling. The base is then built by `tree_copy.build_app`, with its own Swift, core,
+  header and `project.yml`. A base that will not build is a FAIL of the row.
+- D15 writes its one fixture at the BASE's format version, which the tree's app reads as an older
+  file. U1 makes its baseline before the tree's instance is launched and empties the work folder
+  again, so neither run reads the other's projects or exports, and keeps `baseline.json` (with
+  `base`, `config` and `plan_probe: base`) for the next run on the same base and build.
+- **U1's baseline plan is the base's** (the diff read's finding 1). `ramp_proof.base_probe` compiles
+  `ramp_spike_probe.swift` over the base copy's own `app/Sources`, bridging header and core, and
+  the baseline's plans are read by it. Read by the tree's probe, as they first were, both sides of
+  the plan clause came from one core, so the clause could not see a plan change, and a kept
+  baseline held the plan of the tree as it was on the day it was made: one tree, two verdicts. A
+  base the probe does not compile over is a FAIL of U1. `--baseline --app EXECUTABLE --base REV`
+  makes a base copy for the probe alone (only its core is built); without `--base` the plans are
+  the tree's probe's, `plan_probe: tree`, and U1 never keeps that baseline.
+- **A mutant is not CAUGHT by a D15 that compared nothing** (finding 2). When D15 fails before its
+  comparison (no base found, the base not built or not listening, either side's outputs not
+  made), `co2a_proof.py --mutant unmasked-dimmed` prints `the control could not be performed —
+  D15 compared nothing: …` and exits 2.
+- **When the tree's build inputs ARE the base's** (a change under `tools/` only, or a clean tree on
+  `main`), each row says so in its detail: it compared two builds of one source. For U1 that is
+  still #337's run-to-run check.
+
+This is not `reference_build.py`'s job: that builds the offscreen harness binary, and these two
+rows need `render_frame` and `export`, which only an app answers. The rule is the same one: the
+base is built from its own sources in a folder of its own, and a failed build is a scored failure.
+
+**Row MA** (#433) in `qualifier_proof.py` and `co2a_proof.py`: every anchor of every mutant occurs
+exactly once in the tree, text only, first in a plain run; the mutant builders count through the
+same function. `qualifier_proof.py`'s `SHOWN` had named a shader line HDR H-6 split in two, so
+`grade-reads-inline-q` and `coverage-blurred` could not be applied; it is now `SHOWN_GREY` and
+`SHOWN_END`. `co2a_proof.py`'s `miss-transparent` anchored on two lines CO10b's image branch
+repeated; its anchor gains the media branch's own line above.
+
+**`unmasked-dimmed`**, D15's mutant: CO-27's gate given an off arm that multiplies an unmasked
+layer's alpha by 0.98. Removing the gate alone was measured first and SURVIVED (D15 2/2): the
+texture bound for a layer with no mask is the 1 × 1 white placeholder and `cutoutCover(1)` is
+exactly 1 at every edge and feather, so the gate and the placeholder each hold the identity alone.
+
+**`build_shader` makes its folder** (#388): `ramp_proof.probe()`, `constant_render_spike.py` and
+`ramp_spike/render_spike.py` build the shader before the probe whose builder made
+`work/ramp-spike/probe/`.
+
+**#431** was already fixed by #528 (5986c327): the three cloud-captions baselines are commits.
+
+| Run | Result |
+|---|---|
+| Before: `qualifier_proof.py --mutant grade-reads-inline-q`, `--mutant coverage-blurred` | exit 2 each, "the anchor occurs 0 times" |
+| After, Debug: the same two | MUTANT PASS each (Q3; Q4), 38/39 |
+| `qualifier_proof.py --only MA`; with one character of `SHOWN_GREY` changed | 1/1; 0/1 naming `coverage-blurred` |
+| Before: `co2a_proof.py --only D15` | FAIL, the base app did not build: "the core's op table has ops with no agent tool" |
+| After, Debug: `--only D15` (base 9f8f02aa, the tree's own inputs) | 2/2, 3 PNGs and 60 frames equal |
+| After, Debug: `--only D15 --base f82c5b20` (format 39, its own core) | 2/2, the base built in 87 s, 3 PNGs and 60 frames equal |
+| `co2a_proof.py --mutant ungated-cutout` (the gate removed; not kept) | SURVIVED, D15 2/2 |
+| `co2a_proof.py --mutant unmasked-dimmed` | CAUGHT, D15 failed (3 PNGs and the export differ) |
+| Before / after: `co2a_proof.py --mutant miss-transparent` | exit 2, "the anchor occurs 2 times" / CAUGHT, D3 failed |
+| Before: `ramp_proof.py --only P1` in a fresh tree | P1 fail, "xcrun metal failed … unable to open output file" |
+| After the folder fix: `--only P1,U1` from no probe folder | P1 pass; U1 fail, "baseline.json is missing" |
+| After: `--only U1` from no `ramp-baseline/` | U1 pass, its baseline made on 9f8f02aa (Debug) |
+| U1's hand mutant (`"spectral"` → `.timeDomain` in the tree's app), from no `ramp-baseline/` | U1 fail on the making run: CK05's two audio streams ≠ |
+| Fix pass, before: a core mutant adding a key to the plan (`plan.rs`), `--only U1`, baseline made | U1 pass, every plan `=` |
+| Fix pass, after: the same mutant, baseline made; then again, baseline kept | U1 fail both times, CX1, CX2 and CK05 plan `≠`, md5 and PCM `=` |
+| Fix pass, before / after: `co2a_proof.py --mutant unmasked-dimmed --base 0000000000` | `CAUGHT`, exit 0 / `the control could not be performed — D15 compared nothing`, exit 2 |
+| `tree_copy.py --selftest` | 8/8 |
+| Release, whole: `qualifier_proof.py` | 40/40 |
+| Release, whole: `co2a_proof.py` | 19/19 |
+| Release, whole: `env -u RC_ASSEMBLYAI_KEY ramp_proof.py` | 43/43 in 691 s |
+| `cloud_captions_probe.py --only chrome,extract,speakers` (#431's rows) | 114/114, 1 skipped by name |
+
+```sh
+python3 tools/proof/tree_copy.py --selftest
+python3 tools/proof/co2a_proof.py --only D15 [--base REV]
+python3 tools/proof/co2a_proof.py --mutant unmasked-dimmed
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py --only U1 [--base REV]
+python3 tools/proof/qualifier_proof.py --only MA
 ```
