@@ -262,9 +262,18 @@ detail there.
   W-6). It lives there, not in `InspectorPane.swift`, for the size rule.
 
 **The document.**
-- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`, +`GraphicFiles`, +`UndoGroup`, +`CacheSaves`, +`Alerts`, +`Reverse`, +`Derived`)
+- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`, +`GraphicFiles`, +`UndoGroup`, +`CacheSaves`, +`Alerts`, +`Reverse`, +`Derived`, +`Close`)
   — NSDocument, `.framejob` package read/write, and the single mutation
-  point (see Undo); `applyEdit`'s `.refused` arm beeps and then posts
+  point (see Undo); `+Close` is `releaseOnClose()`, the body of `close()`:
+  inside the once-only guard it calls `shutDownForClose()` on each editor in
+  the document's weak `editors` table (which `EditorViewController.init`
+  joins), then releases the recipe key, the reverse resolution, the ramp
+  renders and the graphic store. The table and not `windowControllers`: the
+  window's close button removes the window controller before `close()`
+  (spec §11 #568). **Nothing a closed document must give back is left to a
+  deinit**: AppKit keeps a closed window, and so its editor, until another
+  window opens in an instance driven in the background. What must go at the
+  close goes in `releaseOnClose()`; `applyEdit`'s `.refused` arm beeps and then posts
   `projectDocumentDidRefuse` with the `ReelRefusal` (spec §11 CI-10), which
   the editor forwards to the inspector's refusal strip. Holds the SIX pieces of view state nothing persists —
   playhead, clip selection, in/out range, `selectedMedia`, `nestPath` and
@@ -1366,6 +1375,8 @@ window-modal and the preview panel's forwarded keys would otherwise reach
 the key map behind it.
 
 **The editor.**
+- `EditorViewController+Close.swift` — `shutDownForClose()`, the editor's half
+  of its document's close (spec §11 #568).
 - `EditorViewController+Graphics` refreshes the paused frame on
   `.projectGraphicsDidChange` for its own document.
 - `EditorViewController+Cutout` refreshes the paused frame on
@@ -2341,7 +2352,11 @@ the key map behind it.
 
 **Playback and rendering.**
 - `Playback.swift` (+`Meter`, +`PreviewQuality`, +`Step`, +`Scope`, +`Prefetch`, +`Loop`) — one
-  `AVPlayer` over the plan's composition; the transport, JKL, the rate KVO; `+Meter` is the level meter, moved out under
+  `AVPlayer` over the plan's composition; the transport, JKL, the rate KVO;
+  `shutDown()` is the document's close: it latches `isShutDown`, discards a
+  rebuild in flight and calls `invalidate()`, and `update` returns before
+  publishing once shut (spec §11 #568); `invalidate()` alone stays
+  re-armable. `refreshPausedFrame()` lives in `+Scope`. `+Meter` is the level meter, moved out under
   the size rule; `+Scope` also holds `seekFinished()` and `report(_:)`
   (hdr H-3's pure move); `+PreviewQuality` holds `previewComposition`,
   `setPreviewQuality` and `recompose()` with `showsSDRVersion`, reading the

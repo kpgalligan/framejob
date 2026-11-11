@@ -138,6 +138,11 @@ the same way.
 - **Expect:** the playhead stays at 12 s after the click and after the edit, the title shows there, and playback runs on to 15 s.
 - **Source:** #523; `ai_docs_a1_proof.py` P1–P7 seek over MCP (`set_playhead`, `play_preview`'s `seek_to`), never with a mouse.
 
+**PB-19 — Closing projects gives their memory back**
+- **Do:** 1. Open Activity Monitor and find Frame Job's Memory and Threads columns. 2. Open five projects that each hold a movie with sound, and play each for a moment. 3. Note both figures. 4. Close four of them by the window's close button, wait ten seconds, and read the figures again.
+- **Expect:** Threads falls by about twenty and Memory by tens of megabytes; neither stays where it was with five open.
+- **Source:** #568, spec §11 #568 (`document_close_probe.py` and `open_documents_proof.py` O4 score the player and the threads; in an instance driven in the background the windows' memory stays until another window opens, and whether a front app with a person at it holds them was not measured).
+
 **JOB-60 — Remove Background's edges**
 - **Do:** On S-TH1, S-TH2 and S-TH5 (`samples/README.md`; until they exist, any recording of yourself in a busy room with hair, glasses and moving hands), turn Remove Background on and wait for Status to read Ready. Step through hair, hands in motion, glasses and the outline against the room at Edge −0.5, 0 and 0.5.
 - **Expect:** the outline stays on the person; Edge moves it in and out.

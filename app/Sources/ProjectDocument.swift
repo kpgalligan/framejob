@@ -355,6 +355,8 @@ final class ProjectDocument: NSDocument {
     var graphicStore: GraphicStore?
 
     var didReleaseRecipeKey = false
+    /// This document's editors, held weakly: whom `releaseOnClose()` shuts (spec §11 #568).
+    let editors = NSHashTable<EditorViewController>.weakObjects()
 
     /// Media whose reverse render was cancelled or failed. They are NOT
     /// retried on the next edit: a render the user stopped must not restart

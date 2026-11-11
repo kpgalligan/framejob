@@ -296,3 +296,40 @@ in one may now point into a sibling file.
   other way to read the row and is not built: it needs the window shown,
   which an agent export never does. Proofs: `audio_ap10b_proof.py` S1 (two
   stems) and S6 (one, the singular), `export_status_proof.py` A2 (no stems).
+- **#568 — a document's close shuts its editors' players at the close, and
+  a shut player stays shut.** (Amends #40.) `ProjectDocument.close()`
+  released the recipe key, the reverse resolution, the ramp renders and the
+  graphic store, and left the player to `EditorViewController.deinit`. That
+  deinit does not run at the close in an instance a proof or an agent
+  drives in the background: AppKit keeps the closed window (traced with
+  `leaks --traceTree` on a Debug build: the window's holders were the main
+  thread's autorelease pool, the last `NSEvent` in
+  `NSApplication.currentEvent` and `_DPSNextEvent`'s frame; no object of
+  the app's), and `heap` counted every closed editor still there until
+  another window opened, when all of them went. So each closed document
+  kept its `AVPlayerItem`, its taps and its five CoreMedia threads until
+  then. No retainer of the app's
+  was found and none is broken. The rule is the one `close()` already
+  states for the recipe key: nothing a closed document must give back is
+  left to a deinit.
+  (a) Each `EditorViewController` adds itself to its document's weak
+  `editors` table when it is made, and `releaseOnClose()`
+  (`ProjectDocument+Close.swift`) calls `shutDownForClose()`
+  (`EditorViewController+Close.swift`) on each, inside the once-only guard
+  and before the recipe key goes. The table, not `windowControllers`: the
+  window's close button removes the window controller before AppKit calls
+  `close()`.
+  (b) `Playback.shutDown()` latches `isShutDown`, discards a rebuild in
+  flight by bumping `generation`, and calls `invalidate()`. `invalidate()`
+  alone stays re-armable, because a reversed asset landing invalidates and
+  rebuilds.
+  (c) `Playback.update` returns at its first line when shut, before it
+  publishes to `RecipeSource`, so a late change notice cannot register a
+  project on the released key or build an item for a closed document.
+  (d) The editor and its views are still freed only when AppKit lets the
+  window go, and nothing forces that: one application-defined event posted
+  after the close was tried and freed nothing. What a closed window still
+  costs a driven instance until the next window opens is its views' memory,
+  no thread and no player.
+  Proofs: `document_close_probe.py` P0–P4 with four mutants;
+  `open_documents_proof.py` O4 on Release.

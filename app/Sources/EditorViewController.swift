@@ -168,6 +168,7 @@ final class EditorViewController: NSViewController {
         self.document = document
         playback = Playback(recipeKey: document.recipeKey)
         super.init(nibName: nil, bundle: nil)
+        document.editors.add(self)
         let defaults = UserDefaults.standard
         if defaults.object(forKey: Self.snappingKey) != nil {
             snappingEnabled = defaults.bool(forKey: Self.snappingKey)

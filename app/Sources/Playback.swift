@@ -141,6 +141,8 @@ final class Playback {
     private var timeObserver: Any?
     private var rateObservation: NSKeyValueObservation?
     private var itemEndObserver: NSObjectProtocol?
+    /// True once the document closed (`shutDown()`): no item is built again (spec §11 #568).
+    private(set) var isShutDown = false
 
     init(recipeKey: Int) {
         self.recipeKey = recipeKey
@@ -207,8 +209,18 @@ final class Playback {
         GraphicPrefetch.shared.endKeeping(recipeKey)
     }
 
-    /// Stops everything and drops the item. `ProjectDocument` calls this when
-    /// the window closes; releasing the `RecipeSource` key is the document's
+    /// The document's close (`EditorViewController.shutDownForClose()`, spec §11 #568): the
+    /// item goes now, whatever still holds this object, and none is built again. The bump
+    /// discards a rebuild already on the queue, which `invalidate()` alone would let land.
+    func shutDown() {
+        isShutDown = true
+        generation += 1
+        invalidate()
+    }
+
+    /// Stops everything and drops the item. Called by `shutDown()`, by the editor's
+    /// `deinit`, and by a reversed asset's landing, which rebuilds straight after — so
+    /// this alone latches nothing. Releasing the `RecipeSource` key is the document's
     /// job, not this object's.
     func invalidate() {
         debounceTimer?.invalidate()
@@ -260,6 +272,8 @@ final class Playback {
     /// Main thread only — it schedules a run-loop timer and touches AppKit's
     /// player.
     func update(project: ReelProject, urls: [UInt32: URL], isLive: Bool) {
+        // A closed document's key is released: publishing would register it again (#568).
+        if isShutDown { return }
         RecipeSource.shared.set(project, for: recipeKey)
         RecipeSource.shared.setMediaURLs(urls, project: project, for: recipeKey)  // LUTs, cursors
         let audioDSP = AudioDSPParameters.measured(project: project, cache: ReverseSource.shared.resolution(for: recipeKey).cache)

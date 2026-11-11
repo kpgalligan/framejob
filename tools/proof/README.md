@@ -470,12 +470,14 @@ closed sixty in a row on one instance, its thread count 13 before and 18
 after. Each open document with a clip costs about five threads and nineteen
 megabytes (`open_documents_proof.py`, "Issue #555" below: 150 open at once
 took a Release instance from 60 threads and 278 MB to 807 and 3,150 MB, every
-call answered, the slowest in 1.6 s), and **closing a document whose preview
-was built gives back its window and its path but not those threads or that
-memory** (the same run: 768 threads and 3,061 MB a minute after the last
-close; #555's section has what stays). So a proof closes what it opens, to
-keep the window count and the paths free, and a long session of proofs still
-starts a new instance between them, for the memory. An instance once
+call answered, the slowest in 1.6 s). **Closing a document gives back its
+path, its player and its threads at the close** (since #568, "Issue #568"
+below: 773 threads with 150 open, 23 five seconds after the last close),
+**but not its window's memory, which AppKit keeps until another window
+opens** in an instance driven in the background (the same run: 2,953 MB five
+seconds after the last close). So a proof closes what it opens, to keep the
+threads, the window count and the paths free, and a long session of proofs
+still starts a new instance between them, for the memory. An instance once
 DEADLOCKED somewhere past forty open documents, before `close_project`
 existed: every libdispatch worker blocked in a synchronous operation and the
 main thread waiting for ever on `-[NSDocument _performFileAccess:]`'s
@@ -31808,8 +31810,8 @@ memory (`ps -o rss=`), slowest call and one-minute load printed every ten.
   `close_project {discard: true}` answers and `snapshot_ui {}` lists no editor window.
 - **O4** — the threads fall back under the count before the first document plus 64
   (`close_project_proof.py` C3's margin), read 5, 15, 30 and 60 s after the last close.
-  **It fails on the app as it stands**, which is the finding below; it is kept failing, not
-  pinned, and the instrument is in no make target.
+  It failed on the app as #555 measured it, which is the finding below, and passes since
+  #568 ("Issue #568" below). The instrument is in no make target.
 
 ```sh
 make app && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/open_documents_proof.py   # [--bound N] [--only-kind new|open] [--call-seconds S]
@@ -31854,12 +31856,67 @@ other lanes' builds): 75 packages made, saved and closed in 31 s, then
   `save_project` then a plain `close_project`. A document closed before its preview was built
   leaves far less (the 75 packages made, saved and closed one after another took the instance
   only to 60 threads), which is why `close_project_proof.py`'s C3, sixty empty documents,
-  passes. The defect is filed from this batch's notes; the row turns green when a closed
-  document lets its player go.
+  passes. The defect was filed as #568, whose section below has the fix and the row green.
 - Debug, in the loop: `--bound 12` 5/5 before O4 was split off; `--bound 4 --call-seconds
   0.001` showed 25 overruns each read as "slow" (answered while the readings were taken);
   `--mutant timeout-only` fails V0 (1/6 verdicts) and calls the first overrun a deadlock at
   38.8 % CPU.
+
+## Issue #568 — a closed document's player (`document_close_probe.py` P0–P4, four mutants; `open_documents_proof.py` O4; spec §11 #568)
+
+**What held it.** Nothing of the app's. `heap <pid>` on a Debug instance after ten documents
+(each `AV.mov` on a 640×360 canvas) were opened and closed with `close_project {discard: true}`
+counted ten each of `EditorWindow`, `EditorViewController`, `Playback`, `AVPlayerItem`,
+`AudioTapContext` and `Compositor` still alive, and no `ProjectDocument` or
+`EditorWindowController`. One more document opened, and all ten were gone; that one closed, and
+it stayed in its turn. `leaks <pid> --traceTree` on the surviving window named its holders: the
+main thread's autorelease pool, the `NSEvent` in `NSApplication.currentEvent` (and the colour
+panel's toolbar's copy of it) and `_DPSNextEvent`'s frame. So AppKit keeps a closed window
+until another window opens in an instance that is driven in the background, and the editor's
+`deinit` was the only thing that dropped the player's item. Ten structural edits on one open
+document left its `AVPlayerItem` count at one: a rebuild leaks no item.
+
+**The fix** (spec §11 #568). `ProjectDocument.close()` shuts each of its editors' players
+itself (`releaseOnClose()` → `shutDownForClose()` → `Playback.shutDown()`), through the
+document's weak `editors` table, and a shut player stays shut: `shutDown()` discards a rebuild
+in flight and `update` returns before it publishes.
+
+**`document_close_probe.py`** — `document_close_probe.swift` over the whole of `app/Sources`
+(`scope_playhead_probe.py`'s build; no window shown). It holds each editor and its `Playback`
+strongly across the close and reads what the close itself did, never a deinit. **P0** each of
+three documents had an item and one editor in its table. **P1** `document.close()`, what
+`close_project` calls: at its return the player is shut, has no item and nothing built, and
+the key holds no project. **P2** the window's close button, `NSWindow.performClose(_:)`: the
+document is closed and the same holds. MCP cannot drive that door (`perform_menu_item` refuses
+File ▸ Close as a framework item), so the probe is where it is proved. **P3** `update` called on
+the shut player registers nothing and builds no item. **P4** a rebuild held on
+`Playback.rebuildHop` across the close, then run, lands on no item.
+
+```sh
+python3 tools/proof/document_close_probe.py                      # [--mutant NAME]
+make app && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/open_documents_proof.py --bound 40
+```
+
+| Run | Result |
+|---|---|
+| `open_documents_proof.py --bound 40`, Debug, before the fix | 5/6, exit 1: O4 62 threads before the first document, 242 at the bound, 218 a minute after the last close |
+| `document_close_probe.py` | 5/5, exit 0; P2's door `performClose` |
+| `--mutant no-close-shutdown` (`releaseOnClose()` without its loop) | caught: P1, P2, P3 and P4 fail |
+| `--mutant window-controllers` (the loop over `windowControllers`) | caught: P2 fails, no window controller left at the close; P1 passes |
+| `--mutant no-latch` (`update` without its `isShutDown` return) | caught: P3 fails, the key registered at once |
+| `--mutant no-generation-bump` (`shutDown()` without the bump) | caught: P4 fails, an item after the landing |
+| `RC_PROOF_APP=release open_documents_proof.py --bound 40` | 6/6, exit 0: O4 49 threads before, 219 at the bound, 34 five seconds after the last close (913 MB resident) |
+| `RC_PROOF_APP=release open_documents_proof.py` (150) | 6/6, exit 0: 70 threads and 248 MB before, 773 and 3,149 MB at the bound, 23 threads and 2,953 MB five seconds after the last close; slowest call 1.9 s |
+| `RC_PROOF_APP=release close_project_proof.py` | 12/12, exit 0 (C3: 17 threads before, 23 after) |
+
+**What stays, and is not fixed.** The closed window and its views, so its memory: the Debug
+`heap` after the fix still counts ten `EditorWindow`, `EditorViewController` and `Playback`
+after ten closes (no `AVPlayerItem`, `AudioTapContext` or `Compositor`), 15 threads against 66
+before the fix, and resident memory falls only when the next window opens (431 MB → 291 MB with
+one open). Three things were tried on Debug and freed nothing: one application-defined event
+posted after the close, the close inside an `autoreleasepool`, and `CATransaction.flush()` with
+`NSApp.updateWindows()` after it. Whether a person's close in a front app is held the same way
+was not measured: it is `docs/manual-checks.md` PB-19.
 
 ## A cache write against a held save (`save_hold_proof.py`; spec §11 #553, #552, #429)
 

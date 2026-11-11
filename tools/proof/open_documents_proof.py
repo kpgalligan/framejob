@@ -28,9 +28,9 @@ Rows:
   O4  the thread count falls back under its count before the first document
       plus 64 (`close_project_proof.py` C3's margin), read 5, 15, 30 and 60 s
       after the last close; the first reading under it passes the row. It
-      FAILS on the app as #555 measured it: a closed document whose preview
-      had been built leaves its five CoreMedia threads and its memory behind
-      (`tools/proof/README.md`, "Issue #555").
+      failed until #568: a closed document whose preview had been built kept
+      its player, and with it five CoreMedia threads, until another window
+      opened (`tools/proof/README.md`, "Issue #568").
 
 **A hang is never read off a timeout.** A call that runs past
 `--call-seconds` (default 120) gets three `ps -o %cpu=` readings a second
