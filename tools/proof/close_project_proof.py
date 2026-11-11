@@ -15,8 +15,9 @@ package under `work/close_project/`, wiped at the start.
   a boolean, nothing required.
 - **C1** — 60 cycles of `new_project {path: c<NN>}` → `close_project
   {project: path}`, each answering that path (compared canonically) and
-  `discarded_changes: false` — well past the ~40 open documents an instance
-  deadlocks at when nothing closes one.
+  `discarded_changes: false` — sixty documents through one instance and none
+  left open (`tools/proof/README.md`, "Relaunch the instance between proof
+  sessions", has what each open one costs).
 - **C2** — every `get_project {project: c<NN>}` is refused "No open project
   is at"; `snapshot_ui {}` lists no editor window for any of them; and
   `open_project c00` answers without `already_open` (then is closed).

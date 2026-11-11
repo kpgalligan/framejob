@@ -64,7 +64,8 @@
 //            block. The line adds `bars: [[10 lumas] | null…]`.
 //
 // Each job's document is closed (`document.close()`, `spin(0.5)`) before the
-// next opens: never more than one open (the forty-document deadlock).
+// next opens: never more than one open (tools/proof/README.md, "Relaunch
+// the instance between proof sessions", has what each open one costs).
 //
 //   render   (SR1b, spec §11 SR-7) `job.json` is a list of `{name, source,
 //            clip_ticks, source_ticks, keep_pitch, destination, lead_frames?}`;

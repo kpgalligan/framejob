@@ -467,18 +467,25 @@ fail every check that names either tool and then ABORTS at 4b's first
 batch B44 close nothing they open, so every project such a proof makes stays
 open. `close_project` (B44, spec §11 #40) closes one; `close_project_proof.py`
 closed sixty in a row on one instance, its thread count 13 before and 18
-after. Each open document costs about five threads and fifteen megabytes (measured:
-fifteen more documents took one instance from 174 threads and 509 MB to 254
-and 734 MB). All three proofs run in sequence against one fresh instance with
-room to spare — 26 documents, 197 threads — but somewhere past forty, which
-is four or five proof runs on one process, the instance DEADLOCKS:
-libdispatch's 64-thread soft limit is reached with every worker blocked in a
-synchronous operation, and the main thread then waits for ever on
-`-[NSDocument _performFileAccess:]`'s serialization semaphore (seen with
-`sample <pid>`; the wedged instance had 459 threads and 2 GB resident). The
-port keeps listening and the process sits at 0 % CPU, so it looks alive and
-every call simply hangs — `mcp.py` waits 600 s before it gives up. Kill YOUR
-instance and start a new one rather than reading a hang as a proof failure.
+after. Each open document with a clip costs about five threads and nineteen
+megabytes (`open_documents_proof.py`, "Issue #555" below: 150 open at once
+took a Release instance from 60 threads and 278 MB to 807 and 3,150 MB, every
+call answered, the slowest in 1.6 s), and **closing a document whose preview
+was built gives back its window and its path but not those threads or that
+memory** (the same run: 768 threads and 3,061 MB a minute after the last
+close; #555's section has what stays). So a proof closes what it opens, to
+keep the window count and the paths free, and a long session of proofs still
+starts a new instance between them, for the memory. An instance once
+DEADLOCKED somewhere past forty open documents, before `close_project`
+existed: every libdispatch worker blocked in a synchronous operation and the
+main thread waiting for ever on `-[NSDocument _performFileAccess:]`'s
+serialization semaphore (seen with `sample <pid>`, at 459 threads and 2 GB
+resident). That was not reproduced at 150 open on 2026-11-11, at more threads
+and more memory than the wedged instance had. A hang still looks like this:
+the socket keeps listening and the process sits at 0 % CPU, so it looks alive
+and every call simply waits — `mcp.py` for 600 s before it gives up. Kill
+YOUR instance and start a new one rather than reading a hang as a proof
+failure, and `sample` it first if the stack is not already on record.
 
 `phase2_proof.py` covers the catalog floor (65), phase 2's own schema keys —
 `name`, `label` and `solo`, which arrived at version 3 — through a saved
@@ -1585,9 +1592,9 @@ inverted — they are never saved through the document machinery, only read — 
 it opens SIXTEEN documents in the instance (ten `new_project` — one per
 section that needs a clean fixture, and section 7 needs two — and six
 `open_project`), so the relaunch
-rule below is not optional for it: two runs on one process is thirty-two, and
-the deadlock is somewhere past forty. No `ffmpeg`, no `swiftc`, no window server
-grant.
+rule ("Relaunch the instance between proof sessions") is not optional for it:
+it closes none of the ten, and every run on one process leaves ten more open.
+No `ffmpeg`, no `swiftc`, no window server grant.
 
 `media/` and `work/` are ignored: the movies are regenerable from the lines
 above and the projects are rebuilt on every run. Phase 2's packages are
@@ -31487,3 +31494,76 @@ The baseline is now `tools/proof/missing_audio_baseline.json`, tracked, written 
 | Q3, Q4, Q7 (`--only K0`) | each caught, 9/10 clauses, by the clause named above |
 | Q6 (Debug built with the mutant, `--only K1,K2`) | K1 and K2 fail: both presets' audio "≠ the baseline's sha256 over 814400 frames", the video md5 still the baseline's |
 | Debug rebuilt clean, `--only K0,K1,K2` | 5/5 against the Release-recorded file |
+
+## Issue #555 — the forty-document claim measured (open_documents_proof.py V0, D0, O1–O4; mutant `timeout-only`)
+
+The README, the root rulebook and four instruments said an instance deadlocks "somewhere past
+forty" documents open at once. That figure was from before `close_project` existed and nothing
+measured it. `open_documents_proof.py` does: each document is a 640×360 project with `AV.mov`
+placed (a picture and sound, so a player and its caches), opened through `open_project` and
+`new_project` in turn and never closed until the bound, with the threads (`ps -M`), resident
+memory (`ps -o rss=`), slowest call and one-minute load printed every ten.
+
+- **V0** — the verdict rule over made-up readings, no app. A call past `--call-seconds` (120)
+  is "slow" when it answered while three `ps -o %cpu=` readings were taken or any reading is
+  0.5 % or more; unanswered at 0 % it is sampled (`sample <pid> 5`, kept in
+  `work/open-documents/sample.txt`) and is "deadlock" only with `_performFileAccess` on the main
+  thread, else "hung". A timeout alone is never a hang: three lanes share this machine.
+- **D0** — the instance listens; no `Frame Job: ` line.
+- **O1** — the bound open at once, every call answered. **O2** — `get_project` on the first,
+  middle and last, and a `set_canvas` on the last read back. **O3** — every
+  `close_project {discard: true}` answers and `snapshot_ui {}` lists no editor window.
+- **O4** — the threads fall back under the count before the first document plus 64
+  (`close_project_proof.py` C3's margin), read 5, 15, 30 and 60 s after the last close.
+  **It fails on the app as it stands**, which is the finding below; it is kept failing, not
+  pinned, and the instrument is in no make target.
+
+```sh
+make app && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/open_documents_proof.py   # [--bound N] [--only-kind new|open] [--call-seconds S]
+python3 tools/proof/open_documents_proof.py --bound 4 --mutant timeout-only                              # V0 must fail
+```
+
+**Measured 2026-11-11, Release built from d142e3e4** (Apple M2 Max, macOS 26.5.1; the load is
+other lanes' builds): 75 packages made, saved and closed in 31 s, then
+
+| open | threads | resident MB | slowest call s | load (1 min) |
+|---|---|---|---|---|
+| 0 | 60 | 278 | | |
+| 10 | 101 | 414 | 0.3 | 27.9 |
+| 20 | 147 | 607 | 0.3 | 27.1 |
+| 30 | 196 | 797 | 0.3 | 27.1 |
+| 40 | 243 | 985 | 0.3 | 25.8 |
+| 50 | 292 | 1170 | 0.4 | 25.8 |
+| 60 | 341 | 1365 | 0.4 | 24.2 |
+| 70 | 390 | 1553 | 0.4 | 22.8 |
+| 80 | 437 | 1728 | 0.9 | 25.2 |
+| 90 | 496 | 1930 | 1.3 | 24.6 |
+| 100 | 551 | 2124 | 1.1 | 26.5 |
+| 110 | 602 | 2309 | 0.8 | 29.5 |
+| 120 | 647 | 2493 | 1.6 | 29.4 |
+| 130 | 700 | 2696 | 1.1 | 33.1 |
+| 140 | 745 | 2930 | 1.3 | 34.4 |
+| 150 | 807 | 3150 | 1.5 | 49.2 |
+| 150, 10 s later | 792 | 3144 | | 56.7 |
+
+- **No deadlock and no hang at 150 open** (75 by each door, opened in 102 s): O1 and O2 pass, no
+  call ran past 120 s, the slowest took 1.6 s. That is about 5.0 threads and 19 MB a document,
+  and more threads and memory than the instance the old report saw wedged (459 threads, 2 GB).
+  The old deadlock is not reproduced; nothing here says what removed it.
+- **O3 passes**: 150/150 closed in 5 s, no editor window left.
+- **O4 fails, and is the finding**: 773 threads and 3,051 MB 5 s after the last close, 768 and
+  3,061 MB at 60 s, against 60 before the first document. A run at `--bound 40` read the same
+  shape (71 threads before, 242 at the bound, 217 a minute after the closes, 954 MB). A
+  `sample` of an instance after ten such documents closed names what stays: ten each of
+  `com.apple.coremedia.audioqueue.source`, `.videoprocessor`, `.videomediaconverter`,
+  `.audiomentor` and `.videomentor`, with 408 MB resident against 122 MB at launch — each
+  closed document's player. It is the same after `close_project {discard: true}` and after
+  `save_project` then a plain `close_project`. A document closed before its preview was built
+  leaves far less (the 75 packages made, saved and closed one after another took the instance
+  only to 60 threads), which is why `close_project_proof.py`'s C3, sixty empty documents,
+  passes. The defect is filed from this batch's notes; the row turns green when a closed
+  document lets its player go.
+- Debug, in the loop: `--bound 12` 5/5 before O4 was split off; `--bound 4 --call-seconds
+  0.001` showed 25 overruns each read as "slow" (answered while the readings were taken);
+  `--mutant timeout-only` fails V0 (1/6 verdicts) and calls the first overrun a deadlock at
+  38.8 % CPU.

@@ -297,8 +297,9 @@ deleted at the end; the fixture movie and the compiled probe stay in
 `work/recordingproof/`, the way every earlier proof's fixtures do. The
 headless tier opens THREE documents on the given instance (the refusals', the fixture's
 and the detection's) and the granted instance holds four (the new project,
-the placement document, the full one and the microphone's), so
-`tools/proof/README.md`'s forty-document rule is nowhere near.
+the placement document, the full one and the microphone's), so what open
+documents cost an instance (`tools/proof/README.md`, "Relaunch the instance
+between proof sessions") does not come into it.
 
 **A row group that raises scores ONE failure and reports the rest as a
 skip** (`run_rows`): the granted tier's summary then still says how many
