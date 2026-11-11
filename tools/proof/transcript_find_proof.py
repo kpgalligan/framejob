@@ -28,8 +28,9 @@ App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
       field first responder, no matches for an empty field.
   A2  the commonest word, upper-cased, as the query: `matches` equal the same
       rule computed here from `tokens`; `current` is the first at or after
-      `highlight`; `next` advances and wraps, `previous` returns; the range,
-      the selection, the playhead and the undo list are as before;
+      `highlight`; `next` advances and wraps, `previous` returns; the
+      selection, the playhead and the cut are as before, `get_project`'s
+      project and unsaved_changes unchanged and its in_out_range none;
       `current_visible`; `find_step` with the bar closed is refused;
       `find: null` answers null.
   A3  two adjacent tokens' texts as a phrase are found; the last token of one
@@ -459,7 +460,9 @@ def app_rows(results, wanted, app_path, files):
                 mid = tokens[len(tokens) // 2]
                 s.op("set_playhead", t=mid["start"])
                 before = view(s)
-                undo = s.project().get("undo")
+                # `get_project`'s own keys: `project` is the model (unchanged =
+                # no edit) and `in_out_range` sits beside it.
+                document = s.op("get_project")
                 found = view(s, find=query).get("find") or {}
                 lit = before.get("highlight") or 0
                 first = next((i for i, m in enumerate(want or []) if m[0] >= lit), 0)
@@ -476,20 +479,22 @@ def app_rows(results, wanted, app_path, files):
                 refused = s.error(TOOL, find_step="next")
                 wrapped = [(first + k) % count for k in range(count + 1)] if count else []
                 same = all(after.get(k) == before.get(k) for k in ("selection", "playhead", "cut"))
-                project = s.project()
+                document_after = s.op("get_project")
+                unedited = (document_after.get("project") == document.get("project")
+                            and document_after.get("unsaved_changes") == document.get("unsaved_changes"))
+                ranged = document_after.get("in_out_range")
                 return (want is not None and count >= 2 and paragraphs >= 2
                         and pairs(found) == want and found.get("count") == count
                         and found.get("query") == query and walked == wrapped
                         and back == (first - 1) % count and all(v is True for v in visible)
-                        and same and project.get("undo") == undo
-                        and project.get("in_out_range") is None
+                        and same and unedited and ranged is None
                         and closed.get("find", "absent") is None
                         and bool(refused) and "find_step" in refused,
                         f"query {query!r} over {len(tokens)} tokens in {paragraphs} paragraphs: "
                         f"matches {pairs(found)} (want {want}); highlight {lit}, current walked "
                         f"{walked} (want {wrapped}), previous {back}; visible {visible}; "
-                        f"selection, playhead and cut unchanged {same}; undo unchanged "
-                        f"{project.get('undo') == undo}; range {project.get('in_out_range')}; "
+                        f"selection, playhead and cut unchanged {same}; project and "
+                        f"unsaved_changes unchanged {unedited}; range {ranged}; "
                         f"closed {closed.get('find', 'absent')!r}; step while closed {refused!r}")
             run("A2", a2)
 
