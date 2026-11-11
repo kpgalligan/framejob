@@ -31576,6 +31576,54 @@ caught; `transcript_tab_proof.py --only Z0,B4` on Release 2/2; `text_focus_proof
 `v2_menu.py --only H` on Release 5/5. F10 measured the last of 27,000 words estimated at
 88,601 pt and revealed at 130,078 pt in 0.059 s.
 
+## #583, #584 — the Transcript view's whole layout and the follow at the ends (`transcript_find_proof.py` F15, F16; nine mutants; spec §11 TX-37 (d), TX-39 as amended)
+
+After a rebuild or a width change the Transcript view lays its whole text out once in idle time
+(`layOutAll()`), so its height and the scroller's knob are the text's own, and the top word is
+put back at the offset it had before the rebuild (#583). A follow tick whose scroll would be
+clamped to where the view already is runs no layout step (#584). Both rows are probe rows on
+F10's 27,000 words, and each prints its letters' verdicts.
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_find_proof.py --only F10,F14,F15,F16
+```
+
+- **F15** counts `layOut(through:)` calls (`layoutSteps`) on a view the pass has laid out:
+  (a) two ticks on the first words at scroll 0; (c) the control, a tick on word 18,000, after
+  which the height is still the reference's; (b) two ticks on the last words at the view's bottom;
+  (d) a view not laid out whole, its frame cut to the visible bottom by hand, where the tick must
+  still step.
+- **F16** compares with a reference view laid out in one run from the top with the pass off:
+  (a) no pass inside `show`, one after a turn, the reference's height; (b) the visible top and
+  the knob at word 18,000; (c) a rebuild there; (d) two rebuilds in one turn; (f) a scroll
+  before the pass; (e) a width change, alone and between a rebuild and its pass.
+- F10's and F14's views keep the pass off (`longView(idle: false)`), because their mutants are
+  caught only while the far text is an estimate.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `follow-steps-at-ends` | the follow's skip removed (#584's old behaviour) | F15 (b) |
+| `skip-at-laid-out-end` | the bottom skip without `laidOutWhole` | F15 (d) |
+| `no-idle-layout` | `show` schedules no pass (#583's old behaviour) | F16 (a) (b) (c) (d) |
+| `idle-inside-rebuild` | `show` runs the pass itself | F16 (a) (d) (e) |
+| `idle-survives-rebuild` | scheduling does not invalidate the pending observer | F16 (d) |
+| `idle-loses-anchor` | the pass does not scroll its anchor back | F16 (c) (e) |
+| `idle-stale-anchor` | the pass uses the rebuild's anchor whatever was scrolled since | F16 (f) |
+| `resize-stays-short` | a width change schedules no pass | F16 (e) |
+| `resize-drops-anchor` | a width change drops a waiting rebuild's anchor | F16 (e) |
+
+Red before the fix is the two old-behaviour mutants: `follow-steps-at-ends` gave two steps for
+two ticks at the bottom, and `no-idle-layout` left the knob at 0.9951 for word 18,000 and the
+top word 13.3 pt from the top after a rebuild. F15 (a) holds before the fix too: in a 600 pt
+view the first word's line starts at 25 pt, outside the 24 pt margin.
+
+Recorded 2026-11-11 on this tree: Release (`RC_PROOF_APP=release`) 23/23; `--mutants`
+twenty-eight caught (the nineteen before and these nine); `transcript_tab_proof.py` on Release
+26/26, its T6 a median rebuild of 52.1 ms over 27,000 words with the pass on (the bound is
+100); `docs_bugs_a3_proof.py --only P3,P4` on Release 3/3. F16 measured one pass over 27,000
+words at a median of 70 ms on a fresh view and 57 ms after a rebuild at word 18,000, 13.4 MB
+of footprint added, and the knob at word 18,000 at 0.6641.
+
 ## #387 — voice isolation and voice effects on a retimed clip (`audio_ap5_proof.py` P4, P13–P18, P8b, I7a–I7e, I11; `voice_proof.py` V15, V16, I11–I13; `audio_ap6_proof.py` V12; twelve mutants; spec §11 AU-55 and AU-145 as amended)
 
 A clip with a constant speed or a speed ramp is isolated, and voiced, BEFORE it is retimed: its

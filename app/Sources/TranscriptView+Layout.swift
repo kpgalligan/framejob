@@ -150,8 +150,10 @@ extension TranscriptView {
     /// invalidated first: a paragraph laid out on its own, as a measurement
     /// or the walk here does, keeps the place its estimate gave it until it
     /// is laid out again in one run from the top (measured: the paragraph
-    /// after one at 86,015 pt placed at 58,837 pt).
+    /// after one at 86,015 pt placed at 58,837 pt). On a text already laid
+    /// out whole (`layOutAll()`) the same run from the top keeps it whole.
     func layOut(through range: NSRange) {
+        layoutSteps += 1
         guard range.location != NSNotFound, let start = location(range.location),
             let end = location(NSMaxRange(range))
         else { return }
@@ -174,6 +176,59 @@ extension TranscriptView {
         else { return }
         layoutManager.ensureLayout(for: all)
         layoutViewport()  // the view grows to the height laid out
+    }
+
+    /// Asks for the whole text to be laid out when the run loop is next
+    /// idle (spec §11 TX-37 (d) as amended by #583): a one-shot observer
+    /// before the main loop waits, in the default mode only, so the pass is
+    /// never part of the rebuild that asked for it (TX-21's bound) and never
+    /// runs under a scroller's or a divider's drag. One pass is pending at
+    /// most: asking again drops the one before, which is how the next
+    /// rebuild drops a pass that has not run.
+    func scheduleWholeLayout() {
+        guard laysOutWhenIdle else { return }
+        if let pending = wholeLayoutObserver { CFRunLoopObserverInvalidate(pending) }
+        wholeLayoutObserver = nil
+        guard !tokenStarts.isEmpty else { return }
+        // Order 0: meant to run before AppKit's and Core Animation's own
+        // before-waiting observers (the paint order is not measured).
+        let observer = CFRunLoopObserverCreateWithHandler(
+            nil, CFRunLoopActivity.beforeWaiting.rawValue, false, 0
+        ) { [weak self] _, _ in self?.layOutAll() }
+        wholeLayoutObserver = observer
+        CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .defaultMode)
+    }
+
+    /// Lays every paragraph out in one run from the top, so the view is as
+    /// tall as the text and the scroller's knob reads the true position, and
+    /// puts the anchor word back at its offset from the visible top: the
+    /// rebuild's own anchor while the view is where the rebuild left it, else
+    /// the word at the top now (a scroll since then wins). Nothing is
+    /// invalidated first: one layout over the whole document re-places the
+    /// paragraphs the viewport or a measurement had placed from estimates
+    /// (measured: word 26,000 of 27,000, measured at 95,447 pt before the
+    /// pass, at 125,187 pt after it, where a layout from the top puts it).
+    func layOutAll() {
+        wholeLayoutObserver = nil
+        let kept = wholeLayoutAnchor
+        wholeLayoutAnchor = nil
+        let clipY = enclosingScrollView?.contentView.bounds.minY
+        var anchor: (token: Int, offset: CGFloat)?
+        if let kept, let clipY, abs(kept.clipY - clipY) <= 0.5 {
+            anchor = (kept.token, kept.offset)
+        } else if !visibleRect.isEmpty, let top = topVisibleToken(),
+            let rect = rects(forToken: top).first
+        {
+            // Out of sight there is no top word to keep, and no scroll.
+            anchor = (top, rect.minY - visibleRect.minY)
+        }
+        layoutManager.ensureLayout(for: layoutManager.documentRange)
+        layoutViewport()  // the view grows to the text's height
+        if let anchor, let rect = rects(forToken: anchor.token).first {
+            scroll(to: rect.minY - anchor.offset)
+        }
+        laidOutWhole = true
+        wholeLayouts += 1
     }
 
     /// Scrolls `index`'s line to the visible top, the text from the top

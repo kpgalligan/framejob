@@ -212,6 +212,8 @@ transcript shows: stay and scroll; (3) the title is "Transcript" if T1 passes, e
   deviate on purpose: words here, frames on the timeline. A click makes the view first responder.
   **Amended 2026-11-10, by TX-37:** Esc with nothing selected closes the find bar when it is
   open, and passes up only when it is not.
+  **Amended 2026-11-11, by TX-37 (d) (#583):** the whole text is laid out once in idle time
+  after a rebuild or a width change; a rebuild and a draw still lay out only what shows.
 - **TX-22 — The view.** **The highlight** is the latest word whose start is at or before the
   playhead, lit through the pause after it (a binary search over the tokens, which are in start
   order), an accent-tinted rect behind the word; a move invalidates only the old and the new rects.

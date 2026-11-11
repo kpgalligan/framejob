@@ -61,7 +61,31 @@
 //       top or as (b); and in each the place does not move when the rest is
 //       laid out. Its detail also reads the scroller's knob. (d) the follow
 //       (`setHighlight`) to token 18,000 puts it a third from the top, and
-//       the next word's tick scrolls nothing.
+//       the next word's tick scrolls nothing. F10's and F14's views keep the
+//       idle pass OFF (`longView(idle: false)`): their far text must be an
+//       estimate when the row acts.
+//   F15 the follow at the text's ends (#584), the same words laid out whole by
+//       the idle pass, `layoutSteps` counting `layOut(through:)`: (a) two ticks
+//       on the first words at scroll 0 add no step (in a 600 pt view the first
+//       line is inside the margin already, so this letter holds before the fix
+//       too); (c) the control, a tick on token 18,000 adds one and scrolls;
+//       (b) two ticks on the last words with the view's bottom at the visible
+//       bottom add no step and scroll nothing; (d) on a view NOT laid out
+//       whole, its frame cut to the visible bottom by hand, a tick on the last
+//       token still steps and shows it.
+//   F16 the whole layout in idle time (#583), against a REFERENCE view laid
+//       out in one run from the top at scroll 0 with the pass off: (a) as
+//       `show` returns no pass has run and the view is short; after a run-loop
+//       turn one has, and the height is the reference's; (b) `scrollToToken`
+//       18,000 puts the visible top and the scroller's knob where the
+//       reference says; (c) a rebuild there with word 5 removed, far words
+//       measured before the pass as the pane's highlight does: the same top
+//       word at its old offset, it, token 26,000 and the height where a second
+//       reference (the edited words) has them; (d) two rebuilds in one turn
+//       cost one pass; (f) a scroll between a rebuild and its pass wins; (e) a
+//       width change leaves the view not whole until a turn, and one landing
+//       between a rebuild and its pass keeps the rebuild's anchor. Its detail
+//       prints a pass's time and added footprint.
 import AppKit
 
 final class ProbeDocumentController: NSDocumentController {
@@ -71,7 +95,7 @@ _ = ProbeDocumentController()
 
 var rows: [[String: Any]] = []
 func row(_ id: String, _ pass: Bool, _ detail: String) {
-    rows.append(["id": id, "pass": pass, "detail": String(detail.prefix(1500))])
+    rows.append(["id": id, "pass": pass, "detail": String(detail.prefix(2000))])
 }
 
 let args = CommandLine.arguments
@@ -179,10 +203,28 @@ do {
 
 // MARK: - F10 27,000 words, a match in every one
 
+/// F10's 27,000 words in 900 paragraphs, one of them left out for a rebuild.
+func longWords(without dropped: Int? = nil) -> [TimelineTranscript.Word] {
+    var words: [TimelineTranscript.Word] = []
+    words.reserveCapacity(27_000)
+    for paragraph in 0..<900 {
+        for n in 0..<30 where paragraph * 30 + n != dropped {
+            let at = Double(paragraph) * 4 + Double(n) * 0.08
+            words.append(word("w\(paragraph)x\(n)", at, at + 0.06, clip: UInt32(100 + paragraph)))
+        }
+    }
+    return words
+}
+
 /// A bare `TranscriptView` in a 304 × 600 scroll view showing 27,000 words in
 /// 900 paragraphs, drawn nowhere yet. F10 and each of F14's targets take a
 /// fresh one: once a reveal has laid a view out, nothing in it is an estimate.
-func longView() -> (window: NSWindow, view: TranscriptView, model: TranscriptTokens) {
+/// For the same reason the idle pass that lays the whole text out (#583) is
+/// OFF unless `idle`: F10's and F14's mutants are caught only on a view whose
+/// far text is still an estimate. `settle` 0 returns before any run-loop turn.
+func longView(idle: Bool = false, settle: Double = 0.2)
+    -> (window: NSWindow, view: TranscriptView, model: TranscriptTokens)
+{
     let window = NSWindow(
         contentRect: NSRect(x: -20_000, y: 0, width: 304, height: 600), styleMask: [.titled],
         backing: .buffered, defer: false)
@@ -194,17 +236,10 @@ func longView() -> (window: NSWindow, view: TranscriptView, model: TranscriptTok
     scroll.documentView = view
     window.contentView = scroll
     window.orderFrontRegardless()
-    var words: [TimelineTranscript.Word] = []
-    words.reserveCapacity(27_000)
-    for paragraph in 0..<900 {
-        for n in 0..<30 {
-            let at = Double(paragraph) * 4 + Double(n) * 0.08
-            words.append(word("w\(paragraph)x\(n)", at, at + 0.06, clip: UInt32(100 + paragraph)))
-        }
-    }
-    let model = TranscriptTokens.build(words, pauses: [:])
+    let model = TranscriptTokens.build(longWords(), pauses: [:])
+    view.laysOutWhenIdle = idle
     view.show(model, fps: Fps(num: 30, den: 1), timecodeFrames: true)
-    spin(0.2)
+    spin(settle)
     return (window, view, model)
 }
 
@@ -329,6 +364,243 @@ do {
         window.orderOut(nil)
     }
     row("F14", pass, detail)
+}
+
+// MARK: - F15, F16 the whole layout in idle time and the follow at the ends (#583, #584)
+
+/// A view of the same words laid out in ONE run from the top at scroll 0, the
+/// idle pass off: nothing in it was ever placed from an estimate, so its
+/// height and places are what F15 and F16 compare against (never the view
+/// under test laid out again).
+func referenceView(without dropped: Int? = nil) -> (window: NSWindow, view: TranscriptView) {
+    let (window, view, _) = longView()
+    if dropped != nil {
+        view.show(
+            TranscriptTokens.build(longWords(without: dropped), pauses: [:]),
+            fps: Fps(num: 30, den: 1), timecodeFrames: true)
+    }
+    view.layoutManager.ensureLayout(for: view.layoutManager.documentRange)
+    view.layoutViewport()
+    return (window, view)
+}
+
+func footprintMB() -> Double {
+    var info = task_vm_info_data_t()
+    var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+    let result = withUnsafeMutablePointer(to: &info) {
+        $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+            task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+        }
+    }
+    return result == KERN_SUCCESS ? Double(info.phys_footprint) / 1_048_576 : -1
+}
+
+func f1(_ value: CGFloat) -> String { String(format: "%.1f", value) }
+func settleWhole(_ view: TranscriptView) {
+    _ = until(5) { view.laidOutWhole }
+    spin(0.1)
+}
+func clipTop(_ view: TranscriptView) -> CGFloat { view.enclosingScrollView?.contentView.bounds.minY ?? -1 }
+let fps30 = Fps(num: 30, den: 1)
+
+do {
+    var pass = true
+    var detail = ""
+    func claim(_ letter: String, _ ok: Bool, _ text: String) {
+        pass = pass && ok
+        detail += "(\(letter)) \(ok ? "ok" : "FAIL") \(text). "
+    }
+    let (window, view, _) = longView(idle: true)
+    settleWhole(view)
+    let whole = view.laidOutWhole && view.wholeLayouts == 1
+    // (a) the first words at scroll 0: inside the top margin, nowhere to scroll.
+    var steps = view.layoutSteps
+    view.setHighlight(0, follow: true)
+    view.setHighlight(1, follow: true)
+    claim("a", whole && view.layoutSteps == steps && clipTop(view) == 0,
+        "whole \(whole); two ticks on tokens 0, 1 at the top: steps +\(view.layoutSteps - steps) "
+            + "(want 0), top \(f1(clipTop(view))); token 0's line starts at "
+            + "\(f1(view.rects(forToken: 0).first?.minY ?? -1)) pt")
+    // (c) the control: a tick that does scroll pays the step.
+    steps = view.layoutSteps
+    view.setHighlight(18_000, follow: true)
+    let moved = clipTop(view)
+    // The step's run from the top keeps a whole text whole: the height is
+    // still the reference's, read before anything lays the text out again.
+    let (referenceWindow, reference) = referenceView()
+    let wholeHeight = reference.frame.height
+    referenceWindow.orderOut(nil)
+    let keptWhole = view.laidOutWhole && abs(view.frame.height - wholeHeight) <= 0.5
+    claim("c", view.layoutSteps == steps + 1 && moved > 1_000 && keptWhole,
+        "a tick on token 18000: steps +\(view.layoutSteps - steps) (want 1), top \(f1(moved)), "
+            + "height \(f1(view.frame.height)) (reference \(f1(wholeHeight)))")
+    // (b) the last words with the view's bottom at the visible bottom.
+    view.scrollToToken(26_999)
+    spin(0.1)
+    let bottom = clipTop(view)
+    let atBottom = abs(view.visibleRect.maxY - view.frame.height) <= 0.5
+    steps = view.layoutSteps
+    view.setHighlight(26_999, follow: true)
+    view.setHighlight(26_998, follow: true)
+    claim("b", atBottom && view.laidOutWhole && view.layoutSteps == steps && clipTop(view) == bottom,
+        "at the bottom \(atBottom) (top \(f1(bottom)) of \(f1(view.frame.height))): two ticks on "
+            + "tokens 26999, 26998: steps +\(view.layoutSteps - steps) (want 0), top \(f1(clipTop(view)))")
+    window.orderOut(nil)
+    // (d) the bottom of a view not laid out whole is no end of the text. No
+    // scroll rests there (the viewport's pass always lays out some 380 pt
+    // below, measured), so the frame is cut to the visible bottom by hand.
+    do {
+        let (window, view, _) = longView()
+        view.setFrameSize(NSSize(width: view.frame.width, height: view.visibleRect.maxY))
+        let cut = abs(view.visibleRect.maxY - view.frame.height) <= 0.5 && !view.laidOutWhole
+        steps = view.layoutSteps
+        view.setHighlight(26_999, follow: true)
+        let rect = view.rects(forToken: 26_999).first ?? .zero
+        let shown = view.visibleRect
+        let seen = rect.height > 0 && rect.minY >= shown.minY && rect.maxY <= shown.maxY
+        claim("d", cut && view.layoutSteps == steps + 1 && seen,
+            "not whole, the frame cut to the visible bottom \(cut): a tick on the last token: "
+                + "steps +\(view.layoutSteps - steps) (want 1), in sight \(seen)")
+        window.orderOut(nil)
+    }
+    row("F15", pass, detail)
+}
+
+do {
+    var pass = true
+    var detail = ""
+    func claim(_ letter: String, _ ok: Bool, _ text: String) {
+        pass = pass && ok
+        detail += "(\(letter)) \(ok ? "ok" : "FAIL") \(text). "
+    }
+    let reference = referenceView()
+    let refHeight = reference.view.frame.height
+    let refY = reference.view.rects(forToken: 18_000).first?.minY ?? -1
+    reference.window.orderOut(nil)
+    let edited = referenceView(without: 5)
+    let editedY = edited.view.rects(forToken: 17_999).first?.minY ?? -1
+    let editedY9 = edited.view.rects(forToken: 8_999).first?.minY ?? -1
+    let editedFar = edited.view.rects(forToken: 26_000).first?.minY ?? -1
+    let editedHeight = edited.view.frame.height
+    edited.window.orderOut(nil)
+    let full = TranscriptTokens.build(longWords(), pauses: [:])
+    let less = TranscriptTokens.build(longWords(without: 5), pauses: [:])
+
+    // What one pass costs: five fresh views, then five rebuilds at word 18,000
+    // on the last of them (the pass called by hand, the idle one off).
+    var fresh: [Double] = []
+    var again: [Double] = []
+    var added = 0.0
+    for n in 0..<5 {
+        let timed = longView(settle: 0)
+        let before = footprintMB()
+        var began = Date()
+        timed.view.layOutAll()
+        fresh.append(Date().timeIntervalSince(began))
+        if n == 0 { added = footprintMB() - before }
+        if n == 4 {
+            timed.view.scrollToToken(18_000)
+            for turn in 0..<5 {
+                timed.view.show(turn % 2 == 0 ? less : full, fps: fps30, timecodeFrames: true)
+                began = Date()
+                timed.view.layOutAll()
+                again.append(Date().timeIntervalSince(began))
+            }
+        }
+        timed.window.orderOut(nil)
+    }
+    fresh.sort()
+    again.sort()
+
+    // (a) not in the rebuild, then once.
+    let (window, view, _) = longView(idle: true, settle: 0)
+    let clipHeight = view.enclosingScrollView?.contentView.bounds.height ?? 0
+    let earlyPasses = view.wholeLayouts
+    let early = earlyPasses == 0 && !view.laidOutWhole && view.frame.height < refHeight - 1
+    let earlyHeight = view.frame.height
+    settleWhole(view)
+    claim("a", early && view.wholeLayouts == 1 && view.laidOutWhole
+            && abs(view.frame.height - refHeight) <= 0.5,
+        "as show returned: passes \(earlyPasses) (want 0), height \(f1(earlyHeight)); after a "
+            + "turn: passes \(view.wholeLayouts) (want 1), height \(f1(view.frame.height)) "
+            + "(reference \(f1(refHeight)))")
+    // (b) the knob at word 18,000.
+    view.scrollToToken(18_000)
+    let top = clipTop(view)
+    let knob = view.enclosingScrollView?.verticalScroller?.doubleValue ?? -1
+    let knobWant = Double((refY - 4) / max(refHeight - clipHeight, 1))
+    claim("b", abs(top - (refY - 4)) <= 0.5 && abs(knob - knobWant) <= 0.001,
+        "word 18000: top \(f1(top)) (reference \(f1(refY - 4))), knob "
+            + "\(String(format: "%.4f", knob)) (want \(String(format: "%.4f", knobWant)))")
+    spin(0.1)
+    // (c) a rebuild there keeps the top word's offset.
+    func topWord() -> (id: TimelineTranscript.Identity?, offset: CGFloat, y: CGFloat) {
+        guard let index = view.topVisibleToken(), let rect = view.rects(forToken: index).first
+        else { return (nil, -1, -1) }
+        return (view.model.tokens[index].word.id, rect.minY - view.visibleRect.minY, rect.minY)
+    }
+    let was = topWord()
+    var passes = view.wholeLayouts
+    view.show(less, fps: fps30, timecodeFrames: true)
+    let rebuilt = topWord()
+    // As the pane's highlight does straight after a rebuild: far words measured
+    // where estimates put them, before the pass.
+    let farEstimate = view.rects(forToken: 26_000).first?.minY ?? -1
+    _ = view.rects(forToken: 3_000)
+    settleWhole(view)
+    let now = topWord()
+    let farNow = view.rects(forToken: 26_000).first?.minY ?? -1
+    claim("c", was.id != nil && now.id == was.id && abs(now.offset - was.offset) <= 0.5
+            && abs(now.y - editedY) <= 0.5 && view.wholeLayouts == passes + 1
+            && abs(farNow - editedFar) <= 0.5 && abs(view.frame.height - editedHeight) <= 0.5,
+        "a rebuild at word 18000: the same top word \(now.id == was.id), its offset "
+            + "\(f1(was.offset)) → \(f1(rebuilt.offset)) as show returned → \(f1(now.offset)) "
+            + "after the pass, at \(f1(now.y)) (reference \(f1(editedY))); token 26000, "
+            + "measured before the pass at \(f1(farEstimate)), then at \(f1(farNow)) (reference "
+            + "\(f1(editedFar))); height \(f1(view.frame.height)) (reference \(f1(editedHeight)))")
+    // (d) two rebuilds in one turn cost one pass.
+    passes = view.wholeLayouts
+    view.show(full, fps: fps30, timecodeFrames: true)
+    view.show(less, fps: fps30, timecodeFrames: true)
+    settleWhole(view)
+    spin(0.2)
+    claim("d", view.wholeLayouts == passes + 1,
+        "two rebuilds with no turn between: passes +\(view.wholeLayouts - passes) (want 1)")
+    // (f) a scroll between the rebuild and its pass wins.
+    view.show(full, fps: fps30, timecodeFrames: true)
+    view.show(less, fps: fps30, timecodeFrames: true)
+    view.scrollToToken(8_999)  // a paragraph's first word
+    settleWhole(view)
+    let far = topWord()
+    claim("f", view.topVisibleToken() == 8_999 && abs(far.offset - 4) <= 0.5
+            && abs(far.y - editedY9) <= 0.5,
+        "a scroll to token 8999 before the pass: top token \(view.topVisibleToken() ?? -1), offset "
+            + "\(f1(far.offset)) (want 4), at \(f1(far.y)) (reference \(f1(editedY9)))")
+    // (e) a width change, alone and straight after a rebuild.
+    passes = view.wholeLayouts
+    window.setContentSize(NSSize(width: 340, height: 600))
+    let short = !view.laidOutWhole
+    settleWhole(view)
+    let wide = view.laidOutWhole && view.wholeLayouts == passes + 1
+    view.scrollToToken(18_000)
+    spin(0.1)
+    let held = topWord()
+    view.show(full, fps: fps30, timecodeFrames: true)
+    window.setContentSize(NSSize(width: 304, height: 600))
+    settleWhole(view)
+    let kept = topWord()
+    claim("e", short && wide && held.id != nil && kept.id == held.id
+            && abs(kept.offset - held.offset) <= 0.5 && abs(view.frame.height - refHeight) <= 0.5,
+        "width 304 → 340: whole straight after \(!short) (want false), after a turn \(wide); a "
+            + "rebuild then 340 → 304 with no turn between: the same top word \(kept.id == held.id), "
+            + "offset \(f1(held.offset)) → \(f1(kept.offset)), height \(f1(view.frame.height)) "
+            + "(reference \(f1(refHeight)))")
+    func ms(_ seconds: Double) -> String { String(format: "%.0f", seconds * 1000) }
+    detail += "One pass over 27,000 words: fresh, median \(ms(fresh[2])) ms (\(ms(fresh[0]))–"
+        + "\(ms(fresh[4]))); after a rebuild at word 18000, median \(ms(again[2])) ms "
+        + "(\(ms(again[0]))–\(ms(again[4]))); \(String(format: "%.1f", added)) MB of footprint added."
+    window.orderOut(nil)
+    row("F16", pass, detail)
 }
 
 // MARK: - F11 the marks' pixels

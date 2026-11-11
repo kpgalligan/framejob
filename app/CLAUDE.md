@@ -2260,8 +2260,12 @@ the key map behind it.
   `one-wait` mutant's anchor) from a lock-guarded `pending` list `update()` replaces; hiding
   releases the want, clears the waiter's media and drops the words. `TranscriptTokens` is pure
   (TX-22's paragraph rule, the pause sets, the binary-search highlight). `TranscriptView` is NOT
-  an `NSText` (TX-21): a TextKit 2 view (viewport layout) whose text is ONE string styled by
-  ranges, with colours resolved in its appearance (TextKit 2 draws a dynamic colour into a
+  an `NSText` (TX-21): a TextKit 2 view (viewport layout; after a rebuild or a width change the
+  whole text is laid out once in idle time by `layOutAll()`, a one-shot run-loop observer that
+  `scheduleWholeLayout()` replaces when asked again, re-anchored on the rebuild's top word, spec
+  §11 TX-37 (d), so the view's height and the scroller's knob are the text's own;
+  `laysOutWhenIdle`, `layoutSteps` and `wholeLayouts` are a probe's) whose text is ONE string
+  styled by ranges, with colours resolved in its appearance (TextKit 2 draws a dynamic colour into a
   `CGContext` as nothing, TX-S2) and restyled on an appearance change; it tracks its clip view's
   width (`resize(withOldSuperviewSize:)`), draws by walking fragments from the dirty top, remaps
   its selection, highlight and ⇧ anchor by `Identity` across a rebuild, and passes every key it
@@ -2320,8 +2324,10 @@ the key map behind it.
   `TranscriptView+Find` draws the marks under every other mark, measuring only the matches whose
   tokens meet the dirty rect, and `revealFind`, `scrollToToken` and the follow's scroll lay out
   the text from the top through their target and a viewport below it before they scroll
-  (`TranscriptView+Layout`'s `layOut(through:)`: a far rect is an estimate until then, and the
-  view is only as tall as what is laid out). Find moves only
+  (`TranscriptView+Layout`'s `layOut(through:)`: a far rect is an estimate until then, and until the idle
+  pass has run the view is only as tall as what is laid out; the follow skips the step when its
+  scroll would be clamped to where the view already is at a real end of the text,
+  `followIsAtAnEnd`). Find moves only
   the scroll and its marks. Out of sight the pane closes the bar and hands the keys to the content
   view when the window itself or the transcript's text holds them (`handBackKeys`).
   `transcript_view`'s `find` / `find_step` are `AgentServer+TranscriptFind.swift`'s.

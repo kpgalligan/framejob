@@ -12,7 +12,10 @@ extension TranscriptView {
     /// scroll (`layOut(through:)`, #558): after a far jump its rect is an
     /// estimate, and six ticks of scrolling onto estimates never showed it.
     /// With the text above laid out already that costs 1.4 ms (measured at
-    /// word 18,000 of 27,000), and it is paid only on a tick that scrolls.
+    /// word 18,000 of 27,000), and it is paid only on a tick that scrolls:
+    /// at the first and the last lines, where the word sits inside the
+    /// margins of a view that cannot scroll further, the tick ends before
+    /// the step (`followIsAtAnEnd`, #584).
     func setHighlight(_ index: Int?, follow: Bool) {
         let valid = index.flatMap { tokenStarts.indices.contains($0) ? $0 : nil }
         if valid != highlighted {
@@ -23,6 +26,7 @@ extension TranscriptView {
         }
         guard follow, let valid, !personScrolledRecently else { return }
         guard outOfSight(valid) else { return }
+        if followIsAtAnEnd(valid) { return }
         layOut(through: tokenRange(valid))
         guard outOfSight(valid), let rect = rects(forToken: valid).first else { return }
         scroll(to: rect.minY - visibleRect.height / 3)
@@ -35,6 +39,21 @@ extension TranscriptView {
         let shown = visibleRect
         let margin = min(shown.height / 4, 48)
         return rect.minY < shown.minY + margin / 2 || rect.maxY > shown.maxY - margin
+    }
+
+    /// Whether the follow's scroll to `index` would be clamped to where the
+    /// view already is, at a real end of the text: the top, or the bottom
+    /// once the whole text is laid out. Before that the view's bottom is only
+    /// the end of what is laid out, and a word below it must still be
+    /// followed.
+    private func followIsAtAnEnd(_ index: Int) -> Bool {
+        guard let rect = rects(forToken: index).first,
+            let current = enclosingScrollView?.contentView.bounds.minY
+        else { return false }
+        let wanted = rect.minY - visibleRect.height / 3
+        guard let target = clampedScroll(wanted), abs(target - current) <= 0.5 else { return false }
+        // Held short by the view's bottom, which is the text's only when whole.
+        return wanted <= target || laidOutWhole
     }
 
     var personScrolledRecently: Bool {

@@ -11,8 +11,9 @@ the fixtures (TX1's `say` phrases) and the launch are `transcript_tab_proof.py`'
 
 Probe rows (`transcript_find_probe.swift`, built through `swift_build.build()`
 with `-D FRAMEJOB_DEV_TOOLS`, the app's `Compositor.metal` beside it): F0
-builds; F1–F14 as its header says (F14 is #558's: the click-to-clip scroll and
-the follow in 27,000 words).
+builds; F1–F16 as its header says (F14 is #558's: the click-to-clip scroll and
+the follow in 27,000 words; F15 is #584's: the follow at the text's ends; F16
+is #583's: the whole text laid out in idle time after a rebuild).
 
 App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
   Z0  no `Frame Job: ` line; `transcript_view` takes exactly its ten earlier
@@ -34,8 +35,10 @@ App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
   A5  `screens.py --only 11d-transcript-find` exits 0 with "new problems: 0".
 
 Mutants (`--mutant NAME`, or all with `--mutants`): each anchor occurs once; a
-mutant is caught when every row it names fails. All nineteen are probe mutants
-(a copy of `app/Sources` with the edit); TX-39 says why there are nineteen.
+mutant is caught when every row it names fails. All twenty-eight are probe
+mutants (a copy of `app/Sources` with the edit); TX-39 says why there are
+twenty-eight. F15 and F16 print each letter's verdict, and the letter a mutant
+fails is named beside it here.
   return-leaves         K-4 takes Return from the find field (F4)
   across-paragraphs     paragraphs joined by a space (F1)
   case-sensitive        the comparison options dropped (F1)
@@ -59,6 +62,18 @@ mutant is caught when every row it names fails. All nineteen are probe mutants
                         the view ends there (F14)
   below-keeps-estimate  the paragraphs below the target not invalidated, so
                         they keep their estimated places (F14)
+  follow-steps-at-ends  the follow's skip removed, #584's old behaviour (F15 b)
+  skip-at-laid-out-end  the skip at the bottom of a view not laid out whole
+                        (F15 d)
+  no-idle-layout        a rebuild schedules no pass, #583's old behaviour
+                        (F16 a, b, c, d)
+  idle-inside-rebuild   the rebuild runs the pass itself (F16 a, d, e)
+  idle-survives-rebuild scheduling does not drop the pending pass (F16 d)
+  idle-loses-anchor     the pass does not scroll its anchor back (F16 c, e)
+  idle-stale-anchor     the pass uses the rebuild's anchor whatever was
+                        scrolled since (F16 f)
+  resize-stays-short    a width change schedules no pass (F16 e)
+  resize-drops-anchor   a width change drops a waiting rebuild's anchor (F16 e)
 
 Exit: 0 iff every row passed (a mutant run: 0 when caught, 1 when it survived,
 2 when the control could not be performed).
@@ -83,7 +98,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/transcript_find"
 PROBE = ROOT / "tools/proof/transcript_find_probe.swift"
 PROBE_ROWS = ["F0", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
-              "F13", "F14"]
+              "F13", "F14", "F15", "F16"]
 APP_ROWS = ["Z0", "A1", "A2", "A3", "A4"]
 OTHER_ROWS = ["A5"]
 ROWS = PROBE_ROWS + APP_ROWS + OTHER_ROWS
@@ -99,6 +114,7 @@ TP = "TranscriptPane.swift"
 VF = "TranscriptView+Find.swift"
 VH = "TranscriptView+Highlight.swift"
 VL = "TranscriptView+Layout.swift"
+TV = "TranscriptView.swift"
 VK = "TranscriptView+Keys.swift"
 EV = "EditorViewController.swift"
 MUTANTS = {
@@ -147,6 +163,31 @@ MUTANTS = {
     "below-keeps-estimate": (["F14"], [
         (VL, "        if let stale = NSTextRange(location: start, end: last) {\n",
          "        if let stale = NSTextRange(location: start, end: end) {\n")]),
+    "follow-steps-at-ends": (["F15"], [
+        (VH, "        if followIsAtAnEnd(valid) { return }\n", "")]),
+    "skip-at-laid-out-end": (["F15"], [
+        (VH, "        return wanted <= target || laidOutWhole\n", "        return true\n")]),
+    "no-idle-layout": (["F16"], [
+        (TV, "        scheduleWholeLayout()\n        needsDisplay = true\n",
+         "        needsDisplay = true\n")]),
+    "idle-inside-rebuild": (["F16"], [
+        (TV, "        scheduleWholeLayout()\n        needsDisplay = true\n",
+         "        layOutAll()\n        needsDisplay = true\n")]),
+    "idle-survives-rebuild": (["F16"], [
+        (VL, "        if let pending = wholeLayoutObserver { CFRunLoopObserverInvalidate(pending) }\n",
+         "")]),
+    "idle-loses-anchor": (["F16"], [
+        (VL, "            scroll(to: rect.minY - anchor.offset)\n", "            _ = rect\n")]),
+    "idle-stale-anchor": (["F16"], [
+        (VL, "        if let kept, let clipY, abs(kept.clipY - clipY) <= 0.5 {\n",
+         "        if let kept, clipY != nil {\n")]),
+    "resize-stays-short": (["F16"], [
+        (TV, "            laidOutWhole = false\n            scheduleWholeLayout()\n",
+         "            laidOutWhole = false\n")]),
+    "resize-drops-anchor": (["F16"], [
+        (TV, "            laidOutWhole = false\n            scheduleWholeLayout()\n",
+         "            laidOutWhole = false\n            wholeLayoutAnchor = nil\n"
+         "            scheduleWholeLayout()\n")]),
     "keys-left-behind": (["F13"], [
         (TP, "            handBackKeys()\n", "")]),
     "view-esc-passes": (["F6"], [

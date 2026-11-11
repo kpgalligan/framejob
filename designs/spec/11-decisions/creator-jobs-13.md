@@ -339,6 +339,42 @@ free" (TX-20), and on 2026-11-10 to begin it. No owner question was asked.
     the text below the viewport is not laid out (TX-21). A rebuild's anchor restore is not
     changed either: it keeps the top word (measured: the same top word, 9 pt lower), and the
     step there would lay out everything above the anchor on every rebuild.
+    **Amended 2026-11-11 (#583, #584):** the last two rules above (the knob left as it is, the
+    rebuild's anchor not changed) are replaced. (1) **After a rebuild, and after a width change,
+    the whole text is laid out once in the run loop's idle time** (`layOutAll()`): one layout
+    over the whole document, nothing invalidated first, the view sized to it. So it is as tall as
+    the text, the knob reads the true position and reaches the last word, and a far scroll lands
+    on a place that is no estimate. The pass is asked for by a one-shot run-loop observer before
+    the main loop waits, in the default mode only: it is never part of the rebuild (TX-21's
+    100 ms bound is measured around the rebuild alone) and never runs under a scroller's or a
+    divider's drag. One pass is pending at most; asking again replaces it, so the next rebuild
+    drops a pass that has not run and several rebuilds in one turn cost one pass. (2) **The pass
+    re-anchors.** It puts the rebuild's anchor word back at the offset from the visible top it
+    had BEFORE the rebuild, while the view is still where the rebuild left it; after a scroll
+    since then, or with no rebuild pending (a width change), it keeps the word at the top now. A
+    width change leaves a waiting rebuild's anchor alone (an autohiding scroller changes the
+    width straight after a rebuild). (3) **The follow's step is skipped at the text's ends**
+    (#584): a tick whose scroll would be clamped to where the view already is runs no layout
+    step, at the top always and at the bottom once the whole text is laid out. Before that the
+    view's bottom is only the end of what is laid out, and a word below it is still followed.
+    That makes "only on a tick that scrolls" true at the first and last lines. Drawing still
+    lays out only what shows; what changes of TX-21 is that every paragraph's layout is kept
+    after the pass. **Measured** (2026-11-11, the probe's bare view, 27,000 words in 900
+    paragraphs, 304 × 600 pt, Apple M2 Max, three lanes sharing the machine, load average over
+    80): one pass 72 ms on a fresh view and 61 ms after a rebuild at word 18,000 (medians of
+    five; ranges 70–77 and 59–64), 13.6 MB of footprint added (TX-S2's rule for the view was
+    1/256 of physical memory); the knob at word 18,000 reads 0.6641 where it read 0.995; after
+    a rebuild there the top word is 13.3 pt from the visible top as the rebuild returns (it was
+    at 4.0) and back at 4.0 after the pass, at the place a layout from the top gives. The pass
+    invalidates nothing first: one layout over the whole document moved a word measured at
+    95,447 pt before the pass to 125,187 pt, the reference's place. No scroll comes to rest at
+    the bottom of a view not laid out whole (the viewport's pass lays out some 380 pt below
+    what shows), so (3)'s bottom rule guards a state the probe makes by cutting the frame. In a
+    600 pt view the first word's line starts at 25 pt, outside the follow's 24 pt top margin,
+    so the step #584 names was paid at the last lines only (two ticks, two steps); the top
+    rule is kept for a shorter first line. Whether the corrected place is the first one
+    painted after a rebuild is not measured: the observer's order is 0, ahead of AppKit's and
+    Core Animation's own, and a person's look is JOB-10.
   - (e) **Keys and focus.** ⌘F opens the bar and gives its field the keys, its text selected;
     with the bar open it only does that again. In the field Return is (c)'s next and ⇧Return its
     previous, and the field keeps the keys: K-4 (3)'s one exception, decided in the window with
@@ -403,3 +439,25 @@ free" (TX-20), and on 2026-11-10 to begin it. No owner question was asked.
   `reveal-on-estimate` moves to the shared step (F10, F14); new are `reveal-skips-layout`
   (F10), `scroll-on-estimate` (F14), `follow-on-estimate` (F14), `no-viewport-below` (F14) and
   `below-keeps-estimate` (F14).
+  **Amended 2026-11-11 (#583, #584):** probe rows **F15** and **F16**, on the same 27,000
+  words, each letter's verdict in the row's detail. F10's and F14's views keep the idle pass
+  off (`laysOutWhenIdle`, cleared by the probe): their seven mutants are caught only while
+  the far text is an estimate. Every "final" place in F16 is compared with a REFERENCE view
+  laid out in one run from the top at scroll 0, never with the view under test laid out
+  again. F15, the follow at the ends, counting `layOut(through:)` calls: (a) two ticks on the
+  first words at scroll 0 add none; (c) a tick on word 18,000 adds one, scrolls and keeps the
+  reference's height; (b) two ticks on the last words at the bottom add none and scroll nothing;
+  (d) on a view not whole, its frame cut to the visible bottom, a tick on the last word still steps
+  and shows it. F16, the idle pass: (a) none has run as `show` returns, one after a turn, the
+  height the reference's; (b) the visible top and the knob at word 18,000 are the
+  reference's; (c) a rebuild there, far words measured before the pass, keeps the top word at
+  its old offset and at a second reference's place; (d) two rebuilds in one turn cost one
+  pass; (f) a scroll between a rebuild and its pass wins; (e) a width change leaves the view
+  not whole until a turn, and one between a rebuild and its pass keeps the rebuild's anchor.
+  **Twenty-eight mutants**: three issues' decisions now share the instrument, and this batch
+  adds nine, one per decision: `follow-steps-at-ends` (F15 b), `skip-at-laid-out-end`
+  (F15 d), `no-idle-layout` (F16 a–d), `idle-inside-rebuild` (F16 a, d, e),
+  `idle-survives-rebuild` (F16 d), `idle-loses-anchor` (F16 c, e), `idle-stale-anchor` (F16 f),
+  `resize-stays-short` (F16 e) and `resize-drops-anchor` (F16 e). A tenth, the pass not
+  invalidating first, survived F16 (c) and was dropped with its line. The knob under a real
+  drag is JOB-10's.
