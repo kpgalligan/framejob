@@ -816,6 +816,14 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   1336 before, 1182 after; `ProjectDocument+Reverse.swift` is 169. The next seam:
   `generateCaches()` with its doc to `ProjectDocument+Caches.swift` (SW4a, the road map's cap
   table).
+- `ProjectDocument.swift`: #568 gave up `close()`'s body before the close took on shutting the
+  editors' players: the once-only block with its comment moved verbatim to
+  `ProjectDocument+Close.swift` as `releaseOnClose()`, the override keeping `releaseOnClose()`
+  and `super.close()` (so `co2b_proof.py`'s anchor on `override func close()` still matches);
+  `didReleaseRecipeKey` stayed, since an extension cannot hold it, and lost `private`. A pure
+  move gated alone. `wc -l app/Sources/ProjectDocument.swift`: 1182 before, 1172 after;
+  `ProjectDocument+Close.swift` is 20. The next seam is unchanged: `generateCaches()` with its
+  doc to `ProjectDocument+Caches.swift`.
 - `InspectorPane.swift`: the precedents are `InspectorSection.swift`, `InspectorSlider.swift`,
   `InspectorBinding+Writes.swift` and `InspectorRows.swift` (issue batch B87 phase 3: `// MARK: -
   Row builders` through `changedRGBA`, a pure move gated alone before `inspectorRow(discrete:)`
@@ -1033,6 +1041,13 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   name the moved pair. A pure move gated alone. `wc -l app/Sources/Playback.swift`: 592 before,
   550 after; `Playback+PreviewQuality.swift` 54 → 100. The next seam: `refreshPausedFrame()` out
   to `Playback+Scope.swift`.
+- `Playback.swift`: #568 paid that seam before `shutDown()` and its latch: `refreshPausedFrame()`
+  with its doc moved verbatim to the end of `Playback+Scope.swift`, reading `rate` and
+  `currentItem` where it read `player.rate` and `player.currentItem`; `player` stays private. The
+  type's doc and `+Scope`'s name it. A pure move gated alone. `wc -l app/Sources/Playback.swift`:
+  590 before, 548 after; `Playback+Scope.swift` 63 → 106. The next seam: `// MARK: - Transport`
+  (`play`, `pause`, `togglePlayPause`, `setRate`) out to a `Playback+Transport.swift` behind an
+  internal setter for the player's rate.
 - `AppDelegate+Menus.swift`: a submenu builder out (the precedent is
   `AppDelegate+GraphicMenu.swift`). The grading road map's GR1 moved the Clip menu's submenu
   builders (`backgroundMenu`, `transitionMenu`, `motionMenu`, `motionSlotMenu`, `labelMenu`,

@@ -23,7 +23,7 @@ import AppKit
 /// The meter's read and its two switches live in `Playback+Meter.swift`.
 /// `previewComposition`, `setPreviewQuality` and `recompose()` live in
 /// `Playback+PreviewQuality.swift`, `stepFrames` and the main hop `onMain` in `+Step`,
-/// `seekAfterRebuild`, `seekFinished` and `report` in `+Scope`,
+/// `seekAfterRebuild`, `seekFinished`, `report` and `refreshPausedFrame` in `+Scope`,
 /// the playing preview's graphics prefetch, `syncPrefetch(from:)`, in `+Prefetch` (G-36),
 /// `loopEnd` and `itemPlayedToEnd()` in `+Loop`.
 ///
@@ -300,48 +300,6 @@ final class Playback {
             debounceTimer = nil
             startRebuild()
         }
-    }
-
-    /// Forces one composed frame while paused, for a recipe that changed
-    /// under an item that did not (a property-only edit, spec §7.6).
-    ///
-    /// The standard trick, a zero-tolerance seek to the time the player is
-    /// already at, is a NO-OP on macOS 26.5.1 (measured by
-    /// `tools/proof/preview_refresh_probe.py`: the completion fires, no
-    /// composition request is issued; re-assigning `videoComposition` and
-    /// `AVPlayerItem.seek` are the same no-op). Only a seek to a DIFFERENT
-    /// time composes, so this steps one tick off the playhead — inside the
-    /// same frame, so the picture between the two seeks is the picture — with
-    /// the return queued as `pendingSeek`, and lands back on the playhead's
-    /// own tick with the new recipe drawn. Parked AT the end, as a transport
-    /// that played through is, it rests on the last frame's final tick
-    /// instead: the end tick composes nothing (every seek to it, tolerant or
-    /// not, displays black — measured), so a return there would blank it.
-    ///
-    /// Both seeks are a RESTORE, not a playhead move: `onTimeChanged` hears
-    /// neither jump, and hears the landing only when it differs from the tick
-    /// last reported — which the end branch's `end - 1` does, once.
-    func refreshPausedFrame() {
-        refreshWanted = false
-        guard player.rate == 0, player.currentItem != nil else { return }
-        if isSeeking {
-            refreshWanted = true
-            return
-        }
-        let here = currentTime
-        let end = built.map { CompositionBuilder.ticks($0.composition.duration) } ?? 0
-        if here >= end {
-            if end >= 1 {
-                restoring = true
-                startSeek(to: end - 1)
-            }
-            return
-        }
-        let step = here + 1 < end ? here + 1 : here - 1
-        guard step >= 0 else { return }
-        restoring = true
-        startSeek(to: step)
-        startSeek(to: here)
     }
 
     // MARK: - Preview quality and the second layer (road map 2's phase 8)
