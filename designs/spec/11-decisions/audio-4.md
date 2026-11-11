@@ -4,7 +4,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 [`README.md`](README.md).
 
 The IDs continue the AU- series of [`audio.md`](audio.md), so a citation never has to say which
-file; that file names the condensed record and the original. This file holds AU-110…AU-158.
+file; that file names the condensed record and the original. This file holds AU-110…AU-159. AU-160 on are in [`audio-5.md`](audio-5.md).
 It is new because `audio.md` had passed the spec's ~500-line split rule (#424, 2026-11-09); the
 entries moved here unchanged, each phase's opening paragraph with its decisions.
 
@@ -467,3 +467,32 @@ recorded before its code, continuing AU-109's block.
   target has an effect, dashed when some have none. Amount and pitch are not read. Proof:
   `voice_proof.py` V12–V14 (the one list, the mark, what a choice writes), M1–M5 over
   `perform_menu_item` (`--menu`) and seven mutants; manual check SE-45.
+- **AU-159 — The processed loudness reads a clip's audio actions (#402, 2026-11-11; amends AU-64
+  (a), (b), (g)).** AP8b lets an action's end switch a stage on, and such a clip plays through
+  it, so "measured as it will play" (AU-64) covers it.
+  (a) **Which clips render.** `needsRender` is true for AU-64 (a)'s base audio (AU-67 (c)'s
+  leveller with it), or when an action of the clip with a duration above 0 names at its end a
+  `hum`, `gate`, `de_esser`, `compressor`, `leveller` or `eq` that is not null, or an
+  `isolation` or `noise_reduction` above 0. It is read from the clip in the snapshot, never the
+  plan, the playhead or the selected action. It errs toward a render (an end's EQ counts
+  whatever its slots; an action outside the played window counts): a render is always a right
+  reading and costs seconds, a missed one is the defect. `voice` stays the base's (AU-88).
+  (b) **R0 and an action-end limiter.** R0 clears the BASE limiter only. A limiter an action's
+  end switches on stays in the segment's automation and R0 is measured through it, at volume 1.
+  Where the solve sets a base limiter, its verify renders run the action's limiter at the
+  solved volume and converge (V16 (f): the export at −20.11 LUFS for −20, `result_lufs` the
+  same, four renders). **Open, held for the owner on #402:** where the solve needs no base
+  limiter it answers after R0 alone (AU-64 (e)), and an action-end limiter, whose divisor is the
+  base volume (AU-22), then acts at a volume no render measured: V16 (g) (an end limiter at
+  −24 dBTP, target −30) answered `result_lufs` −30.00 and exported at −32.57 LUFS. That arm is
+  as it was before this entry for a clip with a base stage; no rule is chosen here for it.
+  (g) **At volume.** Its test is (a)'s, and on a clip that renders it reads the clip's BASE
+  volume and limiter (AU-26's model on R0's steps), so it is one figure whatever action is
+  selected; an action-end limiter is in R0's steps at volume 1 and is not modelled again. The
+  memo's key is the measurement plan with `limiter` taken out of every automation point, the
+  chain as before, and each action end (duration above 0) that has the `limiter` key — its
+  value or "off" for a null — with the action's start, duration and curve. The core writes the
+  base limiter into every automation point, so before this the solve's own limiter changed the
+  key of any clip with a tap-key action and At volume stayed "≈" for ever; now the reading
+  survives the solve and is dropped when an action's audio changes.
+  Proof: `audio_ap6_probe.py` E10, E13, E14 and mutants M15–M20; `audio_ap6_proof.py` V16.

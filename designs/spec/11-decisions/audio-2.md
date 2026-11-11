@@ -209,10 +209,10 @@ Enhance at record time (B8) the third, with AU-68 and AU-69.
   has an `eq` with an active slot and not bypassed, `hum`, `isolation` > 0, `noise_reduction` >
   0, a `gate`, a `de_esser`, a `compressor` or a voice that is not inert. Pan, mono, channels
   and the limiter are already counted or modelled by the cache reading (AU-11, AU-24), so a clip
-  with only those plans off the cache, byte for byte as before. Enhance always renders.
+  with only those plans off the cache, byte for byte as before. Enhance always renders. An action's end counts too: AU-159 (a).
   (b) **The trial.** On main, `document.project` with one `set_audio {clips: [c], patch:
   chain}` scoped to the open nest, then `.scoped(nest)`. The first render's (R0) chain is
-  Normalize's `{limiter: null}`, or Enhance's chosen patch with `limiter: null`.
+  Normalize's `{limiter: null}`, or Enhance's chosen patch with `limiter: null`. AU-159 (b).
   (c) **What is read.** The trial's plan with only the clip's audio segments (an emptied track
   dropped), each track's `ramps` and each segment's `track_pans` removed — pre-fader, AU-11's
   convention: no volume, fades, ducks, mute, track volume or pan — no video tracks or ducks, and
@@ -249,7 +249,7 @@ Enhance at record time (B8) the third, with AU-68 and AU-69.
   reads the last R0 measured for the clip's current plan and chain (`ProcessedLoudness.Memo`, 32
   entries, emptied when a loudness file or an offline render lands), through the limiter model at
   the current volume as AU-26 does; with none it shows the cache figure as "≈ …", its tooltip
-  saying it is before the clip's processing. No background measurement.
+  saying it is before the clip's processing. No background measurement. Amended: AU-159 (g).
   (h) `AudioDynamicsModel` stays only for Enhance's makeup (AU-62); nothing else reads it.
   (i) **Repeatability, measured (2026-10-31, AP6b step 3, the owner's order to fix the
   non-repeat).** AP6b's first build recorded three Enhance presses on the steady `say` fixture
@@ -267,7 +267,8 @@ Enhance at record time (B8) the third, with AU-68 and AU-69.
   read racing the build, the stamp placement — moves a byte, so there was no cause in the render
   to fix, and the 0.05 dB keep stays. The first build's spread is not reproduced; its record
   does not say how its presses were set up. `audio_ap6b_probe.py`'s R5 (three renders, the
-  isolated render wiped before the third) and `audio_ap6b_proof.py`'s P5 hold it.
+  isolated render wiped before the third) and `audio_ap6b_proof.py`'s P5 hold it. A step's
+  last bit did follow the reader's buffers under load, found and fixed by AU-160 (#567).
 - **AU-65 — The chrome, the tool, the proof.** An "Enhance Voice" button row under the Normalize
   button in the Volume section (its tooltip the rules in a sentence); Clip ▸ Enhance Voice right
   after Normalize, no key equivalent (Normalize's reason). `enhance_voice` takes `clips` and
