@@ -12,7 +12,7 @@
 //!
 //! - (a) Both bounds are snapped and clamped to 0, as every op's ticks are;
 //!   `to` not after `from` is an `Err`, not an identity and not a reorder
-//!   (`edit_time.rs`'s `ordered_range` is deliberately not followed).
+//!   (`edit_range.rs`'s `ordered_range` is deliberately not followed).
 //! - (b) A nest clip a bound lies strictly inside is refused: a nest clip
 //!   has no in point, so a cut there would replay it from its start.
 //! - (c) Every clip, on every track, that a bound lies strictly inside is

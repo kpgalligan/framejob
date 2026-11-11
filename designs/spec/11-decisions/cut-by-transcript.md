@@ -160,7 +160,7 @@ TR-11.
     door), then `SilenceDetector.snapUpToFrame` (start) and `snapDownToFrame` (end), inward as
     Remove Silences snaps; `end ≤ start` drops it (too short).
   - **A locked track:** a clip on a locked track gives no candidates, because
-    `ripple_delete_ranges` neither splits nor shifts a locked track (`core/src/edit_time.rs`), so
+    `ripple_delete_ranges` neither splits nor shifts a locked track (`core/src/edit_range.rs`), so
     the filler would stay and everything else would slide. A track the snapshot cannot find
     counts as unlocked, as the nest walls do.
   - **What drops a candidate, whole:** a project span that overlaps (half-open, more than 0

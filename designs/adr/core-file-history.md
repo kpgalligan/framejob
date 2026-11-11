@@ -395,6 +395,20 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
   moved lines differ from the base only in those widened lines. `cursor_query.rs`'s module doc
   still describes both reads. `wc -l core/src/cursor_query.rs`: 393 before, 265 after;
   `cursor_query_reads.rs` is 139. No next seam is named.
+- `edit_time.rs`: at 599 before #427 (a cut that would break the overlap rule is refused, spec
+  §11 #427), it paid that batch's toll, a pure move gated alone (`make gate`): lines 140–189 at
+  `b86b605e` (`ordered_range` and `clear_range` with their docs) and 245–360 (`ripple_delete_range`,
+  `ripple_delete_ranges` and `lift_range` with their docs) went whole to the new `edit_range.rs`
+  under a module doc, the three ops in an `impl Project` block of their own, and the blank line
+  after each block went too; `lib.rs` gained `mod edit_range;`. Its widenings: `Span`, its two
+  fields and `union` became `pub(crate)`, because `ripple_delete` stays and shares them; nothing
+  else changed. The seam is what a range op does to the cut (`clear_range`) against the shift and
+  the ops that move what they were not given. `edit_time.rs`'s module doc names the new file, and
+  `outcome.rs`, `edit_keep_range.rs`, `TranscriptCut+Plan.swift` and two §11 pointers
+  (`creator-jobs-4.md`, `cut-by-transcript.md`) name it where they named the moved code. `wc -l
+  core/src/edit_time.rs`: 599 before, 432 after; `edit_range.rs` is 187. #427's code then landed
+  in `edit_range.rs`. The next seam is the one road map "creator-jobs" named for SW7a: `freeze_frame`
+  with its doc out to an `edit_freeze.rs`.
 
 ## Open items
 

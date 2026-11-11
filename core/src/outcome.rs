@@ -88,7 +88,7 @@ pub enum Outcome {
     /// `edit_clip`'s `move_clips`, `delete_clips` and `duplicate_clips`,
     /// `edit_props`'s `patch_clips` (the one guard behind all five patch
     /// ops), `edit_nest`'s `nest_clips`, `edit_paste`'s `paste` (an empty
-    /// payload), and `edit_time`'s `ripple_delete` and
+    /// payload), `edit_time`'s `ripple_delete` and `edit_range`'s
     /// `ripple_delete_ranges` (ranges that merge to nothing). Nothing was
     /// ASKED for at any of them, so there is no rule a sentence could name.
     /// The other two, `split_clips` and `paste_attributes`, reach the same

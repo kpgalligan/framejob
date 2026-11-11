@@ -82,6 +82,7 @@ pub mod edit_paste;
 pub mod edit_paste_attributes;
 mod edit_pieces;
 pub mod edit_props;
+mod edit_range;
 pub mod edit_reframe;
 pub mod edit_relink;
 mod edit_retime;

@@ -107,7 +107,7 @@ transcript and lifts on the timeline — **yes**; a word selection sets the time
     extent `[start, max(end, start + 1))` meets the snapped range: "Track <name> is locked and
     has words in this cut: unlock it to cut here." (the name as TX-11 spells it, the id when
     empty); (3) the clip ceiling on the PEAK count `check_caps` sees after `clear_range`'s second
-    split (`core/src/edit_time.rs`, `clear_range`): `ShotSplit.clipCount(project.snapshot)` plus 1
+    split (`core/src/edit_range.rs`, `clear_range`): `ShotSplit.clipCount(project.snapshot)` plus 1
     per unlocked-track clip of the container with start < s < end, plus 1 per one with start < e <
     end; past `RC_MAX_CLIPS`: "This cut would make <N> clips; a project holds at most
     <RC_MAX_CLIPS>. Lock a track that needs no cut, such as a music bed, or cut less.", N that
