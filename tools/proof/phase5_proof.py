@@ -145,6 +145,27 @@ TOOLS = 71
 failures = []
 checks = 0
 
+# How long a proof waits for a cache file the import writes on the cache lane,
+# in seconds (#591). Three lanes building at once made a 15 s wait fail a
+# proof whose app was fine, and wrote a 10 s file's loudness cache 5 minutes
+# after its import (`audio_ap12_proof.ready`'s note). A late file is the bound's failure,
+# not the app's, and the rulebook allows a named host skip only in the
+# recording proof's granted tier, so the answer is the longer bound.
+CACHE_WAIT = 600
+
+
+def wait_for_files(paths, what, bound=CACHE_WAIT):
+    """Returns once every path in `paths` exists, polling each 0.05 s; raises
+    `RuntimeError("<what> was never written (<bound> s)")` after `bound`
+    seconds of wall-clock time."""
+    began = time.monotonic()
+    while True:
+        if all(os.path.exists(path) for path in paths):
+            return
+        if time.monotonic() - began >= bound:
+            raise RuntimeError(f"{what} was never written ({bound} s)")
+        time.sleep(0.05)
+
 
 def check(ok, what):
     global checks
@@ -485,7 +506,9 @@ class Session:
         two-clip fixture, before this wait existed. Waiting here is what makes
         every 5c measurement deterministic, and it leaves that refusal to be
         reached the one way a script can reach it on purpose: by deleting the
-        file."""
+        file. The wait is `CACHE_WAIT` (600 s) since #591: 15 s failed a proof
+        once on a machine three lanes were loading, the app relaunched and
+        passing, so a late waveform is the bound's failure and not the app's."""
         path = os.path.join(FIXTURES, name)
         # Importing one path twice is an identity edit and comes back as the
         # standard "made no change" refusal, so a fixture wanted on two tracks
@@ -494,11 +517,8 @@ class Session:
         media = already[path] if path in already else self.op(
             "import_media", path=path)["media"]
         peaks = self.peaks_file(media)
-        for _ in range(300):
-            if os.path.exists(peaks):
-                return media
-            time.sleep(0.05)
-        raise RuntimeError(f"{self.name}: {os.path.basename(peaks)} was never written")
+        wait_for_files([peaks], f"{self.name}: {os.path.basename(peaks)}")
+        return media
 
     def place(self, name, at=0, track=None):
         """A clip of a fixture, on `track` or the first one."""

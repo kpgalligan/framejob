@@ -157,14 +157,17 @@ class Session:
         before it can measure anything. The cache is written by a
         fire-and-forget task at import, so a normalise issued in the same
         breath legitimately answers "still being analysed"
-        (`phase5_proof.py` argues the same wait)."""
+        (`phase5_proof.py` argues the same wait, and its bound: 600 s since
+        #591, the cache lane being slow on a loaded machine)."""
         media = self.media(movie)
         peaks = os.path.join(self.path, "cache", "peaks", f"{media}.bin")
-        for _ in range(300):
-            if os.path.exists(peaks):
-                return media
+        began = time.monotonic()
+        while not os.path.exists(peaks):
+            if time.monotonic() - began >= 600:
+                raise RuntimeError(
+                    f"{self.name}: cache/peaks/{media}.bin was never written (600 s)")
             time.sleep(0.05)
-        raise RuntimeError(f"{self.name}: cache/peaks/{media}.bin was never written")
+        return media
 
     def place(self, media, at, track=None):
         track = track if track is not None else self.project()["tracks"][0]["id"]

@@ -168,11 +168,8 @@ def ready(s, clip):
     media = s.clip(clip)["source"]["media"]
     markers = [os.path.join(s.path, "cache", kind, f"{media}.complete.json")
                for kind in ("loudness", "speech")]
-    for _ in range(1200):
-        if all(os.path.exists(path) for path in markers):
-            return clip
-        time.sleep(0.05)
-    raise RuntimeError(f"{s.name}: media {media}'s loudness or speech cache was never written")
+    p5.wait_for_files(markers, f"{s.name}: media {media}'s loudness or speech cache")
+    return clip
 
 
 def place(s, name, at=0, track=None):

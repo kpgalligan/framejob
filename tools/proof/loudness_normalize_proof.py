@@ -46,7 +46,6 @@ import os
 import shutil
 import subprocess
 import sys
-import time
 
 import limiter_probe
 import mcp as mcp_module
@@ -124,11 +123,8 @@ def place(s, name, at=0):
     clip = s.place(name, at=at)
     media = s.clip(clip)["source"]["media"]
     marker = os.path.join(s.path, "cache", "loudness", f"{media}.complete.json")
-    for _ in range(600):
-        if os.path.exists(marker):
-            return clip
-        time.sleep(0.05)
-    raise RuntimeError(f"{s.name}: the loudness cache of media {media} was never written")
+    p5.wait_for_files([marker], f"{s.name}: the loudness cache of media {media}")
+    return clip
 
 
 def loud(s, clips, **kwargs):

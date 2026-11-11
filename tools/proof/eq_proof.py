@@ -35,7 +35,6 @@ import math
 import os
 import subprocess
 import sys
-import time
 import wave
 
 import numpy as np
@@ -274,11 +273,8 @@ def loudness_place(s, name, at=0):
     clip = s.place(name, at=at)
     media = s.clip(clip)["source"]["media"]
     marker = os.path.join(s.path, "cache", "loudness", f"{media}.complete.json")
-    for _ in range(600):
-        if os.path.exists(marker):
-            return clip
-        time.sleep(0.05)
-    raise RuntimeError(f"{s.name}: the loudness cache of media {media} was never written")
+    p5.wait_for_files([marker], f"{s.name}: the loudness cache of media {media}")
+    return clip
 
 
 def loudness_rows(m):

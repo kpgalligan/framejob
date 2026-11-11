@@ -700,7 +700,8 @@ fixture loud in its first half and quiet in its second, trimmed to its first
 1.4 s forwards and backwards, which must read 20 dB apart and reads the same
 number twice on a build with the mirror taken out. One thing worth knowing
 before adding a check: `cache/peaks/<id>.bin` is written by a fire-and-forget
-task, so `Session.media` WAITS for it — a normalise issued in the same breath
+task, so `Session.media` WAITS for it (up to 600 s since #591: the cache lane
+on a loaded machine) — a normalise issued in the same breath
 as the import legitimately answers "still being analysed", which is how that
 refusal is reached on purpose (by deleting the file) rather than by accident.
 
