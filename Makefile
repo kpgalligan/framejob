@@ -58,6 +58,9 @@ codecs:
 # first, because swift_build.py's selftest links the archives.
 # `acknowledgements.py --selftest` (spec §11 PUB-10) is the third-party notices'
 # generator over synthetic metadata, locks and package folders: no cargo, no network.
+# `ai_docs_r2c_proof.py --only T1,T2` (#556) is the spelling scan, spec §11 #526: the
+# string literals of app/Sources, core/src and graphic/src, and the site's pages,
+# sidebar.mjs, features.json and README.md; its tree rows launch no app and write nothing.
 test: rust codecs
 	cd core && cargo test --release
 	cd graphic && cargo test --release
@@ -79,6 +82,7 @@ test: rust codecs
 	python3 tools/proof/name_residue.py
 	python3 tools/proof/docs_site_proof.py --selftest
 	python3 tools/proof/docs_site_proof.py
+	python3 tools/proof/ai_docs_r2c_proof.py --only T1,T2
 
 lint:
 	cd core && cargo clippy --all-targets -- -D warnings

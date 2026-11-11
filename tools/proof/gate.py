@@ -14,7 +14,9 @@ CX-5, passing only with no `error:` and exactly TYPECHECK_BASELINE's
 warnings, by file and message; `tools/codecs` is among its and `app`'s inputs, and
 `cmake --version` in the tool fingerprint; `tools/licenses`, the acknowledgements' generator
 and its vendored texts, spec §11 PUB-10, is among `app`'s, its `*.md` not), `fmt` (`cargo fmt --check` in core, graphic,
-mcp-proxy), `lint` (`make lint`), `test` (`make test`) and `app` (`make app`,
+mcp-proxy), `lint` (`make lint`), `test` (`make test`; of the `*.md` files only those under
+`designs/spec/` and `docs/` and the root `README.md`, which its spelling scan reads, #556, are
+its inputs) and `app` (`make app`,
 then dist_check's D25 and D26 over the Release app: its entitlements and its
 seal, the defect a no-op build once shipped and only `make dist` read).
 
@@ -68,7 +70,7 @@ STEP_INPUTS = {
     "typecheck": (("app/Sources", "app/Bridging", "core/include", "agent", "tools/codecs"), ()),
     "fmt": (("core", "graphic", "mcp-proxy"), ()),
     "lint": (("core", "graphic", "mcp-proxy"), ()),
-    "test": (("",), ("designs/spec/", "docs/")),
+    "test": (("",), ("designs/spec/", "docs/", "README.md")),
     "app": (("app", "agent", "core", "graphic", "mcp-proxy", "tools/codecs", "tools/licenses",
              "project.yml", "VERSION",
              "docs/graphics-api.md", "docs/graphics-api.d.ts", "tools/proof/dist_check.py"),
@@ -342,7 +344,8 @@ def selftest(mutant=None):
         ("M3", "docs/manual-checks.md", {"names", "test"}),
         ("M4", "archive/x.md", set()),
         ("M4", "archive/x.py", set()),
-        ("M4", "README.md", {"names"}),
+        ("M3", "README.md", {"names", "test"}),
+        ("M4", "tools/proof/README.md", {"names"}),
         ("M5", "core/CLAUDE.md", {"names"}),
         ("M5", "app/CLAUDE.md", {"names"}),
         ("M6", "designs/adr/x.md", {"names"}),

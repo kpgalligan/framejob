@@ -6,6 +6,7 @@ British spellings in what the app says, and `snapshot_ui` at a forced capture sc
     python3 tools/proof/ai_docs_r2c_proof.py [--only S1,C1,…] [--app PATH] [--expect-red]
     RC_PROOF_APP=release python3 tools/proof/ai_docs_r2c_proof.py
     RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_r2c_proof.py --expect-red
+    python3 tools/proof/ai_docs_r2c_proof.py --only T1,T2      # make test (#556): no app, no write
 
 The built app (`proof_app`'s choice) under a scratch home, driven over MCP, on projects built from
 media made into `tools/proof/work/ai-docs-r2c/media/`: a `say`-voiced WAV (speech.wav, about 14 s)
@@ -702,10 +703,6 @@ def main():
             selected.add("Z1")
     if args.expect_red:
         selected -= TREE
-    if WORK.exists():
-        shutil.rmtree(WORK)
-    HOME.mkdir(parents=True)
-
     if "T1" in selected:
         tree_scan()
     if "T2" in selected:
@@ -715,6 +712,11 @@ def main():
 
     app_rows = selected & (LAUNCH_ONE | LAUNCH_TWO | LAUNCH_THREE)
     if app_rows:
+        # Only an app row uses the work folder: `make test`'s `--only T1,T2` (#556) writes
+        # nothing, so it cannot take a by-hand run's media and homes away.
+        if WORK.exists():
+            shutil.rmtree(WORK)
+        HOME.mkdir(parents=True)
         if not make_media():
             print("ffmpeg is not on PATH: the clips cannot be made")
             return 1

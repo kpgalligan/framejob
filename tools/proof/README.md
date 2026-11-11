@@ -1922,7 +1922,8 @@ files among `git ls-files -co --exclude-standard` and a tool fingerprint
 would not count), `project.yml`, `VERSION`,
 `docs/graphics-api.md`, `docs/graphics-api.d.ts` and
 `tools/proof/dist_check.py`. A `*.md` counts only under `designs/spec/` and
-`docs/` (for `test`) and as `docs/graphics-api.md` (for `app`); `.secrets/`
+`docs/`, and as the root `README.md`, which the spelling scan reads (#556)
+(for `test`), and as `docs/graphics-api.md` (for `app`); `.secrets/`
 is never read. A step is skipped when its hash equals its last pass. The
 hash is taken before the step and again after it (the tree re-read and the
 fingerprint re-run), and the pass is stamped only when the two are equal;
@@ -1945,8 +1946,9 @@ give identical hashes and every step is stamped; M1–M8 one file of each
 input class moves exactly its steps' hashes (an app source, the bridging
 header folder, the C header, the helper; a crate's source and `Cargo.toml`;
 `project.yml`, `VERSION`, a shader, the graphics reference, dist_check, a
-proof, a spec file, `docs/manual-checks.md`; `archive/`, `README.md`, a
-`CLAUDE.md` and an ADR move none; `gate.py` and the `Makefile` move all;
+proof, a spec file, `docs/manual-checks.md`, and the root `README.md`, which
+moves names and test (#556); `archive/` moves none, and `tools/proof/README.md`,
+a `CLAUDE.md` and an ADR move names alone; `gate.py` and the `Makefile` move all;
 M8 `tools/codecs/build_codecs.py` moves names, typecheck, test and app, and
 `tools/licenses/acknowledgements.py` names, test and app); H2
 a substituted tool string moves every step; H3 unequal before and after
@@ -30942,7 +30944,13 @@ T1), M4 "after the leveller" back in `AgentCatalog+Properties.swift` (S12 and T1
 make app-debug && python3 tools/proof/ai_docs_r2c_proof.py [--only S1,S12,C1,T1,T2]
 make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_r2c_proof.py
 RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_r2c_proof.py --expect-red
+python3 tools/proof/ai_docs_r2c_proof.py --only T1,T2      # make test
 ```
+
+T1 and T2 run in `make test` (#556), so a British form or a `levell…` form that comes back in
+a string literal, on a site page or in `README.md` fails the gate's `test` step. With only tree
+rows selected the proof chooses no app and writes nothing: `tools/proof/work/ai-docs-r2c` is
+wiped and made only when an app row runs.
 
 | Run | Result |
 |---|---|
