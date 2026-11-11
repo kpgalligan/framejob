@@ -1,18 +1,20 @@
 // tools/proof/document_close_probe.swift — the in-process instrument behind
-// `document_close_probe.py` (#568). Compiled with every file in `app/Sources`
+// `document_close_probe.py` (#568, #592). Compiled with every file in `app/Sources`
 // but `main.swift`, copied in as `main.swift`, with the app's `Fonts`,
 // `Blank.mp4` and a `default.metallib` of the app's own shader beside it —
 // `scope_playhead_probe.swift`'s build.
 //
-//     document_close_probe <a.framejob> <b.framejob> <c.framejob>
+//     document_close_probe <a> <b> <c> <d> <e> <f>   (six .framejob packages)
 //
 // Each package is opened as a document with its editor window made and never
 // shown, given one shape clip so its player has an item, and closed through a
-// door of its own. The probe HOLDS each editor and its `Playback` strongly
-// across the close, which is the case the fix is for: AppKit keeps a closed
-// window alive for as long as it likes, so nothing here may depend on a deinit.
-// The rebuild in flight is FORCED through `Playback.rebuildHop`, never waited
-// for. The answer is one line, `ANSWER <json>`.
+// door of its own. For every row but P6 the probe HOLDS each editor and its
+// `Playback` strongly across the close, which is the case #568's fix is for:
+// AppKit keeps a closed window alive for as long as it likes, so nothing there
+// may depend on a deinit. P6 holds the WINDOW strongly, as AppKit does, and the
+// editor only weakly: what the window still owns after the close is #592's
+// question. The rebuild in flight is FORCED through `Playback.rebuildHop`, never
+// waited for. The answer is one line, `ANSWER <json>`.
 import AppKit
 import AVFoundation
 
@@ -41,8 +43,8 @@ func wait(_ limit: Double, _ done: () -> Bool) -> Bool {
 }
 
 let args = CommandLine.arguments
-guard args.count == 4 else {
-    print("usage: document_close_probe <a.framejob> <b.framejob> <c.framejob>")
+guard args.count == 7 else {
+    print("usage: document_close_probe <a> <b> <c> <d> <e> <f> (six .framejob packages)")
     exit(2)
 }
 let second = ReelTime.ticks(seconds: 1)
@@ -94,6 +96,23 @@ func shut(_ o: Opened) -> [String: Any] {
     ]
 }
 
+/// What the close left of the editor in its window (#592): read once a door has
+/// returned. The window must hold no content view controller, the editor's root
+/// view must be out of the window, and the first responder must not be in it.
+func detached(_ o: Opened) -> [String: Any] {
+    let root = o.editor.view
+    let first = o.window.firstResponder
+    let inTree = (first as? NSView).map { $0 === root || $0.isDescendant(of: root) } ?? false
+    return [
+        "controller": o.window.contentViewController != nil,
+        "contentIsRoot": o.window.contentView === root,
+        "rootInWindow": root.window != nil,
+        "rootHasSuperview": root.superview != nil,
+        "firstResponderInTree": inTree,
+        "firstResponder": first.map { String(describing: type(of: $0)) } ?? "nil",
+    ]
+}
+
 var answer: [String: Any] = [:]
 
 // P1 — the document's own close(), which `close_project` calls.
@@ -101,6 +120,7 @@ let a = open(args[1])
 let heldProject = a.document.project
 a.document.close()
 answer["P1"] = shut(a)
+var p5: [String: Any] = ["close": detached(a)]
 
 // P3 — a shut player stays shut: `update` called on it directly, as a late
 // change notice would through an editor that outlived its window.
@@ -133,6 +153,8 @@ var p2 = shut(b)
 p2["door"] = door
 p2["controllersLeft"] = b.document.windowControllers.count
 answer["P2"] = p2
+p5["button"] = detached(b)
+answer["P5"] = p5
 
 // P4 — a rebuild in flight at the close: the build is held on the seam, the
 // document closes, and the held block is then run.
@@ -166,6 +188,96 @@ spin(1)
 p4["hasItemAfterLanding"] = c.playback.currentItem != nil
 p4["builtAfterLanding"] = c.playback.built != nil
 answer["P4"] = p4
+
+// P6 — the window held strongly, as AppKit holds a closed one (the main thread's
+// autorelease pool and `NSApplication.currentEvent`, #592), and the editor, its
+// `Playback` and its root view held only weakly; the document opened and closed
+// inside an `autoreleasepool`, so no local of the probe's owns any of them.
+final class Weakly {
+    weak var editor: EditorViewController?
+    weak var playback: Playback?
+    weak var root: NSView?
+    var gone: Bool { editor == nil && playback == nil && root == nil }
+}
+let weakly = Weakly()
+var heldWindow: NSWindow?
+var p6HadItem = false
+autoreleasepool {
+    let d = open(args[4])
+    weakly.editor = d.editor
+    weakly.playback = d.playback
+    weakly.root = d.editor.view
+    heldWindow = d.window
+    p6HadItem = d.hadItem
+    d.document.close()
+}
+let freedAtOnce = weakly.gone
+let freed = wait(5) { weakly.gone }
+answer["P6"] = [
+    "hadItem": p6HadItem,
+    "freedAtOnce": freedAtOnce,
+    "freed": freed,
+    "editorAlive": weakly.editor != nil,
+    "playbackAlive": weakly.playback != nil,
+    "rootAlive": weakly.root != nil,
+    "windowHeld": heldWindow != nil,
+] as [String: Any]
+
+// P7 — text being typed at the close: the close ends no editing, so no commit
+// reaches the closed document. Two of the probe's own views, each added to an
+// editor's root view and made first responder: a field (`NSTextField`, the field
+// editor; every inspector field, the timeline's rename, the timecode) and a text
+// view (`NSTextView`, as the Text tab's area and the canvas's inline editor are).
+// The field's delegate counts `controlTextDidEndEditing`; the text view counts its
+// own `resignFirstResponder` (where the canvas editor commits) and its delegate's
+// `textDidEndEditing` (where the Text tab's area commits).
+final class EndWatch: NSObject, NSTextFieldDelegate, NSTextViewDelegate {
+    var ended = 0
+    func controlTextDidEndEditing(_ obj: Notification) { ended += 1 }
+    func textDidEndEditing(_ notification: Notification) { ended += 1 }
+}
+final class CountingTextView: NSTextView {
+    var resigned = 0
+    override func resignFirstResponder() -> Bool {
+        resigned += 1
+        return super.resignFirstResponder()
+    }
+}
+let fieldWatch = EndWatch()
+let e = open(args[5])
+let field = NSTextField(frame: NSRect(x: 8, y: 8, width: 120, height: 22))
+field.delegate = fieldWatch
+e.editor.view.addSubview(field)
+let fieldBegan = e.window.makeFirstResponder(field)
+(field.currentEditor() as? NSTextView)?.insertText(
+    "typed", replacementRange: NSRange(location: NSNotFound, length: 0))
+let fieldEditing = field.currentEditor() != nil
+e.document.close()
+let fieldEndedAtClose = fieldWatch.ended
+spin(0.5)
+let textWatch = EndWatch()
+let f = open(args[6])
+let text = CountingTextView(frame: NSRect(x: 8, y: 8, width: 200, height: 60))
+text.delegate = textWatch
+f.editor.view.addSubview(text)
+let textBegan = f.window.makeFirstResponder(text)
+text.insertText("typed", replacementRange: NSRange(location: NSNotFound, length: 0))
+let textFirst = f.window.firstResponder === text
+f.document.close()
+let textEndedAtClose = textWatch.ended
+let textResignedAtClose = text.resigned
+spin(0.5)
+answer["P7"] = [
+    "field": [
+        "began": fieldBegan, "editing": fieldEditing, "endedAtClose": fieldEndedAtClose,
+        "endedAfter": fieldWatch.ended, "detached": detached(e),
+    ] as [String: Any],
+    "text": [
+        "began": textBegan, "editing": textFirst, "endedAtClose": textEndedAtClose,
+        "endedAfter": textWatch.ended, "resignedAtClose": textResignedAtClose,
+        "resignedAfter": text.resigned, "detached": detached(f),
+    ] as [String: Any],
+] as [String: Any]
 
 let data = try! JSONSerialization.data(withJSONObject: answer, options: [.sortedKeys])
 FileHandle.standardOutput.write("ANSWER ".data(using: .utf8)! + data + "\n".data(using: .utf8)!)

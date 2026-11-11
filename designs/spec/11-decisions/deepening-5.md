@@ -333,3 +333,44 @@ in one may now point into a sibling file.
   no thread and no player.
   Proofs: `document_close_probe.py` P0–P4 with four mutants;
   `open_documents_proof.py` O4 on Release.
+- **#592 — a closed editor window gives its editor up at the close.**
+  (Amends #568 (d).) The closed `EditorWindow` that AppKit keeps held its
+  editor as its content view controller, so the editor, its `Playback` and
+  the whole view tree stayed with it: after ten `close_project {discard:
+  true}` on a Debug build `heap` counted ten of each, and on Release forty
+  closes left resident memory where the forty open documents had taken it.
+  (a) `EditorWindow.close()` runs `super.close()` and then sets
+  `contentViewController` to nil when it is an `EditorViewController`. Both
+  doors end in `NSWindow.close()`: `close_project`'s `document.close()`
+  closes each window controller's window after `releaseOnClose()`, and the
+  close button closes the document from inside the window's
+  `willCloseNotification`, so that notification's observers (the preview
+  panel's, the assistant's) and `releaseOnClose()` have run before the tree
+  goes, and the players are shut before the editor's `deinit` runs. With no
+  content view controller AppKit takes the editor's root view out as the
+  content view too (measured), so nothing is installed in its place. No
+  path closes an editor window while its document stays open; a document
+  opened with `display: false` has a window, never shown, closed only with
+  its document, and its editor goes the same way.
+  (b) A field being typed in at the close has its editing aborted
+  (`NSControl.abortEditing()` on the field editor's control) before the
+  detach. Taking the tree out of the window ends a field editor's editing
+  (measured), and a field's end of editing is its commit, which would land
+  in a document already closed; a closed window never committed it before.
+  A text view that is not a field editor (the Text tab's area, the canvas's
+  inline editor) is neither resigned nor ended by the detach (measured), and
+  no first responder is asked to resign.
+  (c) What still waits on AppKit is the bare window, held as #568 traced
+  it: after ten closes `heap` counts ten `EditorWindow`, no
+  `EditorViewController` and no `Playback`. It is not fought, and it is
+  small: one more window opened lets AppKit free nine of them, and resident
+  memory then falls by a few megabytes. The rest of what a closed document
+  leaves resident is the allocator's freed pages (`vmmap`'s
+  `MALLOC_SMALL (empty)`), not an object. No `autoreleasepool` around the
+  detach is needed: the editor goes without one. Whether a person's close in
+  a front app frees the same way is `docs/manual-checks.md` PB-19.
+  Proofs: `document_close_probe.py` P5–P7 with the mutants `no-detach` and
+  `no-abort`, and P2 holding that its door was `performClose`;
+  `open_documents_proof.py` O5 (resident memory back under the reading
+  before the first document plus three quarters of what the bound added) on
+  Release, O6 (`--heap`, Debug) and V1 with the mutant `any-fall`.

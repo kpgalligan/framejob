@@ -271,9 +271,10 @@ detail there.
   renders and the graphic store. The table and not `windowControllers`: the
   window's close button removes the window controller before `close()`
   (spec §11 #568). **Nothing a closed document must give back is left to a
-  deinit**: AppKit keeps a closed window, and so its editor, until another
-  window opens in an instance driven in the background. What must go at the
-  close goes in `releaseOnClose()`; `applyEdit`'s `.refused` arm beeps and then posts
+  deinit**: AppKit keeps a closed window until another window opens in an
+  instance driven in the background; since #592 the window gives its editor
+  up when it closes (`EditorWindow.close()`), but what must go at the close
+  still goes in `releaseOnClose()`; `applyEdit`'s `.refused` arm beeps and then posts
   `projectDocumentDidRefuse` with the `ReelRefusal` (spec §11 CI-10), which
   the editor forwards to the inspector's refusal strip. Holds the SIX pieces of view state nothing persists —
   playhead, clip selection, in/out range, `selectedMedia`, `nestPath` and
@@ -1636,7 +1637,10 @@ the key map behind it.
   `.numericPad`/`.function` on function-key scalars; never ⌘ ⌥ ⌃), read by
   `handleEditorKey` (#61). `CanvasKey.isPlain` is the canvas keys' modifier
   rule (⇧ ⇪ and the keypad and fn flags) and `CanvasFocus` hands the keys
-  back on a press outside the canvas (K-5).
+  back on a press outside the canvas (K-5). Its `close()` gives the editor up
+  after `super.close()` (`contentViewController` to nil), aborting a field
+  editor's edit first so nothing commits into the closed document (spec §11
+  #592, `document_close_probe.py` P5–P7).
 
 **Timeline.**
 - `TimelineView.swift` (frozen) · `TimelineLayout.swift` (every ticks ↔

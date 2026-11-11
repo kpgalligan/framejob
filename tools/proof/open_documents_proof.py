@@ -31,6 +31,22 @@ Rows:
       failed until #568: a closed document whose preview had been built kept
       its player, and with it five CoreMedia threads, until another window
       opened (`tools/proof/README.md`, "Issue #568").
+  V1  O5's rule over made-up readings, no app (`memory_fell`).
+  O5  resident memory comes back after the closes: the lowest reading after
+      the last close is at most the reading before the first document plus
+      three quarters of what the bound added (read 10 s after the bound). The
+      readings go on through 5, 15, 30 and 60 s until both O4's and O5's rules
+      hold, or the last wait is over, and each is printed with the one-minute
+      load. It failed until #592: AppKit keeps a closed window until another
+      window opens, and the window kept its editor's whole view tree. Three
+      quarters is measured, not chosen: before #592 a run kept 98–104 % of
+      what the bound added, after it 45–49 %, the rest freed malloc pages the
+      allocator had not yet given back (`tools/proof/README.md`, "Issue #592").
+  O6  with `--heap` only (Debug: a Release build is hardened and `heap` cannot
+      attach): after the readings, `heap <pid>` counts no
+      `EditorViewController` and no `Playback`; the `EditorWindow` count, the
+      bare windows AppKit still keeps, is printed and not scored. A `heap`
+      that cannot read the instance fails the row.
 
 **A hang is never read off a timeout.** A call that runs past
 `--call-seconds` (default 120) gets three `ps -o %cpu=` readings a second
@@ -42,14 +58,15 @@ holds `_performFileAccess` (the stack `tools/proof/README.md`'s "Relaunch the
 instance between proof sessions" describes), else "hung". Either fails O1
 with the count it happened at, and the run makes no further call.
 
-    env -u RC_ASSEMBLYAI_KEY python3 tools/proof/open_documents_proof.py [--bound N] [--only-kind new|open] [--call-seconds S] [--app PATH] [--mutant timeout-only]
+    env -u RC_ASSEMBLYAI_KEY python3 tools/proof/open_documents_proof.py [--bound N] [--only-kind new|open] [--call-seconds S] [--app PATH] [--heap] [--mutant timeout-only|any-fall]
 
 It launches one instance of its own (`mcp.launch` on `proof_app.binary()`),
 logging to `work/open-documents/framejob.log`, and stops it by its PID. It is
 slow and memory-heavy (a window per document) and in no make target: run it
 when the document machinery changes. `--mutant timeout-only` makes the
-verdict "deadlock" for any overrun, which V0 must fail. Exit 0 when every
-row passes, else 1.
+verdict "deadlock" for any overrun, which V0 must fail; `--mutant any-fall`
+makes O5's rule pass on any reading under the bound's, which V1 must fail.
+Exit 0 when every row passes, else 1.
 """
 
 import argparse
@@ -78,10 +95,13 @@ IDLE_BELOW = 0.5          # a %cpu reading under this rounds to 0 %
 HARD = 600                # the longest any one call is waited for
 THREAD_SLACK = 64
 STEP = 10
-FALL = (5, 15, 30, 60)    # seconds after the last close at which the threads are read
+FALL = (5, 15, 30, 60)    # seconds after the last close at which threads and memory are read
 SETTLE = 10              # seconds the bound is held before its last reading
-# The mutants, as `mutant_anchors.py` reads them: a switch on MUTANT in `verdict`, no tree text.
-MUTANTS = ("timeout-only",)
+HEAP_SECONDS = 300       # the longest `heap <pid>` is waited for (--heap)
+HEAP_CLASSES = ("EditorViewController", "Playback", "EditorWindow")
+# The mutants, as `mutant_anchors.py` reads them: switches on MUTANT in `verdict` and
+# `memory_fell`, no tree text.
+MUTANTS = ("timeout-only", "any-fall")
 MUTANT = None
 
 rows = {}
@@ -109,6 +129,60 @@ def verdict(answered, readings, main_stack):
     if main_stack is not None and OLD_FRAME in main_stack:
         return "deadlock"
     return "hung"
+
+
+def memory_line(before, bound):
+    """O5's line, in MB: the resident memory before the first document plus three quarters of
+    what the bound added (#592). None when either reading is missing."""
+    if before is None or bound is None:
+        return None
+    return before + (bound - before) * 3 / 4
+
+
+def memory_fell(before, bound, readings):
+    """O5's rule: the lowest resident reading after the last close is at most `memory_line`.
+    `readings`: the MB read after the closes, None where `ps` answered nothing."""
+    read = [r for r in readings if r is not None]
+    line_mb = memory_line(before, bound)
+    if line_mb is None or not read:
+        return False
+    if MUTANT == "any-fall":
+        return min(read) < bound
+    return min(read) <= line_mb
+
+
+def v1():
+    cases = [("#568 at 40: 250 before, 985 at the bound, 913 after", (250, 985, [913]), False),
+             ("back to where it began", (250, 985, [260]), True),
+             ("exactly on the line", (250, 950, [775]), True),
+             ("one MB above the line", (250, 950, [776]), False),
+             ("the lowest of several", (250, 950, [900, 800, 400]), True),
+             ("a reading unread", (250, 950, [None, 400]), True),
+             ("nothing read after", (250, 950, [None, None]), False),
+             ("no reading before", (None, 950, [300]), False)]
+    got = [(name, memory_fell(*given), want) for name, given, want in cases]
+    bad = [f"{name}: {said} ≠ {want}" for name, said, want in got if said != want]
+    check("V1", not bad, f"{len(got) - len(bad)}/{len(got)} rulings"
+                         + (f"; wrong: {bad}" if bad else ""))
+
+
+def heap_counts(pid):
+    """`heap <pid>`'s instance counts of HEAP_CLASSES, matched on the class name's last
+    component; (counts, the lines counted, None) or (None, None, why)."""
+    ran = bounded.run(["heap", "-q", str(pid)], HEAP_SECONDS)
+    if ran["expired"] or ran["rc"] != 0:
+        return None, None, (f"heap exited {ran['rc']}" + (" (expired)" if ran["expired"] else "")
+                            + f": {ran['stderr'].strip()[-300:]}")
+    counts, lines = {name: 0 for name in HEAP_CLASSES}, []
+    for text in ran["stdout"].splitlines():
+        fields = text.split()
+        if len(fields) < 4 or not fields[0].isdigit():
+            continue
+        last = fields[3].rsplit(".", 1)[-1]
+        if last in counts:
+            counts[last] += int(fields[0])
+            lines.append(" ".join(fields[:5]))
+    return counts, lines, None
 
 
 def v0():
@@ -258,7 +332,7 @@ def line(app, count):
     app.slowest = 0.0
 
 
-def run_rows(app, bound, only):
+def run_rows(app, bound, only, heap=False):
     order = kinds(bound, only)
     saved = [package(f"saved-{n:03d}") for n, kind in enumerate(order) if kind == "open"]
     began = time.monotonic()
@@ -269,8 +343,8 @@ def run_rows(app, bound, only):
     print(f"  {len(saved)} packages made, saved and closed in {time.monotonic() - began:.0f} s "
           f"(slowest call {app.slowest:.1f} s)", flush=True)
     app.slowest = 0.0
-    before = thread_count(app.pid)
-    print(f"  before the first document: {before} threads, {resident_mb(app.pid)} MB resident\n"
+    before, before_mb = thread_count(app.pid), resident_mb(app.pid)
+    print(f"  before the first document: {before} threads, {before_mb} MB resident\n"
           f"  | open | threads | resident MB | slowest call s | load (1 min) |\n"
           f"  |---|---|---|---|---|", flush=True)
     held, waiting = [], iter(saved)
@@ -293,6 +367,7 @@ def run_rows(app, bound, only):
         raise
     time.sleep(SETTLE)
     print(f"  after {SETTLE} s more:", flush=True)
+    bound_mb = resident_mb(app.pid)
     line(app, len(held))
     doors = {kind: order.count(kind) for kind in sorted(set(order))}
     check("O1", len(held) == bound,
@@ -318,18 +393,37 @@ def run_rows(app, bound, only):
     took, closed, seen, after = time.monotonic() - began, time.monotonic(), [], None
     editors = [w for w in app.call("snapshot_ui", {}).get("windows", [])
                if w.get("kind") == "editor"]
-    for wait in FALL:       # the count is read until it has fallen, or the last wait is over
+    resident, line_mb = [], memory_line(before_mb, bound_mb)
+    for wait in FALL:   # read until the threads AND the memory have fallen, or the last wait
         time.sleep(max(0.0, closed + wait - time.monotonic()))
-        after = thread_count(app.pid)
-        seen.append(f"{wait} s: {after} threads, {resident_mb(app.pid)} MB")
-        if before is not None and after is not None and after < before + THREAD_SLACK:
+        after, mb = thread_count(app.pid), resident_mb(app.pid)
+        resident.append(mb)
+        seen.append(f"{wait} s: {after} threads, {mb} MB (load {os.getloadavg()[0]:.1f})")
+        fallen = before is not None and after is not None and after < before + THREAD_SLACK
+        if fallen and memory_fell(before_mb, bound_mb, resident):
             break
+    print("  after the last close: " + "; ".join(seen), flush=True)
     check("O3", not bad and not editors,
           f"{len(held) - len(bad)}/{len(held)} closed in {took:.0f} s; {len(editors)} editor "
           f"window(s) left" + (f"; refused {bad[:3]}" if bad else ""))
     ok = before is not None and after is not None and after < before + THREAD_SLACK
     check("O4", ok, f"threads {before} before the first document, and after the last close "
                     f"{'; '.join(seen)} (wanted < {before} + {THREAD_SLACK})")
+    low = min((r for r in resident if r is not None), default=None)
+    check("O5", memory_fell(before_mb, bound_mb, resident),
+          f"resident {before_mb} MB before the first document, {bound_mb} MB at the bound, "
+          f"lowest {low} MB after the last close (wanted ≤ "
+          f"{'?' if line_mb is None else f'{line_mb:.0f}'} MB, three quarters of what the "
+          f"bound added); load {os.getloadavg()[0]:.1f}")
+    if heap:
+        counts, lines, why = heap_counts(app.pid)
+        if counts is None:
+            check("O6", False, f"heap could not read the instance: {why}")
+        else:
+            check("O6", counts["EditorViewController"] == 0 and counts["Playback"] == 0,
+                  f"after {len(held)} closes heap counts {counts} (wanted no "
+                  f"EditorViewController and no Playback; the EditorWindow count is printed, "
+                  f"not scored); counted {lines}")
 
 
 def complaints(log):
@@ -348,6 +442,8 @@ def main():
     parser.add_argument("--only-kind", choices=("new", "open"), default=None)
     parser.add_argument("--call-seconds", type=float, default=120)
     parser.add_argument("--mutant", choices=MUTANTS, default=None)
+    parser.add_argument("--heap", action="store_true",
+                        help="score O6 with `heap <pid>` after the closes (Debug only)")
     args = parser.parse_args()
     MUTANT = args.mutant
     binary = args.app or proof_app.binary()
@@ -357,7 +453,8 @@ def main():
     print(f"#555 — {args.bound} documents open at once — {binary} — load "
           f"{os.getloadavg()[0]:.1f}" + (f" — MUTANT {MUTANT}" if MUTANT else ""), flush=True)
     v0()
-    scored = ["V0", "D0", "O1", "O2", "O3", "O4"]
+    v1()
+    scored = ["V0", "V1", "D0", "O1", "O2", "O3", "O4", "O5"] + (["O6"] if args.heap else [])
     log = WORK / "framejob.log"
     up = False
     if not AV_MOV.exists():
@@ -375,7 +472,7 @@ def main():
                 print(f"  instance PID {pid} at {launched.socket_path}", flush=True)
                 try:
                     run_rows(App(launched.client, pid, args.call_seconds), args.bound,
-                             args.only_kind)
+                             args.only_kind, heap=args.heap)
                 except Wedged as wedge:
                     why = f"the instance stopped answering: {wedge}"
                 except Exception as error:  # a broken instrument is a FAIL, not an exit
@@ -383,7 +480,7 @@ def main():
         finally:
             launched.stop()
             mcp.remove_scratch(launched.socket_path)
-    for name in ("O1", "O2", "O3", "O4"):
+    for name in [row for row in scored if row.startswith("O")]:
         if name not in rows:
             check(name, False, why)
     found = complaints(log)

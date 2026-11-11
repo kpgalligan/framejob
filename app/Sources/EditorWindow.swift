@@ -204,6 +204,38 @@ final class EditorWindow: NSWindow {
         fatalError("EditorWindow does not support NSCoder")
     }
 
+    /// A closed editor window gives its editor up at the close (spec §11 #592).
+    /// AppKit keeps a closed window for as long as it likes — in an instance
+    /// driven in the background, until another window opens — and with its
+    /// content view controller it kept the editor, its `Playback` and the whole
+    /// view tree. Both doors end here, after `super.close()`: `close_project`'s
+    /// `document.close()` closes each window controller's window, and the close
+    /// button's close closes the document from inside this close's
+    /// `willCloseNotification`, so every observer of that notification and the
+    /// document's `releaseOnClose()` have run before the tree goes.
+    override func close() {
+        super.close()
+        releaseEditor()
+    }
+
+    /// The editor out of the window: with no content view controller the
+    /// window's content view is no longer the editor's root view (measured,
+    /// `document_close_probe.py` P5). A field being typed in has its editing
+    /// ABORTED first: taking the tree out of the window would otherwise end it,
+    /// and its end of editing is its commit, into a document already closed
+    /// (P7). A closed window never committed it before #592 either. A text
+    /// view is not resigned by the detach (measured), so it needs nothing.
+    /// Runs twice harmlessly.
+    private func releaseEditor() {
+        guard contentViewController is EditorViewController else { return }
+        if let text = firstResponder as? NSText, text.isFieldEditor,
+            let field = text.delegate as? NSControl
+        {
+            field.abortEditing()
+        }
+        contentViewController = nil
+    }
+
     override func sendEvent(_ event: NSEvent) {
         // A key that leaves is spent; a click that leaves is then delivered.
         if keepReturn(for: event) { return }

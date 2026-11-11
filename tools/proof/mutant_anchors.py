@@ -135,8 +135,9 @@ SWITCHES = {
     "matte_spike/matte_spike.py": {"MUTANTS": 2},
     # `MUTANT` in its own scan: the pin comparison, the untracked walk, the exempt prefixes.
     "name_residue.py": {"MUTANTS": 3},
-    # `MUTANT` in `verdict`: a hang decided by the timeout alone.
-    "open_documents_proof.py": {"MUTANTS": 1},
+    # `MUTANT` in `verdict` (a hang decided by the timeout alone) and in `memory_fell` (O5
+    # passed by any fall).
+    "open_documents_proof.py": {"MUTANTS": 2},
     # `main` changes the loaded table or the fetched page in memory, after its one network GET.
     "prices_crosscheck.py": {"MUTANTS": 2},
     # `MUTANT` in its own launch-argument read, input filter and two stale markers.

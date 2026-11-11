@@ -473,11 +473,15 @@ took a Release instance from 60 threads and 278 MB to 807 and 3,150 MB, every
 call answered, the slowest in 1.6 s). **Closing a document gives back its
 path, its player and its threads at the close** (since #568, "Issue #568"
 below: 773 threads with 150 open, 23 five seconds after the last close),
-**but not its window's memory, which AppKit keeps until another window
-opens** in an instance driven in the background (the same run: 2,953 MB five
-seconds after the last close). So a proof closes what it opens, to keep the
-threads, the window count and the paths free, and a long session of proofs
-still starts a new instance between them, for the memory. An instance once
+**and its editor and most of its memory** (since #592, "Issue #592" below:
+3,125 MB with 150 open on Release, 1,476 MB five seconds after the last
+close, where #568's run read 2,953 MB). What stays is the bare window AppKit
+keeps until another window opens, which is small, and pages the allocator
+has freed and not yet given back. So a proof closes what it opens, to keep
+the threads, the paths and the memory free, and a long session of proofs
+still starts a new instance between them. #592's runs at 150 open also met
+calls of 40–150 s past 110 open under other lanes' load, once read as
+"hung" (that section has what the sample showed). An instance once
 DEADLOCKED somewhere past forty open documents, before `close_project`
 existed: every libdispatch worker blocked in a synchronous operation and the
 main thread waiting for ever on `-[NSDocument _performFileAccess:]`'s
@@ -2153,7 +2157,7 @@ keys taken out of the environment and nothing live:
 | `assistant_prompt_proof.py` | `bare-send`: `app/Sources/AssistantSession.swift`, `AssistantPrompt.message(text, document: document)` | `--mutant bare-send` (a Debug copy) | S2 FAIL, 0/1, exit 1: the last user text of both turns is the bare text |
 | `makefile_env_proof.py` | each mutant's `unexport` line in `Makefile`; `KEYS` takes its directives from the table | each `--mutant` (the copy's own `make app`) | `no-unexport`: 3/4, exit 1, the AssemblyAI row FAILS and the Anthropic row passes; `no-unexport-anthropic`: 3/4, exit 1, the Anthropic row FAILS and the AssemblyAI row passes |
 | `defaults_proof.py` | switches: `tuple(sorted(EXPECTED))`, 4 (a function rebound in the child) | each `--mutant` | `MUTANT PASS` each: `no-compare` G1 G3 G4 G5 G6, `no-exit` G1 G3 G4 G6, `home-followed` H1 H2, `no-rehome` G6 |
-| `open_documents_proof.py` | switches, 1 (`verdict`) | `--mutant timeout-only --bound 20` | V0 fail (1/6 verdicts), exit 1, 5/6. Run on this change merged with #568's ("Issue #568" below), where O4 passes (50 threads before the first document, 21 five seconds after the last close); on the tree before #568 the same run was 4/6, O4 failing beside V0 as it did unmutated |
+| `open_documents_proof.py` | switches, 2 (`verdict`; `memory_fell`, since #592) | `--mutant timeout-only --bound 20`; since #592 each `--mutant` at `--bound 4` (Debug) | V0 fail (1/6 verdicts), exit 1, 5/6. Run on this change merged with #568's ("Issue #568" below), where O4 passes (50 threads before the first document, 21 five seconds after the last close); on the tree before #568 the same run was 4/6, O4 failing beside V0 as it did unmutated. #592: `timeout-only` V0 fail (1/6 verdicts), `any-fall` V1 fail (6/8 rulings), each exit 1, 7/8 |
 
 **Three rots the pins had hidden, each fixed in the same change.** `op_contract_proof.py`'s
 `nearest-transition` named `let requested = duration / frame;` and `let asked = duration /
@@ -31983,7 +31987,7 @@ The baseline is now `tools/proof/missing_audio_baseline.json`, tracked, written 
 | Q6 (Debug built with the mutant, `--only K1,K2`) | K1 and K2 fail: both presets' audio "≠ the baseline's sha256 over 814400 frames", the video md5 still the baseline's |
 | Debug rebuilt clean, `--only K0,K1,K2` | 5/5 against the Release-recorded file |
 
-## Issue #555 — the forty-document claim measured (open_documents_proof.py V0, D0, O1–O4; mutant `timeout-only`)
+## Issue #555 — the forty-document claim measured (open_documents_proof.py V0, D0, O1–O4, since #592 V1, O5, O6; mutants `timeout-only`, `any-fall`)
 
 The README, the root rulebook and four instruments said an instance deadlocks "somewhere past
 forty" documents open at once. That figure was from before `close_project` existed and nothing
@@ -32005,6 +32009,11 @@ memory (`ps -o rss=`), slowest call and one-minute load printed every ten.
   (`close_project_proof.py` C3's margin), read 5, 15, 30 and 60 s after the last close.
   It failed on the app as #555 measured it, which is the finding below, and passes since
   #568 ("Issue #568" below). The instrument is in no make target.
+- **O5** — resident memory falls back under the reading before the first document plus three
+  quarters of what the bound added, read with O4's readings, which go on until both rules
+  hold; **V1** is its rule over made-up readings. **O6**, with `--heap` on Debug only, counts
+  no `EditorViewController` and no `Playback` left after the closes. All three since #592
+  ("Issue #592" below).
 
 ```sh
 make app && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/open_documents_proof.py   # [--bound N] [--only-kind new|open] [--call-seconds S]
@@ -32109,7 +32118,108 @@ before the fix, and resident memory falls only when the next window opens (431 M
 one open). Three things were tried on Debug and freed nothing: one application-defined event
 posted after the close, the close inside an `autoreleasepool`, and `CATransaction.flush()` with
 `NSApp.updateWindows()` after it. Whether a person's close in a front app is held the same way
-was not measured: it is `docs/manual-checks.md` PB-19.
+was not measured: it is `docs/manual-checks.md` PB-19. #592 answered the views and the memory:
+the window now gives its editor up when it closes, and only the bare window waits ("Issue #592"
+below).
+
+## Issue #592 — a closed window's editor (`document_close_probe.py` P5–P7, mutants `no-detach`, `no-abort`; `open_documents_proof.py` V1, O5, O6, mutant `any-fall`; spec §11 #592)
+
+**What held it.** The window. #568's trace stands: AppKit keeps a closed `EditorWindow` until
+another window opens in an instance driven in the background. The window held its editor as its
+content view controller, and so the `EditorViewController`, its `Playback` and the whole view
+tree. On a Debug build of the tree before this change, `open_documents_proof.py --bound 10
+--heap` counted ten `EditorViewController`, ten `Playback` and ten `EditorWindow` after the ten
+closes (O6 red), and resident memory stayed where the bound had taken it (O5 red, below).
+
+**The fix** (spec §11 #592). `EditorWindow.close()` runs `super.close()` and then sets
+`contentViewController` to nil. Both doors end in that close after `releaseOnClose()` and the
+window's `willCloseNotification` observers have run. Two things the probe measured on the way:
+
+- With no content view controller AppKit takes the editor's root view out as the content view
+  too, so nothing is installed in its place (P5 green on a build with the nil assignment
+  alone).
+- Taking the tree out ENDS a field editor's editing: on that same build P7 failed with the
+  probe's own field's `controlTextDidEndEditing` counted once at the close, where the tree
+  before the change counted none. A field's end of editing is its commit, which would land in a
+  document already closed. So `releaseEditor()` first aborts the edit (`NSControl.abortEditing()`
+  on the field editor's control). A text view that is not a field editor (the Text tab's area,
+  the canvas's inline editor) is neither resigned nor ended by the detach (P7's text case,
+  measured on both builds), and no first responder is asked to resign.
+
+No `autoreleasepool` around the detach was needed (the plan's challenge asked for one if the
+pool held the editor): O6 counts none left without it. `isOneShot` set before the close, tried
+on Debug in case the windows' backing stores were what stayed, changed nothing (resident 82 MB
+over the reading before the first document after ten closes, against 83 without it) and is not
+in the tree.
+
+**Rows.** `document_close_probe.py` (its docstring is the long form): **P2** now also holds that
+the door that ran was `performClose`; **P5** P1's and P2's windows keep no content view
+controller, the root view is out of the window and under no superview, and the first responder
+is not in it; **P6** the window held strongly, as AppKit holds it, and the editor, its
+`Playback` and its root view held only weakly, all three are freed within 5 s of the close;
+**P7** text being typed at the close, in a field and in a text view of the probe's own, ends no
+editing and the tree still leaves. The fixture is six packages. `open_documents_proof.py`:
+**O5** resident memory falls back under the reading before the first document plus three
+quarters of what the bound added, read with O4's readings, which now go on until both rules
+hold; **V1** that rule over made-up readings; **O6** (`--heap`, Debug only: `heap` cannot attach
+to a hardened Release build) no `EditorViewController` and no `Playback` after the closes, the
+`EditorWindow` count printed.
+
+**Why three quarters.** The plan set half; the runs moved it. Five seconds after the last close
+the fixed tree kept 45–49 % of what the bound added (Debug `--bound 10`: 83 of 177 MB, and 82 of
+183 with `isOneShot`; Debug `--bound 4`: 34 of 76; Release `--bound 40`: 369 of 755), so half
+passed by 5 to 9 MB; the tree before it kept 98 % (Debug) and 104 % (Release). Three quarters
+sits between them with a quarter of the bound's growth on each side.
+
+**What the rest is.** A by-hand Debug run (ten documents with `AV.mov` opened through
+`new_project` and closed with `close_project {discard: true}`, `heap` and `vmmap -summary` at
+each step, from a fresh instance): 125 MB before, 406 MB with ten open, 279 MB after the closes
+(`heap`: no `EditorViewController`, no `Playback`, ten `EditorWindow`), and 275 MB after one
+more document was opened and closed, which left one `EditorWindow`. So the nine bare windows
+AppKit let go of were worth about 4 MB. Between ten open and ten closed `vmmap`'s resident
+`IOSurface` fell from 273.5 MB to 13.3 MB and `CoreAnimation` from 117.2 MB to 3.7 MB, while
+`MALLOC_SMALL (empty)`, pages the allocator has freed and still holds, rose from 4,944 KB to
+60.6 MB; after the one more window its dirty size was 6,208 KB. What a closed document leaves
+resident is the allocator's, not an object.
+
+```sh
+python3 tools/proof/document_close_probe.py                                          # [--mutant NAME]
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/open_documents_proof.py --bound 10 --heap  # Debug: O6
+make app && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/open_documents_proof.py --bound 40
+python3 tools/proof/open_documents_proof.py --bound 4 --mutant any-fall              # V1 must fail
+```
+
+Measured 2026-11-11, the load average beside each figure (three lanes were building):
+
+| Run | Result |
+|---|---|
+| `document_close_probe.py`, the tree before the change | 5/8, exit 1: P5 and P6 fail (the controller and the root view still in both windows; editor, `Playback` and root view alive after 5 s), P7 fails on the tree not leaving (no editing ended) |
+| the same, the nil assignment alone (no abort) | 7/8, exit 1: P7 fails, the field's editing ended once at the close; the text view neither resigned nor ended |
+| `document_close_probe.py` | 8/8, exit 0; P2's door `performClose` |
+| P2's door by hand: the probe's `performClose` line taken out, then restored | P2 fails, door `shouldCloseWindowController` (the fallback left the document open too), and P5 fails; 6/8 |
+| `--mutant no-detach` | caught: P5, P6 and P7 fail |
+| `--mutant no-abort` | caught: P7 fails, the field's editing ended once at the close |
+| `--mutant no-close-shutdown` | caught: P1, P2, P3 and P4 fail |
+| `--mutant window-controllers`, `no-latch`, `no-generation-bump` | caught: P2; P3; P4 |
+| `open_documents_proof.py --bound 10 --heap`, Debug, the tree before the change | 7/9, exit 1: O5 244 MB before, 373 at the bound, 371 lowest after the closes (load 72.0); O6 ten each of `EditorViewController`, `Playback`, `EditorWindow` |
+| `open_documents_proof.py --bound 10 --heap`, Debug | 9/9, exit 0: O5 195, 378, 282 MB (line 332; load 37.4); O6 no `EditorViewController`, no `Playback`, ten `EditorWindow` |
+| `RC_PROOF_APP=release open_documents_proof.py --bound 40`, the tree before the change | 7/8, exit 1: O5 230 MB before, 928 at the bound, 959 to 958 at 5 to 60 s after the closes (load 35.7); its line under the final rule is 754 |
+| `RC_PROOF_APP=release open_documents_proof.py --bound 40` | 8/8, exit 0: O4 64 threads before, 297 with forty open, 73 five seconds after the last close; O5 202, 953, 557 MB (line 765; load 228.0) |
+| `RC_PROOF_APP=release open_documents_proof.py` (150) | 8/8, exit 0: 102 threads and 235 MB before, 768 and 3,125 MB at the bound, 26 threads and 1,476 MB five seconds after the last close (line 2,402; load 40.9); slowest calls 48.7 s, 4.7 s, 43.0 s and 52.8 s in the steps to 120, 130, 140 and 150 open (load 82 to 54) |
+| the same, once more | 3/8, exit 1: O1 fails at 148 open, `get_project` unanswered 147 s at 0 % CPU, read "hung" (768 threads, 3,093 MB; load 174.1 at the end); slowest 8.2 s, 9.6 s and 4.9 s in the steps to 120–140 |
+| `RC_PROOF_APP=release close_project_proof.py` | 12/12, exit 0 (C3: 15 threads before, 22 after) |
+
+**The slow calls past 110 open.** No code this change touches runs while documents are being
+opened: the close path runs for the 75 packages made before the table and then not until the
+last bound is held. The sample the second run kept (`work/open-documents/sample.txt`) shows the
+main thread making progress, not stopped: of 2,497 samples, 1,345 in `sandbox_check` under
+`-[NSDocument presentedItemDidChange]` → `_displayNameForURL:` and 934 waiting in
+`CABackingStoreGetFrontTexture`. #555's run at 150 open read no call over 1.6 s at loads of 23
+to 57, and #568's none over 1.9 s; these ran at 40 to 228. It is not this issue's, and is left to an issue of its own.
+
+**What stays.** The bare `EditorWindow`, AppKit's, until another window opens: small, by the
+measurement above. Whether a person's close in a front app frees the same way is
+`docs/manual-checks.md` PB-19.
 
 ## A cache write against a held save (`save_hold_proof.py`; spec §11 #553, #552, #429)
 

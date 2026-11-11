@@ -141,7 +141,7 @@ the same way.
 **PB-19 — Closing projects gives their memory back**
 - **Do:** 1. Open Activity Monitor and find Frame Job's Memory and Threads columns. 2. Open five projects that each hold a movie with sound, and play each for a moment. 3. Note both figures. 4. Close four of them by the window's close button, wait ten seconds, and read the figures again.
 - **Expect:** Threads falls by about twenty and Memory by tens of megabytes; neither stays where it was with five open.
-- **Source:** #568, spec §11 #568 (`document_close_probe.py` and `open_documents_proof.py` O4 score the player and the threads; in an instance driven in the background the windows' memory stays until another window opens, and whether a front app with a person at it holds them was not measured).
+- **Source:** #568, #592, spec §11 #568 and #592 (`document_close_probe.py` scores the player, the editor leaving its window by `close_project`'s door and by the close button, and the editor freed while the window is held; `open_documents_proof.py` O4 and O5 score the threads and the memory falling, and O6 counts no editor left, all in an instance driven in the background over MCP). A front app with a person at it, closing by the button, is measured only here.
 
 **JOB-60 — Remove Background's edges**
 - **Do:** On S-TH1, S-TH2 and S-TH5 (`samples/README.md`; until they exist, any recording of yourself in a busy room with hair, glasses and moving hands), turn Remove Background on and wait for Status to read Ready. Step through hair, hands in motion, glasses and the outline against the room at Edge −0.5, 0 and 0.5.
