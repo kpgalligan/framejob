@@ -57,7 +57,7 @@ extension AudioPane {
     static func isolationWords(_ status: IsolationStatus) -> String {
         switch status {
         case .off: return "Off"
-        case .unsupported: return "Plays without it at this speed"
+        case .noSound: return "Plays no sound"
         case .waitingForReverse: return "Waits for the reversed copy"
         case .rendering: return "Rendering…"
         case .ready: return "Ready"

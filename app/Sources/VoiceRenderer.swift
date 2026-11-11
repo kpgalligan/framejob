@@ -11,7 +11,9 @@ import AudioToolbox
 ///
 /// The input file (`writeInput`) is the window of the source the composition
 /// plays — or, when the clip isolates, `dry + i·(iso − dry)` from its
-/// isolated render (AU-143) — always stereo, a mono source in both channels.
+/// isolated render (AU-143) — always stereo, a mono source in both channels,
+/// and silent outside the job's `sounding` frames when it names them (a
+/// retimed segment's padded window, AU-145 as amended).
 /// The chain's latency `L` (the sum of its units' `auAudioUnit.latency` at
 /// 48 kHz, read after `start()`) is discarded as `IsolationRenderer`
 /// discards its 4440: `L + window` frames are rendered (the player gives
@@ -120,6 +122,12 @@ enum VoiceRenderer {
                             let wet = w < iso.frames
                                 ? iso.samples(channel: min(c, iso.channels - 1))[w] : 0
                             x += i * (wet - x)
+                        }
+                        // A retimed segment's pad is silent to the effect.
+                        if let sounding = job.job.sounding,
+                            k < sounding.firstFrame || k >= sounding.endFrame
+                        {
+                            x = 0
                         }
                         out[2 * n + c] = x
                     }

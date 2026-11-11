@@ -757,7 +757,7 @@ do {
 func measurement(range: Double?) -> AudioEnhance.Measurement {
     AudioEnhance.Measurement(
         lufs: -30, truePeak: 0.5, speechSteps: 1000, pauseSteps: 100, floorLUFS: -80,
-        pausePeakMedianDB: -80, sibilantShare: 0, peakMedianDB: -12, isolatable: true,
+        pausePeakMedianDB: -80, sibilantShare: 0, peakMedianDB: -12,
         speechRangeLU: range)
 }
 
@@ -817,7 +817,7 @@ do {
         stepHighs: steps.map { _ in 0 })
     var good = false
     var detail = "no measurement"
-    if let m = AudioEnhance.measure(reading, speech: mask, isolatable: true) {
+    if let m = AudioEnhance.measure(reading, speech: mask) {
         let input = AudioEnhance.Input(
             readings: [AudioEnhance.Reading(clip: 7, media: 1, measurement: m, loudness: reading,
                                             current: AudioProps())], problems: [])

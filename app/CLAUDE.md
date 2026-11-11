@@ -2405,9 +2405,12 @@ the key map behind it.
   it, `ramp_proof.py` L3), kept by SR1e (SR-16); written as a 32-bit float CAF through a
   `.partial` file (`RampCAFWriter`). Called by `RampAudioRenders` (SR2b).
 - `RampAudioCache.swift` — `OfflineAudioJob` (a ramp, an isolated
-  window, §11 AU-52, or a voiced one, AU-144), `RampSegmentKey` (the clip, Keep pitch, glide and
+  window, §11 AU-52, a voiced one, AU-144, or a retimed segment's mix,
+  AU-55 as amended), `RampSegmentKey` (the clip, Keep pitch, glide and
   map: equal exactly when the rendered file is), `RampAudioRequest` (its
-  `job`) and the file name from the media file's stat, the version and the
+  `job`, with `sourceFirstFrame` for the render of a processed window,
+  whose name also carries that file's name and first frame; a dry
+  render's is unchanged) and the file name from the media file's stat, the version and the
   reversal (SR-12 (a), SR-6 amended); `prune` keeps files by name prefix,
   in `ramp-audio`, `isolated` or `voiced`.
 - `RampAudioRenders.swift` — the process-wide serial render queue (SR-12)
@@ -2422,7 +2425,9 @@ the key map behind it.
   owner's `settled` closure runs on the main queue when a render it wants
   lands OR fails, so a failure reaches the pane.
 - `ProjectDocument+RampAudio.swift` — the document's wants after each edit,
-  its plans' ramp segments, isolated windows and voiced windows in ONE
+  its plans' ramp segments, isolated windows, voiced windows and retimed
+  chains (`RetimedSound.requests`, each stage once the file before it is
+  on disk, the dry ramp render wanted beside them) in ONE
   `want`, and `rampAudioDidSettle` on a landing or a failure: the prune of
   the three folders, the wants made again (a voice waiting for its
   isolation is wanted once that lands, AU-143) and
@@ -2431,9 +2436,11 @@ the key map behind it.
   `ensureRampAudio()` ends with `ensureMasks()` (`ProjectDocument+Masks.swift`,
   spec §11 CO-22 (b)), so every caller of it wants the cut-out clips' masks
   too.
-  `Exporter+RampAudio.swift` — the export's wait for every ramp render it
-  needs and every isolated window (`isolationFailed`), then a second wait
-  for every voiced window (`voiceFailed`, AU-147), before the build, after
+  `Exporter+RampAudio.swift` — the export's wait for every offline audio
+  render it needs, asked in passes (`RetimedSound.exportRequests`, at most
+  four: a voice over an isolation and a retimed clip's mix and render
+  exist only once the file before them does; `isolationFailed`,
+  `voiceFailed`, AU-57 and AU-147 as amended), before the build, after
   the person masks' wait (`waitForMasks`, CO-22 (e)) (a
   ramp's failure fails the export as `rampAudioFailed`; it never writes a
   placeholder), its wants released by `Exporter.releaseRecipeKey`, and
@@ -2447,7 +2454,7 @@ the key map behind it.
   `RampCAFWriter`. Called by `RampAudioRenders`.
 - `IsolationCache.swift` — `cache/isolated/` (AU-52, AU-55):
   `IsolationWindow`, the name (never the Amount), `IsolationSegmentKey`,
-  which segments are isolatable (×1, no ramp, no freeze), the requests, the
+  which segments are isolated in the tap (`isTapped`, ×1), their requests, the
   status the pane reads (`Memo`, held per document, clip, the two handles
   and the published `ReverseResolution`, and through a gesture;
   `Memo(compute:)` holds Voice Effect's status too), the wet
@@ -2460,6 +2467,22 @@ the key map behind it.
   `dry + a·(wet − dry)` before the chain, reading only preloaded memory).
   A ready voiced segment's render (AU-143) is a span at amount 1 in place
   of its isolation crossfade (`voiced:`).
+- `RetimedSound.swift` — isolation and a voice effect on a retimed segment
+  (AU-55 and AU-145 as amended, #387): `kind(of:)` (tapped, rendered,
+  live), the window `W` (what the segment plays, padded 8,192 frames, a
+  Keep pitch on render's tail, rounded out to whole seconds), `Chain` (the
+  isolation of `W` → the processed window, a mix or a voiced render → for
+  a rendered segment its ramp render; `formable`, `last`, `status`),
+  `requests` (the document's) and `exportRequests` (the export's passes),
+  and `CompositionBuilder.processedAudioTracks` (a live segment's
+  processed window as its source; `resolveSource`, `audioFamilies` and
+  `fill` take the one map).
+- `IsolationMix.swift` — a retimed segment's mix: `MixJob`, its name in
+  `cache/isolated/` (the isolated file's name, a version, the Amount; the
+  map and the points when an action moves it), the Amount per source frame
+  through the inverse of the segment's map, and the writer
+  `dry + a·(iso − dry)` in the source's own channel count. Called by
+  `RampAudioRenders`.
 - `VoiceProps.swift` — `audio.voice`'s Swift model (AU-140): `VoiceKind` in
   E8's order with its bare `name` ("Pitch" … "Cathedral", Clip ▸ Voice ▸'s
   items), `VoiceGroup` and its `kinds`, the popup titles ("Voice: Pitch" …
@@ -2479,9 +2502,12 @@ the key map behind it.
   the chain at 48 kHz stereo in 4,096-frame offline calls, the chain's
   latency discarded, cut at the window's end, mono as `(L+R)/2`, makeup in
   float, through `RampCAFWriter`. Called by `RampAudioRenders`.
-- `VoiceCache.swift` — `cache/voiced/` (AU-144, AU-145): `VoiceJob`, the
-  name, the request (AU-55's segments, and an isolating clip's only once
-  its isolated file is on disk), the requests, the Voice Effect status, and
+- `VoiceCache.swift` — `cache/voiced/` (AU-144, AU-145): `VoiceJob` (with
+  `sounding`, a retimed segment's own frames inside its padded window,
+  silent outside them), the
+  name, the ×1 request (an isolating clip's only once
+  its isolated file is on disk; a retimed segment's is a stage of
+  `RetimedSound.chain`), the requests, the Voice Effect status, and
   `CompositionBuilder.voicedAudio` (the READY renders a build reads into
   memory).
 - `AudioPane+Voice.swift` — the Sound tab's Voice Effect section (AU-146),

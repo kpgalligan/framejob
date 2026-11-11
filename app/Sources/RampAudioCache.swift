@@ -25,12 +25,14 @@ struct RampSegmentKey: Hashable {
 }
 
 /// What one offline audio render makes: a ramp segment's retimed sound
-/// (spec §11 SR-6), a clip window's isolated voice (AU-51), or its voice
-/// effect (AU-142).
+/// (spec §11 SR-6), a clip window's isolated voice (AU-51), its voice
+/// effect (AU-142), or a retimed segment's window crossfaded with its
+/// isolated voice (AU-55 as amended, #387).
 enum OfflineAudioJob: Equatable {
     case ramp(PlanSpeedRamp)
     case isolation(IsolationWindow)
     case voice(VoiceJob)
+    case mix(MixJob)
 }
 
 /// One render a segment asks for: where it lands (the final `.caf`), what it
@@ -42,6 +44,10 @@ struct RampAudioRequest: Equatable {
     let source: URL
     let reversed: Bool
     let job: OfflineAudioJob
+    /// A `.ramp` job reading a retimed segment's processed window instead of
+    /// its media (AU-55 as amended): the 48 kHz frame of the media that file's
+    /// frame 0 is, taken off the map's source ticks. 0 for every other job.
+    var sourceFirstFrame: Int64 = 0
 }
 
 /// The `cache/ramp-audio/` half of the package (spec §5.6, §11 SR-6, SR-12):
@@ -59,12 +65,16 @@ enum RampAudioCache {
     /// `<media>-<16 hex>.caf`: FNV-1a 64 over the MEDIA file's path, size and
     /// modification second (never the copy or the reversed file the renderer
     /// reads), `RampAudioRenderer.version`, the reversal, Keep pitch, the
-    /// glide pairs and the map pairs. Nil when the media cannot be stat'ed.
+    /// glide pairs and the map pairs — and, for the render of a retimed
+    /// segment's processed window (AU-55 as amended), that file's name and
+    /// first frame, appended only then, so a dry render's name is what it
+    /// was. Nil when the media cannot be stat'ed.
     /// `ReverseCache.digest`'s hash, spelled again for the reason that one
     /// gives: it keys a different directory.
-    static func name(media: UInt32, mediaFile: URL, reversed: Bool, ramp: PlanSpeedRamp)
-        -> String?
-    {
+    static func name(
+        media: UInt32, mediaFile: URL, reversed: Bool, ramp: PlanSpeedRamp,
+        processed: (name: String, firstFrame: Int64)? = nil
+    ) -> String? {
         let attributes = try? FileManager.default.attributesOfItem(atPath: mediaFile.path)
         guard let size = (attributes?[.size] as? NSNumber)?.int64Value else { return nil }
         let modified = (attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
@@ -74,6 +84,7 @@ enum RampAudioCache {
         let key = "\(mediaFile.path)|\(size)|\(Int64(modified.rounded()))"
             + "|v\(RampAudioRenderer.version)|r\(reversed ? 1 : 0)|k\(ramp.keepPitch ? 1 : 0)"
             + "|g\(pairs(ramp.glide))|m\(pairs(ramp.map))"
+            + (processed.map { "|p\($0.name)|f\($0.firstFrame)" } ?? "")
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
         for byte in key.utf8 {
             hash = (hash ^ UInt64(byte)) &* 0x0000_0100_0000_01b3
@@ -82,11 +93,14 @@ enum RampAudioCache {
         return "\(media)-" + String(repeating: "0", count: max(0, 16 - hex.count)) + hex + ".caf"
     }
 
-    /// The plan's `[clip tick, source tick]` breakpoints as the renderer's map.
-    static func map(of ramp: PlanSpeedRamp) -> RampAudioMap {
-        RampAudioMap(
+    /// The plan's `[clip tick, source tick]` breakpoints as the renderer's
+    /// map, its source ticks counted from 48 kHz frame `lessFrames` of the
+    /// media (a processed window's first frame; 0 reads the media itself).
+    static func map(of ramp: PlanSpeedRamp, lessFrames: Int64 = 0) -> RampAudioMap {
+        let less = Double(lessFrames) * RampAudioRenderer.ticksPerFrame
+        return RampAudioMap(
             clipTicks: ramp.map.map { $0.first ?? -1 },
-            sourceTicks: ramp.map.map { $0.count > 1 ? Double($0[1]) : -1 })
+            sourceTicks: ramp.map.map { $0.count > 1 ? Double($0[1]) - less : -1 })
     }
 
     /// Every ramp segment of `plan` that can be rendered, one request per
@@ -153,7 +167,8 @@ enum RampAudioCache {
     /// Removes every file in `directory` that no name in `names` prefixes —
     /// a render no owner wants any more, or a temporary of one that died.
     /// Refuses a directory not named `ramp-audio`, `isolated` or `voiced`
-    /// (the three the queue renders into, AU-52, AU-144): this takes a URL and
+    /// (the three the queue renders into, AU-52, AU-144; a retimed segment's
+    /// mix lands in `isolated`): this takes a URL and
     /// removes files (`ReverseCache.prune`'s guard, for its reason).
     static func prune(_ directory: URL, keeping names: Set<String>) {
         guard directory.lastPathComponent == directoryName
@@ -171,26 +186,39 @@ extension CompositionBuilder {
     /// Each READY ramp segment's render as an asset track (spec §11 SR-12
     /// (b)): the first audio track of the file `RampAudioCache` names, when
     /// it exists as the composition is built. A pending one is absent, and
-    /// `resolveSource` answers it as empty time. `assets` holds the opened
-    /// files for the build, as `fill`'s caches do.
+    /// `resolveSource` answers it as empty time. A segment whose clip
+    /// isolates or has a voice effect plays the render of its PROCESSED
+    /// window when that file exists (AU-55 as amended, #387), and its dry
+    /// render until then. `assets` holds the opened files for the build, as
+    /// `fill`'s caches do.
     static func rampAudioTracks(
         plan: CompositionPlan, urls: [UInt32: URL], reverse: ReverseResolution,
-        assets: inout [URL: AVURLAsset]
+        dsp: AudioDSPParameters, assets: inout [URL: AVURLAsset]
     ) -> [RampSegmentKey: AVAssetTrack] {
         var tracks: [RampSegmentKey: AVAssetTrack] = [:]
         for planTrack in plan.audioTracks {
             for segment in planTrack.segments {
-                guard let key = RampSegmentKey(segment), tracks[key] == nil,
-                    let request = RampAudioCache.request(for: segment, urls: urls, reverse: reverse),
-                    FileManager.default.fileExists(atPath: request.destination.path)
+                guard let key = RampSegmentKey(segment), tracks[key] == nil else { continue }
+                let processed = RetimedSound.chain(
+                    for: segment, dsp: dsp, urls: urls, reverse: reverse)?.last.destination
+                let dry = RampAudioCache.request(
+                    for: segment, urls: urls, reverse: reverse)?.destination
+                guard let file = [processed, dry].compactMap({ $0 }).first(where: {
+                    FileManager.default.fileExists(atPath: $0.path)
+                })
                 else { continue }
-                let asset = assets[request.destination] ?? AVURLAsset(
-                    url: request.destination,
-                    options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
-                assets[request.destination] = asset
-                if let track = firstTrack(of: asset, mediaType: .audio) { tracks[key] = track }
+                if let track = retimedTrack(at: file, assets: &assets) { tracks[key] = track }
             }
         }
         return tracks
+    }
+
+    /// The first audio track of a render at `file`, its asset opened once
+    /// and held in `assets` for the build.
+    static func retimedTrack(at file: URL, assets: inout [URL: AVURLAsset]) -> AVAssetTrack? {
+        let asset = assets[file] ?? AVURLAsset(
+            url: file, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
+        assets[file] = asset
+        return firstTrack(of: asset, mediaType: .audio)
     }
 }

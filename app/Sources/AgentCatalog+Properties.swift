@@ -44,7 +44,8 @@ extension AgentServer {
         + "isolation (0–1: voice isolation, Apple's on-device voice model, which also "
         + "reduces room echo; 0 off, 0.8 the app's default, 1 leaves silence between words; "
         + "rendered offline, the clip plays without it until the render lands and an export "
-        + "waits for it; a clip not at ×1 plays without it)" + audioEQClause
+        + "waits for it; a clip at another speed or with a speed ramp is isolated too, "
+        + "and there a new value is rendered again before it is heard)" + audioEQClause
         + audioDynamicsClause + audioVoiceClause + ". duck, "
         + "compressor, limiter, eq (and each of its slots), hum, gate, leveller, de_esser and "
         + "voice are OBJECTS and they "
@@ -111,8 +112,9 @@ extension AgentServer {
         + "-12 to 12 semitones, read only by pitch, high and deep, absent meaning the "
         + "kind's own, 0, +5 and -5; a new kind keeps a stored pitch unless pitch: null "
         + "is sent with it; {voice: null} clears it. The clip plays without the effect "
-        + "until its render lands and an export waits for it; a clip not at ×1 plays "
-        + "without it; reverb and echo tails end with the clip)"
+        + "until its render lands and an export waits for it; on a clip at another "
+        + "speed or with a speed ramp the effect changes speed with the clip; reverb "
+        + "and echo tails end with the clip)"
     // `text.animation`'s clause, its own explicitly-typed local for the
     // reason `obscureClause` is: the kind names are a non-literal operand
     // and the text chain is long enough already.

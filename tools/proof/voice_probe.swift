@@ -23,7 +23,15 @@
 //  V2  a synthetic voiced render read sample for sample at the placement with
 //      isolation 0.5 and its render also present (none applied on top),
 //      ≤ 1e-7 alone and ≤ 1e-4 behind the noise reducer's lead.
-//  V3  no request for amount 0, the kind pitch at 0 st, a time-scaled, ramped,
+//  V15 a ×2 clip's voice is a stage of its retimed chain (AU-145 as amended,
+//      #387): no tapped request; the voice job over the padded window with the
+//      clip's own frames as `sounding`, from the window's isolation when the
+//      clip isolates; then the render, with Keep pitch off; the sounding
+//      frames in the name.
+//  V16 the pad is silent to the effect: Echo with an impulse 50 ms before the
+//      clip's first frame leaves the clip's frames at 0, where the unsilenced
+//      window echoes it into them; an impulse inside the clip echoes.
+//  V3  no tapped request for amount 0, the kind pitch at 0 st, a time-scaled, ramped,
 //      freeze or pending-reverse segment, or an isolating clip whose isolated
 //      file is missing; once it is present, the request names it.
 //  V4  the name changes with window, kind, amount, semitones, isolation and
@@ -1055,4 +1063,118 @@ do {
             + "over {high, 0.4, 8}, {echo, 1}, none: \(deep) in \(deepOps.count) ops; None: "
             + "\(cleared) in \(noneOps.count) op; no target: \(empty) ops; tag 99 a stranger: "
             + "\(stranger), −1 None: \(noneTag), 2 deep: \(deepTag)")
+}
+
+// =========================================================================
+// V15 — a retimed clip's voice is a stage of its chain (AU-145 as amended, #387)
+
+do {
+    clearCaches()
+    var parts: [String] = []
+    var ok = true
+    let rampDir = RampAudioCache.directory(
+        in: isolatedDir.deletingLastPathComponent())
+    /// The fixture's clip at ×2, and its chain.
+    func chain(isolation: Double, keepPitch: Bool)
+        -> (RetimedSound.Chain, PlanSegment, RampAudioRequest?)?
+    {
+        guard let f = fixture(voice: VoiceProps(kind: .hall), isolation: isolation) else {
+            return nil
+        }
+        edit(f.document, "Speed", [.setSpeed(clip: f.clip, rate: 2, keepPitch: keepPitch)])
+        let reverse = ReverseResolution(
+            ready: [:], pending: [], rampAudio: rampDir, isolated: isolatedDir)
+        guard let s = f.segment,
+            let chain = RetimedSound.chain(for: s, dsp: f.dsp, urls: f.urls, reverse: reverse)
+        else { return nil }
+        return (chain, s, VoiceCache.request(for: s, dsp: f.dsp, urls: f.urls, reverse: reverse))
+    }
+    func voiceJob(_ request: RampAudioRequest) -> VoiceJob? {
+        if case .voice(let job) = request.job { return job }
+        return nil
+    }
+    let cases: [(String, Double, Bool, Int)] = [
+        ("isolated, Keep pitch off", 1, false, 3), ("Keep pitch off", 0, false, 2),
+        ("isolated, Keep pitch on", 1, true, 2), ("Keep pitch on", 0, true, 1),
+    ]
+    for (name, isolation, keepPitch, stages) in cases {
+        guard let (chain, s, tapped) = chain(isolation: isolation, keepPitch: keepPitch),
+            let job = voiceJob(chain.processed)
+        else {
+            ok = false
+            parts.append("\(name): no chain with a voice job")
+            continue
+        }
+        let window = RetimedSound.window(of: s)
+        let good = tapped == nil && chain.stages.count == stages && job.window == window
+            && job.sounding == RetimedSound.sounding(of: s) && job.sounding != window
+            && job.isolated == chain.isolation?.destination
+            && job.isolation == (isolation > 0 ? isolation : 0)
+            && (chain.isolation != nil) == (isolation > 0)
+            && chain.processed.destination.deletingLastPathComponent().lastPathComponent
+                == VoiceCache.directoryName
+            && (chain.render != nil) == !keepPitch
+            && (chain.render.map {
+                $0.source == chain.processed.destination
+                    && $0.sourceFirstFrame == chain.window.firstFrame
+            } ?? true)
+        ok = ok && good
+        parts.append("×2, \(name): no tapped request \(tapped == nil), \(chain.stages.count) "
+            + "stage(s) (want \(stages)), the voice over the window "
+            + "\(job.window.firstFrame)–\(job.window.endFrame) sounding "
+            + "\(job.sounding.map { "\($0.firstFrame)–\($0.endFrame)" } ?? "all of it"): \(good)")
+    }
+    let w = IsolationWindow(firstFrame: 0, endFrame: 96_000)
+    let plain = VoiceCache.name(
+        media: 1, mediaFile: dryA, reversed: false,
+        job: VoiceJob(window: w, settings: settings(.hall), isolated: nil, isolation: 0))
+    let inside = VoiceCache.name(
+        media: 1, mediaFile: dryA, reversed: false,
+        job: VoiceJob(
+            window: w, settings: settings(.hall), isolated: nil, isolation: 0,
+            sounding: IsolationWindow(firstFrame: 8_192, endFrame: 80_000)))
+    ok = ok && plain != nil && inside != nil && plain != inside
+    parts.append("the sounding frames are in the name: \(plain != inside)")
+    row("V15", ok, parts.joined(separator: "; "))
+}
+
+// =========================================================================
+// V16 — the pad is silent to the effect (AU-145 as amended)
+
+do {
+    // 6 s of silence with one impulse; the window is [1 s, 5 s), the clip
+    // plays [2 s, 4 s). Echo repeats 250 ms (12,000 frames) later.
+    let window = IsolationWindow(firstFrame: 48_000, endFrame: 240_000)
+    let sounding = IsolationWindow(firstFrame: 96_000, endFrame: 192_000)
+    func peakInClip(_ name: String, impulse: Int, sounding: IsolationWindow?) -> Float? {
+        var samples = [Float](repeating: 0, count: 6 * 48_000)
+        samples[impulse] = 0.9
+        let source = work.appendingPathComponent("v16-\(name).wav")
+        guard writeWAV(source, [samples, samples]) == nil else { return nil }
+        let destination = work.appendingPathComponent("v16-\(name).caf")
+        try? FileManager.default.removeItem(at: destination)
+        let job = VoiceRenderer.Job(
+            source: source,
+            job: VoiceJob(
+                window: window, settings: settings(.echo), isolated: nil, isolation: 0,
+                sounding: sounding),
+            destination: destination)
+        guard (try? VoiceRenderer.render(job, cancelled: { false })) != nil,
+            let out = readCAF(destination), let left = out.first
+        else { return nil }
+        // The clip's frames, past the impulse's own sample when it is inside.
+        let from = max(96_000, impulse + 2_400) - 48_000
+        return left[from..<(192_000 - 48_000)].map(abs).max()
+    }
+    let before = 96_000 - 2_400
+    let padded = peakInClip("pad", impulse: before, sounding: sounding)
+    let whole = peakInClip("whole", impulse: before, sounding: nil)
+    let own = peakInClip("own", impulse: 100_000, sounding: sounding)
+    let ok = (padded ?? 1) <= 1e-6 && (whole ?? 0) >= 1e-2 && (own ?? 0) >= 1e-2
+    func told(_ value: Float?) -> String { value.map { "\($0)" } ?? "no render" }
+    row("V16", ok,
+        "Echo, an impulse 50 ms before the clip's first frame, inside the window: the clip's "
+            + "frames peak \(told(padded)) (≤ 1e-6); with the pad not silenced \(told(whole)) "
+            + "(≥ 0.01, the echo it keeps out); an impulse inside the clip echoes: \(told(own)) "
+            + "(≥ 0.01)")
 }

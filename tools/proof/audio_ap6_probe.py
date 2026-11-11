@@ -8,8 +8,8 @@ solve's pure decisions (`ProcessedLoudness.needsRender`, `measurementPlan`,
 audio_ap6_proof.py's V2, V12 and V13.
 
   E1  each rule on both sides of its threshold (synthetic readings): floor − L
-      at −44 and −46 dB, isolatable or not (isolation 0.8 or noise reduction
-      0.5), the gate's threshold from the pauses' median PEAK + 10 − L and its
+      at −44 and −46 dB (isolation 0.8 with noise reduction off, at any
+      speed since #387), the gate's threshold from the pauses' median PEAK + 10 − L and its
       −40…−6 hold, the de-esser at 6 % and 4 % sibilant speech and a band at
       L − 11, the floor a MEDIAN, Rumble Cut on the clip's own EQ.
   E2  the compressor: threshold the speech's median peak, rounded and held to
@@ -62,8 +62,12 @@ MUTANTS = [
      "static let noisyGapDB = -45.0", "static let noisyGapDB = -40.0"),
     ("M2 gate-plus-6", "E1", "AudioEnhance.swift",
      "static let gateAbovePausePeakDB = 10.0", "static let gateAbovePausePeakDB = 6.0"),
+    # The arm #387 removed: noise reduction in isolation's place.
     ("M3 isolation-swapped", "E1", "AudioEnhance.swift",
-     "if m.isolatable {", "if !m.isolatable {"),
+     "                    patch.isolation = IsolationCache.defaultAmount\n"
+     "                    patch.noiseReduction = 0\n",
+     "                    patch.isolation = 0\n"
+     "                    patch.noiseReduction = 0.5\n"),
     ("M4 sibilance-gap", "E1", "AudioEnhance.swift",
      "static let sibilanceGapDB = -10.0", "static let sibilanceGapDB = -20.0"),
     ("M5 median-mean", "E1", "AudioEnhance.swift",
@@ -150,15 +154,16 @@ def run(sources, name, quiet=False):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--sources", type=Path, default=ROOT / "app/Sources")
-    parser.add_argument("--mutants", action="store_true")
+    parser.add_argument("--mutants", nargs="?", const="", default=None, metavar="M3,M5",
+                        help="every mutant, or the ones whose names start with these")
     args = parser.parse_args()
     try:
         fixtures()
     except Exception as error:
         check("fixture construction", False, str(error))
         return 1
-    if args.mutants:
-        return mutants(args.sources)
+    if args.mutants is not None:
+        return mutants(args.sources, [n for n in args.mutants.split(",") if n])
     rows, problem, _ = run(args.sources, "probe")
     if rows is None:
         check("source probe builds", False, problem)
@@ -173,9 +178,10 @@ def main():
     return 0 if good else 1
 
 
-def mutants(sources):
+def mutants(sources, only=()):
     killed = 0
-    for name, row, file, old, new in MUTANTS:
+    chosen = [m for m in MUTANTS if not only or m[0].split()[0] in only]
+    for name, row, file, old, new in chosen:
         slug = name.split()[0]
         tree = WORK / f"mutant-{slug}" / "Sources"
         shutil.rmtree(tree, ignore_errors=True)
@@ -195,8 +201,8 @@ def mutants(sources):
         check(f"mutant {name} killed by {row}", dead,
               f"{row} {'failed' if dead else 'passed'}; failing rows: "
               + ", ".join(sorted(r for r, ok in rows.items() if not ok)))
-    print(f"\n{killed}/{len(MUTANTS)} mutants killed")
-    return 0 if killed == len(MUTANTS) else 1
+    print(f"\n{killed}/{len(chosen)} mutants killed")
+    return 0 if chosen and killed == len(chosen) else 1
 
 
 if __name__ == "__main__":

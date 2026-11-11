@@ -216,10 +216,7 @@ extension AgentServer {
                     + String(format: "%g", -AudioEnhance.noisyGapDB)
                     + " dB under L — voice isolation at "
                     + String(format: "%g", IsolationCache.defaultAmount)
-                    + " (noise reduction "
-                    + String(format: "%g", AudioEnhance.noiseReductionAmount)
-                    + " instead where isolation cannot serve the clip: a speed other than 1, a "
-                    + "ramp or a freeze) and the gate, opening "
+                    + " with noise reduction off, and the gate, opening "
                     + String(format: "%g", AudioEnhance.gateAbovePausePeakDB)
                     + " dB above the pauses' median true peak (threshold_db re L, held to -40 "
                     + "… -6); with quiet pauses isolation, noise reduction and the gate are off, "

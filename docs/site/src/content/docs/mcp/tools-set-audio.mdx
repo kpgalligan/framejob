@@ -112,7 +112,7 @@ See [Compressor](/audio/compressor/) and [Limiter](/audio/limiter/). A track has
 | `noise_reduction` | 0 to 1 | Reduces noise in the clip's sound. |
 | `isolation` | 0 to 1 | Isolates a voice with Apple's on-device model, which also reduces room echo. 0 is off, 0.8 is the app's default and 1 leaves silence between words. |
 
-Isolation is rendered offline. The clip plays without it until the render finishes, and an export waits for it. A clip not at ×1 plays without it.
+Isolation is rendered offline. The clip plays without it until the render finishes, and an export waits for it. A clip at another speed, or with a speed ramp, is isolated too; there a new `isolation` value is rendered again before it is heard.
 
 See [Noise Reduction](/audio/noise-reduction/) and [Voice Isolation](/audio/voice-isolation/).
 
@@ -213,7 +213,7 @@ The gate, leveler and de-esser act only once the clip's loudness is measured. Un
 
 A new `kind` keeps a stored `pitch` unless you send `pitch: null` with it. `{"voice": null}` clears the effect.
 
-The clip plays without the effect until its render finishes, and an export waits for it. A clip not at ×1 plays without it, and reverb and echo tails end with the clip. See [Voice effects](/audio/voice-effects/).
+The clip plays without the effect until its render finishes, and an export waits for it. On a clip at another speed, or with a speed ramp, the effect changes speed with the clip. Reverb and echo tails end with the clip. See [Voice effects](/audio/voice-effects/).
 
 ## Animate sound
 

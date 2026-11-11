@@ -142,7 +142,13 @@ enum CompositionBuilder {
         // Its assets are held across the fill: a track does not retain its
         // asset, and an optimised build ends a local at its last use.
         var rampAssets: [URL: AVURLAsset] = [:]
-        let ramps = rampAudioTracks(plan: plan, urls: urls, reverse: reverse, assets: &rampAssets)
+        let ramps = rampAudioTracks(
+            plan: plan, urls: urls, reverse: reverse, dsp: dsp, assets: &rampAssets)
+        // A constant-speed Keep pitch on clip that isolates or has a voice
+        // effect reads its processed window, when it is on disk (AU-55 as
+        // amended); held with the ramp renders' assets, for their reason.
+        let processed = processedAudioTracks(
+            plan: plan, urls: urls, reverse: reverse, dsp: dsp, assets: &rampAssets)
         // An isolated clip's ready renders, read into memory (AU-53).
         let isolated = isolatedAudio(plan: plan, urls: urls, reverse: reverse, dsp: dsp)
         // A voiced clip's ready renders, in place of its isolation (AU-143).
@@ -151,7 +157,7 @@ enum CompositionBuilder {
             try addAudioTracks(
                 to: composition, plan: plan, urls: audioURLs, reverse: reverse, dsp: dsp,
                 metering: metering, assets: &audioAssets, reversedAssets: &reversedAssets,
-                ramps: ramps, isolated: isolated, voiced: voiced)
+                ramps: ramps, processed: processed, isolated: isolated, voiced: voiced)
         }
         try addPlaceholderIfNeeded(to: composition, plan: plan)
 
@@ -330,11 +336,16 @@ enum CompositionBuilder {
     ///
     /// **A ramp segment plays its render** (`ramps`, spec §11 SR-6, SR-12):
     /// the whole file from 0 at ×1, never scaled, empty time while pending.
+    ///
+    /// **A segment in `processed` reads its processed window** (spec §11
+    /// AU-55 as amended, #387): the same range, counted from the media frame
+    /// that file starts at, scaled as the media would be.
     static func fill(
         _ track: AVMutableCompositionTrack, segments: [PlanSegment], mediaType: AVMediaType,
         urls: [UInt32: URL], reverse: ReverseResolution, assets: inout [UInt32: AVURLAsset],
         reversedAssets: inout [UInt32: AVURLAsset], shift: AudioShift = .none,
-        ramps: [RampSegmentKey: AVAssetTrack] = [:]
+        ramps: [RampSegmentKey: AVAssetTrack] = [:],
+        processed: [IsolationSegmentKey: ProcessedSource] = [:]
     ) throws {
         var cursor: Ticks = 0
         for segment in segments {
@@ -347,7 +358,8 @@ enum CompositionBuilder {
 
             guard let source = resolveSource(
                 for: segment, mediaType: mediaType, urls: urls, reverse: reverse,
-                assets: &assets, reversedAssets: &reversedAssets, ramps: ramps)
+                assets: &assets, reversedAssets: &reversedAssets, ramps: ramps,
+                processed: processed)
             else {
                 // Missing media, unreadable media, or a reverse that has not
                 // been rendered: hold the place with empty time so every later
@@ -362,8 +374,11 @@ enum CompositionBuilder {
                 continue
             }
 
+            // A processed window's frame 0 is the media's `firstFrame`.
+            let windowStart: Ticks = mediaType == .audio && segment.ramp == nil
+                ? processed[IsolationSegmentKey(segment)]?.firstTick ?? 0 : 0
             let requested = CMTimeRange(
-                start: time(place.sourceIn), duration: time(place.sourceDuration))
+                start: time(place.sourceIn - windowStart), duration: time(place.sourceDuration))
             do {
                 if mediaType == .video, let tail = heldTail(segment, of: source) {
                     if tail.covered > 0 {

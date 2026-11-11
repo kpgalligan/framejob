@@ -34,8 +34,9 @@ samples/Rode-usb-mic.m4a, and `say` speech made here — one low-passed at
        could be enhanced"; target_lufs −51 and −4 and an unknown key refused by
        name, changing nothing.
   V11  the parity log is clean (no "Frame Job: " line in the instance's log).
-  V12  the owner's recording at ×1.5 (`set_speed`, not isolatable): noise
-       reduction 0.5, isolation 0, a gate, its export's pause floor at least
+  V12  the owner's recording at ×1.5 (`set_speed`; isolated at any speed
+       since #387, spec §11 AU-55 as amended): isolation 0.8, noise
+       reduction 0, a gate, its export's pause floor at least
        10 dB under a Normalize-only export at the same speed, and the export
        at −16 ±0.5 LUFS.
   V13  normalize_clip alone on the owner's recording at volume 2: (a) with
@@ -454,10 +455,10 @@ def speed_rows(m):
     row = enhance(s, [clip])["enhanced"][0]
     print_row(row)
     got = row["set"]
-    check(got.get("noise_reduction") == 0.5 and got.get("isolation") == 0
+    check(got.get("noise_reduction") == 0 and got.get("isolation") == 0.8
           and isinstance(got.get("gate"), dict),
-          f"V12 not isolatable: noise_reduction {got.get('noise_reduction')}, isolation "
-          f"{got.get('isolation')}, gate {got.get('gate')}")
+          f"V12 at ×1.5: isolation {got.get('isolation')}, noise_reduction "
+          f"{got.get('noise_reduction')}, gate {got.get('gate')}")
     lufs, _, _, floor = measure(s.export("enhanced")["path"])
     check(floor <= plain - 10,
           f"V12 pause floor {f(floor)} dBFS against Normalize-only {f(plain)} "

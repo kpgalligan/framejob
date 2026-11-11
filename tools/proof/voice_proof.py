@@ -3,12 +3,13 @@ Clip ▸ Voice ▸ (AU-158, #390): the probe over `app/Sources`, its mutants,
 each kind's makeup, and exports and the menu from an instance of its own.
 
     python3 tools/proof/voice_proof.py             # V rows, then I, K and M rows on an own instance
-    python3 tools/proof/voice_proof.py --probe     # V1–V14, no instance
+    python3 tools/proof/voice_proof.py --probe     # V1–V16, no instance
     python3 tools/proof/voice_proof.py --measure   # each kind's m_k on the owner's recording
-    python3 tools/proof/voice_proof.py --mutants   # the eighteen mutants, each against its row
+    python3 tools/proof/voice_proof.py --mutants   # the twenty mutants, each against its row
     python3 tools/proof/voice_proof.py --mutants menu-mixed-as-on,menu-pitch-kept  # the named ones
-    python3 tools/proof/voice_proof.py --instance  # I0, K1–K16, I2–I11 and M1–M5 alone
+    python3 tools/proof/voice_proof.py --instance  # I0, K1–K16, I2–I13 and M1–M5 alone
     python3 tools/proof/voice_proof.py --menu      # I0 and M1–M5 alone
+    python3 tools/proof/voice_proof.py --retimed   # I0 and I11–I13 alone
 
 The instance is `proof_app`'s app (Debug by default, `RC_PROOF_APP=release`
 for the record), launched with `-RCDevRampRenderHold 2` on a scratch socket
@@ -32,7 +33,10 @@ kind change sends `pitch: null`; V12 Clip ▸ Voice ▸'s items against a litera
 list (headers, kinds, tags, the selector, None) and the popup's titles as
 "<header>: <item>"; V13 the mark (`VoiceMenu.state`: on, mixed, off; None
 likewise); V14 what a choice writes (`VoiceMenu.targets`, `ops`, `kind(tag:)`:
-each clip's own amount, no pitch, a text clip no target, None clears).
+each clip's own amount, no pitch, a text clip no target, None clears); V15 a
+retimed clip's voice is a stage of its chain, over the padded window with the
+clip's own frames as `sounding` (AU-145 as amended, #387); V16 the pad is
+silent to the effect (Echo, an impulse 50 ms before the clip's first frame).
 
 **Instance rows:**
 - I0: the instance's log has no `Frame Job: ` line (the parity check).
@@ -64,8 +68,15 @@ each clip's own amount, no pitch, a text clip no target, None clears).
   classifier).
 - I10: `set_audio` refuses amount 1.5, pitch 13 and kind `robo`, each in the
   core's sentence.
-- I11: ×2 with Keep pitch off: no voiced file, and the export equals the
-  voice-less export.
+- I11–I13, a retimed clip is voiced through its processed window (AU-145 as
+  amended, #387), telephone on white noise; the oracle is the ×1 voiced
+  export imported as a mono file and retimed the same way. I11 ×2 with Keep
+  pitch off and I13a a ×1→×2 ramp with it off (rendered, deterministic):
+  residual against the oracle ≤ −40 dB, and ≥ −10 dB against the dry export.
+  I12 ×2 with Keep pitch on and I13b the ramp with it on (Apple's
+  time-pitch): telephone's K8 signature against the dry export (125 Hz and
+  8 kHz ≤ −20 dB re 1 kHz), within 3 dB of the oracle's. Each counts its
+  files: one voiced; two ramp renders when rendered (dry and processed).
 - M1–M5, Clip ▸ Voice ▸ through `perform_menu_item` (AU-158), on two tone
   clips A and B and a text clip; "the listing" is `perform_menu_item` with no
   path, whose seventeen `setVoiceEffect:` leaves carry `enabled` and `state`:
@@ -83,7 +94,8 @@ each clip's own amount, no pitch, a text clip no target, None clears).
 its named row fails): call-size 1024 (V5), preset via `loadFactoryPreset` (V9),
 pitch-zero-kept (V3), window-not-keyed (V4), isolation-ignored (V6),
 voice-before-isolation (V3), pending-silent (V1), export-no-wait (V8),
-tail-kept +48,000 frames (V5), mono-left (V7), latency-kept (V10); and the
+tail-kept +48,000 frames (V5), mono-left (V7), latency-kept (V10); #387's three,
+voice-retimed-dry and sounding-not-keyed (V15) and pad-voiced (V16); and the
 menu's seven (AU-158): menu-mixed-as-on, menu-mixed-unmarked and
 menu-none-unmarked (V13), menu-amount-from-first, menu-pitch-kept and
 menu-targets-all (V14), menu-order-flat (V12). `--mutants a,b` runs the named
@@ -123,7 +135,7 @@ HOLD_S = 2
 CALL_BOUND = 600
 VOLUME = 4.0
 PROBE_ROWS = ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13",
-              "V14"]
+              "V14", "V15", "V16"]
 KINDS = ["pitch", "high", "deep", "robot", "bass", "treble", "bright", "telephone", "radio",
          "lofi", "distorted", "echo", "room", "hall", "plate", "cathedral"]
 
@@ -269,9 +281,32 @@ MUTANTS = [
          "        }\n"
          "        if isolates, let isolation = isolation {\n")]),
     ("export-no-wait", ["V8"], [
-        ("Exporter+RampAudio.swift",
-         "                try wait(for: voices, wanting: requests + voices, key: key, cancelled: cancelled)\n",
-         "                _ = voices\n")]),
+        ("RetimedSound.swift",
+         "        add(VoiceCache.requests(plan: plan, dsp: dsp, urls: urls, reverse: reverse))\n",
+         "")]),
+    # AU-145 as amended (#387): a retimed clip's chain carries no voice; and
+    # the pad of its window reaches the effect.
+    ("voice-retimed-dry", ["V15"], [
+        ("RetimedSound.swift",
+         "        let voice = dsp.voice(for: s.clip)\n"
+         "        let wants = dsp.wantsIsolation(s.clip)\n",
+         "        let voice: VoiceSettings? = dsp.voice(for: s.clip).flatMap { _ in nil }\n"
+         "        let wants = dsp.wantsIsolation(s.clip)\n")]),
+    # The sounding frames are part of a retimed voice render's name: without
+    # them two segments with one padded window and different played frames
+    # share a file.
+    ("sounding-not-keyed", ["V15"], [
+        ("VoiceCache.swift",
+         '            + (job.sounding.map { "|o\\($0.firstFrame):\\($0.endFrame)" } ?? "")\n',
+         '            + (job.sounding.map { _ in "" } ?? "")\n')]),
+    ("pad-voiced", ["V16"], [
+        ("VoiceRenderer.swift",
+         "                            k < sounding.firstFrame || k >= sounding.endFrame\n"
+         "                        {\n"
+         "                            x = 0\n",
+         "                            k < sounding.firstFrame || k >= sounding.endFrame\n"
+         "                        {\n"
+         "                            x *= 1\n")]),
     ("tail-kept", ["V5"], [
         ("VoiceRenderer.swift",
          "            let frames = job.job.window.endFrame - job.job.window.firstFrame\n",
@@ -852,20 +887,102 @@ def i10(client, fx):
         doc.close()
 
 
-def i11(client, fx):
-    doc = Doc(client, "i11")
+def retime(doc, clip, kind, keep):
+    """`kind` "x2": ×2; "ramp": 2.5 s of clip under a ×1→×2 Speed action
+    (3.75 s of the fixture's 4)."""
+    if kind == "x2":
+        doc.must("set_speed", clip=clip, rate=2.0, keep_pitch=keep)
+    else:
+        doc.must("trim_end", clip=clip, to=5 * SEC // 2)
+        if not keep:
+            doc.must("set_speed", clip=clip, rate=1.0, keep_pitch=False)
+        doc.must("add_speed_ramp", clip=clip, shape="ramp_up", rate=2, curve="linear")
+
+
+def retimed_voice(client, fx, tag, kind, keep):
+    """Telephone on the noise clip, retimed (AU-145 as amended, #387): its dry
+    and voiced exports, its render files, and — the oracle — the ×1 voiced
+    export imported as a mono file and retimed the same way."""
+    doc = Doc(client, tag)
     try:
         clip, _ = doc.place(fx["noise"])
-        doc.must("set_speed", clip=clip, rate=2.0, keep_pitch=False)
-        dry = decode(doc.export("i11-dry"))
+        retime(doc, clip, kind, keep)
+        dry = decode(doc.export(f"{tag}-dry"))
         doc.voice(clip, {"kind": "telephone"})
-        wet = decode(doc.export("i11-voice"))
-        files = doc.renders()
-        same = len(dry) == len(wet) and np.array_equal(dry, wet)
-        row("I11", same and not files, f"×2, Keep pitch off: cache/voiced/ {files}; the export "
-            f"equals the voice-less one: {same} ({len(wet)} vs {len(dry)} frames)")
+        wet = decode(doc.export(f"{tag}-voice"))
+        files = (doc.renders(), doc.renders("ramp-audio"))
     finally:
         doc.close()
+    flat = Doc(client, f"{tag}-x1")
+    try:
+        clip, _ = flat.place(fx["noise"])
+        flat.voice(clip, {"kind": "telephone"})
+        voiced = flat.export(f"{tag}-x1-voice")
+    finally:
+        flat.close()
+    mono = voiced.with_name(voiced.stem + "-mono.wav")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(voiced), "-af", "pan=mono|c0=c0",
+                    "-c:a", "pcm_s16le", str(mono)], check=True, timeout=120)
+    again = Doc(client, f"{tag}-oracle")
+    try:
+        clip, _ = again.place(mono)
+        retime(again, clip, kind, keep)
+        want = decode(again.export(f"{tag}-oracle"))
+    finally:
+        again.close()
+    return dry, wet, want, files
+
+
+def telephone_tilt(x, dry):
+    def tilt(a, b):
+        return (db(octave(x, a)) - db(octave(x, b))) - (db(octave(dry, a)) - db(octave(dry, b)))
+    return tilt(125, 1000), tilt(8000, 1000)
+
+
+def residual(a, b):
+    n = min(len(a), len(b))
+    return db(np.mean((a[:n] - b[:n]) ** 2)) - db(np.mean(b[:n] ** 2))
+
+
+def exact_row(row_id, what, dry, wet, want, files, want_files):
+    """A rendered Keep pitch off clip: against the oracle sample for sample."""
+    res = residual(wet, want)
+    moved = residual(wet, dry)
+    counts = (len(files[0]), len(files[1]))
+    row(row_id, res <= -40 and moved >= -10 and counts == want_files,
+        f"{what}: against the ×1 voiced export retimed: residual {res:.1f} dB (≤ −40); "
+        f"against its dry export {moved:.1f} dB (≥ −10, the effect is there); voiced files "
+        f"{counts[0]}, ramp-audio {counts[1]} (want {want_files[0]} and {want_files[1]})")
+
+
+def kept_row(row_id, what, dry, wet, want, files, want_files):
+    """A Keep pitch on clip keeps its pitch, so telephone's K8 signature is
+    read on it, and beside it on the oracle."""
+    lo, hi = telephone_tilt(wet, dry)
+    olo, ohi = telephone_tilt(want, dry)
+    counts = (len(files[0]), len(files[1]))
+    row(row_id, lo <= -20 and hi <= -20 and abs(lo - olo) <= 3 and abs(hi - ohi) <= 3
+        and counts == want_files,
+        f"{what}: 125 Hz {lo:+.1f} dB, 8 kHz {hi:+.1f} dB re 1 kHz against dry (≤ −20); the ×1 "
+        f"voiced export retimed {olo:+.1f} and {ohi:+.1f} (within 3); voiced files {counts[0]}, "
+        f"ramp-audio {counts[1]} (want {want_files[0]} and {want_files[1]})")
+
+
+def i11(client, fx):
+    exact_row("I11", "×2, Keep pitch off, telephone",
+              *retimed_voice(client, fx, "i11", "x2", False), (1, 2))
+
+
+def i12(client, fx):
+    kept_row("I12", "×2, Keep pitch on, telephone",
+             *retimed_voice(client, fx, "i12", "x2", True), (1, 0))
+
+
+def i13(client, fx):
+    exact_row("I13a", "a ×1→×2 ramp, Keep pitch off, telephone",
+              *retimed_voice(client, fx, "i13a", "ramp", False), (1, 2))
+    kept_row("I13b", "a ×1→×2 ramp, Keep pitch on, telephone",
+             *retimed_voice(client, fx, "i13b", "ramp", True), (1, 2))
 
 
 # ---- Clip ▸ Voice ▸ (spec §11 AU-158) --------------------------------------------
@@ -997,10 +1114,10 @@ def menu_rows(client, fx):
 
 
 MENU_ROWS = [menu_rows]
-APP_ROWS = [kind_rows, i3, i4_i5, i6, i7, i8, i9, i10, i11] + MENU_ROWS
+APP_ROWS = [kind_rows, i3, i4_i5, i6, i7, i8, i9, i10, i11, i12, i13] + MENU_ROWS
 ROW_NAMES = {kind_rows: [f"K{i}" for i in range(1, 17)] + ["I2"], i3: ["I3"],
              i4_i5: ["I4", "I5"], i6: ["I6"], i7: ["I7"], i8: ["I8"], i9: ["I9"],
-             i10: ["I10"], i11: ["I11"], menu_rows: ["M1", "M2", "M3", "M4", "M5"]}
+             i10: ["I10"], i11: ["I11"], i12: ["I12"], i13: ["I13a", "I13b"], menu_rows: ["M1", "M2", "M3", "M4", "M5"]}
 
 
 def complaints(log):
@@ -1061,19 +1178,20 @@ def main():
                         help="every mutant, or the named ones")
     parser.add_argument("--instance", action="store_true", help="the I, K and M rows alone")
     parser.add_argument("--menu", action="store_true", help="I0 and M1–M5 alone")
+    parser.add_argument("--retimed", action="store_true", help="I0 and I11–I13 alone")
     args = parser.parse_args()
     WORK.mkdir(parents=True, exist_ok=True)
     if args.measure:
         return 0 if measure() else 1
     if args.mutants is not None:
         return 0 if mutants([n for n in args.mutants.split(",") if n] or None) else 1
-    if not (args.instance or args.menu):
+    if not (args.instance or args.menu or args.retimed):
         probe_rows()
     if not args.probe:
         shutil.rmtree(WORK / "projects", ignore_errors=True)
         shutil.rmtree(WORK / "exports", ignore_errors=True)
         (WORK / "framejob.log").unlink(missing_ok=True)
-        app_rows(MENU_ROWS if args.menu else None)
+        app_rows(MENU_ROWS if args.menu else [i11, i12, i13] if args.retimed else None)
     passed = sum(1 for _, ok in rows if ok)
     print(f"{passed}/{len(rows)}", flush=True)
     return 0 if passed == len(rows) else 1

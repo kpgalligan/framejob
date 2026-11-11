@@ -48,7 +48,7 @@ Amount blends the isolated voice with the clip's own sound.
 - **At 100 %**, the pauses are silent.
 - **Below that**, more of the original sound comes through.
 
-Changing Amount takes effect at once. It doesn't need the isolated voice to be worked out again.
+Changing Amount takes effect at once on a clip at normal speed. It doesn't need the isolated voice to be worked out again. On a clip with a speed change or a ramp it [takes a moment](#speed-ramps-and-freeze-frames).
 
 ## While it renders
 
@@ -65,14 +65,21 @@ An export waits for every isolated clip to be ready, and its sheet reads "Prepar
 | Off | Isolation is off for this clip. |
 | Rendering… | The isolated voice is being worked out. The clip plays without it for now. |
 | Ready | The clip plays with isolation. |
-| Plays without it at this speed | The clip has a speed change, a ramp or a freeze frame. See below. |
+| Plays no sound | The clip is silent, so there's nothing to isolate: it's faster than ×12. See below. |
 | Waits for the reversed copy | The clip is reversed, and its reversed copy isn't ready yet. |
 | Not rendered: and a reason | It failed. "Not rendered: its media cannot be found" means the clip's file has gone missing, so [relink it](/projects/relink-media/). |
 | — | Several clips are selected. |
 
 ## Speed, ramps and freeze frames
 
-Isolation plays only at normal speed. A clip with a [speed change](/speed/change-speed/), a [speed ramp](/speed/speed-ramps/) or a [freeze frame](/speed/freeze-frame/) plays without it, and **Status** says so.
+Isolation works at any speed. On a clip with a [speed change](/speed/change-speed/) or a [speed ramp](/speed/speed-ramps/), with [Keep pitch](/speed/keep-pitch/) on or off, the voice is isolated first and then sped up or slowed down with the clip.
+
+Two things differ on such a clip:
+
+- Changing **Amount** takes a moment. The clip plays without isolation until the new amount is ready, then the editor switches over by itself.
+- Changing the clip's speed doesn't isolate the voice again when the clip still plays the same part of its file.
+
+A clip faster than ×12 is silent, so its **Status** reads "Plays no sound". A [freeze frame](/speed/freeze-frame/) has no sound of its own, so it has no Voice Isolation section.
 
 A [reversed](/speed/reverse/) clip is isolated once its reversed copy is ready.
 

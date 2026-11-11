@@ -106,13 +106,13 @@ Choosing one of the three sets Pitch back to that effect's own: 0, +5 or −5. A
 | Off | The clip has no effect, or one that changes nothing, such as an Amount of 0 or **Voice: Pitch** at 0 semitones. |
 | Rendering… | The effect is being worked out. Until it's done the clip plays without it. |
 | Ready | The clip plays with the effect. |
-| Plays without it at this speed | The clip has a speed change, a speed ramp or a freeze frame. An effect plays only at normal speed. |
+| Plays no sound | The clip is silent, so there's nothing to add an effect to: it's faster than ×12. |
 | Waits for the reversed copy | The clip is reversed and its [reversed copy](/speed/reverse/) isn't ready yet. |
 | Not rendered: and a reason | The render failed. The reason might be "its media cannot be found" or "its isolated voice was not rendered". |
 
 ## When you hear the effect
 
-The effect is worked out once for each clip, in the background. Until it's ready the clip plays without it, and the editor switches over by itself when it is. A clip that isn't at normal speed plays without the effect, and [Status](#read-the-status) says so.
+The effect is worked out once for each clip, in the background. Until it's ready the clip plays without it, and the editor switches over by itself when it is. An effect works at any speed: on a clip with a [speed change](/speed/change-speed/) or a [speed ramp](/speed/speed-ramps/) the effect is added first and then sped up or slowed down with the clip.
 
 Changing the effect, Amount, Pitch or the clip's [Voice Isolation](/audio/voice-isolation/) amount works it out again. So does trimming or slipping the clip, because the clip then plays a different part of its file. Moving the clip along the timeline doesn't.
 
@@ -125,6 +125,7 @@ The effect comes right after Voice Isolation and before everything else in the [
 ## Good to know
 
 - A reverb or an echo stops at the end of the clip. It doesn't ring on into the next one.
+- On a clip with a speed change or a ramp, the effect changes speed with the clip. At ×2 an echo's repeats come twice as close together and a reverb's tail is half as long.
 - A clip split from a take starts its effect fresh at the cut, so a reverb or echo doesn't carry across the join.
 - On a stereo file a reverb or an echo mixes the two channels together, so the [channel choice](/audio/channels/) picks from the effected pair, not from the original left and right.
 - The effect can't be animated. Voice Effect is marked ⊘ inside an [action](/audio/animate-sound/), and a change there still applies to the whole clip. It's also made from the clip's own Voice Isolation amount, not an animated one.

@@ -11,7 +11,8 @@ import Foundation
 /// replaces the owner's set); `RampAudioRenders` renders them one at a time
 /// off the main thread. Nothing here blocks: a pending ramp is silent time in
 /// the preview and a pending isolation plays dry until it lands, and the
-/// editor rebuilds then.
+/// editor rebuilds then. A retimed clip that isolates or has a voice effect
+/// is wanted stage by stage (`RetimedSound`), beside its dry render.
 extension ProjectDocument {
     /// `cache/ramp-audio/` of `intendedCacheDirectory`, published beside the
     /// plan as `ReverseResolution.rampAudio`. Not created here: the first
@@ -57,6 +58,10 @@ extension ProjectDocument {
             // A voice over an isolated clip is requested once that render is
             // on disk (AU-143); the settle that lands it wants again.
             add(VoiceCache.requests(plan: plan, dsp: dsp, urls: urls, reverse: reverse))
+            // A retimed clip's chain, each stage once the one before it is
+            // on disk (AU-55 as amended, #387). Its dry ramp render stays
+            // wanted above, so the clip sounds while the chain renders.
+            add(RetimedSound.requests(plan: plan, dsp: dsp, urls: urls, reverse: reverse))
         }
         RampAudioRenders.shared.want(requests, owner: recipeKey) { [weak self] in
             self?.rampAudioDidSettle()

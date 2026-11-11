@@ -31262,3 +31262,90 @@ Recorded 2026-11-10 on this tree: Release (`RC_PROOF_APP=release`) 20/20; `--mut
 caught; `transcript_tab_proof.py --only Z0,B4` on Release 2/2; `text_focus_proof.py` 57/57;
 `v2_menu.py --only H` on Release 5/5. F10 measured the last of 27,000 words estimated at
 88,601 pt and revealed at 130,078 pt in 0.059 s.
+
+## #387 — voice isolation and voice effects on a retimed clip (`audio_ap5_proof.py` P4, P13–P18, P8b, I7a–I7e, I11; `voice_proof.py` V15, V16, I11–I13; `audio_ap6_proof.py` V12; twelve mutants; spec §11 AU-55 and AU-145 as amended)
+
+A clip with a constant speed or a speed ramp is isolated, and voiced, BEFORE it is retimed: its
+padded window is rendered to a file (`RetimedSound.swift`, `IsolationMix.swift`) and the retimer
+reads that file in the media's place. The rows live in the proofs of the two features, and they
+replace four older ones, which described the limit this lifts: AP5's P4 ("no request for a
+time-scaled … segment") and I7 ("×2 plays dry"), AP14's I11 ("×2 with Keep pitch off: no voiced
+file") and AP6's "not isolatable" leg of E1 and V12 (noise reduction 0.5 in isolation's place).
+
+- **Probe rows** (`audio_ap5_probe.swift`). Their chains are rendered by the export's own wait
+  (`Exporter.withOfflineAudio`), with the DRY window written where the chain's isolation lands,
+  so a mix is the dry sound and a processed render must equal the dry one. `AP5_ROWS=P4,P13` in
+  the environment runs only the sections answering those rows; the mutants ask for their own.
+
+  | Row | What it holds |
+  |---|---|
+  | P4 | a ×1 segment gets a tapped request and no chain; ×2 with Keep pitch on a two-stage chain, ×2 with it off and a ramp three stages, each formable only once the file before it is on disk; a pending reverse none |
+  | P13 | the processed render against the dry render of the same segment: ×2 from 2.5 s, ×2 over 2–6 s of the file (both ends on a whole second), a ×1→×2 ramp and a clip whose source-in is under the pad, Keep pitch off, max \|Δ\| ≤ 1e-6; a ×1→×2 ramp from 2.5 s and from 2 s and a ×1→×12 ramp, Keep pitch on, ≤ −60 dB, and the frames Apple's unit read past the clip's last no more than the window holds |
+  | P8b | the export's wait ran its build with all three stages of each of P13's chains on disk |
+  | P18 | a metering build (the preview's) and an export build of each of P13's clips read identical; a live ×2 clip of the owner's recording: its two reads and the dry clip's each ≤ −10 dB (AVFoundation's time-pitch is not deterministic), and its lag against the dry clip, whose samples its window holds, ≤ 48 samples |
+  | P14 | the mix: dry 1 and isolated 0 give 1 − a at 0.5 and 0.25; a mono source stays mono; an Amount moved 0 → 1 over a two-leg map against the closed form, ≤ 1e-5 |
+  | P15 | a live clip of the recording (AAC) beside a ×1 clip of it: it reads its processed window at source-in − the window's first frame (less SY-24's 575 ticks at ×1.0005), scaled as the media, on a composition track of its own, with no tap; with the file removed it reads the media. A rendered segment plays its processed render, the dry one when only that exists, nothing with neither |
+  | P16 | ×2 and ×1.9 of one window name one isolation and one mix and two renders; Amount 1 and 0.5 one isolation, two mixes, two renders; a clip 2 s shorter another isolation; the dry render's name is the one the rule before #387 gives, spelled again in the probe |
+  | P17 | the Status of a retimed clip: "Rendering…" under a held render with the dry render wanted beside the chain, "Ready" once the last file lands (2 isolated and 2 ramp files with Keep pitch off, 2 and 0 with it on), "Not rendered: …" in the isolation's words; at ×16 (no audio segment) "Plays no sound" for Voice Isolation and Voice Effect |
+
+- **Instance rows.** The oracle is "isolating then retiming equals retiming the isolated file":
+  I2's ×1 isolated export, its left channel as a mono file, imported and given the same speed.
+  I7a ×2 with Keep pitch off and I7c's Keep pitch off ramp are compared with it sample against
+  sample (residual ≤ −40 dB, \|lag\| ≤ 0.5); I7b (×2, Keep pitch on) and I7c's Keep pitch on ramp
+  are Apple's time-pitch and are held to the pause floor and a lag (≤ 5 ms), the dry export's
+  lag and residual against the dry file retimed reported beside them. The floor's bound is 6 dB
+  (400 ms windows of a retimed clip span more media than I2's) and what the oracle lowers it,
+  within 1 dB (2 dB on the Keep pitch on ramp). I7d the Amount at 0.5; I7e what a rate edit, an
+  Amount and a trim render again; I11 a freeze frame.
+- **`voice_proof.py`**: V15 a ×2 clip's voice as a stage of its chain; V16 the pad silent to
+  the effect (Echo, an impulse 50 ms before the clip's first frame); I11 and I13a against the
+  ×1 voiced export retimed, I12 and I13b by telephone's K8 signature. `--retimed` runs I0 and
+  I11–I13 alone.
+- **A freeze frame.** `freeze_frame`'s still has no audio properties (`enabled.audio` false), so
+  the core refuses isolation on it by `set_audio` and by `paste_attributes` ("clip 7 has no audio
+  properties"): I11 is that refusal, not a render.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `retimed-dry` | `RetimedSound.chain` answers none for a retimed segment (the old behaviour) | P4 |
+| `map-unshifted` | the ramp render reads the processed window with the media's own map | P13 |
+| `pad-zero` | the window is not widened by the pad | P13 |
+| `mix-swapped` | `iso + a·(dry − iso)` | P14 |
+| `automation-unmapped` | the Amount's points read in source time | P14 |
+| `live-not-substituted` | `resolveSource` ignores the processed window | P15 |
+| `family-not-told` | `audioFamilies` splits by the media's format while `fill` inserts the window | P15 |
+| `amount-not-keyed` | the mix's name leaves the Amount out | P16 |
+| `dry-not-wanted` | the document stops wanting the dry ramp render | P17 |
+| `export-one-pass` | the export asks once | P8b |
+| `voice-retimed-dry` (`voice_proof.py`) | a retimed chain carries no voice | V15 |
+| `pad-voiced` (`voice_proof.py`) | the pad reaches the effect | V16 |
+| `sounding-not-keyed` (`voice_proof.py`) | a retimed voice render's name leaves out the frames the clip plays | V15 |
+
+Three older mutants were re-anchored on the new code and killed again: AP5's `scaled-isolated`
+(a time-scaled segment taken for a tapped one, P4) and `export-no-wait` (P8), AP14's
+`export-no-wait` (V8); AP6's `M3 isolation-swapped` now restores the removed arm (E1). Every
+other mutant of the three proofs had its anchor found exactly once in `app/Sources` and was not
+run again.
+
+| Run (2026-11-10) | Result |
+|---|---|
+| Debug: `audio_ap5_proof.py --probe` | 20/20 |
+| Debug: `audio_ap5_proof.py --mutants` with the ten names and the three re-anchored | 13/13 killed, each by its row (`pad-zero` survived P13 until the case with both ends on a whole second was added, then killed) |
+| Debug: `voice_proof.py --probe`; `--mutants export-no-wait,voice-retimed-dry,pad-voiced` | 16/16; 3/3 killed |
+| Debug, the fix pass: `voice_proof.py --mutants sounding-not-keyed` | 1/1 killed, by V15 |
+| Debug: `audio_ap6_probe.py`; `--mutants M3` | 10/10; 1/1 killed |
+| Debug: `audio_ap6b_probe.py`, twice | 14/15 (R5: three renders not byte-identical), then 15/15 |
+| `make gate` | PASS |
+| Release, whole, after `make gate`: `RC_PROOF_APP=release audio_ap5_proof.py` | 37/37. I7a: floor lowered 8.7 dB (the oracle 8.7), residual −67.2 dB, lag +0.000; I7b: 9.3 dB (9.3), lag +94.9 samples, its dry export against the dry file retimed lag −0.9 and residual −9.6 dB; I7c: Keep pitch off 10.2 dB (10.2), −66.6 dB, lag −0.000; Keep pitch on 8.3 dB (10.0), lag +22.0, its dry export against the dry file retimed lag −23.5 and residual +2.4 dB; I7d −63.7 dB; P13 max \|Δ\| 0.0 to 2.98e-8 with Keep pitch off and −329.3 to −335.6 dB with it on, the unit reading 6,661 frames past the clip's last at ×2 and 35,712 at ×12 |
+| Release, whole: `RC_PROOF_APP=release voice_proof.py` | 51/51. I11 −62.2 dB and I13a −64.1 dB against the oracle; I12 125 Hz −24.7 dB and 8 kHz −28.2 dB re 1 kHz (the oracle the same); I13b −27.3 and −27.5 dB |
+| Release: `audio_ap6_proof.py` on a `proof_app.py launch --app release` instance | 38/38. V12 at ×1.5: isolation 0.8, noise reduction 0, the pause floor 28.33 dB under Normalize-only, the export at −16.05 LUFS; no `Frame Job: ` line |
+| Release, whole: `env -u RC_ASSEMBLYAI_KEY ramp_proof.py` | 43/43 in 690 s (U1: dry constant and ramped clips equal to the base's, plan, md5 and PCM) |
+| Release, whole: `env -u RC_ASSEMBLYAI_KEY constant_render_proof.py` | 27 rows in 764 s, failed [] |
+
+```sh
+python3 tools/proof/audio_ap5_proof.py --probe
+python3 tools/proof/audio_ap5_proof.py --mutants retimed-dry,map-unshifted,pad-zero,mix-swapped,automation-unmapped,live-not-substituted,family-not-told,amount-not-keyed,dry-not-wanted,export-one-pass
+python3 tools/proof/audio_ap5_proof.py --instance --only I7a --only I7e --only I11
+python3 tools/proof/voice_proof.py --retimed
+python3 tools/proof/voice_proof.py --mutants voice-retimed-dry,pad-voiced,sounding-not-keyed
+```

@@ -14,7 +14,9 @@
 // Projects are ops on an untitled `ProjectDocument`, published under a fresh
 // recipe key with `AudioDSPSource` and a `ReverseResolution` whose `isolated`
 // is <work-dir>/cache/isolated. One line per row, `ok <ID> — <detail>` or
-// `FAIL <ID> — <detail>`; no app is launched.
+// `FAIL <ID> — <detail>`; no app is launched. With `AP5_ROWS=P4,P13` in the
+// environment only the sections answering those rows run (the proof's
+// mutants ask for their own).
 //
 //  P1  isolation 1 with no render: no tap on any track, the mix read
 //      byte-identical to isolation 0.
@@ -25,8 +27,10 @@
 //  P2b `wetOffset` and a built span off the 48 kHz grid: at 20,020 /
 //      sourceIn 40,040 ticks is 1,602 − first, the reverse −1,602 − first.
 //  P3  amount 0.5 and 0.25 against dry + a·(render − dry), ≤ 1e-6.
-//  P4  no request for a time-scaled, a ramped, a freeze or a pending-reverse
-//      segment; a plain one gets one.
+//  P4  a ×1 segment gets a tapped request and no chain; a constant speed with
+//      Keep pitch on a two-stage chain, with it off or a ramp a three-stage
+//      one, each stage formable only once the file before it is on disk; a
+//      pending reverse none (AU-55 as amended, #387).
 //  P5  `IsolationRenderer` over 6 s of the Rode recording from 10 s: the
 //      render's lag against the dry by cross-correlation is 0.
 //  P6  the window [10, 15 s) against the whole file's render over 10–11 s:
@@ -52,6 +56,40 @@
 //  P12 the same landing leg for Voice Effect's Status (its own memo).
 //      P11 and P12 run first, before any other row's document wants a
 //      render, and each leg releases its wants and removes its cache folder.
+//
+// The retimed rows (#387). Their chains are rendered by the export's own
+// wait, with the DRY window written where the isolation lands, so a mix is
+// the dry sound and a processed render must equal the dry one.
+//  P13 the shift is exact: the processed render against the dry render of
+//      the same segment — ×2 (from 2.5 s, and over 2–6 s of the file,
+//      where both ends sit on a whole second and only the pad holds what the
+//      resampler reads outside them) and a ×1→×2 ramp with Keep pitch off,
+//      and a clip whose source-in is under the pad, max |Δ| ≤ 1e-6; a ×1→×2
+//      ramp (from 2.5 s and from 2 s) and a ×1→×12 ramp with Keep pitch on
+//      ≤ −60 dB, and the frames Apple's unit read past the clip's last no
+//      more than the window holds.
+//  P8b the export's wait ran its build with every stage of each chain on disk.
+//  P18 a metering build (the preview's) and an export build of each read
+//      identical; a live ×2 clip's two reads, and the dry clip's, each
+//      within −10 dB (AVFoundation's time-pitch is not deterministic, #337:
+//      both figures reported), and its lag against the dry clip, whose
+//      samples its window holds, 0 (≤ 48 samples).
+//  P14 the mix: dry 1 and isolated 0 give 1 − a at 0.5 and 0.25; mono stays
+//      mono; an Amount moved 0 → 1 over a two-leg map against the closed form.
+//  P15 a live segment reads its processed window at source-in − the window's
+//      first frame (less SY-24's lead at ×1.0005), scaled as the media, on a
+//      composition track apart from an AAC neighbour, with no tap; with the
+//      file removed it reads the media. A rendered segment plays its
+//      processed render, the dry one when only that exists, nothing with
+//      neither.
+//  P16 names: a rate edit that keeps the window keeps the isolation and the
+//      mix and renames the render; an Amount renames the mix and the render,
+//      not the isolation; a window that moves renames the isolation; a dry
+//      render's name is what the rule before #387 gives.
+//  P17 the Status: "Rendering…" under a held render with the dry render
+//      wanted beside the chain, "Ready" once the last file lands, "Not
+//      rendered: …" in the isolation's words; "Plays no sound" above the
+//      audio ceiling, for Voice Isolation and Voice Effect.
 import AVFoundation
 import Accelerate
 import AppKit
@@ -65,6 +103,15 @@ let RATE = 48_000
 func row(_ id: String, _ ok: Bool, _ detail: String) {
     print("\(ok ? "ok" : "FAIL") \(id) — \(detail)")
     fflush(stdout)
+}
+
+/// `AP5_ROWS=P4,P13` runs only the sections that answer one of those rows (a
+/// mutant is scored on its own rows); unset, every section runs.
+let chosenRows: Set<String>? = ProcessInfo.processInfo.environment["AP5_ROWS"].map {
+    Set($0.split(separator: ",").map(String.init))
+}
+func runs(_ ids: String...) -> Bool {
+    chosenRows.map { !$0.isDisjoint(with: ids) } ?? true
 }
 
 guard CommandLine.arguments.count == 3 else {
@@ -278,7 +325,7 @@ func expectedSpan(_ s: PlanSegment, _ window: IsolationWindow) -> (Int, Int, Int
 // =========================================================================
 // P1 — pending: no tap, the dry read byte for byte
 
-do {
+if runs("P1") {
     guard let off = fixture(isolation: 0), let on = fixture(isolation: 1),
         let builtOff = build(off), let builtOn = build(on),
         let readOff = exportRead(builtOff), let readOn = exportRead(builtOn)
@@ -317,7 +364,7 @@ func p2(noiseClip: Bool, bound: Float) -> (Bool, String) {
         + "\(counted) frames, worst |out − render| \(worst) (bound \(bound))")
 }
 
-do {
+if runs("P2") {
     let (alone, aloneDetail) = p2(noiseClip: false, bound: 1e-7)
     let (led, ledDetail) = p2(noiseClip: true, bound: 1e-4)
     row("P2", alone && led, aloneDetail + "; " + ledDetail)
@@ -326,7 +373,7 @@ do {
 // =========================================================================
 // P2b — off the 48 kHz grid
 
-do {
+if runs("P2b") {
     let window = IsolationWindow(firstFrame: 1_000, endFrame: 2_000)
     let forward = IsolationCache.wetOffset(at: 20_020, sourceIn: 40_040, window: window)
     let backward = IsolationCache.wetOffset(at: 40_040, sourceIn: 20_020, window: window)
@@ -365,7 +412,7 @@ do {
 // =========================================================================
 // P3 — Amount is a crossfade
 
-do {
+if runs("P3") {
     guard let dryFixture = fixture(isolation: 0), let s = dryFixture.segment,
         let built = build(dryFixture), let dry = exportRead(built)
     else {
@@ -397,53 +444,6 @@ do {
         parts.append("amount \(amount): worst \(worst) over \(end - start) frames")
     }
     row("P3", ok, parts.joined(separator: "; ") + " (bound 1e-6)")
-}
-
-// =========================================================================
-// P4 — which segments are isolated
-
-do {
-    let fixed = fixture(isolation: 1)
-    guard let f = fixed, let media = f.segment?.media else {
-        row("P4", false, "the fixture did not build")
-        exit(0)
-    }
-    func segment(_ extra: String, duration: Ticks = 600_000, sourceDuration: Ticks = 600_000)
-        -> PlanSegment?
-    {
-        ReelJSON.decode(
-            PlanSegment.self,
-            from: "{\"clip\": \(f.clip), \"media\": \(media), \"source_in\": 0, "
-                + "\"source_duration\": \(sourceDuration), \"start\": 0, "
-                + "\"duration\": \(duration)\(extra)}")
-    }
-    let reverse = ReverseResolution(ready: [:], pending: [], isolated: isolatedDir)
-    let pendingReverse = ReverseResolution(ready: [:], pending: [f.clip], isolated: isolatedDir)
-    let cases: [(String, PlanSegment?, ReverseResolution, Bool)] = [
-        ("plain", segment(""), reverse, true),
-        ("time-scaled ×2", segment(", \"pitch\": \"spectral\"", sourceDuration: 1_200_000),
-         reverse, false),
-        ("ramped", segment(
-            ", \"ramp\": {\"keep_pitch\": false, \"glide\": [], "
-                + "\"map\": [[0, 0], [600000, 1200000]], \"constant\": true}",
-            sourceDuration: 1_200_000), reverse, false),
-        ("freeze", segment("", duration: 1_200_000, sourceDuration: 20_000), reverse, false),
-        ("pending reverse", segment(""), pendingReverse, false),
-    ]
-    var ok = true
-    var parts: [String] = []
-    for (name, s, resolution, wanted) in cases {
-        guard let s else {
-            ok = false
-            parts.append("\(name): did not decode")
-            continue
-        }
-        let got = IsolationCache.request(
-            for: s, dsp: f.dsp, urls: f.document.mediaURLs(), reverse: resolution)
-        ok = ok && (got != nil) == wanted
-        parts.append("\(name): \(got == nil ? "no request" : "a request")")
-    }
-    row("P4", ok, parts.joined(separator: ", "))
 }
 
 // =========================================================================
@@ -480,7 +480,7 @@ func rodeDry(from: Int64, to: Int64) -> [Float]? {
     return (from..<to).map { reader.sample($0, channel: 0) }
 }
 
-do {
+if runs("P5") {
     let window = IsolationWindow(firstFrame: 10 * 48_000, endFrame: 16 * 48_000)
     let (audio, detail) = renderRode(window, "p5.caf")
     if let audio, let dry = rodeDry(from: window.firstFrame, to: window.endFrame) {
@@ -508,7 +508,7 @@ do {
     }
 }
 
-do {
+if runs("P6") {
     let window = IsolationWindow(firstFrame: 10 * 48_000, endFrame: 15 * 48_000)
     let total = (try? AVAudioFile(forReading: rode).length) ?? 0
     let (part, partDetail) = renderRode(window, "p6-window.caf")
@@ -681,7 +681,7 @@ func landed(_ leg: StatusLeg) -> Bool {
         && leg.settles > 0 && leg.after == "Ready" && leg.fileExists && leg.failure == nil
 }
 
-do {
+if runs("P11", "P12") {
     let lands = statusLeg(
         dryA, section: "audio.isolation", patch: AudioPatch(isolation: 1), voice: false)
     let text = work.appendingPathComponent("p11-not-audio.txt")
@@ -701,9 +701,109 @@ do {
 }
 
 // =========================================================================
+// P17 — a retimed clip's Status, and what the document wants (#387). Here,
+// with P11 and P12, before any other row's document wants a render.
+
+if runs("P17") {
+    var parts: [String] = []
+    var ok = true
+    /// A 1 s clip of `file` at `rate`, isolated; the Status under a held
+    /// render, what the document wants meanwhile, and the Status once the
+    /// chain settles (a state waited for, bounded at 120 s).
+    func leg(_ file: URL, rate: Double, keepPitch: Bool) -> (String, String, Bool, [Int]) {
+        let document = ProjectDocument()
+        guard let clip = place(document, file, seconds: 12, at: 0) else {
+            return ("no clip", "", false, [])
+        }
+        edit(document, "Trim", [.trimEnd(clip: clip, to: 2 * SEC)])
+        edit(document, "Speed", [.setSpeed(clip: clip, rate: rate, keepPitch: keepPitch)])
+        defer {
+            RampAudioRenders.shared.release(owner: document.recipeKey)
+            if let cache = document.temporaryCacheDirectory {
+                try? FileManager.default.removeItem(at: cache)
+            }
+        }
+        holdRenders(statusHold)
+        defer { holdRenders(0) }
+        edit(document, "Iso", [.setAudio(clips: [clip], patch: AudioPatch(isolation: 1))])
+        let before = AudioPane.isolationWords(IsolationCache.status(of: clip, in: document))
+        var wantsDry = false
+        if let s = document.project.plan?.audioTracks.flatMap(\.segments).first(where: {
+            $0.clip == clip
+        }), let directory = document.rampAudioDirectory,
+            let dry = RampAudioCache.request(
+                for: s, urls: document.mediaURLs(),
+                reverse: ReverseSource.shared.resolution(for: document.recipeKey))
+        {
+            wantsDry = RampAudioRenders.shared.keptNames(in: directory)
+                .contains(dry.destination.lastPathComponent)
+        }
+        holdRenders(0)
+        RampAudioRenders.shared.release(owner: document.recipeKey)
+        let deadline = Date().addingTimeInterval(120)
+        func kept() -> Bool {
+            [document.rampAudioDirectory, document.isolatedAudioDirectory].compactMap { $0 }
+                .contains { !RampAudioRenders.shared.keptNames(in: $0).isEmpty }
+        }
+        while kept(), Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        }
+        document.ensureRampAudio()
+        var status = IsolationCache.status(of: clip, in: document)
+        while status == .rendering, Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+            status = IsolationCache.status(of: clip, in: document)
+        }
+        func count(_ directory: URL?) -> Int {
+            directory.flatMap { try? FileManager.default.contentsOfDirectory(atPath: $0.path) }?
+                .filter { $0.hasSuffix(".caf") }.count ?? 0
+        }
+        return (before, AudioPane.isolationWords(status), wantsDry,
+            [count(document.isolatedAudioDirectory), count(document.rampAudioDirectory)])
+    }
+    let off = leg(dryA, rate: 2, keepPitch: false)
+    let good = off.0 == "Rendering…" && off.1 == "Ready" && off.2 && off.3 == [2, 2]
+    ok = ok && good
+    parts.append("×2 Keep pitch off: \"\(off.0)\" under a held render, the dry render wanted "
+        + "beside the chain: \(off.2); then \"\(off.1)\" with \(off.3[safe: 0] ?? -1) isolated "
+        + "and \(off.3[safe: 1] ?? -1) ramp files (want 2 and 2)")
+    let on = leg(dryA, rate: 2, keepPitch: true)
+    ok = ok && on.0 == "Rendering…" && on.1 == "Ready" && on.3 == [2, 0]
+    parts.append("×2 Keep pitch on: \"\(on.0)\" → \"\(on.1)\", \(on.3[safe: 0] ?? -1) isolated "
+        + "and \(on.3[safe: 1] ?? -1) ramp files (want 2 and 0)")
+    let text = work.appendingPathComponent("p17-not-audio.txt")
+    try? "not audio".write(to: text, atomically: true, encoding: .utf8)
+    let fails = leg(text, rate: 2, keepPitch: true)
+    ok = ok && fails.1.hasPrefix("Not rendered: The isolated voice's source cannot be read")
+    parts.append("a file that is not audio: \"\(fails.1)\"")
+
+    // Above the audio ceiling a clip plays no sound: nothing to isolate.
+    let silent = ProjectDocument()
+    if let clip = place(silent, dryA, seconds: 12, at: 0) {
+        edit(silent, "Fast", [
+            .setSpeed(clip: clip, rate: 16),
+            .setAudio(clips: [clip], patch: AudioPatch(
+                isolation: 1, voice: .some(VoiceProps(kind: .pitch, pitch: 2)))),
+        ])
+        let isolation = AudioPane.isolationWords(IsolationCache.status(of: clip, in: silent))
+        let voice = AudioPane.isolationWords(VoiceCache.status(of: clip, in: silent))
+        let segments = silent.project.plan?.audioTracks.flatMap(\.segments)
+            .filter { $0.clip == clip && $0.duration > 0 }.count ?? -1
+        ok = ok && isolation == "Plays no sound" && voice == "Plays no sound" && segments == 0
+        parts.append("×16 (\(segments) audio segments): Voice Isolation \"\(isolation)\", Voice "
+            + "Effect \"\(voice)\"")
+        RampAudioRenders.shared.release(owner: silent.recipeKey)
+    } else {
+        ok = false
+        parts.append("×16: no clip")
+    }
+    row("P17", ok, parts.joined(separator: "; "))
+}
+
+// =========================================================================
 // P7 — the name
 
-do {
+if runs("P7") {
     let w1 = IsolationWindow(firstFrame: 0, endFrame: 48_000)
     let w2 = IsolationWindow(firstFrame: 0, endFrame: 48_001)
     let forward = IsolationCache.name(media: 1, mediaFile: dryA, reversed: false, window: w1)
@@ -730,7 +830,7 @@ do {
 // =========================================================================
 // P8 — the export waits
 
-do {
+if runs("P8") {
     let document = ProjectDocument()
     var detail = "the fixture did not build"
     var ok = false
@@ -781,7 +881,7 @@ do {
 // =========================================================================
 // P9 — a failure reaches the owner
 
-do {
+if runs("P9") {
     let folder = work.appendingPathComponent("p9", isDirectory: true)
         .appendingPathComponent("cache", isDirectory: true)
     try? FileManager.default.removeItem(at: folder)
@@ -817,7 +917,7 @@ do {
 // =========================================================================
 // P10 — lanes that disagree fail the render (#409)
 
-do {
+if runs("P10") {
     let agree = try? IsolationRenderer.roundFrames([4096, 4096])
     let one = try? IsolationRenderer.roundFrames([4096])
     var message = "no error"
@@ -836,4 +936,568 @@ do {
     row("P10", agree == 4096 && one == 4096 && named,
         "[4096, 4096] → \(agree.map(String.init) ?? "threw"); [4096] → "
             + "\(one.map(String.init) ?? "threw"); [4096, 4095] → \(message)")
+}
+
+// =========================================================================
+// P13–P18, P8b — a retimed clip is isolated through its processed window
+// (spec §11 AU-55 as amended, #387)
+
+/// One clip of `file` on its own document, retimed, with `isolation`, its
+/// renders published into a cache folder of its own.
+struct Retimed {
+    let f: Fixture
+    let reverse: ReverseResolution
+    var urls: [UInt32: URL] { f.document.mediaURLs() }
+    var segment: PlanSegment? { f.segment }
+    var chain: RetimedSound.Chain? {
+        segment.flatMap { RetimedSound.chain(for: $0, dsp: f.dsp, urls: urls, reverse: reverse) }
+    }
+}
+
+enum Retime {
+    case constant(Double, keepPitch: Bool)
+    case ramp(to: Double, keepPitch: Bool)
+}
+
+/// The clip is added at 1 s, trimmed to start `sourceIn` into the file and to
+/// last `length`, then retimed. `amount` 0 leaves it dry.
+func retimed(
+    _ name: String, _ retime: Retime, amount: Double = 1, sourceIn: Ticks = 5 * SEC / 2,
+    length: Ticks = 4 * SEC, file: URL = dryA, seconds: Double = 12, neighbour: URL? = nil
+) -> Retimed? {
+    let document = ProjectDocument()
+    guard let clip = place(document, file, seconds: seconds, at: SEC) else { return nil }
+    edit(document, "Trim", [
+        .trimStart(clip: clip, to: SEC + sourceIn),
+        .trimEnd(clip: clip, to: SEC + sourceIn + length),
+    ])
+    switch retime {
+    case .constant(let rate, let keepPitch):
+        edit(document, "Speed", [.setSpeed(clip: clip, rate: rate, keepPitch: keepPitch)])
+    case .ramp(let rate, let keepPitch):
+        if !keepPitch {
+            edit(document, "Pitch", [.setSpeed(clip: clip, rate: 1, keepPitch: false)])
+        }
+        edit(document, "Ramp", [.addSpeedRamp(clip: clip, shape: .rampUp, rate: rate)])
+    }
+    if amount > 0 {
+        edit(document, "Iso", [.setAudio(clips: [clip], patch: AudioPatch(isolation: amount))])
+    }
+    if let neighbour, let other = addMedia(document, neighbour, seconds: 30) {
+        let track = document.project.snapshot.tracks[0].id
+        edit(document, "Neighbour", [.addClip(track: track, media: other, at: 20 * SEC)])
+    }
+    let cache = work.appendingPathComponent("retimed-\(name)", isDirectory: true)
+        .appendingPathComponent("cache", isDirectory: true)
+    try? FileManager.default.removeItem(at: cache)
+    let reverse = ReverseResolution(
+        ready: [:], pending: [], rampAudio: RampAudioCache.directory(in: cache),
+        isolated: IsolationCache.directory(in: cache))
+    // The document's own wants (into its temporary cache) are not the row's.
+    RampAudioRenders.shared.release(owner: document.recipeKey)
+    let key = RecipeSource.shared.register()
+    RecipeSource.shared.set(document.project, for: key)
+    AudioDSPSource.shared.publish(AudioDSPParameters(snapshot: document.project.snapshot), for: key)
+    ReverseSource.shared.publish(reverse, project: document.project, for: key)
+    return Retimed(f: Fixture(document: document, key: key, clip: clip), reverse: reverse)
+}
+
+/// `file`'s frames `[window)` as interleaved floats, `channels` wide.
+func sourceFrames(_ file: URL, _ window: IsolationWindow, channels: Int) -> [Float]? {
+    let asset = AVURLAsset(url: file)
+    guard let track = CompositionBuilder.firstTrack(of: asset, mediaType: .audio),
+        let reader = try? RampSourceReader(
+            asset: asset, track: track, channels: channels, from: window.firstFrame),
+        (try? reader.fill(through: window.endFrame)) != nil
+    else { return nil }
+    var out: [Float] = []
+    out.reserveCapacity(Int(window.endFrame - window.firstFrame) * channels)
+    for k in window.firstFrame..<window.endFrame {
+        for c in 0..<channels { out.append(reader.sample(k, channel: c)) }
+    }
+    return out
+}
+
+func writeCAF(_ url: URL, _ samples: [Float], channels: Int) -> Bool {
+    try? FileManager.default.createDirectory(
+        at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    guard let writer = try? RampCAFWriter(url: url, channels: channels) else { return false }
+    do {
+        try writer.write(samples, frames: samples.count / channels)
+        try writer.close()
+    } catch { return false }
+    return true
+}
+
+/// The DRY window written where the chain's isolation lands, so the mix at
+/// any Amount is the dry sound and the processed render must equal the dry
+/// one; then the rest of the chain rendered by the export's own wait.
+/// Answers whether `build` ran with every stage on disk, or why not.
+func renderChain(_ r: Retimed, file: URL = dryA) -> (ok: Bool, detail: String) {
+    guard let chain = r.chain, let isolation = chain.isolation, let plan = r.f.project.plan,
+        let dry = sourceFrames(file, chain.window, channels: 2),
+        writeCAF(isolation.destination, dry, channels: 2)
+    else { return (false, "no chain, or its isolation was not written") }
+    var existed: [Bool] = []
+    do {
+        try Exporter.withOfflineAudio(plan: plan, urls: r.urls, key: r.f.key, cancelled: { false }) {
+            existed = chain.stages.map {
+                FileManager.default.fileExists(atPath: $0.destination.path)
+            }
+        }
+    } catch {
+        return (false, "withOfflineAudio threw: \(error.localizedDescription)")
+    }
+    RampAudioRenders.shared.release(owner: r.f.key)
+    return (existed.count == chain.stages.count && existed.allSatisfy { $0 },
+        "\(chain.stages.count) stages, on disk at build: \(existed)")
+}
+
+func channel0(_ url: URL) -> [Float]? {
+    guard let audio = IsolatedAudio(contentsOf: url) else { return nil }
+    return Array(UnsafeBufferPointer(start: audio.samples(channel: 0), count: audio.frames))
+}
+
+/// (max |a − b|, 10·log10(Σ(a − b)² / Σ b²)) over the common length.
+func difference(_ a: [Float], _ b: [Float]) -> (worst: Float, db: Double) {
+    let n = min(a.count, b.count)
+    var worst: Float = 0
+    var error = 0.0
+    var power = 0.0
+    for i in 0..<n {
+        let d = a[i] - b[i]
+        worst = max(worst, abs(d))
+        error += Double(d) * Double(d)
+        power += Double(b[i]) * Double(b[i])
+    }
+    return (worst, 10 * log10(max(error, 1e-30) / max(power, 1e-30)))
+}
+
+/// The dry render of `r`'s segment, straight through the renderer.
+func dryRender(_ r: Retimed, _ name: String, file: URL = dryA)
+    -> (samples: [Float], report: RampAudioRenderer.Report)?
+{
+    guard let ramp = r.segment?.ramp else { return nil }
+    let url = work.appendingPathComponent("dry-render-\(name).caf")
+    try? FileManager.default.removeItem(at: url)
+    guard let report = try? RampAudioRenderer.render(
+        RampAudioRenderer.Job(
+            source: file, map: RampAudioCache.map(of: ramp), keepPitch: ramp.keepPitch,
+            destination: url)),
+        let samples = channel0(url)
+    else { return nil }
+    return (samples, report)
+}
+
+// P4 — which segments are tapped, and which form a chain
+
+if runs("P4") {
+    var parts: [String] = []
+    var ok = true
+    func touch(_ url: URL) {
+        try? FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: url.path, contents: Data())
+    }
+    let cases: [(String, Retime?, RetimedSound.Kind, Int)] = [
+        ("×1", nil, .tapped, 0),
+        ("×2 Keep pitch on", .constant(2, keepPitch: true), .live, 2),
+        ("×2 Keep pitch off", .constant(2, keepPitch: false), .rendered, 3),
+        ("a ramp", .ramp(to: 2, keepPitch: true), .rendered, 3),
+    ]
+    for (name, retime, kind, stages) in cases {
+        guard let r = retimed("p4-\(stages)-\(name.count)", retime ?? .constant(1, keepPitch: true)),
+            let s = r.segment
+        else {
+            ok = false
+            parts.append("\(name): no fixture")
+            continue
+        }
+        let tapped = IsolationCache.request(for: s, dsp: r.f.dsp, urls: r.urls, reverse: r.reverse)
+        let chain = r.chain
+        var grown: [Int] = []
+        if let chain {
+            grown.append(chain.formable.count)
+            for stage in chain.stages.dropLast() {
+                touch(stage.destination)
+                grown.append(chain.formable.count)
+            }
+        }
+        let good = RetimedSound.kind(of: s) == kind && (tapped != nil) == (kind == .tapped)
+            && (chain?.stages.count ?? 0) == stages && chain?.kind == (kind == .tapped ? nil : kind)
+            && grown == Array(1...max(stages, 1)).prefix(stages).map { $0 }
+        ok = ok && good
+        parts.append("\(name): \(tapped == nil ? "no tapped request" : "a tapped request"), "
+            + "\(chain?.stages.count ?? 0) chain stage(s), formable as each lands \(grown)")
+    }
+    if let r = retimed("p4-pending", .constant(2, keepPitch: true)), let s = r.segment {
+        let pending = ReverseResolution(
+            ready: [:], pending: [r.f.clip], rampAudio: r.reverse.rampAudio,
+            isolated: r.reverse.isolated)
+        let none = RetimedSound.chain(for: s, dsp: r.f.dsp, urls: r.urls, reverse: pending) == nil
+        ok = ok && none
+        parts.append("pending reverse: \(none ? "no chain" : "a chain")")
+    }
+    row("P4", ok, parts.joined(separator: "; "))
+}
+
+// P13, P8b, P18 — the shift is exact, the export waits for the whole chain,
+// and a metering build reads what an export build reads
+
+var rendered: [String: Retimed] = [:]
+if runs("P13", "P8b", "P18", "P15") {
+    var parts: [String] = []
+    var ok = true
+    var waited = true
+    var waitParts: [String] = []
+    var same = true
+    var sameParts: [String] = []
+    // name, retime, source-in, length, bound: max |Δ| for Keep pitch off, dB for on.
+    let cases: [(String, Retime, Ticks, Ticks, Double)] = [
+        ("x2-off", .constant(2, keepPitch: false), 5 * SEC / 2, 4 * SEC, 1e-6),
+        // From 2 s to 6 s of the file: both ends on a whole second, so only
+        // the pad holds what the resampler reads outside them.
+        ("x2-off-grid", .constant(2, keepPitch: false), 2 * SEC, 4 * SEC, 1e-6),
+        ("ramp-off", .ramp(to: 2, keepPitch: false), 5 * SEC / 2, 4 * SEC, 1e-6),
+        ("head-off", .constant(2, keepPitch: false), SEC / 10, 2 * SEC, 1e-6),
+        ("ramp-on", .ramp(to: 2, keepPitch: true), 5 * SEC / 2, 4 * SEC, -60),
+        // On a whole second, so only the pad holds the unit's preroll.
+        ("ramp-on-grid", .ramp(to: 2, keepPitch: true), 2 * SEC, 4 * SEC, -60),
+        ("ramp-on-x12", .ramp(to: 12, keepPitch: true), SEC / 2, SEC, -60),
+    ]
+    for (name, retime, sourceIn, length, bound) in cases {
+        guard let r = retimed("p13-\(name)", retime, sourceIn: sourceIn, length: length),
+            let chain = r.chain, let s = r.segment
+        else {
+            ok = false
+            parts.append("\(name): no fixture")
+            continue
+        }
+        let made = renderChain(r)
+        waited = waited && made.ok
+        waitParts.append("\(name): \(made.detail)")
+        guard made.ok, let processed = channel0(chain.last.destination),
+            let dry = dryRender(r, name)
+        else {
+            ok = false
+            parts.append("\(name): the chain or the dry render did not land (\(made.detail))")
+            continue
+        }
+        rendered[name] = r
+        let d = difference(processed, dry.samples)
+        let keep = s.ramp?.keepPitch ?? false
+        var good = processed.count == dry.samples.count && !processed.isEmpty
+        var text = "\(name) (window from frame \(chain.window.firstFrame) to "
+            + "\(chain.window.endFrame), \(processed.count) frames): "
+        if keep {
+            // What the unit read past what the clip plays, against the pad.
+            let sounding = RetimedSound.sounding(of: s)!
+            let played = sounding.endFrame - sounding.firstFrame
+            let past = (dry.report.pulledFrames ?? 0) - played
+            let room = chain.window.endFrame - sounding.endFrame
+            good = good && d.db <= bound && past <= room
+            text += String(format: "%.1f dB against the dry render (bound %.0f); the unit read "
+                + "%lld frames past the clip's last, the window holds %lld", d.db, bound, past, room)
+        } else {
+            good = good && Double(d.worst) <= bound
+            text += "max |Δ| \(d.worst) against the dry render (bound \(bound))"
+        }
+        ok = ok && good
+        parts.append(text)
+
+        // P18: the preview's build against the export's.
+        guard let plan = r.f.project.plan,
+            let export = build(r.f).flatMap(exportRead),
+            let preview = (try? CompositionBuilder.build(
+                plan: plan, planJSON: r.f.project.planJSON, urls: r.urls, recipeKey: r.f.key,
+                metering: true)).flatMap(exportRead)
+        else {
+            same = false
+            sameParts.append("\(name): a build did not read")
+            continue
+        }
+        let equal = export.left == preview.left && export.right == preview.right
+        let heard = export.left.contains { $0 != 0 }
+        same = same && equal && heard
+        sameParts.append("\(name): identical \(equal) over \(export.left.count) frames")
+    }
+    row("P13", ok, parts.joined(separator: "; "))
+    row("P8b", waited, waitParts.joined(separator: "; "))
+
+    // P18's live leg: Keep pitch on at ×2 is AVFoundation's time-pitch, read twice.
+    func twoReads(_ r: Retimed) -> Double? {
+        guard let plan = r.f.project.plan, let a = build(r.f).flatMap(exportRead),
+            let b = (try? CompositionBuilder.build(
+                plan: plan, planJSON: r.f.project.planJSON, urls: r.urls, recipeKey: r.f.key,
+                metering: true)).flatMap(exportRead)
+        else { return nil }
+        return difference(a.left, b.left).db
+    }
+    // On the owner's recording: speech keeps its shape through the time-pitch.
+    if let live = retimed(
+        "p18-live", .constant(2, keepPitch: true), sourceIn: 8 * SEC, file: rode, seconds: 30),
+        let dry = retimed(
+            "p18-live-dry", .constant(2, keepPitch: true), amount: 0, sourceIn: 8 * SEC,
+            file: rode, seconds: 30),
+        renderChain(live, file: rode).ok, let isolated = twoReads(live),
+        let plain = twoReads(dry),
+        let a = build(live.f).flatMap(exportRead), let b = build(dry.f).flatMap(exportRead)
+    {
+        rendered["x2-on"] = live
+        // The processed window holds the dry sound here, so the two clips
+        // play the same samples: the lag between them is the substitution's.
+        // 1.5 s from 0.25 s into the clip (it plays 2 s from 9 s).
+        let n = 72_000
+        let base = Int((live.segment?.start ?? 0) * 2 / 25) + 12_000
+        var best = -Float.infinity
+        var lag = Int.min
+        for l in -2_000...2_000 {
+            var dot: Float = 0
+            a.left.withUnsafeBufferPointer { x in
+                b.left.withUnsafeBufferPointer { y in
+                    vDSP_dotpr(x.baseAddress! + base, 1, y.baseAddress! + base + l, 1, &dot,
+                        vDSP_Length(n))
+                }
+            }
+            if dot > best { (best, lag) = (dot, l) }
+        }
+        // Two reads of AVFoundation's time-pitch are sometimes identical
+        // and sometimes not, dry or processed alike (measured from −18 dB
+        // to −334 dB over four runs of this row, #337), so the two figures
+        // are reported and held only to −10 dB: one sound, not another.
+        let good = isolated <= -10 && plain <= -10 && abs(lag) <= 48 && best > 0
+            && a.left.count >= base + n + 2_000
+        same = same && good
+        sameParts.append(String(format: "x2-on (live): two reads differ by %.1f dB, two reads "
+            + "of the dry clip by %.1f dB (each ≤ −10: AVFoundation's time-pitch is not "
+            + "deterministic); against the dry clip, whose samples its window holds, lag %d "
+            + "samples (≤ 48, 1 ms)", isolated, plain, lag))
+    } else {
+        same = false
+        sameParts.append("x2-on (live): did not build or read")
+    }
+    row("P18", same, sameParts.joined(separator: "; "))
+}
+
+// P14 — the mix
+
+if runs("P14") {
+    var parts: [String] = []
+    var ok = true
+    let folder = work.appendingPathComponent("p14", isDirectory: true)
+    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let frames = 48_000
+    func constant(_ name: String, channels: Int, value: Float) -> URL? {
+        let url = folder.appendingPathComponent(name)
+        try? FileManager.default.removeItem(at: url)
+        return writeCAF(url, [Float](repeating: value, count: frames * channels), channels: channels)
+            ? url : nil
+    }
+    let window = IsolationWindow(firstFrame: 0, endFrame: Int64(frames))
+    func mix(_ name: String, source: URL, isolated: URL, amount: Double, map: [[Ticks]] = [],
+        points: [MixPoint] = []) -> (samples: [Float], channels: Int)?
+    {
+        let out = folder.appendingPathComponent(name)
+        try? FileManager.default.removeItem(at: out)
+        let job = MixJob(
+            window: window, isolated: isolated, amount: amount, map: map, points: points)
+        guard (try? IsolationMix.render(
+            IsolationMix.Job(source: source, job: job, destination: out),
+            cancelled: { false })) != nil,
+            let audio = IsolatedAudio(contentsOf: out)
+        else { return nil }
+        return (Array(UnsafeBufferPointer(start: audio.samples(channel: 0), count: audio.frames)),
+            audio.channels)
+    }
+    if let mono = constant("one-mono.caf", channels: 1, value: 1),
+        let stereo = constant("one-stereo.caf", channels: 2, value: 1),
+        let zero = constant("zero.caf", channels: 2, value: 0)
+    {
+        for amount in [0.5, 0.25] {
+            if let got = mix("flat-\(amount).caf", source: stereo, isolated: zero, amount: amount) {
+                let worst = got.samples.map { abs($0 - Float(1 - amount)) }.max() ?? 1
+                ok = ok && worst <= 1e-6 && got.channels == 2 && got.samples.count == frames
+                parts.append("amount \(amount) of dry 1 and isolated 0: worst |out − "
+                    + "\(1 - amount)| \(worst), \(got.channels) channels")
+            } else {
+                ok = false
+                parts.append("amount \(amount): no file")
+            }
+        }
+        if let got = mix("mono.caf", source: mono, isolated: zero, amount: 0.5) {
+            ok = ok && got.channels == 1
+            parts.append("a mono source: \(got.channels) channel(s)")
+        } else {
+            ok = false
+            parts.append("mono: no file")
+        }
+        // A two-leg map: clip [0, 0.25 s) plays source [0, 0.25 s) at ×1, clip
+        // [0.25, 0.5 s) plays source [0.25, 1 s) at ×3; the Amount runs 0 → 1
+        // over the clip. Out = 1 − a(t(f)), computed here.
+        let quarter = SEC / 4
+        let map: [[Ticks]] = [[0, 0], [quarter, quarter], [2 * quarter, SEC]]
+        let points = [MixPoint(at: 0, amount: 0), MixPoint(at: 2 * quarter, amount: 1)]
+        if let got = mix(
+            "moved.caf", source: stereo, isolated: zero, amount: 0, map: map, points: points)
+        {
+            var worst: Float = 0
+            for (f, sample) in got.samples.enumerated() {
+                let x = Double(f) * 12.5
+                let t = x <= Double(quarter)
+                    ? x : Double(quarter) + (x - Double(quarter)) / 3
+                let a = min(max(t / Double(2 * quarter), 0), 1)
+                worst = max(worst, abs(sample - Float(1 - a)))
+            }
+            ok = ok && worst <= 1e-5
+            parts.append("an Amount moved 0 → 1 over a two-leg map: worst \(worst) against the "
+                + "closed form (bound 1e-5)")
+        } else {
+            ok = false
+            parts.append("moved: no file")
+        }
+    } else {
+        ok = false
+        parts.append("the fixtures were not written")
+    }
+    row("P14", ok, parts.joined(separator: "; "))
+}
+
+// P15 — what the composition reads
+
+if runs("P15") {
+    var parts: [String] = []
+    var ok = true
+    /// (source file, source start in ticks, source length, target start,
+    /// target length, the composition track's id) of each non-empty segment.
+    func segments(_ built: BuiltComposition) -> [(URL, Ticks, Ticks, Ticks, Ticks, CMPersistentTrackID)] {
+        built.composition.tracks.filter { $0.mediaType == .audio }.flatMap { track in
+            track.segments.compactMap { segment in
+                guard !segment.isEmpty, let url = segment.sourceURL else { return nil }
+                let m = segment.timeMapping
+                return (url, CompositionBuilder.ticks(m.source.start),
+                    CompositionBuilder.ticks(m.source.duration),
+                    CompositionBuilder.ticks(m.target.start),
+                    CompositionBuilder.ticks(m.target.duration), track.trackID)
+            }
+        }
+    }
+    func same(_ a: URL, _ b: URL) -> Bool {
+        a.standardizedFileURL.path == b.standardizedFileURL.path
+    }
+    // A live clip of the Rode recording (AAC) with a ×1 clip of it at 20 s:
+    // one format on one plan track, until the live one reads its window.
+    for (name, rate, lead) in [("×2", 2.0, Ticks(0)), ("×1.0005 (varispeed)", 1.0005, Ticks(575))] {
+        guard FileManager.default.fileExists(atPath: rode.path),
+            let r = retimed(
+                "p15-\(rate)", .constant(rate, keepPitch: true), file: rode, seconds: 30,
+                neighbour: rode),
+            let chain = r.chain, let s = r.segment, renderChain(r, file: rode).ok,
+            let built = build(r.f)
+        else {
+            ok = false
+            parts.append("\(name): the fixture did not build")
+            continue
+        }
+        let found = segments(built)
+        let own = found.first { same($0.0, chain.processed.destination) }
+        let other = found.first { same($0.0, rode) && $0.3 == 20 * SEC }
+        let taps = built.audioMix.inputParameters.filter { $0.audioTapProcessor != nil }.count
+        let wantIn = s.sourceIn - lead - chain.window.firstFrame * 25 / 2
+        let placed = own.map {
+            $0.1 == wantIn && $0.2 == s.sourceDuration && $0.3 == s.start && $0.4 == s.duration
+        } ?? false
+        let apart = own != nil && other != nil && own!.5 != other!.5
+        try? FileManager.default.removeItem(at: chain.processed.destination)
+        let dry = build(r.f).map(segments)?.contains { same($0.0, rode) && $0.3 == s.start } ?? false
+        let good = chain.kind == .live && placed && apart && taps == 0 && dry
+        ok = ok && good
+        parts.append("\(name), Keep pitch on: reads its processed window from "
+            + "\(own.map { String($0.1) } ?? "nowhere") ticks (want \(wantIn)), "
+            + "\(own.map { String($0.2) } ?? "-") long scaled to \(own.map { String($0.4) } ?? "-") "
+            + "(want \(s.sourceDuration) → \(s.duration)); on a track of its own beside the AAC "
+            + "clip: \(apart); taps \(taps); with the file removed it reads the media: \(dry)")
+    }
+    // A rendered segment: the processed render, else the dry one, else nothing.
+    if let r = rendered["x2-off"], let chain = r.chain, let s = r.segment,
+        let dry = RampAudioCache.request(for: s, urls: r.urls, reverse: r.reverse)
+    {
+        let first = build(r.f).map(segments)?.first?.0
+        try? FileManager.default.createDirectory(
+            at: dry.destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? FileManager.default.copyItem(at: chain.last.destination, to: dry.destination)
+        try? FileManager.default.removeItem(at: chain.last.destination)
+        let second = build(r.f).map(segments)?.first?.0
+        try? FileManager.default.removeItem(at: dry.destination)
+        let third = build(r.f).map(segments)?.count
+        let good = first.map { same($0, chain.last.destination) } == true
+            && second.map { same($0, dry.destination) } == true && third == 0
+        ok = ok && good
+        parts.append("a rendered segment plays its processed render "
+            + "(\(first?.lastPathComponent ?? "none")), the dry one when only that is there "
+            + "(\(second?.lastPathComponent ?? "none")), and nothing with neither "
+            + "(\(third.map(String.init) ?? "no build") segments)")
+    } else {
+        ok = false
+        parts.append("rendered: P13's ×2 fixture is not there")
+    }
+    row("P15", ok, parts.joined(separator: "; "))
+}
+
+// P16 — what each file is named by
+
+if runs("P16") {
+    var parts: [String] = []
+    var ok = true
+    func chainOf(_ rate: Double, amount: Double, length: Ticks = 4 * SEC, keep: Bool = false)
+        -> (Retimed, RetimedSound.Chain, PlanSegment)?
+    {
+        guard let r = retimed(
+            "p16-\(rate)-\(amount)-\(length)", .constant(rate, keepPitch: keep), amount: amount,
+            length: length),
+            let chain = r.chain, let s = r.segment
+        else { return nil }
+        return (r, chain, s)
+    }
+    func last(_ request: RampAudioRequest?) -> String { request?.destination.lastPathComponent ?? "" }
+    if let a = chainOf(2, amount: 1), let b = chainOf(1.9, amount: 1),
+        let c = chainOf(2, amount: 0.5), let d = chainOf(2, amount: 1, length: 2 * SEC),
+        let ramp = a.2.ramp, let file = a.0.urls[a.2.media]
+    {
+        let rate = last(a.1.isolation) == last(b.1.isolation)
+            && last(a.1.processed) == last(b.1.processed) && last(a.1.render) != last(b.1.render)
+        let amount = last(a.1.isolation) == last(c.1.isolation)
+            && last(a.1.processed) != last(c.1.processed) && last(a.1.render) != last(c.1.render)
+        let moved = last(a.1.isolation) != last(d.1.isolation)
+        // A dry render's name by the rule as it stood before #387, spelled
+        // again here: FNV-1a 64 over the media file, the renderer's version
+        // (4), the reversal, Keep pitch, the glide and the map.
+        let attributes = try? FileManager.default.attributesOfItem(atPath: file.path)
+        let size = (attributes?[.size] as? NSNumber)?.int64Value ?? -1
+        let modified = (attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        func pairs(_ list: [[Ticks]]) -> String {
+            list.map { $0.map(String.init).joined(separator: ":") }.joined(separator: ",")
+        }
+        let key = "\(file.path)|\(size)|\(Int64(modified.rounded()))|v4|r0|k0"
+            + "|g\(pairs(ramp.glide))|m\(pairs(ramp.map))"
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        for byte in key.utf8 { hash = (hash ^ UInt64(byte)) &* 0x0000_0100_0000_01b3 }
+        let hex = String(hash, radix: 16)
+        let pinned = "\(a.2.media)-" + String(repeating: "0", count: max(0, 16 - hex.count))
+            + hex + ".caf"
+        let dry = last(RampAudioCache.request(for: a.2, urls: a.0.urls, reverse: a.0.reverse))
+        ok = rate && amount && moved && dry == pinned && dry != last(a.1.render)
+        parts.append("×2 and ×1.9 of one window (\(a.1.window.firstFrame)–\(a.1.window.endFrame) "
+            + "and \(b.1.window.firstFrame)–\(b.1.window.endFrame)): one isolation and one mix, "
+            + "two renders: \(rate); Amount 1 and 0.5: one isolation, two mixes, two renders: "
+            + "\(amount); a clip 2 s shorter: another isolation: \(moved); the dry render "
+            + "\(dry) is the name the rule before #387 gives (\(pinned))")
+    } else {
+        ok = false
+        parts.append("the fixtures did not build")
+    }
+    row("P16", ok, parts.joined(separator: "; "))
+}
+
+extension Array {
+    subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
 }

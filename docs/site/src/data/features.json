@@ -7539,7 +7539,7 @@
     {
      "id": "audio-isolation-status",
      "name": "Voice Isolation status",
-     "summary": "Shows what the isolated voice is doing, such as Rendering…, Ready or Plays without it at this speed.",
+     "summary": "Shows what the isolated voice is doing, such as Rendering…, Ready or Not rendered and a reason.",
      "page": "audio/voice-isolation",
      "anchor": "what-status-says",
      "where": "Clip tab ▸ Sound ▸ Voice Isolation ▸ Status"
@@ -7555,7 +7555,7 @@
     {
      "id": "audio-isolation-speed-limits",
      "name": "Voice Isolation and speed",
-     "summary": "Isolation plays only at normal speed; a speed change, ramp or freeze frame plays without it and Status says so.",
+     "summary": "Isolation works on a clip with a speed change or a speed ramp: the voice is isolated first, then retimed with the clip.",
      "page": "audio/voice-isolation",
      "anchor": "speed-ramps-and-freeze-frames",
      "where": "Clip tab ▸ Sound ▸ Voice Isolation ▸ Status"
@@ -8090,7 +8090,7 @@
     {
      "id": "audio-voice-effect-status",
      "name": "Voice Effect status",
-     "summary": "Shows where the effect's render has got to, such as Rendering…, Ready or Plays without it at this speed.",
+     "summary": "Shows where the effect's render has got to, such as Rendering…, Ready or Not rendered and a reason.",
      "page": "audio/voice-effects",
      "anchor": "read-the-status",
      "where": "Clip tab ▸ Sound ▸ Voice Effect ▸ Status"

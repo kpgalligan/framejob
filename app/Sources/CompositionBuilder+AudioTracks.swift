@@ -61,15 +61,24 @@ extension CompositionBuilder {
     }
 
     /// The asset track one segment reads from: the reversed copy when it is
-    /// ready, nil while it is pending, else the media's own track.
+    /// ready, nil while it is pending, else the media's own track. An audio
+    /// segment in `processed` reads its processed window instead (spec §11
+    /// AU-55 as amended): `fill` and `audioFamilies` must be handed the same
+    /// map, so the parameter has no default.
     static func resolveSource(
         for segment: PlanSegment, mediaType: AVMediaType, urls: [UInt32: URL],
         reverse: ReverseResolution, assets: inout [UInt32: AVURLAsset],
-        reversedAssets: inout [UInt32: AVURLAsset], ramps: [RampSegmentKey: AVAssetTrack] = [:]
+        reversedAssets: inout [UInt32: AVURLAsset], ramps: [RampSegmentKey: AVAssetTrack] = [:],
+        processed: [IsolationSegmentKey: ProcessedSource]
     ) -> AVAssetTrack? {
         // A ramped clip's sound is its render (spec §11 SR-6, SR-12): the
         // ready one's track, else empty time while it is pending.
         if segment.ramp != nil { return RampSegmentKey(segment).flatMap { ramps[$0] } }
+        if mediaType == .audio, !processed.isEmpty,
+            let source = processed[IsolationSegmentKey(segment)]
+        {
+            return source.track
+        }
         if let reversed = reverse.ready[segment.clip] {
             return assetTrack(
                 at: reversed, key: segment.media, mediaType: mediaType,
@@ -95,7 +104,8 @@ extension CompositionBuilder {
     static func audioFamilies(
         of planTrack: PlanTrack, nextID: inout Int, urls: [UInt32: URL],
         reverse: ReverseResolution, assets: inout [UInt32: AVURLAsset],
-        reversedAssets: inout [UInt32: AVURLAsset], ramps: [RampSegmentKey: AVAssetTrack] = [:]
+        reversedAssets: inout [UInt32: AVURLAsset], ramps: [RampSegmentKey: AVAssetTrack] = [:],
+        processed: [IsolationSegmentKey: ProcessedSource]
     ) -> [AudioFamily] {
         var families: [AudioFamily] = []
         for segment in planTrack.segments {
@@ -105,7 +115,8 @@ extension CompositionBuilder {
             let source = segment.duration > 0
                 ? resolveSource(
                     for: segment, mediaType: .audio, urls: urls, reverse: reverse,
-                    assets: &assets, reversedAssets: &reversedAssets, ramps: ramps)
+                    assets: &assets, reversedAssets: &reversedAssets, ramps: ramps,
+                    processed: processed)
                 : nil
             let span = segment.start..<(segment.start + max(0, segment.duration))
             guard let key = source.flatMap(audioFormatSignature(of:)) else {
@@ -152,6 +163,7 @@ extension CompositionBuilder {
         reverse: ReverseResolution, dsp: AudioDSPParameters, metering: Bool,
         assets: inout [UInt32: AVURLAsset], reversedAssets: inout [UInt32: AVURLAsset],
         ramps: [RampSegmentKey: AVAssetTrack] = [:],
+        processed: [IsolationSegmentKey: ProcessedSource],
         isolated: [IsolationSegmentKey: IsolatedAudio] = [:],
         voiced: [IsolationSegmentKey: IsolatedAudio] = [:]
     ) throws -> (
@@ -165,7 +177,8 @@ extension CompositionBuilder {
         for planTrack in plan.audioTracks {
             let families = audioFamilies(
                 of: planTrack, nextID: &nextID, urls: urls, reverse: reverse,
-                assets: &assets, reversedAssets: &reversedAssets, ramps: ramps)
+                assets: &assets, reversedAssets: &reversedAssets, ramps: ramps,
+                processed: processed)
             for family in families {
                 let track = try makeTrack(in: composition, mediaType: .audio, id: family.id)
                 if let owner = planTrack.track { owners[track.trackID] = owner }
@@ -197,7 +210,7 @@ extension CompositionBuilder {
                     try fill(
                         track, segments: family.segments, mediaType: .audio, urls: urls,
                         reverse: reverse, assets: &assets, reversedAssets: &reversedAssets,
-                        shift: shift, ramps: ramps)
+                        shift: shift, ramps: ramps, processed: processed)
                 }
                 let isolation = isolated.isEmpty && voiced.isEmpty
                     ? nil

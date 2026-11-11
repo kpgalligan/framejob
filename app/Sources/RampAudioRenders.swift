@@ -2,7 +2,8 @@ import Foundation
 
 /// The process-wide scheduler of every offline audio render (spec §11 SR-12
 /// (c)–(g), (j), AU-52, AU-144): a ramp segment's retimed sound, a clip
-/// window's isolated voice and its voice effect (`OfflineAudioJob`), what
+/// window's isolated voice, its voice effect and a retimed segment's mix
+/// (`OfflineAudioJob`), what
 /// each OWNER wants, one serial
 /// `.utility` queue rendering one at a time, and the waits an export makes
 /// on it.
@@ -204,11 +205,25 @@ final class RampAudioRenders: @unchecked Sendable {
             if cancelled() { return .cancelled }
             switch request.job {
             case .ramp(let ramp):
+                // A processed window (AU-55 as amended) is a 48 kHz float
+                // CAF and answers itself; its map is counted from its frame 0.
                 let job = RampAudioRenderer.Job(
                     source: try RampAudioCache.renderSource(for: request.source),
-                    map: RampAudioCache.map(of: ramp), keepPitch: ramp.keepPitch,
-                    destination: landing)
+                    map: RampAudioCache.map(of: ramp, lessFrames: request.sourceFirstFrame),
+                    keepPitch: ramp.keepPitch, destination: landing)
                 _ = try RampAudioRenderer.render(job, cancelled: cancelled)
+            case .mix(let mix):
+                // The source as `.isolation`'s, a refusal in its words.
+                let source: URL
+                do {
+                    source = request.reversed
+                        ? request.source : try RampAudioCache.renderSource(for: request.source)
+                } catch RampAudioRenderer.RenderError.unreadable(let why) {
+                    throw IsolationRenderer.RenderError.unreadable(why)
+                }
+                try IsolationMix.render(
+                    IsolationMix.Job(source: source, job: mix, destination: landing),
+                    cancelled: cancelled)
             case .isolation(let window):
                 // A reversed file is 48 kHz LPCM already; a forward one is
                 // read from what the composition plays (AU-51), a refusal in
@@ -252,7 +267,7 @@ final class RampAudioRenders: @unchecked Sendable {
             let kind: String
             switch request.job {
             case .ramp: kind = "ramp audio"
-            case .isolation: kind = "isolated voice"
+            case .isolation, .mix: kind = "isolated voice"
             case .voice: kind = "voice effect"
             }
             NSLog("RampAudioRenders: clip %u's %@ was not rendered into %@: %@",

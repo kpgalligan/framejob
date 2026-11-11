@@ -41,8 +41,6 @@ enum AudioEnhance {
     static let minimumSpeechSteps = 100
     /// 0.5 s of pause: under it there is no floor.
     static let minimumPauseSteps = 50
-    /// Noise reduction's amount where isolation cannot serve the clip.
-    static let noiseReductionAmount = 0.5
 
     /// One clip's measurements (AU-61), before any rule.
     struct Measurement: Equatable {
@@ -60,8 +58,6 @@ enum AudioEnhance {
         let sibilantShare: Double
         /// The median speech-step true peak, dBFS.
         let peakMedianDB: Double
-        /// Every segment of the clip `IsolationCache.isolatable`.
-        let isolatable: Bool
         /// The speech's short-term loudness range, LU (AU-67); nil under 3 s.
         let speechRangeLU: Double?
 
@@ -176,10 +172,7 @@ enum AudioEnhance {
                 continue
             }
             let mask = speechMask(sources: loudness.stepSources, spans: spans)
-            guard
-                let measurement = measure(
-                    loudness, speech: mask, isolatable: own.allSatisfy(IsolationCache.isolatable))
-            else {
+            guard let measurement = measure(loudness, speech: mask) else {
                 skip(id, "has under 1 s of speech over the part of it that plays, too little "
                     + "to measure a voice from.")
                 continue
@@ -217,9 +210,7 @@ enum AudioEnhance {
 
     /// AU-61's figures from a reading and its speech mask; nil without a
     /// loudness or under `minimumSpeechSteps` of speech.
-    static func measure(_ reading: ClipLoudness.Reading, speech: [Bool], isolatable: Bool)
-        -> Measurement?
-    {
+    static func measure(_ reading: ClipLoudness.Reading, speech: [Bool]) -> Measurement? {
         guard let lufs = reading.lufs else { return nil }
         let count = min(reading.steps.count, reading.stepPeaks.count, speech.count)
         var speechPeaks: [Double] = []
@@ -244,7 +235,7 @@ enum AudioEnhance {
             pauseSteps: pauseLevels.count, floorLUFS: floored ? median(pauseLevels) : nil,
             pausePeakMedianDB: floored ? median(pausePeaks) : nil,
             sibilantShare: Double(sibilant) / Double(speechPeaks.count),
-            peakMedianDB: median(speechPeaks), isolatable: isolatable,
+            peakMedianDB: median(speechPeaks),
             speechRangeLU: speechRange(steps: reading.steps, speech: speech))
     }
 
@@ -273,19 +264,12 @@ enum AudioEnhance {
                 let measured = "the pauses' floor is \(lufs(floor)), \(db(gap)) under the "
                     + "voice's \(lufs(m.lufs))"
                 if gap > noisyGapDB {
-                    if m.isolatable {
-                        patch.isolation = IsolationCache.defaultAmount
-                        patch.noiseReduction = 0
-                        reasons.append("Noise: \(measured), above the \(db(noisyGapDB)) line, "
-                            + "so voice isolation at \(percent(IsolationCache.defaultAmount)) "
-                            + "and noise reduction off.")
-                    } else {
-                        patch.noiseReduction = noiseReductionAmount
-                        patch.isolation = 0
-                        reasons.append("Noise: \(measured), above the \(db(noisyGapDB)) line; "
-                            + "isolation cannot serve this clip at its speed, so noise "
-                            + "reduction at \(percent(noiseReductionAmount)).")
-                    }
+                    // Isolation serves a clip at any speed (AU-55 as amended).
+                    patch.isolation = IsolationCache.defaultAmount
+                    patch.noiseReduction = 0
+                    reasons.append("Noise: \(measured), above the \(db(noisyGapDB)) line, "
+                        + "so voice isolation at \(percent(IsolationCache.defaultAmount)) "
+                        + "and noise reduction off.")
                     let opens = (m.pausePeakMedianDB ?? -.infinity) + gateAbovePausePeakDB - m.lufs
                     let threshold = min(
                         max(opens.rounded(), gateThresholdRange.lowerBound),

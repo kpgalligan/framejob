@@ -1,10 +1,13 @@
-"""Road map "audio" AP5 — voice isolation (spec §11 AU-50…AU-57): the probe
-over `app/Sources`, its mutants, and exports from an instance of its own.
+"""Road map "audio" AP5 — voice isolation (spec §11 AU-50…AU-57), and
+isolation on a retimed clip (#387, AU-55 as amended): the probe over
+`app/Sources`, its mutants, and exports from an instance of its own.
 
     python3 tools/proof/audio_ap5_proof.py             # P rows, then I rows on an own instance
-    python3 tools/proof/audio_ap5_proof.py --probe     # P1–P12 and P2b, no instance
-    python3 tools/proof/audio_ap5_proof.py --mutants   # the fourteen mutants, each against its row
-    python3 tools/proof/audio_ap5_proof.py --instance  # I0–I10 and I1b alone
+    python3 tools/proof/audio_ap5_proof.py --probe     # P1–P18, P2b and P8b, no instance
+    python3 tools/proof/audio_ap5_proof.py --mutants   # the twenty-four mutants, each against its row
+    python3 tools/proof/audio_ap5_proof.py --mutants a,b  # the named ones
+    python3 tools/proof/audio_ap5_proof.py --instance  # I0–I11, I1b and I7a–I7e alone
+    python3 tools/proof/audio_ap5_proof.py --instance --only I7a --only I11  # those rows' runners
 
 The instance is `proof_app`'s app (Debug by default, `RC_PROOF_APP=release`
 for the record), launched with `-RCDevRampRenderHold 2` on a scratch socket
@@ -20,8 +23,9 @@ after the tap, so it changes no comparison between two exports.
 render hold; a build failure is a scored FAIL):
 P1 pending is dry with no tap; P2 a synthetic render read sample for sample at
 the placement, alone and with the noise reducer's lead; P2b the wet offset off
-the 48 kHz grid; P3 Amount 0.5 and 0.25 as a crossfade; P4 no request for a
-time-scaled, ramped, freeze or pending-reverse segment; P5 the render's lag 0
+the 48 kHz grid; P3 Amount 0.5 and 0.25 as a crossfade; P4 a ×1 segment gets
+a tapped request, a retimed one a chain (two stages live, three rendered),
+each stage formable once the file before it is there; P5 the render's lag 0
 on the recording; P6 a window against the whole file's render ≤ −40 dB; P7 the
 name; P8 the export waits; P9 a failure reaches the owner once, on main; P10
 a round whose lanes answer different frame counts fails the render naming both
@@ -29,7 +33,14 @@ a round whose lanes answer different frame counts fails the render naming both
 "Rendering…" while a held render is pending, "Ready" once it lands and "Not
 rendered: …" once one fails, which only the pane's drop of its memo on
 `.reversedMediaDidChange` can move (#408); P12 the same landing for Voice
-Effect's Status.
+Effect's Status. The retimed rows (#387; the probe's header has each):
+P13 the processed render equals the dry render when the mix is the dry sound
+(the shift by the window's first frame is exact; the pad holds what Apple's
+unit reads); P8b the export's wait builds with every stage on disk; P18 the
+preview's build reads what the export's reads; P14 the mix and its Amount
+through a map; P15 what the composition reads for a live and a rendered
+segment; P16 what each file is named by; P17 the Status and the dry render
+wanted beside the chain.
 
 **Instance rows:**
 - I0: the instance's log has no `Frame Job: ` line (the parity check).
@@ -49,11 +60,29 @@ Effect's Status.
   is pruned, and the new export's lag against its dry is 0 (≤ 0.5).
 - I6: a reversed clip (the reverse waited for): lag ≤ 0.5; its floor drop is
   reported.
-- I7: ×2 with Keep pitch on and off: no `.caf` in `cache/isolated/`; Keep
-  pitch off's export equals isolation 0's over the common length, sample for
-  sample; Keep pitch on's (AVFoundation's spectral time-pitch, which is not
-  deterministic between two exports) keeps isolation 0's pause floor within
-  ±1 dB, a second dry export's difference reported.
+- I7a–I7d, a retimed clip is isolated (AU-55 as amended, #387). The oracle
+  is "isolating then retiming equals retiming the isolated file": I2's ×1
+  isolated export, its left channel as a mono file, imported and given the
+  same speed. I7a ×2 with Keep pitch off, isolation 1: the pause floor at
+  least 6 dB under its dry export and within 1 dB of what the oracle
+  lowers it (400 ms windows of a ×2 clip span twice the media, so a pause
+  window is shallower than I2's), speech within ±0.5 dB; against the oracle a
+  residual ≤ −40 dB and |lag| ≤ 0.5 sample; two files in `cache/isolated/`
+  (the isolation and the mix) and two in `cache/ramp-audio/` (dry and
+  processed). I7b ×2 with Keep pitch on (AVFoundation's time-pitch, not
+  deterministic): the floor by the same rule, speech ±1 dB, |lag| against
+  the oracle ≤ 5 ms; no ramp file. I7c a ×1→×2 Speed action over 12 s:
+  Keep pitch off by I7a's rule; on (Apple's unit, rendered) by I7b's with
+  the floor within 2 dB, its dry export's lag and residual against the dry
+  file retimed reported beside it. I7d ×2 Keep pitch off at Amount 0.5
+  against 0.5·(I7a's dry + isolated): residual ≤ −60 dB.
+- I7e: ×2 → ×1.5 with Keep pitch on keeps both files in `cache/isolated/`
+  and their dates (one window, rounded out to whole seconds); Amount 1 → 0.5
+  keeps the isolation and writes a new mix, the old one pruned; a trim to
+  10 s renders both again.
+- I11: a `freeze_frame` still has no audio properties: `paste_attributes`
+  and `set_audio` with `isolation` are refused in the core's sentence, no
+  file is rendered and the export is unchanged.
 - I8: `paste_attributes` carries `isolation` onto another clip.
 - I9: `set_audio {isolation: 1.5}` is refused with the core's sentence.
 - I10: `set_audio {isolation: 0}` on an isolated clip: `get_project` holds no
@@ -65,8 +94,12 @@ its named row fails): latency-kept (P5), no-preroll (P6), amount-swapped
 export-no-wait (P8), window-not-keyed (P7), split-rounding (P2b),
 failure-silent (P9), lanes-cut-to-shorter (P10), memo-not-dropped (P11),
 voice-memo-not-dropped (P12), isolation-failure-retimed (P11: an unreadable
-forward source fails in the ramp renderer's words). split-rounding is also I1b's; the instance rows are not
-re-run per mutant.
+forward source fails in the ramp renderer's words); and #387's ten, one per
+decision: retimed-dry (P4: no chain, the old behaviour), map-unshifted (P13),
+pad-zero (P13), mix-swapped (P14), automation-unmapped (P14),
+live-not-substituted (P15), family-not-told (P15), amount-not-keyed (P16),
+dry-not-wanted (P17), export-one-pass (P8b). split-rounding is also I1b's;
+the instance rows are not re-run per mutant.
 
 Rows print `<ID> ok|FAIL — <detail>`, then `n/m`; exit 0 iff all pass.
 """
@@ -99,7 +132,7 @@ HOLD_S = 2
 CALL_BOUND = 600
 VOLUME = 4.0
 PROBE_ROWS = ["P1", "P2", "P2b", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11",
-              "P12"]
+              "P12", "P13", "P8b", "P18", "P14", "P15", "P16", "P17"]
 OCTAVES = [63, 125, 250, 500, 1000, 2000, 4000, 8000]
 
 rows = []
@@ -134,8 +167,9 @@ def build_probe(sources, name):
     return binary, ""
 
 
-def run_probe(sources, name):
-    """({row: (passed, detail)}, problem) — None rows when it did not build."""
+def run_probe(sources, name, only=None):
+    """({row: (passed, detail)}, problem) — None rows when it did not build.
+    `only`: the rows whose sections run (`AP5_ROWS`); every one when None."""
     binary, problem = build_probe(sources, name)
     if binary is None:
         return None, problem
@@ -143,8 +177,12 @@ def run_probe(sources, name):
     shutil.rmtree(scratch, ignore_errors=True)
     scratch.mkdir(parents=True)
     try:
+        env = dict(os.environ)
+        env.pop("AP5_ROWS", None)
+        if only:
+            env["AP5_ROWS"] = ",".join(only)
         result = subprocess.run([str(binary), str(scratch), str(RODE)], capture_output=True,
-                                text=True, timeout=900, cwd=str(binary.parent))
+                                text=True, timeout=900, cwd=str(binary.parent), env=env)
     except subprocess.TimeoutExpired:
         return {}, "the probe ran past 900 s and was killed"
     found = {}
@@ -218,13 +256,14 @@ MUTANTS = [
          "            }\n"
          "        }\n"
          "        if isolates, let isolation = isolation {\n")]),
+    # A time-scaled segment taken for a ×1 one: a tapped request for it.
     ("scaled-isolated", ["P4"], [
         ("IsolationCache.swift",
-         "        s.duration > 0 && s.ramp == nil && !s.isTimeScaled\n",
-         "        s.duration > 0 && s.ramp == nil\n")]),
+         "        RetimedSound.kind(of: s) == .tapped\n",
+         "        RetimedSound.kind(of: s) != .rendered\n")]),
     ("export-no-wait", ["P8"], [
-        ("Exporter+RampAudio.swift",
-         "            + IsolationCache.requests(plan: plan, dsp: dsp, urls: urls, reverse: reverse)\n",
+        ("RetimedSound.swift",
+         "        add(IsolationCache.requests(plan: plan, dsp: dsp, urls: urls, reverse: reverse))\n",
          "")]),
     ("window-not-keyed", ["P7"], [
         ("IsolationCache.swift",
@@ -251,15 +290,70 @@ MUTANTS = [
         ("AudioPane.swift", "        voiceMemo.invalidate()\n", "")]),
     ("isolation-failure-retimed", ["P11"], [
         ("RampAudioRenders.swift",
-         "                    throw IsolationRenderer.RenderError.unreadable(why)\n",
-         "                    throw RampAudioRenderer.RenderError.unreadable(why)\n")]),
+         "                    throw IsolationRenderer.RenderError.unreadable(why)\n"
+         "                }\n"
+         "                let job = IsolationRenderer.Job(\n",
+         "                    throw RampAudioRenderer.RenderError.unreadable(why)\n"
+         "                }\n"
+         "                let job = IsolationRenderer.Job(\n")]),
+    # AU-55 as amended (#387), one per decision.
+    # The old behaviour: a retimed segment has no chain and plays dry.
+    ("retimed-dry", ["P4"], [
+        ("RetimedSound.swift",
+         "        guard voice != nil || wants, let kind = kind(of: s), kind != .tapped,\n",
+         "        guard voice != nil || wants, let kind = kind(of: s), kind == .tapped,\n")]),
+    ("map-unshifted", ["P13"], [
+        ("RampAudioRenders.swift",
+         "                    map: RampAudioCache.map(of: ramp, lessFrames: request.sourceFirstFrame),\n",
+         "                    map: RampAudioCache.map(of: ramp),\n")]),
+    ("pad-zero", ["P13"], [
+        ("RetimedSound.swift",
+         "    static let padFrames: Int64 = 8192\n",
+         "    static let padFrames: Int64 = 0\n")]),
+    ("mix-swapped", ["P14"], [
+        ("IsolationMix.swift",
+         "                            x += a * (iso.samples(channel: min(c, iso.channels - 1))[w] - x)\n",
+         "                            let wet = iso.samples(channel: min(c, iso.channels - 1))[w]\n"
+         "                            x = wet + a * (x - wet)\n")]),
+    # The Amount's points read in source time, not through the map.
+    ("automation-unmapped", ["P14"], [
+        ("IsolationMix.swift",
+         "            let t = clip[leg] + u * (clip[leg + 1] - clip[leg])\n",
+         "            let t = x - source[0] + 0 * u\n")]),
+    ("live-not-substituted", ["P15"], [
+        ("CompositionBuilder+AudioTracks.swift",
+         "        if mediaType == .audio, !processed.isEmpty,\n",
+         "        if mediaType == .video, !processed.isEmpty,\n")]),
+    # The families are split by the media's format while `fill` inserts the
+    # processed window: a float CAF on an AAC track (#34).
+    ("family-not-told", ["P15"], [
+        ("CompositionBuilder+AudioTracks.swift",
+         "                    assets: &assets, reversedAssets: &reversedAssets, ramps: ramps,\n"
+         "                    processed: processed)\n"
+         "                : nil\n",
+         "                    assets: &assets, reversedAssets: &reversedAssets, ramps: ramps,\n"
+         "                    processed: [:])\n"
+         "                : nil\n")]),
+    ("amount-not-keyed", ["P16"], [
+        ("IsolationMix.swift",
+         '|\\(job.isolated.lastPathComponent)|a\\(job.amount)"',
+         '|\\(job.isolated.lastPathComponent)"')]),
+    ("dry-not-wanted", ["P17"], [
+        ("ProjectDocument+RampAudio.swift",
+         "            if ramped { add(RampAudioCache.requests(plan: plan, urls: urls, reverse: reverse)) }\n",
+         "")]),
+    ("export-one-pass", ["P8b"], [
+        ("Exporter+RampAudio.swift",
+         "        for _ in 0..<offlineAudioPasses {\n",
+         "        for _ in 0..<1 {\n")]),
 ]
 
 
-def mutants():
+def mutants(only=None):
     killed = 0
     sources = ROOT / "app/Sources"
-    for name, targets, edits in MUTANTS:
+    chosen = [m for m in MUTANTS if not only or m[0] in only]
+    for name, targets, edits in chosen:
         tree = WORK / f"mutant-{name}" / "Sources"
         shutil.rmtree(tree, ignore_errors=True)
         shutil.copytree(sources, tree)
@@ -274,17 +368,18 @@ def mutants():
         if problem:
             row(f"mutant {name}", False, problem)
             continue
-        found, why = run_probe(tree, f"mutant-{name}")
+        # Only the sections its rows are in run: a mutant is scored on those.
+        found, why = run_probe(tree, f"mutant-{name}", only=targets)
         if found is None:
             row(f"mutant {name}", False, "did not build: " + why)
             continue
-        failing = sorted(r for r in PROBE_ROWS if not found.get(r, (False, ""))[0])
+        failing = sorted(r for r in found if not found[r][0])
         dead = any(found.get(r, (True, ""))[0] is False for r in targets)
         killed += dead
-        row(f"mutant {name}", dead, f"killed by {'/'.join(targets)}: {dead}; failing rows: "
-            + (", ".join(failing) or "none"))
-    print(f"{killed}/{len(MUTANTS)} mutants killed", flush=True)
-    return killed == len(MUTANTS)
+        row(f"mutant {name}", dead, f"killed by {'/'.join(targets)}: {dead}; of the rows run "
+            f"({', '.join(sorted(found))}), failing: " + (", ".join(failing) or "none"))
+    print(f"{killed}/{len(chosen)} mutants killed", flush=True)
+    return bool(chosen) and killed == len(chosen)
 
 
 # ---- the instance ----------------------------------------------------------------
@@ -557,41 +652,223 @@ def i6(client, state):
         doc.close()
 
 
+def folder_files(doc, name):
+    folder = Path(doc.path) / "cache" / name
+    return sorted(p.name for p in folder.iterdir() if p.suffix == ".caf") \
+        if folder.is_dir() else []
+
+
+def retime(doc, clip, kind, keep):
+    """`kind` "x2": ×2; "ramp": a ×1→×2 Speed action over the whole clip."""
+    if kind == "x2":
+        doc.must("set_speed", clip=clip, rate=2.0, keep_pitch=keep)
+    else:
+        # 12 s of clip, so the ramp's 18 s of media fit the recording.
+        doc.must("trim_end", clip=clip, to=12 * SEC)
+        if not keep:  # on is the default, and saying so again is no change
+            doc.must("set_speed", clip=clip, rate=1.0, keep_pitch=False)
+        doc.must("add_speed_ramp", clip=clip, shape="ramp_up", rate=2, curve="linear")
+
+
+def residual_db(a, b):
+    n = min(len(a), len(b))
+    return db(np.mean((a[:n] - b[:n]) ** 2)) - db(np.mean(b[:n] ** 2))
+
+
+def speech_shift(dry, wet):
+    _, speech = classify(dry)
+    n = min(len(dry), len(wet))
+    return class_db(wet[:n], speech[: len(windows(wet[:n]))]) \
+        - class_db(dry[:n], speech[: len(windows(dry[:n]))])
+
+
+def oracle(client, source, kind, keep, tag):
+    """The ×1 isolated export `source` (a WAV) imported as media and retimed
+    the same way, at volume 1: retiming the isolated file. Its left channel
+    alone, as a mono file: the recording is mono, and Apple's time-pitch
+    unit does not time a stereo source as it does a mono one."""
+    mono = source.with_name(source.stem + "-mono.wav")
+    if not mono.exists():
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(source), "-af",
+                        "pan=mono|c0=c0", "-c:a", "pcm_s16le", str(mono)], check=True,
+                       timeout=120)
+    doc = Doc(client, tag)
+    try:
+        media = doc.must("import_media", path=str(mono))["media"]
+        track = doc.project()["tracks"][0]["id"]
+        clip = doc.must("add_clip", track=track, media=media, at=0)["new_clips"][0]
+        retime(doc, clip, kind, keep)
+        return doc.export(tag)
+    finally:
+        doc.close()
+
+
 def i7(client, state):
-    """Keep pitch off renders through the ramp queue's varispeed, which is
-    deterministic, so its export equals isolation 0's sample for sample. Keep
-    pitch on is AVFoundation's spectral time-pitch, which is not: two exports
-    of one ×2 clip at isolation 0 measured max |Δ| 0.095, 331,924 of 726,400
-    samples apart — so it is held to its dry export's pause floor (±1 dB, where
-    isolation lowers it ≥ 9 dB), with a second dry export's difference
-    reported beside it."""
-    parts, ok = [], True
-    for keep in (True, False):
-        doc = Doc(client, f"i7-{'on' if keep else 'off'}")
+    """AU-55 as amended (#387): a retimed clip is isolated through its
+    processed window. The oracle is "isolating then retiming equals retiming
+    the isolated file": I2's ×1 isolated export imported as media and given
+    the same speed. A rendered segment (Keep pitch off, or a ramp) is
+    deterministic, so it is compared sample against sample; a live one
+    (constant speed, Keep pitch on) is AVFoundation's time-pitch, which is not
+    deterministic between two reads, so it is held to its pause floor and a
+    lag."""
+    iso_wav = WORK / "exports" / "i2-wet.wav"
+    dry_wav = WORK / "exports" / "i2-dry.wav"
+    cases = [("I7a", "x2", False), ("I7b", "x2", True), ("I7c", "ramp", False),
+             ("I7c", "ramp", True)]
+    parts_c, ok_c = [], True
+    for name, kind, keep in cases:
+        tag = f"i7-{kind}-{'on' if keep else 'off'}"
+        doc = Doc(client, tag)
         try:
             clip, _ = doc.rode()
-            doc.must("set_speed", clip=clip, rate=2.0, keep_pitch=keep)
-            dry = doc.export(f"i7-{keep}-dry")
+            retime(doc, clip, kind, keep)
+            dry = doc.export(f"{tag}-dry")
             doc.isolate(clip, 1)
-            wet = doc.export(f"i7-{keep}-wet")
-            n = min(len(dry), len(wet))
-            files = doc.renders()
-            if keep:
-                doc.isolate(clip, 0)
-                again = doc.export(f"i7-{keep}-dry2")
-                m = min(n, len(again))
-                drift = float(np.max(np.abs(dry[:m] - again[:m]))) if m else math.nan
-                drop, _, _ = floor_drop(dry, wet)
-                good = n > SR and abs(drop) <= 1.0
-                parts.append(f"keep pitch on: renders {files}, pause floor moved {drop:+.2f} dB "
-                             f"(±1), a second dry export max |Δ| {drift:.4f} from the first")
+            wet = doc.export(f"{tag}-wet")
+            files = (folder_files(doc, "isolated"), folder_files(doc, "ramp-audio"))
+            drop, _, _ = floor_drop(dry, wet)
+            speech = speech_shift(dry, wet)
+            want = oracle(client, iso_wav, kind, keep, f"{tag}-oracle") \
+                if iso_wav.exists() else np.zeros(0)
+            n = min(len(wet), len(want))
+            lag = xcorr_lag(want[:n], wet[:n]) if n > SR else math.nan
+            rendered = kind == "ramp" or not keep
+            dry_want = oracle(client, dry_wav, kind, keep, f"{tag}-dry-oracle") \
+                if dry_wav.exists() else np.zeros(0)
+            floor_gap = floor_drop(dry_want, want)[0] if len(dry_want) > SR else math.nan
+            # The floor: 400 ms windows of a retimed clip span more media than
+            # I2's, so a pause window is rarer and less deep; the bound is 6 dB
+            # and what retiming the isolated file gives, within 1 dB.
+            # Keep pitch on is Apple's time-pitch, live or rendered: its ramp
+            # render of the DRY recording already differs from the render of
+            # the same sound read from a WAV (reported), so it is held to the
+            # floor (within 2 dB on a ramp) and a lag, not a residual.
+            within = 2.0 if keep and kind == "ramp" else 1.0
+            floor = (f"floor lowered {drop:.1f} dB (≥ 6; retiming the isolated file lowers it "
+                     f"{floor_gap:.1f}, within {within:g})")
+            good = drop >= 6 and abs(drop - floor_gap) <= within
+            if not keep:
+                res = residual_db(wet, want) if n > SR else math.nan
+                good = good and abs(speech) <= 0.5 and res <= -40 and abs(lag) <= 0.5
+                detail = (f"{floor}, speech {speech:+.2f} dB (±0.5); against retiming the "
+                          f"isolated file: residual {res:.1f} dB (≤ −40), lag {lag:+.3f} "
+                          f"(≤ 0.5)")
             else:
-                good = n > SR and np.array_equal(dry[:n], wet[:n])
-                parts.append(f"keep pitch off: renders {files}, equal over {n} frames: {good}")
-            ok = ok and good and not files
+                m = min(len(dry), len(dry_want))
+                base_lag = xcorr_lag(dry_want[:m], dry[:m]) if m > SR else math.nan
+                base_res = residual_db(dry, dry_want) if m > SR else math.nan
+                good = good and abs(speech) <= 1.0 and abs(lag) <= 0.005 * SR
+                detail = (f"{floor}, speech {speech:+.2f} dB (±1); lag {lag:+.1f} samples "
+                          f"(≤ {0.005 * SR:.0f}); its dry export against the dry file retimed: "
+                          f"lag {base_lag:+.1f}, residual {base_res:.1f} dB (reported)")
+            counts = (len(files[0]), len(files[1]))
+            good = good and counts == ((2, 2) if rendered else (2, 0))
+            detail = (f"{'×2' if kind == 'x2' else '×1→×2 ramp'}, Keep pitch "
+                      f"{'on' if keep else 'off'}: {detail}; files isolated {counts[0]} "
+                      f"(want 2), ramp-audio {counts[1]} (want {2 if rendered else 0})")
+            if name == "I7c":
+                parts_c.append(detail)
+                ok_c = ok_c and good
+            else:
+                row(name, good, detail)
+            if name == "I7a":
+                # I7d: the Amount on a retimed clip is the mix's.
+                doc.isolate(clip, 0.5)
+                half = doc.export("i7d-half")
+                m = min(len(half), len(dry), len(wet))
+                mid = 0.5 * (dry[:m] + wet[:m])
+                res = db(np.mean((half[:m] - mid) ** 2)) - db(np.mean(mid ** 2))
+                row("I7d", res <= -60, f"×2 Keep pitch off, Amount 0.5 against 0.5·(dry + "
+                    f"isolated): residual {res:.1f} dB (bound −60)")
         finally:
             doc.close()
-    row("I7", ok, "; ".join(parts))
+    row("I7c", ok_c, "; ".join(parts_c))
+
+
+def settle(doc, folder, want, bound=20):
+    """`folder`'s `.caf` names once `want(names)` holds, or after `bound` s."""
+    deadline = time.monotonic() + bound
+    names = folder_files(doc, folder)
+    while not want(names) and time.monotonic() < deadline:
+        time.sleep(0.25)
+        names = folder_files(doc, folder)
+    return names
+
+
+def stamps(doc, folder):
+    base = Path(doc.path) / "cache" / folder
+    return {n: (base / n).stat().st_mtime_ns for n in folder_files(doc, folder)}
+
+
+def i7e(client, state):
+    """What a render is named by. The whole recording at ×2 and at ×1.5 reads
+    the same seconds of media, so its window — rounded out to whole seconds —
+    is the same, and so are the isolated file and (the Amount unchanged) the
+    mix. A new Amount writes a new mix beside the same isolation; a trim that
+    moves the window by seconds renders the isolation again."""
+    doc = Doc(client, "i7e")
+    try:
+        clip, _ = doc.rode()
+        doc.must("set_speed", clip=clip, rate=2.0, keep_pitch=True)
+        doc.isolate(clip, 1)
+        doc.export("i7e-a")
+        first = stamps(doc, "isolated")
+        doc.must("set_speed", clip=clip, rate=1.5, keep_pitch=True)
+        doc.export("i7e-b")
+        second = stamps(doc, "isolated")
+        doc.isolate(clip, 0.5)
+        doc.export("i7e-c")
+        third = settle(doc, "isolated", lambda names: len(names) == 2)
+        doc.must("trim_end", clip=clip, to=10 * SEC)
+        doc.export("i7e-d")
+        fourth = settle(doc, "isolated",
+                        lambda names: len(names) == 2 and not set(names) & set(first))
+        kept = set(third) & set(first)
+        ok = len(first) == 2 and first == second and len(third) == 2 and len(kept) == 1 \
+            and len(fourth) == 2 and not set(fourth) & set(first)
+        row("I7e", ok,
+            f"×2 → ×1.5, Keep pitch on: isolated files and their dates unchanged: "
+            f"{first == second} ({sorted(first)}); Amount 1 → 0.5: {third}, {len(kept)} kept "
+            f"(the isolation; want 1) and a new mix; trimmed to 10 s: {fourth}, none of the "
+            f"first two: {not set(fourth) & set(first)}")
+    finally:
+        doc.close()
+
+
+def i11(client, state):
+    """A freeze frame has no sound of its own: the still `freeze_frame`
+    makes has no audio properties, so the core refuses isolation on it by
+    either door, nothing is rendered and no sample changes."""
+    doc = Doc(client, "i11")
+    try:
+        other, _ = doc.rode(at=60 * SEC)
+        picture = doc.must("import_media", path=str(ROOT / "tools/proof/media/AV.mov"))["media"]
+        track = doc.project()["tracks"][0]["id"]
+        clip = doc.must("add_clip", track=track, media=picture, at=0)["new_clips"][0]
+        before = {c["id"] for c in doc.project()["clips"]}
+        doc.must("freeze_frame", clip=clip, at=3 * SEC, duration=2 * SEC)
+        stills = [c for c in doc.project()["clips"]
+                  if c["id"] not in before and c["source"].get("kind") == "still"]
+        plain = doc.export("i11-plain")
+        doc.isolate(other, 0.6)
+        source = doc.clip(other)
+        doc.isolate(other, 0)
+        got = doc.call("paste_attributes", clips=[s["id"] for s in stills],
+                       payload={"clips": [source], "media": []}, groups=["audio"])
+        direct = doc.call("set_audio", clips=[s["id"] for s in stills], patch={"isolation": 1})
+        sentence = "has no audio properties"
+        refused = [not g["ok"] and sentence in g.get("error", "") for g in (got, direct)]
+        again = doc.export("i11-isolated")
+        time.sleep(HOLD_S + 1)
+        files = folder_files(doc, "isolated")
+        same = len(plain) == len(again) and np.array_equal(plain, again)
+        row("I11", len(stills) == 1 and all(refused) and same and not files,
+            f"isolation on a freeze_frame still: paste_attributes: {got.get('error', got)}; "
+            f"set_audio: {direct.get('error', direct)}; isolated files {files}; export equals "
+            f"the one before: {same} ({len(again)} frames)")
+    finally:
+        doc.close()
 
 
 def i8_i9(client, state):
@@ -613,9 +890,10 @@ def i8_i9(client, state):
         doc.close()
 
 
-APP_ROWS = [i1, i1b, i2_i3_i10_i5, i4, i6, i7, i8_i9]
+APP_ROWS = [i1, i1b, i2_i3_i10_i5, i4, i6, i7, i7e, i11, i8_i9]
 ROW_NAMES = {i1: ["I1"], i1b: ["I1b"], i2_i3_i10_i5: ["I2", "I3", "I10", "I5"], i4: ["I4"],
-             i6: ["I6"], i7: ["I7"], i8_i9: ["I8", "I9"]}
+             i6: ["I6"], i7: ["I7a", "I7d", "I7b", "I7c"], i7e: ["I7e"], i11: ["I11"],
+             i8_i9: ["I8", "I9"]}
 
 
 def complaints(log):
@@ -626,7 +904,13 @@ def complaints(log):
         return [f"the log could not be read: {error}"]
 
 
-def app_rows():
+def app_rows(only=None):
+    if only:
+        chosen = [r for r in APP_ROWS if set(ROW_NAMES[r]) & set(only)]
+        # I7's oracle is I2's exports.
+        if i7 in chosen and i2_i3_i10_i5 not in chosen:
+            chosen.insert(0, i2_i3_i10_i5)
+        APP_ROWS[:] = chosen
     if not RODE.exists():
         for runner in APP_ROWS:
             for name in ROW_NAMES[runner]:
@@ -664,19 +948,22 @@ def app_rows():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--probe", action="store_true")
-    parser.add_argument("--mutants", action="store_true")
+    parser.add_argument("--mutants", nargs="?", const="", default=None, metavar="a,b",
+                        help="every mutant, or the named ones")
     parser.add_argument("--instance", action="store_true", help="the I rows alone")
+    parser.add_argument("--only", action="append", default=[],
+                        help="an instance row to run (repeatable); with --instance")
     args = parser.parse_args()
     WORK.mkdir(parents=True, exist_ok=True)
-    if args.mutants:
-        return 0 if mutants() else 1
+    if args.mutants is not None:
+        return 0 if mutants([n for n in args.mutants.split(",") if n]) else 1
     if not args.instance:
         probe_rows()
     if not args.probe:
         shutil.rmtree(WORK / "projects", ignore_errors=True)
         shutil.rmtree(WORK / "exports", ignore_errors=True)
         (WORK / "framejob.log").unlink(missing_ok=True)
-        app_rows()
+        app_rows(args.only)
     passed = sum(1 for _, ok in rows if ok)
     print(f"{passed}/{len(rows)}", flush=True)
     return 0 if passed == len(rows) else 1

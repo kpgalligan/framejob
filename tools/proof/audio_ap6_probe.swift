@@ -63,11 +63,9 @@ func voice(floorGap: Double? = -40, pause: Int = 100, pausePeak: Double = -70,
     return steps
 }
 
-func enhance(_ steps: [Step], isolatable: Bool = true, current: AudioProps = AudioProps())
-    -> AudioEnhance.Choice?
-{
+func enhance(_ steps: [Step], current: AudioProps = AudioProps()) -> AudioEnhance.Choice? {
     let (r, mask) = reading(steps, lufs: L)
-    guard let m = AudioEnhance.measure(r, speech: mask, isolatable: isolatable) else { return nil }
+    guard let m = AudioEnhance.measure(r, speech: mask) else { return nil }
     let input = AudioEnhance.Input(
         readings: [AudioEnhance.Reading(clip: 7, media: 1, measurement: m, loudness: r,
                                         current: current)], problems: [])
@@ -86,7 +84,7 @@ let cleaning = ["compressor", "de_esser", "eq", "gate", "isolation", "noise_redu
 
 do {
     let noisy = enhance(voice(floorGap: -44))
-    check("E1", "floor − L −44 dB, isolatable: isolation 0.8, noise reduction 0, a gate",
+    check("E1", "floor − L −44 dB: isolation 0.8, noise reduction 0, a gate",
           noisy?.patch.isolation == IsolationCache.defaultAmount
             && noisy?.patch.noiseReduction == 0 && noisy?.patch.gate??.ratio == 4
             && keys(noisy) == cleaning,
@@ -101,10 +99,6 @@ do {
           quiet?.patch.isolation == 0 && quiet?.patch.noiseReduction == 0
             && quiet?.patch.gate.map { $0 == nil } == true && keys(quiet) == cleaning,
           "\(String(describing: quiet?.patch.dictionary))")
-    let dry = enhance(voice(floorGap: -44), isolatable: false)
-    check("E1", "noisy and not isolatable: noise reduction 0.5, isolation 0, a gate",
-          dry?.patch.noiseReduction == 0.5 && dry?.patch.isolation == 0
-            && dry?.patch.gate??.thresholdDb == -30, "\(String(describing: dry?.patch.dictionary))")
     let high = enhance(voice(floorGap: -20, pausePeak: -40))
     let low = enhance(voice(floorGap: -44, pausePeak: -100))
     check("E1", "the gate's threshold held to −6 and −40",
@@ -199,7 +193,7 @@ do {
           "\(keys(row)) \(row?.reasons.first { $0.hasPrefix("Noise") } ?? "")")
     let (r, mask) = reading(Array(voice().suffix(150)), lufs: L)
     check("E7", "under 1 s of speech measures nothing",
-          AudioEnhance.measure(r, speech: mask, isolatable: true) == nil)
+          AudioEnhance.measure(r, speech: mask) == nil)
 }
 
 // MARK: - E9 the measurement plan
@@ -540,8 +534,7 @@ do {
     print("  note E6 measured: L \(f3(m.lufs)) LUFS, TP \(f3(dB(m.truePeak))) dBTP, speech "
           + "\(m.speechSteps) steps, pause \(m.pauseSteps), floor \(f3(m.floorLUFS)) LUFS "
           + "(F \(f3(m.floorGapDB)) dB), pause peak \(f3(m.pausePeakMedianDB)) dBFS, speech peak "
-          + "\(f3(m.peakMedianDB)) dBFS, sibilant share \(f3(m.sibilantShare)), isolatable "
-          + "\(m.isolatable)")
+          + "\(f3(m.peakMedianDB)) dBFS, sibilant share \(f3(m.sibilantShare))")
     let set = choice.patch.dictionary
     let json = (try? JSONSerialization.data(withJSONObject: set, options: [.sortedKeys]))
         .flatMap { String(data: $0, encoding: .utf8) } ?? "?"
