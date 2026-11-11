@@ -10,7 +10,7 @@ moves drift onto the features and takes the plan off the main thread). SY-1…SY
 answers of 2026-10-15 (quoted verbatim in the road map): placement frame-snapped; the clip with
 video stays and the audio moves; drift reported first, correction straight after. SY-6…SY-10 were
 recorded in AS-2 before its code; SY-8 was amended by the owner's choice after AS-2's STOP.
-SY-11…SY-30 (round 2's AS-3 and AS-4, #298's phase 2 and round 3) are [`audio-sync-2.md`](audio-sync-2.md).
+SY-11…SY-30 (round 2's AS-3 and AS-4, #298's phase 2 and round 3) are [`audio-sync-2.md`](audio-sync-2.md) and, from SY-23, [`audio-sync-2b.md`](audio-sync-2b.md).
 
 **Stands, and nothing here re-litigates it:** the overlap rule and `move_clip` (foundations,
 spec §6); D2-1 (a composite that measures nothing makes no op and says why); #42's one-delta
