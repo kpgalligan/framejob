@@ -471,6 +471,19 @@ plan leaves the audio out, one pitch per plan audio track).
     refused publish removes it and puts the render straight back at the queue's end while any
     owner still wants that name, so a waiting export and the document's want finish with no
     further edit; it is not a failure.
+    *Amended by #553:* the renderer writes `<name>.landing` OUTSIDE the package, in a folder of
+    its own (`RenderLanding`: the system's item-replacement folder for the package's volume,
+    else one under the temporary directory), and the one `publish` both makes
+    `cache/<folder>/` and moves the file in (a rename; across volumes a copy beside the name,
+    then a rename). So a render writes nothing into the package outside the ledger, for all four
+    offline jobs (a ramp, an isolation, its mix, a voice effect). **Why:** a file written into
+    the package between a save's listing and its swap goes with the old package (#429), and the
+    folder made before the dev hold and the landing file written during the render were both
+    such writes: a save that met either failed the render for the launch ((g)), "the CAF could
+    not be created" or "could not be moved into place", and every later export of that clip
+    with it. A retry would repeat a render that can take minutes and still write outside the
+    ledger. Row: `save_hold_proof.py` R1, a render held into a held save, with the mutants
+    `landing-in-package` and `folder-before-publish` (an expected survivor).
   - **(f) After a landing** the document calls `packageContentsDidChangeOnDisk()`, prunes every
     file in the folder whose name no owner wants and no in-flight render's name prefixes, and
     posts `.reversedMediaDidChange`, so the editor rebuilds. An undone ramp is rendered again.

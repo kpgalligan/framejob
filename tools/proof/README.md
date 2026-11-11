@@ -31596,3 +31596,36 @@ other lanes' builds): 75 packages made, saved and closed in 31 s, then
   0.001` showed 25 overruns each read as "slow" (answered while the readings were taken);
   `--mutant timeout-only` fails V0 (1/6 verdicts) and calls the first overrun a deadlock at
   38.8 % CPU.
+
+## A cache write against a held save (`save_hold_proof.py`; spec §11 #553, #429)
+
+A save of a titled document lists `cache/` and later swaps the new package in, so a file
+written into the package between the two goes with the old one. `-RCDevSaveHold <s>` (dev
+tools only) holds every save of a launch in that window. A held launch holds every save,
+`new_project {path}`'s included, so each row's document is made, saved and closed on a plain
+launch first and opened on the held one. Needs `tools/proof/media/AV.mov`.
+
+**R1** (#553): the launch is `-RCDevRampRenderHold 3 -RCDevSaveHold 12`; the document holds
+2 s of `AV.mov` at ×1 and no `cache/ramp-audio/`. `set_speed` ×2 with Keep pitch off queues
+the render (held 3 s) and `save_project` is the next call, so the render runs inside the held
+save. It passes when no `.caf` is there as the save is sent, the render's `.caf` is in the
+package within 2 s of the save's return and is the folder's one file, and `export audio_wav`
+then succeeds. **Z1**: no `Frame Job: ` line in any instance's log.
+
+`--mutant NAME` builds the app in a tree copy with the named decision broken (about 40 s) and
+runs its rows: `landing-in-package` (the landing file beside its destination and the folder
+made before the hold, as before #553; caught only when R1's export says "could not be moved
+into place") and `folder-before-publish` (the folder made before the hold, the landing still
+outside: an EXPECTED SURVIVOR, exit 0 when R1 passes, showing the row does not rest on where
+the folder is made).
+
+```sh
+make app-debug && python3 tools/proof/save_hold_proof.py
+python3 tools/proof/save_hold_proof.py --mutant landing-in-package
+```
+
+Recorded 2026-11-11: on the Debug app of d142e3e4, before the change, R1 FAILED ("the render
+NOT there after it returned … the export FAILED: … the file could not be moved into place
+(errno 2)": that run's render, of the whole 5 s clip, was still writing when the package was
+swapped); with the change R1 passed ("the render there 0.01 s after it returned");
+`landing-in-package` CAUGHT ("the render could not be moved into place").

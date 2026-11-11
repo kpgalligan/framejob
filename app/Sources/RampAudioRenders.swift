@@ -16,8 +16,10 @@ import Foundation
 /// wanting the old file: a queued render no owner wants is dropped and a
 /// running one cancelled, and an edit storm costs at most the one in flight.
 ///
-/// **Landing.** A render writes `<name>.landing` and is renamed to `<name>`
-/// inside the cache ledger's `publish`, so never mid-save (SR-12 (e)). A
+/// **Landing.** A render writes `<name>.landing` outside the package
+/// (`RenderLanding`, spec §11 #553) and is moved to `<name>` inside the cache
+/// ledger's `publish`, which makes the folder too, so never mid-save and
+/// nothing in the package outside the ledger (SR-12 (e)). A
 /// refused publish removes it and puts the render straight back at the
 /// queue's end while anyone still wants the name — not a failure, so a
 /// waiting export and the document finish with no further edit. A landed
@@ -193,14 +195,13 @@ final class RampAudioRenders: @unchecked Sendable {
         return runningCancelled
     }
 
-    /// One render into `<name>.landing`, then the rename under the ledger.
+    /// One render into a landing file outside the package, then the folder
+    /// and the move under the ledger (spec §11 #553).
     private func perform(_ request: RampAudioRequest) -> Outcome {
-        let landing = URL(fileURLWithPath: request.destination.path + ".landing")
+        let landing = RenderLanding(for: request.destination)
+        defer { landing.remove() }
         let cancelled = { [self] in isRunningCancelled }
         do {
-            try FileManager.default.createDirectory(
-                at: request.destination.deletingLastPathComponent(),
-                withIntermediateDirectories: true)
             hold(cancelled: cancelled)
             if cancelled() { return .cancelled }
             switch request.job {
@@ -210,7 +211,7 @@ final class RampAudioRenders: @unchecked Sendable {
                 let job = RampAudioRenderer.Job(
                     source: try RampAudioCache.renderSource(for: request.source),
                     map: RampAudioCache.map(of: ramp, lessFrames: request.sourceFirstFrame),
-                    keepPitch: ramp.keepPitch, destination: landing)
+                    keepPitch: ramp.keepPitch, destination: landing.url)
                 _ = try RampAudioRenderer.render(job, cancelled: cancelled)
             case .mix(let mix):
                 // The source as `.isolation`'s, a refusal in its words.
@@ -222,7 +223,7 @@ final class RampAudioRenders: @unchecked Sendable {
                     throw IsolationRenderer.RenderError.unreadable(why)
                 }
                 try IsolationMix.render(
-                    IsolationMix.Job(source: source, job: mix, destination: landing),
+                    IsolationMix.Job(source: source, job: mix, destination: landing.url),
                     cancelled: cancelled)
             case .isolation(let window):
                 // A reversed file is 48 kHz LPCM already; a forward one is
@@ -236,7 +237,7 @@ final class RampAudioRenders: @unchecked Sendable {
                     throw IsolationRenderer.RenderError.unreadable(why)
                 }
                 let job = IsolationRenderer.Job(
-                    source: source, window: window, destination: landing)
+                    source: source, window: window, destination: landing.url)
                 _ = try IsolationRenderer.render(job, cancelled: cancelled)
             case .voice(let voice):
                 // The source as `.isolation`'s (AU-142), a refusal in the
@@ -249,20 +250,16 @@ final class RampAudioRenders: @unchecked Sendable {
                 } catch RampAudioRenderer.RenderError.unreadable(let why) {
                     throw VoiceRenderer.RenderError.unreadable(why)
                 }
-                let job = VoiceRenderer.Job(source: source, job: voice, destination: landing)
+                let job = VoiceRenderer.Job(source: source, job: voice, destination: landing.url)
                 _ = try VoiceRenderer.render(job, cancelled: cancelled)
             }
         } catch RampAudioRenderer.RenderError.cancelled {
-            try? FileManager.default.removeItem(at: landing)
             return .cancelled
         } catch IsolationRenderer.RenderError.cancelled {
-            try? FileManager.default.removeItem(at: landing)
             return .cancelled
         } catch VoiceRenderer.RenderError.cancelled {
-            try? FileManager.default.removeItem(at: landing)
             return .cancelled
         } catch {
-            try? FileManager.default.removeItem(at: landing)
             let why = error.localizedDescription
             let kind: String
             switch request.job {
@@ -275,14 +272,11 @@ final class RampAudioRenders: @unchecked Sendable {
             return .failed(why.hasSuffix(".") ? String(why.dropLast()) : why)
         }
         let cache = request.destination.deletingLastPathComponent().deletingLastPathComponent()
-        var moved = false
         var renameErrno: Int32 = 0
         let published = MediaImporter.CacheLedger.shared.publish(in: cache, for: nil) {
-            moved = rename(landing.path, request.destination.path) == 0
-            if !moved { renameErrno = errno }
+            renameErrno = landing.publish(to: request.destination)
         }
-        if published, moved { return .landed }
-        try? FileManager.default.removeItem(at: landing)
+        if published, renameErrno == 0 { return .landed }
         if published {
             NSLog("RampAudioRenders: %@ could not be moved into place (errno %d)",
                 request.destination.lastPathComponent, renameErrno)
