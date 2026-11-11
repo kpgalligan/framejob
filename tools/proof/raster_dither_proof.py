@@ -94,6 +94,32 @@ whose 8-bit raster is PR-13's dithered one:
 Without `--base` (and not `capture`) E1, D3 and D4 FAIL. A `capture` writes
 D1's, D5's and D6's frames too, so a base folder shows what they were.
 
+Issue #563, spec §11 PR-16: a shape's gradient, which Core Graphics draws,
+measured as PR-15 measured a graphic's and then drawn at 16-bit float where
+its frame is delivered deeper than 8 bits. Fixture `shape563`: no graphic
+module, one 1 s rectangle shape clip covering the canvas with a linear 0°
+gradient `#0D1512` → `#2A4F3D`, so `e(x) = 21 + 58 × (x + 0.5) / 1920` green
+levels, 24 of them over x 0–800. The rows, scored against `--base DIR`, a
+`capture` made by the app as it was BEFORE PR-16:
+- **G0** (the measurement) `render_frame` of `shape563` alone: an 8-bit PNG.
+  Printed, not scored: row 540's distinct levels and runs, the rows of
+  500–580 that differ from row 540, RMS and worst |G − e|, the worst 16-px
+  block bias.
+- **G1** the frame beside D1's 16-bit still: D1's rule against the shape's `e`.
+- **G3** a `prores_422` export, the frame at 0.5 s as `rgb48le`: D3's rule
+  against the base. **G4**, printed with it and NOT scored (PR-15's limit),
+  a `hevc_10bit` export of the same clip.
+- **G5** beside D5's 10-bit HEVC clip, **G7** with D7's H.264 clip under it:
+  G1's rule. **G6** an HLG project: a 16-bit PNG, ≥ 400 distinct values.
+- **GEa** G0's frame decodes equal to the base's. **GEb** the HLG project's
+  frame as a JPEG (its SDR version) decodes equal to the base's. **GEc** a
+  frame of flat shapes (a `#336699` rectangle, the same at alpha 0.6, a
+  stroked ellipse) beside the 16-bit still: a 16-bit PNG equal to the base's.
+A capture also prints #563's verdict from its own G3 file: the cure is built
+when the 8-bit ramp's ProRes file keeps at least the noise and the error PR-15
+measured for a graphic's dithered raster (`VERDICT_NOISE`, `VERDICT_ERROR`).
+Without `--base` (and not `capture`) G3 and GEa–GEc FAIL.
+
 `capture DIR` runs every row and keeps every file in DIR; its own files are
 the control it is scored against, so on the control tree B1, B3, B4a and B4b
 are expected to FAIL. Without `--control` (and not `capture`) B1–B4b, F1 and
@@ -153,14 +179,37 @@ CARGO_BOUND = 1800
 W, H = 1920, 1080
 SEC = 600_000
 ROWS = ["B1", "B2", "B3", "B4a", "B4b", "F1", "F2", "S1", "E1", "D1", "D3", "D4", "D5", "D6",
-        "D7", "Z1"]
+        "D7", "G0", "G1", "G3", "G5", "G6", "G7", "GEa", "GEb", "GEc", "Z1"]
 # Every file a run keeps, by the row that writes it (L1–L3 are printed only).
 FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B4a": "b4a-prores.mov",
          "B4b": "b4b-hevc10-moving.mp4", "L1": "l1-h264-static.mp4",
          "L2": "l2-hevc-static.mp4", "L3": "l3-h264-16M-moving.mp4",
          "F1": "f1-sheet.png", "F2": "f2-frame.png", "S1": "s1-sheet.png",
          "D1": "d1-frame-still.png", "D5": "d5-frame-hevc10.png", "D6": "d6-frame-hlg.png",
-         "D7": "d7-frame-h264-under-hevc10.png"}
+         "D7": "d7-frame-h264-under-hevc10.png",
+         "G0": "g0-frame-shape.png", "G1": "g1-frame-shape-still.png",
+         "G3": "g3-shape-prores.mov", "G4": "g4-shape-hevc10.mp4",
+         "G5": "g5-frame-shape-hevc10.png", "G6": "g6-frame-shape-hlg.png",
+         "G7": "g7-frame-shape-h264-under-hevc10.png", "GEb": "geb-frame-shape-hlg.jpg",
+         "GEc": "gec-frame-flat-shapes-still.png"}
+# Spec §11 PR-16's fixture: the shape's gradient, and its exact G in levels.
+SHAPE_FROM, SHAPE_TO = (13, 21, 18), (42, 79, 61)    # #0D1512 at x 0, #2A4F3D at x 1920
+SHAPE_563 = {"kind": "rectangle", "stroke": None, "width": W, "height": H, "fill": [1, 1, 1, 1],
+             "gradient": {"kind": "linear", "angle": 0, "stops": [
+                 {"at": 0, "color": [c / 255 for c in SHAPE_FROM] + [1]},
+                 {"at": 1, "color": [c / 255 for c in SHAPE_TO] + [1]}]}}
+# GEc's flat shapes: (shape, video patch).
+FLAT_SHAPES = [
+    ({"kind": "rectangle", "stroke": None, "width": 400, "height": 300,
+      "fill": [0.2, 0.4, 0.6, 1]}, {"x": -600, "y": -200}),
+    ({"kind": "rectangle", "stroke": None, "width": 400, "height": 300,
+      "fill": [0.2, 0.4, 0.6, 0.6]}, {"x": 0, "y": -300}),
+    ({"kind": "ellipse", "stroke": {"color": [1, 1, 1, 1], "width": 9}, "width": 400,
+      "height": 300, "fill": [0.2, 0.4, 0.6, 1]}, {"x": 600, "y": 200}),
+]
+# #563's verdict rule: what PR-15's base measured for a graphic's dithered 8-bit raster in a
+# `prores_422` file (its noise kept, its RMS of G − e less its mean).
+VERDICT_NOISE, VERDICT_ERROR = 0.3306, 0.3460
 # The limits: (row, title, which project, export arguments, seek seconds).
 LIMITS = [("L1", "h264, default quality, static 1 s", "band", {"preset": "h264"}, 0.5),
           ("L2", "hevc, default quality, static 1 s", "band", {"preset": "hevc"}, 0.5),
@@ -426,6 +475,11 @@ def exact(x, y):
     return INNER[1] + (OUTER[1] - INNER[1]) * t
 
 
+def shape_exact(x, y):
+    """`shape563`'s exact G in levels at pixel (x, y)'s centre."""
+    return SHAPE_FROM[1] + (SHAPE_TO[1] - SHAPE_FROM[1]) * (x + 0.5) / W
+
+
 # ---- the figures --------------------------------------------------------------------
 
 def runs(picture):
@@ -462,11 +516,13 @@ def bracket_misses(picture):
     return misses, first
 
 
-def block_bias(picture):
-    """Rows 500–580, 16-px column blocks over x 0–800: max |mean(G − e)|."""
+def block_bias(picture, e=None):
+    """Rows 500–580, 16-px column blocks over x 0–800: max |mean(G − e)|, `e`
+    `band374`'s unless a function is given."""
+    e = e or exact
     worst = 0.0
     for x0 in range(0, 800, 16):
-        gaps = [picture.g(x, y) - exact(x, y) for y in range(500, 581) for x in range(x0, x0 + 16)]
+        gaps = [picture.g(x, y) - e(x, y) for y in range(500, 581) for x in range(x0, x0 + 16)]
         worst = max(worst, abs(sum(gaps) / len(gaps)))
     return worst
 
@@ -490,12 +546,16 @@ def noise(picture):
     return math.sqrt(sum(g * g for g in gaps) / len(gaps))
 
 
-def pixel_error(picture, cx=CX):
+def pixel_error(picture, cx=CX, e=None):
     """Rows 530–550, x 32–768: RMS of G − e less its mean (a decode's constant
-    offset is not the raster's), `e` for a gradient centred at `cx`."""
+    offset is not the raster's), `e` for a gradient centred at `cx`, or the
+    function `e` when one is given."""
     gaps = []
     for y in range(530, 551):
         for x in range(32, 769):
+            if e is not None:
+                gaps.append(picture.g(x, y) - e(x, y))
+                continue
             t = min(math.hypot(x + 0.5 - cx, y + 0.5 - CY) / RADIUS, 1.0)
             gaps.append(picture.g(x, y) - (INNER[1] + (OUTER[1] - INNER[1]) * t))
     mean = sum(gaps) / len(gaps)
@@ -551,7 +611,9 @@ def band_rows(row, picture, control, scope):
 # ---- the app rows -------------------------------------------------------------------
 
 class Doc:
-    def __init__(self, client, name, module, source):
+    def __init__(self, client, name, module=None, source=None):
+        """`module` None makes a project with no graphic module (PR-16's rows:
+        a shape's depth must not depend on a graphic set)."""
         self.client, self.name, self.module = client, name, module
         self.path = WORK / f"{name}.framejob"
         steps = [attempt(client, "new_project", {"path": str(self.path)})["ok"]]
@@ -559,8 +621,10 @@ class Doc:
         canvas = self.project().get("canvas") or {}
         steps.append(canvas.get("width") == W and canvas.get("height") == H
                      and canvas.get("fps") == [30, 1])
-        wrote = reply(self.call("write_graphic", name=module, source=source))
-        steps.append(bool(wrote.get("ok")))
+        wrote = {}
+        if module is not None:
+            wrote = reply(self.call("write_graphic", name=module, source=source))
+            steps.append(bool(wrote.get("ok")))
         self.ok = all(steps)
         self.why = None if self.ok else f"project, canvas, write_graphic: {steps} {wrote}"
 
@@ -586,6 +650,25 @@ class Doc:
                 return True, ""
             time.sleep(0.2)
         return False, got.get("error")
+
+    def shape_clip(self, shape, video=None, seconds=1):
+        """A `seconds` shape clip at 0 on a NEW track, with `video` patched on it."""
+        before = {track["id"] for track in self.project().get("tracks") or []}
+        self.call("add_track")
+        fresh = [track["id"] for track in self.project().get("tracks") or []
+                 if track["id"] not in before]
+        if not fresh:
+            return False, "no new track"
+        clips = {clip["id"] for clip in self.project().get("clips") or []}
+        got = self.call("add_shape_clip", track=fresh[0], at=0, duration=seconds * SEC,
+                        shape=shape)
+        made = [clip["id"] for clip in self.project().get("clips") or []
+                if clip["id"] not in clips]
+        if not (got["ok"] and len(made) == 1):
+            return False, got.get("error", f"{len(made)} new clips")
+        if video:
+            got = self.call("set_video", clips=made, patch=video)
+        return got["ok"], got.get("error", "")
 
     def sheet(self, file, **extra):
         out = WORK / file
@@ -685,6 +768,7 @@ def run(client, files):
             print(f"       moving project: {why}", flush=True)
         closed = moving.close() and closed
     closed = run_deep(client, files) and closed
+    closed = run_shapes(client, files) and closed
     flat = Doc(client, "flat", "flat", FLAT_JS)
     if not flat.ok:
         print(f"       flat project: {flat.why}", flush=True)
@@ -746,9 +830,68 @@ def run_deep(client, files):
     return closed
 
 
-def deep_frame(row, scope, path, exact_rule):
+def run_shapes(client, files):
+    """PR-16's frames and exports: `shape563` alone (G0, G3, G4), beside a deep
+    still (G1), a 10-bit HEVC clip (G5), that clip over an H.264 one (G7), in
+    an HLG project (G6, GEb), and flat shapes beside the still (GEc)."""
+    closed = True
+    hevc = ["-f", "lavfi", "-i", "color=c=gray:size=256x144:rate=30:duration=1,format=yuv420p10le",
+            "-c:v", "hevc_videotoolbox", "-profile:v", "main10", "-pix_fmt", "p010le", "-tag:v",
+            "hvc1", "-b:v", "2M"]
+    still = ["-f", "lavfi", "-i", "color=c=gray:size=64x64", "-frames:v", "1", "-pix_fmt",
+             "rgb48be"]
+    # (the rows that want it, name, the shapes, media in front, media at the back, output)
+    plans = [
+        ({"G0", "G3", "GEa"}, "shape", [(SHAPE_563, None)], None, None, None),
+        ({"G1"}, "shapestill", [(SHAPE_563, None)], ("gstill16.png", still), None, None),
+        ({"G5"}, "shapehevc", [(SHAPE_563, None)], ("ghevc10.mov", hevc), None, None),
+        ({"G7"}, "shapereread", [(SHAPE_563, None)], ("ghevc10b.mov", hevc),
+         ("gh264.mov", ["-f", "lavfi", "-i",
+                        "color=c=gray:size=256x144:rate=30:duration=1,format=yuv420p", "-c:v",
+                        "h264_videotoolbox", "-b:v", "2M"]), None),
+        ({"G6", "GEb"}, "shapehlg", [(SHAPE_563, None)], None, None, "hlg"),
+        ({"GEc"}, "shapeflat", FLAT_SHAPES, ("gstill16b.png", still), None, None),
+    ]
+    for wanted, name, shapes, front, back, output in plans:
+        if not selected & wanted:
+            continue
+        doc = Doc(client, name)
+        made, why = (True, "") if doc.ok else (False, doc.why)
+        for shape, video in shapes:
+            if made:
+                made, why = doc.shape_clip(shape, video)
+        if made and output:
+            got = doc.call("set_canvas", output=output)
+            made, why = got["ok"], got.get("error", "")
+        if made and front:
+            made, why = doc.media_clip(fixture(*front))
+        if made and back:
+            made, why = doc.media_clip(fixture(*back), index=0)
+        if not made:
+            print(f"       {name} project: {why}", flush=True)
+        elif name == "shape":
+            if selected & {"G0", "GEa"}:
+                files["G0"] = doc.frame(FILES["G0"])
+            if "G3" in selected:
+                files["G3"] = doc.export(FILES["G3"], preset="prores_422")
+                files["G4"] = doc.export(FILES["G4"], preset="hevc_10bit")
+        elif name == "shapehlg":
+            if "G6" in selected:
+                files["G6"] = doc.frame(FILES["G6"])
+            if "GEb" in selected:
+                files["GEb"] = doc.frame(FILES["GEb"])
+        else:
+            row = sorted(wanted)[0]
+            files[row] = doc.frame(FILES[row])
+        closed = doc.close() and closed
+    return closed
+
+
+def deep_frame(row, scope, path, exact_rule, e=None):
     """D1's rule over a rendered frame: a 16-bit PNG, ≥ 400 distinct G values
-    along row 540, and (with `exact_rule`) each within 1/8 level of `e`."""
+    along row 540, and (with `exact_rule`) each within 1/8 level of `e`
+    (`band374`'s unless a function is given)."""
+    e = e or exact
     picture = read_png(path)
     values = deep_row(picture)
     header = png_header(path) if path and Path(path).exists() else None
@@ -757,7 +900,7 @@ def deep_frame(row, scope, path, exact_rule):
               f"header {header}; read {picture is not None}")
         return
     distinct = len(set(values))
-    worst = max(abs(v / 257.0 - exact(x, 540)) for x, v in enumerate(values))
+    worst = max(abs(v / 257.0 - e(x, 540)) for x, v in enumerate(values))
     levels, median, widest = runs(picture)
     good = distinct >= 400 and (not exact_rule or worst <= 0.125)
     check(f"{row} {scope}: a 16-bit PNG, row 540 x 0–800 G ≥ 400 distinct values"
@@ -822,6 +965,103 @@ def score_deep(files, base):
                    files.get("D7"), True)
     if "D6" in selected:
         deep_frame("D6", "render_frame of band374 in an HLG project", files.get("D6"), False)
+
+
+def read_jpeg(path):
+    """A 1920×1080 JPEG decoded to rgb24, or None."""
+    if path is None or not Path(path).exists():
+        return None
+    raw = ffmpeg_raw(path, "rgb24")
+    if raw is None or len(raw) != W * H * 3:
+        return None
+    return Picture(W, H, 3, array.array("B", raw))
+
+
+def shape_measure(picture):
+    """G0's printed figures over an 8-bit frame of `shape563`."""
+    levels, median, widest = runs(picture)
+    row = [picture.g(x, 540) for x in range(801)]
+    differing = sum(1 for y in range(500, 581)
+                    if [picture.g(x, y) for x in range(801)] != row)
+    gaps = [picture.g(x, y) - shape_exact(x, y) for y in range(500, 581) for x in range(801)]
+    rms = math.sqrt(sum(g * g for g in gaps) / len(gaps))
+    monotonic = all(b >= a for a, b in zip(row, row[1:]))
+    return (f"row 540 x 0–800 G: {len(set(row))} levels, median run {median}, widest {widest}, "
+            f"{'non-decreasing' if monotonic else 'NOT monotonic'}; {differing} of 81 rows "
+            f"(500–580) differ from row 540; RMS(G − e) {rms:.4f}, worst |G − e| "
+            f"{max(abs(g) for g in gaps):.4f} levels; worst 16-px block bias "
+            f"{block_bias(picture, shape_exact):.4f}")
+
+
+def score_shapes(files, base, capturing):
+    """PR-16's rows over this run's files and the base's (or None)."""
+    def theirs(row):
+        path = base / FILES[row] if base else None
+        return path if path and path.exists() else None
+
+    if "G0" in selected:
+        picture = read_png(files.get("G0"))
+        header = png_header(files["G0"]) if files.get("G0") else None
+        check("G0 render_frame of shape563 alone (the measurement): an 8-bit PNG, read",
+              picture is not None and header is not None and header[2] == 8,
+              f"header {header}; " + (shape_measure(picture) if picture else "not read"))
+    if "G1" in selected:
+        deep_frame("G1", "render_frame of shape563 beside a 16-bit PNG still", files.get("G1"),
+                   True, shape_exact)
+    if "G3" in selected:
+        here = movie_figures(files.get("G3"), 0.5, True)
+        then = movie_figures(theirs("G3"), 0.5, True)
+        ours, base_movie = (read_movie(files.get("G3"), 0.5, True),
+                            read_movie(theirs("G3"), 0.5, True))
+        error = pixel_error(ours, e=shape_exact) if ours else None
+        was = pixel_error(base_movie, e=shape_exact) if base_movie else None
+        good = (here is not None and then is not None and here[1] <= then[1] / 2
+                and error <= was / 2 and here[0] <= 0.15 and increasing(here[3]))
+        check("G3 the prores_422 export of the shape563 clip, the frame at 0.5 s (16-bit decode): "
+              "noise kept ≤ ½ the base's, RMS of G − e less its mean ≤ ½ the base's, banding RMS "
+              "≤ 0.15, row-540 block means strictly increase", good,
+              f"{shown(here)}\n       base: {shown(then)}\n       RMS of G − e "
+              f"{'none' if error is None else f'{error:.4f}'}; base's "
+              f"{'none' if was is None else f'{was:.4f}'}")
+        tenbit = movie_figures(files.get("G4"), 0.5, True)
+        before = movie_figures(theirs("G4"), 0.5, True)
+        print(f"  --   G4 (NOT scored; PR-15's limit) the hevc_10bit export of the shape563 clip, "
+              f"the frame at 0.5 s (16-bit decode): {shown(tenbit)}\n       base: {shown(before)}",
+              flush=True)
+        if capturing and then is not None and was is not None:
+            cure = then[1] >= VERDICT_NOISE and was >= VERDICT_ERROR
+            verdict = ("CURE: the 8-bit ramp carries at least a dithered graphic's noise and "
+                       "error into a deep file" if cure else "RECORD ONLY: under what PR-15 cured")
+            print(f"  --   #563 VERDICT on this capture's own prores_422 file: noise kept "
+                  f"{then[1]:.4f} (PR-15's base graphic {VERDICT_NOISE}), RMS of G − e less its "
+                  f"mean {was:.4f} ({VERDICT_ERROR}): {verdict}", flush=True)
+    if "G5" in selected:
+        deep_frame("G5", "render_frame of shape563 beside a 10-bit HEVC clip", files.get("G5"),
+                   True, shape_exact)
+    if "G7" in selected:
+        deep_frame("G7", "render_frame of shape563 beside a 10-bit HEVC clip over an H.264 clip",
+                   files.get("G7"), True, shape_exact)
+    if "G6" in selected:
+        deep_frame("G6", "render_frame of shape563 in an HLG project", files.get("G6"), False,
+                   shape_exact)
+    if "GEa" in selected:
+        here, there = read_png(files.get("G0")), read_png(theirs("G0"))
+        header = png_header(files["G0"]) if files.get("G0") else None
+        check("GEa render_frame of shape563 alone: an 8-bit PNG that decodes equal to the base's",
+              same(here, there) and header is not None and header[2] == 8,
+              f"read {here is not None}; base {there is not None}; header {header}")
+    if "GEb" in selected:
+        here, there = read_jpeg(files.get("GEb")), read_jpeg(theirs("GEb"))
+        check("GEb render_frame of shape563 in an HLG project as a JPEG (its SDR version): "
+              "decodes equal to the base's", same(here, there),
+              f"read {here is not None}; base {there is not None}")
+    if "GEc" in selected:
+        here, there = read_png(files.get("GEc")), read_png(theirs("GEc"))
+        header = png_header(files["GEc"]) if files.get("GEc") else None
+        check("GEc render_frame of flat shapes beside a 16-bit PNG still: a 16-bit PNG that "
+              "decodes equal to the base's (a flat shape stays 8-bit in a deep frame)",
+              same(here, there) and header is not None and header[2] == 16,
+              f"read {here is not None}; base {there is not None}; header {header}")
 
 
 def score(files, control):
@@ -1082,6 +1322,7 @@ def main():
         print(f"  captured {len(files)} files into {keep}", flush=True)
     score(files, keep or control)
     score_deep(files, keep or base)
+    score_shapes(files, keep or base, keep is not None)
     found = hdr.complaints(log)
     check("Z1 every project closed and the log holds no `Frame Job: ` line",
           closed and not found, f"closed {closed}; complaints {found}")
