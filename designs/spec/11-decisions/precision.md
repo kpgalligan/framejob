@@ -194,6 +194,10 @@ of twelve track layouts; it amends PR-4, PR-9 and PR-12.
   not edited, and PR-8 closes its 10-bit `hevc_alpha` and 10-bit recording as not wanted.
   **Amended by PR-13** (#375 part 1): graphics stay 8-bit, and a graphic's gradients are dithered
   where tiny-skia rounds them to 8 bits; the list is not edited.
+  **Amended by PR-15** (#374): a graphic is drawn at 16 bits a channel where its frame is
+  delivered deeper than 8 bits (a deep export row, a deep `render_frame` or Save Frame…); every
+  other frame keeps the 8-bit raster, and text, shapes, word captions and 8-bit stills stay
+  8-bit; the list is not edited.
 - **PR-6 — A still deeper than 8 bits a component is drawn at 16-bit float (owner, 2026-10-11,
   choice 1a).**
   - `LayerRenderers.renderImage` checks `image.bitsPerComponent > 8`. When it is, the image is
@@ -552,6 +556,8 @@ of twelve track layouts; it amends PR-4, PR-9 and PR-12.
     each; commands and figures in #375's comment 6454026110). B4 is therefore scored on those exports: B4a
     `prores_422` (≤ ½ the control's) and B4b `hevc_10bit` (≤ 0.15 and under the control's).
   - Amends PR-5.
+  - **Amended by PR-15** (#374): the dither is the 8-bit raster's; a raster drawn deep takes
+    none, and a deep layer read at 8 bits inside the renderer takes this offset there.
   - The compositor's own output is NOT dithered (#375 part 2, dropped by the owner 2026-10-27):
     the 8-bit lossy codecs strip a ±7/16 dither as they strip the raster's, ProRes and the
     10-bit rows keep the float frame's levels, and what remained (8-bit PNG and JPEG stills,
@@ -583,3 +589,128 @@ of twelve track layouts; it amends PR-4, PR-9 and PR-12.
     look thumbnails do not keep depth and never ask.
   - No op, FFI, recipe, format or catalog change. No `depth` argument.
   - Amends PR-4, PR-9 and PR-12.
+- **PR-15 — A graphic is drawn deeper than 8 bits where its frame is delivered deeper (#374;
+  owner, 2026-11-10: "begin all").**
+  - The rule: a graphic clip's raster is 16 bits a channel, with no dither, exactly when the
+    frame it is drawn into leaves Frame Job deeper than 8 bits:
+    - a movie export whose video row keeps more than 8 bits: `hevc_10bit`, `prores_422`,
+      `prores_4444`, `av1`, `av1_webm`, and `vp9_webm` as HLG or HDR10 (`Exporter.graphicsDeep`,
+      read from `ExportWriter.frameForm` and the bundled encoders' depth, nothing else);
+    - a `render_frame` or File ▸ Save Frame… as PNG or HEIC (`keepsDepth`) whose frame comes
+      out deep: PR-9's still, PR-12's VP9 track, a frame the generator answers deep, PR-14's
+      re-read, and every such frame of an HLG project.
+  - Everything else draws PR-13's dithered 8-bit raster, byte for byte: the preview with its
+    prefetch and kept frames (G-36, G-37, G-38), `h264`, `hevc`, `hevc_alpha`, `vp9_alpha_webm`,
+    SDR `vp9_webm`, an HLG project's SDR version on those rows, an 8-bit PNG, every JPEG, GIF
+    and APNG (in an HLG project too), the eyedropper, look tiles, `render_graphic`, the Graphic
+    pane's and the browser's thumbnails and the cursor arrow.
+  - Why not deep everywhere: PR-13's last bullet. The compositor's 8-bit output is not
+    dithered (#375 part 2, dropped by the owner 2026-10-27), so a deep raster rounded to 8 bits
+    by the compositor would band where PR-13's dither does not: PR-13 measured row 540 at
+    median run 2 px dithered against 19 px undithered. It also keeps playback's raster time and
+    memory as they are, and moves no 8-bit proof baseline. It is one switch:
+    `GraphicRegistry.resolve` answers `deep` false for a document's own key.
+  - A frame showing only graphics is still an 8-bit PNG (PR-4 and PR-9 stand): a graphic is not
+    a deep source. Held for the owner, below.
+  - The patch: a second diff on the vendored tiny-skia, `graphic/vendor/tiny-skia-deep.diff`,
+    applied after PR-13's (which stays byte-identical); every hunk marked `// Frame Job (spec
+    §11 PR-15):`.
+    - A deep `Pixmap` keeps its RGBA8 `data` and gains a residual plane of the same size. A
+      channel's value in 1/256 levels is `data × 256 + (residual as i8)`, 65,280 being 1.
+      `data` alone is the value rounded to 8 bits, which keeps resvg's 8-bit readers correct;
+      resvg is not vendored.
+    - The door is `tiny_skia::with_deep_pixmaps(f)`: inside it, on the calling thread only,
+      `Pixmap::new` makes the plane, so the root and every layer resvg makes under it (an
+      isolated group, a mask, a clip, a pattern tile, an image) are deep. A thread-local flag
+      restored by a drop guard, on a panic too. The prefetch workers and `CursorSprites` draw
+      8-bit rasters beside it on other threads.
+    - The highp pipeline loads, stores, source-overs and samples both planes; a deep
+      destination forces highp (lowp has no deep form); `load_mask_u8` is given a body, because
+      a deep `apply_mask` runs highp where upstream only ever ran lowp; a solid memset and
+      `fill` zero the residual; a gradient pushes no `Stage::Dither` for a deep destination and
+      pushes it as before for an 8-bit one.
+    - `Pixmap::copy_rgba16` writes the output: premultiplied RGBA, 65,535 as 1,
+      `(v × 257 + 128) >> 8`, exact for a value on an 8-bit level. A row with no residual
+      widens `data` alone.
+  - Where the renderer reads a deep layer at 8 bits, it rounds with PR-13's offset
+    (`pixmap::collapse`: the same hash, seed and ±7/16 span, R, G and B clamped to [0, alpha],
+    alpha untouched, a value on a level never moved). That is:
+    - `Pixmap::data_mut` and `pixels_mut` (resvg's filters and image decoders), after which an
+      owned pixmap is 8-bit;
+    - a `Pixmap`'s `clone` and `clone_rect`, which only resvg's filters call (a filter reads
+      its source through a clone, under any `color-interpolation-filters`);
+    - a luminance `Mask::from_pixmap`, whose coverage is the one today's dithered raster makes.
+    So a filtered group and a luminance mask come out on 8-bit levels, dithered as today, and
+    everything outside them is deep. resvg's filters are not patched: that means vendoring
+    resvg (4,600 lines, eleven filter files), and no bundled template uses a filter. A filter
+    under the default `linearRGB` interpolation already takes a dark gradient through an 8-bit
+    sRGB-to-linear table (sRGB 21 to 79 is linear 2 to 20), so `band374` inside one has about
+    20 levels at any depth, today and after this.
+  - The crate: `graphic::rasterize_deep` (`src/deep.rs`), `rasterize`'s checks and warnings
+    with `stride` counted in 16-bit values; `raster.rs`'s `draw` is the parse and render both
+    share. `rasterize` keeps its signature, texts and bytes.
+  - The FFI: `rc_graphic_rasterize_deep(lib, svg, w, h, uint16_t *out_rgba16, stride,
+    diag_out)`, `rc_graphic_rasterize`'s contract in native-endian 16-bit values;
+    `GraphicLibrary.rasterize(…, deep:)`; a deep `GraphicRaster` holds `rgba16` and an empty
+    `bgra`, and `byteCount` is what every budget counts.
+  - The app: the texture is `.rgba16Unorm` under a key ending `:16`, so the two depths never
+    serve each other; no shader, uniform, recipe or pipeline change (a deep still is already
+    `rgba16Float` through the same layer stage, and the HLG lift and the matte pass sample what
+    they are handed). `GraphicRegistry.pin(_:for:deep:)` and `markDeep` carry the depth on the
+    offline key; a single frame is marked before the reader reads it, and a frame the
+    generator answers deep with a graphic on it is read once more through
+    `DeepStillFrame.read` with its graphics deep.
+  - G-36, G-37 and G-38 are unchanged: the preview's keys are never deep. An export's prefetch
+    counts a deep raster's real bytes (8 a pixel), so G-37's budget holds half the frames for a
+    deep export and bounds itself; CX-18's encoder ledger is separate and unchanged.
+  - PR-5's other members stay 8-bit: text, shapes, word captions and 8-bit stills are drawn by
+    Core Text and Core Graphics in Swift (`LayerRenderers.bitmap`), not by this crate. Whether a
+    shape's Core Graphics gradient bands in a 10-bit export was not measured (filed).
+  - Limits:
+    - The preview and a deep export differ in a graphic's low bits: dithered 8-bit against
+      deep. A colour on a level is the same in both.
+    - A filtered group, and a luminance mask's coverage, are 8-bit (above).
+    - A `hevc_10bit` file at the default rate gains little: the encoder bands a smooth
+      gradient itself (measured below). ProRes and a still keep the levels.
+  - No op, catalog, schema, recipe or format change; `RC_FORMAT_VERSION` is unchanged. One new
+    export, `rc_graphic_rasterize_deep`.
+  - Measured in the crate (`graphic/tests/deep.rs`, `band374` at 1920×1080, row 540, x 0–800,
+    green): 801 distinct 16-bit values of 801 pixels, the worst 0.93 of 65,535 from the exact
+    value; 801 through a group at opacity 0.6, a pattern tile, a translucent solid over it, a
+    clip path and a flat mask (the masked value within 1.29); a filtered group and an arithmetic
+    composite under sRGB interpolation on 8-bit levels at median run 2 px, a luminance mask at
+    1 px; every bundled template within 2.24 levels of its 8-bit raster, no channel over its
+    alpha, the same warnings; a fade under half a level keeps 102 distinct alphas below 128.
+  - Raster time (`graphic/tests/deep_bench.rs`, one thread, medians of alternating rounds, on a
+    12-core host under two other lanes' builds, load average 60 to 90, so the ratios are
+    steadier than the milliseconds; two runs): the 23 templates at two frames each, summed,
+    1.73× and 1.75× at 1920×1080 (123 ms against 213 and 216) and 2.24× and 2.74× at
+    3840×2160; an empty frame 0.32 ms against 0.70 at 1080p, so the fixed cost is 0.38 ms a
+    frame where the spike's was 0.72; a full-canvas translucent solid, the worst scene, 3× to
+    5×. Memory is exactly twice: 16,588,800 bytes a 1080p raster against 8,294,400. Only a
+    deep export or a deep still pays either.
+  - Measured in the app (Release, 2026-11-10, `raster_dither_proof.py --base`, 8/8, the base a
+    capture of the app at d7d791c1; Debug gave the same figures): the 8-bit sheets and frames decode equal to the base's (E1);
+    `render_frame` beside a 16-bit still, beside a 10-bit HEVC clip, and beside one over an
+    H.264 clip, each a 16-bit PNG with 781 distinct greens of 801, the worst 0.0606 of a level
+    from `e`, where the base's held 44 (D1, D5, D7); an HLG project's frame 737 distinct
+    against 56 (D6); a `prores_422` export's per-pixel noise 0.0165 against the base's 0.3306,
+    its error from `e` less its mean 0.1115 against 0.3460, its banding RMS 0.0974 against
+    0.0943 (that figure cannot tell the base's dither from 10-bit steps; an undithered 8-bit
+    raster measured 0.3249, PR-13), and its file 2,123,379 bytes against 9,195,715 (D3); a
+    `hevc_10bit` export of the moving fixture banding 0.1213 against 0.1185 and noise 0.0741
+    against 0.1059 (D4).
+  - Mutants: fifteen, over the rule of ten, because the change adds decisions in two places
+    that share no instrument: seven in the vendored crate (the dither on a deep store, layers
+    made 8-bit, lowp on a deep destination, the mask load, the collapse without its offset, the
+    door left open, a residual dropped at the copy), five in the app (never deep, always deep,
+    Main 10 not deep, a generator's deep frame not read again, PR-14's re-read not marked) and
+    three in the probe (the byte count, the frame-form test, one budget site). PR-13's
+    `core-unpatched` is now caught by the build: without core's `[patch]` table the staticlib
+    does not compile, naming `with_deep_pixmaps`.
+  - Held for the owner (neither blocks this): (1) whether a frame that shows only a graphic
+    should be saved as a 16-bit PNG, counting a graphic as a deep source (recommended, as its
+    own batch: about thirty proofs read graphic frames with an 8-bit decoder); (2) whether the
+    preview and the 8-bit outputs should draw from the deep raster, which needs the
+    compositor's output dither dropped on 2026-10-27 (recommended: leave it).
+  - Amends PR-5 and PR-13.
