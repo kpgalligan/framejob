@@ -321,12 +321,19 @@ AU-140…AU-149 are AP14's (voice effects; survey B10, E8 of `designs/adr/effect
   per launch, `-RCDevRampRenderHold` — and every settle wants again, so a voice waiting for its
   isolation is wanted when that isolation lands. Deviations from E8, both AP5's: no marker file
   (the ledger's landing rename is the commit), and pruning on settle rather than sweeping on open.
-- **AU-145 — Which segments are voiced: AU-55's rule.** ×1 forward segments and reversed segments
-  whose copy is ready (`IsolationCache.isolatable`); a time-scaled, ramped or freeze segment
-  plays without the effect. A pending render plays without its effect — with isolation, if that
-  render is ready. A tap at a rate other than 48 kHz passes dry. Deviation from E8: the builder
+- **AU-145 — Which segments are voiced: AU-55's rule, every one that sounds (amended
+  2026-11-10, #387).** A ×1 segment, forward or reversed with its copy ready, plays its voiced
+  render in the tap. A pending render plays without its effect — with isolation, if that render
+  is ready. A tap at a rate other than 48 kHz passes dry. Deviation from E8: at ×1 the builder
   does not substitute an asset track; the voiced render is read into memory and played by AP5's
-  pass.
+  pass. A RETIMED segment (AU-55's two kinds) is voiced through AU-55's chain, the voiced render
+  taking the mix's place as stage (2): AU-142's job over the window `W`, from `W`'s isolation
+  when the clip isolates (the base Amount, as AU-143), the input SILENT outside the frames the
+  clip plays (`VoiceJob.sounding`, in the name only then), so the effect starts cold at the
+  clip's first frame as it does at ×1 and an echo or a reverb never carries sound from before
+  the cut into the clip. The effect is then retimed with the clip: an echo's spacing and a
+  reverb's tail are shortened at ×2, where at ×1 they are not. As first decided, a retimed
+  segment played without the effect.
 - **AU-146 — The section.** "Voice Effect", in the Sound tab after Voice Isolation: an Effect popup
   — "None", then the sixteen in E8's order titled "Voice: Pitch" … "Space: Cathedral" (the groups
   in the titles, because `OptionControls.swift` is Rasterize's and not forked); choosing a kind
@@ -336,10 +343,11 @@ AU-140…AU-149 are AP14's (voice effects; survey B10, E8 of `designs/adr/effect
   the kind's own; a Status read-out in Voice Isolation's words. The Clip ▸ Voice ▸ menu E8 names
   is AU-158's (#390).
 - **AU-147 — Export and agents.** An export wants and waits for its voice renders after its ramp
-  and isolation renders ("Preparing…"), and fails `voiceFailed` naming the clip when one cannot be
+  and isolation renders ("Preparing…"; a retimed clip's whole chain, AU-57 as amended), and fails `voiceFailed` naming the clip when one cannot be
   rendered. An agent uses `set_audio {voice}`: no new op, tool or FFI, and the render's status is
   not in `get_project`.
-- **AU-148 — Limits.** Tails end with the clip. One effect per clip. Waveforms, Normalize's
+- **AU-148 — Limits.** Tails end with the clip. On a retimed clip the effect is retimed with it
+  (AU-145 as amended). One effect per clip. Waveforms, Normalize's
   reading and Remove Silences read the dry media. A split take's windows start cold. In a stereo
   source a reverb or a delay mixes the channels, so AP3's channel pick chooses from the effected
   pair. How each kind sounds is a person's (SE-32).

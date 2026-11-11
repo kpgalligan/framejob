@@ -46,27 +46,79 @@ AU-50…AU-57 are AP5's (voice isolation; survey A4, and B4's verdict), recorded
   fps) cannot round apart. The render is read into memory when the composition is built (about
   11.5 MB per channel-minute, the recorded cost). A missing render adds nothing — no span, and no
   tap earned by isolation — so the clip plays DRY while it is pending; a tap whose rate is not
-  48 kHz passes dry. An Amount change rebuilds the composition, never the render.
+  48 kHz passes dry. An Amount change rebuilds the composition, never the render. All of this is
+  a ×1 segment's; a retimed segment's Amount is AU-55's, in a file (amended 2026-11-10, #387).
 - **AU-54 — The order (amends AU-3).** isolation → channels → high-pass/EQ → hum → noise
   reduction → gate → de-esser → compressor → limiter → fader. Isolation and noise reduction do not
   exclude each other; noise reduction works on the crossfade.
-- **AU-55 — Which segments are isolated.** ×1 forward segments and reversed segments whose
-  reversed copy is ready; a time-scaled segment (a constant speed with Keep pitch on), a
-  ramp-rendered one (a ramp, or a constant speed with Keep pitch off) and a freeze play dry, and
-  the pane, the guide and `set_audio`'s prose say so. A reversed clip renders the reversed file
-  itself, so it aligns by construction; its floor is measured and reported. Two clips cut from one
-  take render two windows (S2: a seam about −30…−50 dB, accepted, not shown audible).
+- **AU-55 — Which segments are isolated: every one that sounds (amended 2026-11-10, #387).** A
+  ×1 segment, forward or reversed with its copy ready, is isolated in the tap as AU-53 says. A
+  reversed clip renders the reversed file itself, so it aligns by construction; its floor is
+  measured and reported. Two clips cut from one take render two windows (S2: a seam about
+  −30…−50 dB, accepted, not shown audible). As first decided, a retimed segment played dry and
+  the Status said "Plays without it at this speed"; that limit is lifted:
+  - **Two kinds of retimed segment** (`RetimedSound.kind`). RENDERED: the plan segment carries a
+    `ramp` — a Speed action, or a constant speed with Keep pitch off (SR-28) — and the composition
+    plays a file from `cache/ramp-audio/`. LIVE: a constant speed with Keep pitch on, which the
+    composition inserts and scales itself (AVFoundation's time-pitch, or varispeed inside SY-39's
+    band).
+  - **The way: the processed window is what gets retimed.** The clip's sound is isolated BEFORE
+    the retime and written to a file, and the retimer reads that file in the media's place. The
+    other way — isolating the retimed sound — was not taken: a live segment's retimed sound exists
+    only inside AVFoundation's player and reader; Apple's voice model would hear a pitch-shifted
+    voice with Keep pitch off, and start cold on every render; and the model would run again
+    after every rate edit, where this way it runs again only when the media it reads moves.
+  - **The window `W`** (`RetimedSound.window`): the 48 kHz frames the segment plays — a ramp
+    map's first to last source tick, else its source range — widened by 8,192 frames each side
+    (Keep pitch on's 4,800-frame preroll, the resampler's reach at ×12, SY-24's 46 samples), and
+    for a Keep pitch on render by what Apple's unit reads past the clip's end, (2,688 + 1,024)
+    output frames at the map's last rate (measured 642 past the lead at ×2 and 288 at ×12); then
+    rounded OUTWARD to whole seconds, its first frame never before 0. The rounding is so that an
+    edit which moves the source range by less than the slack keeps the isolated render, whose
+    name carries the window (AU-52): a rate edit on a clip that plays the same media does. An
+    edit that moves the range further renders again.
+  - **The chain** (`RetimedSound.chain`), each stage a job on `RampAudioRenders`, wanted only
+    once the file before it is on disk (AU-143's pattern; every settle wants again): (1) the
+    isolation of `W`, AU-51's job and AU-52's name unchanged; (2) the MIX, `dry + a·(iso − dry)`
+    over `W` in the source's own channel count (`IsolationMix`), in `cache/isolated/`, named by
+    the isolated file's name, a version and the Amount; (3) for a rendered segment, the ramp
+    render of the mix through the segment's own map counted from `W`'s first frame, in
+    `cache/ramp-audio/`, named as a dry render is plus the mix's name and `W`'s first frame — so
+    a dry render's name is what it was. A live segment has no third stage: `fill` inserts the
+    same source range of the mix, counted from `W`'s first frame, and scales it as it scaled the
+    media, on a composition track of the mix's format (`audioFamilies` is handed the same map).
+    The tap adds no span for a retimed segment.
+  - **The Amount is in the file.** A changed Amount writes a new mix (and renders a rendered
+    segment again), and the clip plays dry until it lands; at ×1 it stays AU-53's live crossfade.
+    An Amount an action moves (AU-87) is evaluated per source frame: the frame's clip time through
+    the inverse of the segment's map, then the straight line between the points; the map and the
+    points are in the mix's name only then.
+  - **Pending plays dry.** The document wants the dry ramp render of a rendered segment beside
+    its chain, always, so the clip sounds while the chain renders; the builder takes the
+    processed render when it exists, else the dry one. A live segment reads the media until its
+    mix exists.
+  - **What plays no sound is not isolated.** A freeze frame is a still, and a still has no audio
+    properties: the core refuses `set_audio` and an audio paste on one. A clip above ×12 (the
+    audio ceiling) has no audio segment. For a clip that asks while no plan sounds it, the
+    Status reads "Plays no sound".
+  - **Limits, recorded.** Disk: a processed rendered clip holds four files (the isolated window,
+    the mix, the dry render, the processed render), about 11.5 MB a minute each in mono. A live
+    segment's two reads differ as two reads of a dry Keep pitch on clip do (AVFoundation's
+    time-pitch, #337); a rendered segment's are sample-identical. Preview and export build one
+    composition from the same files, as before.
 - **AU-56 — The section.** "Voice Isolation", in the Sound tab before Noise Reduction: an "Isolate
   voice" check (on sets `IsolationCache.defaultAmount`, 0.8: S2's pauses −14 dB with room tone
   kept, where 1.0 makes them dead air), an Amount row 0–100 % (quick 50, 80, 100), and a Status
-  read-out — Rendering…, Ready, "Plays without it at this speed", "Waits for the reversed copy",
-  "Not rendered: <why>" — refreshed on `.reversedMediaDidChange`, which the document posts when a
+  read-out — Rendering…, Ready, "Plays no sound" (AU-55 as amended, #387; it replaced "Plays
+  without it at this speed"), "Waits for the reversed copy", "Not rendered: <why>" — refreshed on `.reversedMediaDidChange`, which the document posts when a
   render lands and when one fails. De-reverb (B4) is this control (S2: C50 +5.2 dB, the late tail
   −5.3 dB on an RT60 0.6 s room): the section says it "reduces room echo", and there is no
   separate control.
 - **AU-57 — Export and agents.** An export wants and waits for its isolation renders as it does
   for ramps ("Preparing…"), and fails `isolationFailed` naming the clip when one cannot be
-  rendered. An agent uses `set_audio {isolation}`: no new tool, and the render's status is not in
+  rendered. A retimed clip's chain (AU-55 as amended) is waited for whole: the export asks for
+  what can be rendered, waits, and asks again until a pass names nothing new (at most four
+  passes; a failed mix is `isolationFailed`). An agent uses `set_audio {isolation}`: no new tool, and the render's status is not in
   `get_project`.
 
 AU-60…AU-65 are AP6's first part (Enhance Voice; survey B1), recorded before its code. AP6 is
@@ -111,7 +163,7 @@ Enhance at record time (B8) the third, with AU-68 and AU-69.
   least 0.5 s (50 steps) of pause; the PAUSE PEAK the median of 20·log10 of the pause steps' true
   peaks (dBFS, nil with the floor); the SPEECH PEAK the median of the same over the speech steps;
   the SIBILANT SHARE the share of speech steps whose high band (`stepHighs`, AU-63) reads
-  ℓ ≥ L − 10; `isolatable` that every segment of the clip is `IsolationCache.isolatable`. A clip
+  ℓ ≥ L − 10. (`isolatable`, measured until #387, is gone: AU-55 as amended.) A clip
   needs at least 1 s (100 steps) of speech. Nothing measured depends on a key Enhance writes, so a
   second press measures the same and writes the same: the core answers an identity ("made no
   change").
@@ -119,7 +171,8 @@ Enhance at record time (B8) the third, with AU-68 and AU-69.
   - **High-pass, always:** the EQ's Rumble Cut (`EqPreset.rumbleCut`, 80 Hz at 24 dB/octave)
     applied to the clip's own EQ, or to an empty one.
   - **Noisy pauses, F > −45 dB:** voice isolation at `IsolationCache.defaultAmount` (0.8) and
-    noise reduction 0 when the clip is isolatable, else noise reduction 0.5 and isolation 0; and
+    noise reduction 0, at any speed (amended 2026-11-10, #387: the "noise reduction 0.5 where the
+    clip is not isolatable" arm went with AU-55's limit); and
     the gate at its defaults with `threshold_db = clamp(round(pause peak + 10 − L), −40, −6)` —
     10 dB above the pauses' median true peak, in the gate detector's own units (its peak
     follower, `AudioGateStage`), re L. F decides only WHETHER to clean and gate. **Quiet pauses,
