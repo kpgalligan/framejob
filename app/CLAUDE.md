@@ -2644,9 +2644,9 @@ the key map behind it.
   §11 PR-16; `markDeep`, `deliversDeep`, cleared by `unregister`): an export's
   for a row `Exporter.graphicsDeep` takes, an offline frame's once it comes
   out deep; never a document's. `MetalRenderer.source(for:)` reads it for a
-  shape layer that is not a matte member (`layer.matte?.into == nil`, spec
-  §11 PR-17: the 8-bit coverage would band an exact ramp). A graphic layer's
-  membership is passed to `LayerRenderers.graphic` the same way (PR-18).
+  shape layer, a matte member included, and `render` for the frame's matte
+  coverage, `r16Unorm` on a key it holds (spec §11 PR-19, which withdrew
+  PR-17 and PR-18).
 - `GraphicRegistry.swift` · `LayerRenderersGraphic.swift` — a graphic layer
   drawn (road map 10). The registry maps a `RecipeSource` key to one
   immutable `GraphicSet` (library, `libraryVersion`, each module `.compiled`
@@ -2663,11 +2663,8 @@ the key map behind it.
   row that keeps more than 8 bits, `Exporter.graphicsDeep`; a `render_frame`
   or Save Frame… that comes out deep in a format that keeps depth). A deep
   key's raster is 16 bits a channel, its texture `.rgba16Unorm`, its texture
-  key ends `:16`. A matte member under a deep key is not (spec §11 PR-18:
-  the matte's 8-bit coverage would round the exact raster with no dither):
-  `Resolved.drawsDeep(matteMember:)` is the one rule, asked by
-  `MetalRenderer.source(for:)` with the layer's `matte.into` and by the
-  prefetch's worker off the same layer. **An offline key draws only what
+  key ends `:16`, a matte member's too (spec §11 PR-19: a deep frame's
+  matte coverage is deep). **An offline key draws only what
   its caller pinned** (`pin(set, for: key)` with the document's
   `snapshot(for: recipeKey)`, captured on main): every `pin` has its `unpin`
   — `Exporter.releaseRecipeKey` (from `finish` AND `deinit`), and
@@ -2715,8 +2712,8 @@ the key map behind it.
   push out the frames drawn ahead. A pass's end line (`done`, `full`,
   `stopped`) is written at its stop. `Slot` lives at the foot of
   `LayerRenderersGraphic.swift` (a pure move under the cap) and carries the
-  depth its raster is drawn at (spec §11 PR-18), so `rasterBytes` counts a
-  slot's own raster. `GraphicPrefetch+Background.swift` holds a background
+  depth its raster is drawn at (its key's, spec §11 PR-15), so `rasterBytes`
+  counts a slot's own raster. `GraphicPrefetch+Background.swift` holds a background
   session's own branches — `stopBackground`, and the pass's arms of `draw`
   and `finish` as `passDeferred` and `passFinished`, under `condition` — a
   pure move under the cap (#596); the rest of that seam is named in
@@ -2875,7 +2872,8 @@ the key map behind it.
   (`MetalRenderer.workingFormat`, from `Compositor.outputPixelFormat`,
   `64RGBAHalf`; spec §11 PR-1): every layer, blend, shadow and dissolve
   pipeline's attachment, the destination, each matte composite and dissolve
-  half, and the shadow pair. The coverage stays `r8Unorm`, and the blurred
+  half, and the shadow pair. The coverage is `r8Unorm`, or `r16Unorm` in a
+  frame delivered deeper than 8 bits (spec §11 PR-19), and the blurred
   qualifier's selection map and its pair (`QualifierSurfaces`, the
   destination's size, spec §11 GR-35) are `r16Float`. `texture(from:)`
   wraps a buffer by its own format. Every video source decodes to
@@ -2927,7 +2925,8 @@ the key map behind it.
   through `MotionBlurPipelines`' accumulate pipelines (source factors `blendColor`/`blendAlpha`,
   destination `one`, the blend colour 1/N), then laid on the pass once by
   `framejob_motion_blur_fragment` with the layer's blend, blending OFF. **Nine pipelines from seven
-  fragment functions** (the eighth, `Compositor+Adjustment.swift`'s, is an
+  fragment functions**, the sixth built at two coverage depths (the eighth,
+  `Compositor+Adjustment.swift`'s, is an
   adjustment clip's full-frame pass reading the destination, blending off, its
   weight times the qualifier's `q` (`QualifierUniforms` at `buffer(1)`) and a
   layer marked `selection` writing `q` × coverage as opaque grey instead; spec
@@ -2942,7 +2941,7 @@ the key map behind it.
   over a translucent one. A shadow's silhouette pass takes `maskState`, the
   gather specialization without the blend (defensive, not load-bearing). Motion
   blur adds three more (`MotionBlurPipelines`, built in `MetalRenderer.init`: the two
-  accumulates and the composite); `MetalRenderer.swift`'s own doc counts fourteen from ten
+  accumulates and the composite); `MetalRenderer.swift`'s own doc counts fifteen from ten
   fragment functions. A
   shadow's three passes and its canvas-sized pair are
   `Compositor+Shadow.swift`'s (`encodeShadow`); a layer's uniforms and source
@@ -2958,8 +2957,11 @@ the key map behind it.
   pipelines into a pooled destination-sized target (`MattePool`), scheduled by
   `MattePlan.swift` (spec §11 MT-9: each cut set resolved once its last matte is
   drawn, a composite given back after its last resolve; the pool keeps what the
-  renderer's last 30 frames held, a frame being one `render` call), each cut set
-  resolved by the sixth pipeline, the matte resolve (r8, source factor zero,
+  renderer's last 30 frames held, a frame being one `render` call, and empties
+  its coverages when the frame's depth changes), each cut set resolved by the
+  sixth pipeline, the matte resolve (into an `r8Unorm` coverage, or an
+  `r16Unorm` one in a frame `RecipeSource.deliversDeep` marks, spec §11
+  PR-19, by its build of the coverage's format; source factor zero,
   destination factor `sourceColor`), into a pooled coverage the layer stage
   samples at `texture(1)` — every layer draw binds one, the 1×1 placeholder when
   nothing cuts it, and so do the shadow's silhouette pass and the reflection. A
@@ -2988,7 +2990,7 @@ the key map behind it.
   uploaded `rgba16Float`, spec §11 PR-6; a shape that draws a gradient
   (`ShapeProps.drawsGradient`) is drawn the same way when its frame is
   delivered deeper than 8 bits, `shape(_:hash:deep:)`, in a six-entry pool of
-  its own, spec §11 PR-16, never for a layer on a matte track (PR-17);
+  its own, spec §11 PR-16, a layer on a matte track included (PR-19);
   `LayerRenderersImage` is the still arm — the plain, deep and HDR decodes, and a gain-map still's rendition in
   an HLG project, HD-22, whose texture answers its own `peak`),
   keyed by the recipe's `hash` (`RecipeSourceRef.cacheHash` is the WHOLE key;
