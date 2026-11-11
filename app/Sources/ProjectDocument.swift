@@ -354,7 +354,7 @@ final class ProjectDocument: NSDocument {
     /// This document's `graphics/` (`ProjectDocument+Graphics.swift`).
     var graphicStore: GraphicStore?
 
-    private var didReleaseRecipeKey = false
+    var didReleaseRecipeKey = false
 
     /// Media whose reverse render was cancelled or failed. They are NOT
     /// retried on the next edit: a render the user stopped must not restart
@@ -457,17 +457,7 @@ final class ProjectDocument: NSDocument {
     }
 
     override func close() {
-        // The compositor's only channel to this document. Dropping it here —
-        // not in a deinit, which a retained window controller can delay
-        // indefinitely — is what keeps a closed document's Rust project from
-        // living for the life of the process.
-        if !didReleaseRecipeKey {
-            didReleaseRecipeKey = true
-            RecipeSource.shared.unregister(recipeKey)
-            ReverseSource.shared.unpublish(recipeKey)
-            RampAudioRenders.shared.release(owner: recipeKey)
-            stopGraphicStore()
-        }
+        releaseOnClose()
         super.close()
     }
 
