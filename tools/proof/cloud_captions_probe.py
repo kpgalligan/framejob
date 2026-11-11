@@ -8270,8 +8270,9 @@ MUTANTS = {
         "                else { throw failure }\n",
         "                throw failure\n",
         "the upload retry removed (row 15)"),
+    # Re-aimed (#554): the cue builder moved to CaptionCues.swift; the text is unchanged.
     "no-fifth-rule": (
-        "CaptionLayout.swift",
+        "CaptionCues.swift",
         "            if word.speaker != speaker {\n"
         "                flush()\n"
         "                lines = [text]\n"
@@ -8716,7 +8717,8 @@ FAKE_MUTANTS: dict[str, tuple[str, str, str]] = {
     # Issue batch B46 (#93): `speaker_words` served whatever `speaker_labels`
     # said (SP4\u00b7off; the proof's SC3).
     "speaker-labels-ignored": (
-        '        labelled = self.transcripts[tid]["request"].get("speaker_labels") is True\n',
+        # Re-aimed (#554): the request became a local of its own (`request = …`).
+        '        labelled = request.get("speaker_labels") is True\n',
         "        labelled = True\n",
         "B46 \u2014 the fake serving `speaker_words` whatever `speaker_labels` said "
         "(SP4\u00b7off, SC3)"),

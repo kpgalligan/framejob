@@ -1968,6 +1968,126 @@ error, a fifth warning, a clippy warning and a failing spec-index row each
 FAIL their step, named; a held lock BLOCKED in 2 s under `--wait 2`; a file
 added while `test` ran left `test` unstamped and stamped `app`.
 
+## Mutant anchors (mutant_anchors.py)
+
+`mutant_anchors.py` (#554) counts every proof's mutant anchors in the tree, in `make test`. A
+mutant is an anchor (a piece of source text) and its replacement, and its applier demands the
+anchor exactly once in a file; when the source moves the anchor rots, and before this nothing
+said so until someone ran the mutant. Standard library only; no app, no build, a few seconds.
+
+```
+python3 tools/proof/mutant_anchors.py              # the check (make test)
+python3 tools/proof/mutant_anchors.py --list       # every table: mutants, anchors read, copies
+python3 tools/proof/mutant_anchors.py --selftest   # K0, U2, C1, A1–A3, F1, F2, U1, U3, E1–E3, H1, P2–P8, C2 (make test)
+python3 tools/proof/mutant_anchors.py --mutant count-any|skip-unreadable|pins-one-way|missing-file-zero|no-entry-check|loose-file-passes|copies-counted
+```
+
+**What it reads.** Every `tools/proof/**/*.py` outside `work/`, itself left out. A proof is
+parsed, never imported: some call `proof_app.binary()` at top level, which refuses a stale
+app, and `make test` runs before `make app`. A table's expression is evaluated in a
+namespace that runs only the top-level statements that bind or add to a name the table needs,
+each at most once and in source order: a constant, a helper `def` (`tone_proof.py`'s
+`grade_inline`), a later `T[k] = …`, `T += …`, `T.update(…)` or a top-level `for` holding one
+(`cloud_captions_proof.py`). A statement first has the names it reads brought up to its own
+line, so a table holds what a constant was where the table is written, whatever rebinds the
+name further down (`docs_bugs_a3_proof.py`'s `REGION`). An import of a sibling proof is a proxy
+read the same way (`playback_prefetch_proof.py`'s `gp.WORKER_SVG`); a statement that merely sits
+at top level never runs. **A table's expression must therefore be pure**: whatever it calls
+runs in `make test`.
+
+**What a table is.** A top-level name ending `MUTANTS`; `MUTANT_EDITS`; the pair `MUTANT_FILE`
+with `MUTANT_ANCHOR` or `MUTANT_EDITS`; and `MUTANT` bound to a tuple. A table name bound by an
+import is the other proof's table and is checked there. `MUTANT = None` is an instrument's own
+switch and needs no row.
+
+**How an entry's edits are read.** R1: a file followed by an anchor and a replacement (a string
+or `None`), anywhere in the entry, flat or nested. R2: a file followed by a list of (anchor,
+replacement) pairs. A dict entry with `file` and `anchor` keys is read by those. R3: a table
+whose file is implicit in its applier has a row in `HINTS`, read off that applier: `pair`
+(anchor, replacement, …), `anchor` (anchor, …) or `pairs` ([(anchor, replacement) or (anchor,
+replacement, file), …], …). A file is a path from the repo root, a `Path`, or a bare name found
+under exactly one of `app/Sources`, the shaders, the bridging folder, a crate's `src` or root,
+`agent/src` or `tools/proof`. The same mutant name with the same anchor in the same file in a
+second table is a copy, counted once under the first table in path and source order.
+
+**The count.** Each anchor occurs exactly once in its file. A table in `EVERY` has an applier
+that replaces every occurrence, so its anchors need one or more.
+
+**Nothing is passed over silently.** Each failure is one `FAIL` line naming the proof, the
+table and the mutant, and each has one answer:
+
+| The line says | The answer |
+|---|---|
+| `anchor occurs 0 times` / `N times` | The source moved. Re-aim the anchor and its replacement at the same defect (lengthen an anchor that now repeats), run the mutant, and see it caught. Only when it cannot be run now: a `ROTTED` row saying where it is filed. |
+| `no file X` / `X is ambiguous` | Spell the path from the repo root in the table. |
+| `UNREADABLE, <exception>` | The table needs something the reader could not evaluate. Keep its expression to constants, pure helpers and sibling constants. |
+| `no anchor read from any of its N mutants` | A new shape: a `HINTS` row when the file is implicit in the applier; `SWITCHES` with the count when the mutants are switches inside the instrument or have no tree text. |
+| `<mutant>: no anchor read` | Give the entry its file and anchor, or name it in `UNANCHORED`. |
+| `names X and no rule read an anchor for it` | A half-read entry: a source file is named and no rule took it as an edit's file. Write the edit as R1 or R2. |
+| `not the shape HINTS says` | The entry or the `HINTS` row is wrong. |
+| `a top-level name containing MUTANT that is no table` | Make it a table the reader knows, or name it in `NOT_TABLES`. |
+| `takes --mutant and has no mutant table` | Give the proof a table, or name it in `NO_TABLE`. |
+| `<PIN> names it and …` | The pin no longer applies: drop or correct the row. Every pin is exact in both directions, as `gate.py`'s `TYPECHECK_BASELINE` is: a `SWITCHES` count that is off, a `ROTTED` anchor that counts once again, an `UNANCHORED` mutant that has an anchor, a name that is gone. |
+
+**The pins as landed** (#554): seven `HINTS` rows; `SWITCHES` for fifteen tables in twelve
+instruments (71 mutants); two `UNANCHORED` mutants (`assistant_session_proof.py` `key-echo`,
+which builds nothing, and `raster_dither_proof.py` `core-unpatched`, a file swap); `EVERY` for
+`clip_inspector2_proof.py`; eleven `NOT_TABLES` names; nineteen `NO_TABLE` proofs, whose edits
+sit inline in functions where no table can be read; and twelve `ROTTED` anchors (below).
+
+**The selftest** runs the reader over synthetic proofs and sources in scratch trees under
+`tools/proof/work/mutant-anchors-selftest/`, removed after. K0 (CONTROL) every shape at once:
+R1 flat, nested, by `Path` and with `None`; R2; a dict's own keys; a constant rebound further
+down; a helper `def`; a sibling's constants by `import … as` and `from … import`; `T[k] =`,
+`T.update` and a top-level `for`; the three hinted shapes; `MUTANT_FILE` with `MUTANT_ANCHOR`
+and with `MUTANT_EDITS` under `EVERY`; a `MUTANT` tuple; and one row of every pin. U2 (CONTROL)
+K0's proof holds `BINARY = open(…)`, a bare `open(…)` and `sys.exit(…)` at top level and its
+sibling a `raise SystemExit`, and no marker file exists after. C1 (CONTROL) an imported table
+name is no table of the importer, and the importer, which takes `--mutant`, is not a proof
+without a table. A1 an anchor that is nowhere; A2 a table that passes, then fails once its
+SOURCE line gains a comment; A3 an anchor twice; F1 a file that is nowhere; F2 a bare name
+under two folders; U1 a name nothing binds (UNREADABLE, `NameError`); U3 a table that is a
+string; E1 a mutant with no anchor and no pin; E3 a table with none and no pin; E2 a half-read
+entry; H1 an entry that is not its hinted shape; P2 a `SWITCHES` count off by one; P3 a `ROTTED`
+row whose anchor is back; P4 an `UNANCHORED` row for a mutant that has an anchor; P5 a new
+`MUTANT` name; P6 a `NO_TABLE` row for a proof that has a table; P7 `--mutant` with no table
+and no row; P8 a `SWITCHES` row for a table that has anchors; C2 a dead anchor copied into a
+second table, reported once. Each mutant is a switch inside the reader and fails exactly its
+rows: `count-any` (one or more accepted) A3; `skip-unreadable` U1, U3; `pins-one-way` (a stale
+pin passes) P2, P3, P4, P6, P8; `missing-file-zero` F1; `no-entry-check` E1, E3;
+`loose-file-passes` E2; `copies-counted` (a copy reported again) C2.
+
+**What it does not see.** An anchor inside a function (the nineteen `NO_TABLE` proofs), or
+behind a callable in an entry. A mutant's REPLACEMENT: that it still compiles and is still
+caught is shown only by running the mutant. `qualifier_proof.py`'s and `co2a_proof.py`'s own
+row MA stay; this check agrees with them (21 mutants and 28 anchors; 10 and 10).
+
+| Run (#554) | Result |
+|---|---|
+| The first run, before any re-aim | 195 proofs, 210 tables, 2,057 mutants; 2,048 anchors once; 24 anchors failed in 16 proofs: 20 occur 0 times, 4 twice |
+| After twelve re-aims and twelve `ROTTED` rows | exit 0: 2,060 anchors occur exactly once, 30 copies, 12 pinned as rotted |
+| `--selftest` | 22/22 |
+| Each of the seven `--mutant`s | `MUTANT PASS`, exactly its rows |
+| On the tree: one character of `qualifier_proof.py`'s first anchor changed; a comment appended to an anchored source line; an entry calling an undefined name | exit 1 each: `occurs 0 times`, `occurs 0 times`, `UNREADABLE, NameError` |
+
+**The twelve re-aimed, each mutant run once and caught:** `camera_recording_probe.py`
+`camera-format-elsewhere-admitted` (T7), `camera-format-alone-admitted` (T9) and
+`remainder-camera-dropped` (L8), whose lines CO8 rewrote; `cloud_captions_probe.py`
+`no-fifth-rule` (row 19 and SP4·on; the cue builder moved to `CaptionCues.swift`) and the fake's
+`speaker-labels-ignored` (SP4·off); `container_rewrap_probe.py` `no-recopy` (O40);
+`limiter_probe.py` `M5 gain-not-told` (L2); `speed_sheet_probe.py` `no-gain-lines` (P1, P3–P6);
+`transcript_proof.py` `device-past-clip-end` (P2); and `recording_probe.py` `ask-every-press`,
+`open-first-press` and `shell-opens`, whose three lines `inputMonitoringStep` (CU-62) repeats,
+so each anchor now starts at `screenStep`'s signature (`SCREEN_STEP`).
+
+**The twelve pinned in `ROTTED`,** not re-aimed because a re-aim counts only once its mutant
+has run: an app-copy build each for `co2b_proof.py` `M7-export-previous-empty`,
+`curves_proof.py` `identity-kept`, `export_readers_proof.py` `no-own-cancel`,
+`export_status_proof.py` `no-graphics-gate` (which occurs twice), `log_proof.py`
+`vp9-jpeg-deep`, `matte_proof.py` `handler-drops-matte` and `mixed_audio_proof.py` `old-onset`;
+by hand, `export_offset_proof.py` `M25-no-limiter-lead` and `M26-no-lookup-lead`; and
+`raster_bench.py`'s three, which need the bench's package.
+
 ## The offscreen harness (no running app)
 
 `harness/` is CLAUDE.md's "Seeing the chrome": `harness/main.swift` compiles
@@ -31180,7 +31300,9 @@ exactly once in the tree, text only, first in a plain run; the mutant builders c
 same function. `qualifier_proof.py`'s `SHOWN` had named a shader line HDR H-6 split in two, so
 `grade-reads-inline-q` and `coverage-blurred` could not be applied; it is now `SHOWN_GREY` and
 `SHOWN_END`. `co2a_proof.py`'s `miss-transparent` anchored on two lines CO10b's image branch
-repeated; its anchor gains the media branch's own line above.
+repeated; its anchor gains the media branch's own line above. Since #554 the same count runs
+over every proof's table in `make test` ("Mutant anchors (mutant_anchors.py)" above); these two
+rows stay.
 
 **`unmasked-dimmed`**, D15's mutant: CO-27's gate given an off arm that multiplies an unmasked
 layer's alpha by 0.98. Removing the gate alone was measured first and SURVIVED (D15 2/2): the

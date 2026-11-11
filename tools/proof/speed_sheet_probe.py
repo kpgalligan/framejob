@@ -64,8 +64,10 @@ HINT = ("Faster clips can leave gaps; slower clips can overlap. Later clips stay
 MUTANTS = {
     "no-gain-lines": (["P1", "P3", "P4", "P5", "P6"], [
         ("SpeedSheetController.swift",
-         "return ([summary] + changes.map(changeLine)).joined(separator: \"\\n\")",
-         "return ([summary] + changes.map(changeLine).prefix(0)).joined(separator: \"\\n\")")]),
+         # Re-aimed (#554): the ramp's line joined the list after the clips' lines.
+         "return ([summary] + changes.map(changeLine) + ramp).joined(separator: \"\\n\")",
+         "return ([summary] + changes.map(changeLine).prefix(0) + ramp)"
+         ".joined(separator: \"\\n\")")]),
     "minted-only": (["P5"], [
         ("SpeedSheetController.swift",
          "let had = effective(id, in: before)",

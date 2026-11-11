@@ -10278,6 +10278,10 @@ def section_exclusion(binary, sources):
 # or the copy is not the mutant it claims to be (`phase9_chrome.py`'s
 # `prepare_mutant`).
 
+# `screenStep`'s first two lines, which `inputMonitoringStep` does not share (#554).
+SCREEN_STEP = (
+    "    static func screenStep(granted: Bool, asked: Bool, launchedByLaunchd: Bool) -> Step {\n"
+    "        if granted { return .proceed }\n")
 MUTANTS = {
     "excludes": (
         "RecordingSetup.swift",
@@ -10466,17 +10470,21 @@ MUTANTS = {
         "        state = .paused\n",
         "pause() leaves the microphone's writer running through the pause"),
     # The grants a press checks (spec §11 recording; section 10's rows).
+    # The three `screenStep` mutants were re-aimed (#554): `inputMonitoringStep` (CU-62) has
+    # the same three lines, so each anchor starts at `screenStep`'s own signature.
     "ask-every-press": (
         "RecordingGrant.swift",
+        SCREEN_STEP + "        if !launchedByLaunchd { return .ask }\n"
         "        if asked { return .openPane }\n",
+        SCREEN_STEP + "        if !launchedByLaunchd { return .ask }\n"
         "        if asked { return .ask }\n",
         "screenStep ignores the asked flag — every press puts up a prompt that never comes again"),
     "open-first-press": (
         "RecordingGrant.swift",
-        "        if !launchedByLaunchd { return .ask }\n"
+        SCREEN_STEP + "        if !launchedByLaunchd { return .ask }\n"
         "        if asked { return .openPane }\n"
         "        return .ask\n",
-        "        return .openPane\n",
+        SCREEN_STEP + "        return .openPane\n",
         "screenStep always opens the pane — the first press never asks, so the app is never listed"),
     "asked-forgotten": (
         "RecorderPanelController+Grants.swift",
@@ -10490,8 +10498,8 @@ MUTANTS = {
         "a shell-launched press writes the flag — a later Finder launch would never be asked"),
     "shell-opens": (
         "RecordingGrant.swift",
-        "        if !launchedByLaunchd { return .ask }\n",
-        "",
+        SCREEN_STEP + "        if !launchedByLaunchd { return .ask }\n",
+        SCREEN_STEP,
         "screenStep's launchd arm deleted — a shell-launched press that finds the flag opens the pane"),
     "mic-denied-asks": (
         "RecordingGrant.swift",
