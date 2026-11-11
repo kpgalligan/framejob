@@ -1632,9 +1632,12 @@ the key map behind it.
   multi-line view routes its own Return through `TextEditKey`
   (`tools/proof/text_focus_probe.swift`).
   The one field whose Return is its own is the Transcript tab's find field
-  (spec §11 TX-37 (e)): `sendEvent` asks `TextFocus.keptReturn` first and
-  hands a `TextFocusKeepsReturn` field the key, ⇧ read from the event; and
-  `TextFocus.host(of:)` answers an enclosing `TextFocusHosting` view, so a
+  (spec §11 TX-37 (e), TX-43): `sendEvent` asks `TextFocus.keptReturn` first
+  and hands a `TextFocusKeepsReturn` field the key as a `KeptReturn` (Return
+  next, ⇧Return previous, ⌘Return select), and the window's
+  `performKeyEquivalent(with:)` asks it too and takes ⌘Return alone, because
+  `NSApplication` offers a ⌘ key to the key window's key equivalents before
+  `sendEvent`; and `TextFocus.host(of:)` answers an enclosing `TextFocusHosting` view, so a
   press on the find bar's own buttons keeps the typing.
   `EditorKey.isBare` is the bare-key map's modifier rule (⇧ ⇪ always;
   `.numericPad`/`.function` on function-key scalars; never ⌘ ⌥ ⌃), read by
@@ -2335,11 +2338,18 @@ the key map behind it.
   (`TranscriptView+Layout`'s `layOut(through:)`: a far rect is an estimate until then, and until the idle
   pass has run the view is only as tall as what is laid out; the follow skips the step when its
   scroll would be clamped to where the view already is at a real end of the text,
-  `followIsAtAnEnd`). Find moves only
+  `followIsAtAnEnd`). Find's search and steps move only
   the scroll and its marks. Out of sight the pane closes the bar and hands the keys to the content
   view when the window itself or the transcript's text holds them (`handBackKeys`).
   `transcript_view`'s `find` / `find_step` are `AgentServer+TranscriptFind.swift`'s.
-- `MediaPane.swift` · `MediaRowView.swift` (a row and the drag it starts,
+  Since #559 and #560 (spec §11 TX-43…TX-45): the find field's ⌘Return is `TranscriptPane+Find`'s
+  `findSelect()` — the transcript view first responder, then `TranscriptView.select(match:)`, a
+  click over the whole match — and `find_step` takes `select`; Edit ▸ Find…'s `findInTranscript`
+  and `validateTranscriptAction` also answer the Media tab, through `MediaPane.pane(in:)` (a
+  weak-to-weak table keyed by the inspector, `TranscriptPane`'s shape) and its `shownSearch`, the
+  find band's search field only while it is on screen.
+- `MediaPane.swift` (with `pane(in:)` and `shownSearch`, Edit ▸ Find…'s
+  Media arm, spec §11 TX-45) · `MediaRowView.swift` (a row and the drag it starts,
   with `MediaDropMode` read from `NSEvent.modifierFlags` at the drop; an HDR
   still's row shows nothing until its step-0 tile lands, HD-21) ·
   `MediaPaneCommands.swift` · `MediaListFilter.swift` (the find band as a
@@ -5086,7 +5096,8 @@ is a decision: Preview Quality, the preview window, Show Ungraded and the
 Scopes panel and its slot picks and zooms (spec §11 GR-4, GR-5, GR-10, GR-31;
 `render_frame {ungraded, waveform, parade, vectorscope, vectorscope_zoom,
 histogram}` is the capability), the export queue, the
-Media tab's search and sort, the Transcript tab's Find (spec §11 TX-37), the
+Media tab's search and sort, the Transcript tab's Find (spec §11 TX-37,
+TX-43) and Edit ▸ Find… on the Media tab (TX-45), the
 Assistant tab (view state; the dev tool
 `select_inspector_tab` shows it in a Release build, and the assistant's own
 calls already are tool calls) and Settings' Assistant pane (the key, the model
