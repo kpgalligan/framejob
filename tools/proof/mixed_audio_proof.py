@@ -75,8 +75,9 @@ import tree_copy  # noqa: E402
 SEC = 600_000
 
 MUTANTS = {"old-onset": ("CompositionBuilder+AudioTracks.swift",
-                         "onset: family.sounding.map(\\.lowerBound).min(),",
-                         "onset: family.segments.filter { $0.duration > 0 }.map(\\.start).min(),")}
+                         "let onset = family.sounding.map(\\.lowerBound).min()",
+                         "let onset = family.segments.filter { $0.duration > 0 }"
+                         ".map(\\.start).min()")}
 
 failures = []
 checks = 0

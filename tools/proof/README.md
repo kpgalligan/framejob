@@ -2033,7 +2033,8 @@ table and the mutant, and each has one answer:
 instruments (71 mutants); two `UNANCHORED` mutants (`assistant_session_proof.py` `key-echo`,
 which builds nothing, and `raster_dither_proof.py` `core-unpatched`, a file swap); `EVERY` for
 `clip_inspector2_proof.py`; eleven `NOT_TABLES` names; nineteen `NO_TABLE` proofs, whose edits
-sit inline in functions where no table can be read; and twelve `ROTTED` anchors (below).
+sit inline in functions where no table can be read; and twelve `ROTTED` anchors, six since
+2026-11-11 (below).
 
 **The selftest** runs the reader over synthetic proofs and sources in scratch trees under
 `tools/proof/work/mutant-anchors-selftest/`, removed after. K0 (CONTROL) every shape at once:
@@ -2075,6 +2076,8 @@ row MA stay; this check agrees with them (21 mutants and 28 anchors; 10 and 10).
 | `--selftest` | 25/25 |
 | Each of the eight `--mutant`s | `MUTANT PASS`, exactly its rows |
 | On the tree: one character of `qualifier_proof.py`'s first anchor changed; a comment appended to an anchored source line; an entry calling an undefined name | exit 1 each: `occurs 0 times`, `occurs 0 times`, `UNREADABLE, NameError` |
+| 2026-11-11 (#573, #575–#579), the six app-copy anchors re-aimed and their `ROTTED` rows still there | exit 1, 6 failures, each `ROTTED names it … and its anchor occurs once in <file>: drop the row` |
+| The same day, the six rows deleted | exit 0: 196 proofs, 211 tables, 2,095 mutants; 2,114 anchors occur exactly once, 30 copies, 6 pinned as rotted |
 
 **The twelve re-aimed, each mutant run once and caught:** `camera_recording_probe.py`
 `camera-format-elsewhere-admitted` (T7), `camera-format-alone-admitted` (T9) and
@@ -2086,13 +2089,23 @@ row MA stay; this check agrees with them (21 mutants and 28 anchors; 10 and 10).
 `open-first-press` and `shell-opens`, whose three lines `inputMonitoringStep` (CU-62) repeats,
 so each anchor now starts at `screenStep`'s signature (`SCREEN_STEP`).
 
-**The twelve pinned in `ROTTED`,** not re-aimed because a re-aim counts only once its mutant
-has run: an app-copy build each for `co2b_proof.py` `M7-export-previous-empty`,
-`curves_proof.py` `identity-kept`, `export_readers_proof.py` `no-own-cancel`,
-`export_status_proof.py` `no-graphics-gate` (which occurs twice), `log_proof.py`
-`vp9-jpeg-deep`, `matte_proof.py` `handler-drops-matte` and `mixed_audio_proof.py` `old-onset`;
-by hand, `export_offset_proof.py` `M25-no-limiter-lead` and `M26-no-lookup-lead`; and
-`raster_bench.py`'s three, which need the bench's package.
+**Twelve were pinned in `ROTTED`,** not re-aimed because a re-aim counts only once its mutant
+has run. **Six are still pinned:** an app-copy build for `co2b_proof.py`
+`M7-export-previous-empty` (#572); by hand, `export_offset_proof.py` `M25-no-limiter-lead` and
+`M26-no-lookup-lead` (#574); and `raster_bench.py`'s three, which need the bench's package
+(#580).
+
+**Six were re-aimed and run on 2026-11-11,** each in a Debug copy of the tree, each planting the
+defect it always planted, and their rows deleted:
+
+| Mutant | The anchor now | Run | Result |
+|---|---|---|---|
+| `curves_proof.py` `identity-kept` (#573) | `core/src/edit_props.rs`, `settle_video`'s `props.curves.drop_identities();` at 8 spaces | `--mutant identity-kept`, twice | First `MUTANT FAILURE`: N1 and CT failed (`--test curves`, `--test hue_curves`) and so did H7, whose identity hue patch was "accepted": the same decision, a row grading-4 added. The table now names N1 H7 CT; run again, `MUTANT PASS`, 56/59, no other row failed |
+| `export_readers_proof.py` `no-own-cancel` (#575) | the plain pump's `stop` closure, moved to `app/Sources/ExporterWriter+Pump.swift` (`PUMP`); the text unchanged | `--mutant no-own-cancel` | `MUTANT CAUGHT`, exit 1: failing exactly F1–F4, readers `video 1, audio 1` on F1–F3 and `video 4, audio 1` on F4 |
+| `export_status_proof.py` `no-graphics-gate` (#576) | four lines from `Exporter.graphicsRefusal(` to its throw in `AgentServer+Export.swift`, which the settings refusal (#470) does not repeat | `--mutant no-graphics-gate` | `caught — A7 failed`, exit 1: the broken graphic's export answered `export_id` 4, `running`, and the next id was 5 |
+| `log_proof.py` `vp9-jpeg-deep` (#577) | `AgentServer+Render.swift`'s `graphics: graphics, keepsDepth: format.carriesDepth,` (the call gained `cutoutWait:`) | `capture` then `--mutant vp9-jpeg-deep --control … --only L18,Z1`, twice | **Survived**, as B103 and spec §11 PR-12 record: the JPEG byte-identical (5,099 bytes), 2/2. A sixth L18 case tried for it, `slog3_fr_vp9e.mp4` as JPEG at `max_width` 512, was byte-identical too (4,328 bytes) and was taken out again. Kept as the recorded equivalent, as `precision_proof.py`'s `jpeg-deep` is; a pin cannot sit on a live anchor |
+| `matte_proof.py` `handler-drops-matte` (#578) | `AgentServer+Tracks.swift`'s `solo: solo, matte: matte,` (the call gained arguments) | `--mutant handler-drops-matte`, then with `--only C0,A1,G0,U0,P6,MM,V5,H0,B0,A2,N0,R0,Z1` | The whole run answered 2 (12/46): every project past P sets its fixture's matte through the handler, so those fixtures cannot hold under this mutant. Over project P's rows: `MUTANT PASS`, 5/13, failed A1 G0 U0 P6 MM B0 A2 N0 |
+| `mixed_audio_proof.py` `old-onset` (#579) | `CompositionBuilder+AudioTracks.swift`'s `let onset = family.sounding.map(\.lowerBound).min()`, the local both its readers take | `--mutant old-onset` | `caught`, exit 0, 20/22: both first-25 ms rows FAIL at −28.8 dBFS, every CONTROL passes |
 
 ## The offscreen harness (no running app)
 
@@ -18087,7 +18100,7 @@ that failed.
 | `core-matte-behind-matte` | `matte_target` ignores that the track behind is a matte | MM |
 | `core-untargeted-into-null` | an unlisted group's `into` is written `null` | B0 MM CT |
 | `core-no-override` | `layer` is told no layer is drawn into a matte | P6 |
-| `handler-drops-matte` | `set_track`'s handler sends `matte: nil` | A1 G0 |
+| `handler-drops-matte` | `set_track`'s handler sends `matte: nil` | A1 G0 (run with `--only` project P's rows and Z1 since MT3, #578) |
 
 **Its record** (2026-10-08): on Debug 16/16; recorded on the third gate's
 Release build (`RC_PROOF_APP=release`) 16/16, beside `phase6_proof.py` 168/168
@@ -20022,7 +20035,7 @@ MUTANT PASS only when every named row failed and no other scored row did.
 | `curves-before-wheels` | step 4c.2's block moved before 4c.1 in the layer stage | O1 |
 | `ungraded-misses-curves` | `ungraded` keeps the curves | V1 CT |
 | `adjust-without-curves` | the adjustment pass has no step 4c.2 | J1 |
-| `identity-kept` | `set_video` stores an identity curve | N1 CT |
+| `identity-kept` | `set_video` stores an identity curve | N1 H7 CT (H7's identity hue patch, since grading-4; #573) |
 | `identity-not-aligned` | no identity alignment before an action's lerp | A2 A3 CT |
 
 Also moved by G2-3: `wheels_proof.py` N2 (the header's format version, not
@@ -21134,7 +21147,9 @@ and L17 FAILED; L9 and L18 captured 5 and 4 references; Z1 ok.
 - `vp9-jpeg-deep` (`AgentServer+Render.swift` passes `keepsDepth: true`; `--only L18,Z1`):
   survived, the JPEG byte-identical (5,099 bytes). Recorded as equivalent, as
   `precision_proof.py`'s `jpeg-deep` was: the JPEG's bytes do not move when it is read through
-  the reader (why was not measured), and L18 stays the guard.
+  the reader (why was not measured), and L18 stays the guard. Run again on 2026-11-11 with its
+  anchor re-aimed (#577; the call gained `cutoutWait:`): survived again, 5,099 bytes, and so did
+  a JPEG of the same fixture at `max_width` 512 (4,328 bytes), a case tried and not kept.
 
 `isDeep`'s VP9 subtype guard has no mutant: no fixture but VP9 carries a `vpcC` atom (L16 prints
 `absent` for the others), so removing it changes no answer. `composition_gap_probe.swift` and

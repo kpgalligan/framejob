@@ -96,7 +96,13 @@ MUTANTS = {
     "no-cancel": ("AgentServer+ExportStatus.swift",
                   "            ExportQueueController.shared.cancel(id)\n", "", "A5"),
     "no-graphics-gate": ("AgentServer+Export.swift",
+                         "        if let refusal = Exporter.graphicsRefusal(\n"
+                         "            project: project, settings: settings, graphics: graphics)\n"
+                         "        {\n"
                          "            throw ToolError(message: refusal.localizedDescription)\n",
+                         "        if let refusal = Exporter.graphicsRefusal(\n"
+                         "            project: project, settings: settings, graphics: graphics)\n"
+                         "        {\n"
                          "            _ = refusal\n", "A7"),
     "no-observer": ("AgentServer+ExportStatus.swift",
                     "        ) { [weak self] _ in self?.refresh() }\n",

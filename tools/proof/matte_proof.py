@@ -183,7 +183,10 @@ FAIL:
                               B0 MM CT
   core-no-override            the source keeps shadow, reflection, blend
                               (`LayerRoles`' `drawn_into` since B90 phase 4): P6
-  handler-drops-matte         the handler drops `matte`: A1 G0
+  handler-drops-matte         the handler drops `matte`: A1 G0 (run with
+                              `--only` project P's rows and Z1: every later
+                              project's fixture sets its matte through the
+                              handler, so a whole run answers 2, #578)
   (MT3)
   dissolve-no-cover           the dissolve's cover ignores the matte: T3
   nest-always-carries         `nest` keeps every matte: N4
@@ -297,8 +300,8 @@ MUTANTS = {
         "                    drawn_into: false && *drawn_into,", ["P6"]),
     "handler-drops-matte": (
         "app/Sources/AgentServer+Tracks.swift",
-        "solo: solo, matte: matte)",
-        "solo: solo, matte: nil)", ["A1", "G0"]),
+        "solo: solo, matte: matte,",
+        "solo: solo, matte: nil,", ["A1", "G0"]),
     # MT3
     "dissolve-no-cover": (
         "app/Resources/Shaders/Compositor.metal",

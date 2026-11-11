@@ -139,7 +139,7 @@ UNANCHORED = {
 # is filed. The pin is the MUTANT's: its anchors that still count once are counted, its dead ones
 # are held, and the row fails ("drop the row") once none of its anchors counted under that table
 # is dead. A copy's rot is pinned under the first table, where it is counted.
-# These twelve were found by this check's first run (#554) and not re-aimed in it, because a
+# These were found by this check's first run (#554) and not re-aimed in it, because a
 # re-aim counts only once its mutant has been run and seen caught: `APP` needs a copy of the tree
 # built as an app and driven, `HAND` an app rebuilt and driven twice by hand, `BENCH` the raster
 # bench over a real package. Each row names the issue it went to.
@@ -147,14 +147,8 @@ APP, HAND, BENCH = ("an app-copy mutant, not run", "a by-hand mutant, not run",
                     "a bench mutant, not run")
 ROTTED = {
     ("co2b_proof.py", "MUTANTS", "M7-export-previous-empty"): "#572: " + APP,
-    ("curves_proof.py", "MUTANTS", "identity-kept"): "#573: " + APP,
     ("export_offset_proof.py", "HAND_MUTANTS", "M25-no-limiter-lead"): "#574: " + HAND,
     ("export_offset_proof.py", "HAND_MUTANTS", "M26-no-lookup-lead"): "#574: " + HAND,
-    ("export_readers_proof.py", "MUTANTS", "no-own-cancel"): "#575: " + APP,
-    ("export_status_proof.py", "MUTANTS", "no-graphics-gate"): "#576: " + APP,
-    ("log_proof.py", "MUTANTS", "vp9-jpeg-deep"): "#577: " + APP,
-    ("matte_proof.py", "MUTANTS", "handler-drops-matte"): "#578: " + APP,
-    ("mixed_audio_proof.py", "MUTANTS", "old-onset"): "#579: " + APP,
     ("raster_bench.py", "MUTANTS", "no-clear"): "#580: " + BENCH,
     ("raster_bench.py", "MUTANTS", "no-swap"): "#580: " + BENCH,
     ("raster_bench.py", "MUTANTS", "padded-in-place"): "#580: " + BENCH,

@@ -84,13 +84,14 @@ READER_ROWS = ("R2", "R3")
 
 SOURCES = "app/Sources"
 WRITER = f"{SOURCES}/ExporterWriter.swift"
+PUMP = f"{SOURCES}/ExporterWriter+Pump.swift"
 MUTANTS = {
     "shared-reader": {"rows": F_ROWS, "anchors": [
         (WRITER,
          "            audioReader = hasAudio ? try AVAssetReader(asset: built.composition) : nil\n",
          "            audioReader = hasAudio ? videoReader : nil\n")]},
     "no-own-cancel": {"rows": F_ROWS, "anchors": [
-        (WRITER, "            if self?.isStopping ?? true { reader.cancelReading() }\n",
+        (PUMP, "            if self?.isStopping ?? true { reader.cancelReading() }\n",
          "            if self?.isStopping ?? true && false { reader.cancelReading() }\n")]},
     "encode-cancel-dropped": {"rows": ["F4"], "anchors": [
         (WRITER,
