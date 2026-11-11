@@ -159,7 +159,7 @@ on in `creator-jobs-2.md`, as before.
 - **CJ-9 — The clip ceiling is decided by spike CJ-S1 at CJ6's head.** Its verdict amends this
   entry: `MAX_CLIPS` stays 4,096 and TX and SW design around it (both read `RC_MAX_CLIPS`, so
   nothing spells 4,096), or CJ6 raises it to the spike's N. **Amended at CJ6: 4,096 kept**
-  ([CJ-60](creator-jobs-7.md)): no N passed CJ-S1's rule; at 4,096 itself, a 100-range
+  ([CJ-60](creator-jobs-7b.md)): no N passed CJ-S1's rule; at 4,096 itself, a 100-range
   `ripple_delete_ranges` took 3.7 s and the timeline's draw 281 ms (fit) and 126 ms (default).
 
 The bets' scope-level decisions, recorded at CJ0a (their phases hold the rest):
