@@ -32230,3 +32230,4 @@ spike run (ffmpeg, the staticlib, a camera), which this does not make.
 | `spec_rule.py` after | exit 0; SR-5 `f877f429…`, SR-7 `219498b0…`, SR-9 `ad79a637…`, SR-14 `673fbaaa…`, SR-17 `8c6b65ab…`, CAM-2 `cd3dca30…`, CAM-3 `b7aa0d56…` |
 | by hand, each restored byte-identical: `camera_spike.py`'s `--format` pin renamed; its other pin pointed at `ramp_spike`; `RULE_FILE` put back in `ramp_spike.py` | exit 1 each (1, 2 and 1 problems) |
 | `ramp_spike.py --selftest`, `render_spike.py --selftest`, `camera_spike.py --selftest` | 7, 15 and 5 rows, exit 0 |
+| `spec_rule.py` before and after SR-10…SR-12 moved to `speed-ramps-1b.md` | byte-identical output (SR-5, SR-7 and SR-9 keep their hashes and their file), while `shasum -a 256 speed-ramps.md` went from `a5ac8842…` to `68c832a7…` |
