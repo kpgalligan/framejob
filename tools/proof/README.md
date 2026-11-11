@@ -25524,9 +25524,53 @@ With the cure (Release, 2026-11-11, 15/15 of the rows above): G1, G5 and G7 785 
 `shape-reread-not-marked` (G7), `sdr-version-marked` (GEb). PR-15's `generator-frame-not-deep`
 was re-aimed at its moved line and run again (D5).
 
-**Not measured here.** How the ramp looks on a display (`docs/manual-checks.md` PRC-7); the draw
-time of a float gradient; the deep pool's size, which nothing over MCP observes; the AV1 and WebM
-rows' pixels, which mark their key through the same line as ProRes.
+**Not measured here.** How the ramp looks on a display (`docs/manual-checks.md` PRC-7); the deep
+pool's size, which nothing over MCP observes; the AV1 and WebM rows' pixels, which mark their key
+through the same line as ProRes. The draw time, an 8-bit movie row and a matte track are the next
+section's.
+
+## Issue #588 — a gradient shape as a matte, in an 8-bit movie, and its draw time (`raster_dither_proof.py` GEd, GM, GMg; `shape_draw_probe.py` T1, T2; three mutants; spec §11 PR-17)
+
+**What it proves.** The three things #563 left unmeasured. GEd: `shape563` exported `h264`, the
+frame at 0.5 s as `rgb24`, decodes equal to the base's, so an 8-bit movie row keeps Core Graphics'
+dithered draw. GM: a white full-canvas card under `shape563` on a `luma` matte track, exported
+`prores_422`; the picture's green is the matte's coverage, and its banding RMS is at most 0.15
+with the row-540 block means strictly increasing. The coverage is 8-bit and not dithered, so a
+float ramp rounded there bands; PR-17 keeps a matte member's 8-bit dithered draw. GMg, printed
+with GM and not scored, is the same project with the `band374` graphic as the matte, which PR-17
+does not cure. GEd fails without `--base`; GM's rule is absolute and prints the base's figures.
+
+    RC_PROOF_APP=/path/to/the/earlier/Frame\ Job\ Debug.app python3 tools/proof/raster_dither_proof.py capture tools/proof/work/raster-dither-base588
+    RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py --base tools/proof/work/raster-dither-base588 --only E1,D1,D5,D6,D7,G0,G1,G3,G5,G6,G7,GEa,GEb,GEc,GEd,GM,Z1
+    python3 tools/proof/raster_dither_proof.py --app-mutant matte-shape-deep --base tools/proof/work/raster-dither-base588
+    python3 tools/proof/shape_draw_probe.py [--mutant deep-call-eight]
+
+The base is a `capture` by the app before PR-16, made with THIS script so it holds the new rows'
+files (`tree_copy.make_base_copy(dest, "e929b761^")`, then `make app-debug` there).
+
+**The probe.** `shape_draw_probe.py` builds `shape_draw_probe.swift` over `app/Sources` and times
+`LayerRenderers.shape(_:hash:deep:)` as a cache miss (the Core Graphics draw plus the upload;
+`renderShape` is private) at 1920×1080 and 3840×2160: two warm-up pairs, then fifteen pairs of one
+8-bit and one float call, alternating order, the pools purged after each pair. T1: it builds and
+answers. T2: every call answered a texture of the asked size, `bgra8Unorm` at 8 bits and
+`rgba16Float` deep. The medians, their ratio and the load average are printed and never scored,
+and the probe is not in `make test`.
+
+**Recorded** (2026-11-11). The tree as PR-16 left it (Debug): GM FAILS at banding RMS 0.2770, 22
+levels at median run 38 px, noise 0.0000. With PR-17 (Release, 17/17 of the rows above; Debug gave the same figures): GM 0.0921, 23 levels at median
+run 1 px, noise 0.4411, 8,918,275 bytes, the base's figures exactly; GEd equal to the base's;
+GMg 0.3398 at median run 21 px on both. The probe, three runs under load average 23 to 24: ratio
+float/8-bit 1.21, 1.16, 1.21 at 1080p (8-bit median 6.49 to 6.58 ms) and 1.20, 1.19, 1.21 at 4K
+(25.89 to 26.51 ms).
+
+**Mutants** (each caught): `matte-shape-deep` (GM, 0.2770), `export-always-marked` (GEd: worst
+|Δ| 4 levels, mean 0.69), and the probe's `deep-call-eight` (T2). PR-16's `shape-never-deep` and
+`shape-always-deep`, anchored on the line after PR-17's condition, were run again (G1, G3, G5, G6;
+GEa).
+
+**Not measured here.** The draw alone, apart from the upload; a graphic or a 10-bit clip as a
+matte beyond GMg's printed figures; `hevc`, `hevc_alpha` and the 8-bit WebM rows, which mark
+through the line GEd holds.
 
 ## Codec export C0 — the bundled encoders' link (`codecs_proof.py` L1–L3; `tools/codecs/build_codecs.py --selftest`; spec §11 CX-4, CX-5)
 

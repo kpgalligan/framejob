@@ -2639,7 +2639,8 @@ the key map behind it.
   §11 PR-16; `markDeep`, `deliversDeep`, cleared by `unregister`): an export's
   for a row `Exporter.graphicsDeep` takes, an offline frame's once it comes
   out deep; never a document's. `MetalRenderer.source(for:)` reads it for a
-  shape layer.
+  shape layer that is not a matte member (`layer.matte?.into == nil`, spec
+  §11 PR-17: the 8-bit coverage would band an exact ramp).
 - `GraphicRegistry.swift` · `LayerRenderersGraphic.swift` — a graphic layer
   drawn (road map 10). The registry maps a `RecipeSource` key to one
   immutable `GraphicSet` (library, `libraryVersion`, each module `.compiled`
@@ -2972,8 +2973,8 @@ the key map behind it.
   uploaded `rgba16Float`, spec §11 PR-6; a shape that draws a gradient
   (`ShapeProps.drawsGradient`) is drawn the same way when its frame is
   delivered deeper than 8 bits, `shape(_:hash:deep:)`, in a six-entry pool of
-  its own, spec §11 PR-16; `LayerRenderersImage` is the still
-  arm — the plain, deep and HDR decodes, and a gain-map still's rendition in
+  its own, spec §11 PR-16, never for a layer on a matte track (PR-17);
+  `LayerRenderersImage` is the still arm — the plain, deep and HDR decodes, and a gain-map still's rendition in
   an HLG project, HD-22, whose texture answers its own `peak`),
   keyed by the recipe's `hash` (`RecipeSourceRef.cacheHash` is the WHOLE key;
   nothing here may append to it — a graphic's key is its SVG text instead,

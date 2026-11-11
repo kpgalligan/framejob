@@ -82,7 +82,10 @@ extension MetalRenderer {
             return lifting(rendered.texture, rendered.size)
         case .shape(let hash, let props):
             // Spec §11 PR-16: a gradient is drawn deep where this key's frames are delivered deep.
+            // PR-17: not a matte member, whose values are rounded into the 8-bit coverage,
+            // where the exact ramp bands and Core Graphics' dithered one does not.
             let deep = RecipeSource.shared.deliversDeep(instruction?.recipeKey ?? 0)
+                && layer.matte?.into == nil
             guard let rendered = renderers.shape(props, hash: hash, deep: deep)
             else { return .absent }
             return lifting(rendered.texture, rendered.size)

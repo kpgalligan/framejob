@@ -345,5 +345,61 @@ sibling file.
     gradient shape (G5), PR-14's re-read not marked (G7), and the reader's frame marked without
     `keepsDepth` (GEb). PR-15's `generator-frame-not-deep` was re-aimed at its moved line and
     run again (D5).
+  - Measured since (#588, 2026-11-11):
+    - The cost of the float texture, as a cache miss of `LayerRenderers.shape` (the Core
+      Graphics draw plus the upload; the draw alone is private), `shape563`'s gradient,
+      medians of fifteen alternating pairs in one process, three runs of
+      `shape_draw_probe.py` on an Apple silicon Mac under other builds (load average 23 to
+      24): at 1920×1080 the 8-bit texture 6.49, 6.56 and 6.58 ms and the float one 7.85, 7.62
+      and 7.95 ms, a ratio of 1.21, 1.16 and 1.21; at 3840×2160 25.89, 26.10 and 26.51 ms
+      against 31.07, 31.10 and 32.07 ms, a ratio of 1.20, 1.19 and 1.21. A measurement, not a
+      bound: a gradient animated by an action pays it a frame in a deep export.
+    - An 8-bit movie row: `shape563` exported `h264` decodes equal to the base's, byte for
+      byte (GEd); with the export's mark stripped of its guard the same frame differs by up
+      to 4 levels, 0.69 on average (the mutant `export-always-marked`).
+    - A gradient shape on a matte track: PR-17.
   - No op, catalog, schema, recipe, FFI or format change; `RC_FORMAT_VERSION` is unchanged.
-  - Amends PR-5 and PR-15.
+  - Amends PR-5 and PR-15. Amended by PR-17.
+
+- **PR-17 — A gradient shape on a matte track keeps its 8-bit dithered draw in every frame
+  (#588).**
+  - What PR-16 did not see: a layer on a matte track (its recipe layer's `matte.into` names a
+    group) is drawn through the same `source(for:)` into the matte's composite, and each cut
+    set is then resolved into the `r8Unorm` coverage (MT-6), which PR-5 keeps 8-bit and
+    which is not dithered. So since PR-16, in a frame delivered deep, a matte member's ramp
+    was the exact float one rounded to 8 bits there: a staircase, where Core Graphics' own
+    dithered ramp, rounded the same way, has none. PR-16's "Why not deep everywhere" names
+    the same effect for the compositor's 8-bit output.
+  - The rule, fixed before the app was measured: a `prores_422` export of a white full-canvas
+    card under `shape563` on a `luma` matte track, canvas background black, so the picture's
+    green is the coverage, whose exact value is the gradient's Rec. 709 luma (19.08 to 69.83
+    levels across the canvas); banding RMS at most 0.15 (D3's and B4b's bound) and the
+    row-540 50-px block means strictly increasing (`raster_dither_proof.py` GM).
+  - Measured (Debug, 2026-11-11, row 540, x 0–800): on the tree as PR-16 left it, banding RMS
+    0.2770, 22 levels at median run 38 px, per-pixel noise 0.0000, 1,943,855 bytes: GM fails.
+    The app before PR-16 (Debug at 2be9bf9a): 0.0921, 23 levels at median run 1 px, noise
+    0.4411, 8,918,275 bytes.
+  - The decision: `MetalRenderer.source(for:)` asks for the deep shape texture only when the
+    layer is not a matte member (`layer.matte?.into == nil`). A matte member's gradient shape
+    is Core Graphics' 8-bit dithered bitmap in every frame, as it was before PR-16 and as it
+    is in the preview and every 8-bit export. With it GM reads the base's figures exactly
+    (0.0921, the same 8,918,275 bytes; Release, `raster_dither_proof.py --base`, 17/17 with
+    PR-15's and PR-16's rows; Debug gave the same figures).
+  - Unchanged: a gradient shape that is CUT by a matte, or that no matte touches, is deep
+    where PR-16 says (G1, G3, G5, G6, G7). A shape inside a nest whose clip is on a matte
+    track is a matte member too: the recipe flattens it with `into` set
+    (`core/src/recipe_matte.rs`). The two pools keep the depths apart under one hash, so one
+    shape description drawn both on a matte track and on the canvas gets a texture of each.
+  - Not chosen: a 16-bit coverage in deep frames. It reopens PR-5's and MT-6's memory
+    figures and changes what a 10-bit clip used as a `luma` matte gets; it is a candidate
+    issue, not decided here.
+  - Left open, and filed: a GRAPHIC on a matte track. PR-15's deep raster takes no dither
+    either, and its depth is its key's pin, read by the prefetch ahead of the frame, so the
+    fix is not this one condition. `band374` as the `luma` matte in the same project reads
+    banding RMS 0.3398, 37 levels at median run 21 px (GMg, printed and not scored), on this
+    tree and on the app before PR-16 alike.
+  - Mutant: `matte-shape-deep` (the condition removed) fails GM at 0.2770. PR-16's
+    `shape-never-deep` and `shape-always-deep`, whose anchor is the next line, were run again
+    and caught (G1, G3, G5, G6; GEa).
+  - No op, catalog, schema, recipe, FFI or format change; `RC_FORMAT_VERSION` is unchanged.
+  - Amends PR-16.

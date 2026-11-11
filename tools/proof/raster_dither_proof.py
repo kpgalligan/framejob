@@ -118,7 +118,27 @@ levels, 24 of them over x 0–800. The rows, scored against `--base DIR`, a
 A capture also prints #563's verdict from its own G3 file: the cure is built
 when the 8-bit ramp's ProRes file keeps at least the noise and the error PR-15
 measured for a graphic's dithered raster (`VERDICT_NOISE`, `VERDICT_ERROR`).
-Without `--base` (and not `capture`) G3 and GEa–GEc FAIL.
+Without `--base` (and not `capture`) G3 and GEa–GEd FAIL.
+
+Issue #588, spec §11 PR-17: what PR-16 left unmeasured.
+- **GEd** `shape563` exported `h264`, the frame at 0.5 s as `rgb24`: decodes
+  equal to the base's (the 8-bit rows mark nothing deep, so the shape keeps
+  Core Graphics' dithered draw). Printed: the worst and mean |Δ| against the
+  base over rows 500–580.
+- **GM** project `shapematte`, canvas background black: a flat white
+  full-canvas rectangle on the back track and `shape563` on a `luma` matte
+  track in front of it (read back through `get_project`), exported
+  `prores_422`, the frame at 0.5 s as `rgb48le`. The picture's green is the
+  matte's coverage, whose exact value is the gradient's Rec. 709 luma,
+  `m(x)` (19.08 → 69.83 levels). Holds: banding RMS ≤ 0.15 (D3's and B4b's
+  bound) and the row-540 50-px block means strictly increase. The coverage
+  is 8-bit (`r8`, PR-5), so a ramp drawn at 16-bit float is rounded there
+  with no dither and bands; PR-17 keeps a matte member's 8-bit dithered
+  draw. Printed, not scored: the noise kept, RMS of G − m less its mean, the
+  row-540 runs, and the base's same figures.
+- **GMg**, printed with GM and NOT scored: the same project with `band374`,
+  a graphic, as the `luma` matte (PR-15's deep raster takes no dither
+  either; PR-17 does not cure it).
 
 `capture DIR` runs every row and keeps every file in DIR; its own files are
 the control it is scored against, so on the control tree B1, B3, B4a and B4b
@@ -181,7 +201,7 @@ CARGO_BOUND = 1800
 W, H = 1920, 1080
 SEC = 600_000
 ROWS = ["B1", "B2", "B3", "B4a", "B4b", "F1", "F2", "S1", "E1", "D1", "D3", "D4", "D5", "D6",
-        "D7", "G0", "G1", "G3", "G5", "G6", "G7", "GEa", "GEb", "GEc", "Z1"]
+        "D7", "G0", "G1", "G3", "G5", "G6", "G7", "GEa", "GEb", "GEc", "GEd", "GM", "Z1"]
 # Every file a run keeps, by the row that writes it (L1–L3 are printed only).
 FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B4a": "b4a-prores.mov",
          "B4b": "b4b-hevc10-moving.mp4", "L1": "l1-h264-static.mp4",
@@ -193,13 +213,18 @@ FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B4a": "b4a-prores.mov",
          "G3": "g3-shape-prores.mov", "G4": "g4-shape-hevc10.mp4",
          "G5": "g5-frame-shape-hevc10.png", "G6": "g6-frame-shape-hlg.png",
          "G7": "g7-frame-shape-h264-under-hevc10.png", "GEb": "geb-frame-shape-hlg.jpg",
-         "GEc": "gec-frame-flat-shapes-still.png"}
+         "GEc": "gec-frame-flat-shapes-still.png", "GEd": "ged-shape-h264.mp4",
+         "GM": "gm-shape-matte-prores.mov", "GMg": "gmg-graphic-matte-prores.mov"}
 # Spec §11 PR-16's fixture: the shape's gradient, and its exact G in levels.
 SHAPE_FROM, SHAPE_TO = (13, 21, 18), (42, 79, 61)    # #0D1512 at x 0, #2A4F3D at x 1920
 SHAPE_563 = {"kind": "rectangle", "stroke": None, "width": W, "height": H, "fill": [1, 1, 1, 1],
              "gradient": {"kind": "linear", "angle": 0, "stops": [
                  {"at": 0, "color": [c / 255 for c in SHAPE_FROM] + [1]},
                  {"at": 1, "color": [c / 255 for c in SHAPE_TO] + [1]}]}}
+# GM's card (spec §11 PR-17): flat white over the canvas, so the picture is the matte's coverage.
+WHITE_CARD = {"kind": "rectangle", "stroke": None, "width": W, "height": H, "fill": [1, 1, 1, 1]}
+LUMA = (0.2126, 0.7152, 0.0722)    # `framejob_matte_resolve_fragment`'s weights
+MATTE_BOUND = 0.15                 # GM's banding RMS bound: D3's and B4b's
 # GEc's flat shapes: (shape, video patch).
 FLAT_SHAPES = [
     ({"kind": "rectangle", "stroke": None, "width": 400, "height": 300,
@@ -368,6 +393,13 @@ APP_MUTANTS = {
     "sdr-version-marked": ([(f"{SOURCES}/Exporter+Frame.swift",
                              "            if keepsDepth { RecipeSource.shared.markDeep(key) }\n",
                              "            RecipeSource.shared.markDeep(key)\n")], ["GEb"]),
+    # #588: the export's mark without its guard (GEd), and spec §11 PR-17's one decision (GM).
+    "export-always-marked": ([(f"{SOURCES}/Exporter.swift",
+                               "        if Exporter.graphicsDeep(settings) { "
+                               "RecipeSource.shared.markDeep(key) }\n",
+                               "        RecipeSource.shared.markDeep(key)\n")], ["GEd"]),
+    "matte-shape-deep": ([(f"{SOURCES}/Compositor+Sources.swift",
+                           "                && layer.matte?.into == nil\n", "")], ["GM"]),
 }
 CORE_PATCH = "[patch.crates-io]\n"
 
@@ -508,6 +540,19 @@ def exact(x, y):
 def shape_exact(x, y):
     """`shape563`'s exact G in levels at pixel (x, y)'s centre."""
     return SHAPE_FROM[1] + (SHAPE_TO[1] - SHAPE_FROM[1]) * (x + 0.5) / W
+
+
+def matte_exact(x, y):
+    """GM's exact G in levels: `shape563`'s Rec. 709 luma at pixel (x, y)'s
+    centre, which a `luma` matte over a white card on black shows as is."""
+    t = (x + 0.5) / W
+    return sum(w * (a + (b - a) * t) for w, a, b in zip(LUMA, SHAPE_FROM, SHAPE_TO))
+
+
+def band_matte_exact(x, y):
+    """GMg's exact G in levels: `band374`'s Rec. 709 luma at pixel (x, y)'s centre."""
+    t = min(math.hypot(x + 0.5 - CX, y + 0.5 - CY) / RADIUS, 1.0)
+    return sum(w * (a + (b - a) * t) for w, a, b in zip(LUMA, INNER, OUTER))
 
 
 # ---- the figures --------------------------------------------------------------------
@@ -664,8 +709,9 @@ class Doc:
     def project(self):
         return reply(self.call("get_project")).get("project") or {}
 
-    def clip(self, seconds=1):
-        """A `seconds` clip of the module at 0, covering the canvas."""
+    def clip(self, seconds=1, track=None):
+        """A `seconds` clip of the module at 0, covering the canvas, on the
+        first track (made when there is none) or on `track`."""
         tracks = self.project().get("tracks") or []
         if not tracks:
             self.call("add_track")
@@ -674,7 +720,7 @@ class Doc:
             return False, "no track"
         deadline, got = time.monotonic() + 5, {"error": "not tried"}
         while time.monotonic() < deadline:
-            got = self.call("add_graphic_clip", track=tracks[0]["id"], at=0,
+            got = self.call("add_graphic_clip", track=track or tracks[0]["id"], at=0,
                             duration=seconds * SEC, name=self.module)
             if got["ok"]:
                 return True, ""
@@ -682,12 +728,10 @@ class Doc:
         return False, got.get("error")
 
     def shape_clip(self, shape, video=None, seconds=1):
-        """A `seconds` shape clip at 0 on a NEW track, with `video` patched on it."""
-        before = {track["id"] for track in self.project().get("tracks") or []}
-        self.call("add_track")
-        fresh = [track["id"] for track in self.project().get("tracks") or []
-                 if track["id"] not in before]
-        if not fresh:
+        """A `seconds` shape clip at 0 on a NEW track (kept as `self.track`),
+        with `video` patched on it."""
+        fresh = [self.new_track()]
+        if fresh[0] is None:
             return False, "no new track"
         clips = {clip["id"] for clip in self.project().get("clips") or []}
         got = self.call("add_shape_clip", track=fresh[0], at=0, duration=seconds * SEC,
@@ -699,6 +743,27 @@ class Doc:
         if video:
             got = self.call("set_video", clips=made, patch=video)
         return got["ok"], got.get("error", "")
+
+    def new_track(self):
+        """A new track's id (kept as `self.track`), or None."""
+        before = {track["id"] for track in self.project().get("tracks") or []}
+        self.call("add_track")
+        fresh = [track["id"] for track in self.project().get("tracks") or []
+                 if track["id"] not in before]
+        self.track = fresh[0] if fresh else None
+        return self.track
+
+    def luma_matte(self):
+        """`self.track` made a `luma` matte, in front of every other track and
+        read back: (True, "") or (False, why)."""
+        got = self.call("set_track", track=self.track, matte="luma")
+        tracks = self.project().get("tracks") or []
+        mine = [track for track in tracks if track.get("id") == self.track]
+        if not (got["ok"] and mine and mine[0].get("matte") == "luma"):
+            return False, f"set_track matte: {got.get('error', mine)}"
+        if tracks[-1].get("id") != self.track or len(tracks) < 2:
+            return False, f"the matte track is not in front: {[t.get('id') for t in tracks]}"
+        return True, ""
 
     def sheet(self, file, **extra):
         out = WORK / file
@@ -872,7 +937,7 @@ def run_shapes(client, files):
              "rgb48be"]
     # (the rows that want it, name, the shapes, media in front, media at the back, output)
     plans = [
-        ({"G0", "G3", "GEa"}, "shape", [(SHAPE_563, None)], None, None, None),
+        ({"G0", "G3", "GEa", "GEd"}, "shape", [(SHAPE_563, None)], None, None, None),
         ({"G1"}, "shapestill", [(SHAPE_563, None)], ("gstill16.png", still), None, None),
         ({"G5"}, "shapehevc", [(SHAPE_563, None)], ("ghevc10.mov", hevc), None, None),
         ({"G7"}, "shapereread", [(SHAPE_563, None)], ("ghevc10b.mov", hevc),
@@ -905,6 +970,8 @@ def run_shapes(client, files):
             if "G3" in selected:
                 files["G3"] = doc.export(FILES["G3"], preset="prores_422")
                 files["G4"] = doc.export(FILES["G4"], preset="hevc_10bit")
+            if "GEd" in selected:
+                files["GEd"] = doc.export(FILES["GEd"], preset="h264")
         elif name == "shapehlg":
             if "G6" in selected:
                 files["G6"] = doc.frame(FILES["G6"])
@@ -913,6 +980,37 @@ def run_shapes(client, files):
         else:
             row = sorted(wanted)[0]
             files[row] = doc.frame(FILES[row])
+        closed = doc.close() and closed
+    if "GM" in selected:
+        closed = run_mattes(client, files) and closed
+    return closed
+
+
+def run_mattes(client, files):
+    """Spec §11 PR-17's exports: a white card under `shape563` on a `luma`
+    matte track (GM), and under a `band374` graphic clip on one (GMg)."""
+    closed = True
+    for row, name, module, source in [("GM", "shapematte", None, None),
+                                      ("GMg", "bandmatte", "band374", BAND_JS)]:
+        doc = Doc(client, name, module, source)
+        made, why = (True, "") if doc.ok else (False, doc.why)
+        if made:
+            # A new project's background is opaque black: read, not set (an identity is refused).
+            ground = (doc.project().get("canvas") or {}).get("background")
+            made, why = ground == [0, 0, 0, 1], f"canvas background {ground}"
+        if made:
+            made, why = doc.shape_clip(WHITE_CARD)
+        if made and module is None:
+            made, why = doc.shape_clip(SHAPE_563)
+        elif made:
+            made, why = ((False, "no new track") if doc.new_track() is None
+                         else doc.clip(track=doc.track))
+        if made:
+            made, why = doc.luma_matte()
+        if made:
+            files[row] = doc.export(FILES[row], preset="prores_422")
+        else:
+            print(f"       {name} project: {why}", flush=True)
         closed = doc.close() and closed
     return closed
 
@@ -1093,6 +1191,47 @@ def score_shapes(files, base, capturing):
               "decodes equal to the base's (a flat shape stays 8-bit in a deep frame)",
               same(here, there) and header is not None and header[2] == 16,
               f"read {here is not None}; base {there is not None}; header {header}")
+
+
+def matte_shown(path, e):
+    """A matte export's figures and their printed form against its exact coverage `e`."""
+    figures = movie_figures(path, 0.5, True)
+    movie = read_movie(path, 0.5, True)
+    if figures is None or movie is None:
+        return None, "not read"
+    return figures, f"{shown(figures)}, RMS of G − m less its mean {pixel_error(movie, e=e):.4f}"
+
+
+def score_mattes(files, base):
+    """#588's rows (spec §11 PR-17) over this run's files and the base's (or None)."""
+    def theirs(row):
+        path = base / FILES[row] if base else None
+        return path if path and path.exists() else None
+
+    if "GEd" in selected:
+        here, there = (read_movie(files.get("GEd"), 0.5, False),
+                       read_movie(theirs("GEd"), 0.5, False))
+        gap = "n/a"
+        if here is not None and there is not None:
+            gaps = [abs(a - b) for a, b in zip(here.samples[500 * W * 3:581 * W * 3],
+                                               there.samples[500 * W * 3:581 * W * 3])]
+            gap = f"worst {max(gaps)}, mean {sum(gaps) / len(gaps):.4f}"
+        check("GEd the h264 export of the shape563 clip, the frame at 0.5 s (8-bit decode): "
+              "decodes equal to the base's", same(here, there),
+              f"read {here is not None}; base {there is not None}; |Δ| over rows 500–580: {gap}")
+    if "GM" in selected:
+        here, text = matte_shown(files.get("GM"), matte_exact)
+        _, before = matte_shown(theirs("GM"), matte_exact)
+        good = here is not None and here[0] <= MATTE_BOUND and increasing(here[3])
+        check("GM the prores_422 export of a white card under shape563 on a luma matte track, the "
+              f"frame at 0.5 s (16-bit decode): banding RMS ≤ {MATTE_BOUND}, row-540 block means "
+              "strictly increase", good,
+              f"{text}\n       base: {before}"
+              + (f"\n       row-540 block means {[round(m, 2) for m in here[3]]}" if here else ""))
+        _, graphic = matte_shown(files.get("GMg"), band_matte_exact)
+        _, was = matte_shown(theirs("GMg"), band_matte_exact)
+        print("  --   GMg (NOT scored; PR-17 leaves a graphic matte open) the same under a band374 "
+              f"graphic clip on a luma matte track: {graphic}\n       base: {was}", flush=True)
 
 
 def score(files, control):
@@ -1286,7 +1425,7 @@ def main():
     parser.add_argument("--mutant", choices=list(MUTANTS))
     parser.add_argument("--base", default=None,
                         help="a capture made by the app before spec §11 PR-15 (E1, D3, D4) "
-                             "or PR-16 (G3, GEa–GEc)")
+                             "or PR-16 (G3, GEa–GEd; GM prints its figures)")
     parser.add_argument("--app-mutant", choices=list(APP_MUTANTS))
     args = parser.parse_args()
     base = Path(args.base).resolve() if args.base else None
@@ -1355,6 +1494,7 @@ def main():
     score(files, keep or control)
     score_deep(files, keep or base)
     score_shapes(files, keep or base, keep is not None)
+    score_mattes(files, keep or base)
     found = hdr.complaints(log)
     check("Z1 every project closed and the log holds no `Frame Job: ` line",
           closed and not found, f"closed {closed}; complaints {found}")
