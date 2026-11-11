@@ -300,7 +300,8 @@ detail there.
   `saveBegan` / `saveEnded` (#115, #169), and, under dev tools only, the
   `write(to:ofType:for:originalContentsURL:)` override that holds a save
   `-RCDevSaveHold <s>` seconds after the package is written and before it is
-  swapped in (spec §11 #429).
+  swapped in (spec §11 #429), telling `CacheLedgerDev` when that hold begins and ends
+  (#552).
   `+Import` is File ▸ Add Media… and every drop into an open project
   (`importMedia`, the probe chain and the one grouped commit), the opening
   read's probe (`probeForOpening`, a cancelled copy as `.userCancelled`), and the Media
@@ -543,7 +544,7 @@ detail there.
   of `pictureWidth` (1, CJ-S3) and a serial sound queue, never the
   cooperative pool and never `MediaCacheLane`; a job takes no `CachePass`
   and writes only through `AnalysisStore.publish` or `publishFile` — a lock
-  per (cache, kind, media) inside `CacheLedger.publish(in:for: nil)`,
+  per (cache, kind, media) inside `CacheLedger.publish(in:for: nil, as:)`,
   re-reading and merging what is on disk — so an import pass and a job never
   cancel or wait on each other, and nothing in a publish waits on main. A
   stamp is compared field by field (`AnalysisStamp.matches`).
@@ -640,9 +641,11 @@ detail there.
   `-RCDevAnalysisCanned YES` are dev only, as is the probes'
   `AnalysisLane.devSetProgress`, and `analysis_job`
   (`AgentServer+AnalysisJob.swift`) is the dev tool proofs act through.
-  `CacheLedger.publish`'s optional `waited` says whether a save was in flight
-  when the call came; under dev tools `AnalysisStore.publishFile` counts those
-  per (cache, kind, media) and `analysis_job` answers `save_waits` (spec §11 #429).
+  `CacheLedger.publish` takes its writer's name (`as:`, required; the store's is
+  `AnalysisStore.ledgerWriter`, `analysis/<kind>/<media>`); under dev tools
+  `CacheLedgerDev.swift` counts, per cache folder and writer, the publishes that found a
+  save in flight, and `analysis_job` answers the store's as `save_waits` (spec §11 #429,
+  #552).
   Clip ▸ Split at Shot Changes (road map creator-jobs CJ2b, CJ-28, CJ-29):
   `ShotSplit` is the planner both doors call — targets, one request per
   media over the union of the played windows, cuts mapped to the canvas
@@ -2447,8 +2450,11 @@ the key map behind it.
   owners (a document's recipe key, an export's key while it writes) WANT
   file names; a render nobody wants is cancelled, one wanted again while it
   runs is not, and a cancelled or refused render still wanted is queued
-  again; the finished file is renamed into place inside `CacheLedger.publish`
-  so it never lands mid-save; `wait` returns only on landing, failure or
+  again; the render is written to a landing file outside the package
+  (`RenderLanding.swift`: the item-replacement folder for the package's volume, else one
+  under the temporary directory) and `CacheLedger.publish` makes `cache/<folder>/` and
+  moves it in, so nothing is written into the package outside the ledger and it never
+  lands mid-save (spec §11 #553); `wait` returns only on landing, failure or
   cancellation; `-RCDevRampRenderHold <s>` holds each render (dev only); an
   owner's `settled` closure runs on the main queue when a render it wants
   lands OR fails, so a failure reaches the pane.
@@ -4738,6 +4744,14 @@ free.
   rebuilds: [{generation, built_ms, landed_ms}]}` in that key order, written
   by hand, times rounded to 0.1 ms. `tools/proof/rebuild_log_proof.py` and
   `creator_spike/angles_spike.py` drive it.
+- `CacheLedgerDev.swift` · `AgentServer+CacheLedger.swift` — the cache ledger's dev side
+  (dev only, wholly under the flag; spec §11 #552). `CacheLedgerDev`: per cache folder and
+  writer, the publishes that found a save in flight (`noteWait`, called by
+  `CacheLedger.publish` after it releases its lock), and a one-shot gate (`arm`, `arrive`
+  at `publish`'s first line, `saveHold` from `ProjectDocument+CacheSaves.swift`'s dev
+  `write` override) that holds a named writer's next publish until a save of that folder
+  is inside its `-RCDevSaveHold`. `cache_ledger {gate?, seconds?}`, on main, answers
+  `{ok, cache, save_waits, gate}` at once. `tools/proof/save_hold_proof.py` drives it.
 - `PlaybackTrial.swift` — `PlaybackTrials`, `play_preview`'s record (dev
   only): `Compositor.serve` reports each finished frame's time, compose
   time and, while a trial asks, a SHA-256 of the destination's pixels;

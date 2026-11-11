@@ -415,7 +415,10 @@ hand-back after the sheet has gone, so a proof can act in that gap (spec §11
 `-RCDevSaveHold <s>`, which holds each save of a package for s seconds after it is
 written and before it is swapped in, so a proof can publish a cache file during one
 (spec §11 #429; `analysis_job`'s rows answer `save_waits`, the publishes that waited
-a save out); and
+a save out); and `cache_ledger`, which answers, for a document's cache folder, how many
+publishes of each cache writer met a save and waited it out, and arms a gate that holds a
+named writer's next publish until a save of that folder is inside its `-RCDevSaveHold`
+(spec §11 #552); and
 `-RCDevExportFault audio@N|video@N|audio-hold@N`, the same for an
 `ExportWriter` export's pumps, spec §11 #378), which
 Distribution does not. `rc_op_names`
