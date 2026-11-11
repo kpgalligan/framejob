@@ -8,10 +8,11 @@ microphone as a second file and its offset, the camera beside a running `SCStrea
 the screen file's start estimators, pause as a file sequence, the live preview's cost, the
 virtual cameras, and what a proof can measure without a person. **The answers are not here**:
 they are in `archive/camera-recording.md`'s "CR0 — the spike" record (the rows and the VERDICT
-line). The rule the run is judged by is spec §11 CAM-2
-(`designs/spec/11-decisions/camera-recording.md`), fixed before the run; `results.json` stores
-that file's SHA-256 as `rule_sha256`, so the rule a recorded run read is pinned. What is here is
-how to run it again.
+line). The rule the run is judged by is spec §11 CAM-2, fixed before the run; `results.json`
+stores the SHA-256 of that entry (and of CAM-3 after it under `--format`) as `rule_sha256`, so the
+rule a recorded run read is pinned (`tools/proof/spec_rule.py`; until #585, 2026-11-11, the hash
+was of the whole §11 file, which is what CR0's and step 2's records hold). What is here is how to
+run it again.
 
 ```sh
 python3 tools/proof/camera_spike/camera_spike.py --selftest                              # S1–S5; no build, no camera

@@ -4,10 +4,11 @@ One question the road map asks before any ramp code is written: **do the many ab
 constant-rate segments a ramp's plan will hold click, drop out, or misplace audio or frames, in
 export and in playback?** (`scaleTimeRange` is piecewise-constant, so a ramp is many segments.)
 **The answers are not here**: they are in `archive/speed-ramps.md`'s "SR1 — the spike" record
-(the table and the VERDICT line). The rule the run is judged by is spec §11 SR-5
-(`designs/spec/11-decisions/speed-ramps.md`), fixed before the run; `results.json` stores that
-file's SHA-256 as `rule_sha256`, so the rule a recorded run read is pinned. What is here is how
-to run it again.
+(the table and the VERDICT line). The rule the run is judged by is spec §11 SR-5, fixed before
+the run; `results.json` stores the SHA-256 of that entry as `rule_sha256`, so the rule a recorded
+run read is pinned (`tools/proof/spec_rule.py` finds the entry by ID and lists what each spike and
+mode is judged by; until #585, 2026-11-11, the hash was of the whole §11 file, which is what an
+older `results.json` and the archived records hold). What is here is how to run it again.
 
 ```sh
 python3 tools/proof/ramp_spike/ramp_spike.py --selftest                     # the classifiers' controls; no build
@@ -280,9 +281,10 @@ for f in tools/proof/work/ramp-render-spike-sr1b/renders/R{V,F,C-off}*.caf; do c
 SR-13 put the Keep pitch arm back to SR-6's rate-driven unit with its rate read a lead L ahead
 (`RampAudioRenderer+TimePitch.swift`, `rateLeadFrames`); SR-8's three stages are gone, and
 `RampVarispeedStream` and `position`/`chunk` lost their `per` parameter. SR1d measures the lead
-first and then judges it by spec §11 SR-14 (fixed before the run, pinned by `rule_sha256`; since
-the road map's close SR-14 is in `designs/spec/11-decisions/speed-ramps-2.md`, the file
-`--verdict rate` hashes); the answers are in `archive/speed-ramps.md`'s SR1d record.
+first and then judges it by spec §11 SR-14 (fixed before the run, pinned by `rule_sha256`: since
+#585 the hash of SR-5, SR-7, SR-9, SR-14 and SR-17 as entries, `spec_rule.py`'s row
+`render_spike --verdict rate`; SR1d's own run hashed the whole §11 file); the answers are in
+`archive/speed-ramps.md`'s SR1d record.
 
 ```sh
 python3 tools/proof/ramp_spike/render_spike.py --selftest                           # S8–S21

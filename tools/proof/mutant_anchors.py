@@ -146,6 +146,8 @@ SWITCHES = {
     "ramp_spike/ramp_spike.py": {"MUTANTS": 5},
     "ramp_spike/render_spike.py": {"MUTANTS": 14},
     "retimed_audio_proof.py": {"MUTANTS": 2},
+    # `MUTANT` in its own entry reader, `pin` and the spikes' call scan.
+    "spec_rule.py": {"MUTANTS": 7},
 }
 
 # Single mutants with no anchor, in a table that has anchors. proof → table → [names].

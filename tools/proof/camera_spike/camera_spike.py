@@ -8,7 +8,8 @@ camera grant (the responsible process, the hardened runtime with and without
 microphone as a second file and its offset, the camera beside an `SCStream` recording and
 the screen file's start estimators against a display-link counter, pause as a file sequence,
 the live preview's cost, the virtual cameras, and what a proof can measure without a person.
-It judges by CAM-2 (fixed before the run; `results.json` pins the §11 file's SHA-256).
+It judges by CAM-2 (fixed before the run; `results.json` pins the SHA-256 of that §11 entry, and
+of CAM-3 after it under `--format`: `spec_rule.py`; until #585, 2026-11-11, of the whole §11 file).
 The answers are in `archive/camera-recording.md`'s CR0 record, not here.
 
     python3 tools/proof/camera_spike/camera_spike.py [--groups devices,grant,write,mic,screen,pause,preview,virtual,aimed]
@@ -25,7 +26,6 @@ socket, no MCP, no network; every child runs in its own process group under
 """
 
 import argparse
-import hashlib
 import json
 import os
 import platform
@@ -41,6 +41,7 @@ SPIKE = HERE / "camera_spike"
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE / "graphics_spike"))
 import bounded  # noqa: E402
+import spec_rule  # noqa: E402
 
 WORK = HERE / "work/camera-spike"
 BUILD = WORK / "build"
@@ -49,7 +50,6 @@ ANSWERS = WORK / "answers"
 RESULTS = WORK / "results.json"
 PROBE_SWIFT = SPIKE / "camera_spike_probe.swift"
 LIBRARY = ROOT / "core/target/release/libframejob_core.a"
-RULE_FILE = ROOT / "designs/spec/11-decisions/camera-recording.md"
 
 GROUPS = ["devices", "grant", "write", "mic", "screen", "pause", "preview", "virtual", "aimed"]
 CAMERA_GROUPS = {"grant", "write", "mic", "screen", "pause", "preview", "aimed"}
@@ -1038,7 +1038,8 @@ def main():
     started = time.time()
     for folder in (WORK, RECORDINGS, ANSWERS):
         folder.mkdir(parents=True, exist_ok=True)
-    rule_sha = hashlib.sha256(RULE_FILE.read_bytes()).hexdigest()
+    # CAM-2, and CAM-3 after it when `--format` measures at the format CAM-3 picks (#585).
+    rule = spec_rule.pin("camera_spike --format") if args.format else spec_rule.pin("camera_spike")
     snapshot("start")
     paths, row = build()
     ROWS["B0"] = row
@@ -1054,7 +1055,7 @@ def main():
     ROWS["Q0"] = {"outcome": "ok", "table": q0()}
     results = {
         "command": "python3 tools/proof/camera_spike/camera_spike.py " + " ".join(sys.argv[1:]),
-        "date": time.strftime("%Y-%m-%d %H:%M:%S"), "head": commit(), "rule_sha256": rule_sha,
+        "date": time.strftime("%Y-%m-%d %H:%M:%S"), "head": commit(), **rule,
         "python": platform.python_version(), "groups": groups, "runs": args.runs,
         "camera": Ctx.camera and Ctx.camera["localizedName"], "d3": Ctx.d3, "microphone": Ctx.mic,
         "formatOverride": Ctx.format_override,
@@ -1063,7 +1064,7 @@ def main():
     }
     RESULTS.write_text(json.dumps(results, indent=1))
     print_table()
-    print(f"\nrule_sha256 {rule_sha}; head {results['head']}; {results['seconds']} s; results {RESULTS}")
+    print(f"\nrule_sha256 {rule['rule_sha256']}; head {results['head']}; {results['seconds']} s; results {RESULTS}")
     for failure in FAILURES:
         print(f"INSTRUMENT FAILURE: {failure}", file=sys.stderr)
     code = score(ROWS)

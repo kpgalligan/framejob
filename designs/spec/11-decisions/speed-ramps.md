@@ -22,9 +22,10 @@ source map, the plan's ramped segments, C's refusals, format 27) recorded SR-10,
 Amended-by lines before its code; SR2b (the renderer wired into the composition and the export)
 builds what those lines say Swift does, and recorded SR-12 and SR-6's third Amended-by line
 before its code. Each pinned SHA-256 is of this file as that run read it, when it still held
-every SR- entry recorded by then, so the split leaves those pins as history: `ramp_spike.py` and
-`render_spike.py` hash this file, which holds SR-5, SR-7 and SR-9, and `render_spike.py
---verdict rate` hashes `speed-ramps-2.md`, which holds SR-14.
+every SR- entry recorded by then, so the split left those pins as history. Since #585
+(2026-11-11) `ramp_spike.py` and `render_spike.py` hash the entries a run is judged by, found by
+ID wherever they are (SR-5; SR-5, SR-7 and SR-17, with SR-9 under `--verdict on` and SR-9 and
+SR-14 under `--verdict rate`), not a file: CAM-2's Amended-by line has the rule.
 
 **Stands, and nothing here re-litigates it:** SY-24 (the varispeed lead: a time-scaled segment
 on an `off` track reads its source 575 ticks earlier; ×1 untouched); SY-26 (one pitch name per

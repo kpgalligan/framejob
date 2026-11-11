@@ -7,7 +7,8 @@ export and in playback? Measured on synthetic fixtures through the app's own
 `CompositionBuilder`, `Exporter` and editor player, by `ramp_spike_probe.swift`
 compiled AS `main.swift` over `app/Sources`, against constant-rate controls and
 a planted fault, by SR-5's rule (fixed before the run; `results.json` pins the
-§11 file's SHA-256). The answers are in `archive/speed-ramps.md`'s SR1 record.
+SHA-256 of that §11 entry, `spec_rule.py`; until #585, 2026-11-11, of the whole
+§11 file). The answers are in `archive/speed-ramps.md`'s SR1 record.
 
     python3 tools/proof/ramp_spike/ramp_spike.py [--groups plan,export,playback]
         [--variants V1-G1,C-off-x2,…] [--remake]
@@ -26,7 +27,6 @@ MCP, no network; every child runs under `graphics_spike/bounded.py`.
 import argparse
 import array
 import bisect
-import hashlib
 import itertools
 import json
 import math
@@ -44,6 +44,7 @@ SPIKE = HERE / "ramp_spike"
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE / "graphics_spike"))
 import bounded  # noqa: E402
+import spec_rule  # noqa: E402
 import swift_build  # noqa: E402
 from export_offset_proof import click_value, read_ffmpeg, summary, template  # noqa: E402
 from media_less_playback_probe import build_shader  # noqa: E402
@@ -57,7 +58,6 @@ RESULTS = WORK / "results.json"
 PROBE_SWIFT = SPIKE / "ramp_spike_probe.swift"
 BLANK = ROOT / "app/Resources/Blank.mp4"
 LIBRARY = ROOT / "core/target/release/libframejob_core.a"
-RULE_FILE = ROOT / "designs/spec/11-decisions/speed-ramps.md"
 
 SEC = 600_000
 FRAME = 20_000
@@ -1022,10 +1022,10 @@ def main():
 
     score = Score()
     started = time.time()
-    rule_sha = hashlib.sha256(RULE_FILE.read_bytes()).hexdigest()
+    rule = spec_rule.pin("ramp_spike")  # SR-5, by entry (#585)
     info = host()
     score.row("H0", "measured", f"{info['model']}, macOS {info['macos']}, load {info['load']}, "
-              f"Frame Job pids {info['framejob_pids'] or 'none'}; rule_sha256 {rule_sha[:16]}…")
+              f"Frame Job pids {info['framejob_pids'] or 'none'}; rule_sha256 {rule['rule_sha256'][:16]}…")
     score.row("B0", "ok", f"{LIBRARY.relative_to(ROOT)} present")
 
     past = [f"{n} ends at {source_end(everything[n]) / SEC:.3f} s" for n in names
@@ -1275,7 +1275,7 @@ def main():
 
     RESULTS.write_text(json.dumps({
         "commit": commit(), "date": time.strftime("%Y-%m-%d %H:%M:%S %z"),
-        "seconds": round(time.time() - started), "rule_sha256": rule_sha, "host": info,
+        "seconds": round(time.time() - started), **rule, "host": info,
         "rows": score.rows,
         "variants": {n: {"segments": everything[n]["segs"],
                          "export": _jsonable(results["export"].get(n)),

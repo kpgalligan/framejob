@@ -78,6 +78,17 @@ series (CAM-3 on), before its code.
   **Risk accepted:** a bare binary's grant is its responsible process's (road map 3 R0 q1), so
   T2 and T3 measure the hardened runtime under the terminal's grant, not a signed bundle's own
   prompt; that prompt is a person's check in CR1.
+  **Amended by #585** (2026-11-11): `rule_sha256` is the SHA-256 of the ENTRIES the run is judged
+  by, in order (CAM-2; CAM-2 then CAM-3 under `--format`), not of this file, so a split of the
+  file or an amendment to another entry no longer moves it. An entry is its `- **<ID> — ` line
+  through the line before the next line that is not blank and does not start with a space,
+  trailing blank lines left out, each line with its newline (`tools/proof/spec_rule.py`, whose
+  `RULES` table lists, for each spike and mode, every entry its deciders read: the speed-ramp
+  spikes' rows hold SR-5, SR-7, SR-9, SR-14 and SR-17, which those entries take rules from by
+  reference). `results.json` also holds each entry's own hash and the file it was found in
+  (`rule_entries`) and `rule_method: "entries"`. A hash recorded before this line (CR0's, step
+  2's, the speed-ramp spikes') is of the whole file as that run read it and stays as recorded.
+  This line changes CAM-2's hash, as any amendment to a judged entry does.
 
 - **CAM-3 — The camera recorder's rules (CR1a), recorded before its code; amends CAM-2's Best
   format.** CR0's verdict chose `AVAssetWriter` (CAM-2 Writer) and E1; these are the rules CR1a's
@@ -146,7 +157,8 @@ series (CAM-3 on), before its code.
     rounded (at least 1). In an open project the camera lands by the screen recording's picture
     rule (`RecordingLanding.placement`, unchanged).
   - **The rule's hash.** This entry changes the file's SHA-256, so step 2's run records a new
-    `rule_sha256`; CR0's pinned hash stays CR0's.
+    `rule_sha256`; CR0's pinned hash stays CR0's. *Amended by #585:* since 2026-11-11 the hash
+    is of the judged entries, not the file (CAM-2's Amended-by line).
 
 - **CAM-4 — `record_screen`'s camera (CR1b), recorded before its code.** The tool's own choices
   CAM-3 left open; CAM-3's refusal order stands, and this entry fills in its steps (3) and (7).

@@ -32188,3 +32188,45 @@ than their verify renders.
 
 U1's new clause was red on a Debug build made before the two `set_track` rows in
 `AgentCatalog+Declarations.swift` (`{'compressor': 'object', 'limiter': 'object'}`) and green after.
+
+## #585 — a spike's rule hash, by entry (`spec_rule.py` S1–S6, seven mutants; spec §11 CAM-2 as amended)
+
+`ramp_spike.py`, `render_spike.py` and `camera_spike.py` write `rule_sha256` into `results.json`, so
+the rule a recorded run read is pinned. Until #585 it was the SHA-256 of the whole §11 file, which
+moved with every amendment to any entry of that file and held the file against the spec's split
+rule. `spec_rule.py` hashes the ENTRIES a run is judged by instead: `pin(name)` finds each ID of
+`RULES[name]` by its head line `- **<ID> — ` in whichever file of `designs/spec/11-decisions/`
+holds it, takes the entry through the line before the next non-blank line in column 0 (trailing
+blank lines out), and answers `rule_sha256` (the entries joined in order), `rule_entries` (each
+ID's file and hash) and `rule_method: "entries"`. Standard library only; no app, no build.
+
+```
+python3 tools/proof/spec_rule.py                          # the tree (make test)
+python3 tools/proof/spec_rule.py --selftest               # S1–S6 over scratch folders (make test)
+python3 tools/proof/spec_rule.py --selftest --mutant NAME # exit 1 naming exactly its rows
+```
+
+The tree check prints each `RULES` name's hash and each entry's file, line count and hash, and
+fails unless each spike's source calls `spec_rule.pin` with a string constant for every one of its
+names and nothing else, with no `RULE_FILE` left. The hash sites themselves run only in a real
+spike run (ffmpeg, the staticlib, a camera), which this does not make.
+
+| Row | What it holds | Mutants it catches |
+|---|---|---|
+| S1 | an entry ends at the next entry's head; an indented paragraph after an interior blank line is in it (CAM-2's shape); trailing blank lines are not | `stop-at-blank`, `whole-file`, `head-only` |
+| S2 | one entry hashes the same in mid-file, as the file's last, under another head in another file, and before a column-0 paragraph | `whole-file` |
+| S3 | a neighbour's amendment leaves the hash; one byte changed in the entry's last line moves it | `whole-file`, `head-only` |
+| S4 | `ZZ-1` does not find `ZZ-10`; an ID in no file, in two files and twice in one file is each refused by name | `prefix-loose`, `first-wins` |
+| S5 | `pin` over one entry is that entry's hash; over two, joined in order, order matters, both listed with their files | `first-entry-only` |
+| S6 | a spike's `pin` calls: a bare string literal is not a call, another spike's name, a computed name and a `RULE_FILE` left are each a problem | `literal-scan` |
+
+`whole-file` is the behaviour before #585. Recorded 2026-11-11:
+
+| Run | Result |
+|---|---|
+| `spec_rule.py --selftest` | 6/6, exit 0 |
+| each of the seven mutants, once | exit 1, `MUTANT PASS`, exactly the rows above |
+| `spec_rule.py` before the spikes were changed | exit 1, 9 problems (each spike: no `pin` call for its names, `RULE_FILE` named) |
+| `spec_rule.py` after | exit 0; SR-5 `f877f429…`, SR-7 `219498b0…`, SR-9 `ad79a637…`, SR-14 `673fbaaa…`, SR-17 `8c6b65ab…`, CAM-2 `cd3dca30…`, CAM-3 `b7aa0d56…` |
+| by hand, each restored byte-identical: `camera_spike.py`'s `--format` pin renamed; its other pin pointed at `ramp_spike`; `RULE_FILE` put back in `ramp_spike.py` | exit 1 each (1, 2 and 1 problems) |
+| `ramp_spike.py --selftest`, `render_spike.py --selftest`, `camera_spike.py --selftest` | 7, 15 and 5 rows, exit 0 |

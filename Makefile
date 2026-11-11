@@ -45,6 +45,9 @@ codecs:
 # anchor; no app, no build. `spec_index_proof.py` (issue batch B70) checks the
 # spec indexes' Lines cells against `wc -l`, a row for every spec file and
 # (#548) every decision row naming the file that holds its entry.
+# `spec_rule.py` (#585) is a spike's rule hash: the §11 entries each spike is
+# judged by, found by ID and hashed entry by entry, over scratch folders and
+# then the tree, where each spike must call `spec_rule.pin` by name; no app.
 # `proof_defaults.py` (issue batch B83, #238) is the defaults removal recipe
 # on a throwaway domain, its refusals over scratch folders, then the sweep of
 # the proofs' own idle domains, and of the two probes this target ran, out of
@@ -75,6 +78,8 @@ test: rust codecs
 	python3 tools/proof/budget_proof.py
 	python3 tools/proof/capture_spike/inventory.py --check
 	python3 tools/proof/spec_index_proof.py
+	python3 tools/proof/spec_rule.py --selftest
+	python3 tools/proof/spec_rule.py
 	python3 tools/codecs/build_codecs.py --selftest
 	python3 tools/licenses/acknowledgements.py --selftest
 	python3 tools/proof/swift_build.py --selftest
