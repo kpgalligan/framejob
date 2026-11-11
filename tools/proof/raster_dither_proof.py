@@ -142,6 +142,34 @@ Issue #588, spec §11 PR-17: what PR-16 left unmeasured.
   matte member's graphic as PR-13's dithered 8-bit raster in every frame.
   Until PR-18 it was printed and not scored.
 
+Issue #597, spec §11 PR-19: a matte's coverage in a frame delivered deeper than
+8 bits. The sources are precision_proof's own fixtures (`ramp_clip()`, the
+10-bit ProRes 422 HQ ramp, every 10-bit code 64..940 across 1920 px, grey;
+`still16_png()`, `ramp16.png`, every column X at X/1919 of full scale), each
+placed at 0 on a track of its own at its own size, which is the canvas's, and
+1 s long (read back through `get_project`). Its exact green is
+`e(x) = 255 × x / 1919` levels, which the picture shows as is: grey's Rec. 709
+luma is its own value.
+- **GMc** a white full-canvas card under the ramp clip on a `luma` matte
+  track, canvas background black, exported `prores_422`, the frame at 0.5 s as
+  `rgb48le`; **GMs** the same with `ramp16.png` as the matte. Each beside its
+  control, **GMc0** / **GMs0**, the same source placed plainly (no card, no
+  matte), exported the same way. Holds: banding RMS ≤ `MATTE_BOUND`, the
+  row-540 block means strictly increase, and row 540, x 0–800, holds at least
+  half the distinct stored 16-bit greens its control holds. Printed: the
+  noise kept, RMS of G − e less its mean, the row's runs, the bytes, and the
+  base's same figures. An 8-bit coverage rounds the ramp to 8-bit levels (a
+  run of 7.5 px each), which these measures see and GM's `runs` cannot.
+- **GMe** a 60 % grey card under the ramp clip on a `luma` matte track,
+  exported `h264`, the frame at 0.5 s as `rgb24`: decodes equal to the
+  base's (an 8-bit row keeps the 8-bit coverage; a white card would hide it,
+  since round(1 × c) is the same either way).
+- **GMf** `render_frame` at 0.5 s of GMc's project, beside **GMf0**, the
+  ramp clip's own frame: a 16-bit PNG, banding RMS ≤ `MATTE_BOUND`, and row
+  540 at least half GMf0's distinct 16-bit greens (the generator answers that
+  frame deep with its key unmarked, so it is read again with the key deep).
+Without `--base` (and not `capture`) GMe FAILS.
+
 `capture DIR` runs every row and keeps every file in DIR; its own files are
 the control it is scored against, so on the control tree B1, B3, B4a and B4b
 are expected to FAIL. Without `--control` (and not `capture`) B1–B4b, F1 and
@@ -191,6 +219,7 @@ sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import hdr_proof as hdr  # noqa: E402
 import mcp  # noqa: E402
+import precision_proof as precision  # noqa: E402
 import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 
@@ -205,7 +234,8 @@ CARGO_BOUND = 1800
 W, H = 1920, 1080
 SEC = 600_000
 ROWS = ["B1", "B2", "B3", "B4a", "B4b", "F1", "F2", "S1", "E1", "D1", "D3", "D4", "D5", "D6",
-        "D7", "G0", "G1", "G3", "G5", "G6", "G7", "GEa", "GEb", "GEc", "GEd", "GM", "GMg", "Z1"]
+        "D7", "G0", "G1", "G3", "G5", "G6", "G7", "GEa", "GEb", "GEc", "GEd", "GM", "GMg", "GMc",
+        "GMs", "GMe", "GMf", "Z1"]
 # Every file a run keeps, by the row that writes it (L1–L3 are printed only).
 FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B4a": "b4a-prores.mov",
          "B4b": "b4b-hevc10-moving.mp4", "L1": "l1-h264-static.mp4",
@@ -218,7 +248,11 @@ FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B4a": "b4a-prores.mov",
          "G5": "g5-frame-shape-hevc10.png", "G6": "g6-frame-shape-hlg.png",
          "G7": "g7-frame-shape-h264-under-hevc10.png", "GEb": "geb-frame-shape-hlg.jpg",
          "GEc": "gec-frame-flat-shapes-still.png", "GEd": "ged-shape-h264.mp4",
-         "GM": "gm-shape-matte-prores.mov", "GMg": "gmg-graphic-matte-prores.mov"}
+         "GM": "gm-shape-matte-prores.mov", "GMg": "gmg-graphic-matte-prores.mov",
+         "GMc": "gmc-clip-matte-prores.mov", "GMc0": "gmc0-clip-prores.mov",
+         "GMs": "gms-still-matte-prores.mov", "GMs0": "gms0-still-prores.mov",
+         "GMe": "gme-clip-matte-grey-h264.mp4", "GMf": "gmf-frame-clip-matte.png",
+         "GMf0": "gmf0-frame-clip.png"}
 # Spec §11 PR-16's fixture: the shape's gradient, and its exact G in levels.
 SHAPE_FROM, SHAPE_TO = (13, 21, 18), (42, 79, 61)    # #0D1512 at x 0, #2A4F3D at x 1920
 SHAPE_563 = {"kind": "rectangle", "stroke": None, "width": W, "height": H, "fill": [1, 1, 1, 1],
@@ -229,6 +263,9 @@ SHAPE_563 = {"kind": "rectangle", "stroke": None, "width": W, "height": H, "fill
 WHITE_CARD = {"kind": "rectangle", "stroke": None, "width": W, "height": H, "fill": [1, 1, 1, 1]}
 LUMA = (0.2126, 0.7152, 0.0722)    # `framejob_matte_resolve_fragment`'s weights
 MATTE_BOUND = 0.15                 # GM's banding RMS bound: D3's and B4b's
+# GMe's card (spec §11 PR-19): 60 % grey, so an 8-bit and a 16-bit coverage round apart.
+GREY_CARD = dict(WHITE_CARD, fill=[0.6, 0.6, 0.6, 1])
+RAMP_LAST = 1919                   # precision_proof's ramps: column X at X / 1919 of full scale
 # GEc's flat shapes: (shape, video patch).
 FLAT_SHAPES = [
     ({"kind": "rectangle", "stroke": None, "width": 400, "height": 300,
@@ -566,6 +603,20 @@ def band_matte_exact(x, y):
     return sum(w * (a + (b - a) * t) for w, a, b in zip(LUMA, INNER, OUTER))
 
 
+def ramp_exact(x, y):
+    """GMc's and GMs's exact G in levels: precision_proof's ramps hold column
+    x at x / 1919 of full scale, grey, so a `luma` matte of either over a
+    white card on black shows it as is."""
+    return 255.0 * x / RAMP_LAST
+
+
+def deep_distinct(picture):
+    """How many distinct stored 16-bit greens row 540, x 0–800, holds, or None
+    for an 8-bit picture or none."""
+    values = deep_row(picture)
+    return None if values is None else len(set(values))
+
+
 # ---- the figures --------------------------------------------------------------------
 
 def runs(picture):
@@ -823,6 +874,40 @@ class Doc:
         got = self.call("add_clip", track=fresh[0], media=media, at=0)
         return got["ok"], got.get("error", "")
 
+    def canvas_media(self, path, seconds=1):
+        """`path` imported and placed at 0 on a NEW track (kept as `self.track`),
+        `seconds` long, read back covering the canvas exactly: its media W×H and
+        the clip at scale 1, centred. (True, "") or (False, why)."""
+        if path is None:
+            return False, "no fixture"
+        got = self.call("import_media", path=str(path))
+        media = reply(got).get("media")
+        if media is None:
+            return False, f"import_media: {got.get('error', got)}"
+        if self.new_track() is None:
+            return False, "no new track"
+        before = {clip["id"] for clip in self.project().get("clips") or []}
+        got = self.call("add_clip", track=self.track, media=media, at=0)
+        made = [clip for clip in self.project().get("clips") or [] if clip["id"] not in before]
+        if not (got["ok"] and len(made) == 1):
+            return False, f"add_clip: {got.get('error', f'{len(made)} new clips')}"
+        if made[0].get("duration") != seconds * SEC:
+            got = self.call("trim_end", clip=made[0]["id"], to=seconds * SEC)
+            if not got["ok"]:
+                return False, f"trim_end: {got.get('error')}"
+        project = self.project()
+        clip = [c for c in project.get("clips") or [] if c["id"] == made[0]["id"]]
+        item = [m for m in project.get("media") or [] if m.get("id") == media]
+        video = (clip[0].get("video") or {}) if clip else {}
+        size = [item[0].get("width"), item[0].get("height")] if item else None
+        placed = (clip and clip[0].get("start") == 0 and clip[0].get("duration") == seconds * SEC
+                  and size == [W, H] and video.get("scale") == 1 and video.get("x") == 0
+                  and video.get("y") == 0)
+        return bool(placed), "" if placed else (
+            f"read back: media size {size}, clip {clip[0].get('start') if clip else None}+"
+            f"{clip[0].get('duration') if clip else None}, video scale {video.get('scale')} "
+            f"at ({video.get('x')}, {video.get('y')})")
+
     def close(self):
         return attempt(self.client, "close_project", {"project": str(self.path),
                                                        "discard": True})["ok"]
@@ -994,6 +1079,8 @@ def run_shapes(client, files):
         closed = doc.close() and closed
     if selected & {"GM", "GMg"}:
         closed = run_mattes(client, files) and closed
+    if selected & {"GMc", "GMs", "GMe", "GMf"}:
+        closed = run_source_mattes(client, files) and closed
     return closed
 
 
@@ -1025,6 +1112,44 @@ def run_mattes(client, files):
             files[row] = doc.export(FILES[row], preset="prores_422")
         else:
             print(f"       {name} project: {why}", flush=True)
+        closed = doc.close() and closed
+    return closed
+
+
+def run_source_mattes(client, files):
+    """Spec §11 PR-19's projects (#597): precision_proof's 10-bit ramp clip and
+    deep still, each as a `luma` matte over a white card (GMc, GMs, GMf) or a
+    60 % grey one (GMe), and each placed plainly as its control (GMc0, GMs0,
+    GMf0), each only when a row that reads it is selected."""
+    closed = True
+    clip, still = precision.ramp_clip(), precision.still16_png()
+    # (name, the source, the card under it or None, [(row, file, preset or None for a frame)])
+    plans = [("clipmatte", clip, WHITE_CARD, [("GMc", "GMc", "prores_422"), ("GMf", "GMf", None)]),
+             ("clipplain", clip, None, [("GMc", "GMc0", "prores_422"), ("GMf", "GMf0", None)]),
+             ("stillmatte", still, WHITE_CARD, [("GMs", "GMs", "prores_422")]),
+             ("stillplain", still, None, [("GMs", "GMs0", "prores_422")]),
+             ("clipgrey", clip, GREY_CARD, [("GMe", "GMe", "h264")])]
+    for name, source, card, outputs in plans:
+        outputs = [output for output in outputs if output[0] in selected]
+        if not outputs:
+            continue
+        doc = Doc(client, name)
+        made, why = (True, "") if doc.ok else (False, doc.why)
+        if made:
+            # A new project's background is opaque black: read, not set (an identity is refused).
+            ground = (doc.project().get("canvas") or {}).get("background")
+            made, why = ground == [0, 0, 0, 1], f"canvas background {ground}"
+        if made and card is not None:
+            made, why = doc.shape_clip(card)
+        if made:
+            made, why = doc.canvas_media(source)
+        if made and card is not None:
+            made, why = doc.luma_matte()
+        if not made:
+            print(f"       {name} project: {why}", flush=True)
+        for _, file, preset in outputs if made else []:
+            files[file] = (doc.export(FILES[file], preset=preset) if preset
+                           else doc.frame(FILES[file]))
         closed = doc.close() and closed
     return closed
 
@@ -1254,6 +1379,68 @@ def score_mattes(files, base):
               + (f"\n       row-540 block means {[round(m, 2) for m in here[3]]}" if here else ""))
 
 
+def ramp_figures(path, picture):
+    """GMc's, GMs's and GMf's printed figures of one decoded picture."""
+    if picture is None:
+        return "not read"
+    levels, median, widest = runs(picture)
+    size = Path(path).stat().st_size if path and Path(path).exists() else None
+    return (f"banding RMS {banding(picture):.4f}, noise kept {noise(picture):.4f}, RMS of G − e "
+            f"less its mean {pixel_error(picture, e=ramp_exact):.4f}, row 540 x 0–800 "
+            f"{deep_distinct(picture)} distinct 16-bit greens, {levels} 8-bit levels at median "
+            f"run {median}, widest {widest}, {size} bytes")
+
+
+def score_source_mattes(files, base):
+    """#597's rows (spec §11 PR-19) over this run's files and the base's (or None)."""
+    def theirs(row):
+        path = base / FILES[row] if base else None
+        return path if path and path.exists() else None
+
+    for row, control, title in [("GMc", "GMc0", "the 10-bit ProRes ramp clip"),
+                                ("GMs", "GMs0", "the 16-bit PNG ramp still")]:
+        if row not in selected:
+            continue
+        here = read_movie(files.get(row), 0.5, True)
+        plain = read_movie(files.get(control), 0.5, True)
+        before = read_movie(theirs(row), 0.5, True)
+        kept, wanted = deep_distinct(here), deep_distinct(plain)
+        good = (here is not None and kept is not None and wanted is not None
+                and banding(here) <= MATTE_BOUND and increasing(block_means(here))
+                and 2 * kept >= wanted)
+        check(f"{row} the prores_422 export of a white card under {title} on a luma matte track, "
+              f"the frame at 0.5 s (16-bit decode): banding RMS ≤ {MATTE_BOUND}, row-540 block "
+              f"means strictly increase, row 540 at least half the distinct 16-bit greens of the "
+              f"source placed plainly ({control})", good,
+              f"{ramp_figures(files.get(row), here)}\n       {control}: "
+              f"{ramp_figures(files.get(control), plain)}\n       base: "
+              f"{ramp_figures(theirs(row), before)}"
+              + (f"\n       row-540 block means {[round(m, 2) for m in block_means(here)]}"
+                 if here else ""))
+    if "GMe" in selected:
+        here, there = (read_movie(files.get("GMe"), 0.5, False),
+                       read_movie(theirs("GMe"), 0.5, False))
+        gap = "n/a"
+        if here is not None and there is not None:
+            gaps = [abs(a - b) for a, b in zip(here.samples[500 * W * 3:581 * W * 3],
+                                               there.samples[500 * W * 3:581 * W * 3])]
+            gap = f"worst {max(gaps)}, mean {sum(gaps) / len(gaps):.4f}"
+        check("GMe the h264 export of a 60 % grey card under the ramp clip on a luma matte track, "
+              "the frame at 0.5 s (8-bit decode): decodes equal to the base's", same(here, there),
+              f"read {here is not None}; base {there is not None}; |Δ| over rows 500–580: {gap}")
+    if "GMf" in selected:
+        here, plain = read_png(files.get("GMf")), read_png(files.get("GMf0"))
+        header = png_header(files["GMf"]) if files.get("GMf") else None
+        kept, wanted = deep_distinct(here), deep_distinct(plain)
+        good = (kept is not None and wanted is not None and banding(here) <= MATTE_BOUND
+                and 2 * kept >= wanted)
+        check(f"GMf render_frame at 0.5 s of GMc's project: a 16-bit PNG, banding RMS ≤ "
+              f"{MATTE_BOUND}, row 540 at least half the distinct 16-bit greens of the clip's own "
+              "frame (GMf0)", good,
+              f"header {header}; {ramp_figures(files.get('GMf'), here)}\n       GMf0: "
+              f"{ramp_figures(files.get('GMf0'), plain)}")
+
+
 def score(files, control):
     """Every row but Z1, over this run's files and the control's (or None)."""
     def theirs(row):
@@ -1445,7 +1632,8 @@ def main():
     parser.add_argument("--mutant", choices=list(MUTANTS))
     parser.add_argument("--base", default=None,
                         help="a capture made by the app before spec §11 PR-15 (E1, D3, D4) "
-                             "or PR-16 (G3, GEa–GEd; GM and GMg print its figures)")
+                             "or PR-16 (G3, GEa–GEd, GMe; GM, GMg, GMc and GMs print its "
+                             "figures)")
     parser.add_argument("--app-mutant", choices=list(APP_MUTANTS))
     args = parser.parse_args()
     base = Path(args.base).resolve() if args.base else None
@@ -1515,6 +1703,7 @@ def main():
     score_deep(files, keep or base)
     score_shapes(files, keep or base, keep is not None)
     score_mattes(files, keep or base)
+    score_source_mattes(files, keep or base)
     found = hdr.complaints(log)
     check("Z1 every project closed and the log holds no `Frame Job: ` line",
           closed and not found, f"closed {closed}; complaints {found}")
