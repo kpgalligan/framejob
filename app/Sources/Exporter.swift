@@ -251,7 +251,9 @@ final class Exporter {
         // makes this enough: `finish` unregisters the key and takes them with
         // it, and nothing else in the process can be reading it.
         RecipeSource.shared.setOptions(options.delivering(settings), for: key)
-        if let graphics = graphics { GraphicRegistry.shared.pin(graphics, for: key) }
+        if let graphics = graphics {
+            GraphicRegistry.shared.pin(graphics, for: key, deep: Exporter.graphicsDeep(settings))
+        }
 
         measureShare = Exporter.measuresLoudness(settings)
             ? (settings.isAudioOnly ? 0.5 : 0.1) : 0

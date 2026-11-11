@@ -376,7 +376,7 @@ final class GraphicPrefetch: @unchecked Sendable {
         entry.bytes = 0
         guard keeping.contains(session.key), entry.done,
             case .success(let raster)? = entry.raster, let textureKey = entry.textureKey,
-            raster.bgra.count <= budgetBytes - heldTotal
+            raster.byteCount <= budgetBytes - heldTotal
         else { return false }
         kept.insert(session.key, textureKey, raster)
         kept.trim(toFit: budgetBytes - heldTotal)
@@ -476,16 +476,16 @@ final class GraphicPrefetch: @unchecked Sendable {
         defer { condition.unlock() }
         let slots = wanted.map(\.slot)
         while session.follows, aheadOrigin?.key == session.key, !session.stopped,
-            !roomAhead(for: slots) { condition.wait() }
+            !roomAhead(for: slots, key: session.key) { condition.wait() }
         guard !session.stopped else { return nil }
-        if session.background, !roomAhead(for: slots) {
+        if session.background, !roomAhead(for: slots, key: session.key) {
             (session.exhausted, session.end) = (true, "full")
             return nil
         }
         session.framesWithGraphics += 1
         var jobs: [Job] = []
         for (slot, module) in wanted where session.slots[slot] == nil {
-            let entry = Entry(index: index, bytes: slot.width * slot.height * 4)
+            let entry = Entry(index: index, bytes: rasterBytes(slot, key: session.key))
             session.slots[slot] = entry
             session.heldBytes += entry.bytes
             heldTotal += entry.bytes
@@ -503,7 +503,7 @@ final class GraphicPrefetch: @unchecked Sendable {
     /// between jobs, and the rest marked done. A texture key an earlier
     /// frame's entry rasterizes, or the key keeps, is left to the compositor.
     private func draw(
-        _ jobs: [Job], session: Session, resolved: (set: GraphicSet, budgetMs: Int)
+        _ jobs: [Job], session: Session, resolved: GraphicRegistry.Resolved
     ) {
         for (position, job) in jobs.enumerated() {
             condition.lock()
@@ -524,7 +524,7 @@ final class GraphicPrefetch: @unchecked Sendable {
             }
             let key = LayerRenderers.textureKey(
                 svg: drawn.svg, width: slot.width, height: slot.height,
-                libraryVersion: resolved.set.libraryVersion)
+                libraryVersion: resolved.set.libraryVersion, deep: resolved.deep)
             condition.lock()
             job.entry.textureKey = key
             let keptAlready = keeping.contains(session.key) && kept.contains(session.key, key)
@@ -553,7 +553,7 @@ final class GraphicPrefetch: @unchecked Sendable {
             condition.unlock()
             let raster = Result<GraphicRaster, any Error>(catching: {
                 try resolved.set.library.rasterize(
-                    drawn.svg, width: slot.width, height: slot.height)
+                    drawn.svg, width: slot.width, height: slot.height, deep: resolved.deep)
             })
             finish(job, in: session, raster: raster)
         }

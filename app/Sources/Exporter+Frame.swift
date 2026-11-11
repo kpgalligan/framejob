@@ -45,7 +45,8 @@ extension Exporter {
     /// is the only way a proof script can photograph a burn-in at all.
     ///
     /// `graphics` is pinned on the frame's own key, as `export` pins it on
-    /// its own; nil draws every graphic's slate. `keepsDepth` is the caller's
+    /// its own; nil draws every graphic's slate, and the pin is marked deep when
+    /// the frame comes out deep and `keepsDepth` (PR-15). `keepsDepth` is the caller's
     /// format (`carriesDepth`): when true and `DeepVideoFrame.reads` the frame (a deep still,
     /// PR-9, or a deep VP9 track, PR-12), `DeepStillFrame.read`'s reader reads it, and
     /// it re-reads a frame the generator answers 8-bit while it shows a deep source (PR-14).
@@ -110,7 +111,13 @@ extension Exporter {
                 image: nil, graphics: GraphicRegistry.shared.reports(for: key),
                 cursorWarnings: cursorWarnings, uncut: uncut)
         }
-        if DeepVideoFrame.reads(project, built, urls: urls, at: t, options: options, keepsDepth: keepsDepth) {
+        let reads = DeepVideoFrame.reads(
+            project, built, urls: urls, at: t, options: options, keepsDepth: keepsDepth)
+        // Spec §11 PR-15: a frame that comes out deep, in a format that keeps depth, draws
+        // its graphics deep; every other frame keeps the dithered 8-bit raster.
+        let deepens = keepsDepth && graphics != nil
+        if reads {
+            if deepens { GraphicRegistry.shared.markDeep(key) }
             return RenderedFrame(
                 image: DeepStillFrame.read(built, at: t, maxWidth: maxWidth),
                 graphics: GraphicRegistry.shared.reports(for: key), cursorWarnings: cursorWarnings,
@@ -130,6 +137,14 @@ extension Exporter {
         }
         var image = try? generator.copyCGImage(
             at: CompositionBuilder.time(max(0, t)), actualTime: nil)
+        // The generator answered deep with the frame's graphics drawn at 8 bits: the reader
+        // reads it again with them deep (PR-15). A frame with no graphic is not read twice.
+        if deepens, let first = image, first.bitsPerComponent > 8,
+            drawsGraphic(project, at: t, options: options)
+        {
+            GraphicRegistry.shared.markDeep(key)
+            image = DeepStillFrame.read(built, at: t, maxWidth: maxWidth) ?? image
+        }
         // The generator's depth follows the lowest track that has video, so a
         // deep clip above an 8-bit one comes back 8-bit (spec §11 PR-14). A
         // frame already deep never asks, so HEVC or ProRes alone stays byte
@@ -137,6 +152,7 @@ extension Exporter {
         if keepsDepth, let shallow = image, shallow.bitsPerComponent <= 8,
             DeepVideoFrame.showsDeepSource(project, built, at: t, options: options)
         {
+            if deepens { GraphicRegistry.shared.markDeep(key) }
             image = DeepStillFrame.read(built, at: t, maxWidth: maxWidth) ?? image
         }
         return RenderedFrame(

@@ -69,7 +69,7 @@ struct KeptFrames {
     private var order: [(name: Name, stamp: Int)] = []
     private var head = 0
     private var clock = 0
-    /// Σ raster.bgra.count over the kept frames.
+    /// Σ raster.byteCount over the kept frames.
     private(set) var bytes = 0
 
     var count: Int { frames.count }
@@ -96,7 +96,7 @@ struct KeptFrames {
         clock += 1
         frames[name] = Frame(name: name, raster: raster, stamp: clock)
         order.append((name, clock))
-        bytes += raster.bgra.count
+        bytes += raster.byteCount
     }
 
     /// Out until `bytes <= max(0, room)`: unmarked frames least recently used
@@ -141,7 +141,7 @@ struct KeptFrames {
             ahead[name] = max(old, index)
         } else {
             ahead[name] = index
-            aheadBytes += frame.raster.bgra.count
+            aheadBytes += frame.raster.byteCount
         }
     }
 
@@ -150,7 +150,7 @@ struct KeptFrames {
         let passed = ahead.filter { $0.value < index }.map(\.key)
         for name in passed {
             ahead[name] = nil
-            if let frame = frames[name] { aheadBytes -= frame.raster.bgra.count }
+            if let frame = frames[name] { aheadBytes -= frame.raster.byteCount }
         }
     }
 
@@ -163,8 +163,8 @@ struct KeptFrames {
     /// `name`'s frame out, and its mark with it.
     private mutating func evict(_ name: Name) {
         guard let frame = frames.removeValue(forKey: name) else { return }
-        bytes -= frame.raster.bgra.count
-        if ahead.removeValue(forKey: name) != nil { aheadBytes -= frame.raster.bgra.count }
+        bytes -= frame.raster.byteCount
+        if ahead.removeValue(forKey: name) != nil { aheadBytes -= frame.raster.byteCount }
     }
 
     private mutating func touch(_ name: Name) {
@@ -298,9 +298,16 @@ extension GraphicPrefetch {
     /// Whether a background pass can take `slots` without its marked frames
     /// giving way: they, every held raster and `slots` within the budget. A
     /// pass ends `full` when not (G-38 (c)). Under `condition`.
-    func roomAhead(for slots: [Slot]) -> Bool {
-        kept.aheadBytes + heldTotal + slots.reduce(0) { $0 + $1.width * $1.height * 4 }
+    func roomAhead(for slots: [Slot], key: Int) -> Bool {
+        kept.aheadBytes + heldTotal + slots.reduce(0) { $0 + rasterBytes($1, key: key) }
             <= budgetBytes
+    }
+
+    /// The bytes `slot`'s raster will hold under `key`: 4 a pixel, or 8 when
+    /// the key draws deep (spec §11 PR-15). Any thread.
+    func rasterBytes(_ slot: Slot, key: Int) -> Int {
+        let deep = GraphicRegistry.shared.resolve(key)?.deep == true
+        return slot.width * slot.height * (deep ? 8 : 4)
     }
 
     /// A background session's one line (G-38 (c)); B is the marked bytes.
@@ -320,7 +327,7 @@ extension GraphicPrefetch {
     func keep(_ key: Int, textureKey: String, raster: GraphicRaster) {
         condition.lock()
         defer { condition.unlock() }
-        guard keeping.contains(key), raster.bgra.count <= budgetBytes - heldTotal else { return }
+        guard keeping.contains(key), raster.byteCount <= budgetBytes - heldTotal else { return }
         kept.insert(key, textureKey, raster)
         kept.trim(toFit: budgetBytes - heldTotal)
     }

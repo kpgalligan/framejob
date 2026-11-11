@@ -82,6 +82,8 @@ final class GraphicRegistry {
     /// warns on every frame can fill `warnings` and never hide it.
     private struct Pin {
         let set: GraphicSet
+        /// The key's frames are delivered deeper than 8 bits (spec §11 PR-15).
+        var deep = false
         var failure: GraphicReport?
         var warnings: [GraphicReport]
     }
@@ -171,11 +173,21 @@ final class GraphicRegistry {
     }
 
     /// Opens `key`'s pin on `set`: an offline key draws with it until
-    /// `unpin`, and records its reports. Any thread.
-    func pin(_ set: GraphicSet, for key: Int) {
+    /// `unpin`, and records its reports. `deep` says the key's frames are
+    /// delivered deeper than 8 bits, so its graphics are drawn deep (spec
+    /// §11 PR-15). Any thread.
+    func pin(_ set: GraphicSet, for key: Int, deep: Bool = false) {
         lock.lock()
         defer { lock.unlock() }
-        pins[key] = Pin(set: set, failure: nil, warnings: [])
+        pins[key] = Pin(set: set, deep: deep, failure: nil, warnings: [])
+    }
+
+    /// Marks `key`'s pin deep, before its first frame is asked for; a no-op
+    /// for a key never pinned. Any thread.
+    func markDeep(_ key: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        pins[key]?.deep = true
     }
 
     /// Drops `key`'s pin and its reports; a no-op for a key never pinned.
@@ -228,15 +240,28 @@ final class GraphicRegistry {
         return pins[key]?.failure
     }
 
+    /// What a recipe under a key draws with: the set, the per-frame budget,
+    /// and whether its graphics are drawn deep (spec §11 PR-15).
+    struct Resolved {
+        let set: GraphicSet
+        let budgetMs: Int
+        let deep: Bool
+    }
+
     /// The set a recipe under `key` draws with, and the per-frame budget:
-    /// a document's own key answers its set at the preview budget; a
-    /// pinned offline key answers its pinned set at the offline budget;
-    /// anything else is nil. Any thread.
-    func resolve(_ key: Int) -> (set: GraphicSet, budgetMs: Int)? {
+    /// a document's own key answers its set at the preview budget, never
+    /// deep (the preview is 8-bit and keeps PR-13's dither); a pinned
+    /// offline key answers its pinned set at the offline budget, deep when
+    /// its pin says so; anything else is nil. Any thread.
+    func resolve(_ key: Int) -> Resolved? {
         lock.lock()
         defer { lock.unlock() }
-        if let own = sets[key] { return (own, Self.previewBudgetMs) }
-        if let pinned = pins[key] { return (pinned.set, Self.offlineBudgetMs) }
+        if let own = sets[key] {
+            return Resolved(set: own, budgetMs: Self.previewBudgetMs, deep: false)
+        }
+        if let pinned = pins[key] {
+            return Resolved(set: pinned.set, budgetMs: Self.offlineBudgetMs, deep: pinned.deep)
+        }
         return nil
     }
 

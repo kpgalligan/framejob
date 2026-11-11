@@ -48,9 +48,14 @@ final class GraphicLibrary {
         GraphicUsage.decoded(takeString(rc_graphic_library_usage(handle)))
     }
 
-    /// `svg` drawn at `width`×`height`, rows `width × 4` bytes apart.
-    func rasterize(_ svg: String, width: Int, height: Int) throws -> GraphicRaster {
+    /// `svg` drawn at `width`×`height`, rows `width × 4` bytes apart; `deep` draws it at 16
+    /// bits a channel (`rc_graphic_rasterize_deep`, spec §11 PR-15), rows `width × 8` bytes
+    /// apart, for a frame delivered deeper than 8 bits.
+    func rasterize(
+        _ svg: String, width: Int, height: Int, deep: Bool = false
+    ) throws -> GraphicRaster {
         try GraphicFailure.checkSides(width, height, max: Self.maxSide)
+        if deep { return try rasterizeDeep(svg, width: width, height: height) }
         let stride = width * 4
         var bgra = [UInt8](repeating: 0, count: max(height * stride, 1))
         var diag: UnsafeMutablePointer<CChar>? = nil
@@ -62,6 +67,25 @@ final class GraphicLibrary {
         guard ok else { throw GraphicFailure(diagnostics: diagnostics) }
         return GraphicRaster(
             width: width, height: height, stride: stride, bgra: bgra, warnings: diagnostics)
+    }
+
+    /// The deep draw: the export writes every value on success and the call throws
+    /// otherwise, so the buffer is made without a zero fill.
+    private func rasterizeDeep(_ svg: String, width: Int, height: Int) throws -> GraphicRaster {
+        let values = width * 4
+        var diag: UnsafeMutablePointer<CChar>? = nil
+        var ok = false
+        let rgba16 = [UInt16](unsafeUninitializedCapacity: max(height * values, 1)) { out, count in
+            ok = rc_graphic_rasterize_deep(
+                handle, svg, UInt32(width), UInt32(height), out.baseAddress, values, &diag)
+            if !ok { out.initialize(repeating: 0) }
+            count = out.count
+        }
+        let diagnostics = takeDiagnostics(diag)
+        guard ok else { throw GraphicFailure(diagnostics: diagnostics) }
+        return GraphicRaster(
+            width: width, height: height, stride: values * 2, bgra: [], warnings: diagnostics,
+            rgba16: rgba16)
     }
 }
 

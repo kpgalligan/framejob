@@ -33,6 +33,34 @@ extension Exporter {
         let uncut: [UInt32]
     }
 
+    /// Whether an export's graphics are drawn deep (spec §11 PR-15): true exactly when the
+    /// row's video keeps more than 8 bits a channel. An audio-only export and an image
+    /// sequence (GIF, APNG: 8-bit, drawn through `renderFrameReported`'s own keys) are not.
+    /// A bundled encoder's row answers by its encoder's depth (`ExportEncodePump`): VP9
+    /// with alpha 8, VP9 by its picture, AV1 10. Every other row by `ExportWriter.frameForm`:
+    /// `h264`, `hevc` and `hevc_alpha` are rounded to 8 bits first (PR-3).
+    static func graphicsDeep(_ settings: ExportSettings) -> Bool {
+        guard !settings.isAudioOnly, !settings.isImageSequence else { return false }
+        if settings.writer == ExportEncodePump.vp9Writer {
+            return !settings.alpha
+                && VP9Encoder.bitDepth(for: ExportAV1Picture(color: settings.color)) > 8
+        }
+        if settings.writer != nil { return true }
+        switch ExportWriter.frameForm(settings) {
+        case .eightBit?, .straightEightBit?: return false
+        default: return true
+        }
+    }
+
+    /// Whether the recipe at `t` draws a graphic layer: PR-15's question of a frame the
+    /// generator answered deep, before it is read again with its graphics deep.
+    static func drawsGraphic(_ project: ReelProject, at t: Ticks, options: RecipeOptions) -> Bool {
+        guard let recipe = project.recipe(at: max(0, t), options: options) else { return false }
+        return recipe.layers.contains {
+            if case .graphic = $0.source { return true } else { return false }
+        }
+    }
+
     /// `.graphicsNotCompiled` when a graphic clip the export will draw has a
     /// module that failed to compile or has none, else nil. Nothing to gate
     /// with no set or an audio-only export. The clips are the top level's in
