@@ -69,7 +69,7 @@ final class GraphicPrefetch: @unchecked Sendable {
     static let entryCeiling = 1024
 
     /// One slot's raster as a worker made it. Guarded by `condition`.
-    private final class Entry {
+    final class Entry {
         let index: Int
         var bytes: Int
         var done = false
@@ -89,7 +89,7 @@ final class GraphicPrefetch: @unchecked Sendable {
 
     /// One export's prefetch. Guarded by `condition`; its workers hold it
     /// after `stop` has removed it from `sessions`.
-    private final class Session: @unchecked Sendable {
+    final class Session: @unchecked Sendable {
         let key: Int
         let start: CMTime
         let frameDuration: CMTime
@@ -157,7 +157,7 @@ final class GraphicPrefetch: @unchecked Sendable {
     }
 
     let condition = NSCondition()
-    private var sessions: [Int: Session] = [:]
+    var sessions: [Int: Session] = [:]
     /// The kept frames and the keys that keep (G-37 (c)).
     var kept = KeptFrames()
     var keeping: Set<Int> = []
@@ -230,14 +230,6 @@ final class GraphicPrefetch: @unchecked Sendable {
             thread.start()
         }
         return true
-    }
-
-    /// `stop(key)` for every background session, no other. Main only.
-    func stopBackground() {
-        condition.lock()
-        let keys = sessions.values.filter(\.background).map(\.key)
-        condition.unlock()
-        for key in keys { stop(key) }
     }
 
     /// Ends `key`'s session: its entries unused (a keeping key's finished
@@ -368,7 +360,7 @@ final class GraphicPrefetch: @unchecked Sendable {
     /// An entry's bytes out of the totals, once; a keeping key's finished
     /// raster then kept, room permitting (true when it is). Under `condition`.
     @discardableResult
-    private func release(_ entry: Entry, from session: Session) -> Bool {
+    func release(_ entry: Entry, from session: Session) -> Bool {
         guard entry.bytes > 0 else { return false }
         session.heldBytes -= entry.bytes
         heldTotal -= entry.bytes
@@ -386,7 +378,7 @@ final class GraphicPrefetch: @unchecked Sendable {
     // MARK: - Workers
 
     /// One graphic layer a worker will draw.
-    private struct Job {
+    struct Job {
         let slot: Slot
         let entry: Entry
         let module: GraphicModule
@@ -534,16 +526,7 @@ final class GraphicPrefetch: @unchecked Sendable {
                 job.entry.deferred = true
                 release(job.entry, from: session)
                 if session.background, !session.stopped {
-                    if session.slots[job.slot] === job.entry { session.slots[job.slot] = nil }
-                    if keptAlready, kept.raster(session.key, key) != nil {
-                        kept.markAhead(session.key, key, index: job.entry.index)
-                        session.alreadyKept += 1
-                    } else if let first = session.slots.values.first(where: {
-                        !$0.done && $0.textureKey == key && $0.index < job.entry.index
-                    }) {
-                        (first.sharers, first.sharedUpTo) =
-                            (first.sharers + 1, max(first.sharedUpTo, job.entry.index))
-                    }
+                    passDeferred(job, key: key, keptAlready: keptAlready, in: session)
                 }
                 condition.broadcast()
                 condition.unlock()
@@ -565,15 +548,7 @@ final class GraphicPrefetch: @unchecked Sendable {
         condition.lock()
         job.entry.raster = raster
         job.entry.done = true
-        if session.background, !session.stopped {
-            if session.slots[job.slot] === job.entry { session.slots[job.slot] = nil }
-            if release(job.entry, from: session), let textureKey = job.entry.textureKey {
-                let entry = job.entry
-                kept.markAhead(session.key, textureKey, index: max(entry.index, entry.sharedUpTo))
-                (session.drawn, session.alreadyKept) =
-                    (session.drawn + 1, session.alreadyKept + entry.sharers)
-            }
-        }
+        if session.background, !session.stopped { passFinished(job, in: session) }
         condition.broadcast()
         condition.unlock()
     }

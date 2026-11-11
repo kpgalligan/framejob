@@ -488,9 +488,15 @@ to pay a toll starts from it. A file not listed has no named seam yet.
 
 - `GraphicPrefetch.swift`: at 600 since #127 G6 phase 4 (spec §11 G-38), which moved `Slot`
   unchanged to the foot of `LayerRenderersGraphic.swift` (a pure move committed alone, 3551b60).
-  The next seam: the background-pass branches (`start(background:)`'s arm, `stopBackground`,
-  the pass's end line) out whole to a `GraphicPrefetch+Background.swift` extension, with what
-  they read made internal, a pure move gated alone before anything else lands in the file.
+  #596 (spec §11 PR-18) paid the next toll with a pure move gated alone: `stopBackground` and
+  the pass's two arms of `draw` and `finish` (as `passDeferred` and `passFinished`, bodies
+  unchanged, the guards left at their call sites) out to `GraphicPrefetch+Background.swift`,
+  with `Entry`, `Session`, `Job`, `sessions` and `release(_:from:)` made internal; 575 lines
+  after it. The rest of that seam, if the file is at the cap again: `start`'s refusal arm and
+  its `beginAhead` line, `claim`'s and `insert`'s `full` arms, `stop`'s and `work`'s end lines
+  and `logLine`'s pass branch, each one statement inside a lock hold or a wait loop, four of
+  them other proofs' mutant anchors (`background_render_proof.py`), so a move there re-points
+  those tables.
 
 - `ProjectSnapshot.swift`: a property group's snapshot types out, whole. The precedents are
   `TextProps.swift`, `ProjectSnapshot+Graphic.swift`, `MediaSnapshot.swift` (issue batch
