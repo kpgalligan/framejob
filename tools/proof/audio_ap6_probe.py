@@ -29,7 +29,11 @@ audio_ap6_proof.py's V2, V12 and V13.
       instruction from 0 over the plan, the span; and on the owner's clip.
   E10 `needsRender`: each of the nine keys (the leveller since AP6b) true; pan, mono, channels, the
       limiter, the volume, fades, a bypassed or empty EQ and an inert voice
-      false.
+      false. On a clip (AU-159 (a), #402): each of the eight stages an action
+      can switch on, only at an action's end, true; pan, mono, channels, a
+      limiter, a volume, a null EQ or gate and a 0 isolation or noise
+      reduction at an end false; a gate at the end of an action of no
+      duration false.
   E11 `plan(solved:)` keeps the clip's volume at 0.04 dB and writes the solve
       at 0.06 dB or with another limiter; a cache row is never kept; the keep
       rule compares the clip's OWN limiter, so a clip with none whose reading
@@ -37,8 +41,16 @@ audio_ap6_proof.py's V2, V12 and V13.
   E12 the processed memo's key names its document: an R0 stored for one
       document's clip is not read by a second open document over a copy of the
       same package (#401, AU-64 (g)).
+  E13 the memo's key survives the solve (AU-159 (g), #402): on a clip with a
+      base gate and an action whose end is a pan, R0's trial (no base limiter,
+      volume 1) and the clip after `set_audio {volume: 2, limiter}` have one
+      key, though their measurement plans differ.
+  E14 the key follows an action's audio: another gate threshold or limiter
+      ceiling at an action's end is another key; another end volume is not;
+      a limiter keyed off at a later action's end is another key than the
+      limiter left on.
 
---mutants runs M1–M6 and M8–M14 (M7 is the loudness probe's), each over its
+--mutants runs M1–M6 and M8–M20 (M7 is the loudness probe's), each over its
 own copy of app/Sources, scored killed when its named row fails. Build failures
 are scored. Needs samples/Rode-usb-mic.m4a. Output is under
 tools/proof/work/audio-ap6-probe.
@@ -55,7 +67,7 @@ ROOT = Path(__file__).resolve().parents[2]
 RODE = ROOT / "samples/Rode-usb-mic.m4a"
 WORK = ROOT / "tools/proof/work/audio-ap6-probe"
 FIXTURES = WORK / "fixtures"
-ROWS = ["E1", "E2", "E3", "E6", "E7", "E8", "E9", "E10", "E11", "E12"]
+ROWS = ["E1", "E2", "E3", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13", "E14"]
 
 MUTANTS = [
     ("M1 noisy-gap", "E1", "AudioEnhance.swift",
@@ -93,8 +105,26 @@ MUTANTS = [
      "if solve.limiter == reading.currentLimiter, let current",
      "if solve.limiter == reading.limiter, let current"),
     ("M14 memo-without-document", "E12", "ProcessedLoudness.swift",
-     "return Key(document: document, clip: clip, plan: measured.json, chain: text)",
-     "return Key(document: 0, clip: clip, plan: measured.json, chain: text)"),
+     "return Key(document: document, clip: clip, plan: plan, chain: text + ends)",
+     "return Key(document: 0, clip: clip, plan: plan, chain: text + ends)"),
+    # AU-159 (#402): the render test and the memo's key read a clip's actions.
+    ("M15 actions-not-read", "E10", "ProcessedLoudness.swift",
+     "return clip.actions.contains { $0.duration > 0 && endNeedsRender($0.end.audio) }",
+     "return false && clip.actions.contains { endNeedsRender($0.end.audio) }"),
+    ("M16 no-duration-counts", "E10", "ProcessedLoudness.swift",
+     "return clip.actions.contains { $0.duration > 0 && endNeedsRender($0.end.audio) }",
+     "return clip.actions.contains { endNeedsRender($0.end.audio) }"),
+    ("M17 key-keeps-point-limiters", "E13", "ProcessedLoudness.swift",
+     'audio.removeValue(forKey: "limiter")', "_ = audio.count"),
+    ("M18 key-without-end-limiters", "E14", "ProcessedLoudness.swift",
+     "return Key(document: document, clip: clip, plan: plan, chain: text + ends)",
+     "return Key(document: document, clip: clip, plan: plan, chain: text)"),
+    ("M19 key-without-automation", "E14", "ProcessedLoudness.swift",
+     'point["audio"] = audio', 'point["audio"] = [String: Any]()'),
+    ("M20 key-without-limiter-offs", "E14", "ProcessedLoudness.swift",
+     'let value = limiter.map { "\\($0.ceilingDb),\\($0.release)" } ?? "off"',
+     'guard let held = limiter else { continue }\n'
+     '            let value = "\\(held.ceilingDb),\\(held.release)"'),
 ]
 
 

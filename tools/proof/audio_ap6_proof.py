@@ -54,6 +54,22 @@ samples/Rode-usb-mic.m4a, and `say` speech made here — one low-passed at
   V15  At volume (snapshot_ui's layout dump, the Sound sub-tab) after Enhance
        within ±0.2 of −16 LUFS with no "≈"; after an EQ change, "≈ " and the
        tooltip saying why.
+  V16  a stage only at an action's end (AU-159, #402): the owner's recording
+       with one action from 1 s for 2 s whose end is an EQ (band 3 and a high
+       shelf), nothing on the clip. (a) At volume starts with "≈" before any press; (b)
+       normalize_clip (loudness, −16): processed_lufs differs from
+       measured_lufs, renders ≥ 1, the export at −16 ±0.5, a second call "made
+       no change"; (c) At volume after it within ±0.2 of −16 with no "≈"; (d)
+       with the end also naming a volume, At volume reads the same with the
+       playhead inside the action (the action selected) as at 0; (e) another
+       shelf gain at the end: "≈" again. (f) an action end that is a gate
+       AND a limiter at −6 dBTP, on a clip whose own limiter is on, so the
+       solve verifies by render (target −20): renders ≥ 2, |result_lufs − the
+       export| ≤ 0.2, the export at −20 ±0.5 and limited_by null. (g) the same end at
+       −24 dBTP on a clip with no limiter, target −30: the solve's one-render
+       arm, which no render checks; renders 1, and the miss between
+       result_lufs and the export PRINTED (AU-159 (b)'s recorded limit, #402's
+       open half), never scored.
 """
 
 import json
@@ -504,6 +520,101 @@ def normalize_rows(m):
     m.call("close_project", project=s.path, discard=True)
 
 
+# ---- V16 a stage only at an action's end (AU-159, #402) ----------------------
+
+SECOND = 600_000
+# V16's end EQ: band 3 4 kHz +3 dB q 1 and a high shelf 6 kHz +6 dB.
+END_EQ = {"band_3": {"frequency": 4000, "gain_db": 3, "q": 1},
+          "high_shelf": {"frequency": 6000, "gain_db": 6}}
+
+
+def keyed(s, clip, end, at=SECOND, duration=2 * SECOND):
+    """One action on `clip` from `at` for `duration` whose end's audio is `end`;
+    its id."""
+    s.op("add_action", clip=clip, at=at, duration=duration)
+    action = s.clip(clip)["actions"][-1]["id"]
+    s.op("set_action_end", clip=clip, action=action, patch={"audio": end})
+    return action
+
+
+def action_rows(m):
+    print("\nV16 — a stage only at an action's end")
+    s = Session(m, "ap6-action")
+    clip = place(s, "ap6-rode.wav")
+    action = keyed(s, clip, {"eq": END_EQ})
+    s.op("set_playhead", t=0)
+    s.op("set_selection", clips=[clip])
+    s.op("select_inspector_tab", tab="clip", sub_tab="sound")
+    text, tip = at_volume(s)
+    check((text or "").startswith("≈ ") and (tip or "").startswith("≈ before the clip's")
+          and audio(s, clip).get("eq") is None,
+          f"V16 (a) an EQ only at an action's end: At volume {text!r} before any press")
+    answer, seconds = timed(lambda: s.op("normalize_clip", clips=[clip], mode="loudness",
+                                         target_lufs=-16))
+    row = answer["normalized"][0]
+    processed, measured = row.get("processed_lufs"), row.get("measured_lufs")
+    lufs = integrated(channels(pcm(s.export("normalized")["path"])))
+    again = s.error("normalize_clip", clips=[clip], mode="loudness", target_lufs=-16) or ""
+    check(processed is not None and abs(processed - measured) > 0.01
+          and (row.get("renders") or 0) >= 1 and abs(lufs + 16) <= 0.5
+          and "made no change" in again,
+          f"V16 (b) normalize_clip: processed {f(processed)} against measured {f(measured)} "
+          f"LUFS, renders {row.get('renders')} in {seconds:.2f} s, volume {f(row['volume'], 4)}, "
+          f"result {f(row['result_lufs'])}, the export at {f(lufs)} LUFS (−16 ±0.5); again "
+          f"{again[:60]!r}")
+    text, _ = at_volume(s)
+    shown = lufs_of(text)
+    check(shown is not None and abs(shown + 16) <= 0.2 and "≈" not in (text or ""),
+          f"V16 (c) At volume after it {text!r} (−16 ±0.2, no ≈)")
+    s.op("set_action_end", clip=clip, action=action, patch={"audio": {"volume": 0.5}})
+    outside, _ = at_volume(s)
+    s.op("set_playhead", t=2 * SECOND)
+    inside, _ = at_volume(s)
+    s.op("set_playhead", t=0)
+    check(outside is not None and outside == inside and "≈" not in outside,
+          f"V16 (d) the end also naming volume 0.5: At volume {outside!r} with the playhead "
+          f"at 0 and {inside!r} inside the action")
+    s.op("set_action_end", clip=clip, action=action,
+         patch={"audio": {"eq": {"high_shelf": {"frequency": 6000, "gain_db": 3}}}})
+    text, _ = at_volume(s)
+    check((text or "").startswith("≈ "),
+          f"V16 (e) another shelf gain at the end: At volume {text!r}")
+    m.call("close_project", project=s.path, discard=True)
+
+    # (f) the verify arm: the clip's own limiter is on, so the solve checks by render.
+    s = Session(m, "ap6-action-f")
+    clip = place(s, "ap6-rode.wav")
+    keyed(s, clip, {"gate": {"threshold_db": -30}, "limiter": {"ceiling_db": -6}})
+    s.op("set_audio", clips=[clip], patch={"limiter": {"ceiling_db": -1}})
+    row = s.op("normalize_clip", clips=[clip], mode="loudness",
+               target_lufs=-20)["normalized"][0]
+    lufs = integrated(channels(pcm(s.export("normalized")["path"])))
+    check((row.get("renders") or 0) >= 2 and abs(row["result_lufs"] - lufs) <= 0.2
+          and abs(lufs + 20) <= 0.5 and row["limited_by"] is None,
+          f"V16 (f) an end gate and limiter at −6 dBTP under the clip's own limiter, target "
+          f"−20: the export at {f(lufs)} LUFS (−20 ±0.5), renders "
+          f"{row.get('renders')} (≥ 2), volume {f(row['volume'], 4)}, result "
+          f"{f(row['result_lufs'])} against the export {f(lufs)} LUFS "
+          f"({f(row['result_lufs'] - lufs)} LU, ≤ 0.2), limited_by {row['limited_by']}")
+    m.call("close_project", project=s.path, discard=True)
+
+    # (g) the one-render arm: no limiter on the clip and a target low enough that the
+    # solve adds none, so nothing renders the action's limiter at the solved volume.
+    s = Session(m, "ap6-action-g")
+    clip = place(s, "ap6-rode.wav")
+    keyed(s, clip, {"gate": {"threshold_db": -30}, "limiter": {"ceiling_db": -24}})
+    row = s.op("normalize_clip", clips=[clip], mode="loudness",
+               target_lufs=-30)["normalized"][0]
+    lufs = integrated(channels(pcm(s.export("normalized")["path"])))
+    check(row.get("renders") == 1 and row.get("limiter") is None,
+          f"V16 (g) an end gate and limiter at −24 dBTP, no limiter on the clip, target −30: "
+          f"the one-render arm (renders {row.get('renders')}, limiter {row.get('limiter')})")
+    print(f"  note V16 (g) NOT SCORED (AU-159 (b), #402): volume {f(row['volume'], 4)}, "
+          f"processed {f(row.get('processed_lufs'))}, result {f(row['result_lufs'])} against "
+          f"the export {f(lufs)} LUFS: {f(row['result_lufs'] - lufs)} LU")
+    m.call("close_project", project=s.path, discard=True)
+
+
 # ---- V14 the sheet, cancelled and stale -------------------------------------
 
 HOLD = 3
@@ -589,7 +700,7 @@ def main():
     errors = (ToolError, KeyError, IndexError, RuntimeError, OSError, ValueError, TypeError)
     parts = (("owner", owner_rows), ("sibilance", sibilance_rows),
              ("selection", selection_rows), ("speed", speed_rows),
-             ("normalize", normalize_rows))
+             ("normalize", normalize_rows), ("actions", action_rows))
     for name, part in parts:
         if only and name not in only:
             continue

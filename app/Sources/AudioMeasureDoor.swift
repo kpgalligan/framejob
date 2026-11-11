@@ -198,8 +198,9 @@ enum AudioMeasureDoor {
     }
 
     /// Loudness Normalize's jobs: a clip whose chain has a stage the cache
-    /// leaves out renders with no change to its settings (the run takes its
-    /// limiter off for R0); any other reading stands (AU-64 (a)). Main.
+    /// leaves out, in its base audio or at an action's end (AU-159 (a)),
+    /// renders with no change to its settings (the run takes its base limiter
+    /// off for R0); any other reading stands (AU-64 (a)). Main.
     static func normalizeJobs(_ input: AudioNormalize.LoudnessInput, in document: ProjectDocument)
         -> [LoudnessMeasureRun.Job]
     {
@@ -207,8 +208,7 @@ enum AudioMeasureDoor {
         return input.readings.map {
             LoudnessMeasureRun.Job(
                 reading: $0,
-                chain: ProcessedLoudness.needsRender(snapshot.clip($0.clip)?.audio)
-                    ? AudioPatch() : nil)
+                chain: ProcessedLoudness.needsRender(snapshot.clip($0.clip)) ? AudioPatch() : nil)
         }
     }
 

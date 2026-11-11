@@ -294,7 +294,131 @@ do {
     for (name, audio) in plain {
         check("E10", "\(name) alone plans off the cache", !ProcessedLoudness.needsRender(audio))
     }
-    check("E10", "no audio props plans off the cache", !ProcessedLoudness.needsRender(nil))
+    check("E10", "no audio props plans off the cache",
+          !ProcessedLoudness.needsRender(Optional<AudioProps>.none))
+
+    // AU-159 (a): a stage only at an action's end. No base stage; one action
+    // from 1 s whose end is `end`, `duration` ticks long.
+    func clip(_ end: String, duration: Int = 1_200_000) -> ClipSnapshot? {
+        ReelJSON.decode(ClipSnapshot.self, from: """
+            {"id": 2, "track": 3, "start": 0, "duration": 6000000,
+             "source": {"kind": "media", "media": 1, "in": 0}, "audio": {},
+             "actions": [{"id": 90, "start": 600000, "duration": \(duration),
+                          "curve": "linear", "end": {"audio": \(end)}}]}
+            """)
+    }
+    let ends: [(String, String)] = [
+        ("eq", #"{"eq": {"high_pass": {"frequency": 80, "slope": 24}}}"#),
+        ("hum", #"{"hum": {}}"#), ("isolation", #"{"isolation": 0.5}"#),
+        ("noise_reduction", #"{"noise_reduction": 0.5}"#),
+        ("gate", #"{"gate": {"threshold_db": -20}}"#), ("de_esser", #"{"de_esser": {}}"#),
+        ("compressor", #"{"compressor": {}}"#), ("leveller", #"{"leveller": {}}"#),
+    ]
+    let plainEnds: [(String, String)] = [
+        ("pan", #"{"pan": 0.5}"#), ("mono", #"{"mono": true}"#),
+        ("channels", #"{"channels": "left"}"#), ("limiter", #"{"limiter": {"ceiling_db": -6}}"#),
+        ("volume", #"{"volume": 2}"#), ("a null eq", #"{"eq": null}"#),
+        ("a null gate", #"{"gate": null}"#), ("isolation 0", #"{"isolation": 0}"#),
+        ("noise_reduction 0", #"{"noise_reduction": 0}"#),
+    ]
+    for (name, end) in ends {
+        let snapshot = clip(end)
+        check("E10", "\(name) only at an action's end renders",
+              snapshot?.actions.count == 1 && !ProcessedLoudness.needsRender(snapshot?.audio)
+                && ProcessedLoudness.needsRender(snapshot))
+    }
+    for (name, end) in plainEnds {
+        let snapshot = clip(end)
+        check("E10", "\(name) at an action's end alone plans off the cache",
+              snapshot?.actions.count == 1 && !ProcessedLoudness.needsRender(snapshot))
+    }
+    let still = clip(#"{"gate": {"threshold_db": -20}}"#, duration: 0)
+    check("E10", "a gate at the end of an action of no duration plans off the cache",
+          still?.actions.first?.duration == 0 && !ProcessedLoudness.needsRender(still))
+    check("E10", "no clip plans off the cache",
+          !ProcessedLoudness.needsRender(Optional<ClipSnapshot>.none))
+}
+
+// MARK: - E13, E14 the memo's key and a clip's actions (AU-159 (g))
+
+do {
+    /// One 10 s clip of media 1 with `audio` and `actions`.
+    func project(audio: String, actions: String) -> ReelProject? {
+        try? ReelProject.from(json: """
+            {"version": \(RC_FORMAT_VERSION),
+             "canvas": {"width": 320, "height": 180, "fps": [30, 1], "background": [0, 0, 0, 1]},
+             "media": [{"id": 1, "path": "/fixtures/ap6.wav", "kind": "audio",
+                        "duration": 36000000, "has_video": false, "has_audio": true}],
+             "tracks": [{"id": 3, "name": "Track 1"}],
+             "clips": [{"id": 2, "track": 3, "start": 0, "duration": 6000000,
+                        "source": {"kind": "media", "media": 1, "in": 0}, "audio": \(audio),
+                        "actions": [\(actions)]}],
+             "nests": [], "next_id": 100}
+            """)
+    }
+    func action(_ id: Int, at start: Int, _ end: String) -> String {
+        """
+        {"id": \(id), "start": \(start), "duration": 600000, "curve": "linear",
+         "end": {"audio": \(end)}}
+        """
+    }
+    func key(_ project: ReelProject?) -> ProcessedLoudness.Key? {
+        project.flatMap { ProcessedLoudness.key(clip: 2, project: $0, document: 0) }
+    }
+    func applied(_ project: ReelProject?, _ patch: AudioPatch) -> ReelProject? {
+        guard let project, case .applied(let next)? = try? project.applying(
+            .setAudio(clips: [2], patch: patch)) else { return nil }
+        return next
+    }
+
+    // E13: R0's trial (no base limiter, volume 1) against the same clip after
+    // the solve wrote its volume and limiter. The clip has a base gate and an
+    // action whose end is a pan, so its segment has automation points, and
+    // the core writes the base limiter into every one.
+    let trial = project(audio: #"{"gate": {}}"#, actions: action(90, at: 600_000, #"{"pan": 0.5}"#))
+    let solved = applied(trial, AudioPatch(volume: 2, limiter: .some(LimiterProps())))
+    let rawTrial = trial.flatMap { ProcessedLoudness.measurementPlan($0.planJSON, clip: 2)?.json }
+    let rawSolved = solved.flatMap { ProcessedLoudness.measurementPlan($0.planJSON, clip: 2)?.json }
+    check("E13", "the key R0 was stored under is the clip's key after the solve wrote its "
+            + "volume and limiter, though the two measurement plans differ (the base limiter is "
+            + "in every automation point)",
+          key(trial) != nil && key(trial) == key(solved) && rawTrial != nil
+            && rawTrial != rawSolved && rawTrial?.contains("\"automation\"") == true
+            && rawSolved?.contains("\"limiter\":{") == true,
+          "keys equal \(key(trial) == key(solved)), plans differ \(rawTrial != rawSolved)")
+
+    // E14: the key follows an action's audio.
+    let gate20 = project(audio: "{}", actions: action(90, at: 600_000, #"{"gate": {"threshold_db": -20}}"#))
+    let gate30 = project(audio: "{}", actions: action(90, at: 600_000, #"{"gate": {"threshold_db": -30}}"#))
+    check("E14", "another gate threshold at an action's end is another key",
+          key(gate20) != nil && key(gate30) != nil && key(gate20) != key(gate30))
+    let limit6 = project(audio: #"{"gate": {}}"#,
+                         actions: action(90, at: 600_000, #"{"limiter": {"ceiling_db": -6}}"#))
+    let limit3 = project(audio: #"{"gate": {}}"#,
+                         actions: action(90, at: 600_000, #"{"limiter": {"ceiling_db": -3}}"#))
+    check("E14", "another limiter ceiling at an action's end is another key",
+          key(limit6) != nil && key(limit3) != nil && key(limit6) != key(limit3))
+    let loud = project(audio: #"{"gate": {}}"#,
+                       actions: action(90, at: 600_000, #"{"pan": 0.5, "volume": 0.5}"#))
+    let quiet = project(audio: #"{"gate": {}}"#,
+                        actions: action(90, at: 600_000, #"{"pan": 0.5, "volume": 0.8}"#))
+    check("E14", "another volume at an action's end is the same key (the fader's)",
+          key(loud) != nil && key(loud) == key(quiet))
+    // A limiter one action switches on and a later one keys off: the key-off
+    // is a stored null, and taking it away leaves the limiter on to the end.
+    let on = action(90, at: 600_000, #"{"limiter": {"ceiling_db": -6}}"#)
+    let keyedOff = project(audio: #"{"gate": {}}"#,
+                           actions: on + "," + action(91, at: 2_400_000, #"{"pan": 0.1, "limiter": null}"#))
+    let leftOn = project(audio: #"{"gate": {}}"#,
+                         actions: on + "," + action(91, at: 2_400_000, #"{"pan": 0.1}"#))
+    var stored = false
+    if case .some(.none) = keyedOff?.snapshot.clip(2)?.actions.last?.end.audio?.limiter {
+        stored = true
+    }
+    check("E14", "a limiter keyed off at a later action's end is another key than the limiter "
+            + "left on",
+          stored && key(keyedOff) != nil && key(leftOn) != nil && key(keyedOff) != key(leftOn),
+          "the null stored \(stored)")
 }
 
 // MARK: - E11 the solved row keeps a volume within 0.05 dB

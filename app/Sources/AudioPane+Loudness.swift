@@ -13,9 +13,11 @@ extension AudioPane {
 
     /// The one clip the readout is about: exactly one selected clip Normalize
     /// is offered for, else nothing ("—").
-    private var readoutClip: UInt32? {
+    private var readoutClip: UInt32? { readoutSnapshot?.id }
+
+    private var readoutSnapshot: ClipSnapshot? {
         let clips = AudioPane.normalizable(binding)
-        return clips.count == 1 && binding.clips.count == 1 ? clips[0].id : nil
+        return clips.count == 1 && binding.clips.count == 1 ? clips[0] : nil
     }
 
     private func loudnessAnswer() -> ClipLoudness.Answer {
@@ -57,22 +59,26 @@ extension AudioPane {
         return minus(String(format: "%.1f LUFS · ", lufs) + peakText)
     }
 
-    /// At volume (spec §11 AU-64 (g)): on a clip whose chain has a stage the
-    /// loudness cache leaves out, the last R0 measured for its plan and chain
-    /// (`ProcessedLoudness.Memo`) at the current volume and limiter, else the
-    /// cache figure marked approximate; any other clip, the cache figure.
+    /// At volume (spec §11 AU-64 (g), AU-159 (g)): on a clip that plays
+    /// through a stage the loudness cache leaves out, on the clip or at an
+    /// action's end (`ProcessedLoudness.needsRender`, read from the clip and
+    /// so the same whatever action is selected), the last R0 measured for
+    /// its plan and chain (`ProcessedLoudness.Memo`) at the clip's BASE
+    /// volume and limiter, else the cache figure at them marked approximate;
+    /// any other clip, the cache figure at the props the fields show.
     private func atVolumeText(_ audio: AudioProps) -> (text: String, approximate: Bool) {
-        let cached = loudnessText(gain: audio.decibels, limiter: audio.limiter)
-        guard ProcessedLoudness.needsRender(audio), let clip = readoutClip,
+        guard let snapshot = readoutSnapshot, ProcessedLoudness.needsRender(snapshot),
             let document = binding.document, case .reading = loudnessAnswer()
-        else { return (cached, false) }
-        guard let processed = ProcessedLoudness.Memo.shared.reading(for: clip, in: document) else {
-            return ("≈ " + cached, true)
+        else { return (loudnessText(gain: audio.decibels, limiter: audio.limiter), false) }
+        let base = snapshot.audioProps
+        guard let processed = ProcessedLoudness.Memo.shared.reading(for: snapshot.id, in: document)
+        else {
+            return ("≈ " + loudnessText(gain: base.decibels, limiter: base.limiter), true)
         }
         let text = levelText(
             lufs: StepLoudness.integrated(processed.steps), truePeak: processed.peaks.max() ?? 0,
-            steps: processed.steps, peaks: processed.peaks, gain: audio.decibels,
-            limiter: audio.limiter)
+            steps: processed.steps, peaks: processed.peaks, gain: base.decibels,
+            limiter: base.limiter)
         return (text, false)
     }
 
