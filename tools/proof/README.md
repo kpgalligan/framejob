@@ -23639,8 +23639,11 @@ is toneA and toneB on tracks 1 and 2. Each document's canvas is 640×360.
 - **R1–R4** — M1–M4 with "pending" in place of "gone".
 - **V0** — a gone `AV.mov` alone at 0, `prores_422`: done, a video stream, all-zero audio, frames ≥
   its own timeline's frames − 1024 (240 000 − 1024).
-- **K1 / K2** — C's and T's `audio_wav` PCM, `prores_422` PCM and video md5 identical to
-  `work/missing-audio-baseline/` (written by `--baseline` at bb73b35).
+- **K1 / K2** — C's and T's `audio_wav` PCM, `prores_422` PCM and video md5 identical to the
+  digests in the tracked `tools/proof/missing_audio_baseline.json`, which `--baseline` rewrites
+  (#550, "Issue #550" below; until then the baseline was raw PCM under
+  `work/missing-audio-baseline/`, written at bb73b35 and never tracked). **K0** scores the
+  digest comparison itself, with no app.
 - **P1** — `play_preview {seconds: 2, await_start: true}` on M1's document: `to − playing_from`
   ≥ 900 000 ticks, timed from the playhead's first move (#368, in "Hygiene a1" below; until then
   the row scored `to − from`, which includes the player's start-up).
@@ -23651,8 +23654,8 @@ section below measured. Each row reports its excess against its own document's t
 from `get_project` as the end of its last clip (#366), not scored.
 
 ```sh
-make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/missing_audio_proof.py --baseline   # at bb73b35 only
-make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/missing_audio_proof.py --only X0,M1,M2,M3,M4,R1,R2,R3,R4,V0,K1,K2,P1
+make app && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/missing_audio_proof.py --baseline   # rewrites the tracked missing_audio_baseline.json: only when the controls are meant to change
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/missing_audio_proof.py --only X0,M1,M2,M3,M4,R1,R2,R3,R4,V0,K0,K1,K2,P1
 make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/missing_audio_proof.py
 ```
 
@@ -31435,3 +31438,52 @@ The fix pass (2026-11-11, a second response refused, F9): `--mutant many-answers
 fail — FETCHED 230 bytes after 1.0 s; FrameJobLink-* folders this fetch left: 41"), the probe
 31/31 (F9 "the server answered more than once", 0 folders left), `--mutants` 22/22 caught,
 `make gate` PASS, and `RC_PROOF_APP=release graphic_link_proof.py` 10/10.
+
+## Issue #550 — missing_audio_proof's baseline in the repository (missing_audio_proof.py K0, K1, K2; mutants Q1–Q7)
+
+K1 and K2 compared the control exports with raw PCM under `work/missing-audio-baseline/`, which
+is ignored, so both rows failed "no baseline" in every checkout that had not written its own.
+The baseline is now `tools/proof/missing_audio_baseline.json`, tracked, written only by
+`--baseline`, one control's entry at a time (`--only K1 --baseline` leaves T's as it was).
+
+- **What an entry holds.** Per export: channels, rate, `frames` and the sha256 of the first
+  `frames` frames of its interleaved pcm_f32le, and for `prores_422` the video md5. `frames` is
+  min(the timeline's frames, the export's frames) when it was recorded: the old common-length
+  rule with the baseline's side fixed. A run with fewer frames fails, naming both counts; what a
+  run has past them is reported, not scored.
+- **What it was recorded from.** The digests are the current tree's, not bb73b35's: that tree is
+  not to be rebuilt, and what the rows guard is the controls changing from here on. Each entry's
+  `recorded` says so: `head` is the tree the exporting app was built from (not the commit that
+  carries the file), `app` its configuration, the date, and the host (chip, macOS, ffmpeg).
+  Debug and Release export the same bytes (the Debug recording differed from the Release one in
+  `app` alone), so the rows run on either.
+- **The fixtures are part of it.** `toneA.m4a` and `toneB.m4a` are AAC written by whichever
+  ffmpeg made `media/`, so an entry stores the sha256 of each fixture it read. A fixture that is
+  not that file fails the row with a sentence saying so, never a digest mismatch; `--baseline`
+  there records that machine's.
+- **A failure names the host when it moved.** The PCM is Apple's AAC decode, the video Apple's
+  ProRes encode read back through ffmpeg. A failed digest on a host that is not the recording's
+  ends with both hosts and "re-record with --baseline if the app did not change"; on the
+  recording's host it says nothing more.
+- **K0** scores the comparison over PCM made in the script, with no app and no fixture
+  (`--only K0` launches nothing): ten clauses.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| Q1 | one hex digit of C's `audio_wav` sha256 in the file | K1 (K2 passes) |
+| Q2 | one hex digit of T's `prores_422` video md5 in the file | K2 (K1 passes) |
+| Q3 | `digest_compare` hashes the whole run | K0 "frames past the count are not scored" |
+| Q4 | the shorter-run refusal dropped, what there is hashed | K0 "a run shorter than the count" (the row still fails on the digest: the refusal is for its sentence) |
+| Q5 | the fixture check removed, C's recorded toneB sha256 altered | K1 passes where it fails with the check |
+| Q6 | app: `silentEnd` without the `sounding.isEmpty` guard (the #336 section's MU2) | K1, K2 audio |
+| Q7 | `host_note` always empty | K0 "another host is named" |
+
+| Run (2026-11-11) | Result |
+|---|---|
+| base d142e3e4, Debug, `--only K1,K2`, a worktree with no `work/` | K1, K2 FAIL "no baseline at …/work/missing-audio-baseline/C.json (run --baseline first)" |
+| `--only K1,K2 --baseline` (Release, built from d142e3e4) | wrote both entries: C and T each 814 400 frames of 2 ch 48 kHz for both presets, video md5 `fd0ac14a…` |
+| `missing_audio_proof.py` (Release), twice, each its own launch | **15/15** in 32 s and 33 s: K0 10/10 clauses, K1 and K2 "= the baseline's sha256 over 814400 frames; the run has +0 past them", X0 16/16 |
+| Q1, Q2, Q5 (Release) | Q1 K1 fails "audio_wav audio ≠", K2 passes; Q2 K2 fails "video md5 … ≠ baseline", K1 passes; the altered fixture digest fails K1 "toneB.m4a is not the file the baseline was recorded from", and passes under Q5 |
+| Q3, Q4, Q7 (`--only K0`) | each caught, 9/10 clauses, by the clause named above |
+| Q6 (Debug built with the mutant, `--only K1,K2`) | K1 and K2 fail: both presets' audio "≠ the baseline's sha256 over 814400 frames", the video md5 still the baseline's |
+| Debug rebuilt clean, `--only K0,K1,K2` | 5/5 against the Release-recorded file |

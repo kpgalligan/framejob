@@ -1,0 +1,63 @@
+{
+ "controls": {
+  "C": {
+   "audio_wav": {
+    "channels": 2,
+    "frames": 814400,
+    "rate": 48000,
+    "sha256": "3f5e2e54a715f5c01f0586601d93ef2885c9f07357c80e00bd9ee32c5444a102"
+   },
+   "fixtures": {
+    "toneB.m4a": "17b94dc6576fbb66bb2bd6f513bcc07d3fded8fd89b8c8a79b646ecd45b66614"
+   },
+   "prores_422": {
+    "channels": 2,
+    "frames": 814400,
+    "rate": 48000,
+    "sha256": "3f5e2e54a715f5c01f0586601d93ef2885c9f07357c80e00bd9ee32c5444a102",
+    "video": "fd0ac14a3cefb10578029c72edde9ff5"
+   },
+   "recorded": {
+    "app": "Release",
+    "date": "2026-11-11",
+    "head": "d142e3e4",
+    "host": {
+     "chip": "Apple M2 Max",
+     "ffmpeg": "ffmpeg version 9.0.2",
+     "macos": "26.5.1 (25F80)"
+    }
+   },
+   "timeline": 10180000
+  },
+  "T": {
+   "audio_wav": {
+    "channels": 2,
+    "frames": 814400,
+    "rate": 48000,
+    "sha256": "dbcc1fa465b1cbbce6cadfc9a9f30378fdb81b101e6ddd6cd3e512e109253819"
+   },
+   "fixtures": {
+    "toneA.m4a": "f1be508bf920cde31365dbe9659863e4961a3e2e0f40ebbd297c03dda2d4c548",
+    "toneB.m4a": "17b94dc6576fbb66bb2bd6f513bcc07d3fded8fd89b8c8a79b646ecd45b66614"
+   },
+   "prores_422": {
+    "channels": 2,
+    "frames": 814400,
+    "rate": 48000,
+    "sha256": "dbcc1fa465b1cbbce6cadfc9a9f30378fdb81b101e6ddd6cd3e512e109253819",
+    "video": "fd0ac14a3cefb10578029c72edde9ff5"
+   },
+   "recorded": {
+    "app": "Release",
+    "date": "2026-11-11",
+    "head": "d142e3e4",
+    "host": {
+     "chip": "Apple M2 Max",
+     "ffmpeg": "ffmpeg version 9.0.2",
+     "macos": "26.5.1 (25F80)"
+    }
+   },
+   "timeline": 10180000
+  }
+ }
+}

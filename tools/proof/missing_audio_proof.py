@@ -6,8 +6,9 @@ An audio track whose only clip's media file is missing ("gone"), or whose
 reverse is pending ("pending"), holds only empty time in its composition
 track. Each shape is exported as `audio_wav` and `prores_422`, alone and
 beside a track that sounds, and a missing clip with picture and sound
-(`AV.mov`) alone; the constant projects' exports are compared with a
-baseline this script writes under `--baseline`.
+(`AV.mov`) alone; the constant projects' exports are compared with the
+digests in `tools/proof/missing_audio_baseline.json`, a tracked file this
+script writes under `--baseline` (#550).
 
 Rows (every M, R and K clip at 12 s; every row reads its document's
 timeline from `get_project`, the end of its last clip, and reports each
@@ -41,10 +42,19 @@ export's length against it (#366): for C, M, R and T 10 180 000 ticks,
   V0  a gone copy of `AV.mov` alone at 0, `prores_422`: done, a video
       stream, every audio sample 0.0, audio frames ≥ its timeline's frames
       − 1024.
-  K1  C (toneB alone on track 1): its `audio_wav` PCM, its `prores_422` PCM
-      and video md5 identical to `work/missing-audio-baseline/`'s over the
-      common length; a missing baseline is a FAIL. Under `--baseline` the row
-      writes the baseline instead.
+  K0  the digest comparison itself over PCM made in the script, no app and
+      no fixture: equal bytes pass; frames after the stored count are not
+      scored; a sample changed inside the count, a run shorter than the
+      count and another channel count each fail; and a failure's host note
+      is empty on the recording's host and names both hosts on another.
+  K1  C (toneB alone on track 1): its `audio_wav` PCM and its `prores_422`
+      PCM have the baseline's channels and rate and, over the baseline's
+      frame count, its sha256; its `prores_422` video md5 is the baseline's.
+      The count is min(the timeline's frames, the export's frames) as it was
+      recorded, so a run SHORTER than it fails and frames past it are
+      reported, not scored. A missing file or entry is a FAIL, and so is a
+      fixture whose sha256 is not the one the baseline was recorded from.
+      Under `--baseline` the row writes its entry instead.
   K2  as K1 for T (toneA on track 1, toneB on track 2, both present).
   P1  `play_preview {seconds: 2, await_start: true}` on M1's document:
       `to − playing_from` ≥ 900000 ticks, the preview plays rather than
@@ -64,11 +74,16 @@ scored FAIL. Needs `ffmpeg` and `ffprobe`.
 
 It launches one instance of its own (`mcp.launch` on `proof_app.binary()`),
 logging to `work/missing-audio/framejob.log`, and stops it by its PID.
-`work/missing-audio/` is emptied on each run; `work/missing-audio-baseline/`
-is written only by `--baseline`. Exit 0 when every scored row passes, else 1.
+`work/missing-audio/` is emptied on each run; `missing_audio_baseline.json`
+is written only by `--baseline`, one control's entry at a time, each stamped
+with the tree and app it was exported by, the day and the host (the chip,
+macOS and ffmpeg: the AAC decoder, the ProRes encoder and the decoder behind
+every digest). `--only K0` launches nothing. Exit 0 when every scored row
+passes, else 1.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -86,7 +101,7 @@ import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/missing-audio"
-BASELINE = ROOT / "tools/proof/work/missing-audio-baseline"
+BASELINE = ROOT / "tools/proof/missing_audio_baseline.json"
 MEDIA = ROOT / "tools/proof/media"
 TONE_A = MEDIA / "toneA.m4a"
 TONE_B = MEDIA / "toneB.m4a"
@@ -96,7 +111,10 @@ AT = 12 * SEC
 SLACK = 1024
 CALL_BOUND = 600
 PLAY_FLOOR = 900_000
-ROWS = ["D0", "X0", "M1", "M2", "M3", "M4", "R1", "R2", "R3", "R4", "V0", "K1", "K2", "P1"]
+ROWS = ["D0", "X0", "M1", "M2", "M3", "M4", "R1", "R2", "R3", "R4", "V0", "K0", "K1", "K2",
+        "P1"]
+# The fixtures each control's digests were taken from (their sha256 is stored).
+FIXTURES = {"C": (TONE_B,), "T": (TONE_A, TONE_B)}
 
 rows = {}
 controls = []   # (ok, what) for X0
@@ -422,41 +440,148 @@ def control_exports(doc):
     return got
 
 
-def write_baseline(tag, exports):
-    BASELINE.mkdir(parents=True, exist_ok=True)
-    table = {}
+def host():
+    """What a digest depends on besides the build and the fixtures: the chip,
+    macOS (the AAC decoder, the ProRes encoder) and ffmpeg (the decoder behind
+    every digest), as `hevc_alpha_proof.host` reads them."""
+    def first(argv):
+        lines = run(argv, 60)["stdout"].strip().splitlines()
+        return lines[0].strip() if lines else "?"
+
+    return {"chip": first(["sysctl", "-n", "machdep.cpu.brand_string"]),
+            "macos": f"{first(['sw_vers', '-productVersion'])} "
+                     f"({first(['sw_vers', '-buildVersion'])})",
+            "ffmpeg": " ".join(first(["ffmpeg", "-version"]).split()[:3])}
+
+
+def host_note(recorded, now):
+    """"" on the host a baseline was recorded on, else the sentence a failed
+    digest carries: the app may not be what changed."""
+    if recorded == now:
+        return ""
+    def said(stamp):
+        return " / ".join(str((stamp or {}).get(key, "?")) for key in ("chip", "macos", "ffmpeg"))
+    return (f" [recorded on {said(recorded)}; this host is {said(now)}: re-record with "
+            f"--baseline if the app did not change]")
+
+
+def sha256_of(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def digest_entry(pcm, timeline):
+    """One export's stored half: its channels and rate, and the sha256 of its
+    first min(the timeline's frames, its own frames) frames."""
+    data, channels, rate = pcm
+    width = 4 * channels
+    frames = min(frames_of_ticks(timeline, rate), len(data) // width)
+    return {"channels": channels, "rate": rate, "frames": frames,
+            "sha256": hashlib.sha256(data[:frames * width]).hexdigest()}
+
+
+def digest_compare(pcm, entry):
+    """(same, detail): the run has the entry's channels and rate, at least
+    its frames, and its sha256 over exactly that many; what the run has past
+    them is reported, not scored."""
+    data, channels, rate = pcm
+    if (channels, rate) != (entry["channels"], entry["rate"]):
+        return False, f"{channels} ch {rate} Hz ≠ {entry['channels']} ch {entry['rate']} Hz"
+    width = 4 * channels
+    have, count = len(data) // width, entry["frames"]
+    if have < count:
+        return False, f"the run's {have} frames are fewer than the baseline's {count}"
+    same = count > 0 and hashlib.sha256(data[:count * width]).hexdigest() == entry["sha256"]
+    return same, (f"{'=' if same else '≠'} the baseline's sha256 over {count} frames; the run "
+                  f"has {have - count:+d} past them (not scored)")
+
+
+def k0():
+    """The comparison's own decisions, over PCM made here."""
+    frame = array("f", [0.25, -0.5]).tobytes()
+    data = b"".join(array("f", [n / 4096, -n / 4096]).tobytes() for n in range(2048))
+    timeline = 2048 * SEC // 48_000
+    entry = digest_entry((data, 2, 48_000), timeline)
+    changed = data[:400] + array("f", [0.75]).tobytes() + data[404:]
+    here = {"chip": "a", "macos": "b", "ffmpeg": "c"}
+    short = digest_compare((data[:-8], 2, 48_000), entry)
+    clauses = [
+        ("the count is the timeline's frames", entry["frames"] == 2048),
+        ("equal bytes pass", digest_compare((data, 2, 48_000), entry)[0]),
+        ("frames past the count are not scored",
+         digest_compare((data + frame * 37, 2, 48_000), entry)[0]),
+        ("a sample changed inside the count fails",
+         not digest_compare((changed, 2, 48_000), entry)[0]),
+        ("a run shorter than the count fails, naming both lengths (its digest would differ "
+         "anyway: the refusal is for the sentence)",
+         not short[0] and "2047" in short[1] and "2048" in short[1]),
+        ("another channel count fails", not digest_compare((data, 1, 48_000), entry)[0]),
+        ("another rate fails", not digest_compare((data, 2, 44_100), entry)[0]),
+        ("an export shorter than its timeline stores its own frames",
+         digest_entry((data[:-80], 2, 48_000), timeline)["frames"] == 2038),
+        ("no host note on the recording's host", host_note(here, dict(here)) == ""),
+        ("another host is named", "ffmpeg 9" in host_note(here, dict(here, ffmpeg="ffmpeg 9"))
+         and "re-record" in host_note(here, dict(here, ffmpeg="ffmpeg 9"))),
+    ]
+    bad = [name for name, ok in clauses if not ok]
+    check("K0", not bad, f"{len(clauses) - len(bad)}/{len(clauses)} clauses"
+                         + (f"; failed {bad}" if bad else ""))
+
+
+def read_baseline():
+    try:
+        return json.loads(BASELINE.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def write_baseline(tag, exports, timeline, binary):
+    """`tag`'s entry merged into the tracked file; the other control's kept."""
+    entry = {"recorded": {"head": run(["git", "-C", ROOT, "rev-parse", "--short", "HEAD"],
+                                      60)["stdout"].strip(),
+                          "app": Path(binary).parents[3].name,
+                          "date": time.strftime("%Y-%m-%d"), "host": host()},
+             "fixtures": {p.name: sha256_of(p) for p in FIXTURES[tag]},
+             "timeline": timeline}
     for preset, e in exports.items():
-        data, channels, rate = e["pcm"]
-        (BASELINE / f"{tag}-{preset}.f32").write_bytes(data)
-        table[preset] = {"channels": channels, "rate": rate, "video": e["video"]}
-    (BASELINE / f"{tag}.json").write_text(json.dumps(table, indent=1))
-    return table
+        entry[preset] = digest_entry(e["pcm"], timeline)
+        if e["video"] is not None:
+            entry[preset]["video"] = e["video"]
+    table = read_baseline()
+    table.setdefault("controls", {})[tag] = entry
+    BASELINE.write_text(json.dumps(table, indent=1, sort_keys=True) + "\n")
+    return entry
 
 
-def score_baseline(row, tag, exports, writing, timeline):
+def score_baseline(row, tag, exports, writing, timeline, binary):
     if writing:
         if set(exports) != {"audio_wav", "prores_422"}:
             check(row, False, f"{tag}'s exports did not both finish ({sorted(exports)}); "
                               f"no baseline written")
             return
-        table = write_baseline(tag, exports)
-        check(row, True, f"--baseline: {tag} written to {BASELINE} ({table})")
+        entry = write_baseline(tag, exports, timeline, binary)
+        check(row, True, f"--baseline: {tag} written to {BASELINE} ({entry})")
         return
-    table_file = BASELINE / f"{tag}.json"
-    if not table_file.exists():
-        check(row, False, f"no baseline at {table_file} (run --baseline first)")
+    entry = read_baseline().get("controls", {}).get(tag)
+    if entry is None:
+        check(row, False, f"no baseline for {tag} in {BASELINE} (run --baseline, and commit "
+                          f"the file)")
         return
-    table = json.loads(table_file.read_text())
+    stamp = entry["recorded"]
+    for fixture in FIXTURES[tag]:
+        if sha256_of(fixture) != entry["fixtures"].get(fixture.name):
+            check(row, False, f"{tag}: {fixture.name} is not the file the baseline was recorded "
+                              f"from (its sha256 differs), so its digests say nothing here: "
+                              f"--baseline records this host's"
+                              + host_note(stamp["host"], host()))
+            return
     good, details = True, []
     for preset in ("audio_wav", "prores_422"):
         if preset not in exports:
             good = False
             details.append(f"{preset} export failed")
             continue
-        base = table[preset]
-        data = (BASELINE / f"{tag}-{preset}.f32").read_bytes()
-        same, detail = pcm_compare(exports[preset]["pcm"],
-                                   (data, base["channels"], base["rate"]), timeline)
+        base = entry[preset]
+        same, detail = digest_compare(exports[preset]["pcm"], base)
         details.append(f"{preset} audio {detail}")
         good = good and same
         if preset != "audio_wav":
@@ -464,7 +589,9 @@ def score_baseline(row, tag, exports, writing, timeline):
             details.append(f"video md5 {video} {'=' if video == base['video'] else '≠'} "
                            f"baseline")
             good = good and video == base["video"]
-    check(row, good, f"{tag}: " + "; ".join(details))
+    check(row, good, f"{tag} against {stamp['head']} ({stamp['app']}, {stamp['date']}), "
+                     f"timeline {timeline} (recorded {entry['timeline']}): " + "; ".join(details)
+                     + ("" if good else host_note(stamp["host"], host())))
 
 
 def guarded(rows_named, body):
@@ -477,7 +604,7 @@ def guarded(rows_named, body):
                 check(name, False, f"the row could not run: {type(error).__name__}: {error}")
 
 
-def run_rows(client, chosen, writing):
+def run_rows(client, chosen, writing, binary):
     want = set(chosen)
     found = {"C": None}
 
@@ -487,7 +614,7 @@ def run_rows(client, chosen, writing):
         c.place(TONE_B, track, AT)
         found["C"] = control_exports(c)
         if "K1" in want:
-            score_baseline("K1", "C", found["C"], writing, c.timeline())
+            score_baseline("K1", "C", found["C"], writing, c.timeline(), binary)
         c.close()
 
     if want & {"K1", "M1", "M2", "M3", "M4", "R1", "R2", "R3", "R4"}:
@@ -569,7 +696,7 @@ def run_rows(client, chosen, writing):
             first, second = t.tracks(2)
             t.place(TONE_A, first, AT)
             t.place(TONE_B, second, AT)
-            score_baseline("K2", "T", control_exports(t), writing, t.timeline())
+            score_baseline("K2", "T", control_exports(t), writing, t.timeline(), binary)
             t.close()
         guarded(["K2"], doc_t)
 
@@ -596,6 +723,13 @@ def main():
     chosen = [r for r in ROWS[2:] if not only or r in only]
     print(f"#336 — an audio track whose only clip has no source — {binary}"
           + (" — writing the baseline" if args.baseline else ""), flush=True)
+    if "K0" in chosen:
+        k0()
+    driven = [r for r in chosen if r != "K0"]
+    if not driven:      # K0 alone: no app, no fixture
+        print(f"{int(rows.get('K0', False))}/1 in {time.monotonic() - started:.0f} s")
+        return 0 if rows.get("K0") else 1
+    chosen, every = driven, chosen
     absent = [p for p in (TONE_A, TONE_B, AV_MOV) if not p.exists()]
     log = WORK / "framejob.log"
     up = False
@@ -616,7 +750,7 @@ def main():
             else:
                 print(f"  instance PID {launched.child.pid} at {launched.socket_path}",
                       flush=True)
-                run_rows(launched.client, chosen, args.baseline)
+                run_rows(launched.client, chosen, args.baseline, binary)
         finally:
             launched.stop()
             mcp.remove_scratch(launched.socket_path)
@@ -625,7 +759,7 @@ def main():
           f"{len(controls) - len(bad)}/{len(controls)} controls" + (f"; failed {bad}" if bad else ""))
     found = complaints(log)
     check("D0", up and found == [], f"listening {up}; complaints {found[:5]}")
-    scored = ["D0", "X0"] + chosen
+    scored = ["D0", "X0"] + every
     passed = sum(1 for name in scored if rows.get(name))
     print(f"{passed}/{len(scored)} in {time.monotonic() - started:.0f} s")
     return 0 if passed == len(scored) else 1
