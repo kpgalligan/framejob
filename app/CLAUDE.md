@@ -475,13 +475,13 @@ detail there.
   MP3 read past its tag's encoder delay, SY-38) →
   speech.
   `MediaImporter+Loudness.swift` (await-free, spec §11 AU-10) is the loudness
-  cache's marker (`LoudnessStamp`, `loudnessVersion` 1), URLs, load, clear,
-  head check (`loudnessPassNeeded`), reader (`writeLoudness`: the file's own
-  rate, a file of more than two channels read again as two) and one
-  publication (`finishLoudness`, a `loudness` post); `LoudnessBlocks.swift` is
-  the loaded cache (`MediaLoudness`) and the 10 ms accumulator fed beside a
-  `PeakBuckets` that validates, places and covers for it (`KWeighting` is
-  `Loudness.swift`'s).
+  cache's marker (`LoudnessStamp`, `loudnessVersion` 2 since AU-63, kept by
+  AU-164), URLs, load, clear, head check (`loudnessPassNeeded`), reader
+  (`writeLoudness`: the file's own rate, a file of more than two channels
+  read again as two) and one publication (`finishLoudness`, a `loudness`
+  post); `LoudnessBlocks.swift` is the loaded cache (`MediaLoudness`) and the
+  10 ms accumulator fed beside a `PeakBuckets` that validates, places and
+  covers for it (`KWeighting` is `Loudness.swift`'s).
   `MediaImporter.loudness` runs after `peaks` and before `syncFeatures`; the
   in-session retry runs while either published nothing.
   `thumbnails` holds a
