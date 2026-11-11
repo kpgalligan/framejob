@@ -49,6 +49,7 @@ Each clip's limiter holds that clip alone. All of these can go past the ceiling:
 - A clip inside a nest, when the nest's volume is above 100 %.
 - A clip on a track whose [volume](/audio/track-volume-and-pan/) is above 0 dB.
 - The first moments after a hard cut from a louder clip on the same track, while the level settles.
+- A clip at a speed other than ×1 with [Keep pitch](/speed/keep-pitch/) on. Frame Job stretches its sound after the limiter, and the stretch can lift a peak back over the ceiling. With **Keep pitch** off, or on a [speed ramp](/speed/ramp-audio/), the limiter holds.
 
 In an export, the [master limiter](/export/loudness/#the-master-limiter) holds the whole mix at its own ceiling, whichever of these happens. A [stem](/export/stems/) doesn't go through it. The preview has no master limiter, so they can sound louder while you edit than they do in the file.
 

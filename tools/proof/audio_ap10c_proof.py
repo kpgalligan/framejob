@@ -547,6 +547,20 @@ def u1(mcp, media, socket):
         good = good and whole and undone == fresh and "compressor" not in fresh
         details.append(f"read back {edited} (whole {whole}); one undo back to fresh "
                        f"{undone == fresh}")
+        # The schema says what the prose says (#549): each may be an object or
+        # null, neither is required, and a null clears what an object set.
+        schema = project.mcp.schemas()["set_track"]["inputSchema"]
+        types = {key: schema["properties"][key].get("type") for key in ("compressor", "limiter")}
+        nullable = all(isinstance(kinds, list) and {"object", "null"} <= set(kinds)
+                       for kinds in types.values())
+        optional = not {"compressor", "limiter"} & set(schema.get("required", []))
+        project.call("set_track", track=track, compressor={}, limiter={})
+        both = project.track(track)
+        project.call("set_track", track=track, compressor=None, limiter=None)
+        cleared = project.track(track) == fresh and "compressor" in both and "limiter" in both
+        good = good and nullable and optional and cleared
+        details.append(f"tools/list publishes {types} (object and null {nullable}, optional "
+                       f"{optional}); null clears both {cleared}")
 
         def refused(arguments, sentence):
             try:

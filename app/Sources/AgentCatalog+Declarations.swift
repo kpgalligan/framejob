@@ -102,9 +102,9 @@ struct AgentDeclaration {
     /// it may NARROW what the core published and never relax it** — a
     /// `minimum` tighter than the core's is a truer promise, one looser than
     /// the core's is a false one, and nothing here can tell the two apart.
-    /// All six rows that use it today NARROW — `set_speed.rate` and
+    /// All seven rows that use it today NARROW — `set_speed.rate` and
     /// `add_speed_ramp.rate` a range, `set_canvas.fps` a floor on its items,
-    /// three lists a `minItems` — so the rule is written down rather than
+    /// four lists a `minItems` — so the rule is written down rather than
     /// enforced: a guard that silently dropped the key would put a row in the
     /// list that does nothing, which is the trap this file's one shared
     /// predicate exists to avoid.
@@ -124,15 +124,16 @@ struct AgentDeclaration {
 extension AgentServer {
 
     /// Every declaration, in one list (`AgentDeclaration`'s doc has the rule
-    /// an entry has to pass). Twenty rows over seven kinds of difference:
-    /// two bare-string shorthands, one reading of a whole JSON kind, two
-    /// nulls that mean something, two ranges the core clamps to rather than
-    /// refusing, one the APP refuses outside where the core's kind is
-    /// looser, five times the tool takes from the app what the op would
-    /// have made the caller send or would have defaulted, and three times a
-    /// list the tool will not accept empty although the op reads one, and
-    /// four times an argument only the app can fill, which the tool does
-    /// not publish at all.
+    /// an entry has to pass). Twenty-four rows over eight kinds of
+    /// difference: two bare-string shorthands, one reading of a whole JSON
+    /// kind, four nulls that mean something, two ranges the core clamps to
+    /// rather than refusing, one the APP refuses outside where the core's
+    /// kind is looser, four times a list the tool will not accept empty
+    /// although the op reads one, five times the tool takes from the app
+    /// what the op would have made the caller send or would have defaulted
+    /// (one of them a fifth null, read as omitted), and five times an
+    /// argument only the app can fill, which the tool does not publish at
+    /// all.
     ///
     /// **Two rows narrow rather than widen, and they are the same rule read
     /// the other way.** `set_speed.rate` and `set_canvas.fps` each publish a
@@ -200,6 +201,18 @@ extension AgentServer {
                 + "an absent region the same way, so a forgotten rectangle would become the "
                 + "opposite edit. Declared nullable and required for that one reason; "
                 + "zoomRegionArg refuses the omission by name and says what to send."),
+        AgentDeclaration(
+            .argument("compressor", of: "set_track"), alsoTypes: ["null"],
+            why: "null CLEARS the track's compressor (spec §11 AU-150). Unlike every other "
+                + "optional argument, the op tells an absent key from a null one here "
+                + "(core/src/track_dynamics.rs's `present`): absent keeps, null clears. So "
+                + "the null is declared and the key stays optional: no forgotten key can "
+                + "clear anything, which is why this row is not required as "
+                + "set_transition's kind is."),
+        AgentDeclaration(
+            .argument("limiter", of: "set_track"), alsoTypes: ["null"],
+            why: "The same reader and the same reason as set_track's compressor: null "
+                + "clears the track's limiter, an absent key keeps it."),
 
         // ---- a range the core clamps to rather than refusing --------------
 

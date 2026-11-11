@@ -75,3 +75,38 @@ It is new because [`audio-4.md`](audio-4.md) had reached the spec's ~500-line sp
   seek drained by a stop, a tick at rate 0, the other rate), ten mutants (twenty-one in all), L2 also holds the seek's play within
   0.01 LU of L1's export, and L3 plays a third time after 6 s paused, and a fourth after a seek made while paused. `audio_ap6b_proof.py` P3's seek row is absolute again, within
   0.01 LU, its control gone (AU-67 (e)). SE-30 stays the person's check.
+- **AU-162 — A live retimed segment can pass its clip limiter's ceiling (#399, 2026-11-11;
+  amends AU-20 and AU-22).** #399 read +0.73 dBTP on a clip at ×1.5 with Keep pitch on whose
+  limiter was at −1, and guessed the time-pitch runs after the tap. Measured before anything
+  was written (`audio_ap6_proof.py` V17, the owner's recording, a gate and the limiter at −1
+  dBTP, Loudness Normalize to −18, the deciding run on Debug): the guess holds. AU-55's two
+  kinds of retimed segment differ.
+  - **RENDERED** (a Speed action, or a constant speed with Keep pitch off): the tap is handed a
+    ×1 file that is already retimed, so the limiter holds it. ×1, ×1.5 and ×0.75 with Keep
+    pitch off and a Speed Dip to ×0.7 with Keep pitch on each read −1.0000 dBTP in the solve's
+    verify render and at most −0.9998 dBTP in the pre-master stem.
+  - **LIVE** (a constant speed with Keep pitch on): AVFoundation scales the segment inside the
+    composition, after the tap. In every live leg the tap's own output held the ceiling (the
+    live meter's true peak over a preview play around the stem's largest sample, AU-70:
+    −1.0000 dBTP), and what came out of the composition did not: +0.4325 dB over the ceiling at
+    ×1.5, +1.1493 dB at ×0.5, and +1.7293 dB at ×1.5 on #399's own chain (noise reduction 0.5,
+    Enhance's gate and compressor, target −16), which is #399's +0.73 dBTP to the digit. ×1.02
+    (`time_domain`, SY-26) read 0.0000 dB over. The stretch re-shapes the peaks the limiter
+    held, and it can lower them as readily: the same ×1.5 leg at a −20 target read 1.6573 dB
+    UNDER the ceiling, and the solve gives the volume back. Two renders of one clip can also
+    differ (#337's two outcomes), so a figure is its run's.
+  - **Accepted, and why.** No tap can run after the scaled edit, and SY-41 rules out Frame Job's
+    own time-stretch; rendering a live segment offline so the tap sees it would move every Keep
+    pitch clip onto SR-13's unit, with its lead and SR-15's lateness, which is not this fix. The
+    export's master limiter holds the file (AU-27, AU-28: every leg's export ≤ −1 dBTP by both
+    meters); the preview has no master (AU-73) and a stem does not go through it (AU-108
+    (e)), so both can pass the ceiling. Loudness Normalize and Enhance Voice report the figure as
+    `result_true_peak_dbtp` and do not correct for it.
+  - **The proof.** V17: every leg scores that its reading is a verify render's (renders ≥ 2,
+    `limited_by` null), that the limiter has 3 dB or more to take off, that the export holds
+    −1 dBTP and that the tap's output holds the ceiling in the preview; the rendered legs also
+    score the verify render and the stem at the ceiling; the live legs' margins are printed
+    and never scored, as V12's is. Two mutants: the limiter dropped from the clip's chain
+    (`AudioTapSchedule.swift`) fails the tap row of every leg and the ceiling row of every
+    rendered leg; the gate dropped from leg (a)'s chain fails its `renders` clause (the model's
+    capped figure would otherwise pass).

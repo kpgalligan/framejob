@@ -176,7 +176,8 @@ decisions from AU-27.
   158 samples (lookahead 96 + taps − 2) at any rate. Every buffer is allocated in `init`, and
   `reset()` restores the fresh state. In the chain it runs last, after an enclosing nest's fold
   (AU-3's "limiter, then the fader"). With no settings its ceiling is +∞: a pure delay once
-  released.
+  released. **Amended by AU-162 (#399):** last in the TAP's chain; a live retimed segment (a
+  constant speed with Keep pitch on) is retimed by AVFoundation after the tap, past the stage.
 - **AU-21 — `audio.limiter`.** Null (absent) or `{ceiling_db, release}`: `ceiling_db` in dBTP,
   post-fader, −24…0, default −1; `release` in ticks, 600…600 000 (1 ms…1 s), default 60 000
   (100 ms). Written only when set (`skip_serializing_if`), so a project without one writes the
@@ -193,7 +194,7 @@ decisions from AU-27.
   base, an enclosing nest clip's volume above 1, the fader's slew at a hard cut from a louder
   clip (#87's limit), and two limited clips overlapping (a transition, two tracks), whose sum no
   clip limiter sees. AP2's second part's master limiter holds the export; the preview has none
-  (S3).
+  (S3). **Amended by AU-162 (#399):** a fifth accepted pass, a live retimed segment.
 - **AU-23 — The limiter's lead.** The stage runs for the WHOLE composition audio track once any
   clip on it has a limiter, so the track's delay never changes at a cut. Such a track's media is
   placed 1,975 ticks earlier (158 samples at 48 kHz; plus SY-25's 6,400 when it also runs noise

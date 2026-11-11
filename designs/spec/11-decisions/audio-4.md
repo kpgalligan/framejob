@@ -432,7 +432,9 @@ recorded before its code, continuing AU-109's block.
   `tracks_approximate`), U1 (undo, read-back, refusals, `nest`, the parity log), probe rows B1–B5
   (the stage at any buffer size, `ExportMixRead` against the single read, a nest bus, the tap's
   ×E/÷E at 48 and 44.1 kHz, the leads and the footer); ten mutants, each killed by a named row or
-  `core/tests/track_dynamics.rs`; manual check SE-40.
+  `core/tests/track_dynamics.rs`; manual check SE-40. **Amended by #414:** eleven mutants: M11
+  (`ExportMixRead`'s last drain handed back as one uncapped buffer, killed by probe row B2) came
+  with that fix. **Amended by #549:** U1 also reads `set_track`'s schema, object or null.
 - **AU-157 — A linked pair's duck belongs to its sound half.** `detach_audio` drops `audio.duck`
   from the picture half, and `duckers` skips a linked clip whose picture is on and whose audio is
   off, so a pair saved earlier, or a duck pasted or set on the picture half, ducks nothing. An

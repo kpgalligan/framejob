@@ -27393,7 +27393,7 @@ floor is `eq_proof.report`'s 10th percentile of 50 ms RMS. Its fixtures are the 
 recording and `say` speech (V6 low-passed at 3.5 kHz, V7 high-shelved +15 dB above 5 kHz). V8
 launches a second instance with `-FrameJobNormalizeTargetLUFS '<real>-18</real>'` (a plist
 fragment: a bare `-18` is read as a flag and never arrives, and −18 is not the default, #404),
-V14 one with `-RCDevRampRenderHold 3`; each is stopped. `AP6_ONLY=owner,sibilance,selection,speed,normalize,menu,hold`
+V14 one with `-RCDevRampRenderHold 3`; each is stopped. `AP6_ONLY=owner,sibilance,selection,speed,normalize,menu,hold,actions,limiter`
 runs only those parts while iterating; a recorded run sets nothing.
 
 | Row | What it holds |
@@ -27408,7 +27408,7 @@ runs only those parts while iterating; a recorded run sets nothing.
 | V9 | two clips each their own, one undo |
 | V10 | skips and refused arguments, changing nothing |
 | V11 | the parity log clean |
-| V12 | ×1.5 (not isolatable): noise reduction 0.5, a gate, the floor ≥ 10 dB under, the export at −16 ±0.5 |
+| V12 | ×1.5 with Keep pitch on (isolated at any speed since #387): isolation 0.8, noise reduction 0, a gate, the floor ≥ 10 dB under, the export at −16 ±0.5; its verify render against its limiter's ceiling printed, not scored (AU-162) |
 | V13 | `normalize_clip` alone at volume 2: (a) isolation 0.8 and (b) an EQ, `processed_lufs` ≠ `measured_lufs`, the export at −16 ±0.5 and a second call "made no change"; (c) a plain clip, `processed_lufs` null, `renders` 0, the cache plan's −16 |
 | V14 | the hold instance, each leg on a fresh project whose `cache/isolated/` is empty: (a) the Measuring Sound sheet seen in `snapshot_ui` (else FAIL), `cancel_sheet`, the clip unchanged after the hold; (b) the sheet seen, `set_audio {pan: 0.2}` during the hold, and once the sheet goes only the pan changed |
 | V15 | At volume (the `option.display` part after the "At volume" label in `snapshot_ui`'s layout, the Sound sub-tab) after Enhance within ±0.2 of −16 with no "≈"; after an EQ change "≈ " and the tooltip |
@@ -31891,3 +31891,37 @@ A14,P9` 3/3 and its mutants `write-outside-publish`, `write-outside-publish-app`
 `ramp_proof.py` 43/43 on Debug. `make gate` PASS. On Release (`RC_PROOF_APP=release`, after
 the gate's `make app`): `save_hold_proof.py` 11/11, `analysis_proof.py` 26/26,
 `ramp_proof.py` 43/43.
+
+## #399, #549 — a live retimed clip past its limiter's ceiling, and AU-156's residue (`audio_ap6_proof.py` V17, V12; `audio_ap10c_proof.py` U1; `core/tests/link_edges.rs`; three mutants; spec §11 AU-162)
+
+**V17** (`AP6_ONLY=limiter`, `AP6_LEGS=a,c` for some legs) measures #399 before anything was
+decided: the owner's recording with a gate and the limiter at −1 dBTP, `normalize_clip`
+(loudness, −18), one fresh project per leg.
+
+| Row | What it holds |
+|---|---|
+| every leg | renders ≥ 2 and `limited_by` null (a verify render's reading, not the model's capped figure); R0's peak at the solved volume 3 dB or more over the ceiling (the limiter is working); the `audio_wav` export ≤ −1 dBTP by both meters; the tap's own output at the ceiling: `loudness_meter`'s true peak over a 6 s `play_preview` around the pre-master stem's largest sample ≤ −1 + 0.001 |
+| (a) ×1, (b) ×1.5 and (f) ×0.75 Keep pitch off, (g) a Speed Dip to ×0.7 with Keep pitch on | rendered ahead of the tap: the verify render and the stem (`stems: tracks`) ≤ −1 + 0.001 |
+| (c) ×1.5, (d) ×0.5, (e) ×1.02 Keep pitch on, (h) ×1.5 Keep pitch on with #399's chain (target −16) | live: the verify render and the stem against the ceiling printed, NOT scored (AU-162) |
+
+Recorded 2026-11-11, after `make gate`:
+
+| Run | Result |
+|---|---|
+| Release: `audio_ap6_proof.py` whole on a `proof_app.py launch --app release` instance | 73/73; no `Frame Job: ` line. V17's verify renders: (a), (b), (f), (g) −1.0000 dBTP; (c) −0.5675 (+0.4325 dB over the ceiling); (d) +0.1493 (+1.1493); (e) −1.0000; (h) +0.7293 (+1.7293), #399's own +0.73. The tap −1.0000 dBTP in all eight legs. The rendered legs' stems −0.9998 to −1.0000 dBTP. V12's verify render +0.2407 dBTP (1.2407 dB over) |
+| Debug, the same instrument (`AP6_ONLY=limiter,speed`) | 32/32, V17's figures the same to four places; V12's verify render −0.9832 dBTP (0.0168 dB over), another outcome of the same stretch (#337) |
+| Debug at a −20 target, before the target moved to −18 | the limiter's work under 3 dB in (d); (c) read 1.6573 dB UNDER the ceiling and (d) 0.4883 under, the tap at −1.0000: the stretch re-shapes peaks either way |
+| Release: `audio_ap10c_proof.py` whole | 13/13. U1: `tools/list` publishes `["object", "null"]` for `set_track`'s `compressor` and `limiter`, neither required, and a null clears both |
+| Debug: `op_catalog_proof.py`, `op_argument_proof.py` | 23/23 and 205/205 |
+
+A stem is an integer file: it reads no sample over 0 dBFS, so (d)'s and (h)'s stems read lower
+than their verify renders.
+
+| Mutant | Edit | Killed by |
+|---|---|---|
+| limiter dropped | `AudioTapSchedule.swift`: `limiter: audio.limiter.map {` → `limiter: Optional<LimiterProps>.none.map {` (a Debug build) | V17 (a), (b), (g) on the tap row and the ceiling row (verify renders +5.1125, +5.2083, +4.3898 dBTP; the tap the same), (c) on the tap row (+6.2075 dBTP) |
+| no gate (the instrument) | `LIMITER_CHAIN` without its gate | V17 (a)'s first row: renders 0, where the model's capped −1.0000 would pass the ceiling row |
+| the lock ignored | `core/src/edit_link.rs`: `self.unlocked(partner.track) &&` removed | `an_overwrite_leaves_a_linked_picture_on_a_locked_track_whole` and its Insert twin (the picture cut to 2 s) |
+
+U1's new clause was red on a Debug build made before the two `set_track` rows in
+`AgentCatalog+Declarations.swift` (`{'compressor': 'object', 'limiter': 'object'}`) and green after.

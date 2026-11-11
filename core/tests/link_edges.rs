@@ -2,7 +2,7 @@
 //! consecutive detached shots, a J-cut near 0, the shift floor's refusal in
 //! each op that shifts, what `delete` and `ripple_delete` take, whose
 //! duck a pair's is (AU-157), and an insert or overwrite on the SOUND's track
-//! cutting the linked picture (AU-92, #414).
+//! cutting the linked picture (AU-92, #414) unless its track is locked.
 //!
 //! Every pair here is made by `detach_audio` itself, so the link under test
 //! is the one the product writes.
@@ -416,6 +416,43 @@ fn an_insert_leaves_a_linked_picture_on_a_locked_track_whole() {
     // 101 is the sound's second half, 102 the new clip.
     assert_eq!(span(&after, 101), (6 * SEC, 4 * SEC));
     assert_eq!(span(&after, 102), (4 * SEC, 2 * SEC));
+}
+
+#[test]
+fn an_overwrite_leaves_a_linked_picture_on_a_locked_track_whole() {
+    let locked = pair_and_roll().apply(&json!({"op": "set_track", "track": 2, "locked": true}));
+    let after = locked
+        .apply(&json!({"op": "overwrite_clip", "track": 1, "media": 8, "at": 4 * SEC}))
+        .value();
+    assert_eq!(span(&after, 10), (2 * SEC, 6 * SEC), "not cut, not moved");
+    assert_eq!(track(&after, 10), 2);
+    // The cut at 4 s mints 101 (the sound from 4 s), the cut at 6 s mints
+    // 102 (the sound's tail), and 103 is the new clip. No picture is minted.
+    assert_eq!(span(&after, 100), (2 * SEC, 2 * SEC));
+    assert!(!has(&after, 101), "the sound under the new clip is gone");
+    assert_eq!(span(&after, 102), (6 * SEC, 2 * SEC), "nothing moved");
+    assert_eq!(span(&after, 103), (4 * SEC, 2 * SEC));
+    assert_eq!(
+        (track(&after, 100), track(&after, 102), track(&after, 103)),
+        (1, 1, 1)
+    );
+    let clips = array(&after, "/clips");
+    assert_eq!(
+        clips.len(),
+        4,
+        "the picture, two sound pieces, the new clip"
+    );
+    assert_eq!(
+        clips.iter().filter(|c| c["track"] == json!(2)).count(),
+        1,
+        "the locked track holds the picture alone"
+    );
+    // Each cut left the picture linked to the piece sharing more of its time
+    // (the first on a tie): 101 both times, the piece the new clip replaced.
+    // So the pair is over, and no clip names another.
+    for id in [10, 100, 102, 103] {
+        assert_eq!(linked(&after, id), None, "clip {id}");
+    }
 }
 
 #[test]

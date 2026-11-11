@@ -70,6 +70,27 @@ samples/Rode-usb-mic.m4a, and `say` speech made here — one low-passed at
        arm, which no render checks; renders 1, and the miss between
        result_lufs and the export PRINTED (AU-159 (b)'s recorded limit, #402's
        open half), never scored.
+  V17  the clip limiter at a speed other than ×1 (#399, spec §11 AU-162): the
+       owner's recording, a gate and the limiter at −1 dBTP, normalize_clip
+       (loudness, −18), one fresh project per leg: (a) ×1; (b) ×1.5 and (f)
+       ×0.75 Keep pitch off and (g) a Speed Dip to ×0.7 with Keep pitch on,
+       all three RENDERED ahead of the tap (AU-55); (c) ×1.5, (d) ×0.5 and (e)
+       ×1.02 Keep pitch on, LIVE; (h) ×1.5 Keep pitch on with #399's own chain
+       (the Rumble Cut, noise reduction 0.5, Enhance's gate and compressor,
+       target −16). Every leg: renders ≥ 2 and limited_by null (the reading is
+       a verify render's, not the model's capped figure), the limiter has
+       3 dB or more to take off (R0's peak at the solved volume over the
+       ceiling), the audio_wav export ≤ −1 dBTP by both meters (its master),
+       and the TAP's own output holds the ceiling: the live meter's true peak
+       (AU-70: the tap's block × the fader) over a 6 s preview play around
+       the pre-master stem's largest sample ≤ −1 + 0.001. (a), (b), (f), (g):
+       the clip holds its ceiling, the verify render and the stem (`stems:
+       tracks`, no master) ≤ −1 + 0.001. (c), (d), (e), (h): the verify
+       render and the stem against the ceiling PRINTED, never scored: the
+       time-pitch runs after the tap and re-shapes the peaks the limiter held,
+       either way and differently from one render to the next (AU-162). A
+       stem is an integer file, so it reads no sample over 0 dBFS.
+       AP6_LEGS=a,c runs only those legs.
 """
 
 import json
@@ -470,6 +491,10 @@ def speed_rows(m):
     plain = floor_of(s.export("normalized")["path"])
     row = enhance(s, [clip])["enhanced"][0]
     print_row(row)
+    print(f"  note V12 NOT SCORED (AU-162, #399): a live retimed clip, its verify render "
+          f"{f(row['result_true_peak_dbtp'], 4)} dBTP, "
+          f"{f(row['result_true_peak_dbtp'] - row['set']['limiter']['ceiling_db'], 4)} dB "
+          f"against its limiter's ceiling")
     got = row["set"]
     check(got.get("noise_reduction") == 0 and got.get("isolation") == 0.8
           and isinstance(got.get("gate"), dict),
@@ -483,6 +508,133 @@ def speed_rows(m):
           f"V12 the export at {f(lufs)} LUFS (−16 ±0.5); result_lufs {f(row['result_lufs'])}, "
           f"renders {row.get('renders')}")
     m.call("close_project", project=s.path, discard=True)
+
+
+# ---- V17 the clip limiter at a speed other than ×1 (#399, AU-162) -------------
+
+CEILING = -1.0
+LIMITER_TARGET = -18
+LIMITER_CHAIN = {"gate": {"threshold_db": -30}, "limiter": {"ceiling_db": CEILING}}
+# #399's own chain, as Enhance Voice wrote it at ×1.5 before #387: the Rumble Cut,
+# noise reduction 0.5, Enhance's gate and compressor for this recording, the limiter.
+ISSUE_CHAIN = {"eq": {"high_pass": {"frequency": 80, "slope": 24}}, "noise_reduction": 0.5,
+               "gate": {"threshold_db": -6, "ratio": 4, "range_db": 20},
+               "compressor": {"threshold_db": -40, "ratio": 3, "makeup_db": 9},
+               "limiter": {"ceiling_db": CEILING}}
+ISSUE_TARGET = -16
+PLAY_SECONDS = 6
+TAP_TOLERANCE = 0.001
+# (leg, what it is, the speed op or None, the chain, rendered ahead of the tap?)
+LIMITER_LEGS = (
+    ("a", "×1", None, LIMITER_CHAIN, True),
+    ("b", "×1.5 Keep pitch off (rendered)", {"rate": 1.5, "keep_pitch": False},
+     LIMITER_CHAIN, True),
+    ("c", "×1.5 Keep pitch on (live)", {"rate": 1.5, "keep_pitch": True}, LIMITER_CHAIN, False),
+    ("d", "×0.5 Keep pitch on (live)", {"rate": 0.5, "keep_pitch": True}, LIMITER_CHAIN, False),
+    ("e", "×1.02 Keep pitch on (live, time-domain)", {"rate": 1.02, "keep_pitch": True},
+     LIMITER_CHAIN, False),
+    ("f", "×0.75 Keep pitch off (rendered)", {"rate": 0.75, "keep_pitch": False},
+     LIMITER_CHAIN, True),
+    ("g", "a Speed Dip to ×0.7, Keep pitch on (a ramp, rendered)",
+     {"ramp": {"shape": "speed_dip", "rate": 0.7}}, LIMITER_CHAIN, True),
+    ("h", "×1.5 Keep pitch on (live), #399's chain", {"rate": 1.5, "keep_pitch": True},
+     ISSUE_CHAIN, False),
+)
+
+
+def stem_peak(path, start=None, seconds=None):
+    """(Kaiser dBTP, Annex 2 dBTP, the largest sample's time in s) of a file's
+    first channel, over `[start, start + seconds)` when given."""
+    x = limiter_probe.channels_of(path)[0]
+    if start is not None:
+        x = x[max(0, int(start * RATE)):int((start + seconds) * RATE)]
+    if not len(x):
+        return -np.inf, -np.inf, 0.0
+    return (limiter_probe.db(limiter_probe.kaiser_true_peak(x)),
+            limiter_probe.db(limiter_probe.annex2_true_peak(x)),
+            float(np.argmax(np.abs(x))) / RATE)
+
+
+def tap_peak(s, at):
+    """The live meter's true peak (the tap's own output × the fader, AU-70)
+    over a preview play of PLAY_SECONDS from `at` seconds, and the seconds it
+    measured; (None, 0) when the meter measured nothing."""
+    s.op("set_playhead", t=int(round(at * 30)) * (SECOND // 30))
+    s.op("loudness_meter", reset=True)
+    deadline = time.monotonic() + 60
+    while True:
+        try:
+            s.op("play_preview", seconds=PLAY_SECONDS)
+            break
+        except ToolError as error:
+            if "nothing to play" not in str(error) or time.monotonic() > deadline:
+                raise
+            time.sleep(0.5)
+    got = s.op("loudness_meter")
+    peak = got.get("true_peak_dbtp")
+    frames = (got.get("to_frame") or 0) - (got.get("from_frame") or 0)
+    return (peak if isinstance(peak, (int, float)) else None,
+            frames / (got.get("sample_rate") or RATE))
+
+
+def limiter_speed_rows(m):
+    print("\nV17 — the clip limiter at a speed other than ×1 (#399, AU-162)")
+    only = set(filter(None, os.environ.get("AP6_LEGS", "").split(",")))
+    for leg, what, speed, chain, rendered in LIMITER_LEGS:
+        if only and leg not in only:
+            continue
+        s = Session(m, f"ap6-limit-{leg}")
+        clip = place(s, "ap6-rode.wav")
+        if speed and "ramp" in speed:
+            s.op("add_speed_ramp", clip=clip, **speed["ramp"])
+        elif speed:
+            s.op("set_speed", clip=clip, **speed)
+        s.op("set_audio", clips=[clip], patch=chain)
+        row = s.op("normalize_clip", clips=[clip], mode="loudness",
+                   target_lufs=ISSUE_TARGET if chain is ISSUE_CHAIN
+                   else LIMITER_TARGET)["normalized"][0]
+        volume, renders = row["volume"], row.get("renders") or 0
+        # What the limiter has to take off: R0's pre-fader peak (no limiter) at
+        # the solved volume, over the ceiling.
+        work = row["true_peak_dbtp"] + 20 * np.log10(volume) - CEILING
+        result = row["result_true_peak_dbtp"]
+        exported = s.export("limited", stems="tracks")
+        mix = limiter_probe.true_peaks(exported["path"])
+        stems = exported.get("stems") or []
+        kaiser, annex, peak_at = stem_peak(stems[0]["path"]) if stems else (None, None, 0.0)
+        # The tap's side: the preview played around the stem's largest sample.
+        at = max(0.0, peak_at - PLAY_SECONDS / 2)
+        tap, measured = tap_peak(s, at)
+        window = stem_peak(stems[0]["path"], at, PLAY_SECONDS) if stems else (None, None, 0.0)
+        duration = s.clip(clip)["duration"] / SECOND
+        m.call("close_project", project=s.path, discard=True)
+        label = f"V17 ({leg}) {what}"
+        print(f"  note {label}: {f(duration)} s, volume {f(volume, 4)}, renders {renders}, "
+              f"limited_by {row['limited_by']}, the limiter's work {f(work)} dB; the verify "
+              f"render {f(result, 4)} dBTP ({f(result - CEILING, 4)} dB against the ceiling); "
+              f"the stem (pre-master) {f(kaiser, 4)} (Kaiser) / {f(annex, 4)} (Annex 2) dBTP, "
+              f"its largest sample at {f(peak_at)} s; the preview from {f(at)} s: the tap "
+              f"{f(tap, 4)} dBTP over {f(measured)} s, the stem there {f(window[0], 4)} / "
+              f"{f(window[1], 4)} dBTP")
+        check(renders >= 2 and row["limited_by"] is None and work >= 3,
+              f"{label}: the reading is a verify render's and the limiter is working "
+              f"(renders {renders} ≥ 2, limited_by {row['limited_by']}, {f(work)} dB to take "
+              f"off, ≥ 3)")
+        check(max(mix) <= CEILING + 0.001,
+              f"{label}: the export (its master) {f(mix[0], 4)} / {f(mix[1], 4)} dBTP ≤ −1")
+        check(tap is not None and measured >= PLAY_SECONDS / 2 and tap <= CEILING + TAP_TOLERANCE,
+              f"{label}: the tap's own output holds the ceiling in the preview "
+              f"({f(tap, 4)} dBTP over {f(measured)} s, ≤ −1 + {TAP_TOLERANCE})")
+        if rendered:
+            check(result <= CEILING + 0.001 and kaiser is not None
+                  and max(kaiser, annex) <= CEILING + 0.001,
+                  f"{label}: the clip holds its ceiling: the verify render "
+                  f"{f(result, 4)} dBTP, the stem {f(kaiser, 4)} / {f(annex, 4)} dBTP (≤ −1)")
+        else:
+            print(f"  note {label} NOT SCORED (AU-162, #399): the verify render "
+                  f"{f(result - CEILING, 4)} dB and the stem "
+                  f"{f(max(kaiser, annex) - CEILING, 4)} dB against the ceiling (the stem is "
+                  f"another render and an integer file, with no sample over 0 dBFS)")
 
 
 # ---- V13 normalize_clip through the chain ------------------------------------
@@ -700,7 +852,8 @@ def main():
     errors = (ToolError, KeyError, IndexError, RuntimeError, OSError, ValueError, TypeError)
     parts = (("owner", owner_rows), ("sibilance", sibilance_rows),
              ("selection", selection_rows), ("speed", speed_rows),
-             ("normalize", normalize_rows), ("actions", action_rows))
+             ("normalize", normalize_rows), ("actions", action_rows),
+             ("limiter", limiter_speed_rows))
     for name, part in parts:
         if only and name not in only:
             continue
