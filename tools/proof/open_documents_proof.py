@@ -80,6 +80,8 @@ THREAD_SLACK = 64
 STEP = 10
 FALL = (5, 15, 30, 60)    # seconds after the last close at which the threads are read
 SETTLE = 10              # seconds the bound is held before its last reading
+# The mutants, as `mutant_anchors.py` reads them: a switch on MUTANT in `verdict`, no tree text.
+MUTANTS = ("timeout-only",)
 MUTANT = None
 
 rows = {}
@@ -345,7 +347,7 @@ def main():
     parser.add_argument("--bound", type=int, default=150)
     parser.add_argument("--only-kind", choices=("new", "open"), default=None)
     parser.add_argument("--call-seconds", type=float, default=120)
-    parser.add_argument("--mutant", choices=("timeout-only",), default=None)
+    parser.add_argument("--mutant", choices=MUTANTS, default=None)
     args = parser.parse_args()
     MUTANT = args.mutant
     binary = args.app or proof_app.binary()

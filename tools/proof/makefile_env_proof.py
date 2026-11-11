@@ -91,15 +91,23 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 WORK = os.path.join(ROOT, "tools", "proof", "work", "makefile-env")
 SWEEP_SECONDS = 30
 
+# The mutants: a file from the repo root, the directive as it stands there (it must occur
+# once) and what the mutant leaves in its place. `make_copy` reads it through KEYS and
+# `mutant_anchors.py` counts each directive in the tree's Makefile.
+MUTANTS = {
+    "no-unexport": ("Makefile", "unexport RC_ASSEMBLYAI_KEY\n", ""),
+    "no-unexport-anthropic": ("Makefile", "unexport ANTHROPIC_API_KEY\n", ""),
+}
+
 # Each key: its dummy (recognisable, and nothing else in the tree or in any
-# SDK spells it), its directive as it stands in the tree's Makefile, the
-# mutant that removes that directive, and the row's name.
+# SDK spells it), the mutant that removes its directive, the directive as that
+# mutant's row spells it, and the row's name.
 KEYS = [
     {"key": "RC_ASSEMBLYAI_KEY", "dummy": "RCDUMMY-makefile-env-proof-5d1c",
-     "directive": "unexport RC_ASSEMBLYAI_KEY\n", "mutant": "no-unexport",
+     "mutant": "no-unexport", "directive": MUTANTS["no-unexport"][1],
      "label": "AssemblyAI"},
     {"key": "ANTHROPIC_API_KEY", "dummy": "RCDUMMY-makefile-env-proof-anthropic-9b3e",
-     "directive": "unexport ANTHROPIC_API_KEY\n", "mutant": "no-unexport-anthropic",
+     "mutant": "no-unexport-anthropic", "directive": MUTANTS["no-unexport-anthropic"][1],
      "label": "Anthropic"},
 ]
 
@@ -139,7 +147,7 @@ def make_copy(mutant):
     if root is None:
         return None, reason
 
-    makefile = os.path.join(root, "Makefile")
+    makefile = os.path.join(root, MUTANTS["no-unexport"][0])
     with open(makefile) as handle:
         text = handle.read()
     for one in KEYS:
@@ -150,7 +158,7 @@ def make_copy(mutant):
                                                 if mutant == one["mutant"] else ""))
     for one in KEYS:
         if mutant == one["mutant"]:
-            text = text.replace(one["directive"], "")
+            text = text.replace(one["directive"], MUTANTS[mutant][2])
             with open(makefile, "w") as handle:
                 handle.write(text)
             print(f"  mutant {mutant}: {one['directive'].strip()!r} removed from the COPY — "
@@ -301,7 +309,7 @@ def holders(root):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--mutant", choices=[one["mutant"] for one in KEYS],
+    parser.add_argument("--mutant", choices=list(MUTANTS),
                         help="remove one key's `unexport` directive in the COPY — the "
                              "CONTROL, under which that key's leak row must FAIL")
     parser.add_argument("--wall", type=float, default=900,

@@ -69,6 +69,11 @@ RELEASE_APP = os.path.join(ROOT, "build", "Build", "Products", "Release", "Frame
 MODEL = "claude-opus-5-5"
 BUN_ERROR = "error: bun is not installed"
 GUARD_EXIT = "  exit 1\n"
+# The mutants. `skip-without-bun` is tree text (a file from the repo root, the text that
+# must occur there once, its replacement), which `mutant_build_sh` reads and
+# `mutant_anchors.py` counts; `no-fields` is a switch in P4's `configure`.
+MUTANTS = {"skip-without-bun": ("agent/build.sh", GUARD_EXIT, "  exit 0\n"),
+           "no-fields": None}
 WALL_P1, WALL_READY, WALL_TURN, WALL_EXIT, WALL_P5 = 30, 20, 60, 5, 180
 
 
@@ -143,8 +148,9 @@ def p0():
 def mutant_build_sh():
     """A scratch build.sh whose guard `exit 1` became `exit 0`. Answers
     (path, None) or (None, reason)."""
-    text = open(BUILD_SH).read()
-    count = text.count(GUARD_EXIT)
+    file, anchor, mutated = MUTANTS["skip-without-bun"]
+    text = open(os.path.join(ROOT, file)).read()
+    count = text.count(anchor)
     if count != 1:
         return None, f"the guard's `exit 1` occurs {count} times in build.sh, not once"
     folder = os.path.join(WORK, "p1-mutant")
@@ -152,7 +158,7 @@ def mutant_build_sh():
     os.makedirs(folder)
     path = os.path.join(folder, "build.sh")
     with open(path, "w") as f:
-        f.write(text.replace(GUARD_EXIT, "  exit 0\n"))
+        f.write(text.replace(anchor, mutated))
     return path, None
 
 
@@ -449,7 +455,7 @@ def p5():
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--dist", help="a Distribution Frame Job.app, for P2d")
-    parser.add_argument("--mutant", choices=["skip-without-bun", "no-fields"],
+    parser.add_argument("--mutant", choices=list(MUTANTS),
                         help="run one row against its made-to-fail variant; it must FAIL")
     args = parser.parse_args()
     os.makedirs(WORK, exist_ok=True)

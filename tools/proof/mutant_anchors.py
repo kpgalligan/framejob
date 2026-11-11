@@ -112,6 +112,8 @@ HINTS = {
 # Tables no anchor is read from: switches inside the instrument itself, or mutants with no tree
 # text. proof → table → the number of mutants, so one added there fails until the row says so.
 SWITCHES = {
+    # A launch argument: the app started with clearing off.
+    "assistant_clearing_proof.py": {"MUTANTS": 1},
     "bt709_fixture.py": {"MUTANTS": 4},
     # `main` rebinds `budget.BUDGETS` or `budget.anthropic_worst_row` in memory.
     "budget_proof.py": {"MUTANTS": 2},
@@ -121,6 +123,8 @@ SWITCHES = {
     "camera_spike/camera_spike.py": {"MUTANTS": 5},
     "constant_render_spike.py": {"MUTANTS": 3},
     "cursor_spike/cursor_spike.py": {"MUTANTS": 15},
+    # `child` rebinds a function of `proof_defaults` or `mcp` in the child process.
+    "defaults_proof.py": {"MUTANTS": 4},
     # `MUTANT ==` in the spike's own token strip, classifier and o2 verdict.
     "filler_spike/filler_spike.py": {"MUTANTS": 3},
     # `MUTANT` in the gate's own input classes, fingerprint, stamp rule and warning baseline.
@@ -131,8 +135,9 @@ SWITCHES = {
     "matte_spike/matte_spike.py": {"MUTANTS": 2},
     # `MUTANT` in its own scan: the pin comparison, the untracked walk, the exempt prefixes.
     "name_residue.py": {"MUTANTS": 3},
-    # `main` changes the loaded table or the fetched page in memory. Both need its one
-    # network GET, so neither was run when the table was written (2026-11-11).
+    # `MUTANT` in `verdict`: a hang decided by the timeout alone.
+    "open_documents_proof.py": {"MUTANTS": 1},
+    # `main` changes the loaded table or the fetched page in memory, after its one network GET.
     "prices_crosscheck.py": {"MUTANTS": 2},
     # `MUTANT` in its own launch-argument read, input filter and two stale markers.
     "proof_app.py": {"MUTANTS": 4},
@@ -145,6 +150,8 @@ SWITCHES = {
 
 # Single mutants with no anchor, in a table that has anchors. proof → table → [names].
 UNANCHORED = {
+    # A switch in P4's `configure`: the three fields left out.
+    "assistant_helper_proof.py": {"MUTANTS": ["no-fields"]},
     # Builds nothing: launch A of the built app, K1 last.
     "assistant_session_proof.py": {"MUTANTS": ["key-echo"]},
     # In memory: every cache_read rate doubled; one expected number of the reducer's case.
@@ -186,13 +193,10 @@ NOT_TABLES = {
 }
 
 # Proofs that take `--mutant` and hold their edits or switches inline in functions, with no
-# table to read.
-NO_TABLE = {
-    "assistant_clearing_proof.py", "assistant_compaction_proof.py", "assistant_helper_proof.py",
-    "assistant_prompt_proof.py", "defaults_proof.py",
-    "makefile_env_proof.py",
-    "op_contract_proof.py", "open_documents_proof.py",
-}
+# table to read. Empty since 2026-11-11 (#581): the nineteen proofs it named each hold a
+# top-level table now, read above. A row goes here again only for a proof whose mutant cannot
+# run without money or a real key, with the issue it is filed under.
+NO_TABLE = set()
 
 PINS = {"HINTS": HINTS, "SWITCHES": SWITCHES, "UNANCHORED": UNANCHORED, "ROTTED": ROTTED,
         "EVERY": EVERY, "NOT_TABLES": NOT_TABLES, "NO_TABLE": NO_TABLE}

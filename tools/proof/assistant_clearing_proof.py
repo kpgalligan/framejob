@@ -100,6 +100,9 @@ POSTS = 5
 SUGGESTED_CAP = 3.00
 TURN_SECONDS = 300
 ROWS = ["X0", "X1", "X2", "X3", "X4", "H", "K"]
+# The mutants, as `mutant_anchors.py` reads them: the app launched with clearing off (a
+# launch argument, `main`), no tree text.
+MUTANTS = ("clearing-off",)
 TA = "Add a marker called Alpha at 1 second."
 TA_MARKER = (600_000, "Alpha")
 TB = "Add a marker called Beta at 2 seconds."
@@ -545,7 +548,7 @@ def main():
                         help="the conversation against the stand-in, scripted")
     parser.add_argument("--live", action="store_true",
                         help="the conversation against the real API; needs --cap and the key")
-    parser.add_argument("--mutant", choices=["clearing-off"],
+    parser.add_argument("--mutant", choices=MUTANTS,
                         help="the rehearsal against an app launched with clearing off; X1 FAILS")
     parser.add_argument("--refused", action="store_true",
                         help="with --rehearse: the relay answers turn B 400 naming the trigger; "

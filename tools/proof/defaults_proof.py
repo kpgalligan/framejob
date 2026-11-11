@@ -151,6 +151,9 @@ HOME_KINDS = ("absent-home", "home-removed")
 ROWS = ["C0", "G1", "G2", "G3", "G6", "G5", "G4", "H1", "H2", "R1", "R2"]
 EXPECTED = {"no-compare": {"G1", "G3", "G6", "G4", "G5"}, "no-exit": {"G1", "G3", "G6", "G4"},
             "home-followed": {"H1", "H2"}, "no-rehome": {"G6"}}
+# The mutants, as `mutant_anchors.py` reads them: each rebinds a function of `proof_defaults`
+# or `mcp` in the child (`child`), no tree text.
+MUTANTS = tuple(sorted(EXPECTED))
 REHOMED = "mcp: the defaults guard moved "
 WALL_CHILD, WALL_COPY = 240, 300
 TOGGLES, WAIT = 3, 3.0
@@ -474,7 +477,7 @@ def main():
     parser.add_argument("--app", default=None,
                         help="the built Frame Job.app (default: proof_app.bundle())")
     parser.add_argument("--only", help="rows to run, comma-separated (C0 runs for any G row)")
-    parser.add_argument("--mutant", choices=sorted(EXPECTED))
+    parser.add_argument("--mutant", choices=MUTANTS)
     parser.add_argument("--child", nargs=2, metavar=("KIND", "TARGET"), help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.child:

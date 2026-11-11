@@ -2035,8 +2035,9 @@ table and the mutant, and each has one answer:
 instruments (71 mutants); two `UNANCHORED` mutants (`assistant_session_proof.py` `key-echo`,
 which builds nothing, and `raster_dither_proof.py` `core-unpatched`, a file swap); `EVERY` for
 `clip_inspector2_proof.py`; eleven `NOT_TABLES` names; nineteen `NO_TABLE` proofs, whose edits
-sit inline in functions where no table can be read; and twelve `ROTTED` anchors, none since
-2026-11-11 (below).
+sat inline in functions where no table can be read, none since 2026-11-11 (#581, below: with
+their tables, `SWITCHES` holds twenty-six tables and 98 mutants, and `UNANCHORED` five
+mutants); and twelve `ROTTED` anchors, none since 2026-11-11 (below).
 
 **The selftest** runs the reader over synthetic proofs and sources in scratch trees under
 `tools/proof/work/mutant-anchors-selftest/`, removed after. K0 (CONTROL) every shape at once:
@@ -2066,8 +2067,8 @@ pin passes) P2, P3, P4, P6, P8, P10, P11; `missing-file-zero` F1; `no-entry-chec
 (`ROTTED` tested on each anchor, so a pinned mutant's good edit fails "drop the row") P9, P10,
 P11.
 
-**What it does not see.** An anchor inside a function (the nineteen `NO_TABLE` proofs), or
-behind a callable in an entry. A mutant's REPLACEMENT: that it still compiles and is still
+**What it does not see.** An anchor inside a function (none known since #581; a proof that
+takes `--mutant` and has no table at all fails by name), or behind a callable in an entry. A mutant's REPLACEMENT: that it still compiles and is still
 caught is shown only by running the mutant. `qualifier_proof.py`'s and `co2a_proof.py`'s own
 row MA stay; this check agrees with them (21 mutants and 28 anchors; 10 and 10).
 
@@ -2082,6 +2083,10 @@ row MA stay; this check agrees with them (21 mutants and 28 anchors; 10 and 10).
 | The same day, the six rows deleted | exit 0: 196 proofs, 211 tables, 2,095 mutants; 2,114 anchors occur exactly once, 30 copies, 6 pinned as rotted |
 | 2026-11-11 (#572, #574, #580), the last four re-aimed, two dropped, `save_hold_proof.py`'s `transcript-no-model` added (#571), and the six `ROTTED` rows still there | exit 1, 6 failures: four `ROTTED names it … and its anchor occurs once in <file>: drop the row` (M7, M25, M26, `no-swap`) and two `ROTTED names it and it is not there: drop the row` (`no-clear`, `padded-in-place`) |
 | The same day, `ROTTED` emptied | exit 0: 196 proofs, 211 tables, 2,094 mutants; 2,119 anchors occur exactly once, 30 copies, 0 pinned as rotted |
+| 2026-11-11 (#581), four of the nineteen given a table, their `NO_TABLE` rows still there and no `SWITCHES` row yet | exit 1, 8 failures: four `no anchor read from any of its N mutants` and four `NO_TABLE names it and it is not there: drop the row` |
+| The same day, `op_contract_proof.py`'s edits moved into a table verbatim | exit 1, 2 failures: `nearest-transition: anchor occurs 0 times` in `core/src/edit_transition.rs` and in `core/src/edit_transition_shift.rs` |
+| The same day, one character of `makefile_env_proof.py`'s first anchor changed in its table | exit 1: `anchor occurs 0 times in Makefile` |
+| The same day, all nineteen moved and `NO_TABLE` emptied | exit 0: 214 proofs, 229 tables, 2,134 mutants; 2,132 anchors occur exactly once; 26 switch tables (98 mutants), 5 mutants without an anchor, 30 copies, 0 pinned as rotted, 0 proofs with `--mutant` and no table; `--selftest` 25/25. Landed beside #568's and #583's proofs, the same line reads 215 proofs, 230 tables, 2,147 mutants and 2,145 anchors |
 
 **The twelve re-aimed, each mutant run once and caught:** `camera_recording_probe.py`
 `camera-format-elsewhere-admitted` (T7), `camera-format-alone-admitted` (T9) and
@@ -2120,6 +2125,48 @@ of `save_hold_proof.py`'s new `transcript-no-model` (#571) is under that proof's
 | `export_offset_proof.py` `M26-no-lookup-lead` (#574) | `AudioTapSchedule.swift`'s `(usesLimiter ? CompositionBuilder.AudioShift.limiterLead : 0) + trackLead`, the same term of the tap's lookup lead | by hand, as M25, `limiter_proof.py <sock>` | Control 19/19. Mutant 18/19: P4's second leg FAIL, true peak -0.0000 (Kaiser) / -0.0067 (Annex 2) dBTP against -1 + 0.001; its first leg ok. A first run of the copy ended that leg on "limiter-cut-lead: 4.bin was never written" (the import's waveform not there in 15 s, load average 95 with three lanes building): not a catch, so the copy was launched and run again |
 | `raster_bench.py` `no-swap` (#580) | `graphic/src/raster.rs`, the row copy's three lines `to[0] = from[2];` … `to[2] = from[0];` (G-7), the route that exists | `--mutant no-swap` | "the mutant is CAUGHT: a_rect_draws_in_bgra_and_nothing_else_is_touched FAILED", exit 0 |
 | `raster_bench.py` `no-clear`, `padded-in-place` (#580) | none: the in-place route's clear of a caller's buffer and its `stride == row` branch, which the spike's STOP left unbuilt | not run | Dropped from the table. `rasterize` draws into a fresh pixmap and copies rows, and the tests the two named were never written; `bytes_past_the_row_are_untouched` holds a padded stride on the copy route |
+
+**The nineteen `NO_TABLE` proofs on 2026-11-11** (#581). Each held its mutants inline in a
+function; each now holds a top-level `MUTANTS` its own `--mutant` choices and applier read, so
+the table cannot drift from what runs. Eleven are switches with no tree text (a tuple of names,
+pinned in `SWITCHES` with its count); eight edit tree text (a file from the repo root, the
+anchor, the replacement). Each mutant was run once, on Debug where it drives an app, with both
+keys taken out of the environment and nothing live:
+
+| Proof | Its table | Run | Result |
+|---|---|---|---|
+| `gate.py` | switches: `tuple(sorted(EXPECTED))`, 4 | `--selftest`, then each `--mutant` | 37/37; `MUTANT PASS` each: `no-tools` H2, `stamp-always` H3, `md-counted` M4 M5 M6, `warning-count` W2 |
+| `proof_app.py` | switches: `tuple(sorted(EXPECTED))`, 4 | `--selftest`, then each `--mutant` | 17/17; `MUTANT PASS` each: `exe-marker` F3 F4, `md-counted` F5, `exe-mtime-running` R1 R2, `bare-number` A1 |
+| `name_residue.py` | switches, 3 | `--selftest`, then each `--mutant` | 8/8; `MUTANT PASS` each: `ge-count` S4, `no-untracked` S2, `text-history-paths` S7 |
+| `filler_spike/filler_spike.py` | switches, 3 | `--selftest`, then each `--selftest --mutant` | 13/13; exit 1 each: `keep-punctuation` K, O, f1, f2, o2 (8/13); `replaced-as-kept` R, O (11/13); `o2-ignored` V1, V2 (11/13) |
+| `budget_proof.py` | switches, 2 (`budget`'s names rebound in memory) | the proof, then each `--mutant` | 23/23; exit 1 each: `no-budget` P G1 R2 A2 A4 (18/23), `unknown-as-zero` W S2 S3 (20/23) |
+| `prices_proof.py` | `ts-disagrees` carries `"name": "opus-mixed"` in `agent/prices/cases.json`, the line `scratch_agent` must find once (its edit is a number in the parsed copy, so the replacement is `None`); `py-disagrees` and `reduce-disagrees` are in memory, in `UNANCHORED` | the proof, then each `--mutant` | 27/27; exit 1 each: `py-disagrees` four C rows and A (22/27), `ts-disagrees` T and A (25/27), `reduce-disagrees` R (26/27) |
+| `prices_crosscheck.py` | switches, 2 (the loaded table or the fetched page changed in memory) | each `--mutant` (the proof's one public GET each, no key) | exit 1 each: `table` X1 FAIL (`claude-opus-5-5 cache_read: table 0.21, page 0.2`), 2/3; `page` X2 FAIL (the page has no 'Claude Fable 5.1' row), 2/3 |
+| `op_contract_proof.py` | per mutant, its `edits`, the `tests` that must fail and the `signature` their failure carries; five anchors in `core/src` | each `--mutant` | exit 1 each, `NEGATIVE CONTROL PASS` for each named test (two for `nearest-transition`). Two rots found first, below |
+| `graphics_spike/rows_local.py` | `q5`: the edit the spike's Rust binary makes to `graphics/counter.js`, and the Rust line that makes it (`src/rows_stress.rs`), pinned so the two cannot drift apart. `q5` refuses, by name, a mutant whose anchor is not there once, since Rust's `replace` takes every occurrence and none silently | `graphics_spike.py --only q5 --mutant` | `q5 MUTANT: CAUGHT (137 raster mismatches)`, 864 renders, exit 0 |
+| `graphics_spike/graphics_spike.py` | none of its own: `from rows_local import MUTANTS` | the row above | |
+| `codec_import_proof.py` | switches, 2 (a fixture swapped) | each `--mutant` | exit 1 each: `p1-as-p0` R1 and the six rows that need its clip (3/10), `p0-as-p1` R4 (9/10) |
+| `container_import_proof.py` | switches, 1 (a fixture swapped) | `--mutant ffmpeg-copy` | `MUTANT PASS`: failed M2 (15/16) |
+| `assistant_clearing_proof.py` | switches, 1 (a launch argument) | `--mutant clearing-off`, then with `--cap 4` | First exit 2, "the control could not be performed": every POST refused on the $3 cap (worst $3.04). The unmutated `--rehearse` is refused the same way: the helper's body is about 396 KB now, over `assistant_prompt_eval.py`'s 256,000-byte bound, and H says so. At `--cap 4` (the stand-in, a scratch ledger): `X1 FAIL — the mutant was caught`, exit 1, `context_management null, beta False` on each POST; X4 and H fail beside it |
+| `assistant_helper_proof.py` | `skip-without-bun`: `agent/build.sh`, the guard's `  exit 1`; `no-fields` a switch in P4, in `UNANCHORED` | each `--mutant` (`no-fields` on Release) | `skip-without-bun`: P1 FAIL, 0/1, exit 1. `no-fields`: P4 FAIL, 0/1, exit 1 (the first POST's system ends `undefined`) |
+| `assistant_compaction_proof.py` | `extra-instruction`: `app/Sources/AssistantSession.swift`, the `compaction_instructions` line | `--mutant extra-instruction` (a Debug copy), `--rehearse` | `C3 FAIL — the mutant was caught`, exit 1: verbatim False, instructions 509 chars, wanted 499; H fails beside it (the stale body bound), 6/8. The first run also failed C4, as the unmutated rehearsal did (below); with C4 fixed the rehearsal is 7/8, H alone |
+| `assistant_prompt_proof.py` | `bare-send`: `app/Sources/AssistantSession.swift`, `AssistantPrompt.message(text, document: document)` | `--mutant bare-send` (a Debug copy) | S2 FAIL, 0/1, exit 1: the last user text of both turns is the bare text |
+| `makefile_env_proof.py` | each mutant's `unexport` line in `Makefile`; `KEYS` takes its directives from the table | each `--mutant` (the copy's own `make app`) | `no-unexport`: 3/4, exit 1, the AssemblyAI row FAILS and the Anthropic row passes; `no-unexport-anthropic`: 3/4, exit 1, the Anthropic row FAILS and the AssemblyAI row passes |
+| `defaults_proof.py` | switches: `tuple(sorted(EXPECTED))`, 4 (a function rebound in the child) | each `--mutant` | `MUTANT PASS` each: `no-compare` G1 G3 G4 G5 G6, `no-exit` G1 G3 G4 G6, `home-followed` H1 H2, `no-rehome` G6 |
+| `open_documents_proof.py` | switches, 1 (`verdict`) | `--mutant timeout-only --bound 20` | V0 fail (1/6 verdicts), exit 1, 5/6. Run on this change merged with #568's ("Issue #568" below), where O4 passes (50 threads before the first document, 21 five seconds after the last close); on the tree before #568 the same run was 4/6, O4 failing beside V0 as it did unmutated |
+
+**Three rots the pins had hidden, each fixed in the same change.** `op_contract_proof.py`'s
+`nearest-transition` named `let requested = duration / frame;` and `let asked = duration /
+frame;`, which are `frames_in(duration, fps)` calls now: moved into the table verbatim, the
+check failed on both (0 times each). It is re-aimed at the same defect, round to nearest instead
+of counting down: `frames_in(duration + crate::time::one_frame(fps) / 2, fps)` in both files, and
+both floor tests fail their `assert_eq` (handles 460000 against 440000, ripple 480000 against
+500000). The same proof's control copied `core/` alone and could not compile any mutant, since
+`core/Cargo.toml` names `../graphic` and its vendored tiny-skia by path; it copies both crates
+now. And `assistant_compaction_proof.py`'s C4 looked for `hello framejob` in a summary that
+reads "Hello Frame Job", so it failed unmutated; it looks for the title as the fixture spells
+it. What is left is filed as #594: the assistant proofs' 256,000-byte body bound is stale, so H
+fails in every rehearsal and the clearing rehearsal is refused at its own suggested cap.
 
 ## The offscreen harness (no running app)
 
@@ -5189,6 +5236,14 @@ every row on port base 4960 (2026-09-20, against 115):
 | `auth-carries-on` | the 401 arm not ending the run | 114/115 |
 | `no-hold` | R6-11's hold removed | 111/115 |
 
+`no-fifth-rule` was run again on 2026-11-11 (#582), after its anchor moved to
+`CaptionCues.swift` with the cue builder: a Debug copy (`make app-debug`, built
+in 55 s), every row against the stand-in with the dummy key. **222/225, exit
+1**, in 485 s, failing row 7's "a served speaker change BREAKS the cue where
+the fifth rule says", SC1 (two speakers place two caption clips, white then
+yellow) and SC2 (their rendered glyphs). In 2026-09 it failed one row of 115;
+SC1 and SC2 are rows added since.
+
 `no-delete` is the one whose TOTAL moves: with no transcript ever deleted,
 R6-11 holds every media a later row touches, so rows 7, 11 and H throw where
 the tree's build answers — scored as three row failures each named for its
@@ -6109,7 +6164,8 @@ available directly with `cd core && cargo test --release --test NAME`.
 
 Three negative controls use `--mutant null-as-absent`,
 `--mutant unsnapped-marker`, or `--mutant nearest-transition`. Each copies
-the current core and tests into its own temporary tree, uses a private Cargo
+the current core and tests (and `graphic/`, which `core/Cargo.toml` names by
+path) into its own temporary tree, uses a private Cargo
 target and mutates only that copy. A successful negative control **exits 1**
 after compiling and observing its named behavioral assertion fail; anchor,
 compile or attribution failures exit 2. The nearest-transition control runs

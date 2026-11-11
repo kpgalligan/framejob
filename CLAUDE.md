@@ -503,9 +503,10 @@ rest — is a row in `docs/manual-checks.md`, which the owner runs.
   threshold, refusal or ordering, usually 3–8; more than 10 only with a reason
   written in the spec. The full set runs once, at the end, on the final
   instrument. A mutant's anchor is counted by `tools/proof/mutant_anchors.py` in
-  `make test`: a new table shape, a mutant with no tree text, or a proof
-  taking `--mutant` with no table gets its row there in the same change, and
-  a table's expression stays pure, because the check evaluates it.
+  `make test`: a proof taking `--mutant` holds its mutants in a top-level
+  table (tree text as file, anchor, replacement; switches as names), and a new
+  table shape or a mutant with no tree text gets its row there in the same
+  change, and a table's expression stays pure, because the check evaluates it.
 - **A fix pass** re-runs only the rows whose instrument code it changed and
   the mutants whose anchor lines it touched, then `make gate`.
 - **Background** only for a command that cannot fit 600 s, waited on once with

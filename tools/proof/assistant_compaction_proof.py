@@ -87,6 +87,9 @@ WALL_BUILD = 900
 MODEL = "claude-opus-5-5"
 ANCHOR = '"compaction_instructions": AssistantPrompt.compactionInstructions,'
 MUTATED = '"compaction_instructions": AssistantPrompt.compactionInstructions + " Be brief.",'
+# The mutants: a file from the repo root, the text that must occur there once, and its
+# replacement. `build_mutant` reads it and `mutant_anchors.py` counts the anchor.
+MUTANTS = {"extra-instruction": ("app/Sources/AssistantSession.swift", ANCHOR, MUTATED)}
 ROWS = ["C0", "C1", "C2", "C3", "C4", "C5", "C6", "H", "K"]
 TURN1_ROWS = ["C1", "C2", "C3", "C4"]
 T1 = ("Change the title's text to Hello Frame Job, rename the Shapes track to Boxes, and add a "
@@ -517,7 +520,7 @@ def row_c4(ctx):
         (f"title clip id {ids['title']}", re.search(rf"\b{ids['title']}\b", text)),
         (f"Shapes track id {ids['shapes']}", re.search(rf"\b{ids['shapes']}\b", text)),
         (f"Intro marker id {intro_id}", re.search(rf"\b{intro_id}\b", text)),
-        ("Hello Frame Job", "hello framejob" in text.lower()),
+        ("Hello Frame Job", "hello frame job" in text.lower()),
         ("Boxes", "boxes" in text.lower()),
         ("Intro", "intro" in text.lower()),
         ("the frame", re.search(r"\b(frame|render\w*)\b", text, re.I)),
@@ -690,20 +693,21 @@ def converse(asp, atp, app_path, secrets, relay, texts, folder, stand_in, wrong,
 # The mutant: the session's compaction instructions carry one sentence more.
 
 
-def build_mutant(asp, child_env):
+def build_mutant(name, asp, child_env):
+    file, anchor, mutated = MUTANTS[name]
     base = os.path.join(WORK, "mutant")
     tree_copy.remove_tree(base)
     root, reason = tree_copy.make_copy(os.path.join(base, "tree"))
     if root is None:
         return None, reason
-    session = os.path.join(root, "app", "Sources", "AssistantSession.swift")
+    session = os.path.join(root, file)
     with open(session) as handle:
         text = handle.read()
-    if text.count(ANCHOR) != 1:
-        return None, f"AssistantSession.swift has {text.count(ANCHOR)} `{ANCHOR}`, not 1"
+    if text.count(anchor) != 1:
+        return None, f"{os.path.basename(file)} has {text.count(anchor)} `{anchor}`, not 1"
     with open(session, "w") as handle:
-        handle.write(text.replace(ANCHOR, MUTATED))
-    print(f"mutant: `{ANCHOR}` → `{MUTATED}` in the copy; building it (up to {WALL_BUILD} s)…",
+        handle.write(text.replace(anchor, mutated))
+    print(f"mutant: `{anchor}` → `{mutated}` in the copy; building it (up to {WALL_BUILD} s)…",
           flush=True)
     app, reason = tree_copy.build_app(root, WALL_BUILD, env=child_env())
     if app is None:
@@ -720,7 +724,7 @@ def main():
                         help="the conversation against the stand-in, scripted")
     parser.add_argument("--live", action="store_true",
                         help="the conversation against the real API; needs --cap and the key")
-    parser.add_argument("--mutant", choices=["extra-instruction"],
+    parser.add_argument("--mutant", choices=sorted(MUTANTS),
                         help="the right rehearsal against a build whose compaction instructions "
                              "carry one sentence more; C3 FAILS")
     parser.add_argument("--wrong", action="store_true",
@@ -761,7 +765,7 @@ def main():
     release = os.path.join(ROOT, asp.APP_PATH)
     if args.mutant:
         try:
-            release, why = build_mutant(asp, asp.child_env)
+            release, why = build_mutant(args.mutant, asp, asp.child_env)
         except Exception as error:  # noqa: BLE001 — rule R: a setup that cannot run exits 2
             release, why = None, f"{type(error).__name__}: {error}"
         if release is None:

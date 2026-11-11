@@ -89,6 +89,9 @@ PROBE_ROWS = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "M1", "M2", "M3", 
               "M6"]
 EVAL_ROWS = ["E1", "E2", "E3", "E4", "E5", "E6", "H", "K"]
 SEND = "AssistantPrompt.message(text, document: document)"
+# The mutants: a file from the repo root, the text that must occur there once, and its
+# replacement. `build_mutant` reads it and `mutant_anchors.py` counts the anchor.
+MUTANTS = {"bare-send": ("app/Sources/AssistantSession.swift", SEND, "text")}
 TAG = "framejob_context"
 
 
@@ -349,20 +352,21 @@ def stand_in_posts():
 # The mutant: `send` writes the bare text.
 
 
-def build_mutant(asp):
+def build_mutant(name, asp):
+    file, anchor, mutated = MUTANTS[name]
     base = os.path.join(WORK, "mutant")
     tree_copy.remove_tree(base)
     root, reason = tree_copy.make_copy(os.path.join(base, "tree"))
     if root is None:
         return None, reason
-    session = os.path.join(root, "app", "Sources", "AssistantSession.swift")
+    session = os.path.join(root, file)
     with open(session) as handle:
         text = handle.read()
-    if text.count(SEND) != 1:
-        return None, f"AssistantSession.swift has {text.count(SEND)} `{SEND}`, not 1"
+    if text.count(anchor) != 1:
+        return None, f"{os.path.basename(file)} has {text.count(anchor)} `{anchor}`, not 1"
     with open(session, "w") as handle:
-        handle.write(text.replace(SEND, "text"))
-    print(f"mutant: `{SEND}` → `text` in the copy; building it (up to {WALL_BUILD} s)…",
+        handle.write(text.replace(anchor, mutated))
+    print(f"mutant: `{anchor}` → `{mutated}` in the copy; building it (up to {WALL_BUILD} s)…",
           flush=True)
     app, reason = tree_copy.build_app(root, WALL_BUILD, env=child_env())
     if app is None:
@@ -388,7 +392,7 @@ def main():
     parser.add_argument("--month-spent", type=float, dest="month_spent",
                         help="with --rehearse: seed the scratch proofs' ledger with this many "
                              "dollars already spent this month")
-    parser.add_argument("--mutant", choices=["bare-send"],
+    parser.add_argument("--mutant", choices=sorted(MUTANTS),
                         help="S2 alone, against a build whose send writes the bare text; FAILS")
     args = parser.parse_args()
     if args.cap is not None and not (math.isfinite(args.cap) and args.cap > 0):
@@ -438,7 +442,7 @@ def main():
         try:
             fake = asp.Fake(os.path.join(WORK, "fake"))
             secrets = asp.secret_folder()
-            app, why = build_mutant(asp)
+            app, why = build_mutant(args.mutant, asp)
             if app is None:
                 score("S2", False, f"the mutant did not build: {why}", instrument=True)
                 print(f"0/1\nmutant {args.mutant}: the control could not be performed — "
