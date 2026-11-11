@@ -20,10 +20,16 @@ cache built by the product's own pass, read back by `ClipLoudness`, against
        the 6 kHz sections' own |H|², and a 1 kHz tone's h at least 60 dB under its z.
   C13  Normalize's mode changed through one window's Mode popup re-titles another
        window's Normalize button to the new tip with no rebuild (#406, AU-15).
+  C14  one programme (3 s of stereo noise at 48 kHz, its left channel, mono noise at
+       44.1 kHz) fed to LoudnessBlocks whole, a block at a time, in 4,096 and 1,024
+       frames and unevenly writes the whole feeding's cache bytes; a block at a time
+       gives the whole's Double sums bit for bit; and the product's stereo cache (the
+       reader's own buffers) is the bytes of the same PCM fed in one buffer (#595,
+       AU-164). The Double sums that differ are printed, not scored.
 
 Build failures are scored. --sources points at a copied app/Sources tree;
---mutants runs the eight arithmetic mutants (AP6's M7 among them) and #406's
-`normalize-tip-unobserved`, each over its own copy, and
+--mutants runs the eight arithmetic mutants (AP6's M7 among them), #406's
+`normalize-tip-unobserved` and #595's `weighting-state-per-buffer`, each over its own copy, and
 scores each killed when its named row fails. Needs ffmpeg and
 samples/Rode-usb-mic.m4a. All output is under tools/proof/work/loudness-cache-probe.
 """
@@ -65,6 +71,17 @@ MUTANTS = [
      "        NotificationCenter.default.addObserver(\n"
      "            self, selector: #selector(normalizeChoiceChanged(_:)),\n"
      "            name: NormalizeChoice.didChangeNotification, object: nil)\n", ""),
+    # #595: the K-weighting state started afresh at each buffer, so every block
+    # after a buffer's edge holds the filters' start-up and the bytes follow
+    # the buffering.
+    ("weighting-state-per-buffer", "C14", "LoudnessBlocks.swift",
+     "            guard width == channels, rate == sampleRate, let stages else {\n"
+     "                failed = true; return false\n"
+     "            }\n",
+     "            guard width == channels, rate == sampleRate, let stages else {\n"
+     "                failed = true; return false\n"
+     "            }\n"
+     "            filterState = Array(repeating: [Double](repeating: 0, count: 8), count: width)\n"),
 ]
 
 
@@ -157,9 +174,9 @@ def main():
         check("source probe builds", False, problem)
         return 1
     sys.stdout.write(stdout)
-    expected = [f"C{n}" for n in range(1, 14)]
+    expected = [f"C{n}" for n in range(1, 15)]
     good = all(rows.get(row) for row in expected)
-    good &= check("every row C1..C13 ran", all(row in rows for row in expected),
+    good &= check("every row C1..C14 ran", all(row in rows for row in expected),
                   ", ".join(row for row in expected if row not in rows) or "")
     passed = sum(1 for row in expected if rows.get(row))
     print(f"\n{passed}/{len(expected)} rows passed")

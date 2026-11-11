@@ -132,3 +132,26 @@ It is new because [`audio-4.md`](audio-4.md) had reached the spec's ~500-line sp
   - **The proof.** `audio_ap6b_probe.py` R8 (the sums through `shortTermSubBlockSums`, and the
     three loudness figures, bit for bit across five feedings, stereo and mono; the peaks
     compared and printed, not scored) and mutant M20, the per-chunk sum restored.
+- **AU-164 — The loudness cache's records do not follow the reader's buffers, so its block sums
+  stay per cut (#595, 2026-11-11; amends nothing).** `LoudnessBlocks` (AU-10, AU-63) adds a
+  block's sums once per cut of a reader buffer: one `vDSP_svesqD` or `vDSP_dotprD` into Σ y²,
+  Σ yL·yR and the high band's three, AU-160's and AU-163's shape, so a block a buffer ends inside
+  is the sum of two vector sums. What the cache keeps is `Float(sum / n)`, and its contract is
+  those Float32 records. C14 fed 3 s of noise whole, a block at a time, in 4,096 and 1,024 frames
+  and unevenly: the Double sums differed in their last bits (stereo at 48 kHz 135, 522 and 428 of
+  1,800; mono at 48 kHz 44, 169 and 138 of 600; mono at 44.1 kHz 34, 161 and 126 of 600) and not
+  one Float32 value moved (0 of 2,400 or of 900 in every feeding, true peaks included); fed a
+  block at a time, the sums were the whole's bits. The product's own pass over C1's 30 s stereo
+  fixture (178 reader buffers, 166 of them ending inside a block) left 575 of 18,216 Double sums
+  different from the same PCM fed in one buffer, and its 24,288 Float values the same bytes.
+  - **The rule.** The per-cut sums stay and `loudnessVersion` stays 2: no record a cache writes
+    was seen to move. By argument, a difference of k units in a Double's last place moves the
+    rounded Float only when the value lies within k units of a Float rounding boundary, about
+    k·2⁻²⁹ of the time, which is why no feeding moved one.
+  - **What would reopen it.** A C14 failure, any feeding's bytes differing from the whole's;
+    then AU-163's rule is applied here (a block's weighted and high-band samples kept per
+    channel and summed once in sample order when it closes) and the version moves to 3.
+  - **The proof.** `loudness_cache_probe.py` C14, through `LoudnessBlocks.blockSums`: the bytes
+    scored for every feeding of three programmes and for the product's pass, the block-at-a-time
+    feeding's Double sums scored bit for bit, the other Double counts printed; mutant
+    `weighting-state-per-buffer` (the K-weighting state started afresh at each buffer) fails it.

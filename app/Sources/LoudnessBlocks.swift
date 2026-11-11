@@ -106,6 +106,12 @@ extension MediaImporter {
             return values.withUnsafeBufferPointer { Data(buffer: $0) }
         }
 
+        /// The six per-block sums `data` divides, in record order — Σ yL², Σ yR²,
+        /// Σ yL·yR, Σ hL², Σ hR², Σ hL·hR, each `count` long (mono's right and
+        /// cross sums stay 0) — what a proof compares bit for bit across
+        /// bufferings (#595, `loudness_cache_probe.swift` C14).
+        var blockSums: [[Double]] { [sumL, sumR, sumLR, highL, highR, highLR] }
+
         /// A buffer the peaks rule refuses, one of more than two channels, or
         /// one whose channel count or rate differs from the first latches
         /// failure, and nothing of it lands.

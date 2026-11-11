@@ -26348,8 +26348,10 @@ tone at 44.1 kHz with ffmpeg's 48 kHz copies, and a −85 dBFS tone.
 | C10 | `ClipLoudness.Memo` on a probe document: pending, still pending after the cache lands (held), the reading after `invalidate()` |
 | C11 | through `beginLiveEdit` / `updateLiveEdit` (volume, pan) the held reading with no file read and no recompute; after `endLiveEdit` one recompute, still no file read |
 | C12 | (AP6, AU-63) the high band: an 8 kHz tone's `h` within 0.05 dB of its mean square times the 6 kHz high-pass's \|H(8 kHz)\|²; a 1 kHz tone's `h` at least 60 dB under its `z` |
+| C13 | (#406, AU-15) Normalize's mode changed through one window's Mode popup re-titles another window's Normalize button to the new tip, with no rebuild |
+| C14 | (#595, AU-164) 3 s of seeded noise — stereo at 48 kHz, its left channel, mono at 44.1 kHz — fed to `LoudnessBlocks` whole, a block at a time, in 4,096 and 1,024 frames and unevenly (`1, 479, 481, 1000, 37, 4096, 263`): each feeding's `data` the whole feeding's bytes; a block at a time, `blockSums` the whole's bits; and the product's stereo cache from C1 (the reader's own buffers) the bytes of the same PCM fed in one buffer. Per feeding the detail prints how many Float values and how many Double sums differ, with the first of each at `%.17g`; the Double counts are printed, not scored |
 
-`--mutants` runs eight (seven, and AP6's `M7-high-unfiltered`), each one replacement in a copied `app/Sources` (its
+`--mutants` runs ten (seven, AP6's `M7-high-unfiltered`, #406's `normalize-tip-unobserved` and #595's `weighting-state-per-buffer`), each one replacement in a copied `app/Sources` (its
 anchor asserted once), and scores each killed when its named row fails:
 
 | Mutant | Edit | Must fail |
@@ -26362,6 +26364,8 @@ anchor asserted once), and scores each killed when its named row fails:
 | `tables-at-44k` | Tables 1 and 2 used at every rate | C6 |
 | `version-unchecked` | the marker's version not checked | C9 |
 | `M7-high-unfiltered` | (AP6) the high band read unfiltered | C12 |
+| `normalize-tip-unobserved` | (#406) no pane observes `NormalizeChoice` | C13 |
+| `weighting-state-per-buffer` | (#595) the K-weighting state started afresh at each buffer | C14 |
 
 **`loudness_normalize_proof.py <dir>/agent.sock`** drives an instance over
 MCP and measures every export with `phase5_proof.py`'s own BS.1770-4
@@ -26399,8 +26403,8 @@ The eighth mutant, `target_lufs`'s range check dropped in
 must fail N2's −51 and −4 rows.
 
 ```sh
-python3 tools/proof/loudness_cache_probe.py            # C1–C12
-python3 tools/proof/loudness_cache_probe.py --mutants   # 8 mutants
+python3 tools/proof/loudness_cache_probe.py            # C1–C14
+python3 tools/proof/loudness_cache_probe.py --mutants   # 10 mutants
 make app-debug && python3 tools/proof/proof_app.py launch
 python3 tools/proof/loudness_normalize_proof.py <dir>/agent.sock
 ```
@@ -26412,6 +26416,16 @@ by its named row. `loudness_normalize_proof.py` 30/30 on Debug and on Release
 after `make gate` (PASS), the owner's recording measured −41.67 LUFS and landing
 at −24.15, held by its true peak; the N2 mutant on Debug failed N2's −51 and −4
 rows. `phase5_proof.py` 92/92 on both.
+
+**#595's run (2026-11-11):** `loudness_cache_probe.py` 14/14 rows on the tree
+before any change to the summing, which C14 left unchanged (AU-164): every
+feeding 0 Float values different from the whole's; the Double sums different in
+their last bits — stereo 135, 522 and 428 of 1,800 (4,096, 1,024, uneven), mono
+at 48 kHz 44, 169 and 138 of 600, mono at 44.1 kHz 34, 161 and 126 of 600, a
+block at a time 0 —; the product's stereo cache from 178 reader buffers (7,168
+and 8,192 frames, 166 ending inside a block), 0 of 24,288 Float values
+different from the one-buffer feeding and 575 of 18,216 Double sums. `--mutants`
+10/10 killed, `weighting-state-per-buffer` by C14.
 
 ## Road map "audio" AP2, part 1 — the clip limiter, and Normalize to a loudness through it (`limiter_probe.py`, `limiter_proof.py`; `loudness_normalize_proof.py` N4, N6, N11–N13; `export_offset_proof.py` E44, E45; `core/tests/schema_v30.rs`; spec §11 AU-20..AU-26)
 
