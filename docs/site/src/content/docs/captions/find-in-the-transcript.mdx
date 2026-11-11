@@ -5,10 +5,16 @@ description: "Search the Transcript tab's words with ⌘F, step through the matc
 
 import { Steps } from '@astrojs/starlight/components';
 import AtAGlance from '@components/AtAGlance.astro';
+import Shot from '@components/Shot.astro';
 
 Find searches the words in the [Transcript tab](/captions/transcript-tab/), so you can get to a moment by typing what was said. It marks every match in the text and scrolls to the one you're on.
 
 <AtAGlance menu="Edit ▸ Find…" keys="⌘F" where="Inspector ▸ Transcript" />
+
+<Shot
+  name="11d-transcript-find.inspector"
+  alt="The inspector's Transcript tab with the find bar above the text: a field holding the letters typed, the count 1 of 3, the previous, next and Done buttons, and each match marked in yellow in the words below, the current one outlined."
+/>
 
 Finding changes nothing in your project. It doesn't select words, set the in/out range, move the playhead or add an undo step.
 
