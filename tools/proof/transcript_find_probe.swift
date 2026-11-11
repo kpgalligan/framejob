@@ -84,7 +84,17 @@
 //       reference (the edited words) has them; (d) two rebuilds in one turn
 //       cost one pass; (f) a scroll between a rebuild and its pass wins; (e) a
 //       width change leaves the view not whole until a turn, and one landing
-//       between a rebuild and its pass keeps the rebuild's anchor. Its detail
+//       between a rebuild and its pass keeps the rebuild's anchor; (g) a width
+//       change with no rebuild pending keeps the top word (#593), against
+//       references laid out at 340 and 322 pt too: (g1) word 18,000 in sight at
+//       its offset straight after 304 → 340, (g2) after a turn the same word at
+//       its offset and the 340 pt reference's place and height, (g3) a drag's
+//       steps 340 → 322 → 304 with no turn between, the word at its offset
+//       straight after each and after the turn, (g4) a scroll before the
+//       pass wins, (g5) a drag 304 → 322 → 304 from a word that starts a line
+//       at 304 pt and not at 322 pt; (h) in a legacy autohiding scroll view, as
+//       the pane's on such a host, a rebuild from ten words to 27,000 shows the
+//       scroller inside `show`, and `show`'s anchor still wins. Its detail
 //       prints a pass's time and added footprint.
 import AppKit
 
@@ -95,7 +105,7 @@ _ = ProbeDocumentController()
 
 var rows: [[String: Any]] = []
 func row(_ id: String, _ pass: Bool, _ detail: String) {
-    rows.append(["id": id, "pass": pass, "detail": String(detail.prefix(2000))])
+    rows.append(["id": id, "pass": pass, "detail": String(detail.prefix(4000))])
 }
 
 let args = CommandLine.arguments
@@ -222,14 +232,14 @@ func longWords(without dropped: Int? = nil) -> [TimelineTranscript.Word] {
 /// For the same reason the idle pass that lays the whole text out (#583) is
 /// OFF unless `idle`: F10's and F14's mutants are caught only on a view whose
 /// far text is still an estimate. `settle` 0 returns before any run-loop turn.
-func longView(idle: Bool = false, settle: Double = 0.2)
+func longView(idle: Bool = false, settle: Double = 0.2, width: CGFloat = 304)
     -> (window: NSWindow, view: TranscriptView, model: TranscriptTokens)
 {
     let window = NSWindow(
-        contentRect: NSRect(x: -20_000, y: 0, width: 304, height: 600), styleMask: [.titled],
+        contentRect: NSRect(x: -20_000, y: 0, width: width, height: 600), styleMask: [.titled],
         backing: .buffered, defer: false)
     window.appearance = NSAppearance(named: .aqua)
-    let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 304, height: 600))
+    let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: width, height: 600))
     scroll.hasVerticalScroller = true
     let view = TranscriptView(frame: NSRect(x: 0, y: 0, width: scroll.contentSize.width, height: 600))
     view.autoresizingMask = [.width]
@@ -371,9 +381,11 @@ do {
 /// A view of the same words laid out in ONE run from the top at scroll 0, the
 /// idle pass off: nothing in it was ever placed from an estimate, so its
 /// height and places are what F15 and F16 compare against (never the view
-/// under test laid out again).
-func referenceView(without dropped: Int? = nil) -> (window: NSWindow, view: TranscriptView) {
-    let (window, view, _) = longView()
+/// under test laid out again). `width` is the window's, as `longView`'s.
+func referenceView(without dropped: Int? = nil, width: CGFloat = 304)
+    -> (window: NSWindow, view: TranscriptView)
+{
+    let (window, view, _) = longView(width: width)
     if dropped != nil {
         view.show(
             TranscriptTokens.build(longWords(without: dropped), pauses: [:]),
@@ -381,6 +393,28 @@ func referenceView(without dropped: Int? = nil) -> (window: NSWindow, view: Tran
     }
     view.layoutManager.ensureLayout(for: view.layoutManager.documentRange)
     view.layoutViewport()
+    return (window, view)
+}
+
+/// A bare `TranscriptView` with no text yet in a 304 × 600 scroll view whose
+/// scroller is legacy and hides itself, as the pane's does on a host with
+/// legacy scrollers: it shows once the text is taller than the clip, and the
+/// view narrows by its width (F16 (h)).
+func legacyView(idle: Bool) -> (window: NSWindow, view: TranscriptView) {
+    let window = NSWindow(
+        contentRect: NSRect(x: -20_000, y: 0, width: 304, height: 600), styleMask: [.titled],
+        backing: .buffered, defer: false)
+    window.appearance = NSAppearance(named: .aqua)
+    let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 304, height: 600))
+    scroll.hasVerticalScroller = true
+    scroll.autohidesScrollers = true
+    scroll.scrollerStyle = .legacy
+    let view = TranscriptView(frame: NSRect(x: 0, y: 0, width: scroll.contentSize.width, height: 600))
+    view.autoresizingMask = [.width]
+    scroll.documentView = view
+    window.contentView = scroll
+    window.orderFrontRegardless()
+    view.laysOutWhenIdle = idle
     return (window, view)
 }
 
@@ -476,6 +510,22 @@ do {
     let reference = referenceView()
     let refHeight = reference.view.frame.height
     let refY = reference.view.rects(forToken: 18_000).first?.minY ?? -1
+    // (g5)'s: a word of paragraph 600 that starts a line at 304 pt and not at 322 pt.
+    func lineStarts(_ shown: TranscriptView) -> Set<Int> {
+        var starts: Set<Int> = []
+        var lastY: CGFloat = -1
+        for token in 18_000..<18_030 {
+            guard let y = shown.rects(forToken: token).first?.minY, y > lastY + 0.5 else { continue }
+            starts.insert(token)
+            lastY = y
+        }
+        return starts
+    }
+    let narrowRef = referenceView(width: 322)
+    let midWord = lineStarts(reference.view).subtracting(lineStarts(narrowRef.view))
+        .filter { $0 > 18_000 }.min() ?? -1
+    let midRefY = reference.view.rects(forToken: max(midWord, 0)).first?.minY ?? -1
+    narrowRef.window.orderOut(nil)
     reference.window.orderOut(nil)
     let edited = referenceView(without: 5)
     let editedY = edited.view.rects(forToken: 17_999).first?.minY ?? -1
@@ -483,8 +533,24 @@ do {
     let editedFar = edited.view.rects(forToken: 26_000).first?.minY ?? -1
     let editedHeight = edited.view.frame.height
     edited.window.orderOut(nil)
+    // (g)'s: the same words in a window 340 pt wide, laid out from the top.
+    let wideRef = referenceView(width: 340)
+    let wideRefHeight = wideRef.view.frame.height
+    let wideRefY = wideRef.view.rects(forToken: 18_000).first?.minY ?? -1
+    let wideRefY9 = wideRef.view.rects(forToken: 9_000).first?.minY ?? -1
+    wideRef.window.orderOut(nil)
     let full = TranscriptTokens.build(longWords(), pauses: [:])
     let less = TranscriptTokens.build(longWords(without: 5), pauses: [:])
+    // (h)'s: all the words in the legacy scroll view, its scroller shown, laid out from the top.
+    let legacyRef = legacyView(idle: false)
+    legacyRef.view.show(full, fps: fps30, timecodeFrames: true)
+    spin(0.2)
+    legacyRef.view.layoutManager.ensureLayout(for: legacyRef.view.layoutManager.documentRange)
+    legacyRef.view.layoutViewport()
+    let legacyRefWidth = legacyRef.view.frame.width
+    let legacyRefHeight = legacyRef.view.frame.height
+    let legacyRefY = legacyRef.view.rects(forToken: 18_000).first?.minY ?? -1
+    legacyRef.window.orderOut(nil)
 
     // What one pass costs: five fresh views, then five rebuilds at word 18,000
     // on the last of them (the pass called by hand, the idle one off).
@@ -534,10 +600,13 @@ do {
             + "\(String(format: "%.4f", knob)) (want \(String(format: "%.4f", knobWant)))")
     spin(0.1)
     // (c) a rebuild there keeps the top word's offset.
-    func topWord() -> (id: TimelineTranscript.Identity?, offset: CGFloat, y: CGFloat) {
-        guard let index = view.topVisibleToken(), let rect = view.rects(forToken: index).first
+    func topWord(in other: TranscriptView? = nil)
+        -> (id: TimelineTranscript.Identity?, offset: CGFloat, y: CGFloat)
+    {
+        let shown = other ?? view
+        guard let index = shown.topVisibleToken(), let rect = shown.rects(forToken: index).first
         else { return (nil, -1, -1) }
-        return (view.model.tokens[index].word.id, rect.minY - view.visibleRect.minY, rect.minY)
+        return (shown.model.tokens[index].word.id, rect.minY - shown.visibleRect.minY, rect.minY)
     }
     let was = topWord()
     var passes = view.wholeLayouts
@@ -596,6 +665,136 @@ do {
             + "offset \(f1(held.offset)) → \(f1(kept.offset)), height \(f1(view.frame.height)) "
             + "(reference \(f1(refHeight)))")
     func ms(_ seconds: Double) -> String { String(format: "%.0f", seconds * 1000) }
+    // (g) a width change with no rebuild pending keeps the top word (#593): word 18,000 at
+    // the top of the whole text, no anchor waiting.
+    view.scrollToToken(18_000)
+    spin(0.1)
+    let start = topWord()
+    let quiet = view.laidOutWhole && view.wholeLayoutAnchor == nil && view.topVisibleToken() == 18_000
+    // (g1) 304 → 340 alone: straight after, before any turn, the word is in sight at its
+    // offset (the arm's own restore; the pass would put a wrong one right afterwards).
+    passes = view.wholeLayouts
+    let resizing = Date()
+    window.setContentSize(NSSize(width: 340, height: 600))
+    let resizeTook = Date().timeIntervalSince(resizing)
+    let straight = view.rects(forToken: 18_000).first ?? .zero
+    let straightShown = view.visibleRect
+    let straightIn = straight.height > 0 && straight.minY >= straightShown.minY
+        && straight.maxY <= straightShown.maxY
+    claim("g1", quiet && start.id != nil && straightIn
+            && abs(straight.minY - straightShown.minY - start.offset) <= 0.5,
+        "word 18000 at the top, whole, no anchor waiting \(quiet); width 304 → 340 in "
+            + "\(String(format: "%.1f", resizeTook * 1000)) ms: straight after, its line at "
+            + "\(f1(straight.minY)) in visible \(f1(straightShown.minY))…\(f1(straightShown.maxY)) "
+            + "(offset \(f1(straight.minY - straightShown.minY)), was \(f1(start.offset))), in "
+            + "sight \(straightIn)")
+    // (g2) after the turn: the same word at its offset, where a layout at 340 pt puts it.
+    settleWhole(view)
+    let alone = topWord()
+    claim("g2", alone.id == start.id && abs(alone.offset - start.offset) <= 0.5
+            && abs(alone.y - wideRefY) <= 0.5 && abs(view.frame.height - wideRefHeight) <= 0.5
+            && view.wholeLayouts == passes + 1,
+        "after a turn: the same top word \(alone.id == start.id), offset \(f1(start.offset)) → "
+            + "\(f1(alone.offset)), at \(f1(alone.y)) (reference \(f1(wideRefY))), height "
+            + "\(f1(view.frame.height)) (reference \(f1(wideRefHeight))), passes "
+            + "+\(view.wholeLayouts - passes) (want 1)")
+    // (g3) a drag's steps, 340 → 322 → 304 with no turn between, the word at its offset
+    // straight after each (no pass runs inside a drag), then one turn.
+    passes = view.wholeLayouts
+    window.setContentSize(NSSize(width: 322, height: 600))
+    let midStep = topWord()
+    window.setContentSize(NSSize(width: 304, height: 600))
+    let lastStep = topWord()
+    settleWhole(view)
+    let dragged = topWord()
+    claim("g3", midStep.id == start.id && abs(midStep.offset - start.offset) <= 0.5
+            && lastStep.id == start.id && abs(lastStep.offset - start.offset) <= 0.5
+            && dragged.id == start.id && abs(dragged.offset - start.offset) <= 0.5
+            && abs(dragged.y - refY) <= 0.5 && abs(view.frame.height - refHeight) <= 0.5
+            && view.wholeLayouts == passes + 1,
+        "340 → 322 → 304 with no turn between: at 322 the top word the same "
+            + "\(midStep.id == start.id) at offset \(f1(midStep.offset)), at 304 the same "
+            + "\(lastStep.id == start.id) at offset \(f1(lastStep.offset)) (want "
+            + "\(f1(start.offset)) at both); after a turn the same "
+            + "\(dragged.id == start.id), offset \(f1(start.offset)) → \(f1(dragged.offset)), at "
+            + "\(f1(dragged.y)) (reference \(f1(refY))), height \(f1(view.frame.height)) "
+            + "(reference \(f1(refHeight))), passes +\(view.wholeLayouts - passes) (want 1)")
+    // (g4) a scroll between the width change and its pass wins.
+    window.setContentSize(NSSize(width: 340, height: 600))
+    view.scrollToToken(9_000)  // a paragraph's first word
+    settleWhole(view)
+    let scrolled = topWord()
+    claim("g4", view.topVisibleToken() == 9_000 && abs(scrolled.offset - 4) <= 0.5
+            && abs(scrolled.y - wideRefY9) <= 0.5,
+        "304 → 340, then a scroll to token 9000 before the pass: top token "
+            + "\(view.topVisibleToken() ?? -1), offset \(f1(scrolled.offset)) (want 4), at "
+            + "\(f1(scrolled.y)) (reference \(f1(wideRefY9)))")
+    window.setContentSize(NSSize(width: 304, height: 600))
+    settleWhole(view)
+    // (g5) a drag from a word that starts a line at 304 pt and not at 322 pt: at the second
+    // step the word at the top is another one, so only the first step's anchor keeps it. Its
+    // line goes to the very top: at 4 pt the line above still holds the visible top's first
+    // point, so that line's first word would be the top word.
+    view.scrollToToken(midWord)
+    view.scroll(to: view.rects(forToken: max(midWord, 0)).first?.minY ?? 0)
+    spin(0.1)
+    let midStart = topWord()
+    let midTop = view.topVisibleToken()
+    passes = view.wholeLayouts
+    var stepTimes: [Double] = []
+    for width in [322.0, 304.0] {
+        let stepping = Date()
+        window.setContentSize(NSSize(width: width, height: 600))
+        stepTimes.append(Date().timeIntervalSince(stepping))
+    }
+    settleWhole(view)
+    let midEnd = topWord()
+    claim("g5", midWord > 18_000 && midTop == midWord && view.topVisibleToken() == midWord
+            && abs(midEnd.offset - midStart.offset) <= 0.5 && abs(midEnd.y - midRefY) <= 0.5
+            && abs(view.frame.height - refHeight) <= 0.5 && view.wholeLayouts == passes + 1,
+        "token \(midWord) starts a line at 304 pt and not at 322 pt, at the top "
+            + "\(midTop == midWord); 304 → 322 → 304 with no turn between (steps "
+            + "\(stepTimes.map { String(format: "%.1f", $0 * 1000) }.joined(separator: ", ")) ms): "
+            + "top token \(view.topVisibleToken() ?? -1), offset \(f1(midStart.offset)) → "
+            + "\(f1(midEnd.offset)), at \(f1(midEnd.y)) (reference \(f1(midRefY))), height "
+            + "\(f1(view.frame.height)) (reference \(f1(refHeight))), passes "
+            + "+\(view.wholeLayouts - passes) (want 1)")
+    // (h) a width change inside a rebuild: in the legacy scroll view a rebuild from words
+    // 18,000–18,009 (shorter than the clip, the scroller hidden) to all 27,000 shows the
+    // scroller, so the arm runs inside `show`, whose anchor must win. Measured on the word's
+    // own line (the top visible token there is the paragraph above's).
+    do {
+        let narrow = legacyView(idle: true)
+        narrow.view.show(
+            TranscriptTokens.build(Array(longWords()[18_000..<18_010]), pauses: [:]),
+            fps: fps30, timecodeFrames: true)
+        settleWhole(narrow.view)
+        let fewWidth = narrow.view.frame.width
+        let fewTop = narrow.view.topVisibleToken()
+        let fewY = narrow.view.rects(forToken: 0).first?.minY ?? -1
+        let before = narrow.view.wholeLayouts
+        narrow.view.show(full, fps: fps30, timecodeFrames: true)
+        let grownWidth = narrow.view.frame.width
+        func offset18() -> CGFloat {
+            (narrow.view.rects(forToken: 18_000).first?.minY ?? -1) - narrow.view.visibleRect.minY
+        }
+        let returned = offset18()
+        settleWhole(narrow.view)
+        let grownY = narrow.view.rects(forToken: 18_000).first?.minY ?? -1
+        let grown = offset18()
+        claim("h", fewTop == 0 && fewWidth > grownWidth + 0.5
+                && abs(grownWidth - legacyRefWidth) <= 0.5 && abs(grown - fewY) <= 0.5
+                && abs(grownY - legacyRefY) <= 0.5
+                && abs(narrow.view.frame.height - legacyRefHeight) <= 0.5
+                && narrow.view.laidOutWhole && narrow.view.wholeLayouts == before + 1,
+            "width \(f1(fewWidth)) with ten words, the first at the top \(fewTop == 0) at "
+                + "\(f1(fewY)); \(f1(grownWidth)) as show returned with 27,000 (reference "
+                + "\(f1(legacyRefWidth))); word 18000's offset \(f1(returned)) as show returned, "
+                + "\(f1(grown)) after a turn (want \(f1(fewY))), at \(f1(grownY)) (reference "
+                + "\(f1(legacyRefY))), height \(f1(narrow.view.frame.height)) (reference "
+                + "\(f1(legacyRefHeight))), passes +\(narrow.view.wholeLayouts - before) (want 1)")
+        narrow.window.orderOut(nil)
+    }
     detail += "One pass over 27,000 words: fresh, median \(ms(fresh[2])) ms (\(ms(fresh[0]))–"
         + "\(ms(fresh[4]))); after a rebuild at word 18000, median \(ms(again[2])) ms "
         + "(\(ms(again[0]))–\(ms(again[4]))); \(String(format: "%.1f", added)) MB of footprint added."

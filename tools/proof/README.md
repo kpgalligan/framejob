@@ -31725,13 +31725,15 @@ caught; `transcript_tab_proof.py --only Z0,B4` on Release 2/2; `text_focus_proof
 `v2_menu.py --only H` on Release 5/5. F10 measured the last of 27,000 words estimated at
 88,601 pt and revealed at 130,078 pt in 0.059 s.
 
-## #583, #584 — the Transcript view's whole layout and the follow at the ends (`transcript_find_proof.py` F15, F16; nine mutants; spec §11 TX-37 (d), TX-39 as amended)
+## #583, #584, #593 — the Transcript view's whole layout, the follow at the ends and the top word across a width change (`transcript_find_proof.py` F15, F16; fifteen mutants; spec §11 TX-37 (d), TX-39 as amended)
 
 After a rebuild or a width change the Transcript view lays its whole text out once in idle time
 (`layOutAll()`), so its height and the scroller's knob are the text's own, and the top word is
 put back at the offset it had before the rebuild (#583). A follow tick whose scroll would be
-clamped to where the view already is runs no layout step (#584). Both rows are probe rows on
-F10's 27,000 words, and each prints its letters' verdicts.
+clamped to where the view already is runs no layout step (#584). A width change keeps the word
+that was at the visible top at its offset: the text laid out from the top through it, the word
+put back at once and handed to the pass (#593). Both rows are probe rows on F10's 27,000 words,
+and each prints its letters' verdicts.
 
 ```sh
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_find_proof.py --only F10,F14,F15,F16
@@ -31745,7 +31747,12 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_find_proof.py --only F10
 - **F16** compares with a reference view laid out in one run from the top with the pass off:
   (a) no pass inside `show`, one after a turn, the reference's height; (b) the visible top and
   the knob at word 18,000; (c) a rebuild there; (d) two rebuilds in one turn; (f) a scroll
-  before the pass; (e) a width change, alone and between a rebuild and its pass.
+  before the pass; (e) a width change, alone and between a rebuild and its pass; (g) a width
+  change with no rebuild pending, against references at 340 and 322 pt too: (g1) word 18,000 in
+  sight at its offset straight after 304 → 340, (g2) after the pass at its offset and the
+  reference's place, (g3) a drag 340 → 322 → 304 with no turn between, the word at its offset
+  straight after each step and after the pass, (g4) a scroll before the pass wins, (g5) a drag from a word that starts a line at 304 pt and not at 322 pt; (h) a
+  legacy autohiding scroller shown inside `show`, whose anchor still wins.
 - F10's and F14's views keep the pass off (`longView(idle: false)`), because their mutants are
   caught only while the far text is an estimate.
 
@@ -31756,15 +31763,30 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_find_proof.py --only F10
 | `no-idle-layout` | `show` schedules no pass (#583's old behaviour) | F16 (a) (b) (c) (d) |
 | `idle-inside-rebuild` | `show` runs the pass itself | F16 (a) (d) (e) |
 | `idle-survives-rebuild` | scheduling does not invalidate the pending observer | F16 (d) |
-| `idle-loses-anchor` | the pass does not scroll its anchor back | F16 (c) (e) |
-| `idle-stale-anchor` | the pass uses the rebuild's anchor whatever was scrolled since | F16 (f) |
-| `resize-stays-short` | a width change schedules no pass | F16 (e) |
-| `resize-drops-anchor` | a width change drops a waiting rebuild's anchor | F16 (e) |
+| `idle-loses-anchor` | the pass does not scroll its anchor back | F16 (c) (h) |
+| `idle-stale-anchor` | the waiting anchor taken whatever was scrolled since (in `standingAnchor()`) | F16 (f) (g4) |
+| `resize-stays-short` | a width change schedules no pass | F16 (e) (g2) (g3) (g5) |
+| `resize-drops-anchor` | a width change drops a waiting anchor before it takes one | F16 (e) (g5) |
+| `resize-no-anchor` | a width change takes no anchor (#593's old behaviour) | F16 (g1) (g2) (g3) (g5) |
+| `resize-restore-waits` | the arm does not put the word back; the pass does | F16 (g1) |
+| `resize-drops-offset` | the arm puts the word at the very top, not at its offset; the pass corrects it | F16 (g1) (g3) |
+| `resize-on-estimate` | the arm restores on estimates, nothing laid out from the top | F16 (g3) |
+| `resize-viewport-stays` | the arm lays out through the word with the viewport left where it was | F16 (g1)–(g5) |
+| `resize-stale-stamp` | the arm's anchor stamped with the clip's y from before its scroll | F16 (g5) |
 
 Red before the fix is the two old-behaviour mutants: `follow-steps-at-ends` gave two steps for
 two ticks at the bottom, and `no-idle-layout` left the knob at 0.9951 for word 18,000 and the
 top word 13.3 pt from the top after a rebuild. F15 (a) holds before the fix too: in a 600 pt
 view the first word's line starts at 25 pt, outside the 24 pt margin.
+
+For #593, F16 (g) was red on the tree before the fix: 304 → 340 left word 18,000 22,886.5 pt
+above the visible top, the pass kept another word, and the drag 340 → 322 → 304 ended at the
+top of the text (g1, g2, g3; g4 held). (g5), written after, fails under `resize-no-anchor`, the
+old arm; (h) passes under it, a guard for the arm nested in `show`. A mutant is scored by its
+row, so each one's letters above were read from the row's detail. `resize-drops-offset`,
+added on the diff read, survived (g1) and (g3) as first written, which claimed the word in
+sight but not its offset (offset 0.0 where it was 4.0 straight after each step, put right by
+the pass); both now claim the offset.
 
 Recorded 2026-11-11 on this tree: Release (`RC_PROOF_APP=release`) 23/23; `--mutants`
 twenty-eight caught (the nineteen before and these nine); `transcript_tab_proof.py` on Release
@@ -31772,6 +31794,17 @@ twenty-eight caught (the nineteen before and these nine); `transcript_tab_proof.
 100); `docs_bugs_a3_proof.py --only P3,P4` on Release 3/3. F16 measured one pass over 27,000
 words at a median of 70 ms on a fresh view and 57 ms after a rebuild at word 18,000, 13.4 MB
 of footprint added, and the knob at word 18,000 at 0.6641.
+
+Recorded 2026-11-11 for #593 on this tree: Release (`RC_PROOF_APP=release`) 23/23; all
+thirty-three mutants caught, one `--mutant` run each, every new or moved one on the letters
+named above; `transcript_tab_proof.py` on Release 26/26, its T6 a median rebuild of 51.4 ms;
+`docs_bugs_a3_proof.py --only P3,P4` on Release 3/3. F16 measured a width step at word 18,000
+at 80.7 ms (304 → 340) and 59.3 and 50.7 ms (the drag's two steps), the text above the word
+laid out, where the old arm's step took 31.8 ms; one pass a median of 83 ms fresh and 80 ms
+after a rebuild, 13.6 MB of footprint added. Three lanes shared the machine. Then, with
+(g1) and (g3) claiming the offset: `--only F16` 2/2 on this tree ((g1) offset 4.0 straight
+after, (g3) 4.0 at 322 and at 304), and `resize-drops-offset` caught on (g1) and (g3), the
+thirty-fourth.
 
 ## #387 — voice isolation and voice effects on a retimed clip (`audio_ap5_proof.py` P4, P13–P18, P8b, I7a–I7e, I11; `voice_proof.py` V15, V16, I11–I13; `audio_ap6_proof.py` V12; twelve mutants; spec §11 AU-55 and AU-145 as amended)
 

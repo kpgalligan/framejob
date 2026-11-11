@@ -13,7 +13,8 @@ Probe rows (`transcript_find_probe.swift`, built through `swift_build.build()`
 with `-D FRAMEJOB_DEV_TOOLS`, the app's `Compositor.metal` beside it): F0
 builds; F1–F16 as its header says (F14 is #558's: the click-to-clip scroll and
 the follow in 27,000 words; F15 is #584's: the follow at the text's ends; F16
-is #583's: the whole text laid out in idle time after a rebuild).
+is #583's: the whole text laid out in idle time after a rebuild, and #593's:
+the top word kept across a width change, (g) and (h)).
 
 App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
   Z0  no `Frame Job: ` line; `transcript_view` takes exactly its ten earlier
@@ -35,10 +36,11 @@ App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
   A5  `screens.py --only 11d-transcript-find` exits 0 with "new problems: 0".
 
 Mutants (`--mutant NAME`, or all with `--mutants`): each anchor occurs once; a
-mutant is caught when every row it names fails. All twenty-eight are probe
+mutant is caught when every row it names fails. All thirty-four are probe
 mutants (a copy of `app/Sources` with the edit); TX-39 says why there are
-twenty-eight. F15 and F16 print each letter's verdict, and the letter a mutant
-fails is named beside it here.
+thirty-four. F15 and F16 print each letter's verdict, and the letter a mutant
+fails is named beside it here: the row failing is the script's verdict, and a
+record reads the named letter's own verdict too.
   return-leaves         K-4 takes Return from the find field (F4)
   across-paragraphs     paragraphs joined by a space (F1)
   case-sensitive        the comparison options dropped (F1)
@@ -69,11 +71,24 @@ fails is named beside it here.
                         (F16 a, b, c, d)
   idle-inside-rebuild   the rebuild runs the pass itself (F16 a, d, e)
   idle-survives-rebuild scheduling does not drop the pending pass (F16 d)
-  idle-loses-anchor     the pass does not scroll its anchor back (F16 c, e)
-  idle-stale-anchor     the pass uses the rebuild's anchor whatever was
-                        scrolled since (F16 f)
-  resize-stays-short    a width change schedules no pass (F16 e)
-  resize-drops-anchor   a width change drops a waiting rebuild's anchor (F16 e)
+  idle-loses-anchor     the pass does not scroll its anchor back (F16 c, h)
+  idle-stale-anchor     the waiting anchor taken whatever was scrolled since
+                        (F16 f, g4)
+  resize-stays-short    a width change schedules no pass (F16 e, g2, g3, g5)
+  resize-drops-anchor   a width change drops a waiting rebuild's anchor before
+                        it takes one (F16 e, g5)
+  resize-no-anchor      a width change takes no anchor, #593's old behaviour
+                        (F16 g1, g2, g3, g5)
+  resize-restore-waits  the arm does not put the word back, the pass does
+                        (F16 g1)
+  resize-drops-offset   the arm puts the word back at the very top, not at
+                        its offset; the pass corrects it (F16 g1, g3)
+  resize-on-estimate    the arm restores on estimates, nothing laid out from
+                        the top (F16 g3)
+  resize-viewport-stays the arm lays out through the word with the viewport
+                        left where it was (F16 g1–g5)
+  resize-stale-stamp    the arm's anchor stamped with the clip's y from before
+                        its scroll (F16 g5)
 
 Exit: 0 iff every row passed (a mutant run: 0 when caught, 1 when it survived,
 2 when the control could not be performed).
@@ -179,15 +194,35 @@ MUTANTS = {
     "idle-loses-anchor": (["F16"], [
         (VL, "            scroll(to: rect.minY - anchor.offset)\n", "            _ = rect\n")]),
     "idle-stale-anchor": (["F16"], [
-        (VL, "        if let kept, let clipY, abs(kept.clipY - clipY) <= 0.5 {\n",
-         "        if let kept, clipY != nil {\n")]),
+        (VL, "        if let kept = wholeLayoutAnchor, let clipY, abs(kept.clipY - clipY) <= 0.5 {\n",
+         "        if let kept = wholeLayoutAnchor, clipY != nil {\n")]),
     "resize-stays-short": (["F16"], [
         (TV, "            laidOutWhole = false\n            scheduleWholeLayout()\n",
          "            laidOutWhole = false\n")]),
     "resize-drops-anchor": (["F16"], [
-        (TV, "            laidOutWhole = false\n            scheduleWholeLayout()\n",
-         "            laidOutWhole = false\n            wholeLayoutAnchor = nil\n"
-         "            scheduleWholeLayout()\n")]),
+        (TV, "        let anchor = widthChanged ? standingAnchor() : nil\n",
+         "        if widthChanged { wholeLayoutAnchor = nil }\n"
+         "        let anchor = widthChanged ? standingAnchor() : nil\n")]),
+    "resize-no-anchor": (["F16"], [
+        (TV, "        let anchor = widthChanged ? standingAnchor() : nil\n",
+         "        let anchor: (token: Int, offset: CGFloat)? = nil\n")]),
+    "resize-restore-waits": (["F16"], [
+        (TV, "                scroll(to: rect.minY - anchor.offset)\n", "                _ = rect\n")]),
+    "resize-drops-offset": (["F16"], [
+        (TV, "                scroll(to: rect.minY - anchor.offset)\n",
+         "                scroll(to: rect.minY)\n")]),
+    "resize-on-estimate": (["F16"], [
+        (TV, "                scroll(to: 0)\n                layOut(through: tokenRange(anchor.token))\n",
+         "                layoutViewport()\n")]),
+    "resize-viewport-stays": (["F16"], [
+        (TV, "                scroll(to: 0)\n                layOut(through: tokenRange(anchor.token))\n",
+         "                layOut(through: tokenRange(anchor.token))\n")]),
+    "resize-stale-stamp": (["F16"], [
+        (TV, "        let anchor = widthChanged ? standingAnchor() : nil\n",
+         "        let anchor = widthChanged ? standingAnchor() : nil\n"
+         "        let staleY = enclosingScrollView?.contentView.bounds.minY ?? 0\n"),
+        (TV, "                    anchor.token, anchor.offset, enclosingScrollView?.contentView.bounds.minY ?? 0\n",
+         "                    anchor.token, anchor.offset, staleY\n")]),
     "keys-left-behind": (["F13"], [
         (TP, "            handBackKeys()\n", "")]),
     "view-esc-passes": (["F6"], [

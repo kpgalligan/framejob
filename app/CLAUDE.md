@@ -2266,9 +2266,10 @@ the key map behind it.
   (TX-22's paragraph rule, the pause sets, the binary-search highlight). `TranscriptView` is NOT
   an `NSText` (TX-21): a TextKit 2 view (viewport layout; after a rebuild or a width change the
   whole text is laid out once in idle time by `layOutAll()`, a one-shot run-loop observer that
-  `scheduleWholeLayout()` replaces when asked again, re-anchored on the rebuild's top word, spec
-  §11 TX-37 (d), so the view's height and the scroller's knob are the text's own;
-  `laysOutWhenIdle`, `layoutSteps` and `wholeLayouts` are a probe's) whose text is ONE string
+  `scheduleWholeLayout()` replaces when asked again, re-anchored on `standingAnchor()`'s word
+  (the rebuild's or the width change's top word); a width change also lays the text out from
+  the top through that word and puts it back at once (#593), spec §11 TX-37 (d), so the view's
+  height and the scroller's knob are the text's own; `laysOutWhenIdle`, `layoutSteps` and `wholeLayouts` are a probe's) whose text is ONE string
   styled by ranges, with colours resolved in its appearance (TextKit 2 draws a dynamic colour into a
   `CGContext` as nothing, TX-S2) and restyled on an appearance change; it tracks its clip view's
   width (`resize(withOldSuperviewSize:)`), draws by walking fragments from the dirty top, remaps

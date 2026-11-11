@@ -375,6 +375,27 @@ free" (TX-20), and on 2026-11-10 to begin it. No owner question was asked.
     rule is kept for a shorter first line. Whether the corrected place is the first one
     painted after a rebuild is not measured: the observer's order is 0, ahead of AppKit's and
     Core Animation's own, and a person's look is JOB-10.
+    **Amended 2026-11-11 (#593):** in (2), "or with no rebuild pending (a width change), it
+    keeps the word at the top now" is replaced: **a width change keeps the word that was at the
+    visible top at its offset**, at once and after the pass. Before the new width lays the
+    text out again the view takes the word to keep by the pass's own rule (`standingAnchor()`):
+    an anchor still waiting (a rebuild's, or an earlier step's of the same drag) while the view
+    is where that left it, else the word at the top now. It lays the text out from the top
+    through that word as a far scroll does (#558), the viewport moved to the top first, puts the
+    word back at its offset, and stamps it as the pass's anchor with the clip's y read after
+    that scroll. So a divider drag, which no pass interrupts, keeps the same words in sight, its
+    later steps keep the word from before its first, and a scroll since still wins. The
+    viewport goes to the top first because TextKit 2 lays a viewport out where it is: left past
+    the end of the text just laid out, it put word 18,000's paragraph at 85,985 pt over its
+    place at 76,025 pt. A restore on estimates alone was tried and does not hold: after the
+    resize the clip view rounds its origin, the viewport is laid out again on estimates, the
+    view's height fell to 600 pt and the clip to the top. **Measured** (the probe's bare view,
+    27,000 words, Apple M2 Max, three lanes sharing the machine): before, 304 → 340 pt left
+    word 18,000 22,886.5 pt above the visible top and the pass kept another word, and a drag
+    340 → 322 → 304 pt ended at the top of the text; after, the word is at its offset straight
+    after each step and after the pass, where a layout from the top puts it. A width step at
+    word 18,000 took 50.7–80.7 ms, the text above it laid out (the old arm's took 31.8 ms, a
+    whole pass a median 83 ms); near the top, about a viewport. `show`'s restore is unchanged.
   - (e) **Keys and focus.** ⌘F opens the bar and gives its field the keys, its text selected;
     with the bar open it only does that again. In the field Return is (c)'s next and ⇧Return its
     previous, and the field keeps the keys: K-4 (3)'s one exception, decided in the window with
@@ -461,3 +482,18 @@ free" (TX-20), and on 2026-11-10 to begin it. No owner question was asked.
   `resize-stays-short` (F16 e) and `resize-drops-anchor` (F16 e). A tenth, the pass not
   invalidating first, survived F16 (c) and was dropped with its line. The knob under a real
   drag is JOB-10's.
+  **Amended 2026-11-11 (#593):** F16 gains (g), against references laid out at 340 and
+  322 pt too: (g1) word 18,000 in sight at its offset straight after 304 → 340 pt; (g2) after
+  the pass the same word at its offset, at the reference's place and height; (g3) a drag's
+  steps 340 → 322 → 304 with no turn between, the word at its offset straight after each; (g4)
+  a scroll before the pass wins; (g5) a drag 304 → 322 → 304 from a word that starts a line at
+  304 pt and not at 322 pt, so at the second step the top word is another one. And (h): in a
+  legacy autohiding scroll view a rebuild from ten words to 27,000 shows the scroller inside
+  `show`, whose anchor still wins, read on the word's own line. (g1)–(g3) and (g5) failed
+  before the fix; (h) holds before it too, a guard for the arm nested in `show`. **Thirty-four
+  mutants**, six new, one per decision: `resize-no-anchor` (g1–g3, g5), `resize-restore-waits`
+  (g1), `resize-drops-offset` (g1, g3), `resize-on-estimate` (g3), `resize-viewport-stays`
+  (g1–g5) and `resize-stale-stamp` (g5). `resize-drops-anchor` now drops the anchor before the
+  capture (e, g5), `idle-stale-anchor` anchors in `standingAnchor()` (f, g4), and
+  `idle-loses-anchor` fails (c) and (h), the arm leaving (e) nothing to put back. A mutant is
+  scored by its row, so each one's letters were read from the row's detail.

@@ -5,7 +5,7 @@ import AppKit
 /// an `NSTextLayoutManager` over an `NSTextContentStorage`, with viewport
 /// layout, so a rebuild lays out and draws only the fragments in sight. The
 /// rest is laid out once afterwards, in the run loop's idle time
-/// (`layOutAll()` in `+Layout`, spec §11 TX-37 (d) as amended by #583), so
+/// (`layOutAll()` in `+Layout`, spec §11 TX-37 (d) as amended by #583, #593), so
 /// the view is as tall as the whole text and the scroller's knob is true.
 ///
 /// **Not an `NSText`** (TX-21): `handleEditorKey` gives up on an `NSText`
@@ -76,9 +76,10 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
     var laidOutWhole = false
     /// The pending idle pass (`scheduleWholeLayout()`), its only owner.
     var wholeLayoutObserver: CFRunLoopObserver?
-    /// The last rebuild's anchor, kept for the idle pass: the top token, its
-    /// offset from the visible top as it was BEFORE the rebuild, and the
-    /// clip's y after the rebuild's own restore.
+    /// The last rebuild's or width change's anchor, kept for the idle pass:
+    /// the top token, its offset from the visible top as it was BEFORE the
+    /// rebuild or the width change (#593), and the clip's y after that one's
+    /// own restore.
     var wholeLayoutAnchor: (token: Int, offset: CGFloat, clipY: CGFloat)?
     /// Whether a rebuild schedules the idle pass. Internal: a probe clears it
     /// to keep a view whose far text is an estimate.
@@ -294,15 +295,37 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
 
     // MARK: - Viewport layout
 
+    /// A new width lays every line out again, so the word at the visible top
+    /// is taken first and kept there (#593): the text is laid out from the
+    /// top through it, as a far scroll does (#558), and it is put back at its
+    /// offset at once, so a divider drag, which no idle pass interrupts,
+    /// shows the same words; then it is the pass's anchor, stamped with the
+    /// clip's y after this arm's own scroll. A rebuild's anchor still waiting
+    /// for its pass, or an earlier step's of the same drag, is the one taken
+    /// (`standingAnchor()`): an autohiding scroller changes the width during
+    /// or right after a rebuild. The viewport goes to the top first: TextKit 2
+    /// lays a viewport out where it is, so one left past the end of the text
+    /// laid out puts the anchor's paragraph there, over its real place
+    /// (measured: word 18,000 of 27,000 at 85,985 pt where a layout from the
+    /// top at the new width puts it at 76,025).
     override func setFrameSize(_ newSize: NSSize) {
         let widthChanged = newSize.width != frame.width
+        let anchor = widthChanged ? standingAnchor() : nil
         super.setFrameSize(newSize)
         if widthChanged {
             fitContainer()
-            layoutViewport()
-            // A new width lays every line out again: whole once more in idle
-            // time. A rebuild's anchor still waiting for its pass is kept (an
-            // autohiding scroller changes the width right after a rebuild).
+            if let anchor {
+                scroll(to: 0)
+                layOut(through: tokenRange(anchor.token))
+            } else {
+                layoutViewport()
+            }
+            if let anchor, let rect = rects(forToken: anchor.token).first {
+                scroll(to: rect.minY - anchor.offset)
+                wholeLayoutAnchor = (
+                    anchor.token, anchor.offset, enclosingScrollView?.contentView.bounds.minY ?? 0
+                )
+            }
             laidOutWhole = false
             scheduleWholeLayout()
         }

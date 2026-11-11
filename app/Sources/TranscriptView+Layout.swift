@@ -199,29 +199,33 @@ extension TranscriptView {
         CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .defaultMode)
     }
 
+    /// The word to keep at the visible top, and its offset from it: a
+    /// rebuild's or a width change's anchor still waiting for its pass while
+    /// the view is where that left it, else the word at the top now (a scroll
+    /// since then wins); nil out of sight with none waiting. Reads only.
+    func standingAnchor() -> (token: Int, offset: CGFloat)? {
+        let clipY = enclosingScrollView?.contentView.bounds.minY
+        if let kept = wholeLayoutAnchor, let clipY, abs(kept.clipY - clipY) <= 0.5 {
+            return (kept.token, kept.offset)
+        }
+        // Out of sight there is no top word to keep, and no scroll.
+        guard !visibleRect.isEmpty, let top = topVisibleToken(), let rect = rects(forToken: top).first
+        else { return nil }
+        return (top, rect.minY - visibleRect.minY)
+    }
+
     /// Lays every paragraph out in one run from the top, so the view is as
     /// tall as the text and the scroller's knob reads the true position, and
-    /// puts the anchor word back at its offset from the visible top: the
-    /// rebuild's own anchor while the view is where the rebuild left it, else
-    /// the word at the top now (a scroll since then wins). Nothing is
-    /// invalidated first: one layout over the whole document re-places the
-    /// paragraphs the viewport or a measurement had placed from estimates
-    /// (measured: word 26,000 of 27,000, measured at 95,447 pt before the
-    /// pass, at 125,187 pt after it, where a layout from the top puts it).
+    /// puts `standingAnchor()`'s word back at its offset from the visible top.
+    /// Nothing is invalidated first: one layout over the whole document
+    /// re-places the paragraphs the viewport or a measurement had placed from
+    /// estimates (measured: word 26,000 of 27,000, measured at 95,447 pt
+    /// before the pass, at 125,187 pt after it, where a layout from the top
+    /// puts it).
     func layOutAll() {
         wholeLayoutObserver = nil
-        let kept = wholeLayoutAnchor
+        let anchor = standingAnchor()
         wholeLayoutAnchor = nil
-        let clipY = enclosingScrollView?.contentView.bounds.minY
-        var anchor: (token: Int, offset: CGFloat)?
-        if let kept, let clipY, abs(kept.clipY - clipY) <= 0.5 {
-            anchor = (kept.token, kept.offset)
-        } else if !visibleRect.isEmpty, let top = topVisibleToken(),
-            let rect = rects(forToken: top).first
-        {
-            // Out of sight there is no top word to keep, and no scroll.
-            anchor = (top, rect.minY - visibleRect.minY)
-        }
         layoutManager.ensureLayout(for: layoutManager.documentRange)
         layoutViewport()  // the view grows to the text's height
         if let anchor, let rect = rects(forToken: anchor.token).first {
