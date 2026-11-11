@@ -69,7 +69,16 @@ impl Mask {
                 }
             }
             MaskType::Luminance => {
-                for (p, ma) in pixmap.pixels().iter().zip(mask.data.as_mut_slice()) {
+                // Frame Job (spec §11 PR-15): a deep source is read at 8 bits with PR-13's offset, so its
+                // coverage is the one today's dithered raster makes.
+                let rounded = pixmap.lo.map(|lo| {
+                    crate::pixmap::collapsed(pixmap.data(), lo, pixmap.width() as usize)
+                });
+                let pixels: &[crate::PremultipliedColorU8] = match &rounded {
+                    Some(data) => bytemuck::cast_slice(data),
+                    None => pixmap.pixels(),
+                };
+                for (p, ma) in pixels.iter().zip(mask.data.as_mut_slice()) {
                     // Normalize.
                     let mut r = f32::from(p.red()) / 255.0;
                     let mut g = f32::from(p.green()) / 255.0;
@@ -162,6 +171,7 @@ impl Mask {
             size: self.size,
             real_width: self.size.width() as usize,
             data: &mut self.data,
+            lo: None,
         }
     }
 
@@ -174,6 +184,7 @@ impl Mask {
             size: rect.size(),
             real_width: self.size.width() as usize,
             data: &mut self.data[offset..],
+            lo: None,
         })
     }
 

@@ -40,6 +40,7 @@ flate2 = "1"
 incremental = true
 
 [patch.crates-io]
-# tiny-skia 0.12.0, vendored with the gradient dither (spec §11 PR-13; graphic/vendor/README.md).
+# tiny-skia 0.12.0, vendored with the gradient dither and the deep pixmap (spec §11 PR-13, PR-15;
+# graphic/vendor/README.md).
 # core/Cargo.toml carries the same table: Cargo ignores a dependency's [patch].
 tiny-skia = { path = "vendor/tiny-skia" }

@@ -61,6 +61,9 @@ pub use color::{Color, ColorSpace, ColorU8, PremultipliedColor, PremultipliedCol
 pub use color::{ALPHA_OPAQUE, ALPHA_TRANSPARENT, ALPHA_U8_OPAQUE, ALPHA_U8_TRANSPARENT};
 pub use mask::{Mask, MaskType};
 pub use painter::{FillRule, Paint};
+// Frame Job (spec §11 PR-15): `with_deep_pixmaps`, the door to a deep pixmap.
+#[cfg(feature = "std")]
+pub use pixmap::with_deep_pixmaps;
 pub use pixmap::{Pixmap, PixmapMut, PixmapRef, BYTES_PER_PIXEL};
 pub use shaders::{FilterQuality, GradientStop, PixmapPaint, SpreadMode};
 pub use shaders::{LinearGradient, Pattern, RadialGradient, Shader, SweepGradient};

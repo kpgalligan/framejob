@@ -1,8 +1,10 @@
-# graphic/vendor — the patched tiny-skia (spec §11 PR-13)
+# graphic/vendor — the patched tiny-skia (spec §11 PR-13, PR-15)
 
 `tiny-skia/` is tiny-skia **0.12.0** from crates.io, the version resvg 0.48.1
-pins. It is vendored with a four-file patch that dithers gradients (#375
-part 1). Nothing else in the crate is edited.
+pins. It is vendored with two patches, applied in this order: a four-file
+patch that dithers gradients (#375 part 1, PR-13), and an eight-file patch
+that draws into a pixmap deeper than 8 bits (#374, PR-15). Nothing else in the
+crate is edited.
 
 ## Provenance
 
@@ -54,6 +56,58 @@ The tests are `graphic/tests/dither.rs`, `core/tests/graphic_ffi.rs`'s
 `a_gradient_is_dithered_through_the_ffi`, and
 `tools/proof/raster_dither_proof.py` with its mutants.
 
+## What the deep patch does, and why (spec §11 PR-15)
+
+tiny-skia's only `Pixmap` is RGBA8, so a gradient lost its levels before the
+16-bit-float compositor saw it. The patch lets a pixmap carry more, without
+changing what an 8-bit pixmap draws: the crate's 8-bit path is byte for byte
+what the dither patch alone draws.
+
+- **The representation.** A deep `Pixmap` keeps its RGBA8 `data` and gains a
+  residual plane of the same size (`lo`). A channel's value in 1/256 levels
+  is `data × 256 + (lo as i8)`, with 65,280 as 1. `data` alone is the value
+  rounded to 8 bits, so resvg, which is not vendored and reads `data()` as
+  RGBA8, stays correct.
+- **The door.** `tiny_skia::with_deep_pixmaps(f)` runs `f` with every
+  `Pixmap::new` on the calling thread deep: the root and each layer resvg
+  makes under it. It is a thread-local flag restored by a drop guard, so a
+  panic restores it and another thread's 8-bit raster is untouched. It needs
+  the `std` feature, which resvg enables.
+- **The pipeline.** highp gains deep forms of load-destination, store,
+  source-over and the pattern sampler's gather, and a real `load_mask_u8`
+  (upstream leaves it empty because only lowp ever ran it). A deep
+  destination forces highp. A gradient pushes no `Stage::Dither` for a deep
+  destination and pushes it as before for an 8-bit one.
+- **Reading a deep pixmap at 8 bits** rounds it with PR-13's offset
+  (`pixmap::collapse`, through `highp::dither_offset_256`): in `data_mut`
+  and `pixels_mut`, in `clone` and `clone_rect` (only resvg's filters copy a
+  pixmap), and in a luminance `Mask::from_pixmap`. A value on a level never
+  moves. So a filtered region and a luminance mask's coverage are 8-bit and
+  dithered as before, and an owned pixmap is 8-bit after `data_mut`.
+- **The output.** `Pixmap::copy_rgba16` writes premultiplied RGBA at 16 bits a
+  channel, 65,535 as 1. The residual plane is not public.
+
+The eight files, each hunk marked `// Frame Job (spec §11 PR-15):` (a
+struct literal's `lo:` line carries no marker of its own):
+
+- `src/pixmap.rs`: the plane on `Pixmap`, `PixmapRef`, `PixmapMut` and
+  `SubPixmapMut`, the door, `collapse`, `copy_rgba16`, and `Clone` written
+  out.
+- `src/pipeline/highp.rs`: the deep stages, `load_mask_u8` and
+  `dither_offset_256`.
+- `src/pipeline/mod.rs`: `deep_dst` on the builder, the two-plane accessors
+  and the offset's re-export.
+- `src/pipeline/blitter.rs`: highp forced, and the solid memset's residual.
+- `src/painter.rs`: `apply_mask` in highp for a deep pixmap.
+- `src/mask.rs`: the luminance mask's read, and `lo: None` on a mask's
+  sub-pixmaps.
+- `src/shaders/gradient.rs`: no dither for a deep destination.
+- `src/lib.rs`: the door's re-export.
+
+The tests are `graphic/tests/deep.rs`, `core/tests/graphic_ffi.rs`'s
+`a_gradient_keeps_its_levels_through_the_ffi`, and
+`tools/proof/raster_dither_proof.py`'s rows E1 and D1–D7 with their mutants.
+
 ## How it is linked
 
 Two `[patch.crates-io]` tables point at it:
@@ -68,10 +122,12 @@ files tiny-skia is a path package, with no `source` or `checksum`.
 The crate is not a workspace member, so `make lint` and `cargo fmt --check`
 never cover it. Never reformat it: the stored diff must stay exact.
 
-## The stored diff, and checking it
+## The stored diffs, and checking them
 
-`tiny-skia-dither.diff` is the whole patch. It applies with `patch -p1`
-inside a fresh copy of the pristine crate. To check it against the tree:
+`tiny-skia-dither.diff` is the dither patch against the pristine crate, and
+`tiny-skia-deep.diff` is the deep patch against the crate with the dither
+patch applied. Each applies with `patch -p1`; the two in that order make the
+vendored tree. To check them against the tree:
 
 1. Make the pristine snapshot (gitignored):
 
@@ -84,24 +140,40 @@ inside a fresh copy of the pristine crate. To check it against the tree:
    If the registry no longer holds the crate, `cargo fetch` in `graphic/` with
    the `[patch]` tables removed brings it back.
 
-2. Run the diff command from the repository root. `command diff` skips a
+2. Make the dithered snapshot beside it: a copy of the pristine one with the
+   dither diff applied.
+
+   ```
+   mkdir -p tools/proof/work/raster-dither/dithered
+   cp -R tools/proof/work/raster-dither/pristine/tiny-skia-0.12.0 tools/proof/work/raster-dither/dithered/
+   (cd tools/proof/work/raster-dither/dithered/tiny-skia-0.12.0 && patch -s --no-backup-if-mismatch -p1 < ../../../../../../graphic/vendor/tiny-skia-dither.diff)
+   ```
+
+   The dither diff applying cleanly to the pristine crate is its check: it is
+   no longer the whole difference from the tree.
+
+3. Run the diff command from the repository root. `command diff` skips a
    shell's `--color` wrapper, and the `sed` drops BSD diff's tab-separated
    mtimes and the long prefixes:
 
    ```
-   command diff -ru tools/proof/work/raster-dither/pristine/tiny-skia-0.12.0 graphic/vendor/tiny-skia | sed -E -e 's#^--- tools/proof/work/raster-dither/pristine/tiny-skia-0\.12\.0/([^[:space:]]+).*#--- a/\1#' -e 's#^\+\+\+ graphic/vendor/tiny-skia/([^[:space:]]+).*#+++ b/\1#'
+   command diff -ru tools/proof/work/raster-dither/dithered/tiny-skia-0.12.0 graphic/vendor/tiny-skia | sed -E -e 's#^--- tools/proof/work/raster-dither/dithered/tiny-skia-0\.12\.0/([^[:space:]]+).*#--- a/\1#' -e 's#^\+\+\+ graphic/vendor/tiny-skia/([^[:space:]]+).*#+++ b/\1#'
    ```
 
-   Its output names exactly the four files and holds no `Only in` line.
+   Its output names exactly the deep patch's eight files and holds no
+   `Only in` line.
 
-3. Check it against the stored diff:
+4. Check it against the stored diff:
 
    ```
-   <the diff command> | cmp - graphic/vendor/tiny-skia-dither.diff
+   <the diff command> | cmp - graphic/vendor/tiny-skia-deep.diff
    ```
 
-   This must exit 0. After a deliberate change to the patch, write the
-   command's output to `tiny-skia-dither.diff` instead.
+   This must exit 0. After a deliberate change to the deep patch, write the
+   command's output to `tiny-skia-deep.diff` instead. A deliberate change to
+   the dither patch is made the same way against the pristine snapshot, with
+   the deep patch's eight files left out of the comparison, and the deep diff
+   regenerated after it.
 
 ## Re-applying on an upgrade
 
@@ -110,18 +182,20 @@ When resvg moves to a new tiny-skia:
 1. Make the new version's pristine snapshot, as in step 1 above, with the new
    version's name.
 2. Replace `tiny-skia/` with a copy of it.
-3. Apply `tiny-skia-dither.diff` with `patch -p1` inside it. Resolve any hunk
-   by hand, keeping the stage last in `Stage` and `STAGES`.
+3. Apply `tiny-skia-dither.diff` with `patch -p1` inside it, then
+   `tiny-skia-deep.diff`. Resolve any hunk by hand, keeping the dither stage
+   last in `Stage` and `STAGES`.
 4. Bump the version in this README and the upstream commit from the new
    `.cargo_vcs_info.json`.
 5. Re-pin both `[patch.crates-io]` tables (their paths stay the same), and
    let cargo rewrite both lock files.
-6. Regenerate the stored diff with the diff command.
-7. Run `cargo test --release --test dither` and `--test pins` in `graphic/`.
+6. Regenerate both stored diffs with the diff commands.
+7. Run `cargo test --release --test dither`, `--test deep` and `--test pins` in `graphic/`.
    Re-pin `tests/pins.json` (`GRAPHIC_REPIN=1`) only after looking at the
    PNGs a failing run writes to `target/pins/`.
 8. Run `cargo test --release --test graphic_ffi` in `core/`, then
    `raster_dither_proof.py` and its mutants.
 
-If upstream gains a gradient dither of its own, drop this vendoring and both
-tables, and record that in PR-13.
+If upstream gains a gradient dither of its own, drop the dither patch and
+record that in PR-13; the vendoring and both tables stay while the deep patch
+does.

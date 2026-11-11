@@ -37,6 +37,7 @@ unicode-normalization = "0.1.24"
 incremental = true
 
 [patch.crates-io]
-# graphic's vendored tiny-skia with the gradient dither (spec §11 PR-13): Cargo ignores the
-# [patch] in graphic/Cargo.toml when building this crate, so it is restated here.
+# graphic's vendored tiny-skia with the gradient dither and the deep pixmap (spec §11 PR-13,
+# PR-15): Cargo ignores the [patch] in graphic/Cargo.toml when building this crate, so it is
+# restated here.
 tiny-skia = { path = "../graphic/vendor/tiny-skia" }
