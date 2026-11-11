@@ -188,10 +188,12 @@ final class AudioTapContext {
     ///
     /// `time` is what `MTAudioProcessingTapGetSourceAudio` reported, which is
     /// invalid on the player's very first callback (measured) — hence the
-    /// carried position.
+    /// carried position. `sourced` is false for the player's FILLER: a
+    /// silent buffer whose time range has no duration, handed over while
+    /// paused and at a seek's frame (spec §11 AU-161).
     func process(
         _ bufferList: UnsafeMutablePointer<AudioBufferList>, frames: Int, time: CMTime,
-        startOfStream: Bool
+        startOfStream: Bool, sourced: Bool = true
     ) {
         guard frames > 0, !channels.isEmpty else { return }
         let start = time.isNumeric ? CompositionBuilder.ticks(time) : position
@@ -308,10 +310,16 @@ final class AudioTapContext {
         }
         // The live loudness meter's copy (spec §11 AU-70), placed by the
         // buffer's own time on this tap's sample grid. A buffer with no
-        // usable time (the player's silent pre-roll) is not placed at all.
+        // usable time (the player's silent pre-roll) is not placed at all,
+        // and a filler is placed as a MARK: where the stream stands and how
+        // many frames it stood for, none of its samples (AU-161).
         guard time.isNumeric, time.timescale > 0 else { return }
         let first = Int64(
             (Double(time.value) * Double(sampleRate) / Double(time.timescale)).rounded())
+        guard sourced else {
+            meter.mark(start: first, frames: frames, sampleRate: Int(sampleRate))
+            return
+        }
         channels.withUnsafeMutableBufferPointer { pointers in
             meter.capture(
                 UnsafeMutableBufferPointer(rebasing: pointers[0..<count]), count: count,
@@ -488,9 +496,13 @@ enum AudioTap {
                 let startOfStream =
                     flagsOut.pointee & MTAudioProcessingTapFlags(
                         kMTAudioProcessingTapFlag_StartOfStream) != 0
+                // Source audio has a duration; the player's filler has none
+                // (zero while paused or at a seek, not numeric before the
+                // first buffer), measured for AU-161.
                 context.process(
                     bufferListInOut, frames: Int(numberFramesOut.pointee),
-                    time: timeRange.start, startOfStream: startOfStream)
+                    time: timeRange.start, startOfStream: startOfStream,
+                    sourced: timeRange.duration.isNumeric && timeRange.duration.value > 0)
             })
 
         var tap: MTAudioProcessingTap?

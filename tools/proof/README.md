@@ -26743,7 +26743,7 @@ I5 lag 0.000 with the old render pruned; I6 lag +0.007, floor 10.9 dB lower; I7 
 floor moved 0.00 dB and Keep pitch off sample for sample. `--mutants` 10/10 killed, each by its
 named row alone.
 
-## Road map "audio" AP7 — live loudness and true-peak metering (`audio_ap7_proof.py` T1–T16, L1–L4; eleven mutants; spec §11 AU-70…AU-78)
+## Road map "audio" AP7 — live loudness and true-peak metering (`audio_ap7_proof.py` T1–T18, L1–L4; twenty-one mutants; spec §11 AU-70…AU-78, AU-161)
 
 The live loudness meter (`LiveLoudness.swift`, `LiveLoudness+Sum.swift`) rebuilds the true mix on
 the main thread from each tap's `MixRing` (`LevelMeter.swift`) and measures it with the
@@ -26771,8 +26771,10 @@ signal is split over three tracks at 0.5, 0.3 and 0.2 under unity envelopes.
 | T14 | at ×2 nothing is measured (M, S nil; I, TP and `to_frame` held; `measuring` false); `stop()` holds M, S, I and TP, fires `onReading` once and empties the rings; a resume at ×1 from the reached frame continues with no reset |
 | T15 | the bars: two correlated 0.5 sines read peak 1.0; a sine and its inverse read 0.0 where the per-track sum reads 1.0 |
 | T16 | a 0.3 s and a 1 s gap between two clips on one track, and on one of two tracks: no reset, frames fed = to − from, I within 0.01 LU of the reference with silence in the gap |
+| T17 | the tap (AU-161, #405): a 4,096-frame buffer of non-silent samples through `AudioTapContext.process` with `sourced: false` (the player's filler: no duration) drains as one mark — its frame, its length, no samples, not an overrun; a sourced buffer drains as audio with its samples; a buffer with no time, filler or not, drains nothing; 63 fillers at one frame and then audio drain as 63 marks and the audio with no overrun |
+| T18 | marks in the sum (AU-161), as the player was measured to deliver them: (a) a seek — each track's fillers of the old position, track 1's at the seek's frame, and in a later tick track 2's stale filler, its own at the seek's frame and track 1's first audio, the audio 3,072 and 4,096 frames past the seek — resets once (`jump`), `from_frame` the first audio, frames fed = to − from, I within 0.01 LU of the reference with track 2 silent until its own first frame; (b) pause and continue — a stop with a buffer per track never summed, three fillers at each stream's end, audio 3,072 and 7,167 frames on — and (c) a long pause, 63 fillers a track drained by a second stop, audio 3,072 and 2,560 frames on: no reset, `from_frame` kept, frames fed = to − from, I within 0.01 LU of the reference with silence from the reached frame to the audio; (d) a stop, then audio 5,375 frames past the stream with no filler: a `jump`; (f) a seek 20 s on while paused, its two marks a track drained by a second stop, the same seek just before the first stop, and a seek 2 s back while paused, each with audio 3,072 and 4,096 frames past the marks: no reset at the stop, then one `jump`, `from_frame` the first audio, frames fed = to − from, I within 0.01 LU of the reference with track 2 silent until its own first frame; (g) a tick at rate 0 that takes 8,192 frames a track rendered ahead, then three fillers where the stream stands and audio 3,072 and 2,560 frames on: no reset, as (b); (e) ×2 for a second and two stops, and a stop and then ×2, each then ×1 where the stream stands: a `jump` |
 
-`--mutants` runs eleven, each a replacement in a copied `app/Sources` (its anchor asserted once),
+`--mutants` runs twenty-one, each a replacement in a copied `app/Sources` (its anchor asserted once),
 scored killed when its named row fails:
 
 | Mutant | Edit | Must fail |
@@ -26788,6 +26790,16 @@ scored killed when its named row fails:
 | `short-term-over-4` | short-term over 4 sub-blocks | T6 |
 | `tables-at-every-rate` | Tables 1–2 used at every rate | T9 |
 | `bars-from-per-track-sum` | the bars are `LevelMeterTrack.mix` | T15 |
+| `filler-captured` | the tap captures a filler as audio (the code before #405) | T17 |
+| `filler-unmarked` | the tap drops a filler, no mark | T17 |
+| `mark-reads-as-overrun` | the drain refuses a header with no frames | T18 |
+| `mark-without-length` | what follows a mark must continue its frame, not its length | T18 |
+| `awaiting-after-a-mark` | a track that moved by a mark is put back to awaiting by another track's move | T18 |
+| `resume-asked-of-the-sum` | after a stop, audio is asked against the reached frame as before | T18 |
+| `resume-after-another-rate` | every stop leaves its tracks resuming, one after another rate too | T18 |
+| `stop-adopts-a-seek` | a stop takes whatever it drains as the track's stream, a seek's mark too (the diff read's finding) | T18 |
+| `tick-at-rest-drops-its-drain` | a tick at rate 0 stops without what it drained, so the stream does not move past it | T18 |
+| `resume-through-another-rate` | playing at another rate does not end a track's resuming | T18 |
 
 **With a socket** (`python3 tools/proof/audio_ap7_proof.py <dir>/agent.sock`, an instance
 `proof_app.py launch` started), L1–L4 drive the real player through `play_preview` and the dev
@@ -26797,13 +26809,14 @@ mono pink noise on track 2 as two clips with a 0.4 s gap at 3.0–3.4 s (ffmpeg 
 export over `[from_frame, to_frame)` with `phase5_proof.py`'s BS.1770-4 (K-weighting from rest at
 `from_frame`, sub-blocks counted from there): \|ΔI\|, \|ΔM\|, \|ΔS\| ≤ 0.1 LU, \|ΔTP\| ≤ 0.2 dB,
 `resets` unchanged by the gap, `last_reset` `manual`, `measuring` false after the play. L2
-resets, plays 4 s from 4 s with `seek_to` 1 s: `resets` +1, `jump`. L3 resets and plays 2 s twice
-from 1 s: no reset, `from_frame` kept. L4: the tool listed with `reset` described, and the
+resets, plays 4 s from 4 s with `seek_to` 1 s: `resets` +1, `jump`, and I within 0.01 LU of L1's
+export over `[from_frame, to_frame)`, 1.5 s or more (AU-161). L3 resets and plays 2 s twice
+from 1 s, and a third time after 6 s paused (AU-161): no reset, `from_frame` kept; then `set_playhead` to 6 s while paused and a fourth play: `resets` +1, `jump`, `from_frame` within 0.5 s past 6 s (a guard: the player did not reach T18 (f)'s defect by this sequence, so `stop-adopts-a-seek` built into a Debug app passed it too, 2026-11-11; T18 (f) is the row that fails). L4: the tool listed with `reset` described, and the
 instance's log holds no `Frame Job: ` line. Needs ffmpeg.
 
 ```sh
-python3 tools/proof/audio_ap7_proof.py --probe             # T1–T16
-python3 tools/proof/audio_ap7_proof.py --probe --mutants   # 11 mutants
+python3 tools/proof/audio_ap7_proof.py --probe             # T1–T18
+python3 tools/proof/audio_ap7_proof.py --probe --mutants   # 21 mutants, about 50 minutes (`--only a,b` for some)
 python3 tools/proof/audio_ap7_proof.py <dir>/agent.sock    # L1–L4
 ```
 
@@ -26814,6 +26827,20 @@ or two buffers of the OLD position (sometimes the same buffer twice), not in ste
 the second track's stale buffer arrived after the first had moved. AU-72's admission now asks
 the reset rule only of a chunk that moves its track, and a track that has not moved after a jump
 drops its old stream until it does; T11's third case is that shape.
+
+**What the player hands a tap (#405, Debug, 2026-11-11, every callback logged: 1,044 buffers).**
+Audio has a time range with a duration. A FILLER is silent with a duration of zero or not
+numeric, and no audio buffer had either: one with no time before a stream's first audio (the
+first play, and a play after about 5 s paused); about twelve a second at the frame the track's
+stream stands at while paused, for about 5.3 s (62 or 63 a track), then none; one or two at a
+seek's frame, after the track's stale fillers of the old position (the "old position's buffers"
+above were these). After a seek to 48000 the audio began at 51072 on one track and 51584 or
+52096 on the other; after a pause, 3,072 frames past the stream's end on one and 2,560, 3,071
+and 7,167 on the other. On the tree before the fix L2's new comparison read 0.0654 LU low (the
+meter's [48000, 134016) against the export), and pause and continue reset (`jump`) after a 6 s
+pause and not after none, the audio coming back 6,144 frames past the frame the sum had reached
+(a stop had drained the pause's fillers before they could bridge it). With AU-161: L2 |ΔI|
+0.0000 from 51072, and pauses of 0, 6 and 12 s do not reset.
 
 **The recorded run (2026-10-30):** `--probe` 16/16 (case 1 −22.9933, cases 3–5 −23.0139,
 −23.0139, −22.9787, case 9 worst 0.0137 LU, case 12 worst 0.0396 LU, true peaks −6.0206,
@@ -27638,7 +27665,7 @@ stops it. The names after the socket run only those parts (P2 runs P3, P4 runs P
 |---|---|
 | P1 | `set_audio`'s leveller: `{}` the four defaults, a field merges, null clears; each bound and `threshold_db` refused by name, changing nothing; `paste_attributes` carries it; one undo |
 | P2 | the off-mic fixture, the leveller alone, 24-bit WAV: (a) the speech's range over whole segments out ≤ in − 5 LU; (b) each segment's first 0.5 s mean gain within ±3 dB of its settled gain (the median over [3 s, end − 0.5 s); AU-67 (e): the window holds the glide's end on the bed before each sentence's first word, 0.06–0.29 s in, and the sentences open 0.2–3.1 dB louder than their middles, which the curve follows; v1's carry-over, ~12 dB, still fails); (c) each pause from 0.4 s in to 0.5 s before its end moves ≤ 0.1 dB; (d) over each whole pause the gain within the gains of the 0.5 s before and after it, ±0.5 dB; every figure printed |
-| P3 | `loudness_meter` after `play_preview` 12 s from 0 within 0.01 LU of the export over the same frames; then 8 s from 20 s (a seek), its signed ΔI less a CONTROL's within 0.01 LU — the levelled export itself placed as a clip with nothing on it in a project of its own, the same two plays after its own build, against its own export — because after a seek the player hands every tap a silent zero-duration buffer carrying the seek's time, which the live meter places at the seek's frame (filed), so a seek's ΔI depends on the material's level there; the control hears the same material through the same meter, so that part cancels and a leveller-made difference still fails |
+| P3 | `loudness_meter` after `play_preview` 12 s from 0, then 8 s from 20 s (a seek), each within 0.01 LU of the export over the same frames. The seek's row was held against a control (the levelled export played as a clip of its own) until #405, while the live meter placed the player's silent filler at the seek's frame; since AU-161 it is absolute |
 | P4 | `enhance_voice` on the off-mic fixture: the leveller on at its defaults and its reason; the export at −16 ±0.5 LUFS and ≤ −1 dBTP; the last verify within 0.1 LU of −16; presses 2 and 3 "made no change" |
 | P5 | the steady fixture: the leveller null and its reason; presses 2 and 3 "made no change"; three rounds of `set_audio {volume: 1}` then `normalize_clip {mode: loudness}` give `processed_lufs` equal within 0.0005 LU and equal to Enhance's |
 | P6 | the owner's recording: `speech_range_lu`, the decision and its reason printed; the decision matches the rule; a second call "made no change" |

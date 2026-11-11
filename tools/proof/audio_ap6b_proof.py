@@ -23,12 +23,9 @@ samples/Rode-usb-mic.m4a.
       before its end moves ≤ 0.1 dB; (d) over each whole pause the gain stays
       within the gains of the last 0.5 s before it and the first 0.5 s after
       it, ±0.5 dB. Every figure printed.
-  P3  loudness_meter after play_preview 12 s from 0 within 0.01 LU of the
-      export over the same frames; then 8 s from 20 s (a seek), its ΔI less a
-      CONTROL's within 0.01 LU — the levelled export itself placed as a clip
-      with nothing on it, the same plays, against its own export — so the
-      meter's own seek error (the player's silent filler placed at the seek's
-      frame) cancels and a leveller-made difference does not.
+  P3  loudness_meter after play_preview 12 s from 0, then 8 s from 20 s (a
+      seek), each within 0.01 LU of the export over the same frames (the
+      seek's row absolute since spec §11 AU-161, #405).
   P4  enhance_voice on the off-mic fixture: the leveller on and its reason; the
       export at −16 ±0.5 LUFS and ≤ −1 dBTP; the last verify within 0.1 LU of
       −16; presses 2 and 3 "made no change".
@@ -52,7 +49,6 @@ samples/Rode-usb-mic.m4a.
 import json
 import math
 import os
-import shutil
 import sys
 import time
 
@@ -209,7 +205,7 @@ def offmic_rows(m):
     clip = ready(s, s.place("ap6b-offmic.wav"))
     dry, _ = wav24(s, "dry")
     s.op("set_audio", clips=[clip], patch={"leveller": {}})
-    wet, wet_path = wav24(s, "levelled")
+    wet, _ = wav24(s, "levelled")
     spans = fixture.segments(fixture.OFF_MIC_PEAKS)
     # One channel: the export is the mono fixture in both, and a range is a
     # difference, so the other channel's equal share changes nothing.
@@ -254,32 +250,14 @@ def offmic_rows(m):
     plays = ((0, 12), (20, 8))
     levelled = meter_plays(s, wet, plays)
     m.call("close_project", project=s.path, discard=True)
-    # The CONTROL (spec §11 AU-67 (e)): the levelled export itself, placed as a
-    # clip with nothing on it in a project of its own, its own export, the same
-    # plays after its own build. After a seek the player hands every tap a
-    # silent buffer of zero duration carrying the seek's time, which the meter
-    # places there (filed), so a seek's ΔI depends on how loud the material is
-    # at the seek; the control hears the same material through the same meter,
-    # so the seek row holds the leveller's own part: its ΔI less the control's.
-    name = f"ap6b-levelled-{os.getpid()}.wav"
-    shutil.copyfile(wet_path, os.path.join(p5.FIXTURES, name))
-    c = Session(m, "ap6b-offmic-control")
-    c.place(name)
-    played, _ = wav24(c, "control")
-    control = meter_plays(c, played, plays)
-    m.call("close_project", project=c.path, discard=True)
-    os.remove(os.path.join(p5.FIXTURES, name))
-    for (label, got, _, delta), (_, c_got, _, c_delta) in zip(levelled, control):
-        print(f"  note P3 {label}: levelled {got}, ΔI {delta:+.4f} LU; control {c_got}, "
-              f"ΔI {c_delta:+.4f} LU")
+    # Both rows are absolute (spec §11 AU-161, #405): the player's filler at a
+    # seek is a mark, none of its samples, so the seek's play starts at its
+    # first audio. Before it this row was held against a control.
     label, got, long_enough, delta = levelled[0]
     check(long_enough and abs(delta) <= 0.01, f"P3 {label}: {got}; ΔI {delta:+.4f} LU (≤ 0.01)")
     label, got, long_enough, delta = levelled[1]
-    c_long_enough, c_delta = control[1][2], control[1][3]
-    own = delta - c_delta
-    check(long_enough and c_long_enough and abs(own) <= 0.01,
-          f"P3 {label} (a seek): ΔI {delta:+.4f} LU levelled, {c_delta:+.4f} LU the control; the "
-          f"leveller's own {own:+.4f} LU (≤ 0.01)")
+    check(long_enough and abs(delta) <= 0.01,
+          f"P3 {label} (a seek): {got}; ΔI {delta:+.4f} LU (≤ 0.01)")
 
 
 def meter_plays(s, export, plays):

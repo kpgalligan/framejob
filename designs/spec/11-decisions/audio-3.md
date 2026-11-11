@@ -95,7 +95,7 @@ code.
   rate, momentary_lufs, short_term_lufs, integrated_lufs, true_peak_dbtp, from_frame, to_frame,
   sample_rate, resets, last_reset}`. The View item and Reset are view state, unmirrored (§7.9's
   Preview Quality exemption).
-- **AU-78 — The proof (amended by AU-161: T17, T18, L2's comparison and eight more
+- **AU-78 — The proof (amended by AU-161: T17, T18, L2's comparison and ten more
   mutants).** `audio_ap7_proof.py`: the probe's rows T1–T16 (EBU Tech 3341 cases 1–5, 9
   and 12, true-peak sines, 44.1 kHz, the mix against a reference sum, continuity, the stall,
   overrun, rate, the bars, gaps) and eleven mutants, each anchoring a distinct branch AU-70, AU-72

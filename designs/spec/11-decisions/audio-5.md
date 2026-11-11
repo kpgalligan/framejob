@@ -54,8 +54,8 @@ It is new because [`audio-4.md`](audio-4.md) had reached the spec's ~500-line sp
   later is silence until it does, AU-70's rule for what a track delivers. With the sum not yet
   begun after a reset, a track that has already moved (its mark in an earlier tick) is not put
   back to awaiting by another track's move, and what it hands over in that tick is kept.
-  (c) **A stop is resumed from the stream.** A stop (AU-72) leaves each track RESUMING until it
-  next delivers audio. While resuming, a chunk that continues the track's own stream (what it
+  (c) **A stop is resumed from the stream.** A stop that ends a measured play (AU-72) leaves
+  each track RESUMING until it next delivers audio. While resuming, a chunk that continues the track's own stream (what it
   delivered last, a mark's length included, within the same tolerances) is not a move, however
   far the stop left the sum behind it: pause and continue does not reset after any pause. The
   frames between the frame the sum reached and the first audio after the pause read as
@@ -63,9 +63,15 @@ It is new because [`audio-4.md`](audio-4.md) had reached the spec's ~500-line sp
   restart). Audio more than `aheadTolerance` past the stream is still a jump, and a track that
   played at another rate since or before the stop is not resuming (its stream ran on
   unmeasured), so a play at ×1 after it is the jump it was. AU-72's tolerances do not change.
+  What a stop drops (its own drain, and what a tick at rate 0 took from the rings before it)
+  moves a track's stream only where it continues it: a chunk that does not, such as the marks
+  of a seek made while paused or just before the stop, is another position and is not taken as
+  the stream, so the audio after it is a move and is asked AU-72's rule against the sum, as it
+  was before this decision (the diff read's finding: a second stop had taken a seek's marks as
+  the stream, and the play after it was resumed, the gap summed as silence in one step).
   (d) **The proofs.** `audio_ap7_proof.py`: T17 (the tap: a filler is a mark with none of its
   samples, audio is audio, no time is nothing, 63 fillers overrun nothing), T18 (the measured
-  deliveries in the sum: the seek, pause and continue, the long pause, the tolerance kept, the
-  other rate), eight mutants (nineteen in all), and L2 also holds the seek's play within
-  0.01 LU of L1's export. `audio_ap6b_proof.py` P3's seek row is absolute again, within
+  deliveries in the sum: the seek, pause and continue, the long pause, the tolerance kept, a
+  seek drained by a stop, a tick at rate 0, the other rate), ten mutants (twenty-one in all), L2 also holds the seek's play within
+  0.01 LU of L1's export, and L3 plays a third time after 6 s paused, and a fourth after a seek made while paused. `audio_ap6b_proof.py` P3's seek row is absolute again, within
   0.01 LU, its control gone (AU-67 (e)). SE-30 stays the person's check.

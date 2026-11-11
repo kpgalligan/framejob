@@ -3854,12 +3854,17 @@ free.
   keeps its last buffer across silence.
   Each sink also carries a `MixRing` (AP7, spec §11 AU-70): the tap copies
   its post-chain block into it, lock-free (claims, a release fence, a
-  release publish; the drain detects an overwrite rather than waiting).
+  release publish; the drain detects an overwrite rather than waiting); a
+  buffer with no duration (the player's filler while paused and at a seek)
+  is written as a MARK, its frame and length and no samples (AU-161).
   `LiveLoudness.swift` (+`Sum`) drains every ring on the meter's 30 Hz tick
   (the timer is in `.common` modes) and sums the tracks by frame × envelope
   into a `LoudnessMeter`, measured only at ×1, with `manual`, `jump` and
   `overrun` resets; a track still on the old position after a seek drops
-  its stale buffers until it moves. While it is measuring,
+  its stale buffers until it moves; a mark is asked the rules as silence
+  and summed nowhere, and after a stop a track's audio that continues its
+  own stream is a resume, not a move, the stream moved by what the stop
+  dropped only where that continues it (AU-161). While it is measuring,
   `Playback.meterReading()` answers its bars (the mix's last 100 ms), else
   `LevelMeterTrack.mix`. `LoudnessPanelView.swift` is View ▸ Loudness
   Meter's 132 pt column and `EditorViewController+Loudness.swift` its

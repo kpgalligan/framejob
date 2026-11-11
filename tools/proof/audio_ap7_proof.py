@@ -1,4 +1,4 @@
-"""The live loudness meter (road map "audio" AP7, spec §11 AU-70..AU-78).
+"""The live loudness meter (road map "audio" AP7, spec §11 AU-70..AU-78, AU-161).
 
     python3 tools/proof/audio_ap7_proof.py --probe [--mutants] [--sources DIR]
     python3 tools/proof/audio_ap7_proof.py <dir>/agent.sock
@@ -33,8 +33,21 @@ Signals are written into sinks' rings as two or three tracks whose writes lead b
        the per-track sum reads 1.0.
   T16  a 0.3 s and a 1 s gap between two clips on one track, and on one of two tracks: no
        reset, frames fed == to - from, I within 0.01 LU of the reference with silence.
+  T17  the tap (AU-161): a buffer with no duration (the player's filler) is a mark in the
+       ring, its frame and length and none of its samples; a sourced buffer is audio; a
+       buffer with no time is nothing; 63 fillers and then audio overrun nothing.
+  T18  marks in the sum (AU-161), as the player was measured to deliver them: a seek's
+       fillers in separate ticks reset once and the measurement starts at the first audio
+       (3072 frames past the seek), a track whose audio starts 1024 frames later silent
+       until it does; pause and continue (three fillers, audio 3072 and 7167 frames on) and
+       a six-second pause whose 63 fillers a second stop drained do not reset, frames fed
+       == to - from, I within 0.01 of the reference with silence in the gap; audio 5375
+       frames past a stopped stream resets; a seek while paused or just before the stop,
+       its marks drained by a stop, resets at the audio after it, forwards and backwards; a
+       tick at rate 0 that took 8192 frames rendered ahead leaves a resume; a stream that
+       ran on at x2, before or after a stop (or two), is not resumed.
 
-`--mutants` runs the eleven mutants, each over its own copy of app/Sources, and scores
+`--mutants` runs the twenty-one mutants, each over its own copy of app/Sources, and scores
 each killed when its named row fails. Output under tools/proof/work/audio-ap7-probe.
 
 With a socket (an instance launched by `proof_app.py launch`), L1-L4 drive the real
@@ -52,7 +65,7 @@ import swift_build
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/audio-ap7-probe"
-ROWS = [f"T{n}" for n in range(1, 17)]
+ROWS = [f"T{n}" for n in range(1, 19)]
 
 MUTANTS = [
     ("mono-in-one-channel", "T10", "LiveLoudness+Sum.swift",
@@ -90,6 +103,31 @@ MUTANTS = [
     ("bars-from-per-track-sum", "T15", "LiveLoudness.swift",
      "bars = live ? mixBars() : nil",
      "bars = live ? LevelMeterTrack.mix(meters, at: 0) : nil"),
+    # AU-161
+    ("filler-captured", "T17", "AudioTap.swift",
+     "guard sourced else {", "guard sourced || true else {"),
+    ("filler-unmarked", "T17", "AudioTap.swift",
+     "meter.mark(start: first, frames: frames, sampleRate: Int(sampleRate))", "_ = first"),
+    ("mark-reads-as-overrun", "T18", "LevelMeter.swift",
+     "guard header.frames >= 0, header.frames <= Self.capacityFrames,",
+     "guard header.frames > 0, header.frames <= Self.capacityFrames,"),
+    ("mark-without-length", "T18", "LiveLoudness+Sum.swift",
+     "lane.stream = chunk.streamEnd\n                end = chunk.streamEnd",
+     "lane.stream = chunk.end\n                end = chunk.end"),
+    ("awaiting-after-a-mark", "T18", "LiveLoudness+Sum.swift",
+     "where !moved.contains(ObjectIdentifier(lane)) && lane.end == nil {",
+     "where !moved.contains(ObjectIdentifier(lane)) {"),
+    ("resume-asked-of-the-sum", "T18", "LiveLoudness+Sum.swift",
+     "|| (!lane.resuming", "|| (true"),
+    ("resume-after-another-rate", "T18", "LiveLoudness.swift",
+     "lane.resuming = measured || lane.resuming", "lane.resuming = true"),
+    ("stop-adopts-a-seek", "T18", "LiveLoudness.swift",
+     "!continues(chunk.start, after: stream, rate: rate) {\n                    continue",
+     "!continues(chunk.start, after: stream, rate: rate) {\n                    lane.stream = chunk.streamEnd"),
+    ("tick-at-rest-drops-its-drain", "T18", "LiveLoudness.swift",
+     "stop(holding: drained)", "stop()"),
+    ("resume-through-another-rate", "T18", "LiveLoudness.swift",
+     "item.lane.resuming = false", "_ = item"),
 ]
 
 
@@ -137,7 +175,7 @@ def probe(sources):
     sys.stdout.write(stdout)
     good = check("the probe exited 0", not problem, problem)
     missing = [row for row in ROWS if row not in rows]
-    good &= check("every row T1..T16 ran", not missing, ", ".join(missing))
+    good &= check("every row T1..T18 ran", not missing, ", ".join(missing))
     passed = sum(1 for row in ROWS if rows.get(row))
     good &= passed == len(ROWS)
     print(f"\n{passed}/{len(ROWS)} rows passed")
@@ -185,9 +223,13 @@ def live_rows(socket):
            |dM| and |dS| (the last completed block and 3 s) <= 0.1 LU, |dTP| <= 0.2 dB;
            `resets` still 1 (the gap did not reset), `last_reset` manual, `measuring`
            false after the play.
-       L2  reset, then `play_preview` 4 s from 4 s with `seek_to` 1 s: resets +1, `jump`.
-       L3  reset, then two plays of 2 s back to back from 1 s: no reset, from_frame kept,
-           to_frame moved on.
+       L2  reset, then `play_preview` 4 s from 4 s with `seek_to` 1 s: resets +1, `jump`,
+           and I within 0.01 LU of L1's export over [from_frame, to_frame), 1.5 s or more
+           (AU-161: on the tree before it the filler read 0.0654 LU low).
+       L3  reset, then two plays of 2 s back to back from 1 s, and a third after 6 s
+           paused (AU-161: it reset `jump` on the tree before it): no reset, from_frame
+           kept, to_frame moved on each time; then `set_playhead` to 6 s while paused
+           and a fourth play: resets +1, `jump`, from_frame within 0.5 s past 6 s.
        L4  `loudness_meter` in tools/list with `reset` described; the instance's log
            holds no `Frame Job: ` line."""
     sys.argv[1:] = [socket]  # phase5_proof reads its socket at import
@@ -270,9 +312,17 @@ def live_rows(socket):
         session.op("set_playhead", t=4 * SEC)
         play(4, seek_to=SEC)
         after = meter()
-        row("L2", after["resets"] == before["resets"] + 1 and after["last_reset"] == "jump",
+        rate = after["sample_rate"] or 48000
+        start = round((after["from_frame"] or 0) * 48000 / rate)
+        end = round((after["to_frame"] or 0) * 48000 / rate)
+        sought = measure([left[start:end], right[start:end]], p5)["I"]
+        seek_i = abs(after["integrated_lufs"] - sought) if isinstance(
+            after["integrated_lufs"], (int, float)) and sought is not None else float("inf")
+        row("L2", after["resets"] == before["resets"] + 1 and after["last_reset"] == "jump"
+            and end - start >= 1.5 * 48000 and seek_i <= 0.01,
             f"a seek from about 6 s to 1 s: resets {before['resets']} -> {after['resets']} "
-            f"({after['last_reset']}), from {after['from_frame']}")
+            f"({after['last_reset']}), meter [{after['from_frame']}, {after['to_frame']}) I "
+            f"{after['integrated_lufs']}; export I {fmt(sought)}; |dI| {fmt(seek_i)} (<= 0.01)")
 
         # L3
         before = meter(reset=True)
@@ -281,12 +331,30 @@ def live_rows(socket):
         one = meter()
         play(2)
         two = meter()
-        row("L3", one["resets"] == before["resets"] == two["resets"]
-            and one["from_frame"] is not None and two["from_frame"] == one["from_frame"]
-            and (two["to_frame"] or 0) > (one["to_frame"] or 0),
-            f"resets {before['resets']}, {one['resets']}, {two['resets']}; from "
-            f"{one['from_frame']} then {two['from_frame']}; to {one['to_frame']} then "
-            f"{two['to_frame']}")
+        # Long enough for the player to stop handing the taps its fillers (about 5.3 s).
+        time.sleep(6)
+        play(2)
+        three = meter()
+        # A seek made while paused is not a resume (AU-161 (c)): no reset asked for,
+        # a second for the seek to land and the player's fillers to reach the taps.
+        session.op("set_playhead", t=6 * SEC)
+        time.sleep(1)
+        play(2)
+        four = meter()
+        rate = four["sample_rate"] or 48000
+        row("L3", one["resets"] == before["resets"] == two["resets"] == three["resets"]
+            and one["from_frame"] is not None
+            and two["from_frame"] == one["from_frame"] == three["from_frame"]
+            and (three["to_frame"] or 0) > (two["to_frame"] or 0) > (one["to_frame"] or 0)
+            and four["resets"] == three["resets"] + 1 and four["last_reset"] == "jump"
+            and 6 * rate <= (four["from_frame"] or 0) <= 6.5 * rate
+            and (four["to_frame"] or 0) - (four["from_frame"] or 0) >= 1.5 * rate,
+            f"resets {before['resets']}, {one['resets']}, {two['resets']}, after 6 s paused "
+            f"{three['resets']} ({three['last_reset']}); from {one['from_frame']}, "
+            f"{two['from_frame']}, {three['from_frame']}; to {one['to_frame']}, "
+            f"{two['to_frame']}, {three['to_frame']}; then a seek to 6 s while paused and a "
+            f"play: resets {four['resets']} ({four['last_reset']}), meter "
+            f"[{four['from_frame']}, {four['to_frame']})")
 
         # L4
         listed = mcp.schemas()
