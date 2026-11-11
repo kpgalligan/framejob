@@ -1473,10 +1473,13 @@ governs a module now.
   from `vpcc`; spec §11 CX-16 (10)); the app writes the blobs and the PQ label only for transfer 16. The only payload read
   is the first VP9 keyframe's header, each Opus packet's TOC and each Vorbis
   packet's first byte.
-- `ffi_graphic.rs` — the twelve `rc_graphic_*` exports (road map 10 §5e; the
+- `ffi_graphic.rs` — the thirteen `rc_graphic_*` exports (road map 10 §5e; the
   eleventh `rc_graphic_image_cache`, G-39: set the decoded-image cache's
   limit, answer its bytes; the twelfth `rc_graphic_library_usage`, G-46: the
-  font files and assets the library's draws used; two re-exported from
+  font files and assets the library's draws used; the thirteenth
+  `rc_graphic_rasterize_deep`, PR-15: `rc_graphic_rasterize` at 16 bits a
+  channel, premultiplied RGBA, for a frame delivered deeper than 8 bits; two
+  re-exported from
   `ffi_graphic_pending.rs`)
   and the ONLY module of `core/src/` that names the `graphic` crate (spec
   §11 G-2; `core/tests/graphic_ffi.rs` reads `core/src/` to hold it). An

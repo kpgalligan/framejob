@@ -70,7 +70,10 @@ detail there.
   The `dictionary` extensions on the property types are
   `OpDictionaries.swift`'s (below).
   The graphics engine's wrappers are `ReelCore+Graphics.swift`'s: `GraphicLibrary` (`addFont`,
-  `addAsset`, `rasterize`, `families()`; frozen by its first compile,
+  `addAsset`, `rasterize` (and `rasterize(…, deep: true)`,
+  `rc_graphic_rasterize_deep`, spec §11 PR-15: a `GraphicRaster` holding
+  `rgba16` and an empty `bgra`, `byteCount` what a budget counts),
+  `families()`; frozen by its first compile,
   rasterize or `families()`) and
   `GraphicModule` (`compile`, `describeJSON`, `svg`; it holds its library
   strongly); their values `GraphicDiagnostic` (with `.error`, `.noModule`
@@ -2559,7 +2562,13 @@ the key map behind it.
   `remove`/`entry` are main-only (`compile` is internal: the browser's
   `GraphicTemplateLibrary` compiles the templates with it); `resolve` is the one cross-thread read of
   the set: a document's own key at the 250 ms preview budget, a PINNED
-  offline key at 2 s, else nil — the slate. **An offline key draws only what
+  offline key at 2 s, else nil — the slate. `resolve` answers a `Resolved`
+  {set, budgetMs, deep}: a document's own key is never deep; a pin is deep
+  when `pin(_:for:deep:)` or `markDeep` said so (spec §11 PR-15: an export
+  row that keeps more than 8 bits, `Exporter.graphicsDeep`; a `render_frame`
+  or Save Frame… that comes out deep in a format that keeps depth). A deep
+  key's raster is 16 bits a channel, its texture `.rgba16Unorm`, its texture
+  key ends `:16`. **An offline key draws only what
   its caller pinned** (`pin(set, for: key)` with the document's
   `snapshot(for: recipeKey)`, captured on main): every `pin` has its `unpin`
   — `Exporter.releaseRecipeKey` (from `finish` AND `deinit`), and
@@ -3158,7 +3167,9 @@ the key map behind it.
   (count on the line, list in the tooltip), the queue (`Job.graphicWarnings`;
   the count right after "Exported “…”." since the row truncates its tail;
   `ExportQueueRowView.toolTip(for:)`) and `export`'s `graphic_warnings`
-  (G-24 (c)).
+  (G-24 (c)). `ExporterGraphics.swift` also holds `graphicsDeep(_:)` (which
+  export rows draw graphics deep, read from `ExportWriter.frameForm` and the
+  bundled encoders' depth) and `drawsGraphic(_:at:options:)` (PR-15).
   **`ExportWriter.cancel()` and `Exporter.cancel()` only set flags**; the
   measurement's loop cancels its own reader, `ExportWriter` reads each output
   on a reader of its own and each pump cancels its own reader on its own queue
