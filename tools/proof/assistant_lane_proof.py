@@ -35,6 +35,14 @@ probe".
           `createDirectory(` and calls `AppSupport.ensureDirectory(` once
   M2      made to fail on purpose: S1's checker over the tree with
           `AssistantSpend.swift`'s call put back to `createDirectory(` must FAIL
+  B1      (#594, spec §11 P-9) the assistant's request as its catalog and prompt
+          make it — the probe's `request_bytes`, L6's measure: the tools and the
+          system prompt as the helper sends them on every POST — plus
+          `assistant_prompt_eval.CONVERSATION_BYTES_BOUND` fits the proofs'
+          `BODY_BYTES_BOUND`, so the request outgrowing the bound fails here and
+          not in a paid run's H
+  M3      made to fail on purpose: B1's comparison with the bound one byte under
+          the measured request plus that room must FAIL
 
     python3 tools/proof/assistant_lane_proof.py              # every row; exit 0 when all pass
     python3 tools/proof/assistant_lane_proof.py --no-prepare # the mutant alone: L0 and L1
@@ -184,6 +192,57 @@ def tree_texts():
             if os.path.exists(os.path.join(SOURCES, name))}
 
 
+# ---------------------------------------------------------------------------
+# B1: the assistant's request against the proofs' body bound (#594, spec §11 P-9).
+
+
+def measured_request(answer):
+    """The probe's `request_bytes` (L6's measure), or None when it is not a
+    positive integer."""
+    value = (((answer or {}).get("measure") or {}).get("l6") or {}).get("request_bytes")
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        return None
+    return value
+
+
+def body_row(request, bound, conversation):
+    """(ok, detail): `request` bytes of tools and system prompt plus
+    `conversation` bytes of room fit `bound`."""
+    need = request + conversation
+    left = bound - need
+    detail = (f"the request's tools and system prompt {request:,} bytes + {conversation:,} for "
+              f"the conversation = {need:,}, {'within' if left >= 0 else 'OVER'} the body bound "
+              f"{bound:,} ({left:,} left)")
+    if left < 0:
+        detail += ("; raise BODY_BYTES_BOUND in assistant_prompt_eval.py and recompute the "
+                   "floors and suggested caps (spec §11 P-9)")
+    return left >= 0, detail
+
+
+def body_rows(answer, why, score):
+    """B1 and M3, scored; an instrument that cannot measure FAILs both."""
+    request = measured_request(answer)
+    try:
+        import assistant_prompt_eval as ev
+        bound, conversation = ev.BODY_BYTES_BOUND, ev.CONVERSATION_BYTES_BOUND
+    except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
+        problem = f"assistant_prompt_eval could not be read: {type(error).__name__}: {error}"
+        score("B1", False, problem)
+        score("M3", False, problem)
+        return
+    if request is None:
+        problem = (f"no measured request: L6's request_bytes "
+                   f"{(((answer or {}).get('measure') or {}).get('l6') or {}).get('request_bytes')!r}"
+                   + (f" ({why})" if why else ""))
+        score("B1", False, problem)
+        score("M3", False, problem)
+        return
+    score("B1", *body_row(request, bound, conversation))
+    m3_ok, m3_detail = body_row(request, request + conversation - 1, conversation)
+    score("M3", not m3_ok, f"with the bound one byte under the request and its room, B1's "
+                           f"comparison fails {not m3_ok} ({m3_detail})")
+
+
 def mutant_sources(name):
     """(WORK/mutants/<name>/Sources, None): app/Sources/*.swift copied with
     the mutant's `before` replaced exactly once; or (None, reason)."""
@@ -293,6 +352,7 @@ def main():
         score("L0", ok, detail)
 
     binary, why = build_probe()
+    answer, probe_why = None, f"the probe did not build: {why}"
     if binary is None:
         for row_id in (["L1"] if args.no_prepare else PROBE_ROWS):
             score(row_id, False, f"the probe did not build: {why}")
@@ -301,6 +361,7 @@ def main():
     else:
         extra = ["--no-prepare", "--rows", "L1"] if args.no_prepare else []
         answer, why = run_probe(binary, extra)
+        probe_why = why
         got = {r["id"]: r for r in (answer or {}).get("rows", [])}
         for row_id in (["L1"] if args.no_prepare else PROBE_ROWS):
             r = got.get(row_id)
@@ -333,6 +394,9 @@ def main():
     score("M2", not m2_ok,
           f"with AssistantSpend.swift's {ENSURE} put back to createDirectory(, S1's checker "
           f"fails {not m2_ok} ({m2_detail})")
+
+    if not args.no_prepare:
+        body_rows(answer, probe_why, score)
 
     passed = sum(1 for _, ok, _, _ in results if ok)
     print(f"scores: {passed}/{len(results)} pass", flush=True)

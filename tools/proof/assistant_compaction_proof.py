@@ -41,7 +41,7 @@ At a threshold of 1 token (AI-18) every turn ends compacted. The rows:
 
 `--wrong` scripts the mistakes: C1, C2, C4, C5 and C6 must FAIL, C0, C3 and
 H pass. `--month-spent D` seeds the rehearsal's scratch proofs' ledger
-(`work/assistant_compaction/rehearsal/spend.jsonl`) so `24.99` refuses every
+(`work/assistant_compaction/rehearsal/spend.jsonl`) so `39.99` refuses every
 POST `budget:`. A turn a refused POST touched FAILs its rows naming `cap:` or
 `budget:` (C1–C4 for turn 1; C5 and C6 for either turn). `--live` without
 `--cap` prints the headroom and exits 2 before launching anything.
@@ -81,7 +81,7 @@ BURN_TO = 71
 INTRO_AT = 600_000
 OUTRO_AT = 2_700_000
 POSTS = 2 * ev.ROUNDS_PER_ROW + 2
-SUGGESTED_CAP = 8.00
+SUGGESTED_CAP = 11.50
 TURN_SECONDS = 600
 WALL_BUILD = 900
 MODEL = "claude-opus-5-5"
@@ -158,8 +158,7 @@ def headroom_lines(cap):
         "estimate billing every definition byte",
         f"floor: worst POST + the conversation bound = ${cap_floor():.2f}; suggested cap "
         f"${SUGGESTED_CAP:.2f}",
-        "budget: $25.00 a calendar month (UTC) for Anthropic, before each POST, in the proofs' "
-        "ledger (spec §11 P-6)",
+        ev.budget_line(),
         expected_line(),
     ]
     if cap is None:

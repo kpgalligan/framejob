@@ -17,11 +17,12 @@ The relay records each body as the APP sent it, then forwards it with ONE
 change: `max_tokens` lowered to at most 8,000 (`MAX_TOKENS_CEILING`). The
 helper always asks for 32,000, and spec §11 P-6 reserves each POST at its
 body's bytes / 3 at the dearest cache-write rate plus `max_tokens` at the
-dearest output rate: about $3.17 for a helper body of ~227 KB, so under
-`--cap 3` the relay would refuse every POST unchanged. At 8,000 the worst is
-about $1.91. On turn B it also replaces `context_management.edits` with
-`LOWERED_EDIT` (trigger 1,000 input tokens, keep 1 tool use), so the API can
-be seen to clear; the shipped 150,000-token trigger is out of $3's reach.
+dearest output rate: $4.80 for a body at the 480,000-byte bound (spec §11
+P-9), so with every POST unchanged the floor would be $5.84, past `--cap 5`.
+At 8,000 the worst is $3.60 and the floor $4.64. On turn B it also replaces
+`context_management.edits` with `LOWERED_EDIT` (trigger 1,000 input tokens,
+keep 1 tool use), so the API can be seen to clear; the shipped 150,000-token
+trigger is out of $5's reach.
 The rows:
 
   X0  no `Frame Job: ` line
@@ -57,7 +58,7 @@ X4 must SKIP. `--mutant clearing-off` launches with
 when X1 FAILs, 0 when it passes, 2 when X1 is never scored, was refused on
 the cap or the budget, or any row is an instrument failure. A rehearsal or
 mutant spends against a scratch ledger (`work/assistant_clearing/<mode>/
-spend.jsonl`, deleted first) at `--cap` (default $3.00); a refused POST fails
+spend.jsonl`, deleted first) at `--cap` (default $5.00); a refused POST fails
 the rows its turn touches naming `cap:` or `budget:`. `--live` without
 `--cap` prints the headroom and exits 2 before launching anything; `--live`
 with no key SKIPs every row `host: no key`.
@@ -97,7 +98,7 @@ LOWERED_EDIT = {"type": "clear_tool_uses_20250919",
                 "keep": {"type": "tool_uses", "value": 1}}
 MAX_TOKENS_CEILING = 8_000
 POSTS = 5
-SUGGESTED_CAP = 3.00
+SUGGESTED_CAP = 5.00
 TURN_SECONDS = 300
 ROWS = ["X0", "X1", "X2", "X3", "X4", "H", "K"]
 # The mutants, as `mutant_anchors.py` reads them: the app launched with clearing off (a
@@ -198,8 +199,7 @@ def headroom_lines(cap):
         f"(${_per_million(ev.OUTPUT_PER_ROUND, 'output'):.2f}) = ${estimate_post():.2f}",
         f"floor: worst POST + {POSTS - 1} estimated POSTs = ${cap_floor():.2f}; suggested cap "
         f"${SUGGESTED_CAP:.2f}",
-        "budget: $25.00 a calendar month (UTC) for Anthropic, before each POST, in the proofs' "
-        "ledger (spec §11 P-6)",
+        ev.budget_line(),
     ]
     if cap is None:
         lines.append("cap: none given — --live needs --cap <dollars>, the runner's decision")

@@ -35,7 +35,9 @@ codecs:
 	python3 tools/codecs/build_codecs.py
 
 # `assistant_lane_proof.py` is spec §11 AI-3's `make test`-reachable probe
-# (the agent lane); `rust` first, because it links the staticlib.
+# (the agent lane), and its B1 holds the assistant's request, as its catalog
+# and prompt make it, under the proofs' body bound (#594, spec §11 P-9);
+# `rust` first, because it links the staticlib.
 # `prices_proof.py` is road map 13 P1's price function: the Python reader and
 # the helper's `bun test` (agent/build.sh test) against one fixture file, no
 # network. `budget_proof.py` is P3's proofs' ledger and monthly budgets (spec

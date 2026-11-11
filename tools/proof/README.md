@@ -2152,7 +2152,7 @@ keys taken out of the environment and nothing live:
 | `graphics_spike/graphics_spike.py` | none of its own: `from rows_local import MUTANTS` | the row above | |
 | `codec_import_proof.py` | switches, 2 (a fixture swapped) | each `--mutant` | exit 1 each: `p1-as-p0` R1 and the six rows that need its clip (3/10), `p0-as-p1` R4 (9/10) |
 | `container_import_proof.py` | switches, 1 (a fixture swapped) | `--mutant ffmpeg-copy` | `MUTANT PASS`: failed M2 (15/16) |
-| `assistant_clearing_proof.py` | switches, 1 (a launch argument) | `--mutant clearing-off`, then with `--cap 4` | First exit 2, "the control could not be performed": every POST refused on the $3 cap (worst $3.04). The unmutated `--rehearse` is refused the same way: the helper's body is about 396 KB now, over `assistant_prompt_eval.py`'s 256,000-byte bound, and H says so. At `--cap 4` (the stand-in, a scratch ledger): `X1 FAIL — the mutant was caught`, exit 1, `context_management null, beta False` on each POST; X4 and H fail beside it |
+| `assistant_clearing_proof.py` | switches, 1 (a launch argument) | `--mutant clearing-off`, then with `--cap 4` | First exit 2, "the control could not be performed": every POST refused on the $3 cap (worst $3.04). The unmutated `--rehearse` is refused the same way: the helper's body is about 396 KB now, over `assistant_prompt_eval.py`'s 256,000-byte bound, and H says so. At `--cap 4` (the stand-in, a scratch ledger): `X1 FAIL — the mutant was caught`, exit 1, `context_management null, beta False` on each POST; X4 and H fail beside it. Since #594 it runs at the default cap ("Issue #594" below) |
 | `assistant_helper_proof.py` | `skip-without-bun`: `agent/build.sh`, the guard's `  exit 1`; `no-fields` a switch in P4, in `UNANCHORED` | each `--mutant` (`no-fields` on Release) | `skip-without-bun`: P1 FAIL, 0/1, exit 1. `no-fields`: P4 FAIL, 0/1, exit 1 (the first POST's system ends `undefined`) |
 | `assistant_compaction_proof.py` | `extra-instruction`: `app/Sources/AssistantSession.swift`, the `compaction_instructions` line | `--mutant extra-instruction` (a Debug copy), `--rehearse` | `C3 FAIL — the mutant was caught`, exit 1: verbatim False, instructions 509 chars, wanted 499; H fails beside it (the stale body bound), 6/8. The first run also failed C4, as the unmutated rehearsal did (below); with C4 fixed the rehearsal is 7/8, H alone |
 | `assistant_prompt_proof.py` | `bare-send`: `app/Sources/AssistantSession.swift`, `AssistantPrompt.message(text, document: document)` | `--mutant bare-send` (a Debug copy) | S2 FAIL, 0/1, exit 1: the last user text of both turns is the bare text |
@@ -2171,7 +2171,8 @@ both floor tests fail their `assert_eq` (handles 460000 against 440000, ripple 4
 now. And `assistant_compaction_proof.py`'s C4 looked for `hello framejob` in a summary that
 reads "Hello Frame Job", so it failed unmutated; it looks for the title as the fixture spells
 it. What is left is filed as #594: the assistant proofs' 256,000-byte body bound is stale, so H
-fails in every rehearsal and the clearing rehearsal is refused at its own suggested cap.
+fails in every rehearsal and the clearing rehearsal is refused at its own suggested cap. #594 is
+fixed: "Issue #594" below.
 
 ## The offscreen harness (no running app)
 
@@ -8020,12 +8021,24 @@ in it calls `start()`, and every row makes its own documents.
   with the prepare line deleted, and the probe's L1 under `--no-prepare`
   (the gate is empty, so `add_marker` is refused for `at` and `name`), must
   BOTH fail.
+- **B1** (#594, spec §11 P-9): L6 also measures the assistant's request as
+  the helper puts it on the wire, its fixed part: `agent/src/main.ts`'s tool
+  search entry and each assistant catalog entry as `runnableTool` wraps it,
+  and the system prompt with the search guide, serialised without escaped
+  slashes as `JSON.stringify` writes them (`request_bytes`, with
+  `tools_bytes` and `system_bytes`). B1 requires `request_bytes` plus
+  `assistant_prompt_eval.CONVERSATION_BYTES_BOUND` (30,000, the room for the
+  conversation) to be within `BODY_BYTES_BOUND`; failing, it says to raise
+  the bound and recompute the floors and caps. A probe that did not build or
+  answered no positive `request_bytes` FAILs it. **M3** (made to fail on
+  purpose): B1's comparison with the bound one byte under the measured
+  request plus that room must FAIL.
 
 A probe that does not build is a scored FAIL. Exit 0 only when every row
 passes.
 
 ```sh
-python3 tools/proof/assistant_lane_proof.py               # L0–L9, C1, M1
+python3 tools/proof/assistant_lane_proof.py               # L0–L13, C1, M1, S1, M2, B1, M3 (20 rows)
 python3 tools/proof/assistant_lane_proof.py --no-prepare  # the mutant alone: L0 and L1 FAIL, exit 1
 ```
 
@@ -8528,9 +8541,10 @@ duration, kind and content:
   exactly one export question, the project unchanged. A turn past 600 s is
   stopped and FAILs. A row whose session met a cap refusal FAILs `cap:
   refused at $<spent> of $<cap>`.
-- **H** every POST the relay saw was within `BODY_BYTES_BOUND` (256,000
-  bytes less image data) and `MAX_TOKENS_BOUND` (32,000); a breach FAILs
-  and says the arithmetic is stale. It prints the worst POST priced.
+- **H** every POST the relay saw was within `BODY_BYTES_BOUND` (480,000
+  bytes less image data since #594, spec §11 P-9) and `MAX_TOKENS_BOUND`
+  (32,000); a breach FAILs and says the arithmetic is stale. It prints the
+  worst POST priced and the largest body.
 - **K** (live only) the key's bytes in no file under `work/assistant_prompt/`
   nor the app log.
 Per row it prints the tools called, the tokens and the dollars at `RATES`,
@@ -8544,7 +8558,7 @@ answers 400 `invalid_request_error` naming the cap and writes nothing to the
 proofs' ledger. Otherwise it reserves that worst case in the proofs' ledger
 (`budget.SpendLedger`, road map 13 P3, spec §11 P-6) and answers 400 naming
 the BUDGET instead when this UTC month's recorded Anthropic spend plus it
-would pass $25; only once that reservation is made does the cap count it,
+would pass $40 (spec §11 P-9); only once that reservation is made does the cap count it,
 so a POST the budget refuses holds no cap reservation. A forwarded reply's
 whole usage is read and priced by the table (`budget.settle_anthropic`: the
 table's price, `table`; usage it cannot price at each class's dearest rate,
@@ -8557,14 +8571,15 @@ rate over every row and `above_200k` tier of `agent/prices/anthropic.json`
 (`budget.anthropic_worst_row`), the two cache writes folded into the dearer
 — today $10.00 input, $20.00 cache write, $1.00 cache read and $50.00
 output per MTok. The headroom arithmetic, printed before the first request:
-the helper sends `max_tokens` 32,000 on every POST and all 85 definitions,
-deferred ones included; the A2 session proof's largest logged body was
-230,340 bytes, bounded at 256,000 ≈ 85,333 tokens. The worst POST is
-85,333 × $20.00 + 32,000 × $50.00 per MTok ≈ $1.71 + $1.60 = $3.31. A row is
-bounded at one cache write of that body ($1.71) + 4 cache reads ($0.34) + 5
-rounds × 2,000 output ($0.50) ≈ $2.55, an estimate that bills every
-definition byte. The floor is the worst POST + 6 rows ≈ $18.59;
-`SUGGESTED_CAP` is $20.00, under the month's $25. Below the floor it prints
+the helper sends `max_tokens` 32,000 on every POST and all 122 of the
+assistant's definitions, deferred ones included; since #594 (spec §11 P-9)
+the body is bounded at 480,000 bytes ≈ 160,000 tokens, about 20 % over the
+largest body the rehearsals sent on 2026-11-11 (399,360 bytes). The worst
+POST is 160,000 × $20.00 + 32,000 × $50.00 per MTok = $3.20 + $1.60 = $4.80.
+A row is bounded at one cache write of that body ($3.20) + 4 cache reads
+($0.64) + 5 rounds × 2,000 output ($0.50) = $4.34, an estimate that bills
+every definition byte. The floor is the worst POST + 6 rows = $30.84;
+`SUGGESTED_CAP` is $32.00, under the month's $40. Below the floor it prints
 `WARNING: below the floor; rows past $<cap − worst> of settled spend will
 fail naming the cap` and still runs. A row whose session met the budget
 FAILs `budget: …` before the cap is considered, and the summary counts
@@ -8588,7 +8603,7 @@ scripted right calls (`add_marker`; `undo`; `split` with `clips`;
 `work/assistant_prompt/rehearsal/ledger.jsonl` and a scratch proofs' ledger,
 `work/assistant_prompt/rehearsal/spend.jsonl`, deleted first; `--month-spent
 D` (rehearsal only, D ≥ 0) seeds it with D dollars already spent this month,
-so `--month-spent 24.99` fails every E row `budget:` with nothing sent to
+so `--month-spent 39.99` fails every E row `budget:` with nothing sent to
 the stand-in. Each run prints the ledger's month line after building the
 relay and again with the report;
 `--wrong` scripts the mistakes (3000000; no undo; `split` without `clips`;
@@ -8619,7 +8634,7 @@ python3 tools/proof/assistant_prompt_proof.py --rehearse                # + E1�
 python3 tools/proof/assistant_prompt_proof.py --rehearse --wrong        # every E row FAILs, exit 1
 python3 tools/proof/assistant_prompt_proof.py --rehearse --cap 0.0001   # WARNING; E rows fail `cap:`
 python3 tools/proof/assistant_prompt_proof.py --mutant bare-send        # S2 FAIL, exit 1
-python3 tools/proof/assistant_prompt_proof.py --live --cap 15           # spends: the key from .secrets/ or the env
+python3 tools/proof/assistant_prompt_proof.py --live --cap 32           # spends: the key from .secrets/ or the env
 ```
 
 ## Road map 12's A4 — the helper in both bundles (`dist_check.py` D6–D13, `dist_check_mutants.py`)
@@ -8877,8 +8892,8 @@ no `prices` before `ready`, 1 GET, a later fetched `prices`), exit 1;
 ## Road map 13's P3 — the proofs' ledger and the budgets (`budget.py`, `budget_proof.py`)
 
 Every paid proof request is held to the month's budget (spec §11 P-3, P-6):
-$25 for Anthropic, $5 for AssemblyAI, the owner's numbers, constants in
-`budget.py` that nothing takes from a flag or the environment.
+$40 for Anthropic (P-9, #594) and $5 for AssemblyAI, the owner's numbers,
+constants in `budget.py` that nothing takes from a flag or the environment.
 
 **`budget.py`** (stdlib and `prices.py`) is the only writer of the proofs'
 ledger, `LEDGER` = `~/Library/Application Support/Frame Job Proofs/spend.jsonl`
@@ -8928,16 +8943,20 @@ key. It works in `work/budget/` (made fresh), prints `<ID> ok|FAIL — detail`
 and then `n/m`, exits 0 or 1, and scores an instrument that cannot run as a
 FAIL.
 
-- **P** the budgets are `{anthropic 25, assemblyai 5}`; `LEDGER` is absolute
-  and outside the repo; worst POST ≤ the floor ≤ `SUGGESTED_CAP` ≤ $25.
+- **P** the budgets are `{anthropic 40, assemblyai 5}`; `LEDGER` is absolute
+  and outside the repo; worst POST ≤ the floor ≤ `SUGGESTED_CAP` ≤ $40 for the
+  prompt evaluation and (since #594) the clearing and compaction proofs, whose
+  chains one child process reads (importing the clearing proof rebinds
+  `assistant_session_proof.WORK`, whose `Fake` R1–R4 use); a child that
+  fails or prints no JSON FAILs P as an instrument.
 - **F1** the fold over a hand-written file: last month's $30 counts nothing;
   this month's reserve 2 settled 0.5, open reserve 1, refused 9 and orphan
   settle 0.25 → $1.75; AssemblyAI's 4 settled 4 → $4.00. **F2** an absent
   file is $0; a non-JSON line refuses naming `line 2`, and `reserve`
   appends nothing.
-- **G1** at $24.00 a $1.00 reservation passes (the edge) and $0.01 is refused
+- **G1** at $39.00 a $1.00 reservation passes (the edge) and $0.01 is refused
   `budget:` with exactly one `refused` line; `gate=False` still records.
-  **G2** with an injected clock, $25 recorded in August counts nothing in
+  **G2** with an injected clock, $40 recorded in August counts nothing in
   September. **G3** a nested folder is created 0700 and the file is 0600.
 - **W** `anthropic_worst_row` over a two-row fixture (one tiered) is the
   per-class maximum; no committed rate exceeds it, and it equals the
@@ -8952,7 +8971,7 @@ FAIL.
   usage holding a string, an object and a bool totals only the integers.
 - **R1–R4** `ev.Relay` over `anthropic_fake.py` with a scratch proofs'
   ledger: a streamed `claude-opus-5-5` POST forwarded, reserved at
-  `measure`'s worst and settled $0.0006, `table`; at $24.999 recorded and a
+  `measure`'s worst and settled $0.0006, `table`; at $39.999 recorded and a
   cap of 1.5 × the POST's worst, TWO POSTs each answered 400 naming the
   budget, nothing sent to the stand-in, two `refused` lines, no cap refusal
   and `_reserved` 0 (a leaked cap reservation would make the second a cap
@@ -8988,7 +9007,7 @@ FAIL). Either exits 1.
 python3 tools/proof/budget_proof.py                          # 23/23 (make test)
 python3 tools/proof/budget_proof.py --mutant no-budget       # P G1 R2 A2 A4 FAIL, exit 1
 python3 tools/proof/budget_proof.py --mutant unknown-as-zero # W S2 S3 FAIL, exit 1
-(unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/assistant_prompt_proof.py --rehearse --month-spent 24.99 --cap 10)  # E1–E6 FAIL budget:, exit 1
+(unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/assistant_prompt_proof.py --rehearse --month-spent 39.99 --cap 10)  # E1–E6 FAIL budget:, exit 1
 ```
 
 Measured 2026-09-28, every command with `ANTHROPIC_API_KEY` and
@@ -10479,7 +10498,8 @@ Headroom, as the runner prints it: worst POST $3.31; a conversation bound of
 12 POSTs (one cache write, 11 cache reads, 12 × 2,000 output) $3.85; floor
 $7.15; suggested cap $8.00. Its estimate at `claude-opus-5-5`'s table row
 (8 POSTs × 3,000 input + 5,000 5-minute write + 20,000 read + 500 output) is
-$0.41.
+$0.41. Since #594 (spec §11 P-9) it prints worst POST $4.80, a conversation
+bound of $6.16, floor $10.96 and suggested cap $11.50 ("Issue #594" below).
 
 Run on 2026-09-30 against HEAD0 `abda44b`, every instance my own:
 
@@ -12720,9 +12740,11 @@ python3 tools/proof/clip_inspector7_proof.py --mutant tag-frozen                
   - **The relay lowers the forwarded `max_tokens` to 8,000.** The helper always
     asks for 32,000 (`agent/src/main.ts`). Spec §11 P-6 reserves each POST at
     the body's bytes / 3 at $20/MTok plus `max_tokens` at $50/MTok. A helper
-    body of about 227 KB therefore reserves about $3.17, and under `--cap 3`
-    the relay would refuse every POST unchanged. At 8,000 the worst case is
-    about $1.91 (the rehearsal's H printed a worst POST of $1.9270).
+    body of about 227 KB therefore reserved about $3.17, and under `--cap 3`
+    the relay would have refused every POST unchanged. At 8,000 the worst case
+    was about $1.91 (the rehearsal's H printed a worst POST of $1.9270). Since
+    #594 (spec §11 P-9) a body at the 480,000-byte bound prices $3.60 at 8,000,
+    the floor is $4.64 and the suggested cap $5.00.
   - **X3 proves that the rewrite is the only change to turn A's bodies.** It
     compares each body as the app sent it (`relay.sent`) with the body
     forwarded (`relay.exchanges`). The rehearsal printed, for both turn-A
@@ -12761,7 +12783,7 @@ python3 tools/proof/assistant_tab_proof.py --mutant no-plex                 # P1
 python3 tools/proof/assistant_clearing_proof.py --rehearse                  # 6/6, K skipped
 python3 tools/proof/assistant_clearing_proof.py --rehearse --refused        # X4 SKIP, exit 0
 python3 tools/proof/assistant_clearing_proof.py --mutant clearing-off       # X1 FAIL, exit 1
-python3 tools/proof/assistant_clearing_proof.py --live --cap 3              # needs the key; spends
+python3 tools/proof/assistant_clearing_proof.py --live --cap 5              # needs the key; spends (#594)
 ```
 
 ### Live run
@@ -32434,3 +32456,57 @@ spike run (ffmpeg, the staticlib, a camera), which this does not make.
 | by hand, each restored byte-identical: `camera_spike.py`'s `--format` pin renamed; its other pin pointed at `ramp_spike`; `RULE_FILE` put back in `ramp_spike.py` | exit 1 each (1, 2 and 1 problems) |
 | `ramp_spike.py --selftest`, `render_spike.py --selftest`, `camera_spike.py --selftest` | 7, 15 and 5 rows, exit 0 |
 | `spec_rule.py` before and after SR-10…SR-12 moved to `speed-ramps-1b.md` | byte-identical output (SR-5, SR-7 and SR-9 keep their hashes and their file), while `shasum -a 256 speed-ramps.md` went from `a5ac8842…` to `68c832a7…` |
+
+## Issue #594 — the assistant proofs' body bound and the Anthropic proof budget (`assistant_lane_proof.py` B1, M3; `budget_proof.py` P; spec §11 P-9)
+
+The helper sends the assistant's tool definitions and its system prompt on every POST, and they
+had grown to about 396 KB, over the 256,000 bytes `assistant_prompt_eval.py` priced a worst POST
+from: H failed in every rehearsal, and the clearing rehearsal was refused at its own $3 cap. The
+owner raised the limit (spec §11 P-9): `BODY_BYTES_BOUND` is 480,000 bytes, about 20 % over the
+rehearsals' largest body, and the month's Anthropic proof budget is $40 (`budget.BUDGETS`).
+Every floor and suggested cap follows, printed by each proof's `headroom_lines`:
+
+| Proof | Worst POST | Floor | Suggested cap (was) |
+|---|---|---|---|
+| `assistant_prompt_eval.py` (`assistant_prompt_proof.py --live`), one run of six rows | $4.80 | $30.84 | $32.00 ($20.00) |
+| `assistant_clearing_proof.py` (`max_tokens` lowered to 8,000) | $3.60 | $4.64 | $5.00 ($3.00) |
+| `assistant_compaction_proof.py` | $4.80 | $10.96 | $11.50 ($8.00) |
+
+- **H** prints the largest body the relay saw beside the worst POST (`Relay.max_body`), and every
+  proof's budget line reads `budget.BUDGETS`.
+- **`budget_proof.py`'s P** pins `{anthropic 40, assemblyai 5}` and holds worst POST ≤ floor ≤
+  suggested cap ≤ $40 for all three proofs; before, only the prompt evaluation's chain was held.
+  The clearing and compaction chains are read in one child process. G1 seeds $39.00, G2 $40.00
+  in August and R2 $39.999.
+- **`assistant_lane_proof.py`'s B1** (in `make test`): the probe's L6 serialises the request's
+  fixed part as the helper sends it (the tool search entry and each assistant catalog entry as
+  `runnableTool` wraps it; the system prompt and the search guide), and B1 holds it plus
+  `CONVERSATION_BYTES_BOUND` (30,000: at least that, since the one live evaluation's body ran
+  about 11,000 bytes over its rehearsal's; twice the rehearsals' gap below is 7,388) within the
+  bound. **M3** is B1's comparison made to fail.
+
+Run on 2026-11-11 in a worktree of b86b605e, both keys out of every environment, the stand-in
+server and scratch ledgers only, nothing live:
+
+| Command | Result |
+|---|---|
+| Before the change, Debug: `assistant_clearing_proof.py --rehearse` | 1/6, exit 1: X1–X4 FAIL `cap: refused at $0.0000 of $3 (worst $3.04)`; H FAIL, "a body of 396,377 bytes … is over 256,000" (turn A) and 396,655 (turn B) |
+| `assistant_lane_proof.py` | 20/20, exit 0: B1 "395,666 bytes + 30,000 for the conversation = 425,666, within the body bound 480,000 (54,334 left)"; the probe measured `tools_bytes` 390,660 and `system_bytes` 5,007 over 122 assistant tools |
+| the same, `BODY_BYTES_BOUND` back to 256,000 | 19/20, exit 1: B1 FAIL "… OVER the body bound 256,000 (-169,666 left); raise BODY_BYTES_BOUND …" |
+| the same, the probe's `request_bytes` key renamed | 18/20, exit 1: B1 and M3 FAIL "no measured request: L6's request_bytes None" |
+| `budget_proof.py` | 23/23, exit 0; P "assistant_clearing_proof: worst POST $3.60 ≤ floor $4.64 ≤ suggested cap $5.00 ≤ $40 True; assistant_compaction_proof: … $4.80 ≤ $10.96 ≤ $11.50 … True; assistant_prompt_eval: … $4.80 ≤ $30.84 ≤ $32.00 … True" |
+| the same, `budget.py`'s Anthropic budget back to 25.00 | 21/23, exit 1: P and G1 FAIL (`$1.00 at $39.00 passes False`) |
+| the same, the clearing proof's `SUGGESTED_CAP` back to 3.00 | 22/23, exit 1: P FAIL, "assistant_clearing_proof: … ≤ suggested cap $3.00 ≤ $40 False" |
+| the same, the evaluation's `SUGGESTED_CAP` back to 20.00 at the new bound | 22/23, exit 1: P FAIL, "assistant_prompt_eval: … ≤ floor $30.84 ≤ suggested cap $20.00 ≤ $40 False" |
+| `budget_proof.py --mutant no-budget` / `unknown-as-zero` | 18/23 (P G1 R2 A2 A4) / 20/23 (W S2 S3), exit 1 each |
+| `spec_index_proof.py` with P-9 and its rows; with the folder total left at 26422 | 1323/1323; 1322/1323, exit 1 |
+| `make gate` | PASS: names, typecheck, fmt, lint, test (lane 20/20, budget 23/23), app (D25, D26) |
+| Release: `assistant_clearing_proof.py --rehearse` (default cap $5) | 6/6 pass, K skipped, exit 0; H "worst POST priced $3.0537; largest body 398,050 bytes" |
+| Release: `assistant_clearing_proof.py --mutant clearing-off` (default cap) | 4/6, exit 1: X1 FAIL (`context_management null, beta False`), X4 FAIL beside it, "mutant clearing-off: X1 FAIL — the mutant was caught" |
+| Release: `assistant_compaction_proof.py --rehearse` (default cap $11.50) | 8/8 pass, K skipped, exit 0; H "worst POST priced $4.2944; largest body 399,360 bytes" |
+| Release: `assistant_prompt_proof.py --rehearse` (default cap $32) | 25/25 pass, 1 skipped, exit 0; H "worst POST priced $4.2526; largest body 397,888 bytes" |
+| Release: `assistant_prompt_proof.py --rehearse --month-spent 39.99 --cap 10` | 19/25, exit 1: E1–E6 FAIL `budget: $39.9900 of the $40.00 Anthropic budget …` (worst cases $4.2411–$4.2432), "0 on the cap, 6 on the budget"; the stand-in logged 0 POSTs |
+
+The Debug rehearsals printed the same largest bodies (398,050, 399,360 and 397,888 bytes), and
+each is 2,222 to 3,694 bytes over the probe's 395,666: the probe's mirror of the helper's wire
+shape agrees with the bodies the relay measured. No paid run was made.

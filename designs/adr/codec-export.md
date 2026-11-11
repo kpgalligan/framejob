@@ -92,7 +92,7 @@ Mutants, each run on its phase's final instrument and each caught: C0 three (`bu
 - #379: open. C3's one unreproduced hang, the WebM audio pump stopping early; one reader per output closed the starvation it caused, but its cause was not found in 42 later exports.
 - #381: open. Keeping a `vp9_alpha_webm`'s alpha on re-import (C5's "to file").
 - #382: open. An `av1` MP4 export hung once in `encoder_limit_proof.py`'s Q1, its video read stuck in `copyNextSampleBuffer` with no compositor request in flight (C5's fix pass).
-- #383: open. 4K GIF and APNG memory outside the encoder limit (C6b's finding 2).
+- #383: closed as recorded (owner, 2026-11-12): a sentence on the site's GIF and APNG page; the image rows stay outside the ledger.
 - #380: open, filed beside #376's acknowledgements: whether the LGPL-2 JavaScriptCore inside the bun-compiled assistant helper needs more than a notice. Not this road map's code.
 - Nothing else is known to be unfinished, so no issue was filed at the close.
 

@@ -440,8 +440,11 @@ func rowL6() {
     let ok = !dev.isEmpty && !names.contains("record_screen") && names.isDisjoint(with: dev)
         && !names.contains("close_project")
         && names.contains("transcribe") && names.contains("export") && missingCore.isEmpty
+    let request = requestBytes(tools)
     measure["l6"] = ["catalog": tools.count, "assistant": names.count, "dev": dev.sorted(),
-                     "core_tools": AssistantPrompt.coreTools]
+                     "core_tools": AssistantPrompt.coreTools,
+                     "request_bytes": request.request, "tools_bytes": request.tools,
+                     "system_bytes": request.system]
     row("L6", ok,
         "\(tools.count) tools → \(names.count) for the assistant; record_screen "
             + "\(names.contains("record_screen")), close_project "
@@ -449,6 +452,42 @@ func rowL6() {
             + "\(!names.isDisjoint(with: dev)), transcribe \(names.contains("transcribe")), "
             + "export \(names.contains("export")), core tools \(AssistantPrompt.coreTools) "
             + "missing \(missingCore)")
+}
+
+/// The request's fixed part as the helper puts it on the wire, measured for
+/// `assistant_lane_proof.py`'s B1 (#594, spec §11 P-9): `tools` is
+/// `agent/src/main.ts`'s `TOOL_SEARCH` entry and then each assistant catalog
+/// entry as `runnableTool` wraps it (`name`, `description`, `input_schema`,
+/// and `defer_loading: true` unless a core tool), and `system` is what its
+/// `toolRunner` call sends (the prompt, a blank line, the search guide). The
+/// UTF-8 bytes of each as one JSON object's member, written without escaped
+/// slashes, which is what `JSON.stringify` writes. The conversation and the
+/// envelope are not here: the proof keeps `CONVERSATION_BYTES_BOUND` for them.
+/// When the helper becomes Swift (#599) this mirror becomes a call to its
+/// request builder. 0 for a part that would not serialise.
+func requestBytes(_ catalog: [[String: Any]]) -> (request: Int, tools: Int, system: Int) {
+    let core = Set(AssistantPrompt.coreTools)
+    var wire: [[String: Any]] = [
+        ["type": "tool_search_tool_bm25_20251119", "name": "tool_search_tool_bm25"]
+    ]
+    for entry in AssistantToolTable.assistantCatalog(catalog) {
+        let name = entry["name"] as? String ?? ""
+        var tool: [String: Any] = [
+            "name": name, "description": entry["description"] ?? "",
+            "input_schema": entry["inputSchema"] ?? [String: Any](),
+        ]
+        if !core.contains(name) { tool["defer_loading"] = true }
+        wire.append(tool)
+    }
+    let system = AssistantPrompt.system + "\n\n" + AssistantPrompt.searchGuide
+    func bytes(_ object: [String: Any]) -> Int {
+        (try? JSONSerialization.data(withJSONObject: object, options: [.withoutEscapingSlashes]))?
+            .count ?? 0
+    }
+    let tools = bytes(["tools": wire])
+    let prompt = bytes(["system": system])
+    let both = bytes(["system": system, "tools": wire])
+    return (tools > 0 && prompt > 0 ? both : 0, tools, prompt)
 }
 
 // MARK: - The drag rows: L7, L8 (#144, AI-12), L9 and C1

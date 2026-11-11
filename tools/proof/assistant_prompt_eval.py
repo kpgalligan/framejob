@@ -17,7 +17,8 @@ reserved and that worst case fit under the cap; otherwise it is answered 400
 cap is then RESERVED at that worst case in the proofs' ledger
 (`budget.SpendLedger`, spec §11 P-6) and answered 400 naming the budget
 instead when this UTC month's recorded Anthropic spend plus it would pass
-$25; only once that reservation is made does the cap count it. A body over
+the month's budget (`budget.BUDGETS`, $40 since spec §11 P-9); only once
+that reservation is made does the cap count it. A body over
 `BODY_BYTES_BOUND` or a `max_tokens` over `MAX_TOKENS_BOUND` is a bound breach
 (row H): the headroom arithmetic below assumed neither. The reply is buffered,
 its whole usage read, priced by the table (`budget.settle_anthropic`: the
@@ -36,9 +37,14 @@ folded into the dearer. It prices the worst case only; what a reply cost is
 the table's price for its own model.
 
 **The headroom arithmetic** (`headroom_lines`): the helper sends
-`max_tokens` 32,000 on every POST (`agent/src/main.ts:31`) and all of the
-catalog's definitions, deferred ones included; the A2 session proof's largest
-logged body was 230,340 bytes, bounded here at 256,000, about 85,333 tokens.
+`max_tokens` 32,000 on every POST (`agent/src/main.ts`) and all of the
+catalog's definitions, deferred ones included. Since #594 (spec §11 P-9) the
+body is bounded at 480,000 bytes, about 160,000 tokens: the three
+rehearsals' largest body was 399,360 bytes on 2026-11-11, over the 256,000
+bound before it. `assistant_lane_proof.py`'s B1, in `make test`, holds the
+request's tools and system prompt as the app makes them, plus
+`CONVERSATION_BYTES_BOUND`, under the bound. The relay records the largest
+body it saw, and H prints it.
 """
 
 import json
@@ -61,11 +67,20 @@ RATES = {"input": _WORST["input"],
          "cache_write": max(_WORST["cache_write_5m"], _WORST["cache_write_1h"]),
          "cache_read": _WORST["cache_read"], "output": _WORST["output"]}
 IMAGE_TOKENS = 1600
-BODY_BYTES_BOUND = 256_000
+# Spec §11 P-9 (#594): about 20 % over the rehearsals' largest body, 399,360 bytes
+# (the compaction rehearsal, 2026-11-11).
+BODY_BYTES_BOUND = 480_000
+# The room B1 keeps under the bound for what the probe does not measure: the
+# conversation, the live-context block and the request's other keys. At least
+# 30,000 bytes: the one live evaluation on record (#157) priced H's worst POST
+# at $3.1885, a body of about 238,000 bytes, some 11,000 over the stand-in's of
+# the time (H $3.1137 there). Twice the rehearsals' largest body less the
+# probe's request is under that: 2 × (399,360 − 395,666) = 7,388 on 2026-11-11.
+CONVERSATION_BYTES_BOUND = 30_000
 MAX_TOKENS_BOUND = 32_000
 ROUNDS_PER_ROW = 5
 OUTPUT_PER_ROUND = 2_000
-SUGGESTED_CAP = 20.00
+SUGGESTED_CAP = 32.00
 ROWS = 6
 PROOF_KEY = "proof-key"
 DROPPED_HEADERS = {"x-api-key", "authorization", "host", "content-length", "connection",
@@ -128,6 +143,13 @@ def cap_floor():
     return worst_post() + ROWS * row_bound()
 
 
+def budget_line():
+    """The month's Anthropic budget as `budget.py` holds it, for every proof's
+    headroom print."""
+    return (f"budget: ${budget.BUDGETS['anthropic']:.2f} a calendar month (UTC) for Anthropic, "
+            "before each POST, in the proofs' ledger (spec §11 P-6, P-9)")
+
+
 def headroom_lines(cap):
     lines = [
         "rates ($/MTok, an UPPER BOUND, not a quote: each class's dearest in "
@@ -145,8 +167,7 @@ def headroom_lines(cap):
         f"${row_bound():.2f}, an estimate billing every definition byte",
         f"floor: worst POST + {ROWS} row bounds = ${cap_floor():.2f}; suggested cap "
         f"${SUGGESTED_CAP:.2f}",
-        "budget: $25.00 a calendar month (UTC) for Anthropic, before each POST, in the proofs' "
-        "ledger (spec §11 P-6)",
+        budget_line(),
     ]
     if cap is None:
         lines.append("cap: none given — --live needs --cap <dollars>, the runner's decision")
@@ -260,6 +281,7 @@ class Relay:
         self._budget_refusals = []
         self._breaches = []
         self._max_worst = 0.0
+        self._max_stripped = 0
         self.entries = []
         self.keep_exchanges = keep_exchanges
         self.exchanges = []
@@ -284,6 +306,11 @@ class Relay:
     def max_worst(self):
         with self.lock:
             return self._max_worst
+
+    def max_body(self):
+        """The largest body seen, less its image data, in bytes."""
+        with self.lock:
+            return self._max_stripped
 
     def bound_breaches(self):
         with self.lock:
@@ -361,6 +388,7 @@ class Relay:
                 row = relay.row
                 with relay.lock:
                     relay._max_worst = max(relay._max_worst, worst)
+                    relay._max_stripped = max(relay._max_stripped, stripped)
                     if stripped > BODY_BYTES_BOUND:
                         relay._breaches.append(
                             f"row {row}: a body of {stripped:,} bytes (less {images} images) "
@@ -748,7 +776,8 @@ class Evaluation:
 
 def row_h(relay):
     breaches = relay.bound_breaches()
-    detail = f"worst POST priced ${relay.max_worst():.4f}"
+    detail = (f"worst POST priced ${relay.max_worst():.4f}; largest body "
+              f"{relay.max_body():,} bytes")
     if breaches:
         return False, (detail + "; the headroom arithmetic is stale: "
                        + "; ".join(breaches[:6]))

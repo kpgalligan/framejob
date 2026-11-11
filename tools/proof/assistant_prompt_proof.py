@@ -47,7 +47,7 @@ The month's budget (spec §11 P-3, P-6): a keyed `--live` reserves every POST
 in the proofs' ledger, `budget.LEDGER`, and nothing else ever opens it. A
 rehearsal uses a scratch ledger, `work/assistant_prompt/rehearsal/spend.jsonl`,
 deleted first; `--month-spent D` (rehearsal only) seeds it with D dollars
-already spent this month, so `--month-spent 24.99` shows every E row refused
+already spent this month, so `--month-spent 39.99` shows every E row refused
 `budget:` with nothing sent to the stand-in. `--mutant bare-send` builds a tree copy (`tree_copy.make_copy`, into
 `work/assistant_prompt/mutant/tree`) whose `send` writes the bare
 text and runs S2 against it: it must FAIL (exit 1; 0 when it
