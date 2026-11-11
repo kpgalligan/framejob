@@ -32,7 +32,9 @@ letters "er" are found three times, inside "there" and "everyone" and as the
 word "er". Each match sits on a pale yellow rectangle covering only the letters
 found; the current match, the first, is a stronger yellow with a yellow outline. The word under the playhead
 keeps its own tinted rectangle. Return in the field moves to the next match
-and ⇧Return to the previous one; Esc or Done closes the bar and the marks go.
+and ⇧Return to the previous one; ⌘Return selects the current match's words, moves
+the playhead there and gives the keys to the text, the bar staying open; Esc or
+Done closes the bar and the marks go.
 
 In the light capture the bar is white with black words; in the dark capture it
 is near-black with white words, and the yellow marks stay readable under the

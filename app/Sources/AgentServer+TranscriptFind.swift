@@ -7,14 +7,15 @@ import AppKit
 ///
 /// `find` — a string opens the bar as Edit ▸ Find… does and sets its field's
 /// text through the field's own change path; null closes it by Esc's path.
-/// `find_step` — "next" or "previous", Return's or ⇧Return's path, once,
-/// after `find`; refused while the bar would be closed.
+/// `find_step` — "next", "previous" or "select" (TX-44), Return's, ⇧Return's
+/// or ⌘Return's path, once, after `find`; refused while the bar would be
+/// closed.
 extension AgentServer {
 
     struct TranscriptFindArguments {
         /// `.some(nil)` for an explicit null (close).
         var find: String??
-        var step: Int?
+        var step: KeptReturn?
     }
 
     /// Read on the server thread, refused before anything moves.
@@ -32,10 +33,12 @@ extension AgentServer {
         }
         if let step = try stringArg(a, "find_step") {
             switch step {
-            case "next": out.step = 1
-            case "previous": out.step = -1
+            case "next": out.step = .next
+            case "previous": out.step = .previous
+            case "select": out.step = .select
             default:
-                throw ToolError(message: "find_step must be \"next\" or \"previous\" (got \"\(step)\").")
+                throw ToolError(
+                    message: "find_step must be \"next\", \"previous\" or \"select\" (got \"\(step)\").")
             }
         }
         if out.step != nil, case .some(.none) = out.find {
@@ -62,7 +65,12 @@ extension AgentServer {
                 pane.closeFind()
             }
         }
-        if let step = find.step { pane.findStep(step) }
+        switch find.step {
+        case .next?: pane.findStep(1)
+        case .previous?: pane.findStep(-1)
+        case .select?: pane.findSelect()
+        case nil: break
+        }
     }
 
     /// The answer's `find`: null while the bar is closed. Main thread.
@@ -90,9 +98,10 @@ extension AgentServer {
                 + "null closes it as Esc does.",
         ],
         "find_step": [
-            "type": "string", "enum": ["next", "previous"],
-            "description": "Presses Return's (next) or ⇧Return's (previous) path once, after "
-                + "find; refused while the find bar is closed.",
+            "type": "string", "enum": ["next", "previous", "select"],
+            "description": "Presses Return's (next), ⇧Return's (previous) or ⌘Return's (select: "
+                + "the current match selected and sought, the view first responder, spec §11 "
+                + "TX-44) path once, after find; refused while the find bar is closed.",
         ],
     ]
 
@@ -101,6 +110,6 @@ extension AgentServer {
         + "bar is closed, else {query, count, current: the current match's index or null, "
         + "matches: the first 200 as [{first, last}] token indices, label: the bar's count, "
         + "field_first_responder, current_visible}. Also refused: find_step while the bar is "
-        + "closed or with find: null, and a find_step that is neither next nor previous."
+        + "closed or with find: null, and a find_step that is not next, previous or select."
 }
 #endif

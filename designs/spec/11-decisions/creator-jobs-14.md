@@ -90,7 +90,7 @@ recommendations"): #559's and #560's first options, and #442's third.
   Return and ⇧Return select nothing. Probe row **F18**, ⌘F on the Media tab: (a) the validator
   false on Clip, Document and Assistant and true on Media and Transcript; (b) after a name was
   typed and the keys handed back, the action makes the field's editor first responder with its
-  whole text selected; (c) typing there narrows the list; (d) Return hands the keys to the content
+  whole text selected, and again from a caret at the end; (c) typing there narrows the list; (d) Return hands the keys to the content
   view and Space then plays; (e) with the Media section shut — set as a volatile argument-domain
   default, so the probe writes no preference — the validator is false and the action beeps
   without moving the keys; (f) the same with the inspector hidden — its container hidden
@@ -98,15 +98,15 @@ recommendations"): #559's and #560's first options, and #442's third.
   inspector's sight, the action brings it back into sight. App rows: A1 also finds the item
   disabled on the Document tab; **A6** `find_step: "select"`: the answer's selection the current
   match, the view first responder and the field not, the current match unchanged, the playhead
-  where a click on the match's first word puts it, the in/out range set and the undo list
-  unchanged, and the step refused with the bar closed; **A7** the item disabled on the Media tab
+  where a click on the match's first word puts it, the in/out range set where there was none,
+  the project unedited, and the step refused with the bar closed; **A7** the item disabled on the Media tab
   of an empty project and run on the Media tab of one with media; Z0 also reads `find_step`'s
-  enum as next, previous and select. **Mutants**, one per decision these three issues add:
-  `command-return-untaken` (F17), `key-equivalent-door-shut` (F17 a), `send-event-door-shut`
-  (F17 b), `shifted-command-taken` (F17 f), `select-keeps-keys` (F17 a), `select-no-seek`
-  (F17 a, c), `select-first-word-only` (F17 c), `media-arm-off` (F18 a), `media-find-unshown`
-  (F18 a, e, f), `media-find-no-focus` (F18 b) and `media-find-no-scroll` (F18 g): eleven, over
-  the root rule's ten for one change because they guard three issues' decisions in one
-  instrument, which carries forty-five with TX-39's thirty-four. JOB-67 adds a real ⌘Return and a
-  real ⌘F on the Media tab. #442 has no row: its checks are `spec_index_proof.py` and
-  `docs_site_proof.py`. Amends TX-39.
+  enum as next, previous and select. **Mutants**, one per decision, each read by the letters it
+  fails: #559's seven, `command-return-untaken` (F17 a–d, g), `key-equivalent-door-shut`
+  (F17 a), `send-event-door-shut` (F17 b), `shifted-command-taken` (F17 f), `select-keeps-keys`
+  (F17 a–d, g), `select-no-seek` (F17 a–d, g) and `select-first-word-only` (F17 c); #560's four,
+  `media-arm-off` (F18 a), `media-find-unshown` (F18 e, f), `media-find-no-focus` (F18 b, c, g)
+  and `media-find-no-scroll` (F18 g). Eleven, over the root rule's ten for one change because two
+  issues' decisions share the instrument, which now carries forty-five with TX-39's thirty-four.
+  JOB-67 adds a real ⌘Return and a real ⌘F on the Media tab. #442 has no row: its checks are
+  `spec_index_proof.py` and `docs_site_proof.py`. Amends TX-39.

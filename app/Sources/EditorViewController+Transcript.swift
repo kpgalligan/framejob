@@ -4,8 +4,9 @@ import AppKit
 /// TX-20…TX-22): View ▸ Transcript ⌃⌘T, and the `TranscriptHost` the pane
 /// reaches through `inspector.parent`. The command needs no validator arm: it
 /// falls through to `validateUserInterfaceItem`'s closing `return true`, as
-/// `showAssistant` does. Edit ▸ Find… ⌘F (TX-37) has one,
-/// `validateTranscriptAction`, a line in the frozen file.
+/// `showAssistant` does. Edit ▸ Find… ⌘F (TX-37, TX-45) has one,
+/// `validateTranscriptAction`, a line in the frozen file; the names stayed
+/// when the item gained the Media tab's arm (TX-45).
 extension EditorViewController: TranscriptHost {
 
     /// View ▸ Transcript ⌃⌘T: the inspector shown if it is hidden, the
@@ -17,21 +18,41 @@ extension EditorViewController: TranscriptHost {
         view.window?.makeFirstResponder(pane.transcriptView)
     }
 
-    /// Edit ▸ Find… ⌘F (spec §11 TX-37): the Transcript tab's find bar. It
-    /// mirrors no edit — Find moves only the tab's scroll and its own marks.
+    /// Edit ▸ Find… ⌘F (spec §11 TX-37, TX-45): the Transcript tab's find
+    /// bar while that tab shows; while the Media tab shows its search field,
+    /// the field given the keys with its whole text selected and scrolled
+    /// into sight. It mirrors no edit — Find moves only view state.
     @objc func findInTranscript(_ sender: Any?) {
-        guard let inspector, let pane = TranscriptPane.pane(in: inspector), pane.isShown else {
+        if let pane = shownTranscriptPane {
+            pane.openFind()
+            return
+        }
+        guard let field = shownMediaSearch, let window = view.window else {
             NSSound.beep()
             return
         }
-        pane.openFind()
+        window.makeFirstResponder(field)
+        field.scrollToVisible(field.bounds)
     }
 
-    /// Find… is offered only while the Transcript tab shows (TX-37).
+    /// Find… is offered while the Transcript tab shows (TX-37), or while the
+    /// Media tab shows its search field (TX-45).
     func validateTranscriptAction(_ action: Selector) -> Bool? {
         guard action == #selector(findInTranscript(_:)) else { return nil }
-        guard let inspector, let pane = TranscriptPane.pane(in: inspector) else { return false }
-        return pane.isShown
+        if shownTranscriptPane != nil { return true }
+        return shownMediaSearch != nil
+    }
+
+    private var shownTranscriptPane: TranscriptPane? {
+        guard let inspector, let pane = TranscriptPane.pane(in: inspector), pane.isShown else {
+            return nil
+        }
+        return pane
+    }
+
+    /// The Media tab's search field while Find… can reach it (TX-45).
+    private var shownMediaSearch: NSTextField? {
+        inspector.flatMap { MediaPane.pane(in: $0)?.shownSearch }
     }
 
     var transcriptIsPlaying: Bool { playback.isPlaying }

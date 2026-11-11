@@ -63,6 +63,27 @@ final class MediaPane: InspectorPaneView {
     private weak var listStack: NSStackView?
     private weak var tallyLabel: InspectorRowLabel?
     private weak var noMatchesRow: NSView?
+    /// The find band's search field, for Edit ▸ Find… (spec §11 TX-45);
+    /// nil with no media, when the band is not built. Weak for the reason
+    /// above.
+    private weak var searchField: NSTextField?
+
+    /// The pane each inspector made, weak to weak — `TranscriptPane`'s
+    /// table, because `InspectorViewController.swift` is frozen.
+    private static let table = NSMapTable<InspectorViewController, MediaPane>.weakToWeakObjects()
+
+    static func pane(in inspector: InspectorViewController) -> MediaPane? {
+        table.object(forKey: inspector)
+    }
+
+    /// The search field while Edit ▸ Find… can give it the keys (TX-45): on
+    /// screen in a window — so the Media tab shows, the inspector is not
+    /// hidden and the Media section is open — else nil.
+    var shownSearch: NSTextField? {
+        guard let field = searchField, field.window != nil, !field.isHiddenOrHasHiddenAncestor
+        else { return nil }
+        return field
+    }
 
     /// The order `arrange()` last put the rows in, so it can leave the stack
     /// alone when nothing has moved — it runs on every refresh, and a live
@@ -85,6 +106,7 @@ final class MediaPane: InspectorPaneView {
 
     override init(inspector: InspectorViewController) {
         super.init(inspector: inspector)
+        Self.table.setObject(self, forKey: inspector)
         // Finder drops land on the panel (§4.3). The editor's root view takes
         // file drops too, but it OPENS them as documents; a drop on this
         // panel means "add to this project", so the pane claims the type
@@ -115,6 +137,7 @@ final class MediaPane: InspectorPaneView {
         rows = []
         listStack = nil
         noMatchesRow = nil
+        searchField = nil
         arrangedOrder = []
         var content: [NSView] = [actionRow()]
         if binding.snapshot.media.isEmpty {
@@ -206,6 +229,7 @@ final class MediaPane: InspectorPaneView {
         let controls = MediaListFilter.controls(
             current: { [weak self] in self?.filter ?? MediaListFilter() },
             apply: { [weak self] next in self?.apply(next) })
+        searchField = controls.search as? NSTextField
         return MediaPane.bar(
             height: 60, border: .bottom,
             lines: [

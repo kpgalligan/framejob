@@ -10,7 +10,8 @@ import AppKit
 /// the editor's forward first). Since TX3b (TX-34) a click on a pause token
 /// selects it; Esc, ⌫ and ⌦ act on it, and the arrows move from the word
 /// before it. With nothing selected they pass up, and
-/// Return passes up unchanged until TX5. Every other key goes to
+/// Return passes up unchanged until TX5. `select(match:)` is the find field's
+/// ⌘Return (TX-43), a click over a whole match. Every other key goes to
 /// `super.keyDown`, so J, K, L, I, O and M reach `handleEditorKey` as from the
 /// timeline; Space never arrives here (`SpaceKey.route` takes it at the
 /// window). A click makes the view first responder; a drag selects
@@ -114,5 +115,13 @@ extension TranscriptView {
     func click(token index: Int) {
         select(index...index)
         onActivate?(index)
+    }
+
+    /// ⌘Return in the find field (spec §11 TX-43): a click over a match —
+    /// every token of `tokens` selected, as a person's selection, and the
+    /// first sought.
+    func select(match tokens: ClosedRange<Int>) {
+        select(tokens)
+        onActivate?(tokens.lowerBound)
     }
 }

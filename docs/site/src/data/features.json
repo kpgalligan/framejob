@@ -1058,11 +1058,11 @@
     {
      "id": "media-search",
      "name": "Search by name",
-     "summary": "A Search by name field narrows the list as you type, ignoring case and accents as the Finder does. Esc clears it.",
+     "summary": "A Search by name field narrows the list as you type, ignoring case and accents as the Finder does. ⌘F puts the cursor in it and Esc clears it.",
      "page": "projects/media-tab",
      "anchor": "search-by-name",
      "where": "Media tab ▸ Search by name",
-     "keys": "Esc"
+     "keys": "⌘F, Esc"
     },
     {
      "id": "media-sort",
@@ -10140,7 +10140,7 @@
     {
      "id": "transcript-find",
      "name": "Find in the transcript",
-     "summary": "Search the Transcript tab's words; every match is marked and the current one scrolled into view. It changes nothing in the project.",
+     "summary": "Search the Transcript tab's words; every match is marked and the current one scrolled into view. Searching changes nothing in the project.",
      "page": "captions/find-in-the-transcript",
      "anchor": "open-the-find-bar",
      "where": "Edit ▸ Find…",
@@ -10154,6 +10154,15 @@
      "anchor": "step-through-the-matches",
      "where": "Transcript tab ▸ find bar",
      "keys": "Return, ⇧Return"
+    },
+    {
+     "id": "transcript-find-select",
+     "name": "Choose a match",
+     "summary": "⌘Return in the find bar selects the match you're on, moves the playhead to it and gives the text the keyboard, so ⌫ deletes it next.",
+     "page": "captions/find-in-the-transcript",
+     "anchor": "act-on-a-match",
+     "where": "Transcript tab ▸ find bar",
+     "keys": "⌘Return"
     },
     {
      "id": "transcript-select-words",

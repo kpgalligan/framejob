@@ -119,17 +119,25 @@ enum TextFocus {
         }
     }
 
-    /// K-4 (3)'s one exception (spec §11 TX-37 (e)): nil unless the key-down
-    /// `event` is a Return or keypad Enter that `leavesOnKey` would take
-    /// from a field editor whose field is a `TextFocusKeepsReturn`; then
-    /// whether ⇧ is held. The window asks this BEFORE `leavesOnKey`, hands
-    /// the field the key and spends it, so the field keeps the keys. Pure.
-    static func keptReturn(_ event: NSEvent, in text: NSTextView) -> Bool? {
+    /// K-4 (3)'s one exception (spec §11 TX-37 (e), TX-43): nil unless the
+    /// key-down `event` is a Return or keypad Enter in a field editor whose
+    /// field is a `TextFocusKeepsReturn`; then which of the field's three it
+    /// is — one `leavesOnKey` would take is `.next`, or `.previous` with ⇧,
+    /// and one with exactly ⌘ held (⇪ and the keypad and fn flags allowed)
+    /// is `.select`. The window asks this BEFORE `leavesOnKey`, hands the
+    /// field the key and spends it, so the field keeps the keys. Never while
+    /// an input method has marked text. Pure.
+    static func keptReturn(_ event: NSEvent, in text: NSTextView) -> KeptReturn? {
         guard event.keyCode == 36 || event.keyCode == 76,
-            text.delegate is TextFocusKeepsReturn,
-            leavesOnKey(event, in: text, fullKeyboardAccess: false)
+            text.delegate is TextFocusKeepsReturn
         else { return nil }
-        return event.modifierFlags.contains(.shift)
+        if leavesOnKey(event, in: text, fullKeyboardAccess: false) {
+            return event.modifierFlags.contains(.shift) ? .previous : .next
+        }
+        guard event.type == .keyDown, text.isFieldEditor, !text.hasMarkedText() else { return nil }
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            .subtracting([.capsLock, .numericPad, .function])
+        return flags == .command ? .select : nil
     }
 
     /// True when a mouse-down whose content hit is `hit` leaves `text`: a
@@ -141,11 +149,15 @@ enum TextFocus {
     }
 }
 
-/// A field whose Return is its own (spec §11 TX-37 (e)): the editor window
-/// hands it the key instead of taking the keys back, ⇧ read from the event.
-/// Only the Transcript tab's find field adopts it.
+/// Which of a `TextFocusKeepsReturn` field's Returns a key is (spec §11
+/// TX-37 (e), TX-43): Return, ⇧Return, ⌘Return.
+enum KeptReturn: Equatable { case next, previous, select }
+
+/// A field whose Return is its own (spec §11 TX-37 (e), TX-43): the editor
+/// window hands it the key instead of taking the keys back, read from the
+/// event. Only the Transcript tab's find field adopts it.
 protocol TextFocusKeepsReturn: AnyObject {
-    func returnPressed(backward: Bool)
+    func returnPressed(_ key: KeptReturn)
 }
 
 /// A view whose whole area is its text field's host for `TextFocus.host`:
@@ -257,15 +269,28 @@ final class EditorWindow: NSWindow {
         }
     }
 
+    /// ⌘Return in the find field (spec §11 TX-43) at the window's other
+    /// door: `NSApplication` offers a ⌘ key-down to the key window's key
+    /// equivalents, then to the menus, before it dispatches the key through
+    /// `sendEvent`, so the key is taken here too. A key taken here is spent,
+    /// so `sendEvent` never sees it; every other key is `super`'s.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if keepReturn(for: event, taking: [.select]) { return true }
+        return super.performKeyEquivalent(with: event)
+    }
+
     /// `TextFocus.keptReturn` applied: true when `event` was a Return the
-    /// field being typed in keeps (the find bar's next and previous), now
-    /// spent. Nothing is taken while a sheet is attached.
-    private func keepReturn(for event: NSEvent) -> Bool {
+    /// field being typed in keeps (the find bar's next, previous and
+    /// select) and `keys` names, now spent. Nothing is taken while a sheet
+    /// is attached.
+    private func keepReturn(
+        for event: NSEvent, taking keys: Set<KeptReturn> = [.next, .previous, .select]
+    ) -> Bool {
         guard event.type == .keyDown, attachedSheet == nil,
             let text = TextFocus.typing(firstResponder),
-            let backward = TextFocus.keptReturn(event, in: text)
+            let kept = TextFocus.keptReturn(event, in: text), keys.contains(kept)
         else { return false }
-        (text.delegate as? TextFocusKeepsReturn)?.returnPressed(backward: backward)
+        (text.delegate as? TextFocusKeepsReturn)?.returnPressed(kept)
         return true
     }
 

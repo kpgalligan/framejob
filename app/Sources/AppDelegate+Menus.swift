@@ -266,9 +266,10 @@ extension AppDelegate {
             item(
                 "Select All on Track", #selector(EditorViewController.selectAllClipsOnTrack(_:))))
         menu.addItem(.separator())
-        // The Transcript tab's find bar (spec §11 TX-37), enabled while that
-        // tab shows. It mirrors no edit, so it has no agent tool: Find moves
-        // only the tab's scroll position and its own marks.
+        // The Transcript tab's find bar (spec §11 TX-37) while that tab
+        // shows, and the Media tab's search field while that tab shows it
+        // (TX-45). It mirrors no edit, so it has no agent tool: Find moves
+        // only view state.
         menu.addItem(item("Find…", #selector(EditorViewController.findInTranscript(_:)), "f"))
         return menu
     }

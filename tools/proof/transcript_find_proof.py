@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Find in the Transcript tab (#434, spec §11 TX-37…TX-39): Edit ▸ Find… ⌘F,
-its bar, its marks and the dev tool `transcript_view`'s `find` / `find_step`.
+its bar, its marks and the dev tool `transcript_view`'s `find` / `find_step`;
+since #559 and #560 (TX-43…TX-47) ⌘Return selecting the current match and
+Edit ▸ Find… on the Media tab.
 
     python3 tools/proof/transcript_find_proof.py [--only IDS]
     python3 tools/proof/transcript_find_proof.py --mutant NAME
@@ -14,14 +16,16 @@ with `-D FRAMEJOB_DEV_TOOLS`, the app's `Compositor.metal` beside it): F0
 builds; F1–F16 as its header says (F14 is #558's: the click-to-clip scroll and
 the follow in 27,000 words; F15 is #584's: the follow at the text's ends; F16
 is #583's: the whole text laid out in idle time after a rebuild, and #593's:
-the top word kept across a width change, (g) and (h)).
+the top word kept across a width change, (g) and (h); F17 is #559's: ⌘Return at
+both of the window's doors; F18 is #560's: Edit ▸ Find… on the Media tab).
 
 App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
   Z0  no `Frame Job: ` line; `transcript_view` takes exactly its ten earlier
-      arguments plus `find` and `find_step`.
-  A1  on the Clip tab `perform_menu_item ["Edit","Find…"]` is refused as
-      disabled; on Transcript it runs and `find` answers open, the field first
-      responder, no matches for an empty field.
+      arguments plus `find` and `find_step`, whose enum is next, previous and
+      select (TX-44).
+  A1  on the Clip and Document tabs `perform_menu_item ["Edit","Find…"]` is
+      refused as disabled; on Transcript it runs and `find` answers open, the
+      field first responder, no matches for an empty field.
   A2  the commonest word, upper-cased, as the query: `matches` equal the same
       rule computed here from `tokens`; `current` is the first at or after
       `highlight`; `next` advances and wraps, `previous` returns; the range,
@@ -34,11 +38,19 @@ App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
       cut: after the rebuild the matches equal this rule over the new tokens,
       one fewer.
   A5  `screens.py --only 11d-transcript-find` exits 0 with "new problems: 0".
+  A6  `find_step: "select"` (TX-44): the answer's selection is the current
+      match, the view first responder and the field not, the current match
+      unchanged, the playhead where a click on the match's first word puts it,
+      the in/out range set where there was none, and `get_project`'s project
+      and unsaved_changes unchanged (no edit); refused with the bar closed.
+  A7  on the Media tab of an empty project `perform_menu_item
+      ["Edit","Find…"]` is refused as disabled (no find band); on the Media
+      tab of the project with media it runs.
 
 Mutants (`--mutant NAME`, or all with `--mutants`): each anchor occurs once; a
-mutant is caught when every row it names fails. All thirty-four are probe
-mutants (a copy of `app/Sources` with the edit); TX-39 says why there are
-thirty-four. F15 and F16 print each letter's verdict, and the letter a mutant
+mutant is caught when every row it names fails. All forty-five are probe
+mutants (a copy of `app/Sources` with the edit); TX-39 and TX-47 say why there
+are forty-five. F15 and F16 print each letter's verdict, and the letter a mutant
 fails is named beside it here: the row failing is the script's verdict, and a
 record reads the named letter's own verdict too.
   return-leaves         K-4 takes Return from the find field (F4)
@@ -89,6 +101,18 @@ record reads the named letter's own verdict too.
                         left where it was (F16 g1–g5)
   resize-stale-stamp    the arm's anchor stamped with the clip's y from before
                         its scroll (F16 g5)
+  command-return-untaken  ⌘Return is not a kept Return (F17)
+  key-equivalent-door-shut  the window's `performKeyEquivalent` takes nothing
+                        (F17 a)
+  send-event-door-shut  `sendEvent` takes Return and ⇧Return only (F17 b)
+  shifted-command-taken ⌘ with ⇧ also selects (F17 f)
+  select-keeps-keys     ⌘Return leaves the keys in the field (F17 a)
+  select-no-seek        ⌘Return does not move the playhead (F17 a)
+  select-first-word-only  a phrase selects its first word only (F17 c)
+  media-arm-off         the validator's Media arm answers false (F18 a)
+  media-find-unshown    the Media arm offered for a field not on screen (F18 e, f)
+  media-find-no-focus   the action does not give the field the keys (F18 b)
+  media-find-no-scroll  the action does not scroll the field into sight (F18 g)
 
 Exit: 0 iff every row passed (a mutant run: 0 when caught, 1 when it survived,
 2 when the control could not be performed).
@@ -113,8 +137,8 @@ ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/transcript_find"
 PROBE = ROOT / "tools/proof/transcript_find_probe.swift"
 PROBE_ROWS = ["F0", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
-              "F13", "F14", "F15", "F16"]
-APP_ROWS = ["Z0", "A1", "A2", "A3", "A4"]
+              "F13", "F14", "F15", "F16", "F17", "F18"]
+APP_ROWS = ["Z0", "A1", "A2", "A3", "A4", "A6", "A7"]
 OTHER_ROWS = ["A5"]
 ROWS = PROBE_ROWS + APP_ROWS + OTHER_ROWS
 SEC = 600_000
@@ -132,6 +156,8 @@ VL = "TranscriptView+Layout.swift"
 TV = "TranscriptView.swift"
 VK = "TranscriptView+Keys.swift"
 EV = "EditorViewController.swift"
+ET = "EditorViewController+Transcript.swift"
+MP = "MediaPane.swift"
 MUTANTS = {
     "return-leaves": (["F4"], [
         (EW, "        if keepReturn(for: event) { return }\n", "")]),
@@ -228,6 +254,31 @@ MUTANTS = {
     "view-esc-passes": (["F6"], [
         (VK, "        case 27 where !extend && onEscape?() == true: break  "
              "// the find bar closed (TX-37 (e))\n", "")]),
+    "command-return-untaken": (["F17"], [
+        (EW, "        return flags == .command ? .select : nil\n", "        return nil\n")]),
+    "key-equivalent-door-shut": (["F17"], [
+        (EW, "        if keepReturn(for: event, taking: [.select]) { return true }\n", "")]),
+    "send-event-door-shut": (["F17"], [
+        (EW, "        for event: NSEvent, taking keys: Set<KeptReturn> = [.next, .previous, .select]\n",
+         "        for event: NSEvent, taking keys: Set<KeptReturn> = [.next, .previous]\n")]),
+    "shifted-command-taken": (["F17"], [
+        (EW, "        return flags == .command ? .select : nil\n",
+         "        return flags.contains(.command) ? .select : nil\n")]),
+    "select-keeps-keys": (["F17"], [
+        (PF, "        window.makeFirstResponder(transcriptView)\n", "        _ = window\n")]),
+    "select-no-seek": (["F17"], [
+        (VK, "        onActivate?(tokens.lowerBound)\n", "")]),
+    "select-first-word-only": (["F17"], [
+        (VK, "        select(tokens)\n", "        select(tokens.lowerBound...tokens.lowerBound)\n")]),
+    "media-arm-off": (["F18"], [
+        (ET, "        return shownMediaSearch != nil\n", "        return false\n")]),
+    "media-find-unshown": (["F18"], [
+        (MP, "        guard let field = searchField, field.window != nil, "
+             "!field.isHiddenOrHasHiddenAncestor\n", "        guard let field = searchField\n")]),
+    "media-find-no-focus": (["F18"], [
+        (ET, "        window.makeFirstResponder(field)\n", "        _ = window\n")]),
+    "media-find-no-scroll": (["F18"], [
+        (ET, "        field.scrollToVisible(field.bounds)\n", "")]),
 }
 
 
@@ -358,8 +409,10 @@ def app_rows(results, wanted, app_path, files):
                 complaints = [line for line in app.log().splitlines() if "Frame Job: " in line]
                 schema = app.mcp.schemas().get(TOOL, {}).get("inputSchema", {})
                 keys = sorted(schema.get("properties", {}))
-                return (not complaints and keys == ARGUMENTS,
-                        f"parity lines {complaints[:3]}; properties {keys}")
+                steps = schema.get("properties", {}).get("find_step", {}).get("enum")
+                return (not complaints and keys == ARGUMENTS
+                        and steps == ["next", "previous", "select"],
+                        f"parity lines {complaints[:3]}; properties {keys}; find_step {steps}")
             run("Z0", z0)
 
             def session():
@@ -376,17 +429,20 @@ def app_rows(results, wanted, app_path, files):
                 s = session()
                 s.op("select_inspector_tab", tab="clip")
                 refused = s.error("perform_menu_item", path=["Edit", "Find…"])
+                s.op("select_inspector_tab", tab="document")
+                on_document = s.error("perform_menu_item", path=["Edit", "Find…"])
                 s.op("select_inspector_tab", tab="transcript")
                 shown = view(s, wait=60)
                 s.op("perform_menu_item", path=["Edit", "Find…"])
                 opened = view(s).get("find")
                 closed = view(s, find=None).get("find", "absent")
                 return (bool(refused) and "disabled" in refused and shown.get("find") is None
+                        and bool(on_document) and "disabled" in on_document
                         and isinstance(opened, dict) and opened.get("field_first_responder") is True
                         and opened.get("count") == 0 and opened.get("current") is None
                         and closed is None,
-                        f"on Clip: {refused!r}; before the item find {shown.get('find')!r}; after "
-                        f"{opened!r}; find: null {closed!r}")
+                        f"on Clip: {refused!r}; on Document: {on_document!r}; before the item find "
+                        f"{shown.get('find')!r}; after {opened!r}; find: null {closed!r}")
             run("A1", a1)
 
             def a2():
@@ -481,6 +537,68 @@ def app_rows(results, wanted, app_path, files):
                         f"({victim['text']!r}) cut: {len(tokens)} → {len(after.get('tokens', []))} "
                         f"tokens, matches {got} (want {want})")
             run("A4", a4)
+
+            def a6():
+                s = session()
+                s.op("select_inspector_tab", tab="transcript")
+                s.op("set_playhead", t=0)
+                shown = view(s, wait=60, select=None)
+                tokens = shown.get("tokens", [])
+                texts = [t["text"] for t in tokens]
+                query = max(sorted(set(texts)), key=lambda t: (texts.count(t), len(t)))
+                # `in_out_range` and `unsaved_changes` are `get_project`'s own
+                # keys, beside `project`, which is the model (unchanged = no edit).
+                before = s.op("get_project")
+                opened = view(s, find=query).get("find") or {}
+                stepped = view(s, find_step="next").get("find") or {}
+                at = stepped.get("current")
+                found_pairs = pairs(stepped)
+                match = found_pairs[at] if isinstance(at, int) and at < len(found_pairs) else None
+                chosen = view(s, find_step="select")
+                found = chosen.get("find") or {}
+                after = s.op("get_project")
+                unedited = (after.get("project") == before.get("project")
+                            and after.get("unsaved_changes") == before.get("unsaved_changes"))
+                ranged = after.get("in_out_range")
+                view(s, find=None)
+                closed = s.error(TOOL, find_step="select")
+                clicked = view(s, select=None, click=match[0]) if match else {}
+                view(s, select=None)
+                return (match is not None and len(pairs(opened)) >= 2
+                        and chosen.get("selection") == match
+                        and chosen.get("first_responder") is True
+                        and found.get("field_first_responder") is False
+                        and found.get("current") == at and pairs(found) == found_pairs
+                        and chosen.get("playhead") == clicked.get("playhead")
+                        and chosen.get("playhead") != shown.get("playhead")
+                        and before.get("in_out_range") is None and ranged is not None and unedited
+                        and bool(closed) and "find_step" in closed,
+                        f"{query!r}: {len(pairs(opened))} matches, current {at} {match}; select: "
+                        f"selection {chosen.get('selection')}, view first responder "
+                        f"{chosen.get('first_responder')}, field {found.get('field_first_responder')}, "
+                        f"current {found.get('current')}, playhead {chosen.get('playhead')} (a click "
+                        f"on token {match[0] if match else None}: {clicked.get('playhead')}; before "
+                        f"{shown.get('playhead')}); range {before.get('in_out_range')} → {ranged}; "
+                        f"project and unsaved_changes unchanged {unedited}; with the bar closed "
+                        f"{closed!r}")
+            run("A6", a6)
+
+            def a7():
+                s = session()
+                empty = cloud.Session(app, "find-empty")
+                try:
+                    empty.op("select_inspector_tab", tab="media")
+                    refused = empty.error("perform_menu_item", path=["Edit", "Find…"])
+                finally:
+                    with contextlib.suppress(Exception):
+                        empty.op("close_project", discard=True)
+                s.op("select_inspector_tab", tab="media")
+                ran = s.error("perform_menu_item", path=["Edit", "Find…"])
+                s.op("select_inspector_tab", tab="transcript")
+                return (bool(refused) and "disabled" in refused and ran is None,
+                        f"an empty project's Media tab: {refused!r}; with media: "
+                        f"{'ran' if ran is None else repr(ran)}")
+            run("A7", a7)
         finally:
             if state.get("s") is not None:
                 with contextlib.suppress(Exception):

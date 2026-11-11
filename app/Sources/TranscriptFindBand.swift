@@ -24,6 +24,8 @@ final class TranscriptFindBand: NSView, TextFocusHosting {
     var onQuery: ((String) -> Void)?
     /// Return or Next (+1), ⇧Return or Previous (−1).
     var onStep: ((Int) -> Void)?
+    /// ⌘Return (spec §11 TX-43): the current match selected, as a click does.
+    var onSelect: (() -> Void)?
     /// Esc in the field, or Done.
     var onClose: (() -> Void)?
 
@@ -37,6 +39,7 @@ final class TranscriptFindBand: NSView, TextFocusHosting {
         setAccessibilityIdentifier("transcript.find")
         field.onQuery = { [weak self] text in self?.onQuery?(text) }
         field.onStep = { [weak self] delta in self?.onStep?(delta) }
+        field.onSelect = { [weak self] in self?.onSelect?() }
         field.onClose = { [weak self] in self?.onClose?() }
         count.font = DS.sans(11)
         count.textColor = DS.textMuted
@@ -114,11 +117,13 @@ final class TranscriptFindBand: NSView, TextFocusHosting {
 /// The find bar's field: `DSField` chrome, its own delegate as
 /// `MediaSearchField` is. Return never commits and leaves: in the editor
 /// window `EditorWindow` hands it Return with the event in hand
-/// (`TextFocusKeepsReturn`, K-4 (3)'s one exception), so ⇧ is read from the
-/// key itself and the field keeps the keys.
+/// (`TextFocusKeepsReturn`, K-4 (3)'s one exception), so ⇧ and ⌘ are read
+/// from the key itself (TX-43) and the field keeps the keys unless ⌘Return
+/// selects the match.
 final class TranscriptFindField: NSTextField, NSTextFieldDelegate, TextFocusKeepsReturn {
     var onQuery: ((String) -> Void)?
     var onStep: ((Int) -> Void)?
+    var onSelect: (() -> Void)?
     var onClose: (() -> Void)?
 
     init() {
@@ -138,8 +143,12 @@ final class TranscriptFindField: NSTextField, NSTextFieldDelegate, TextFocusKeep
         onQuery?(stringValue)
     }
 
-    func returnPressed(backward: Bool) {
-        onStep?(backward ? -1 : 1)
+    func returnPressed(_ key: KeptReturn) {
+        switch key {
+        case .next: onStep?(1)
+        case .previous: onStep?(-1)
+        case .select: onSelect?()
+        }
     }
 
     func control(

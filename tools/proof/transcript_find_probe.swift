@@ -96,6 +96,30 @@
 //       the pane's on such a host, a rebuild from ten words to 27,000 shows the
 //       scroller inside `show`, and `show`'s anchor still wins. Its detail
 //       prints a pass's time and added footprint.
+//   F17 ⌘Return in the find field (#559, TX-43), each letter's verdict in the
+//       detail: (a) offered as `NSApplication` offers a ⌘ key first,
+//       `window.performKeyEquivalent(with:)` answering true: the current match
+//       selected, the playhead at its first word, the in/out range set, the
+//       transcript's text first responder, the bar open on the same current
+//       match and count; (b) the same through `sendEvent` alone; (c) "Café
+//       Noir", both words selected, the playhead at the first; (d) "afé", the
+//       whole word; (e) no match: nothing moved, the field keeping the keys;
+//       (f) ⌘⇧Return taken at neither door, nothing selected; (g) the first Esc
+//       clears the selection and the next closes the bar, and after another
+//       ⌘Return ⌫ makes one "Delete Words" (undone after). (c)–(g) press as
+//       `NSApplication` does: the key-equivalent door, then `sendEvent`.
+//   F18 Edit ▸ Find… on the Media tab (#560, TX-45): (a) the validator false
+//       on Clip, Document and Assistant, true on Media and Transcript; (b) a
+//       name typed in Search by name and the keys handed back, the action gives
+//       the field the keys with its whole text selected, and pressed again
+//       with the caret at the end selects it all again; (c) typing there
+//       narrows the rows; (d) Return hands the keys to the content view and
+//       Space plays; (e) the Media section shut, by a volatile argument-domain
+//       default (no preference written): the validator false, the action
+//       moving no keys; (f) the same with the inspector's container hidden
+//       (not Hide Inspector, which writes a default); (g) the pane made taller
+//       than the inspector and scrolled to its foot, the action brings the
+//       field back into sight.
 import AppKit
 
 final class ProbeDocumentController: NSDocumentController {
@@ -1218,9 +1242,297 @@ if let (document, editor, window, pane) = openEditor(), let inspector = editor.i
             && !pane.isFindOpen,
         "a press on Next: current \(String(describing: before12)) → \(String(describing: after12)), "
             + "the field still typing \(typing12); a press on Done closed the bar \(!pane.isFindOpen)")
+
+    // F17 ⌘Return selects the current match (TX-43).
+    let commandReturn = { (flags: NSEvent.ModifierFlags) in key(36, "\r", window: window, flags: flags) }
+    /// As `NSApplication` presses a ⌘ key: the window's key equivalents
+    /// first, then, unclaimed, `sendEvent`.
+    func pressLikeApp(_ flags: NSEvent.ModifierFlags) -> Bool {
+        guard let event = commandReturn(flags) else { return false }
+        if window.performKeyEquivalent(with: event) { return true }
+        window.sendEvent(event)
+        return false
+    }
+    func startOf(_ token: Int) -> Ticks {
+        ReelTime.snapToFrame(model().tokens[token].word.start, fps: fps30)
+    }
+    func currentMatch() -> ClosedRange<Int>? {
+        current().flatMap { pane.find.matches.indices.contains($0) ? pane.find.matches[$0].tokens : nil }
+    }
+    func fresh17(_ query: String?, playhead: Ticks = 0) {
+        view.select(nil)
+        editor.setPlayhead(playhead)
+        spin(0.2)
+        window.makeFirstResponder(view)
+        editor.findInTranscript(nil)
+        spin(0.1)
+        if let query { _ = typeText(query) }
+    }
+    func matchSelected(_ match: ClosedRange<Int>?) -> Bool {
+        guard let match else { return false }
+        return view.selection == match && document.playhead == startOf(match.lowerBound)
+            && document.inOutRange != nil && window.firstResponder === view && pane.isFindOpen
+            && !band.isHidden
+    }
+    func said(_ match: ClosedRange<Int>?) -> String {
+        "match \(String(describing: match)), selection \(String(describing: view.selection)), "
+            + "playhead \(document.playhead) (want \(match.map { startOf($0.lowerBound) } ?? -1)), "
+            + "range \(document.inOutRange != nil), first responder \(who()), bar open \(pane.isFindOpen)"
+    }
+    if pane.isFindOpen { pane.closeFind() }
+    view.scroll(to: 0)
+    fresh17("cafe")
+    send(returnKey([]))  // one on, so the current match is not the first
+    spin(0.1)
+    let matchA = currentMatch()
+    let currentA = current()
+    let countA = pane.find.matches.count
+    let tookA = commandReturn(.command).map { window.performKeyEquivalent(with: $0) } ?? false
+    spin(0.3)
+    let a17 = tookA && matchA?.count == 1 && matchSelected(matchA) && current() == currentA
+        && pane.find.matches.count == countA && countA == 6
+    let saidA = "(a) key-equivalent door answered \(tookA): \(said(matchA)), current "
+        + "\(String(describing: current())) (was \(String(describing: currentA))), \(pane.find.matches.count) "
+        + "matches → \(a17)"
+
+    fresh17(nil)  // the bar open already: the field takes the keys again
+    send(returnKey([]))
+    spin(0.1)
+    let matchB = currentMatch()
+    let currentB = current()
+    send(commandReturn(.command))
+    spin(0.3)
+    let b17 = matchB != nil && matchB != matchA && matchSelected(matchB) && current() == currentB
+    let saidB = "(b) sendEvent: \(said(matchB)) → \(b17)"
+
+    fresh17("Café Noir")
+    let matchC = currentMatch()
+    _ = pressLikeApp(.command)
+    spin(0.3)
+    let c17 = matchC?.count == 2 && matchSelected(matchC)
+    let saidC = "(c) “Café Noir”: \(said(matchC)) → \(c17)"
+
+    fresh17("afé")
+    let matchD = currentMatch()
+    let partial = current().map { pane.find.matches[$0].pieces.map(\.range.length) } ?? []
+    _ = pressLikeApp(.command)
+    spin(0.3)
+    let d17 = matchD?.count == 1 && partial == [3] && matchSelected(matchD)
+    let saidD = "(d) “afé”, pieces \(partial): \(said(matchD)) → \(d17)"
+
+    let heldE = startOf(300)
+    fresh17("zzzz", playhead: heldE)
+    let noneE = current() == nil && pane.find.matches.isEmpty
+    _ = pressLikeApp(.command)
+    spin(0.3)
+    let e17 = noneE && view.selection == nil && document.inOutRange == nil
+        && document.playhead == heldE && typing() && pane.isFindOpen
+    let saidE = "(e) no match \(noneE): selection \(String(describing: view.selection)), range "
+        + "\(document.inOutRange != nil), playhead \(document.playhead) (was \(heldE)), first responder "
+        + "\(who()) → \(e17)"
+
+    fresh17("cafe")
+    let currentF = current()
+    let heldF = document.playhead
+    let tookF = commandReturn([.command, .shift]).map { window.performKeyEquivalent(with: $0) } ?? true
+    send(commandReturn([.command, .shift]))
+    spin(0.3)
+    let f17 = currentF != nil && !tookF && view.selection == nil && document.inOutRange == nil
+        && document.playhead == heldF && typing()
+    let saidF = "(f) ⌘⇧Return: key-equivalent door answered \(tookF) (want false); selection "
+        + "\(String(describing: view.selection)), range \(document.inOutRange != nil), playhead "
+        + "\(document.playhead) (was \(heldF)), first responder \(who()), current "
+        + "\(String(describing: currentF)) → \(String(describing: current())) → \(f17)"
+
+    fresh17("cafe")
+    let matchG = currentMatch()
+    _ = pressLikeApp(.command)
+    spin(0.3)
+    let heldG = matchSelected(matchG)
+    send(escape())
+    spin(0.2)
+    let clearedG = view.selection == nil && pane.isFindOpen
+    send(escape())
+    spin(0.2)
+    let closedG = !pane.isFindOpen && window.firstResponder === view
+    fresh17(nil)  // opens again on the kept text
+    let matchG2 = currentMatch()
+    _ = pressLikeApp(.command)
+    spin(0.3)
+    let heldG2 = matchSelected(matchG2)
+    let tokensG = model().tokens.count
+    let rebuildsG = pane.source.rebuilds
+    send(key(51, "\u{7f}", window: window))
+    _ = until(5) { pane.source.rebuilds != rebuildsG && pane.source.settled }
+    spin(0.3)
+    let stepG = document.undoManager?.undoActionName ?? ""
+    let deletedG = stepG == "Delete Words" && model().tokens.count < tokensG
+    let afterG = model().tokens.count
+    if stepG == "Delete Words" {
+        document.undoManager?.undo()
+        _ = until(5) { pane.source.settled && pane.source.model.tokens.count == 800 }
+        spin(0.3)
+    }
+    let g17 = heldG && clearedG && closedG && heldG2 && deletedG
+    let saidG = "(g) selected \(heldG); Esc cleared, bar open \(clearedG); Esc closed it, the text "
+        + "keeping the keys \(closedG); ⌘Return again \(heldG2), then ⌫: step “\(stepG)”, tokens "
+        + "\(tokensG) → \(afterG) → \(g17)"
+    row("F17", a17 && b17 && c17 && d17 && e17 && f17 && g17,
+        [saidA, saidB, saidC, saidD, saidE, saidF, saidG].joined(separator: "; "))
+    if pane.isFindOpen { pane.closeFind() }
+    view.select(nil)
+    spin(0.2)
+
+    // F18 Edit ▸ Find… on the Media tab (TX-45).
+    func descendants(_ root: NSView) -> [NSView] { root.subviews + root.subviews.flatMap(descendants) }
+    func mediaSearch() -> MediaSearchField? {
+        descendants(inspector.view).compactMap { $0 as? MediaSearchField }.first { $0.window != nil }
+    }
+    func mediaRowsShown() -> Int {
+        descendants(inspector.view).filter { $0 is MediaRowView && !$0.isHiddenOrHasHiddenAncestor }.count
+    }
+    func searchTyping(_ field: MediaSearchField?) -> Bool {
+        guard let field, let text = window.firstResponder as? NSTextView else { return false }
+        return text.delegate === field
+    }
+    var perTab: [String] = []
+    var tabsRight = true
+    let tabs18: [(String, InspectorTab, Bool)] = [
+        ("Clip", .clip, false), ("Document", .document, false), ("Assistant", .assistant, false),
+        ("Transcript", .transcript, true), ("Media", .media, true),
+    ]
+    for (name, tab, want) in tabs18 {
+        inspector.select(tab)
+        spin(0.3)
+        let answer = editor.validateUserInterfaceItem(item)
+        tabsRight = tabsRight && answer == want
+        perTab.append("\(name) \(answer)")
+    }
+    let a18 = tabsRight
+    let saidA18 = "(a) the validator: \(perTab.joined(separator: ", ")) (want false, false, false, "
+        + "true, true) → \(a18)"
+
+    let search = mediaSearch()
+    let name = document.project.snapshot.media.first?.name ?? ""
+    let prefix = String(name.prefix(3))
+    if let search { window.makeFirstResponder(search) }
+    spin(0.1)
+    _ = typeText(prefix)
+    window.makeFirstResponder(root)
+    spin(0.1)
+    editor.findInTranscript(nil)
+    spin(0.2)
+    let editorB = window.firstResponder as? NSTextView
+    let rangeB = editorB?.selectedRange() ?? NSRange(location: NSNotFound, length: 0)
+    let whole = NSRange(location: 0, length: (prefix as NSString).length)
+    // Pressed again with the caret at the end: the whole text selected again.
+    editorB?.setSelectedRange(NSRange(location: whole.length, length: 0))
+    editor.findInTranscript(nil)
+    spin(0.2)
+    let againB = (window.firstResponder as? NSTextView)?.selectedRange()
+    let b18 = search != nil && !prefix.isEmpty && searchTyping(search) && search?.stringValue == prefix
+        && rangeB == whole && againB == whole
+    let saidB18 = "(b) “\(prefix)” typed and the keys handed back; the action: field typing "
+        + "\(searchTyping(search)), selected \(rangeB) of “\(search?.stringValue ?? "no field")”; "
+        + "again from the caret at the end: \(String(describing: againB)) → \(b18)"
+
+    let shownBefore = mediaRowsShown()
+    _ = typeText("zzzz")
+    let shownNone = mediaRowsShown()
+    _ = typeText(prefix)
+    let shownAgain = mediaRowsShown()
+    let c18 = shownBefore == 1 && shownNone == 0 && shownAgain == 1
+    let saidC18 = "(c) rows shown \(shownBefore), “zzzz” \(shownNone), “\(prefix)” \(shownAgain) "
+        + "(want 1, 0, 1) → \(c18)"
+
+    send(returnKey([]))
+    spin(0.2)
+    let backD = window.firstResponder === root
+    send(key(49, " ", window: window))
+    let playedD = until(2) { editor.playback.isPlaying }
+    editor.playback.pause()
+    _ = until(2) { !editor.playback.isPlaying }
+    let d18 = backD && playedD
+    let saidD18 = "(d) Return: first responder \(who()) (want the content view), Space played "
+        + "\(playedD) → \(d18)"
+
+    let shutKey = InspectorSection.collapsedKeyPrefix + "media.files"
+    let defaults = UserDefaults.standard
+    let arguments = defaults.volatileDomain(forName: UserDefaults.argumentDomain)
+    let shutDomain: [String: Any] = [shutKey: true]
+    defaults.setVolatileDomain(
+        arguments.merging(shutDomain) { $1 }, forName: UserDefaults.argumentDomain)
+    inspector.select(.clip)
+    inspector.select(.media)
+    spin(0.3)
+    let shutField = descendants(inspector.view).compactMap { $0 as? MediaSearchField }.first
+    let shut = shutField?.isHiddenOrHasHiddenAncestor == true
+    let validShut = editor.validateUserInterfaceItem(item)
+    window.makeFirstResponder(root)
+    editor.findInTranscript(nil)
+    spin(0.2)
+    let stayedShut = window.firstResponder === root
+    defaults.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+    inspector.select(.clip)
+    inspector.select(.media)
+    spin(0.3)
+    let reopened = editor.validateUserInterfaceItem(item)
+    let e18 = shut && !validShut && stayedShut && reopened
+    let saidE18 = "(e) section shut \(shut): validator \(validShut) (want false), keys left with "
+        + "the content view \(stayedShut); opened again: validator \(reopened) → \(e18)"
+
+    editor.inspectorContainer.isHidden = true
+    spin(0.2)
+    let validHidden = editor.validateUserInterfaceItem(item)
+    window.makeFirstResponder(root)
+    editor.findInTranscript(nil)
+    spin(0.2)
+    let stayedHidden = window.firstResponder === root
+    editor.inspectorContainer.isHidden = false
+    spin(0.3)
+    let shownAgainF = editor.validateUserInterfaceItem(item)
+    let f18 = !validHidden && stayedHidden && shownAgainF
+    let saidF18 = "(f) inspector hidden: validator \(validHidden) (want false), keys left with the "
+        + "content view \(stayedHidden); shown again: validator \(shownAgainF) → \(f18)"
+
+    var g18 = false
+    var saidG18 = "(g) no field or scroll view"
+    if let field = mediaSearch(), let scroll = field.enclosingScrollView, let paneView = scroll.documentView {
+        let tall = paneView.heightAnchor.constraint(greaterThanOrEqualToConstant: 3000)
+        tall.isActive = true
+        spin(0.2)
+        window.layoutIfNeeded()
+        let foot = max(0, paneView.frame.height - scroll.contentView.bounds.height)
+        scroll.contentView.scroll(to: NSPoint(x: 0, y: foot))
+        scroll.reflectScrolledClipView(scroll.contentView)
+        spin(0.1)
+        func inSight() -> Bool {
+            let rect = field.convert(field.bounds, to: scroll.contentView)
+            return scroll.contentView.bounds.contains(rect)
+        }
+        let hiddenBefore = !inSight()
+        window.makeFirstResponder(root)
+        editor.findInTranscript(nil)
+        spin(0.2)
+        let shownAfter = inSight()
+        let typingG = searchTyping(field)
+        g18 = hiddenBefore && shownAfter && typingG
+        saidG18 = "(g) the pane \(paneView.frame.height) pt tall in \(scroll.contentView.bounds.height); "
+            + "the field out of sight \(hiddenBefore) at clip y \(foot); the action: in sight "
+            + "\(shownAfter) at clip y \(scroll.contentView.bounds.minY), typing \(typingG) → \(g18)"
+        tall.isActive = false
+        _ = typeText("")
+        window.makeFirstResponder(root)
+        scroll.contentView.scroll(to: .zero)
+        scroll.reflectScrolledClipView(scroll.contentView)
+        spin(0.2)
+    }
+    row("F18", a18 && b18 && c18 && d18 && e18 && f18 && g18,
+        [saidA18, saidB18, saidC18, saidD18, saidE18, saidF18, saidG18].joined(separator: "; "))
+    inspector.select(.transcript)
     document.close()
 } else {
-    for id in ["F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F12"] {
+    for id in ["F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F12", "F17", "F18"] {
         row(id, false, "the editor did not open on \(package)")
     }
 }

@@ -21,7 +21,8 @@ struct TranscriptFindState {
 /// into sight; Return and ⇧Return step; Esc or Done closes it and hands the
 /// keys back. **Find moves only the scroll position and its own marks** — no
 /// selection, range, playhead or undo step — so it has no MCP mirror: it
-/// edits nothing, like the Media tab's search.
+/// edits nothing, like the Media tab's search. ⌘Return (TX-43) is a click on
+/// the current match: that selection, seek and focus are the click's.
 extension TranscriptPane {
 
     var isFindOpen: Bool { find.isOpen }
@@ -30,6 +31,7 @@ extension TranscriptPane {
     func wireFind() {
         findBand.onQuery = { [weak self] _ in self?.findQueryChanged() }
         findBand.onStep = { [weak self] delta in self?.findStep(delta) }
+        findBand.onSelect = { [weak self] in self?.findSelect() }
         findBand.onClose = { [weak self] in self?.closeFind() }
         transcriptView.onEscape = { [weak self] in
             guard let self, self.find.isOpen else { return false }
@@ -117,6 +119,21 @@ extension TranscriptPane {
         find.current = next
         find.anchor = find.matches[next].tokens.lowerBound
         publishFind(reveal: true)
+    }
+
+    /// ⌘Return in the field (spec §11 TX-43): the current match becomes the
+    /// selection and the playhead goes to its first word, as a click on it
+    /// does (`TranscriptView.select(match:)`), and the transcript's text
+    /// takes the keys; the bar stays open. A beep with no current match.
+    func findSelect() {
+        guard find.isOpen, let window = self.window ?? find.window, let current = find.current,
+            find.matches.indices.contains(current)
+        else {
+            NSSound.beep()
+            return
+        }
+        window.makeFirstResponder(transcriptView)
+        transcriptView.select(match: find.matches[current].tokens)
     }
 
     private func search(reveal: Bool) {

@@ -16,7 +16,7 @@ Find searches the words in the [Transcript tab](/captions/transcript-tab/), so y
   alt="The inspector's Transcript tab with the find bar above the text: a field holding the letters typed, the count 1 of 3, the previous, next and Done buttons, and each match marked in yellow in the words below, the current one outlined."
 />
 
-Finding changes nothing in your project. It doesn't select words, set the in/out range, move the playhead or add an undo step.
+Searching and stepping through the matches change nothing. They don't select words, set the in/out range, move the playhead or add an undo step, until you [choose a match](#act-on-a-match).
 
 ## Open the find bar
 
@@ -28,7 +28,7 @@ Finding changes nothing in your project. It doesn't select words, set the in/out
 
 </Steps>
 
-**Find…** is available only while the Transcript tab is showing. If the bar is already open, <kbd>⌘F</kbd> puts the cursor back in its field with the text there selected.
+**Find…** opens this bar while the Transcript tab is showing. On the Media tab it puts the cursor in that tab's [search field](/projects/media-tab/#search-by-name) instead, and on the other tabs it isn't available. If the bar is already open, <kbd>⌘F</kbd> puts the cursor back in its field with the text there selected.
 
 ## What it finds
 
@@ -60,6 +60,14 @@ The cursor stays in the field while you step, so you can keep typing to narrow t
 ## Act on a match
 
 To move the playhead to a match, click its word in the text. That selects the word as [any click does](/captions/follow-the-transcript/#click-a-word-to-jump), and the find bar stays open.
+
+From the keyboard, press <kbd>⌘Return</kbd> in the field. It does what a click on the match does:
+
+- It selects the match's words. A match inside a word selects the whole word, and a phrase selects every word in it. The selection becomes the [in/out range](/captions/delete-words/#the-selection-becomes-the-range), as any selection in the text does.
+- It moves the playhead to the match's first word.
+- It gives the keyboard to the transcript text, so <kbd>⌫</kbd> [deletes the words](/captions/delete-words/) straight away.
+
+The find bar stays open. The first <kbd>⎋</kbd> clears the selection and the next one closes the bar. With no matches, <kbd>⌘Return</kbd> beeps and the cursor stays in the field.
 
 ## Close the find bar
 
