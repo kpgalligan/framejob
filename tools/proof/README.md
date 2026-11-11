@@ -1589,9 +1589,9 @@ mean nothing on a shape), `A.mov` is sections 6 and 9's media in nobody's use,
 and `B.mov` is only ever a PATH inside a paste payload. Its version packages are
 `work/phase9-v<n>.framejob` at FIXED names, which is safe for phase 2's reason
 inverted — they are never saved through the document machinery, only read — and
-it opens SIXTEEN documents in the instance (ten `new_project` — one per
-section that needs a clean fixture, and section 7 needs two — and six
-`open_project`), so the relaunch
+it opens ten `new_project` documents in the instance (one per section that
+needs a clean fixture, and section 7 needs two) and one `open_project` per
+readable format version, each of those closed, so the relaunch
 rule ("Relaunch the instance between proof sessions") is not optional for it:
 it closes none of the ten, and every run on one process leaves ten more open.
 No `ffmpeg`, no `swiftc`, no window server grant.

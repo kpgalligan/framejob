@@ -465,9 +465,11 @@ sample-for-sample comparison of two exports decoded to PCM (which needs
 `ffmpeg` at proof time). Its README says how to make the test media, run
 one, and which scores are known host-state skips (a locked console, a
 Bluetooth output). Add the next phase's proof there rather than writing a
-throwaway. An instance DEADLOCKS somewhere past forty documents open at once:
-a proof that closes what it opens (`close_project`) can share an instance, and
-one that does not relaunches between proof sessions.
+throwaway. Every open document costs an instance threads and memory
+(`tools/proof/README.md`, "Relaunch the instance between proof sessions", has
+the measured cost and what closing one gives back): a proof that closes what
+it opens (`close_project`) can share an instance, and one that does not
+relaunches between proof sessions.
 
 Spec §10's per-step verifications are the acceptance tests. What no script
 can answer — step 4's "the clip plays with audio", step 5's 60 fps, and the
