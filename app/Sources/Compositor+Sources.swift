@@ -81,7 +81,10 @@ extension MetalRenderer {
             else { return .absent }
             return lifting(rendered.texture, rendered.size)
         case .shape(let hash, let props):
-            guard let rendered = renderers.shape(props, hash: hash) else { return .absent }
+            // Spec §11 PR-16: a gradient is drawn deep where this key's frames are delivered deep.
+            let deep = RecipeSource.shared.deliversDeep(instruction?.recipeKey ?? 0)
+            guard let rendered = renderers.shape(props, hash: hash, deep: deep)
+            else { return .absent }
             return lifting(rendered.texture, rendered.size)
         case .graphic(let name, _, let frame, let props, let ctx):
             let size = layer.sourceSizeCG ?? CGSize(width: 640, height: 360)

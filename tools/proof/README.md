@@ -25389,6 +25389,52 @@ the build failing to name `with_deep_pixmaps`.
 AV1 and WebM rows' pixels (P11 holds their depth answer, and they pin their key through the same
 line as ProRes); raster time, which `graphic/tests/deep_bench.rs` prints unscored.
 
+## Issue #563 — a shape's gradient drawn at 16-bit float where its frame is deep (`raster_dither_proof.py` G0–G7, GEa–GEc; seven mutants; spec §11 PR-16)
+
+**What it proves.** First the measurement #563 asked for: what Core Graphics puts in a gradient
+shape's 8-bit texture, and what a deep frame and a `prores_422` file then hold. Then the cure: a
+shape that draws a gradient is drawn at 16-bit float in a frame delivered deeper than 8 bits, and
+every flat shape and every 8-bit delivery keeps its bytes.
+
+**The base.** G3 and GEa–GEc are scored against `--base DIR`, a `capture` made by the app as it
+was before PR-16 (any build of 692e3f5a or of a commit between PR-15 and PR-16). A capture also
+prints #563's verdict from its own ProRes file:
+
+    RC_PROOF_APP=/path/to/the/earlier/Frame\ Job\ Debug.app python3 tools/proof/raster_dither_proof.py capture tools/proof/work/raster-dither-base563
+    RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py --base tools/proof/work/raster-dither-base563 --only E1,D1,D5,D6,D7,G0,G1,G3,G5,G6,G7,GEa,GEb,GEc,Z1
+    python3 tools/proof/raster_dither_proof.py --app-mutant NAME --base tools/proof/work/raster-dither-base563
+
+Against this base D3 and D4 fail by design (the base already holds PR-15's deep graphics, so
+nothing halves), and B1–B4b need PR-13's control as before; E1 is the graphics' 8-bit claim.
+
+**Rows.** Fixture `shape563`: a project with no graphic module, one full-canvas rectangle with a
+linear 0° gradient `#0D1512` → `#2A4F3D`, 24 green levels over row 540's x 0–800. G0 prints the
+8-bit frame's figures (scored only on being an 8-bit PNG). G1, G5, G7: `render_frame` beside a
+16-bit still, beside a 10-bit HEVC clip, and beside one over an H.264 clip is a 16-bit PNG with at
+least 400 distinct greens, each within 1/8 level of the exact ramp. G6: the same in an HLG
+project, without the exact-value rule. G3: a `prores_422` export keeps at most half the base's
+noise and error, banding RMS at most 0.15; G4 prints a `hevc_10bit` export unscored. GEa: the
+8-bit frame equals the base's. GEb: the HLG project's JPEG equals the base's. GEc: a deep frame of
+flat shapes equals the base's.
+
+**Recorded.** The base (Debug at 692e3f5a, 2026-11-11): G0 26 levels, median run 2 px, widest 17,
+not monotonic, 76 of 81 rows differing from row 540, RMS of G − e 0.4066, worst 0.9922, worst
+block bias 0.0273; G1, G5 and G7 FAIL with 26 distinct values, G6 with 35; the ProRes file noise
+0.3786 and error 0.3887, so the verdict printed CURE (PR-15's base graphic: 0.3306 and 0.3460).
+With the cure (Release, 2026-11-11, 15/15 of the rows above): G1, G5 and G7 785 distinct values of
+801, worst 0.0296 of a level; G6 776; G3 noise 0.0000, error 0.1025, banding 0.0897 against
+0.0812, 1,578,575 bytes against 8,603,875; G4 banding 0.1054 against 0.1081, noise 0.0358 against
+0.0437; GEa, GEb, GEc and E1 equal. `precision_proof.py --only P1` 0.902 against 0.914 before.
+
+**Mutants** (each caught): `shape-never-deep` (G1, G3, G5, G6), `shape-always-deep` (GEa),
+`flat-shape-deep` (GEc), `export-not-marked` (G3), `shape-generator-frame-not-deep` (G5),
+`shape-reread-not-marked` (G7), `sdr-version-marked` (GEb). PR-15's `generator-frame-not-deep`
+was re-aimed at its moved line and run again (D5).
+
+**Not measured here.** How the ramp looks on a display (`docs/manual-checks.md` PRC-7); the draw
+time of a float gradient; the deep pool's size, which nothing over MCP observes; the AV1 and WebM
+rows' pixels, which mark their key through the same line as ProRes.
+
 ## Codec export C0 — the bundled encoders' link (`codecs_proof.py` L1–L3; `tools/codecs/build_codecs.py --selftest`; spec §11 CX-4, CX-5)
 
 `tools/codecs/build_codecs.py` (`make codecs`, and project.yml's "Build Codecs"

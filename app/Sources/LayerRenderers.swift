@@ -6,9 +6,12 @@ import UniformTypeIdentifiers
 /// The platform half of "text and shapes are described, not rasterized"
 /// (§11): a recipe carries the DESCRIPTION, and this turns it into pixels —
 /// Core Text for text, Core Graphics for shapes, ImageIO for stills — and
-/// hands the compositor a premultiplied BGRA `MTLTexture`, with ONE exception:
-/// a still whose decoded image is deeper than 8 bits a component is drawn
-/// into a 16-bit-float premultiplied RGBA bitmap and uploaded `rgba16Float`
+/// hands the compositor a premultiplied BGRA `MTLTexture`, with two exceptions.
+/// A shape that draws a gradient, in a frame delivered deeper than 8 bits, is
+/// drawn into the same 16-bit-float bitmap a deep still is (spec §11 PR-16,
+/// `shape(_:hash:deep:)`). And a still whose decoded image is deeper than 8
+/// bits a component is drawn into a 16-bit-float premultiplied RGBA bitmap
+/// and uploaded `rgba16Float`
 /// (`halfFloatBitmap` in sRGB, spec §11 PR-6), which the layer stage samples
 /// as it does `bgra8Unorm` (PR-2); and a still labelled HLG or PQ is drawn the
 /// same way in its OWN space (`halfFloatBitmap` in that space, spec §11 HD-19
@@ -68,6 +71,15 @@ final class LayerRenderers {
     private let lock = NSLock()
     private var layers = LRUCache<String, Rendered>(limit: LayerRenderers.cacheLimit)
     private var graphics = LRUCache<String, Rendered>(limit: LayerRenderers.graphicCacheLimit)
+    /// Gradient shapes drawn at 16-bit float (spec §11 PR-16), in a pool of their own for the
+    /// graphics' reason: a gradient animated by an action mints a texture a frame at 8 bytes a
+    /// pixel. A second pool also keeps a key's two depths from serving each other.
+    private var deepShapes = LRUCache<String, Rendered>(limit: LayerRenderers.graphicCacheLimit)
+
+    /// Which pool a texture is cached in.
+    enum Pool {
+        case layers, graphics, deepShapes
+    }
 
     /// A cached rasterization: the texture plus the SOURCE SIZE it was drawn
     /// at, which is what §5.3 placement uses for this layer.
@@ -98,19 +110,24 @@ final class LayerRenderers {
     /// milliseconds and the canvas overlay must not block on it. Two threads
     /// racing on the same miss render twice and the second store wins, which
     /// is cheaper than holding the lock across Core Text.
-    /// `graphic` picks the graphics' own pool (`graphicCacheLimit`).
-    func cached(_ key: String, graphic: Bool = false, _ make: () -> Rendered?) -> Rendered? {
+    /// `pool` picks the graphics' own pool or the deep shapes' (`graphicCacheLimit` each).
+    func cached(_ key: String, pool: Pool = .layers, _ make: () -> Rendered?) -> Rendered? {
         lock.lock()
-        let hit = graphic ? graphics.value(for: key) : layers.value(for: key)
+        let hit: Rendered?
+        switch pool {
+        case .layers: hit = layers.value(for: key)
+        case .graphics: hit = graphics.value(for: key)
+        case .deepShapes: hit = deepShapes.value(for: key)
+        }
         lock.unlock()
         if let hit = hit { return hit }
 
         guard let rendered = make() else { return nil }
         lock.lock()
-        if graphic {
-            graphics.insert(rendered, for: key)
-        } else {
-            layers.insert(rendered, for: key)
+        switch pool {
+        case .layers: layers.insert(rendered, for: key)
+        case .graphics: graphics.insert(rendered, for: key)
+        case .deepShapes: deepShapes.insert(rendered, for: key)
         }
         lock.unlock()
         return rendered
@@ -123,6 +140,7 @@ final class LayerRenderers {
         lock.lock()
         layers.removeAll()
         graphics.removeAll()
+        deepShapes.removeAll()
         lock.unlock()
     }
 
@@ -148,8 +166,18 @@ final class LayerRenderers {
     /// the model stores, with the stroke inset by half its width, so the
     /// texture's size and the recipe's `source_size` agree — if they did not,
     /// every hit-test and handle would be off by the stroke.
-    func shape(_ props: ShapeProps, hash: String) -> Rendered? {
-        cached("shape:" + hash) { self.renderShape(props) }
+    ///
+    /// `deep` is whether the frame is delivered deeper than 8 bits
+    /// (`RecipeSource.deliversDeep`). Only a shape that draws a gradient follows
+    /// it (spec §11 PR-16): Core Graphics dithers a ramp into an 8-bit bitmap,
+    /// and that dither is noise in a 10-bit file, so there the ramp is drawn at
+    /// 16-bit float instead. A flat shape is on a level at either depth and
+    /// keeps the 8-bit texture in every frame.
+    func shape(_ props: ShapeProps, hash: String, deep: Bool = false) -> Rendered? {
+        let deep = deep && props.drawsGradient
+        return cached("shape:" + hash, pool: deep ? .deepShapes : .layers) {
+            self.renderShape(props, deep: deep)
+        }
     }
 
     // MARK: - Measured layers
@@ -180,11 +208,16 @@ final class LayerRenderers {
     /// altogether — `drawLine` below is not even told about it — which is
     /// `radius`'s precedent, stored on every kind and read only by the
     /// rectangle arm.
-    private func renderShape(_ props: ShapeProps) -> Rendered? {
+    ///
+    /// `deep` draws the same calls into a `halfFloatBitmap` in sRGB, uploaded
+    /// `rgba16Float` (spec §11 PR-16): the ramp, and with it the shape's stroke
+    /// and edge, at 16-bit float with no dither.
+    private func renderShape(_ props: ShapeProps, deep: Bool) -> Rendered? {
         let size = CGSize(
             width: min(CGFloat(LayerRenderers.maxTextureSide), max(1, CGFloat(props.width).rounded(.up))),
             height: min(CGFloat(LayerRenderers.maxTextureSide), max(1, CGFloat(props.height).rounded(.up))))
-        guard let context = LayerRenderers.bitmap(size) else { return nil }
+        guard let context = deep ? LayerRenderers.deepShapeBitmap(size) : LayerRenderers.bitmap(size)
+        else { return nil }
         let strokeWidth = props.stroke.map { max(0, CGFloat($0.width)) } ?? 0
         // Inset by half the stroke so it lands INSIDE the box: the box is the
         // layer's source size and growing the texture would move the layer.
@@ -209,7 +242,17 @@ final class LayerRenderers {
         case .line, .arrow:
             drawLine(props, in: context, size: size, strokeWidth: strokeWidth)
         }
-        return upload(context, size: size)
+        return upload(context, size: size, pixelFormat: deep ? .rgba16Float : .bgra8Unorm)
+    }
+
+    /// The bitmap a deep gradient shape is drawn into: `halfFloatBitmap` in the
+    /// sRGB space `bitmap(_:)` holds, antialiased as it is.
+    private static func deepShapeBitmap(_ size: CGSize) -> CGContext? {
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+            let context = halfFloatBitmap(size, space: space)
+        else { return nil }
+        context.setAllowsAntialiasing(true)
+        return context
     }
 
     /// One area shape: the interior, then the outline.
@@ -255,13 +298,14 @@ final class LayerRenderers {
     /// rather than drawing nothing.
     ///
     /// One measured thing to know before reading a pixel off one of these:
-    /// `CGGradient` is sampled at pixel CENTRES and interpolated through a
-    /// table of its own, so a black-to-white ramp across 64 columns reads 2
-    /// at the first and 254 at the last (never 0 and 255), and the columns
-    /// between it wobble by up to 3/255 from the straight line — monotonic,
-    /// deterministic, identical row to row, but not arithmetic. Two ramps
-    /// that ought to be each other's mirror differ by that much for the same
-    /// reason.
+    /// `CGGradient` is sampled at pixel CENTRES, so a black-to-white ramp
+    /// across 64 columns reads 2 at the first and 254 at the last (never 0
+    /// and 255). And in an 8-bit bitmap Core Graphics DITHERS it (measured
+    /// for #563, spec §11 PR-16, on Darwin 25.5): a shallow ramp is within
+    /// one level of the straight line at every pixel, not monotonic, and
+    /// differs from row to row, though two draws are byte-equal. In a
+    /// half-float bitmap the same calls give the straight line with no
+    /// dither.
     private static func cgGradient(for gradient: Gradient) -> CGGradient? {
         let stops = gradient.sortedStops
         guard stops.count >= 2, let space = CGColorSpace(name: CGColorSpace.sRGB)

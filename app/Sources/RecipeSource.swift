@@ -56,6 +56,10 @@ final class RecipeSource {
     private var cursorWants: [Int: [CursorTrackRequest]] = [:]
     /// The keys that ever wanted a track: the owners `unregister` releases.
     private var cursorOwners = Set<Int>()
+    /// The keys whose frames are delivered deeper than 8 bits (spec §11 PR-16): an export's
+    /// for a row that keeps the depth, an offline frame's once it is known to come out deep.
+    /// A document's own key is never marked, so the preview never is.
+    private var deepKeys = Set<Int>()
     private var nextKey = 1
 
     /// What a key's cursor files are resolved from (`cursorSources`).
@@ -92,6 +96,7 @@ final class RecipeSource {
         cursorFiles.removeValue(forKey: key)
         cursorSources.removeValue(forKey: key)
         cursorWants.removeValue(forKey: key)
+        deepKeys.remove(key)
         // Released off this thread, never under the lock (CU-37 (e)): `Exporter.deinit` can
         // run inside `CursorTracks.wait`'s `cancelled()`, which holds the registry's lock that
         // `release` takes. Keys are never reused, so a late release drops no newer want.
@@ -203,6 +208,22 @@ final class RecipeSource {
         lock.lock()
         defer { lock.unlock() }
         return mediaURLs[instruction.recipeKey] ?? instruction.mediaURLs
+    }
+
+    /// Marks `key`'s frames as delivered deeper than 8 bits (spec §11 PR-16), until the key
+    /// is unregistered. Beside each of PR-15's marks, with or without a graphic set.
+    func markDeep(_ key: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        deepKeys.insert(key)
+    }
+
+    /// Whether `key`'s frames are delivered deeper than 8 bits: what a gradient shape's
+    /// texture depth follows (`LayerRenderers.shape`). False for a key never marked.
+    func deliversDeep(_ key: Int) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return deepKeys.contains(key)
     }
 
     /// The options published under `key`, for a caller that has to carry

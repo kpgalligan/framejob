@@ -254,6 +254,8 @@ final class Exporter {
         if let graphics = graphics {
             GraphicRegistry.shared.pin(graphics, for: key, deep: Exporter.graphicsDeep(settings))
         }
+        // Spec §11 PR-16: a gradient shape follows the row's depth, with or without graphics.
+        if Exporter.graphicsDeep(settings) { RecipeSource.shared.markDeep(key) }
 
         measureShare = Exporter.measuresLoudness(settings)
             ? (settings.isAudioOnly ? 0.5 : 0.1) : 0

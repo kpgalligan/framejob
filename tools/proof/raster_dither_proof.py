@@ -139,7 +139,9 @@ the mutant is caught when the build fails naming it. MUTANT PASS when every
 named test FAILED. PR-15's app mutants are `--app-mutant NAME`: `app/`,
 `core/`, `graphic/` and the rest of the tree copied by `tree_copy`, the anchor
 replaced, the Debug app built there, and the named rows run against it with
-`--base`; MUTANT PASS when every named row FAILED.
+`--base`; MUTANT PASS when every named row FAILED. PR-16's seven app mutants
+(`shape-never-deep` … `sdr-version-marked`) run the same way against PR-16's
+base.
 
 Exit 0 when every scored row passes (a mutant: caught); 1 when one failed (a
 mutant: survived); 2 when the control could not be performed.
@@ -331,13 +333,41 @@ APP_MUTANTS = {
                           "        default: return settings.preset != \"hevc_10bit\"\n        }\n    }\n\n"
                           "    /// Whether the recipe")], ["D4"]),
     "generator-frame-not-deep": ([(f"{SOURCES}/Exporter+Frame.swift",
-                                   "            drawsGraphic(project, at: t, options: options)\n",
-                                   "            drawsGraphic(project, at: t, options: options), "
-                                   "false\n")], ["D5"]),
+                                   "                && drawsGraphic(project, at: t, options: "
+                                   "options)\n",
+                                   "                && false\n")], ["D5"]),
     "reread-not-deep": ([(f"{SOURCES}/Exporter+Frame.swift",
                           "            if deepens { GraphicRegistry.shared.markDeep(key) }\n"
                           "            image = DeepStillFrame.read(",
                           "            image = DeepStillFrame.read(")], ["D7"]),
+    # Spec §11 PR-16's seven, one per decision it adds.
+    "shape-never-deep": ([(f"{SOURCES}/Compositor+Sources.swift",
+                           "renderers.shape(props, hash: hash, deep: deep)",
+                           "renderers.shape(props, hash: hash, deep: deep && false)")],
+                         ["G1", "G3", "G5", "G6"]),
+    "shape-always-deep": ([(f"{SOURCES}/Compositor+Sources.swift",
+                            "renderers.shape(props, hash: hash, deep: deep)",
+                            "renderers.shape(props, hash: hash, deep: deep || true)")], ["GEa"]),
+    "flat-shape-deep": ([(f"{SOURCES}/LayerRenderers.swift",
+                          "        let deep = deep && props.drawsGradient\n",
+                          "        let deep = deep || (false && props.drawsGradient)\n")],
+                        ["GEc"]),
+    "export-not-marked": ([(f"{SOURCES}/Exporter.swift",
+                            "        if Exporter.graphicsDeep(settings) { "
+                            "RecipeSource.shared.markDeep(key) }\n", "")], ["G3"]),
+    "shape-generator-frame-not-deep": ([(f"{SOURCES}/Exporter+Frame.swift",
+                                         "                drawsGradientShape(project, at: t, "
+                                         "options: options)\n",
+                                         "                false\n")], ["G5"]),
+    "shape-reread-not-marked": ([(f"{SOURCES}/Exporter+Frame.swift",
+                                  "            RecipeSource.shared.markDeep(key)\n"
+                                  "            if deepens { GraphicRegistry.shared.markDeep(key) }\n"
+                                  "            image = DeepStillFrame.read(",
+                                  "            if deepens { GraphicRegistry.shared.markDeep(key) }\n"
+                                  "            image = DeepStillFrame.read(")], ["G7"]),
+    "sdr-version-marked": ([(f"{SOURCES}/Exporter+Frame.swift",
+                             "            if keepsDepth { RecipeSource.shared.markDeep(key) }\n",
+                             "            RecipeSource.shared.markDeep(key)\n")], ["GEb"]),
 }
 CORE_PATCH = "[patch.crates-io]\n"
 
@@ -1196,7 +1226,7 @@ def run_app_mutant(name, base):
     """An app mutant (spec §11 PR-15): the tree copied, the anchor replaced,
     the Debug app built there and the named rows run against it."""
     edits, named = APP_MUTANTS[name]
-    print(f"#374 — the {name} APP MUTANT ({' '.join(named)} must FAIL)", flush=True)
+    print(f"#374, #563 — the {name} APP MUTANT ({' '.join(named)} must FAIL)", flush=True)
     tree = BASE / f"app-mutant-{name}"
     made, why = tree_copy.make_copy(str(tree))
     if made is None:
@@ -1254,7 +1284,8 @@ def main():
     parser.add_argument("--only", help="comma-separated rows to run and score")
     parser.add_argument("--mutant", choices=list(MUTANTS))
     parser.add_argument("--base", default=None,
-                        help="a capture made by the app before spec §11 PR-15 (E1, D3, D4)")
+                        help="a capture made by the app before spec §11 PR-15 (E1, D3, D4) "
+                             "or PR-16 (G3, GEa–GEc)")
     parser.add_argument("--app-mutant", choices=list(APP_MUTANTS))
     args = parser.parse_args()
     base = Path(args.base).resolve() if args.base else None

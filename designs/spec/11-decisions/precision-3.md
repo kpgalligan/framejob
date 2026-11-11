@@ -259,3 +259,91 @@ sibling file.
     preview and the 8-bit outputs should draw from the deep raster, which needs the
     compositor's output dither dropped on 2026-10-27 (recommended: leave it).
   - Amends PR-5 and PR-13.
+
+- **PR-16 — A shape's gradient is drawn at 16-bit float where its frame is delivered deeper
+  than 8 bits (#563).**
+  - The question PR-15 left ("whether a shape's Core Graphics gradient bands in a 10-bit export
+    was not measured") is settled here, and the answer is not "it bands". Core Graphics dithers
+    a gradient it draws into an 8-bit bitmap, so the ramp has no staircase; what a deep file
+    gets is that dithered 8-bit ramp, which is the state a graphic was in between PR-13 and
+    PR-15.
+  - Measured on the app before this decision (Debug at 692e3f5a, Darwin 25.5, 2026-11-11,
+    `raster_dither_proof.py capture`; fixture `shape563`, a 1920×1080 rectangle with
+    a linear 0° gradient `#0D1512` → `#2A4F3D`, green, row 540, x 0–800, where the exact ramp
+    `e` spans 24 levels):
+    - an 8-bit `render_frame`: 26 levels, median run 2 px, widest 17, not monotonic, 76 of rows
+      500–580 differing from row 540, RMS of G − e 0.4066 of a level, the worst 0.9922, the
+      worst 16-px block bias 0.0273. Dithered, about twice PR-13's ±7/16 span, and unbiased;
+    - `render_frame` beside a 16-bit still, beside a 10-bit HEVC clip and beside one over an
+      H.264 clip: a 16-bit PNG holding 26 distinct greens of 801, the worst 0.9602 of a level
+      from `e`; an HLG project's frame 35 distinct;
+    - a `prores_422` export: per-pixel noise kept 0.3786, error from `e` less its mean 0.3887,
+      banding RMS 0.0812, 8,603,875 bytes; a `hevc_10bit` export: 25 levels at median run 32 px,
+      noise 0.0437, banding RMS 0.1081 (the encoder strips the dither and bands, PR-15's limit).
+  - The verdict rule, fixed before the app was measured: cure when the 8-bit ramp's
+    `prores_422` file keeps at least the noise and the error PR-15's base measured for a
+    graphic's dithered raster (0.3306 and 0.3460), record the figures only when it keeps less.
+    0.3786 and 0.3887 are both above, so the cure is built. The owner's standing lean is to keep
+    precision; the cure is the one #563 names.
+  - The rule: a shape clip's texture is 16-bit float (`rgba16Float`, drawn in sRGB into
+    `LayerRenderers.halfFloatBitmap`) exactly when BOTH hold:
+    - the description draws a gradient: kind `rectangle` or `ellipse`, `gradient` set with at
+      least two stops (`ShapeProps.drawsGradient`);
+    - its frame is delivered deeper than 8 bits, PR-15's two cases word for word: a movie export
+      row for which `Exporter.graphicsDeep` is true, and a `render_frame` or File ▸ Save Frame…
+      as PNG or HEIC whose frame comes out deep (PR-9's still, PR-12's VP9 track, a frame the
+      generator answers deep, PR-14's re-read, and every such frame of an HLG project).
+  - Everything else is today's 8-bit bitmap, byte for byte: every flat shape, line and arrow in
+    any frame; every shape in the preview, `h264`, `hevc`, `hevc_alpha`, `vp9_alpha_webm`, SDR
+    `vp9_webm`, an HLG project's SDR version on those rows, an 8-bit PNG, every JPEG, GIF and
+    APNG, the eyedropper and look tiles; text and word captions everywhere (text has no gradient
+    fill).
+  - Why not deep everywhere: PR-15's reason. The compositor's 8-bit output is not dithered, so
+    an exact ramp rounded to 8 bits there would band (median run about 33 px on this fixture)
+    where Core Graphics' own dither does not.
+  - A frame showing only shapes is still an 8-bit PNG: a gradient shape is not a deep source
+    (PR-4). PR-15's held question (1) covers it and is not reopened.
+  - How: the "delivered deep" fact is a set of keys on `RecipeSource` (`markDeep`,
+    `deliversDeep`, cleared by `unregister`), because PR-15's flag lives on a graphic pin and a
+    project with no graphic set has none. It is marked beside each of PR-15's marks and never on
+    a document's own key: the export's key when `Exporter.graphicsDeep`; a frame the reader
+    reads, when `keepsDepth`; a frame the generator answers deep that draws a gradient shape
+    (`Exporter.drawsGradientShape`), which is then read once more through `DeepStillFrame.read`
+    as a graphic's is; PR-14's re-read. `MetalRenderer.source(for:)` hands the answer to
+    `LayerRenderers.shape(_:hash:deep:)`, which draws with the same Core Graphics calls into
+    the half-float bitmap. `GraphicRegistry`'s flag is not moved.
+  - The cache: deep shape textures sit in a pool of their own of `graphicCacheLimit` (6), for
+    the graphics' reason: a gradient animated by an action mints a texture a frame at 8 bytes a
+    pixel (66 MB at a full 4K canvas), and the shared pool's 64 would hold 4.2 GB of them. Two
+    pools also keep the depths from serving each other under one key. No ledger counts layer
+    textures (G-37 counts graphic rasters, CX-18 the encoders), and none is added.
+  - Limits:
+    - The preview and an 8-bit file show Core Graphics' dithered ramp and a deep file the exact
+      one, so they differ by up to about one 8-bit level a pixel.
+    - A deep gradient shape's stroke and antialiased edge are drawn in the same half-float
+      bitmap, so they differ from the 8-bit draw in their low bits too; a one-colour gradient
+      lands within half-float's step of its level.
+    - A `hevc_10bit` file gains little: the encoder bands a static smooth ramp itself (G4).
+    - More than six distinct deep gradient shapes on one frame are redrawn every frame: correct
+      and slower.
+  - Measured in the app with the cure (Release, 2026-11-11, `raster_dither_proof.py --base`,
+    the base the capture above; Debug gave the same figures): `render_frame` beside a 16-bit
+    still, beside a 10-bit HEVC clip and beside one over an H.264 clip, each a 16-bit PNG with
+    785 distinct greens of 801, the worst 0.0296 of a level from `e`, where the base held 26
+    (G1, G5, G7); an HLG project's frame 776 distinct against 35 (G6); a `prores_422` export's
+    per-pixel noise 0.0000 against 0.3786, its error from `e` less its mean 0.1025 against
+    0.3887, its banding RMS 0.0897 against 0.0812 (10-bit steps, which that figure cannot tell
+    from the base's dither), and its file 1,578,575 bytes against 8,603,875 (G3); a
+    `hevc_10bit` export banding 0.1054 against 0.1081 and noise 0.0358 against 0.0437 (G4, not
+    scored); the 8-bit frame, the HLG project's JPEG and a deep frame of flat shapes decode
+    equal to the base's (GEa, GEb, GEc), as do the graphics' 8-bit sheets and frames (E1).
+    `precision_proof.py` P1 (a gradient shape at 50 % through `prores_422` against the 8-bit
+    frame) read 0.902 ten-bit steps RMS against 0.914 before, bound 1.0.
+  - Mutants: seven, one per decision added, each caught (`raster_dither_proof.py --app-mutant`):
+    the read site never deep (G1, G3, G5, G6) and always deep (GEa), a flat shape drawn deep
+    (GEc), the export's key not marked (G3), a generator's deep frame not read again for a
+    gradient shape (G5), PR-14's re-read not marked (G7), and the reader's frame marked without
+    `keepsDepth` (GEb). PR-15's `generator-frame-not-deep` was re-aimed at its moved line and
+    run again (D5).
+  - No op, catalog, schema, recipe, FFI or format change; `RC_FORMAT_VERSION` is unchanged.
+  - Amends PR-5 and PR-15.

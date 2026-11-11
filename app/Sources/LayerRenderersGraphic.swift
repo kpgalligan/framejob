@@ -80,7 +80,7 @@ extension LayerRenderers {
             ctxJSON: ctxJSON)
         var refused: [GraphicDiagnostic]?
         var made = false
-        let rendered = cached(key, graphic: true) {
+        let rendered = cached(key, pool: .graphics) {
             made = true
             let raster: GraphicRaster
             do {
@@ -149,7 +149,7 @@ extension LayerRenderers {
         let hex = digest.map { String(format: "%02x", $0) }.joined()
         let key = "graphic-error:" + hex + ":"
             + "\(Int(size.width.rounded()))x\(Int(size.height.rounded()))"
-        return cached(key, graphic: true) {
+        return cached(key, pool: .graphics) {
             guard let context = LayerRenderers.bitmap(size) else { return nil }
             let bounds = CGRect(x: 0, y: 0, width: context.width, height: context.height)
             Self.paintErrorCard(text, in: context, bounds: bounds)

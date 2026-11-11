@@ -1017,6 +1017,13 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Expect:** every still looks the same as the export in the darks and shadows: no lifted or crushed blacks, no tint, the same brightness overall.
 - **Source:** issue batch B102 (spec §11 PR-11: every rendered frame's file is labelled BT.709, the tag every movie export carries); `frame_label_proof.py` F1 and F11 measure the label and the pixels, not how a viewer shows the file.
 
+**PRC-7 — A gradient shape is smooth in a ProRes file, and unchanged in the preview**
+- **Setup:** A 1920 × 1080 project with a background plate: a rectangle shape filling the canvas with a dark linear gradient (`#0D1512` to `#2A4F3D`), on a display you trust for dark tones, in a dim room.
+- **Do:** 1. Look at the paused preview at 100 %. 2. Export as ProRes 422 and as HEVC 10-bit; open each in QuickTime Player at full size and pause. 3. File ▸ Save Frame… as PNG with a 16-bit PNG still also on the frame; open it in Preview.
+- **Expect:** the preview looks as it did before (no rings; a fine grain at most); the ProRes file and the saved frame show no rings and no grain at all; the HEVC 10-bit file shows no more banding than the same export of a camera gradient would.
+- **Answer:** for each of the three, rings or none, grain or none; whether the ProRes file looks cleaner than the preview.
+- **Source:** spec §11 PR-16; `tools/proof/raster_dither_proof.py` measures the levels, the noise and the 8-bit paths' bytes (G0–G7, GEa–GEc), not how a dark gradient looks on a display.
+
 ## Grading
 
 These rows are run on a Release build (`make app`), with real camera footage of your own (1080p or 4K; a face, some sky or a wall with a soft gradient, and some foliage help), in a project you can spare or a copy of one. GRD-5 and GRD-6 need a `.cube` 3D LUT you own; GRD-8 spends from your own Assistant key and budget.

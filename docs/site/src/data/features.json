@@ -12479,7 +12479,7 @@
     {
      "id": "what-stays-8-bit",
      "name": "What stays 8-bit",
-     "summary": "Text, shapes, captions, thumbnails and screen recordings are 8-bit, and still sit at reference white in HDR (HLG). A graphic is drawn at 16 bits per channel in an export or saved frame that keeps the depth, and at 8 bits elsewhere.",
+     "summary": "Text, captions, flat shapes, thumbnails and screen recordings are 8-bit, and still sit at reference white in HDR (HLG). A graphic and a shape's gradient are drawn deeper in an export or saved frame that keeps the depth, and at 8 bits elsewhere.",
      "page": "hdr/precision",
      "anchor": "what-stays-8-bit"
     }

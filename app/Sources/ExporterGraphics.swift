@@ -61,6 +61,19 @@ extension Exporter {
         }
     }
 
+    /// Whether the recipe at `t` draws a shape layer with a gradient (`ShapeProps.drawsGradient`):
+    /// PR-16's question of a frame the generator answered deep, before it is read again with
+    /// that shape deep. A shape flattened out of a nest is a layer of the recipe like any other.
+    static func drawsGradientShape(
+        _ project: ReelProject, at t: Ticks, options: RecipeOptions
+    ) -> Bool {
+        guard let recipe = project.recipe(at: max(0, t), options: options) else { return false }
+        return recipe.layers.contains {
+            if case .shape(_, let props) = $0.source { return props.drawsGradient }
+            return false
+        }
+    }
+
     /// `.graphicsNotCompiled` when a graphic clip the export will draw has a
     /// module that failed to compile or has none, else nil. Nothing to gate
     /// with no set or an audio-only export. The clips are the top level's in

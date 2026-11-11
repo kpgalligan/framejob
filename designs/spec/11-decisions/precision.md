@@ -202,3 +202,5 @@ of twelve track layouts; it amends PR-4, PR-9 and PR-12.
   delivered deeper than 8 bits (a deep export row, a deep `render_frame` or Save Frame…); every
   other frame keeps the 8-bit raster, and text, shapes, word captions and 8-bit stills stay
   8-bit; the list is not edited.
+  **Amended by PR-16** (#563): a shape's gradient is drawn at 16-bit float where its frame is
+  delivered deeper than 8 bits, as a graphic is; flat shapes, text and word captions stay 8-bit.
