@@ -1582,6 +1582,11 @@ the key map behind it.
   more than commit cannot rely on Return reaching it in this window, and a
   multi-line view routes its own Return through `TextEditKey`
   (`tools/proof/text_focus_probe.swift`).
+  The one field whose Return is its own is the Transcript tab's find field
+  (spec §11 TX-37 (e)): `sendEvent` asks `TextFocus.keptReturn` first and
+  hands a `TextFocusKeepsReturn` field the key, ⇧ read from the event; and
+  `TextFocus.host(of:)` answers an enclosing `TextFocusHosting` view, so a
+  press on the find bar's own buttons keeps the typing.
   `EditorKey.isBare` is the bare-key map's modifier rule (⇧ ⇪ always;
   `.numericPad`/`.function` on function-key scalars; never ⌘ ⌥ ⌃), read by
   `handleEditorKey` (#61). `CanvasKey.isPlain` is the canvas keys' modifier
@@ -2193,7 +2198,9 @@ the key map behind it.
   `TranscriptTokens.swift` · `TranscriptView.swift` (+`Layout`, +`Highlight`, +`Keys`) ·
   `TimelineTranscript+Document.swift` · `EditorViewController+Transcript.swift` ·
   `AgentServer+TranscriptView.swift` · `TranscriptCut.swift` (+`Plan`, +`Pause`) ·
-  `TranscriptView+Delete.swift` · `TranscriptView+Pause.swift` — the Transcript tab (road map creator-jobs TX2a, spec
+  `TranscriptView+Delete.swift` · `TranscriptView+Pause.swift` · `TranscriptFind.swift` ·
+  `TranscriptFindBand.swift` · `TranscriptPane+Find.swift` · `TranscriptView+Find.swift` ·
+  `AgentServer+TranscriptFind.swift` — the Transcript tab (road map creator-jobs TX2a, spec
   §11 TX-20…TX-23, §4.3e). The pane is `AssistantPane`'s shape (one view built in `init`,
   exactly the visible height, its own `NSScrollView`), reaches the editor only through `TranscriptHost` (`inspector.parent`) and
   finds itself through a static weak table keyed by the inspector (`TranscriptPane.pane(in:)`);
@@ -2255,6 +2262,22 @@ the key map behind it.
   " [x.x s]" after its word, a click selects it exclusively of the word selection (`onSelectPause`)
   and the pane sets its cut as the range and seeks to it; ⌫ and the delete family send one
   "Delete Pause" (`transcriptDelete(_:name:)`).
+  Since #434 (spec §11 TX-37, TX-38): Edit ▸ Find… ⌘F (`findInTranscript`, with
+  `validateTranscriptAction`, one line in the frozen file after `validateRelayCaptionsAction`;
+  enabled while the tab shows). `TranscriptFind` is pure — the words as searched (token texts
+  joined by a space, paragraphs and collapses by a line break), the matches (case, diacritics and
+  width ignored, never overlapping, each a token range and its pieces), `current(in:atOrAfter:)`,
+  `step` and `label`. `TranscriptFindBand` is the bar, hidden at no height above the pane's scroll
+  view: `TranscriptFindField` (`DSField` chrome, its own delegate, a `TextFocusKeepsReturn`), the
+  count, ‹, › and Done; the band is a `TextFocusHosting`. `TranscriptPane+Find` holds
+  `TranscriptFindState` (view state, never saved) and `openFind`, `closeFind`, `hideFind`,
+  `findStep`, `findKeep` / `refreshFind` (a rebuild, called around `show` in `sourceChanged`).
+  `TranscriptView+Find` draws the marks under every other mark, measuring only the matches whose
+  tokens meet the dirty rect, and `revealFind` lays out the text from the top through the match
+  before it scrolls (a far rect and the view's height are estimates until then). Find moves only
+  the scroll and its marks. Out of sight the pane closes the bar and hands the keys to the content
+  view when the window itself or the transcript's text holds them (`handBackKeys`).
+  `transcript_view`'s `find` / `find_step` are `AgentServer+TranscriptFind.swift`'s.
 - `MediaPane.swift` · `MediaRowView.swift` (a row and the drag it starts,
   with `MediaDropMode` read from `NSEvent.modifierFlags` at the drop; an HDR
   still's row shows nothing until its step-0 tile lands, HD-21) ·
@@ -4919,7 +4942,8 @@ is a decision: Preview Quality, the preview window, Show Ungraded and the
 Scopes panel and its slot picks and zooms (spec §11 GR-4, GR-5, GR-10, GR-31;
 `render_frame {ungraded, waveform, parade, vectorscope, vectorscope_zoom,
 histogram}` is the capability), the export queue, the
-Media tab's search and sort, the Assistant tab (view state; the dev tool
+Media tab's search and sort, the Transcript tab's Find (spec §11 TX-37), the
+Assistant tab (view state; the dev tool
 `select_inspector_tab` shows it in a Release build, and the assistant's own
 calls already are tool calls) and Settings' Assistant pane (the key, the model
 and the chat settings are the person's, spec §11 AI-8, AI-11, AI-20) and

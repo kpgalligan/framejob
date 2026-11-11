@@ -360,6 +360,11 @@ the same way.
 - **Expect:** no kept word's start is clipped; no audible fragment of a deleted word is left; the pause after each cut sounds natural (no gasp, no doubled pause); in fast speech the end of the word before the cut is not eaten (TX-S3 chose the transcript's own edges, E0; since TX1b each on-device start is moved to where its sound begins, so a word after a pause starts on its sound, but in fast speech a start the voice model hears no gap before stays where the recogniser put it — note each cut that eats the word before, or leaves a slice of pause, with its time); each shortened pause sounds like a natural short pause, about 0.2 s of quiet each side, with no breath or word clipped.
 - **Source:** road map "creator-jobs" TX3a, TX1b and TX3b, spec §11 TX-30, TX-15, TX-34.
 
+**JOB-67 — Find in the Transcript tab with a real ⌘F**
+- **Do:** With a spoken clip placed and View ▸ Transcript (⌃⌘T) showing its words, press ⌘F. Type a word that occurs several times, then press Return a few times, ⇧Return once, click the bar's › and ‹, and press Esc. Then press Space, J, K and L. Open the bar again, click a marked word in the text, press Esc twice. Do it once in the light look and once in the dark, with the inspector dragged to its narrowest.
+- **Expect:** the bar opens above the text with the cursor in its field; every match is marked in yellow and the current one more strongly, with an outline, the words still easy to read in both looks; the count reads like "3 of 12" and nothing in the bar is cut off or overlaps at the narrowest width; Return, ⇧Return, › and ‹ move the current match and the text scrolls to it, the cursor staying in the field; the range and the playhead never move; Esc closes the bar, and Space, J, K and L work at once; the click selects the word and leaves the bar, the first Esc clears the selection and the second closes the bar.
+- **Source:** #434, spec §11 TX-37.
+
 ## Clip tab and action lane
 
 Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Action, ⌥⌘K).

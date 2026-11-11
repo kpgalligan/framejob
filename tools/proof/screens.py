@@ -103,8 +103,11 @@ SECOND = 600_000
 # persist nothing, so no instance's defaults move.
 VIEW_SELECTORS = ("toggleShowUngraded:", "toggleScopes:", "toggleShowSelection:",
                   "toggleLoudnessMeter:")
+# `transcript_view` is here for the Transcript tab's find bar (screen 11d, spec
+# §11 TX-38): Edit ▸ Find… is a `none` menu item that is no view toggle, and
+# the bar's text has no other door.
 STEP_TOOLS = ("set_selection", "set_playhead", "detect_silence", "perform_menu_item",
-              "cancel_sheet", "select_inspector_tab")
+              "cancel_sheet", "select_inspector_tab", "transcript_view")
 LOOKS = ("light", "dark")
 APPEARANCE_KEY = "RCDevAppearance"
 # Every launch holds each analysis job (spec §11 CJ-21's dev hold) so the

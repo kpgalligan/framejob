@@ -31162,3 +31162,51 @@ python3 tools/proof/voice_proof.py --menu
 python3 tools/proof/voice_proof.py --mutants menu-mixed-as-on,menu-mixed-unmarked,menu-none-unmarked,menu-amount-from-first,menu-pitch-kept,menu-targets-all,menu-order-flat
 python3 tools/proof/v2_menu.py --only H
 ```
+
+## #434 — Find in the Transcript tab (`transcript_find_proof.py` F0–F13, Z0, A1–A5; fourteen mutants; `transcript_tab_proof.py` Z0; spec §11 TX-37…TX-39)
+
+Edit ▸ Find… (⌘F) opens Frame Job's own find bar above the Transcript tab's text. The proof is
+`transcript_find_proof.py` with `transcript_find_probe.swift`; its package, fixtures and launch
+are `transcript_tab_proof.py`'s.
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_find_proof.py [--only IDS]
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_find_proof.py --mutant NAME | --mutants
+```
+
+- **Probe rows** (the app's own editor window in the probe's process, 400 preloaded words shown
+  twice; keys and clicks through `NSWindow.sendEvent`): F1 the search alone; F2 the validator
+  and the open; F3 typing from the highlighted word; F4 Return, ⇧Return and keypad Enter; F5
+  Esc and the keys after it; F6 a click on a word and two Escs; F7 a rebuild under the bar; F8
+  the follow; F9 hiding the tab; F10 27,000 words in 900 paragraphs on a bare view; F11 the
+  marks' pixels; F12 a press on the bar's Next and Done; F13 leaving the tab with the text
+  focused. A window that is not key dispatches no mouse-down to a view, so the probe's click
+  sends the press through `sendEvent` (K-4's rule runs there) and then hands it to the view it
+  hit; F12 requires Next to step by exactly one.
+- **App rows**: Z0 the argument set and no parity line; A1 the menu item refused as disabled on
+  the Clip tab and run on Transcript; A2 and A3 the matches against TX-37 (a), (b) computed in
+  Python from the answer's `tokens` (ASCII words only: the twin lowercases); A4 a
+  `ripple_delete_ranges` under the open bar; A5 `screens.py --only 11d-transcript-find`.
+- `transcript_view` is one of `screens.py`'s step tools since this batch (screen 11d).
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `return-leaves` | the window no longer asks `keepReturn` | F4 |
+| `across-paragraphs` | paragraphs joined by a space | F1 |
+| `case-sensitive` | the compare options dropped | F1 |
+| `anchor-ignored` | the current match always the first | F3 |
+| `find-selects` | a step selects its match | F4 |
+| `close-keeps-keys` | closing leaves the keys in the hidden field | F5 |
+| `follow-while-finding` | the follow not paused by the bar | F8 |
+| `stale-after-rebuild` | `refreshFind` not called on a rebuild | F7 |
+| `find-measures-all` | every match measured at draw | F10 |
+| `always-enabled` | the validator arm removed | F2 |
+| `hide-keeps-bar` | hiding the tab leaves the bar open | F9 |
+| `reveal-on-estimate` | the text above the match not laid out before the scroll | F10 |
+| `keys-left-behind` | `handBackKeys` not called | F13 |
+| `view-esc-passes` | Esc in the text does not close the bar | F6 |
+
+Recorded 2026-11-10 on this tree: Release (`RC_PROOF_APP=release`) 20/20; `--mutants` fourteen
+caught; `transcript_tab_proof.py --only Z0,B4` on Release 2/2; `text_focus_proof.py` 57/57;
+`v2_menu.py --only H` on Release 5/5. F10 measured the last of 27,000 words estimated at
+88,601 pt and revealed at 130,078 pt in 0.059 s.

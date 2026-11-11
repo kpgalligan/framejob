@@ -31,7 +31,8 @@ is held (`TranscriptTabSource.loadHold`, as U10): after the release the cloud
 words show with the new cache's pause and paragraph break.
 
 App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
-  Z0  no `Frame Job: ` line; `transcript_view` takes exactly click, focus,
+  Z0  no `Frame Job: ` line; `transcript_view` takes exactly click, find and
+      find_step (#434, TX-38; `transcript_find_proof.py` proves them), focus,
       language, project, read, select, select_pause (TX3b), stop_after, wait
       and words_from.
   M1  `perform_menu_item ["View","Transcript"]` shows the tab with the view
@@ -419,8 +420,9 @@ def app_rows(results, wanted, app_path, files):
                 complaints = [line for line in app.log().splitlines() if "Frame Job: " in line]
                 schema = app.mcp.schemas().get(TOOL, {}).get("inputSchema", {})
                 keys = sorted(schema.get("properties", {}))
-                return (not complaints and keys == ["click", "focus", "language", "project", "read",
-                                                    "select", "select_pause", "stop_after", "wait",
+                return (not complaints and keys == ["click", "find", "find_step", "focus",
+                                                    "language", "project", "read", "select",
+                                                    "select_pause", "stop_after", "wait",
                                                     "words_from"],
                         f"parity lines {complaints[:3]}; properties {keys}")
             run("Z0", z0)

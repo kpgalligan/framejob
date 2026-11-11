@@ -10138,6 +10138,24 @@
      "where": "Toolbar ▸ Loop, with words selected"
     },
     {
+     "id": "transcript-find",
+     "name": "Find in the transcript",
+     "summary": "Search the Transcript tab's words; every match is marked and the current one scrolled into view. It changes nothing in the project.",
+     "page": "captions/find-in-the-transcript",
+     "anchor": "open-the-find-bar",
+     "where": "Edit ▸ Find…",
+     "keys": "⌘F"
+    },
+    {
+     "id": "transcript-find-step",
+     "name": "Step through the matches",
+     "summary": "Return goes to the next match and ⇧Return to the previous one, wrapping at the ends.",
+     "page": "captions/find-in-the-transcript",
+     "anchor": "step-through-the-matches",
+     "where": "Transcript tab ▸ find bar",
+     "keys": "Return, ⇧Return"
+    },
+    {
      "id": "transcript-select-words",
      "name": "Selecting words",
      "summary": "Click a word, drag across a run, or extend with ⇧-click or ⇧ and an arrow, and ⌘A selects every word.",

@@ -4,8 +4,8 @@ import AppKit
 /// (one word, selected and sought, through `onActivate`), ↑ and ↓ (the word
 /// nearest in x on the adjacent laid-out line, the same), ⇧ with any of them
 /// (extend the selection, no seek), ⌘A (`selectAll(_:)`, which the nil-target
-/// Edit ▸ Select All reaches first), Esc (clear the selection, or pass the key
-/// up when there is none), and ⌫ and ⌦ with words selected (`deleteKey()`,
+/// Edit ▸ Select All reaches first), Esc (clear the selection; with none, close
+/// the find bar when it is open, spec §11 TX-37 (e), else pass the key up), and ⌫ and ⌦ with words selected (`deleteKey()`,
 /// TX3a, spec §11 TX-31: one "Delete Words"; Edit ▸ Delete's bare ⌫ reaches
 /// the editor's forward first). Since TX3b (TX-34) a click on a pause token
 /// selects it; Esc, ⌫ and ⌦ act on it, and the arrows move from the word
@@ -33,6 +33,7 @@ extension TranscriptView {
         case UInt32(NSUpArrowFunctionKey): line(up: true, extend: extend)
         case UInt32(NSDownArrowFunctionKey): line(up: false, extend: extend)
         case 27 where !extend && held: select(nil)
+        case 27 where !extend && onEscape?() == true: break  // the find bar closed (TX-37 (e))
         case 0x7F where !extend && held, UInt32(NSDeleteFunctionKey) where !extend && held:
             deleteKey()
         default: super.keyDown(with: event)

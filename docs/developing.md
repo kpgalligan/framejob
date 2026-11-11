@@ -322,7 +322,9 @@ to hold each job, `-RCDevAnalysisCanned YES` to honour canned analyses),
 `transcript_view` (what a window's Transcript tab and its bar show, after
 setting the bar's Words from or Language, pressing Read, focusing its view,
 selecting words or clicking one; `stop_after` presses the bar's Stop that many
-seconds after its answer), `playback_rebuilds` (each preview rebuild of a
+seconds after its answer; `find` opens the tab's find bar and types into it, or
+closes it with null, and `find_step` steps to the next or previous match),
+`playback_rebuilds` (each preview rebuild of a
 window since the last reset, with the milliseconds to its build and to its
 landing; launch with `-RCDevRebuildHold <s>` to hold each rebuild's landing)
 and `assistant_send` / `assistant_answer` (an assistant turn against a

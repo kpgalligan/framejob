@@ -59,6 +59,7 @@ extension UIMenu {
         "selectAllClipsOnTrack:": .plain,
         "selectAll:": .plain,
         "selectAfterPlayhead:": .plain,
+        "findInTranscript:": .plain,
         "insertAdjustmentClip:": .plain,
         "showGraphicBrowser:": .sheet,
         "insertTextBehindSubject:": .plain,

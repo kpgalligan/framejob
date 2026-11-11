@@ -38,9 +38,16 @@ final class TranscriptPane: InspectorPaneView {
     private(set) var bar: TranscriptBar!
     private let scroll = NSScrollView()
     private weak var lastProject: ReelProject?
+    /// The window the tab last showed in: a pane being removed has none.
+    private weak var shownWindow: NSWindow?
     private var shownRebuilds = -1
     /// The range the selection last set (TX-31); nil after a clear or a cut.
     private var rangeSet: TranscriptCut.Range?
+    /// Find (spec §11 TX-37, `+Find`): the bar above the text, no height
+    /// while closed, and its view state.
+    let findBand = TranscriptFindBand()
+    var find = TranscriptFindState()
+    private(set) var findHeight: NSLayoutConstraint!
 
     /// The pane each inspector made, weak to weak.
     private static let table = NSMapTable<InspectorViewController, TranscriptPane>.weakToWeakObjects()
@@ -69,10 +76,18 @@ final class TranscriptPane: InspectorPaneView {
         transcriptView.autoresizingMask = [.width]
         scroll.documentView = transcriptView
         addSubview(scroll)
+        findBand.isHidden = true
+        addSubview(findBand)
+        findHeight = findBand.heightAnchor.constraint(equalToConstant: 0)
+        wireFind()
         let collapse = heightAnchor.constraint(equalToConstant: 0)
         collapse.priority = NSLayoutConstraint.Priority(1)
         NSLayoutConstraint.activate([
-            scroll.topAnchor.constraint(equalTo: topAnchor),
+            findBand.topAnchor.constraint(equalTo: topAnchor),
+            findBand.leadingAnchor.constraint(equalTo: leadingAnchor),
+            findBand.trailingAnchor.constraint(equalTo: trailingAnchor),
+            findHeight,
+            scroll.topAnchor.constraint(equalTo: findBand.bottomAnchor),
             scroll.leadingAnchor.constraint(equalTo: leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: trailingAnchor),
             scroll.bottomAnchor.constraint(equalTo: bottomAnchor),
@@ -99,6 +114,19 @@ final class TranscriptPane: InspectorPaneView {
 
     // MARK: - Shown or not
 
+    /// Leaving its superview or its window, the find bar closes (TX-37 (h)).
+    /// On a tab change AppKit has already left the window first responder
+    /// by now (measured); `handBackKeys` then gives the keys to the editor.
+    override func viewWillMove(toSuperview newSuperview: NSView?) {
+        super.viewWillMove(toSuperview: newSuperview)
+        if newSuperview == nil { hideFind() }
+    }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        if newWindow == nil { hideFind() }
+    }
+
     override func viewDidMoveToSuperview() {
         super.viewDidMoveToSuperview()
         shownChanged()
@@ -124,8 +152,26 @@ final class TranscriptPane: InspectorPaneView {
 
     private func shownChanged() {
         let shown = isShown
-        if shown { lastProject = inspector?.document?.editedProject }
+        if shown {
+            lastProject = inspector?.document?.editedProject
+            shownWindow = window
+        } else {
+            hideFind()
+            handBackKeys()
+        }
         source.setShown(shown)
+    }
+
+    /// Out of sight, the tab holds no keys (spec §11 TX-37 (h)). AppKit
+    /// leaves the WINDOW first responder when the view that was — the
+    /// transcript's text, or the find field — is removed, and there a bare
+    /// key beeps; a hidden text would still take the arrows. Either way the
+    /// keys go to the content view, K-4's target.
+    private func handBackKeys() {
+        guard let window = shownWindow, let first = window.firstResponder else { return }
+        if first === window || first === transcriptView {
+            window.makeFirstResponder(window.contentView)
+        }
     }
 
     // MARK: - The inspector's calls
@@ -142,12 +188,13 @@ final class TranscriptPane: InspectorPaneView {
     }
 
     /// The playhead moved: the highlight follows it, kept in sight while
-    /// playing (TX-22). Nothing while the tab is not shown.
+    /// playing (TX-22) unless the find bar is open (TX-37 (f)). Nothing
+    /// while the tab is not shown.
     func playheadMoved() {
         guard isShown, let document = inspector?.document else { return }
         transcriptView.setHighlight(
             source.model.highlight(at: document.playhead),
-            follow: host?.transcriptIsPlaying ?? false)
+            follow: (host?.transcriptIsPlaying ?? false) && !find.isOpen)
     }
 
     /// A click on a clip while the tab shows (TX-20): its first word — for a
@@ -171,9 +218,11 @@ final class TranscriptPane: InspectorPaneView {
         let canvas = document.editedProject.snapshot.canvas
         // The pauses, once per rebuild, from the cut's table (TX-34).
         let pauses = TranscriptCut.pauses(source.cutTable(), fps: canvas.fps)
+        let found = findKeep()
         transcriptView.show(
             source.model, pauses: pauses, fps: canvas.fps, timecodeFrames: canvas.timecodeFrames)
         transcriptView.setHighlight(source.model.highlight(at: document.playhead), follow: false)
+        refreshFind(keeping: found)  // the matches over the new words (TX-37 (g))
         // The selection was re-mapped by identity: while the document's range
         // is still the one it set, the range follows it (TX-31) — a selected
         // pause's re-planned with no seek (TX-34).

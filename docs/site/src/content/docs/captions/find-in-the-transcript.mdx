@@ -1,0 +1,76 @@
+---
+title: "Find in the transcript"
+description: "Search the Transcript tab's words with ⌘F, step through the matches, and close the find bar when you're done."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import AtAGlance from '@components/AtAGlance.astro';
+
+Find searches the words in the [Transcript tab](/captions/transcript-tab/), so you can get to a moment by typing what was said. It marks every match in the text and scrolls to the one you're on.
+
+<AtAGlance menu="Edit ▸ Find…" keys="⌘F" where="Inspector ▸ Transcript" />
+
+Finding changes nothing in your project. It doesn't select words, set the in/out range, move the playhead or add an undo step.
+
+## Open the find bar
+
+<Steps>
+
+1. Show the Transcript tab, with **View ▸ Transcript** (<kbd>⌃⌘T</kbd>) or by clicking **Transcript** in the inspector.
+2. Choose **Edit ▸ Find…** (<kbd>⌘F</kbd>). The find bar opens above the text, with the cursor in its field.
+3. Type what you're looking for.
+
+</Steps>
+
+**Find…** is available only while the Transcript tab is showing. If the bar is already open, <kbd>⌘F</kbd> puts the cursor back in its field with the text there selected.
+
+## What it finds
+
+Find looks through the words the tab is showing. Upper and lower case don't matter, and neither do accents, so `cafe` finds "Café".
+
+- You can type part of a word, or several words in a row. A phrase is found only when its words are in the same paragraph.
+- A phrase is still found when a [pause](/captions/shorten-pauses/) sits between its words.
+- Timecodes and pause lengths aren't searched.
+
+The search covers what [Words from](/captions/transcript-words/) is showing, so with one track chosen it searches that track's words only.
+
+## The matches
+
+Every match is marked in yellow, and the one you're on is marked more strongly, with an outline. Beside the field, the bar counts them, as in "3 of 12", or says "No matches".
+
+The first match you land on is the first one at or after where you were: the selected words if there are any, otherwise the highlighted word, otherwise the top of the text on screen. The text scrolls to bring it into view.
+
+## Step through the matches
+
+| Key or button | What it does |
+| --- | --- |
+| <kbd>Return</kbd> or **›** | Go to the next match |
+| <kbd>⇧Return</kbd> or **‹** | Go to the previous match |
+
+After the last match, <kbd>Return</kbd> goes back to the first. With no matches, both beep.
+
+The cursor stays in the field while you step, so you can keep typing to narrow the search.
+
+## Act on a match
+
+To move the playhead to a match, click its word in the text. That selects the word as [any click does](/captions/follow-the-transcript/#click-a-word-to-jump), and the find bar stays open.
+
+## Close the find bar
+
+Press <kbd>⎋</kbd> or click **Done**. The marks go away, and the keyboard goes back to the transcript text if it had it when you opened the bar, otherwise to the timeline's keys.
+
+If you've clicked in the transcript text, the first <kbd>⎋</kbd> clears the selected words and the next one closes the bar.
+
+Switching to another inspector tab also closes the bar. What you typed is kept for that window, and is searched again the next time you open the bar.
+
+## While the bar is open
+
+- The text doesn't scroll to follow playback, so a match you're reading stays put.
+- If the words change, because you made an edit or more words were read, the matches are found again. The text doesn't scroll when this happens.
+
+## Related
+
+- [The Transcript tab](/captions/transcript-tab/)
+- [Follow along and jump](/captions/follow-the-transcript/)
+- [Cut by deleting words](/captions/delete-words/)
+- [Transcript keys](/captions/transcript-keys/)

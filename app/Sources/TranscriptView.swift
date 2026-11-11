@@ -29,6 +29,13 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
     /// A click on a pause token (spec §11 TX-34); nil when a person's clear
     /// dropped it. Never a rebuild's re-mapping.
     var onSelectPause: ((Int?) -> Void)?
+    /// Esc with nothing selected (spec §11 TX-37 (e)): true when the pane
+    /// took it, to close the find bar.
+    var onEscape: (() -> Bool)?
+    /// Find's matches and the current one (TX-37), drawn by `+Find`; set only
+    /// through `setFind`.
+    var findMatches: [TranscriptFind.Match] = []
+    var findCurrent: Int?
     /// The clock the 3 s follow pause reads (TX-22). Internal: a probe sets it.
     var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
 

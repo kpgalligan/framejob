@@ -364,7 +364,7 @@ act during it; and `-RCDevAnalysisCanned YES`, with which a canned analysis
 marker is honoured (spec §11 CJ-26); and `transcript_view`, which answers
 what a window's Transcript tab shows — its tokens, paragraphs, highlight,
 selection, fill and status — after focusing its view, selecting words or
-clicking one (road map "creator-jobs" TX2a, spec §11 TX-23); and
+clicking one, or driving its find bar (`find`, `find_step`, spec §11 TX-38) (road map "creator-jobs" TX2a, spec §11 TX-23); and
 `playback_rebuilds`, which answers a window's preview rebuilds since the last
 reset, each with the milliseconds to its build and to its landing (road map
 "creator-jobs" SW0, spec §11 SW-1), with the dev-only launch default

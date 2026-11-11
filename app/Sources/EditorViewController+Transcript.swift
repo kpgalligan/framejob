@@ -4,7 +4,8 @@ import AppKit
 /// TX-20…TX-22): View ▸ Transcript ⌃⌘T, and the `TranscriptHost` the pane
 /// reaches through `inspector.parent`. The command needs no validator arm: it
 /// falls through to `validateUserInterfaceItem`'s closing `return true`, as
-/// `showAssistant` does.
+/// `showAssistant` does. Edit ▸ Find… ⌘F (TX-37) has one,
+/// `validateTranscriptAction`, a line in the frozen file.
 extension EditorViewController: TranscriptHost {
 
     /// View ▸ Transcript ⌃⌘T: the inspector shown if it is hidden, the
@@ -14,6 +15,23 @@ extension EditorViewController: TranscriptHost {
         inspector?.select(.transcript)
         guard let inspector, let pane = TranscriptPane.pane(in: inspector) else { return }
         view.window?.makeFirstResponder(pane.transcriptView)
+    }
+
+    /// Edit ▸ Find… ⌘F (spec §11 TX-37): the Transcript tab's find bar. It
+    /// mirrors no edit — Find moves only the tab's scroll and its own marks.
+    @objc func findInTranscript(_ sender: Any?) {
+        guard let inspector, let pane = TranscriptPane.pane(in: inspector), pane.isShown else {
+            NSSound.beep()
+            return
+        }
+        pane.openFind()
+    }
+
+    /// Find… is offered only while the Transcript tab shows (TX-37).
+    func validateTranscriptAction(_ action: Selector) -> Bool? {
+        guard action == #selector(findInTranscript(_:)) else { return nil }
+        guard let inspector, let pane = TranscriptPane.pane(in: inspector) else { return false }
+        return pane.isShown
     }
 
     var transcriptIsPlaying: Bool { playback.isPlaying }

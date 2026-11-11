@@ -44,7 +44,8 @@ screens run in name order.
   steps run.
 - `steps`: calls, in order, `{"call": TOOL, "args": {…}}`. `TOOL` is one of
   `STEP_TOOLS`: `set_selection`, `set_playhead`, `detect_silence`,
-  `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`. Never give
+  `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`,
+  `transcript_view` (the Transcript tab's find bar, screen 11d). Never give
   `args` a `project`: `screens.py` adds the fixture's path to every call. A
   string `"$clip:<name>"` anywhere in `args` becomes that fixture clip's id.
   `"until_absent": KEY, "within": SECONDS` repeats the call every 0.5 s until its

@@ -384,6 +384,11 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   Esc is unchanged everywhere. Sheets, Settings
   and Welcome are other windows and keep AppKit's dialog keys. No MCP
   mirror: focus is view state, app/CLAUDE.md's exemption.
+  **Amended 2026-11-10, by TX-37:** the Transcript tab's find field is
+  (3)'s one exception — its Return and ⇧Return step to the next and the
+  previous match and the field keeps the keys (`TextFocus.keptReturn`) —
+  and for (1) the find bar is its field's host, so a press on the bar's
+  own buttons keeps the typing.
 - **K-5 — The canvas's keys take ⇧ ⇪ and the keypad and fn flags, an arrow on
   a focused canvas nudges a clip that is showing, and a press outside the
   canvas hands the keys back** (kpgalligan/framejob#463, 2026-11-05). The

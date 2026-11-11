@@ -720,3 +720,105 @@ anywhere, so nothing is keyed (CJ-3).
     Mutants: `polish-ignores-measuring` (P7) and `wait-ignores-measuring` (P6).
     `audio_ap6c_probe.swift`'s P5 also reads `isMeasuring` false after a no-render refusal.
   Amends AU-68 (e), AU-69 (e) and CU-101 (a), (j).
+
+## Find in the Transcript tab (#434, 2026-11-10)
+
+Recorded before the code. The owner asked for it on 2026-11-01 as "⌘F later, unless it comes
+free" (TX-20), and on 2026-11-10 to begin it. No owner question was asked.
+
+- **TX-37 — Edit ▸ Find… (⌘F) finds in the Transcript tab, in Frame Job's own bar.** The item is
+  the Edit menu's last, after a separator, enabled while the window's Transcript tab shows and no
+  sheet is attached, whatever has the keys. ⌘F was free; ⌘G and ⇧⌘G are Nest and Un-nest, so the
+  usual Find Next keys are not offered. **Not `NSTextFinder`**, which #434 named, for four
+  reasons: its bar is a system search field in the editor window, whose Return K-4 (3) spends
+  before the field sees it; it shows the current match by setting its client's selection, and a
+  selection here is the in/out range (TX-31), so every Return and every keystroke of an
+  incremental search would move the range; its only search string from code is the shared find
+  pasteboard, so a proof would write a system-wide pasteboard; and the panel's fields are
+  `DSField` chrome (the Media search's own reasoning). What that gives up: the find pasteboard
+  (⌘E) and the system bar's options. **No MCP mirror:** Find edits nothing and is view state,
+  never saved, as the Media tab's search is; an agent reads `get_timeline_transcript`.
+  - (a) **What is searched.** The words, not the view's string: each paragraph's token texts
+    joined by one space, paragraphs separated by a line break, and a line break rather than a
+    space before a token with `collapsedBefore > 0`. So a timecode, "⋯" and a pause label are
+    never matched, a phrase is found across a pause label, and no match spans a paragraph break
+    or a collapse.
+  - (b) **How.** The query as typed, not trimmed (as `MediaListFilter.search`), compared ignoring
+    case, diacritics and width (what `localizedStandardContains`, the Media search's test,
+    ignores), left to right, never overlapping. A match is its token range and, per token, the
+    part of that token's text it covers. A match covering no token character (a query of spaces)
+    is dropped; an empty query, or one holding a line break, has no matches.
+  - (c) **The current match.** An anchor token is set as the bar opens: the selection's first
+    token, else the highlighted word, else the top visible token, else 0. While typing, the
+    current match is the first one starting at or after the anchor, else the first. Return or
+    Next (›) moves to the next match and ⇧Return or Previous (‹) to the one before, wrapping,
+    and the anchor moves there. With no match they beep. The count reads "3 of 12", "No matches",
+    or nothing for an empty field.
+  - (d) **What Find moves.** Only the scroll position and its own marks. Every match is marked
+    behind its text in `NSColor.findHighlightColor` at 0.3, the current one at 0.65 with a 1.5 pt
+    outline of the same colour (a strength that keeps the words readable in both looks), under
+    the selection and the highlight; a phrase is one mark, and a pause label between two of its
+    words is not marked. The current match is scrolled into sight by `setHighlight`'s rule (a
+    third from the top when it is outside the margins), **after the text from the top through
+    the match is laid out**, the match's own paragraph invalidated first. One scroll onto a
+    measured rect is not enough: a far word's rect and the view's own height are estimates
+    until the text above is laid out (measured on 27,000 words in 900 paragraphs: the last word
+    estimated at 88,601 pt and laid out at 130,078 pt, in a view 979 pt tall, so the scroll was
+    clamped short; a paragraph measured early keeps its estimated place). Laying out all 27,000
+    words took 0.06 s, once; drawing still lays out only what shows. The selection, the range, the playhead and the undo stack are
+    untouched, bar open or closed. To act on a match the person clicks its word, which works
+    with the bar open and leaves it open. Only the matches whose tokens meet the dirty rect are
+    measured, so TX-21's viewport layout stands with a match in every word.
+  - (e) **Keys and focus.** ⌘F opens the bar and gives its field the keys, its text selected;
+    with the bar open it only does that again. In the field Return is (c)'s next and ⇧Return its
+    previous, and the field keeps the keys: K-4 (3)'s one exception, decided in the window with
+    the event in hand (`TextFocus.keptReturn`, asked before `leavesOnKey`; the field is a
+    `TextFocusKeepsReturn`), so ⇧ is read from the key itself. The bar is the field's host for
+    K-4 (1) (`TextFocusHosting`): a press on Previous, Next or the count leaves the keys in the
+    field. Tab and a click outside the bar still hand the keys back by K-4, and the bar stays
+    open. Esc in the field, Done, or Esc in the transcript's text with nothing selected (a
+    selection is cleared first, TX-21) closes the bar. Closing while the field holds the keys
+    hands them to the transcript's text when it had them as the bar opened, else to the window's
+    content view (K-4's target); keys anything else holds stay where they are.
+  - (f) **The follow waits** while the bar is open (TX-22): playback does not scroll a match away.
+  - (g) **A rebuild** (an edit, words landing, Words from, Language) recomputes the matches over
+    the new words. The current match stays on its first word by identity, else the first match
+    at or after that word's start; nothing scrolls.
+  - (h) **Hiding the tab** (another tab, Hide Inspector, the window closing) closes the bar; keys
+    its field holds go to the content view, never to a view not shown. The typed text is kept
+    for the window and searched again when the bar next opens. **Found here and fixed with it:**
+    AppKit leaves the WINDOW first responder when the view that was is removed, and there a bare
+    key beeps, so after leaving the tab with the transcript's text focused J, K and L were dead
+    (measured before the fix: first responder `EditorWindow`, L did not play). Out of sight, the
+    pane now hands the keys to the content view whenever the window itself or the transcript's
+    text holds them (`handBackKeys`), bar or no bar.
+  Amends TX-20 ("⌘F later" is built), TX-21 (Esc), TX-22 (the follow) and K-4 (1), (3).
+- **TX-38 — `transcript_view` drives Find.** `find: string | null` — a string opens the bar as
+  Edit ▸ Find… does and sets the field's text through the field's own change path; null closes
+  it by Esc's path. `find_step: "next" | "previous"` presses Return's or ⇧Return's path once,
+  after `find`; refused while the bar would be closed (no `find` and the bar closed, or
+  `find: null`). Applied after `click` or `select_pause`. The answer gains `find`: null while
+  the bar is closed, else `{query, count, current, matches: [{first, last}] (the first 200),
+  label, field_first_responder, current_visible}`. Amends TX-23.
+- **TX-39 — The proof.** `tools/proof/transcript_find_proof.py` with
+  `transcript_find_probe.swift`. Probe rows F0–F13 over the app's own editor window, keys and
+  clicks through `NSWindow.sendEvent` (a press is then handed to the view it hit, because a
+  window that is not key dispatches none; F12 holds that to one delivery): the search alone (F1), the validator and the open (F2),
+  typing and the anchor (F3), Return, ⇧Return and keypad Enter (F4), Esc and the keys after it
+  (F5), a click on a word and the two Escs (F6), a rebuild (F7), the follow (F8), hiding the tab
+  (F9), a bare view of 27,000 words with a match in every one — the fragments its draw lays out,
+  and the last match in sight once revealed (F10) — the marks' pixels (F11), a press on Next
+  with the field typing (F12), and leaving the tab with the text focused (F13). App rows Z0 and A1–A5 over MCP: the argument set, the menu item's validation,
+  the matches against the same rule computed in Python, phrases and paragraph breaks, a ripple
+  under an open bar, and screen 11d (the `fillers` fixture, "er" found three times;
+  `transcript_view` joins `screens.py`'s step tools for it, since Edit ▸ Find… is a `none` menu
+  item that is no view toggle). **Fourteen mutants**, one per decision, over the root rule's ten
+  because the plan's review named two decisions as unguarded and the build added two (the
+  reveal's layout and the keys handed back):
+  `return-leaves` (F4), `across-paragraphs` (F1), `case-sensitive` (F1), `anchor-ignored` (F3),
+  `find-selects` (F4), `close-keeps-keys` (F5), `follow-while-finding` (F8),
+  `stale-after-rebuild` (F7), `find-measures-all` (F10), `always-enabled` (F2),
+  `hide-keeps-bar` (F9), `view-esc-passes` (F6), `reveal-on-estimate` (F10) and
+  `keys-left-behind` (F13). Each is a probe mutant; the app rows are the same decisions read
+  through MCP and name none. How the bar and the marks look, and a real ⌘F, are
+  `docs/manual-checks.md`'s JOB-67.

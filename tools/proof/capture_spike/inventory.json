@@ -331,6 +331,13 @@
    ],
    "note": "a selection"
   },
+  "findInTranscript:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Transcript.swift `@objc func findInTranscript(`"
+   ],
+   "note": "view state: the Transcript tab's find bar, its field first responder (spec §11 TX-37); beeps when the tab is not shown"
+  },
   "insertAdjustmentClip:": {
    "verdict": "none",
    "code": [

@@ -180,6 +180,8 @@ transcript shows: stay and scroll; (3) the title is "Transcript" if T1 passes, e
   `y = max(1, (title.minY − diameter).rounded(.down))` in the flipped badge; at 280 pt the Assistant
   tab is about 56 pt and the old clamp put the dot on the word. Risk accepted: the transcript gets
   the inspector's 280–440 pt, and showing it hides the Clip tab.
+  **Amended 2026-11-10, by TX-37:** Find is built: Edit ▸ Find… (⌘F), Frame Job's own bar above
+  the text, not `NSTextFinder`.
 - **TX-21 — The transcript view is not an `NSText`**, so the editor's bare keys still reach
   `handleEditorKey`, with no change to a frozen file. It is TX-S2's candidate (b): a custom `NSView`
   laid out by TextKit 2 (`NSTextLayoutManager` over `NSTextContentStorage`, viewport layout).
@@ -204,6 +206,8 @@ transcript shows: stay and scroll; (3) the title is "Transcript" if T1 passes, e
   and TX5. Every other key goes to `super.keyDown`, so J, K, L, I, O and M work as on the
   timeline, and Space never reaches the view (`SpaceKey.route` takes it at the window). Arrows
   deviate on purpose: words here, frames on the timeline. A click makes the view first responder.
+  **Amended 2026-11-10, by TX-37:** Esc with nothing selected closes the find bar when it is
+  open, and passes up only when it is not.
 - **TX-22 — The view.** **The highlight** is the latest word whose start is at or before the
   playhead, lit through the pause after it (a binary search over the tokens, which are in start
   order), an accent-tinted rect behind the word; a move invalidates only the old and the new rects.
@@ -244,6 +248,7 @@ transcript shows: stay and scroll; (3) the title is "Transcript" if T1 passes, e
   the loop's range, and the follow re-centred a word near the top or bottom of the view under the
   pointer. The owner: "The text view scrolls vertically, even when I'm just trying to select
   horizontally."
+  **Amended 2026-11-10, by TX-37:** the follow also waits while the find bar is open.
 - **TX-23 — `transcript_view` is a dev tool** (Debug and Release, never Distribution), off main
   with every step through `onMain`: `transcript_view {project?, focus?: boolean, select?: [integer,
   integer] | null, click?: integer, wait?: number}`. It applies `focus` (the view made first
@@ -262,6 +267,7 @@ transcript shows: stay and scroll; (3) the title is "Transcript" if T1 passes, e
   the range set), each token also carries `cut_start` and `cut_end` (TX-30's `wordCut` over the
   tab's own table), and it answers `cut`: null with no selection, else `{selection, start, end,
   clips_after, clips_peak, refusal}`, the selection's TX-32 plan.
+  **Amended 2026-11-10, by TX-38:** it also takes `find` and `find_step` and answers `find`.
 
 TX-24…TX-27 are TX2b's (the Transcript tab's bar), recorded before its code. No owner question
 was asked: the road map names none for TX2b, and TX2a's answers of 2026-11-01 stand.

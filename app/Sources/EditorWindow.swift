@@ -79,11 +79,19 @@ enum TextFocus {
 
     /// Where a click keeps the typing: a field editor's field, or the
     /// `OptionFieldControl` that frames it (its margins and chevron are the
-    /// field's own); else the text view's scroll view, so a scroller is
+    /// field's own), or the `TextFocusHosting` view around it (the
+    /// Transcript tab's find bar, whose buttons are the field's own, spec
+    /// §11 TX-37 (e)); else the text view's scroll view, so a scroller is
     /// inside; else the text view.
     static func host(of text: NSTextView) -> NSView {
         if text.isFieldEditor, let field = text.delegate as? NSView {
-            return (field.superview as? OptionFieldControl) ?? field
+            if let framed = field.superview as? OptionFieldControl { return framed }
+            var around = field.superview
+            while let view = around {
+                if view is TextFocusHosting { return view }
+                around = view.superview
+            }
+            return field
         }
         return text.enclosingScrollView ?? text
     }
@@ -111,6 +119,19 @@ enum TextFocus {
         }
     }
 
+    /// K-4 (3)'s one exception (spec §11 TX-37 (e)): nil unless the key-down
+    /// `event` is a Return or keypad Enter that `leavesOnKey` would take
+    /// from a field editor whose field is a `TextFocusKeepsReturn`; then
+    /// whether ⇧ is held. The window asks this BEFORE `leavesOnKey`, hands
+    /// the field the key and spends it, so the field keeps the keys. Pure.
+    static func keptReturn(_ event: NSEvent, in text: NSTextView) -> Bool? {
+        guard event.keyCode == 36 || event.keyCode == 76,
+            text.delegate is TextFocusKeepsReturn,
+            leavesOnKey(event, in: text, fullKeyboardAccess: false)
+        else { return nil }
+        return event.modifierFlags.contains(.shift)
+    }
+
     /// True when a mouse-down whose content hit is `hit` leaves `text`: a
     /// hit outside its host. nil — the click is outside the content view,
     /// on the title bar — never leaves.
@@ -119,6 +140,17 @@ enum TextFocus {
         return !hit.isDescendant(of: host(of: text))
     }
 }
+
+/// A field whose Return is its own (spec §11 TX-37 (e)): the editor window
+/// hands it the key instead of taking the keys back, ⇧ read from the event.
+/// Only the Transcript tab's find field adopts it.
+protocol TextFocusKeepsReturn: AnyObject {
+    func returnPressed(backward: Bool)
+}
+
+/// A view whose whole area is its text field's host for `TextFocus.host`:
+/// a click on a control beside the field keeps the typing.
+protocol TextFocusHosting: NSView {}
 
 /// The bare-key map's modifier rule, read by `handleEditorKey` (#61).
 enum EditorKey {
@@ -174,6 +206,7 @@ final class EditorWindow: NSWindow {
 
     override func sendEvent(_ event: NSEvent) {
         // A key that leaves is spent; a click that leaves is then delivered.
+        if keepReturn(for: event) { return }
         if leaveText(for: event), event.type == .keyDown { return }
         leaveCanvas(for: event)
         switch SpaceKey.route(
@@ -190,6 +223,18 @@ final class EditorWindow: NSWindow {
         case .responder, nil:
             super.sendEvent(event)
         }
+    }
+
+    /// `TextFocus.keptReturn` applied: true when `event` was a Return the
+    /// field being typed in keeps (the find bar's next and previous), now
+    /// spent. Nothing is taken while a sheet is attached.
+    private func keepReturn(for event: NSEvent) -> Bool {
+        guard event.type == .keyDown, attachedSheet == nil,
+            let text = TextFocus.typing(firstResponder),
+            let backward = TextFocus.keptReturn(event, in: text)
+        else { return false }
+        (text.delegate as? TextFocusKeepsReturn)?.returnPressed(backward: backward)
+        return true
     }
 
     /// `TextFocus`'s rule applied: true when `event` left the text, first

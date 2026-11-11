@@ -49,8 +49,10 @@ extension TranscriptView {
         for rect in rects(for: tokenRange(tokens)) { setNeedsDisplay(rect.insetBy(dx: -3, dy: -2)) }
     }
 
-    /// The selection, a selected pause and the highlight, behind the text.
+    /// Find's matches, then the selection, a selected pause and the
+    /// highlight, behind the text.
     func drawMarks(in dirtyRect: NSRect) {
+        drawFindMarks(in: dirtyRect)
         drawPauseMark(in: dirtyRect)
         if let selection {
             DS.selectionFill.setFill()
