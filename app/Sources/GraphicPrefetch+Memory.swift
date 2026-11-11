@@ -298,7 +298,7 @@ extension GraphicPrefetch {
     /// Whether a background pass can take `slots` without its marked frames
     /// giving way: they, every held raster and `slots` within the budget. A
     /// pass ends `full` when not (G-38 (c)). `key` is unread since each slot
-    /// carries its own depth (spec §11 PR-18); its callers keep the spelling.
+    /// carries its own depth; its callers keep the spelling.
     /// Under `condition`.
     func roomAhead(for slots: [Slot], key _: Int) -> Bool {
         kept.aheadBytes + heldTotal + slots.reduce(0) { $0 + rasterBytes($1) }
@@ -306,7 +306,7 @@ extension GraphicPrefetch {
     }
 
     /// The bytes `slot`'s raster will hold: 4 a pixel, or 8 when the slot is
-    /// drawn deep (spec §11 PR-15; a matte member never is, PR-18). Any thread.
+    /// drawn deep (spec §11 PR-15). Any thread.
     func rasterBytes(_ slot: Slot) -> Int {
         slot.width * slot.height * (slot.deep ? 8 : 4)
     }

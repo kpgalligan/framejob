@@ -7,9 +7,9 @@
 // **A frame delivered deeper than 8 bits draws its graphics deep** (spec §11
 // PR-15): when the key's `resolve` answers `deep`, the raster is 16 bits a
 // channel and the texture `.rgba16Unorm`, under a key of its own (`:16`).
-// Every other key draws today's dithered 8-bit raster, byte for byte, and so
-// does a matte member under a deep key (PR-18): the matte's 8-bit coverage
-// would round the exact raster with no dither.
+// Every other key draws today's dithered 8-bit raster, byte for byte. A
+// matte member is drawn at its key's depth like any other layer: a deep
+// frame's matte coverage is deep too (PR-19).
 //
 // **The texture key is the SVG TEXT**, not the recipe's hash — a departure
 // from `LayerRenderers.swift`'s "the recipe's hash is the whole key", made
@@ -42,11 +42,10 @@ import Metal
 extension LayerRenderers {
 
     /// The texture for a `graphic` recipe layer at `size` — the graphic, or
-    /// its error card — or nil when `recipeKey` has no set. `matteMember`: the
-    /// layer is drawn into a matte (its `matte.into` is set, spec §11 PR-18).
+    /// its error card — or nil when `recipeKey` has no set.
     func graphic(
         name: String, frame: Int, propsJSON: String, ctxJSON: String,
-        size: CGSize, recipeKey: Int, matteMember: Bool
+        size: CGSize, recipeKey: Int
     ) -> Rendered? {
         guard let resolved = GraphicRegistry.shared.resolve(recipeKey) else { return nil }
         let set = resolved.set
@@ -75,7 +74,7 @@ extension LayerRenderers {
                 for: recipeKey)
         }
         let width = Int(size.width), height = Int(size.height)
-        let deep = resolved.drawsDeep(matteMember: matteMember)
+        let deep = resolved.deep
         let key = LayerRenderers.textureKey(
             svg: drawn.svg, width: width, height: height, libraryVersion: set.libraryVersion,
             deep: deep)
@@ -223,9 +222,9 @@ extension LayerRenderers {
 
 extension GraphicPrefetch {
     /// One graphic layer's inputs — exactly what `LayerRenderers.graphic` is
-    /// called with — and the depth it is drawn at (spec §11 PR-18: a matte
-    /// member under a deep key is not, so one graphic drawn both on a matte
-    /// track and on the canvas in one frame is two slots). Member order is
+    /// called with — and the depth it is drawn at, its key's (spec §11
+    /// PR-15), carried by the slot so a held raster counts its own bytes
+    /// (`rasterBytes`). Member order is
     /// load-bearing (`graphics_proof.py`'s `frame-plus-one` anchor in
     /// `LayerRenderersGraphic.swift`).
     struct Slot: Hashable {

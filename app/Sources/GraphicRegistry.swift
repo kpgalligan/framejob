@@ -246,12 +246,6 @@ final class GraphicRegistry {
         let set: GraphicSet
         let budgetMs: Int
         let deep: Bool
-
-        /// Whether one layer under this key is drawn deep: the key's depth, but never for
-        /// a matte member (spec §11 PR-18), whose values the matte's 8-bit coverage rounds
-        /// with no dither, where PR-15's exact raster bands and PR-13's dithered one does
-        /// not. The compositor and the prefetch's worker both ask it.
-        func drawsDeep(matteMember: Bool) -> Bool { deep && !matteMember }
     }
 
     /// The set a recipe under `key` draws with, and the per-frame budget:

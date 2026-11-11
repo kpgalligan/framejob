@@ -129,18 +129,20 @@ Issue #588, spec §11 PR-17: what PR-16 left unmeasured.
   full-canvas rectangle on the back track and `shape563` on a `luma` matte
   track in front of it (read back through `get_project`), exported
   `prores_422`, the frame at 0.5 s as `rgb48le`. The picture's green is the
-  matte's coverage, whose exact value is the gradient's Rec. 709 luma,
-  `m(x)` (19.08 → 69.83 levels). Holds: banding RMS ≤ 0.15 (D3's and B4b's
-  bound) and the row-540 50-px block means strictly increase. The coverage
-  is 8-bit (`r8`, PR-5), so a ramp drawn at 16-bit float is rounded there
-  with no dither and bands; PR-17 keeps a matte member's 8-bit dithered
-  draw. Printed, not scored: the noise kept, RMS of G − m less its mean, the
+  matte's coverage, whose exact value is the gradient's Rec. 709 luma, `m(x)`
+  (19.08 → 69.83 levels). Holds: banding RMS ≤ 0.15 (D3's and B4b's
+  bound) and the row-540 50-px block means strictly increase. An 8-bit
+  coverage (`r8`, PR-5) rounds a ramp drawn at 16-bit float with no dither,
+  and it banded; PR-17 kept a matte member's 8-bit dithered draw until
+  PR-19 made the coverage of a deep frame 16-bit and drew the member deep.
+  Printed, not scored: the noise kept, RMS of G − m less its mean, the
   row-540 runs, and the base's same figures.
 - **GMg** (#596, spec §11 PR-18): the same project with `band374`, a
   graphic, as the `luma` matte, `m` its radial gradient's Rec. 709 luma:
-  GM's rule. PR-15's deep raster takes no dither either, so PR-18 draws a
-  matte member's graphic as PR-13's dithered 8-bit raster in every frame.
-  Until PR-18 it was printed and not scored.
+  GM's rule. PR-15's deep raster takes no dither either, so PR-18 drew a
+  matte member's graphic as PR-13's dithered 8-bit raster in every frame,
+  until PR-19 (a 16-bit coverage in a deep frame) drew it deep again. Until
+  PR-18 it was printed and not scored.
 
 Issue #597, spec §11 PR-19: a matte's coverage in a frame delivered deeper than
 8 bits. The sources are precision_proof's own fixtures (`ramp_clip()`, the
@@ -191,12 +193,12 @@ named test FAILED. PR-15's app mutants are `--app-mutant NAME`: `app/`,
 replaced, the Debug app built there, and the named rows run against it with
 `--base`; MUTANT PASS when every named row FAILED. PR-16's seven app mutants
 (`shape-never-deep` … `sdr-version-marked`) run the same way against PR-16's
-base, as do #588's two and PR-18's two (`matte-graphic-deep`, the rule;
-`matte-graphic-call-deep`, the compositor's read of membership), whose GM and
-GMg rules are absolute, and PR-19's three (`coverage-never-deep`, the
-coverage's depth read off the frame's; `coverage-always-deep`, its 8-bit
-case; `frame-matte-not-reread`, the frame path's new arm), whose GMc, GMs and
-GMf rules are absolute and GMe's against the base.
+base, as do #588's `export-always-marked` and PR-19's three
+(`coverage-never-deep`, the coverage's depth read off the frame's, which GMc,
+GMs, GM and GMg see; `coverage-always-deep`, its 8-bit case;
+`frame-matte-not-reread`, the frame path's new arm), whose GMc, GMs, GM, GMg
+and GMf rules are absolute and GMe's against the base. PR-17's and PR-18's
+matte mutants went with the code PR-19 withdrew.
 
 Exit 0 when every scored row passes (a mutant: caught); 1 when one failed (a
 mutant: survived); 2 when the control could not be performed.
@@ -437,26 +439,18 @@ APP_MUTANTS = {
     "sdr-version-marked": ([(f"{SOURCES}/Exporter+Frame.swift",
                              "            if keepsDepth { RecipeSource.shared.markDeep(key) }\n",
                              "            RecipeSource.shared.markDeep(key)\n")], ["GEb"]),
-    # #588: the export's mark without its guard (GEd), and spec §11 PR-17's one decision (GM).
+    # #588: the export's mark without its guard (GEd).
     "export-always-marked": ([(f"{SOURCES}/Exporter.swift",
                                "        if Exporter.graphicsDeep(settings) { "
                                "RecipeSource.shared.markDeep(key) }\n",
                                "        RecipeSource.shared.markDeep(key)\n")], ["GEd"]),
-    "matte-shape-deep": ([(f"{SOURCES}/Compositor+Sources.swift",
-                           "                && layer.matte?.into == nil\n", "")], ["GM"]),
-    # #596, spec §11 PR-18: the rule (a matte member is never deep), and the compositor's read
-    # of membership (the worker's is `matte_proof.py`'s `matte-graphic-prefetch-deep`).
-    "matte-graphic-deep": ([(f"{SOURCES}/GraphicRegistry.swift", "{ deep && !matteMember }",
-                             "{ deep }")], ["GMg"]),
-    "matte-graphic-call-deep": ([(f"{SOURCES}/Compositor+Sources.swift",
-                                  "                matteMember: layer.matte?.into != nil)",
-                                  "                matteMember: false)")], ["GMg"]),
-    # #597, spec §11 PR-19: the coverage's depth follows the frame's (GMc, GMs), stays 8-bit in
-    # an 8-bit row (GMe), and a matted frame the generator answers deep is read again (GMf).
+    # #597, spec §11 PR-19: the coverage's depth follows the frame's (GMc, GMs, and GM and GMg,
+    # whose members are drawn deep), stays 8-bit in an 8-bit row (GMe), and a matted frame the
+    # generator answers deep is read again (GMf).
     "coverage-never-deep": ([(f"{SOURCES}/MetalRenderer.swift",
                               "            deep: RecipeSource.shared.deliversDeep(instruction?."
                               "recipeKey ?? 0))\n", "            deep: false)\n")],
-                            ["GMc", "GMs"]),
+                            ["GMc", "GMs", "GM", "GMg"]),
     "coverage-always-deep": ([(f"{SOURCES}/MetalRenderer.swift",
                                "            deep: RecipeSource.shared.deliversDeep(instruction?."
                                "recipeKey ?? 0))\n", "            deep: true)\n")], ["GMe"]),

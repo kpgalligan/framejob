@@ -172,8 +172,7 @@ case "hit":
     func ask() -> LayerRenderers.Rendered? {
         renderers.graphic(
             name: "nofont", frame: 0, propsJSON: "{}", ctxJSON: "{}",
-            size: CGSize(width: 1920, height: 1080), recipeKey: document.recipeKey,
-            matteMember: false)
+            size: CGSize(width: 1920, height: 1080), recipeKey: document.recipeKey)
     }
     let first = ask()
     let second = ask()

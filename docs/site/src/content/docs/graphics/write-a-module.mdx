@@ -159,7 +159,7 @@ A stored value whose key the schema no longer has is passed through to `render`,
 
 ## The SVG the engine draws
 
-Frame Job draws the string `render` returns with resvg, an SVG renderer. It draws text with the fonts graphics can use, images in PNG, JPEG, GIF, WebP and SVG, and compressed SVGZ images. Gradients are dithered so that dark ones don't band. In an export that keeps more than 8 bits, and in a frame saved deep, a graphic is drawn at 16 bits per channel, so a gradient keeps its levels and isn't dithered, unless the graphic is on a matte track; a group with a `filter` and the coverage of a luminance `mask` stay 8-bit there. See [Precision](/hdr/precision/).
+Frame Job draws the string `render` returns with resvg, an SVG renderer. It draws text with the fonts graphics can use, images in PNG, JPEG, GIF, WebP and SVG, and compressed SVGZ images. Gradients are dithered so that dark ones don't band. In an export that keeps more than 8 bits, and in a frame saved deep, a graphic is drawn at 16 bits per channel, so a gradient keeps its levels and isn't dithered; a group with a `filter` and the coverage of a luminance `mask` stay 8-bit there. See [Precision](/hdr/precision/).
 
 Anything you don't draw is transparent, so the tracks behind the clip show through. To fill the frame with a colour, pass `background` to [`svg()`](/graphics/module-api/#svg).
 

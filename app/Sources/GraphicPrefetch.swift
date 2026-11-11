@@ -409,7 +409,7 @@ final class GraphicPrefetch: @unchecked Sendable {
                 let slot = Slot(
                     name: name, frame: frame, width: Int(size.width), height: Int(size.height),
                     propsJSON: props, ctxJSON: ctx,
-                    deep: resolved.drawsDeep(matteMember: layer.matte?.into != nil))
+                    deep: resolved.deep)
                 wanted.append((slot, module))
             }
             guard !wanted.isEmpty else { continue }

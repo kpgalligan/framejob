@@ -61,7 +61,7 @@ A graphic always draws the same pixels for the same frame. What it draws depends
 
 In the preview, in an 8-bit export and in a frame saved at 8 bits, graphics are drawn in 256 levels per colour. Where a gradient has to round to those levels, Frame Job adds a fixed, very fine pattern of less than half a level, so a dark gradient shades smoothly instead of in steps. The pattern depends only on the pixel's position, so it doesn't crawl from frame to frame. Flat colours, pictures, text and transparency are drawn exactly, and there's nothing to set.
 
-In an export that keeps more than 8 bits, such as **HEVC 10-bit (MP4)**, AV1 or ProRes, and in a frame saved deep, a graphic is drawn at 16 bits per channel instead, unless it's on a [matte track](/canvas/matte-tracks/), where it stays at 8 bits. A gradient keeps its in-between shades there and needs no pattern. An 8-bit H.264 or HEVC export smooths the pattern away and the steps come back, so choose 10-bit or ProRes for a dark gradient. For the depth each format keeps, see [Precision and bit depth](/hdr/precision/).
+In an export that keeps more than 8 bits, such as **HEVC 10-bit (MP4)**, AV1 or ProRes, and in a frame saved deep, a graphic is drawn at 16 bits per channel instead. A gradient keeps its in-between shades there and needs no pattern. An 8-bit H.264 or HEVC export smooths the pattern away and the steps come back, so choose 10-bit or ProRes for a dark gradient. For the depth each format keeps, see [Precision and bit depth](/hdr/precision/).
 
 ## The graphics folder
 
