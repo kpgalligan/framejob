@@ -18422,7 +18422,7 @@ scored by `matte_proof.py`'s N5, under its two new mutants.
 
 ```
 python3 tools/proof/matte_pool_probe.py                  # no app; builds through swift_build.py
-python3 tools/proof/matte_pool_probe.py --mutant NAME    # no-release, give-ignored, trim-never, trim-early
+python3 tools/proof/matte_pool_probe.py --mutant NAME    # no-release, give-ignored, trim-never, trim-early, depth-kept
 python3 tools/proof/matte_proof.py --mutant free-ignores-liveness --only N5,Z1
 python3 tools/proof/matte_proof.py --mutant early-resolve --only N5,Z1
 ```
@@ -18438,6 +18438,7 @@ mutant builds a tree copy as MT2's section says.
 | `give-ignored` (`Compositor+Matte.swift`) | `giveComposite` frees nothing | P2 |
 | `trim-never` (`Compositor+Matte.swift`) | `endFrame` releases nothing | P2 |
 | `trim-early` (`Compositor+Matte.swift`) | the window is `keepFrames − 1` frames | P2 |
+| `depth-kept` (`Compositor+Matte.swift`, #597) | a depth change keeps the coverages | P4 (#597's section) |
 | `free-ignores-liveness` (`matte_proof.py`) | each step gives back only its own composite | N5 |
 | `early-resolve` (`matte_proof.py`) | a cut set resolves at its first matte's step | N5 |
 
@@ -25599,6 +25600,9 @@ GEa).
 matte beyond GMg's printed figures; `hevc`, `hevc_alpha` and the 8-bit WebM rows, which mark
 through the line GEd holds.
 
+**Since PR-19** (#597): `matte-shape-deep` went with PR-17's condition, which PR-19 withdrew. GM's
+rule stands, and PR-19's `coverage-never-deep` fails it.
+
 ## Issue #596 — a graphic as a matte in a deep export (`raster_dither_proof.py` GMg; `matte_proof.py` F1; three mutants; spec §11 PR-18)
 
 **What it proves.** GMg, printed since #588 and scored since #596: a white full-canvas card under
@@ -25643,6 +25647,60 @@ and the compositor's 8-bit) fails F1 at 0 hits, 1 missed. PR-15's `never-deep` (
 which the slot's `deep` member keeps apart; nothing over MCP reads the slots); a deep frame
 (`render_frame`) of a graphic matte, which takes the same call; a graphic CUT by a matte, which
 D1–D7's rule covers only without a matte.
+
+**Since PR-19** (#597): the three mutants went with PR-18's rule, which PR-19 withdrew. GMg's rule
+and F1 stand, and PR-19's `coverage-never-deep` fails GMg.
+
+## Issue #597 — a matte's coverage in a deep frame (`raster_dither_proof.py` GMc, GMs, GMe, GMf; `matte_pool_probe.py` P4; four mutants; spec §11 PR-19)
+
+**What it proves.** A matte's coverage is 16 bits where its frame is delivered deep, and 8 bits
+everywhere else. GMc: a white full-canvas card under `precision_proof.py`'s 10-bit ProRes 422 HQ
+ramp (`ramp_clip()`, grey, every 10-bit code across 1920 px) on a `luma` matte track, canvas
+background black, exported `prores_422`, the frame at 0.5 s as `rgb48le`; GMs: the same with
+`ramp16.png` (`still16_png()`). Each is scored against its control, the same source placed plainly
+and exported the same way (GMc0, GMs0): banding RMS at most `MATTE_BOUND` (0.15), the row-540
+block means strictly increasing, and row 540 holding at least half the control's distinct 16-bit
+greens. GMe: a 60 % grey card under the ramp clip, exported `h264`, decodes equal to the base's (an
+8-bit row keeps the 8-bit coverage; a white card would hide the difference). GMf: a `render_frame`
+PNG of GMc's project, which the generator answers deep with its key unmarked, against the clip's
+own frame (GMf0), by GMc's banding and distinct-green rules. `matte_pool_probe.py` P4: a depth
+change empties the pool's coverages and keeps its composites, and the next coverage is of the new
+depth's format; it prints one 3840×2160 coverage's `allocatedSize` at each depth. The fixtures
+come from `precision_proof.py` (imported), under `tools/proof/work/precision/media/`.
+
+    RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py capture tools/proof/work/raster-dither-pr19-before --only GM,GMg,GMc,GMs,GMe,GMf,Z1   # the measurement, on the app before PR-19
+    RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py --base tools/proof/work/raster-dither-base596
+    python3 tools/proof/raster_dither_proof.py --app-mutant coverage-never-deep|coverage-always-deep|frame-matte-not-reread --base tools/proof/work/raster-dither-base596
+    python3 tools/proof/matte_pool_probe.py [--mutant depth-kept]
+
+The base is #596's (the app at d530de3a^), captured with this script so it holds the new rows'
+files; GMe's file there decodes equal to the app's at b86b605e, the tree before PR-19.
+
+**Measured first** (Release at b86b605e, the app before PR-19; row 540, x 0–800): GMc banding RMS
+0.3431 against GMc0's 0.1126, 206 distinct 16-bit greens against 360; GMs 0.3369 against GMs0's
+0.0939, 215 against 366; GMf 0.2930 against GMf0's 0.0765, 107 against 689. The coverage rounds
+the ramp to 8-bit levels: it bands, which decided PR-19. The app at d530de3a^ (Debug) read the
+same figures.
+
+**Recorded** (Release after the gate's `make app`, `--base` as above; Debug gave the same
+figures): GMc 0.1126 with 360 distinct greens, GMs 0.0939 with 366 and GMf 0.0765 with 689, each
+its control's exactly; GMe equal to the base's; GM 0.0839, noise kept 0.0000, 1,350,095 bytes
+(0.0921, 0.4411 and 8,918,275 bytes with PR-17's dithered member), and GMg 0.0836, noise 0.0249,
+1,712,975 bytes (0.1043, 0.3964 and 8,836,195 bytes with PR-18's); E1, S1, D1–D7, G0–G7 and
+GEa–GEd pass as before, 25 rows; B1–B4b, F1 and F2 need PR-13's `--control`, which was not made.
+`matte_proof.py` 46/46, `hdr_proof.py --only HM,LM,Z1` 3/3, `graphics_proof.py` 51/51,
+`graphics_prefetch_proof.py` 7/7 (Release); `matte_pool_probe.py` 5/5, one 3840×2160 coverage
+allocated at 8,880,128 bytes `r8Unorm` and 17,235,968 bytes `r16Unorm` (Apple M2 Max).
+
+**Mutants** (each caught, Debug tree copies against the base; the probe's over a copy of one
+file): `coverage-never-deep` (the frame's depth not passed to the pool) fails GMc at 0.3431, GMs
+at 0.3369, GM at 0.2770 and GMg at 0.3398; `coverage-always-deep` fails GMe (worst |Δ| 2 levels,
+mean 0.1703 over rows 500–580); `frame-matte-not-reread` fails GMf at 0.2930 with 107 distinct
+greens; `depth-kept` fails P4 (the deep frame's coverage the old `r8Unorm` one). PR-16's
+`shape-never-deep` (G1, G3, G5, G6) and PR-15's `never-deep` (D1, D3, D5, D6), anchored beside
+lines PR-19 changed, were run again and caught. PR-19 withdrew PR-17's and PR-18's exceptions on
+the measurement of their own mutants on the new coverage, which survived: GM 0.0839 and GMg 0.0836,
+under the bound, with no dither noise.
 
 ## Codec export C0 — the bundled encoders' link (`codecs_proof.py` L1–L3; `tools/codecs/build_codecs.py --selftest`; spec §11 CX-4, CX-5)
 

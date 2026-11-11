@@ -65,6 +65,15 @@ into a sibling file.
     and `LayerRenderers.graphic` takes no `matteMember`. Kept: the prefetch slot's `deep` (a slot
     carrying its own depth is still right). A deep member never meets an 8-bit coverage: the
     graphics' deep pin is set only beside a `RecipeSource` mark.
+  - With it (Release, after the gate's `make app`; `raster_dither_proof.py --base` the app at
+    d530de3a^; Debug gave the same figures): GMc reads its control's figures exactly, banding RMS
+    0.1126 and 360 distinct greens; GMs 0.0939 and 366; GMf 0.0765 and 689; GMe decodes equal to
+    the base's; GM 0.0839, noise kept 0.0000 (0.0921 and 0.4411 before), and GMg 0.0836, noise
+    0.0249 (0.1043 and 0.3964); E1, D1–D7, G0–G7 and GEa–GEd pass as before, 25 rows in all (the
+    other seven, B1–B4b, F1 and F2, need PR-13's `--control` and were not run against one).
+    `matte_proof.py` 46/46 (E4 and E5 export through a matte deep; F1 1 hit, 0 mismatched),
+    `hdr_proof.py` HM and LM (an HLG project's luma mattes, within their bounds),
+    `graphics_proof.py` 51/51, `graphics_prefetch_proof.py` 7/7, `matte_pool_probe.py` 5/5.
   - Mutants: `coverage-never-deep` (the frame's depth not passed: GMc, GMs, GM, GMg fail),
     `coverage-always-deep` (GMe: the h264 export of a 60 % grey card under the ramp clip no
     longer decodes equal to the base's), `frame-matte-not-reread` (GMf), and
@@ -74,4 +83,4 @@ into a sibling file.
     longer rounded to 8 bits, so a soft edge or a product of mattes moves by under one 8-bit
     level, and a gradient shape or graphic on a matte track is drawn deep. No op, catalog,
     schema, recipe, FFI or format change; `RC_FORMAT_VERSION` is unchanged.
-  - Amends PR-5 (the `r8` coverage), MT-6 and MT-9; withdraws PR-17 and PR-18.
+  - Amends PR-1 and PR-5 (the `r8` coverage), MT-6 and MT-9; withdraws PR-17 and PR-18.

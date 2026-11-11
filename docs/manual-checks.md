@@ -990,6 +990,13 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Expect:** the nested dissolve plays without a stutter or a dark dip at its middle, and looks like the un-nested one; the nested zoom also plays without a dip, its picture as sharp as the un-nested zoom's to the eye.
 - **Source:** #252 (issue batch B90 phase 4, spec §11 MT-8).
 
+**MAT-4 — A 10-bit clip used as a Luma matte cuts smoothly in a ProRes file**
+- **Setup:** A 1920 × 1080 project, canvas background black: a full-canvas white rectangle shape on the back track and, on a track in front, a 10-bit ProRes or HEVC clip of a slow dark gradient (a sky at dusk; `precision_proof.py`'s `tools/proof/work/precision/media/ramp10_prores422hq.mov` is a full black-to-white ramp), its track set to Track ▸ Matte ▸ Luma. On a display you trust for dark tones, in a dim room.
+- **Do:** 1. Look at the paused preview at 100 %. 2. Export as ProRes 422 and as H.264; open each in QuickTime Player at full size and pause on the same frame. 3. File ▸ Save Frame… as PNG; open it in Preview.
+- **Expect:** the ProRes file and the saved frame show the gradient as smoothly as the clip itself on the canvas, with no steps; the preview and the H.264 file look as they did before this change (steps at most as fine as an 8-bit file shows).
+- **Answer:** for each of the four, steps or none; whether the ProRes file looks smoother than the H.264 one.
+- **Source:** spec §11 PR-19; `tools/proof/raster_dither_proof.py` measures the banding, the levels and the 8-bit row's bytes (GMc, GMs, GMe, GMf), not how a dark gradient looks on a display.
+
 ## Precision
 
 **PRC-1 — The preview looks as before**

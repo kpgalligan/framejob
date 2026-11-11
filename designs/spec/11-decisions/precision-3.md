@@ -402,7 +402,9 @@ sibling file.
     `shape-never-deep` and `shape-always-deep`, whose anchor is the next line, were run again
     and caught (G1, G3, G5, G6; GEa).
   - No op, catalog, schema, recipe, FFI or format change; `RC_FORMAT_VERSION` is unchanged.
-  - Amends PR-16. Amended by PR-18.
+  - Amends PR-16. Amended by PR-18. Withdrawn by PR-19 (#597): once a deep frame's coverage
+    is 16-bit, a matte member's gradient is drawn deep as PR-16 says, measured under the
+    bound without the dither's noise.
 
 - **PR-18 — A graphic on a matte track keeps its 8-bit dithered raster in every frame
   (#596).**
@@ -448,4 +450,6 @@ sibling file.
   - Pixels change for one case only: a graphic on a matte track in a deep export or a deep
     frame. No op, catalog, schema, recipe, FFI or format change; `RC_FORMAT_VERSION` is
     unchanged.
-  - Amends PR-15 and PR-17.
+  - Amends PR-15 and PR-17. Withdrawn by PR-19 (#597): once a deep frame's coverage is
+    16-bit, a matte member's graphic is drawn at its key's depth as PR-15 says, measured under
+    the bound without the dither's noise.

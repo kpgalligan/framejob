@@ -79,6 +79,8 @@ of twelve track layouts; it amends PR-4, PR-9 and PR-12.
     +532 MB. **Accepted as measured by the owner (2026-10-09):** "We shouldn't worry about 8g
     macs at all, and give only minimal concern to 16g macs." The +532 MB stop no longer applies
     to this road map; each phase still measures and records the footprints.
+  - Amended by PR-19 (#597): the coverage is `r16Unorm` in a frame delivered deeper than 8 bits;
+    every other frame keeps it `r8Unorm`.
 - **PR-2 — Every video source decodes to `64RGBAHalf` (choice 2).**
   - `sourcePixelBufferAttributes` asks every track for `kCVPixelFormatType_64RGBAHalf`, wrapped
     as `rgba16Float`.
@@ -204,3 +206,5 @@ of twelve track layouts; it amends PR-4, PR-9 and PR-12.
   8-bit; the list is not edited.
   **Amended by PR-16** (#563): a shape's gradient is drawn at 16-bit float where its frame is
   delivered deeper than 8 bits, as a graphic is; flat shapes, text and word captions stay 8-bit.
+  **Amended by PR-19** (#597): the `r8` coverage is `r16Unorm` in a frame delivered deeper than
+  8 bits, and 8-bit in every other; the list is not edited.
