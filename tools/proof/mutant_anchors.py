@@ -6,7 +6,7 @@
     python3 tools/proof/mutant_anchors.py --list       # every table and what was read from it
     python3 tools/proof/mutant_anchors.py --selftest   # the reader over synthetic proofs (make test)
     python3 tools/proof/mutant_anchors.py --mutant count-any|skip-unreadable|pins-one-way|\\
-        missing-file-zero|no-entry-check|loose-file-passes|copies-counted
+        missing-file-zero|no-entry-check|loose-file-passes|copies-counted|pin-per-anchor
 
 A proof's mutant is an anchor (a piece of source text) and its replacement; its applier demands
 that the anchor occurs exactly once in a file of the tree. When the source moves, the anchor rots,
@@ -36,13 +36,16 @@ Nothing is passed over silently. Each of these fails by name:
 - a mutant no anchor was read from in a table that has some, unless UNANCHORED names it;
 - a source file named in an entry that no rule took as an edit's file (a half-read entry);
 - an edit's file that is nowhere, or a bare name found under two folders;
-- an anchor that occurs 0 or 2+ times, unless ROTTED holds it with where it is filed (a table
-  in EVERY has an applier that replaces every occurrence, so its anchors need one or more);
+- an anchor that occurs 0 or 2+ times, unless ROTTED holds its mutant with where it is filed
+  (a table in EVERY has an applier that replaces every occurrence, so its anchors need one or
+  more). ROTTED is decided per MUTANT: a pinned mutant's anchors that still count are counted,
+  and only its dead ones are held, so a mutant with one dead edit of two can be pinned;
 - another top-level name containing `MUTANT`, unless NOT_TABLES names it (`MUTANT = None`,
   an instrument's own switch, needs no row);
 - a proof with the literal `--mutant` and no table, unless NO_TABLE names it;
 - a pin that no longer applies, in either direction (a row for a table that now has anchors, a
-  count that is off, a ROTTED anchor that counts once again, a name that is gone).
+  count that is off, a ROTTED mutant with no dead anchor counted under that table, a name that
+  is gone).
 
 A `--mutant` runs the selftest alone under one of the reader's own switches and must fail exactly
 its rows (EXPECTED).
@@ -73,11 +76,12 @@ MUTATORS = {"update", "append", "extend", "add", "insert", "setdefault", "pop", 
 EXPECTED = {
     "count-any": {"A3"},
     "skip-unreadable": {"U1", "U3"},
-    "pins-one-way": {"P2", "P3", "P4", "P6", "P8"},
+    "pins-one-way": {"P2", "P3", "P4", "P6", "P8", "P10", "P11"},
     "missing-file-zero": {"F1"},
     "no-entry-check": {"E1", "E3"},
     "loose-file-passes": {"E2"},
-    "copies-counted": {"C2"},
+    "copies-counted": {"C2", "P11"},
+    "pin-per-anchor": {"P9", "P10", "P11"},
 }
 MUTANT = None
 
@@ -131,7 +135,10 @@ UNANCHORED = {
     "raster_dither_proof.py": {"MUTANTS": ["core-unpatched"]},
 }
 
-# A known-dead anchor, left for a filed issue. (proof, table, mutant) → where it is filed.
+# A mutant with a known-dead anchor, left for a filed issue. (proof, table, mutant) → where it
+# is filed. The pin is the MUTANT's: its anchors that still count once are counted, its dead ones
+# are held, and the row fails ("drop the row") once none of its anchors counted under that table
+# is dead. A copy's rot is pinned under the first table, where it is counted.
 # These twelve were found by this check's first run (#554) and not re-aimed in it, because a
 # re-aim counts only once its mutant has been run and seen caught: `APP` needs a copy of the tree
 # built as an app and driven, `HAND` an app rebuilt and driven twice by hand, `BENCH` the raster
@@ -614,6 +621,9 @@ def scan(root, pins):
                                     "rule read an anchor for it: a half-read entry")
             if not edits:
                 without.append(mutant)
+            pin = pins["ROTTED"].get((proof, name, mutant))
+            per_anchor = MUTANT == "pin-per-anchor"
+            sound, dead, unplaced = [], 0, 0
             for file, anchor in edits:
                 paths = located(root, file)
                 key = (mutant, str(paths[0].resolve()) if len(paths) == 1 else str(file), anchor)
@@ -622,27 +632,38 @@ def scan(root, pins):
                     continue
                 counted += 1
                 if not paths:
+                    unplaced += 1
                     if MUTANT != "missing-file-zero":
                         report.fail("nofile", where, f"{where} {mutant}: no file {file}")
                     continue
                 if len(paths) > 1:
+                    unplaced += 1
                     report.fail("ambiguous", where, f"{where} {mutant}: {file} is ambiguous, "
                                 + " and ".join(str(p.relative_to(root)) for p in paths))
                     continue
                 times = paths[0].read_text(errors="replace").count(anchor) if anchor else 0
                 shown = paths[0].relative_to(root) if paths[0].is_relative_to(root) else paths[0]
-                pin = pins["ROTTED"].get((proof, name, mutant))
                 good = times >= 1 if MUTANT == "count-any" or every else times == 1
-                if good and pin and not one_way:
+                if good and pin and per_anchor and not one_way:
                     report.fail("pin", where, f"{where} {mutant}: ROTTED names it ({pin}) and "
                                 f"its anchor occurs once in {shown}: drop the row")
                 elif good:
                     report.counts["anchors"] += 1
+                    sound.append(str(shown))
                 elif pin:
                     report.counts["rotted"] += 1
+                    dead += 1
                 else:
                     report.fail("count", where, f"{where} {mutant}: anchor occurs {times} times "
                                 f"in {shown}: {first_line(anchor)!r}")
+            # The pin is the mutant's: it stands while one anchor counted here is dead. (An edit
+            # whose file could not be placed has failed above, and says nothing about the pin.)
+            if pin and not dead and not unplaced and not one_way and not per_anchor:
+                what = (f"its anchor occurs once in {sound[0]}" if len(sound) == 1
+                        else f"its {len(sound)} anchors each occur once" if sound
+                        else "no anchor of it is counted under this table")
+                report.fail("pin", where, f"{where} {mutant}: ROTTED names it ({pin}) and "
+                            f"{what}: drop the row")
         report.rows.append((proof, name, len(rows), counted + copies, len(without), copies))
         report.counts["copies"] += copies
         if switch is not None:
@@ -902,6 +923,19 @@ def selftest(mutant=None):
     report = one("P8", good, SWITCHES={"p_proof.py": {"MUTANTS": 1}})
     row("P8", said(report, ["pin"], "SWITCHES names it and 1 anchors were read"),
         f"a SWITCHES row for a table that has anchors fails: {shown(report)}")
+    half = ('MUTANTS = {"m": (["R1"], [("A.swift", "let a = 1\\n", ""), '
+            '("A.swift", "let gone = 1\\n", "")])}\n')
+    rotted = {("p_proof.py", "MUTANTS", "m"): "#0"}
+    bare, report = one("P9a", half), one("P9", half, ROTTED=rotted)
+    row("P9", said(bare, ["count"], "p_proof.py MUTANTS m: anchor occurs 0 times")
+        and not report.fails and report.counts["anchors"] == 1 and report.counts["rotted"] == 1,
+        "a mutant with two edits, one dead: unpinned it fails for the dead one alone; with its "
+        f"ROTTED row the good anchor is counted and the dead one held: {shown(bare)}; pinned "
+        f"{shown(report)}, {report.counts['anchors']} counted, {report.counts['rotted']} rotted")
+    report = one("P10", 'MUTANTS = {"m": (["R1"], [("A.swift", "let a = 1\\n", ""), '
+                 '("A.swift", "let b = 1\\n", "")])}\n', ROTTED=rotted)
+    row("P10", said(report, ["pin"], "ROTTED names it (#0) and its 2 anchors each occur once"),
+        f"a ROTTED row for a mutant whose two anchors are both back fails, once: {shown(report)}")
     dead = '"m": ("A.swift", "let a = 9\\n", "")'
     root = tree("C2", {"a_probe.py": "MUTANTS = {" + dead + "}\n",
                        "b_proof.py": ("from a_probe import MUTANTS\nAPP_MUTANTS = {}\n"
@@ -913,6 +947,13 @@ def selftest(mutant=None):
     row("C2", said(report, ["count"], "a_probe.py MUTANTS m") and report.counts["copies"] == 1,
         f"a dead anchor copied into a second table is reported once, under the first: "
         f"{shown(report)}, copies {report.counts['copies']}")
+    report = scan(root, pins(ROTTED={("a_probe.py", "MUTANTS", "m"): "#0",
+                                     ("b_proof.py", "APP_MUTANTS", "m"): "#1"}))
+    row("P11", said(report, ["pin"], "b_proof.py APP_MUTANTS m: ROTTED names it (#1) and no "
+                    "anchor of it is counted under this table") and report.counts["rotted"] == 1,
+        "a copy's rot is pinned under the first table: the first table's row holds it, and a "
+        f"row for the copy holds nothing and fails: {shown(report)}, rotted "
+        f"{report.counts['rotted']}")
 
     shutil.rmtree(SCRATCH, ignore_errors=True)
     failed = {name for name, ok in results if not ok}

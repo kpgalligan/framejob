@@ -1978,8 +1978,8 @@ said so until someone ran the mutant. Standard library only; no app, no build, a
 ```
 python3 tools/proof/mutant_anchors.py              # the check (make test)
 python3 tools/proof/mutant_anchors.py --list       # every table: mutants, anchors read, copies
-python3 tools/proof/mutant_anchors.py --selftest   # K0, U2, C1, A1–A3, F1, F2, U1, U3, E1–E3, H1, P2–P8, C2 (make test)
-python3 tools/proof/mutant_anchors.py --mutant count-any|skip-unreadable|pins-one-way|missing-file-zero|no-entry-check|loose-file-passes|copies-counted
+python3 tools/proof/mutant_anchors.py --selftest   # K0, U2, C1, A1–A3, F1, F2, U1, U3, E1–E3, H1, P2–P11, C2 (make test)
+python3 tools/proof/mutant_anchors.py --mutant count-any|skip-unreadable|pins-one-way|missing-file-zero|no-entry-check|loose-file-passes|copies-counted|pin-per-anchor
 ```
 
 **What it reads.** Every `tools/proof/**/*.py` outside `work/`, itself left out. A proof is
@@ -2018,7 +2018,7 @@ table and the mutant, and each has one answer:
 
 | The line says | The answer |
 |---|---|
-| `anchor occurs 0 times` / `N times` | The source moved. Re-aim the anchor and its replacement at the same defect (lengthen an anchor that now repeats), run the mutant, and see it caught. Only when it cannot be run now: a `ROTTED` row saying where it is filed. |
+| `anchor occurs 0 times` / `N times` | The source moved. Re-aim the anchor and its replacement at the same defect (lengthen an anchor that now repeats), run the mutant, and see it caught. Only when it cannot be run now: a `ROTTED` row saying where it is filed. The row is the MUTANT's: its anchors that still count are counted and only its dead ones are held, so a mutant with one dead edit of several is pinned the same way. A copy's rot is pinned under the first table, the one the line names. |
 | `no file X` / `X is ambiguous` | Spell the path from the repo root in the table. |
 | `UNREADABLE, <exception>` | The table needs something the reader could not evaluate. Keep its expression to constants, pure helpers and sibling constants. |
 | `no anchor read from any of its N mutants` | A new shape: a `HINTS` row when the file is implicit in the applier; `SWITCHES` with the count when the mutants are switches inside the instrument or have no tree text. |
@@ -2027,7 +2027,7 @@ table and the mutant, and each has one answer:
 | `not the shape HINTS says` | The entry or the `HINTS` row is wrong. |
 | `a top-level name containing MUTANT that is no table` | Make it a table the reader knows, or name it in `NOT_TABLES`. |
 | `takes --mutant and has no mutant table` | Give the proof a table, or name it in `NO_TABLE`. |
-| `<PIN> names it and …` | The pin no longer applies: drop or correct the row. Every pin is exact in both directions, as `gate.py`'s `TYPECHECK_BASELINE` is: a `SWITCHES` count that is off, a `ROTTED` anchor that counts once again, an `UNANCHORED` mutant that has an anchor, a name that is gone. |
+| `<PIN> names it and …` | The pin no longer applies: drop or correct the row. Every pin is exact in both directions, as `gate.py`'s `TYPECHECK_BASELINE` is: a `SWITCHES` count that is off, a `ROTTED` mutant with no dead anchor counted under that table (every anchor is back, or it is a copy counted under an earlier table), an `UNANCHORED` mutant that has an anchor, a name that is gone. |
 
 **The pins as landed** (#554): seven `HINTS` rows; `SWITCHES` for fifteen tables in twelve
 instruments (71 mutants); two `UNANCHORED` mutants (`assistant_session_proof.py` `key-echo`,
@@ -2051,11 +2051,17 @@ string; E1 a mutant with no anchor and no pin; E3 a table with none and no pin; 
 entry; H1 an entry that is not its hinted shape; P2 a `SWITCHES` count off by one; P3 a `ROTTED`
 row whose anchor is back; P4 an `UNANCHORED` row for a mutant that has an anchor; P5 a new
 `MUTANT` name; P6 a `NO_TABLE` row for a proof that has a table; P7 `--mutant` with no table
-and no row; P8 a `SWITCHES` row for a table that has anchors; C2 a dead anchor copied into a
-second table, reported once. Each mutant is a switch inside the reader and fails exactly its
+and no row; P8 a `SWITCHES` row for a table that has anchors; P9 a mutant with two edits, one
+dead, which fails unpinned for the dead one alone and passes with its `ROTTED` row, the good
+anchor counted and the dead one held; P10 a `ROTTED` row for a mutant whose two anchors are both
+back, failing once; C2 a dead anchor copied into a second table, reported once; P11 that tree
+with a `ROTTED` row for each table, where the first table's row holds the rot and the copy's
+row holds nothing and fails. Each mutant is a switch inside the reader and fails exactly its
 rows: `count-any` (one or more accepted) A3; `skip-unreadable` U1, U3; `pins-one-way` (a stale
-pin passes) P2, P3, P4, P6, P8; `missing-file-zero` F1; `no-entry-check` E1, E3;
-`loose-file-passes` E2; `copies-counted` (a copy reported again) C2.
+pin passes) P2, P3, P4, P6, P8, P10, P11; `missing-file-zero` F1; `no-entry-check` E1, E3;
+`loose-file-passes` E2; `copies-counted` (a copy reported again) C2, P11; `pin-per-anchor`
+(`ROTTED` tested on each anchor, so a pinned mutant's good edit fails "drop the row") P9, P10,
+P11.
 
 **What it does not see.** An anchor inside a function (the nineteen `NO_TABLE` proofs), or
 behind a callable in an entry. A mutant's REPLACEMENT: that it still compiles and is still
@@ -2066,8 +2072,8 @@ row MA stay; this check agrees with them (21 mutants and 28 anchors; 10 and 10).
 |---|---|
 | The first run, before any re-aim | 195 proofs, 210 tables, 2,057 mutants; 2,048 anchors once; 24 anchors failed in 16 proofs: 20 occur 0 times, 4 twice |
 | After twelve re-aims and twelve `ROTTED` rows | exit 0: 2,060 anchors occur exactly once, 30 copies, 12 pinned as rotted |
-| `--selftest` | 22/22 |
-| Each of the seven `--mutant`s | `MUTANT PASS`, exactly its rows |
+| `--selftest` | 25/25 |
+| Each of the eight `--mutant`s | `MUTANT PASS`, exactly its rows |
 | On the tree: one character of `qualifier_proof.py`'s first anchor changed; a comment appended to an anchored source line; an entry calling an undefined name | exit 1 each: `occurs 0 times`, `occurs 0 times`, `UNREADABLE, NameError` |
 
 **The twelve re-aimed, each mutant run once and caught:** `camera_recording_probe.py`
