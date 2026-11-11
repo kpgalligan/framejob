@@ -113,6 +113,8 @@ HINTS = {
 # text. proof → table → the number of mutants, so one added there fails until the row says so.
 SWITCHES = {
     "bt709_fixture.py": {"MUTANTS": 4},
+    # `main` rebinds `budget.BUDGETS` or `budget.anthropic_worst_row` in memory.
+    "budget_proof.py": {"MUTANTS": 2},
     "camera_spike/camera_spike.py": {"MUTANTS": 5},
     "constant_render_spike.py": {"MUTANTS": 3},
     "cursor_spike/cursor_spike.py": {"MUTANTS": 15},
@@ -126,6 +128,9 @@ SWITCHES = {
     "matte_spike/matte_spike.py": {"MUTANTS": 2},
     # `MUTANT` in its own scan: the pin comparison, the untracked walk, the exempt prefixes.
     "name_residue.py": {"MUTANTS": 3},
+    # `main` changes the loaded table or the fetched page in memory. Both need its one
+    # network GET, so neither was run when the table was written (2026-11-11).
+    "prices_crosscheck.py": {"MUTANTS": 2},
     # `MUTANT` in its own launch-argument read, input filter and two stale markers.
     "proof_app.py": {"MUTANTS": 4},
     "proof_defaults.py": {"MUTANTS": 3},
@@ -139,6 +144,8 @@ SWITCHES = {
 UNANCHORED = {
     # Builds nothing: launch A of the built app, K1 last.
     "assistant_session_proof.py": {"MUTANTS": ["key-echo"]},
+    # In memory: every cache_read rate doubled; one expected number of the reducer's case.
+    "prices_proof.py": {"MUTANTS": ["py-disagrees", "reduce-disagrees"]},
     # Copies `core/` without the vendored tiny-skia patch: a file swap, no text edit.
     "raster_dither_proof.py": {"MUTANTS": ["core-unpatched"]},
 }
@@ -179,11 +186,10 @@ NOT_TABLES = {
 # table to read.
 NO_TABLE = {
     "assistant_clearing_proof.py", "assistant_compaction_proof.py", "assistant_helper_proof.py",
-    "assistant_prompt_proof.py", "budget_proof.py", "codec_import_proof.py",
+    "assistant_prompt_proof.py", "codec_import_proof.py",
     "container_import_proof.py", "defaults_proof.py",
     "graphics_spike/graphics_spike.py", "graphics_spike/rows_local.py", "makefile_env_proof.py",
-    "op_contract_proof.py", "open_documents_proof.py", "prices_crosscheck.py",
-    "prices_proof.py",
+    "op_contract_proof.py", "open_documents_proof.py",
 }
 
 PINS = {"HINTS": HINTS, "SWITCHES": SWITCHES, "UNANCHORED": UNANCHORED, "ROTTED": ROTTED,

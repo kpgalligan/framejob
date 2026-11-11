@@ -77,6 +77,9 @@ AUGUST = datetime.datetime(2026, 8, 31, 23, 59, 0, tzinfo=UTC)
 ROWS = ["P", "F1", "F2", "G1", "G2", "G3", "W", "S1", "S2", "S3", "S4", "U1", "U2",
         "R1", "R2", "R3", "R4", "A1", "A2", "A3", "A4", "A5", "N"]
 RESULTS = []
+# The mutants, as `mutant_anchors.py` reads them: both rebind a name of `budget` in memory
+# (`main`), no tree text.
+MUTANTS = ("no-budget", "unknown-as-zero")
 
 
 def score(row, ok, detail, *, instrument=False):
@@ -620,7 +623,7 @@ def row_a5():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--mutant", choices=["no-budget", "unknown-as-zero"],
+    parser.add_argument("--mutant", choices=MUTANTS,
                         help="break one thing in memory; the rows it guards must FAIL")
     args = parser.parse_args()
 

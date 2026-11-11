@@ -64,6 +64,16 @@ WORK = os.path.join(HERE, "work", "prices")
 TOLERANCE = 1e-12
 WALL_TEST = 300
 BASE_KEYS = ("input", "output", "cache_read", "cache_write_5m", "cache_write_1h")
+# The mutants, as `mutant_anchors.py` reads them. `ts-disagrees` is the one with tree text:
+# `scratch_agent` finds TS_CASE in a copy of cases.json by this line (it must be there
+# once) and changes the dollars beside it in the parsed copy, so there is no replacement
+# text. The other two change the loaded table or an expected number in memory.
+TS_CASE = "opus-mixed"
+MUTANTS = {
+    "py-disagrees": None,
+    "ts-disagrees": ("agent/prices/cases.json", f'"name": "{TS_CASE}"', None),
+    "reduce-disagrees": None,
+}
 
 
 def child_env():
@@ -152,9 +162,9 @@ def scratch_agent():
     path = os.path.join(scratch, "prices", "cases.json")
     with open(path) as f:
         doc = json.load(f)
-    hits = [c for c in doc["cases"] if c["name"] == "opus-mixed"]
+    hits = [c for c in doc["cases"] if c["name"] == TS_CASE]
     if len(hits) != 1:
-        raise RuntimeError(f"{len(hits)} opus-mixed cases in cases.json, not 1")
+        raise RuntimeError(f"{len(hits)} {TS_CASE} cases in cases.json, not 1")
     hits[0]["expect"]["dollars"] += 0.01
     with open(path, "w") as f:
         json.dump(doc, f, indent=2)
@@ -164,7 +174,7 @@ def scratch_agent():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--mutant", choices=["py-disagrees", "ts-disagrees", "reduce-disagrees"],
+    parser.add_argument("--mutant", choices=list(MUTANTS),
                         help="a made-to-fail variant; it must end exit 1")
     args = parser.parse_args()
     results = []  # (id, ok, detail)

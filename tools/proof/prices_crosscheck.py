@@ -50,6 +50,9 @@ PAIRS = (("X1", "claude-opus-5-5", "Claude Opus 5.5"),
          ("X2", "claude-fable-5-1", "Claude Fable 5.1"))
 SUP = re.compile(r"<sup>.*?</sup>")
 CELL = re.compile(r"^\$([0-9]+(?:\.[0-9]+)?) / MTok$")
+# The mutants, as `mutant_anchors.py` reads them: each changes the loaded table or the
+# fetched page in memory (`main`), no tree text.
+MUTANTS = ("table", "page")
 
 
 def fetch():
@@ -124,7 +127,7 @@ def compare(model, name, table, page):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--mutant", choices=["table", "page"],
+    parser.add_argument("--mutant", choices=MUTANTS,
                         help="a made-to-fail variant; it must end exit 1")
     args = parser.parse_args()
     results = []
