@@ -10,7 +10,7 @@
   - H-5, #278: Canon Log 2 and Canon Log 3, with Cinema Gamut or BT.2020 (HD-10, HD-17, format 25) (`13ccb1f`, Canon's paper ignored by git; `105ac08`)
   - H-7, the close: this record (the commit that moved this record to `archive/`)
 - **Original:** `archive/hdr.md` is the full record. It has no section numbers, so it is cited by its own headings: "orig H-2" is its "H-2 — #277, the HLG working space (HD-2, HD-3, HD-13)" section.
-- **Spec decisions:** HD-1..HD-17 in spec §11 (`designs/spec/11-decisions/hdr.md`). They stay binding, and where the original words them differently, §11's text wins:
+- **Spec decisions:** HD-1..HD-17 in spec §11 (`designs/spec/11-decisions/hdr.md`, from HD-13 `hdr-2.md`). They stay binding, and where the original words them differently, §11's text wins:
   - HD-1: the road map builds everything (owner, 2026-10-19, choice 1a): #281, #277 in three phases (the working space, the deliverables, the scopes), #278's curves, #276 last and the first to drop, then the close; #274 only if a real clip is at hand.
   - HD-2: an HLG project: `canvas.output` `sdr`/`hlg`, BT.2020 HLG-encoded values with PR-1's clamps and encoded blending, every composition converting in BT.2020/HLG, step 0's HLG arms, drawn layers lifted at upload, BT.2020 luma and HLG's transfer in the grade, frames 16-bit labelled BT.2100 HLG, every SDR project byte-identical; format 23.
   - HD-3: SDR white fixed at 203 cd/m² (HLG 0.75), no setting; one lift for every SDR source and drawn layer, Core Graphics' `kCGColorSpaceCoreMedia709` → `itur_2100_HLG` (SDR 0.50 → 0.5059, 1.00 → 0.7500).
