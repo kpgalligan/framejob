@@ -222,7 +222,8 @@ or package with no licence file gets the canonical SPDX text from
 that text is not vendored; a licence file nested in a package must be listed
 in the generator's `NESTED`, or the build fails naming it. `make dist`'s
 `dist_check.py` D42/D43 and the workflow's `published_check.py` P25 hold the
-file to every shipped component; P22–P24 hold the encoders (each one's own
+file to every shipped component (D44–D47 and P26, P27 hold the `framejob://`
+link's dev switch out of Distribution and its scheme to `framejob`); P22–P24 hold the encoders (each one's own
 string in the binary, which the archive's strip keeps; the load commands; the
 licence texts).
 
@@ -326,7 +327,11 @@ seconds after its answer; `find` opens the tab's find bar and types into it, or
 closes it with null, and `find_step` steps to the next or previous match),
 `playback_rebuilds` (each preview rebuild of a
 window since the last reset, with the milliseconds to its build and to its
-landing; launch with `-RCDevRebuildHold <s>` to hold each rebuild's landing)
+landing; launch with `-RCDevRebuildHold <s>` to hold each rebuild's landing),
+`open_link` (hands the app a `framejob://graphic?src=…` link as a browser's
+click does and answers how it ended, in place of the alert; launch with
+`-RCDevGraphicLinkLoopbackHTTP YES` to let it fetch from a listener on
+`http://127.0.0.1`)
 and `assistant_send` / `assistant_answer` (an assistant turn against a
 stand-in server). To look at the chrome without a
 running app or a Screen Recording grant, use the offscreen harness in

@@ -33,7 +33,7 @@ probably does. If the code cannot settle it, leave it out.
 
 Nothing dev-only, deferred or unbuilt is documented. That excludes the dev tools (`snapshot_ui`,
 `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`, `play_preview`, `graphic_memory`,
-`loudness_meter`, `land_recording`, `analysis_job`, `transcript_view`, `playback_rebuilds`,
+`loudness_meter`, `land_recording`, `analysis_job`, `transcript_view`, `playback_rebuilds`, `open_link`,
 `assistant_send`, `assistant_answer`) and every `-RCDev` launch default.
 
 ## Who reads this

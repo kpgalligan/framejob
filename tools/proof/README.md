@@ -7225,12 +7225,17 @@ spec §11 PUB-10 added `vector.c-LICENSE`, libvpx's three), byte-identical to
   shorter one, else the hoisted name), so a nested version is expected at its
   own version. A missing file, `cargo`, metadata or lock FAILs the row with
   the reason.
+- **D44 / D45** (a `framejob://` link's dev switch, #385, spec §11 G-49 (l)) —
+  the Release binary holds `RCDevGraphicLinkLoopbackHTTP` (the positive
+  control) and the Distribution binary does not.
+- **D46 / D47** (G-49 (i)) — the Release / Distribution Info.plist has exactly
+  one `CFBundleURLTypes` row, whose schemes are exactly `["framejob"]`.
 
 No row is ever skipped: if D1 fails, D4, D5, D12 and D13 FAIL too, and so
 does each when its binary, helper, proxy or snapshot is missing. The last
-line is `dist_check: <passed>/43`; the exit is 0 only at 43/43.
-`dist_check_mutants.py` makes each helper row, D14, D15–D32, D35, D36, D38
-and D40–D43 fail on purpose; the A4 and MC3 sections of this file have its
+line is `dist_check: <passed>/47`; the exit is 0 only at 47/47.
+`dist_check_mutants.py` makes each helper row, D14, D15–D32, D35, D36, D38,
+D40–D43, D46 and D47 fail on purpose; the A4 and MC3 sections of this file have its
 cases. `codec_strings()` (each encoder's own string literal in the binary's
 bytes) is no row here: it is `published_check.py`'s P22.
 
@@ -7245,7 +7250,7 @@ optimised binary by the log line the flag-on `devTools()` writes, so a dev
 tool added to the seam needs no edit here.
 
 ```sh
-make dist                                                  # → dist_check: 42/43 (D31) until the owner's key lands, then 43/43
+make dist                                                  # → dist_check: 47/47
 python3 tools/proof/dist_check.py [--release APP] [--dist APP]
 ```
 
@@ -17072,14 +17077,17 @@ at, read with `dist_check.py`'s own readers (imported, not copied):
   **P24** the bundle holds every pin's licence texts, byte-identical to the
   checkout's `build/codecs/licenses/` (D41's); **P25**
   `Acknowledgements.txt` names every shipped component (D43's; its `cargo
-  metadata --offline` relies on the Archive having fetched the crates).
+  metadata --offline` relies on the Archive having fetched the crates);
+  **P26** the binary does not hold `RCDevGraphicLinkLoopbackHTTP` (D45's,
+  spec §11 G-49 (l)); **P27** the Info.plist's one `CFBundleURLTypes` row
+  claims exactly `framejob` (D47's).
 
-No row is skipped; the last line is `published_check: <passed>/25` and the
-exit is 0 only at 25/25. `make dist` runs it even when `dist_check.py`
+No row is skipped; the last line is `published_check: <passed>/27` and the
+exit is 0 only at 27/27. `make dist` runs it even when `dist_check.py`
 failed, and fails if either did.
 
 ```sh
-make dist                                                   # → dist_check: 42/43, published_check: 24/25 (D31, P20) until the owner's key lands
+make dist                                                   # → dist_check: 47/47, published_check: 27/27
 python3 tools/proof/published_check.py --app APP [--version V --build N]
 ```
 
@@ -31349,3 +31357,81 @@ python3 tools/proof/audio_ap5_proof.py --instance --only I7a --only I7e --only I
 python3 tools/proof/voice_proof.py --retimed
 python3 tools/proof/voice_proof.py --mutants voice-retimed-dry,pad-voiced,sounding-not-keyed
 ```
+
+## A `framejob://` link (#385, spec §11 G-49)
+
+Three instruments, none of which needs a browser or leaves the machine:
+
+- **`graphic_link_server.py`** — the stand-in server both scripts fetch from: stdlib
+  `ThreadingHTTPServer` on `127.0.0.1`, a port the system picks. Its docstring lists the paths
+  (a package, a status, a redirect to anything, a redirect chain, a declared length, an endless
+  body, a stall, a drip, a held body, a multipart body).
+- **`graphic_link_probe.py`** (+ `graphic_link_probe.swift`) — the link's and the address's
+  rules, the fetch and the one-at-a-time rule, through `GraphicLink.swift`,
+  `GraphicLinkDownload.swift` and `GraphicLinkController.swift` alone, built by
+  `swift_build.build` with `FRAMEJOB_DEV_TOOLS` (a build is under a second, so each mutant is
+  its own build). 31 rows: U1–U9 make no request, F1–F9 fetch with small injected limits,
+  K1–K4 drive the controller with a stand-in hand-off. `--mutants` runs all twenty-two.
+- **`graphic_link_proof.py`** — the built app over MCP, driven by the dev tool `open_link`
+  (which hands `GraphicLinkController.shared.receive` a `kAEGetURL` event it built, with a
+  reader of its own in place of the alert): P1 the Info.plist's scheme, L1 the sheet's
+  `From:` line, L2 an import landing, L3 a tampered package, L4 refusals that send no request,
+  L5 a second link during a held fetch, L6 an instance without `-RCDevGraphicLinkLoopbackHTTP`.
+  Three instances in a scratch home. Its one app-tier mutant, `loopback-always`, builds a copy
+  of the tree.
+
+What none of them sees is GR-18's: Launch Services' choice of app, the Apple Event's delivery
+and a launch by a link, the browser's question, a real certificate, and how the alert reads.
+
+| Probe mutant | Edit | Must fail |
+|---|---|---|
+| `any-scheme` | any scheme is the link's | U2 |
+| `no-length` | the 2,048-byte cap dropped | U2b |
+| `any-action` | the action not compared | U3 |
+| `link-extras` | the user, port, path and fragment guards dropped | U3b |
+| `any-keys` | another key and a second `src` taken | U4 |
+| `http-src` | `http` taken as `https` | U5 |
+| `credentials` | the user and password test dropped | U6 |
+| `any-host` | the host rule dropped | U7, U7b |
+| `empty-label` | an empty label allowed | U7 |
+| `any-file-name` | the file name taken as given | U8 |
+| `switch-any-host` | the dev switch takes any `http` host | U9 |
+| `any-status` | any status taken | F2 |
+| `redirect-any` | redirects not held to the rule | F3, F3n |
+| `redirect-count` | the count not enforced | F4 |
+| `no-declared-cap` | the declared length not read | F5 |
+| `no-running-cap` | the running count not enforced | F6 |
+| `no-idle` | the idle timeout not set | F7 |
+| `no-total` | the total timer not started | F8 |
+| `many-answers` | a second response (a multipart body's next part) taken | F9 |
+| `no-single` | a second fetch allowed | K1 |
+| `keep-temp-read` | the folder kept after the read | K2 |
+| `keep-temp-refusal` | the folder kept after a refused fetch | K3 |
+
+`dist_check.py` gained D44–D47 (the switch's name in Release's binary and not in
+Distribution's; each Info.plist's one scheme, `framejob`) and `published_check.py` P26, P27;
+`dist_check_mutants.py` gained `link-scheme-release` and `link-scheme-dist`. D45 has no skeleton
+case, as D5 has none (the skeleton's binary is a link to the real one): it is seen failing by
+naming the Release app as `--dist`.
+
+```sh
+python3 tools/proof/graphic_link_probe.py             # scores: 31/31
+python3 tools/proof/graphic_link_probe.py --mutants   # mutants: 22/22 caught
+python3 tools/proof/graphic_link_proof.py             # 10/10 checks passed
+python3 tools/proof/graphic_link_proof.py --mutant loopback-always   # MUTANT PASS, L6
+```
+
+Recorded 2026-11-10 on this tree: the probe 30/30 and `--mutants` 21/21 caught, before F9; P1 against the
+Debug app built before the change, FAIL (`rows []`); `graphic_link_proof.py` on Debug 10/10 and
+on Release (`RC_PROOF_APP=release`, after the gate's `make app`) 10/10; `loopback-always`
+caught (L6: the link fetched and its sheet went up); `graphic_import_proof.py` 17/17 on Debug
+and on Release; `make dist` `dist_check: 47/47`, `published_check: 27/27`;
+`dist_check_mutants.py` 38/38; `dist_check.py --dist <the Release app>` 40/47 with D45 among
+the FAILs, and `published_check.py --app <the Release app>` 20/27 with P26 among them. F6c's
+listener had written 3,014,656 and 5,898,240 bytes on two runs when the 1 MiB cut-off closed
+the connection, which is why that row asserts the close and no size.
+
+The fix pass (2026-11-11, a second response refused, F9): `--mutant many-answers` caught ("F9
+fail — FETCHED 230 bytes after 1.0 s; FrameJobLink-* folders this fetch left: 41"), the probe
+31/31 (F9 "the server answered more than once", 0 folders left), `--mutants` 22/22 caught,
+`make gate` PASS, and `RC_PROOF_APP=release graphic_link_proof.py` 10/10.

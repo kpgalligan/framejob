@@ -20,7 +20,9 @@ framework removed, its binary's signature removed (`sparkle-unsigned`) or its
 first helper (`dist_check.sparkle_helper_paths`' order) re-signed ad hoc
 without the hardened runtime, or the Info.plist copy's `SUFeedURL` emptied
 (`feed-empty`), its `SUPublicEDKey` made base64 of 31 bytes (`key-short`) or,
-in Release's, its `SUFeedURL` set to Distribution's (`release-feed`), or a
+in Release's, its `SUFeedURL` set to Distribution's (`release-feed`), or its one
+`CFBundleURLTypes` row given a second scheme, `framejob-debug` (`link-scheme`, either side,
+which D46 or D47 must refuse; spec §11 G-49 (i)), or a
 licence text removed (`licence-missing`: Distribution's `libvpx/LICENSE`, which
 D41 must refuse) or changed (`licence-changed`: a byte appended to Release's
 `svt-av1/PATENTS.md`, which D40 must refuse), or the acknowledgements removed
@@ -54,13 +56,13 @@ turns the first of Release's load commands at least as long as
 refuse (CX-4: never a codec dylib).
 
 A case passes iff dist_check's FAIL ids equal the expected set exactly, its
-last line is `dist_check: <43 - |set|>/43`, and it exits 0 for an empty set
+last line is `dist_check: <47 - |set|>/47`, and it exits 0 for an empty set
 and 1 otherwise. `control` (both real) and `skeleton` (both skeletons,
 helpers, proxies and snapshots copied untouched) expect nothing to fail: they
 prove the skeleton is not itself a failure. A setup command that fails (a
 copy, a `codesign`, the offset not found) is a scored FAIL naming it. Each
 case's directory is removed after scoring. The last line is
-`dist_check_mutants: <passed>/36`; the exit is 0 only at 36/36.
+`dist_check_mutants: <passed>/38`; the exit is 0 only at 38/38.
 
 The control needs a Distribution build whose `SUPublicEDKey` passes D31: until
 the owner's key lands, build Distribution with a stand-in 32-byte key on the
@@ -128,6 +130,8 @@ CASES = [
     ("licence-changed-release", ("release",), "licence-changed", {"D40"}),
     ("acknowledgements-missing-release", ("release",), "acknowledgements-missing", {"D42"}),
     ("acknowledgements-crate-dropped-dist", ("dist",), "acknowledgements-crate-dropped", {"D43"}),
+    ("link-scheme-release", ("release",), "link-scheme", {"D46"}),
+    ("link-scheme-dist", ("dist",), "link-scheme", {"D47"}),
 ]
 # The cases that mutate a whole `ditto`ed bundle rather than a skeleton.
 WHOLE = {"app-entitlements", "app-entitlements-mic-only", "noop-sign", "seal-broken",
@@ -182,7 +186,7 @@ def info_plist(app, real_app, other_app, mutation):
     (spec §11 PUB-6..PUB-8, D30–D32)."""
     target = os.path.join(app, dist_check.INFO_PLIST)
     copy_in(os.path.join(real_app, dist_check.INFO_PLIST), target)
-    if mutation not in ("feed-empty", "key-short", "release-feed"):
+    if mutation not in ("feed-empty", "key-short", "release-feed", "link-scheme"):
         return
     try:
         with open(target, "rb") as handle:
@@ -191,12 +195,15 @@ def info_plist(app, real_app, other_app, mutation):
             info["SUFeedURL"] = ""
         elif mutation == "key-short":
             info["SUPublicEDKey"] = base64.b64encode(b"\1" * 31).decode("ascii")
+        elif mutation == "link-scheme":
+            info["CFBundleURLTypes"][0]["CFBundleURLSchemes"].append("framejob-debug")
         else:
             with open(os.path.join(other_app, dist_check.INFO_PLIST), "rb") as handle:
                 info["SUFeedURL"] = plistlib.load(handle)["SUFeedURL"]
         with open(target, "wb") as handle:
             plistlib.dump(info, handle)
-    except (OSError, KeyError, ValueError, plistlib.InvalidFileException) as error:
+    except (OSError, KeyError, IndexError, TypeError, ValueError,
+            plistlib.InvalidFileException) as error:
         raise SetupError(f"rewrite {target}: {error}")
 
 
@@ -462,8 +469,8 @@ def main():
             "dist": os.path.abspath(arguments.dist)}
 
     print("road map 12 A4, #145, road map 14 MC3, B88, spec §11 PUB-6..PUB-10 and CX-4, CX-5 — "
-          "dist_check's helper rows (D6–D13), D14, D15–D32, D35, D36, D38 and D40–D43, each "
-          "made to fail on purpose\n")
+          "dist_check's helper rows (D6–D13), D14, D15–D32, D35, D36, D38, D40–D43, D46 and "
+          "D47, each made to fail on purpose\n")
     print(f"  release:      {real['release']}")
     print(f"  distribution: {real['dist']}\n")
     needle, reason = dist_check.read_needle()

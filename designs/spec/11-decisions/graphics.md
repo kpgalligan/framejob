@@ -2571,3 +2571,128 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   the row's full width and 72 pt tall, and is unchanged; it takes K-4's
   Return (⇧Return a new line). The clip header's name field was already
   pinned edge to edge and is unchanged.
+- **G-49 — A `framejob://graphic?src=<https URL>` link makes Frame Job
+  fetch a `.fjgraphic` itself and hand it to G-47's ask-first import**
+  (#385; the owner, 2026-11-10: "begin all"). The link is input from the
+  open web, so every part of it is refused unless it is exactly what is
+  listed here.
+  (a) **The link.** `<scheme>://graphic?src=<URL, percent-encoded>`, the
+  scheme the bundle claims ((i)), any case. At most 2,048 bytes. The action
+  (the link's host) is `graphic`, any case; any other is refused by name.
+  No user name, password, port or fragment, and no path but an empty one or
+  `/`. The query is exactly one `src`: none, a second one, or any other key
+  is refused.
+  (b) **`src`**, and every address a redirect names. Printable ASCII only
+  (an international name is written in its `xn--` form), at most 2,048
+  bytes. Scheme `https`, any case. No user name and no password. The host
+  is the one the request is sent to (`URL.host`, percent-decoded),
+  lowercased, and must be a public NAME: only letters, digits, hyphens and
+  dots; two or more labels, none empty, so a trailing dot is refused; the
+  last label neither all digits nor starting `0x` (WHATWG's test for an
+  IPv4 literal; `2130706433` and `localhost` fall to the two-label rule,
+  an IPv6 literal to the characters); and not ending in `.local`,
+  `.localhost`, `.internal`, `.home.arpa`, `.lan` or `.home`. Any port.
+  That one string is what is tested and what is shown.
+  (c) **Private networks are refused by name, not by address.** (b)
+  refuses every IP literal, every one-word name and every private suffix,
+  in the link and at each redirect. A public name that RESOLVES to a
+  private address is not detected: `URLSession` gives no address before the
+  request is sent. Accepted, because the request is one GET with no cookie,
+  no credential and no body, an answer is read only after a certificate the
+  system trusts for that name, nothing of the answer goes back to the page,
+  and the sheet names the host.
+  (d) **The fetch.** One `GET` on an ephemeral session of its own: no
+  cookies, no cache, no credential storage. Each redirect is held to (b);
+  at most 5. Only status 200 is taken; `Content-Type` is ignored, because
+  the core's reader decides (G-47 (c)). **One answer only:** a
+  `multipart/x-mixed-replace` body reaches the session as a response per
+  part, and the second is refused, so a fetch makes one folder and the
+  bytes counted are the file's. **At most 32 MiB (33,554,432
+  bytes)** as delivered: refused at the headers when the declared length is
+  larger, and cut off when the body passes it. **30 s** with no byte and
+  **120 s** in all. The body streams to `<temporary
+  directory>/FrameJobLink-<UUID>/<name>`, where `<name>` is `src`'s last
+  path component when it is 1 to 100 of letters, digits, space, `.`, `_`
+  and `-`, does not start with a dot and ends `.fjgraphic`, else
+  `graphic.fjgraphic`. The folder is removed once the package has been
+  read into memory, or at any refusal.
+  (e) **One at a time.** A link that arrives while a fetch runs is refused:
+  "Frame Job is already fetching a graphic from `<host>`". The slot frees
+  when the fetch ends, before the sheet.
+  (f) **No question before the fetch and no progress.** The browser has
+  asked "Open Frame Job?", the fetch is bounded by (d), and it ends in the
+  sheet or an alert. Nothing is imported without the sheet's Import (G-47
+  (f)), and every check of G-47 runs unchanged on the fetched file.
+  (g) **The sheet's host line**, `graphicimport.origin`, under the
+  description: `From: <host>`, or `From: <final host> (the link named
+  <first host>)` when a redirect changed it. Hidden for the Finder door and
+  From File….
+  (h) **A refusal is one alert**, a sheet on the front project's window or,
+  with none, application-modal, shown once launch has settled
+  (`whenSettled`): "This link cannot be opened." before the fetch, "The
+  graphic from `<host>` could not be opened." after it began, with the
+  rule's sentence under it; a package the reader refuses keeps G-47's
+  sentence there. A piece of the link quoted in a sentence is cut to 60
+  characters. After the alert, when Frame Job has no project and no window
+  (a link that launched it), the Welcome window is shown. The sentences:
+  "the link is longer than 2,048 bytes" · "it is not a `<scheme>`:// link"
+  · "Frame Job does not know the action "`<x>`"; the only one is graphic" ·
+  "the link carries a user name or a password" · "the link carries a port"
+  · "the link carries a path" · "the link carries a fragment" · "the link
+  names no src" · "the link names src more than once" · "the link has a key
+  other than src: "`<k>`"" · "`<what>` is not a URL in plain ASCII" ·
+  "`<what>` is longer than 2,048 bytes" · "`<what>` must be an https URL" ·
+  "`<what>` must not carry a user name or a password" · "`<what>` names
+  "`<host>`", which is not a public host name; Frame Job fetches only from
+  a named host on the internet, never an address, a one-word name or a
+  private suffix" (`<what>` is `src` or `the redirect`) · "the server
+  redirected more than 5 times" · "the server answered `<status>`, not 200"
+  · "the server answered more than once"
+  · "the file is `<n>` bytes; a graphic sent by link is at most
+  33,554,432" · "the file is larger than 33,554,432 bytes" · "the server
+  sent nothing for 30 s" · "the download took longer than 120 s" · "the
+  connection failed: `<the system's words>`" · "the download could not be
+  saved: `<the system's words>`".
+  (i) **The claim.** `CFBundleURLTypes`: one row, `CFBundleURLName`
+  `com.kgalligan.framejob-link`, role Viewer, schemes
+  `[$(RC_LINK_SCHEME:default=framejob)]`. Debug sets `RC_LINK_SCHEME` to
+  `framejob-debug` (V-5's pattern: Release and Distribution keep identical
+  Info.plist bytes), so a Debug build never claims `framejob`; a URL type
+  has no documented `LSHandlerRank`. No entitlement is added: the app is
+  not sandboxed and already connects out in every configuration.
+  (j) **The handler is an Apple Event handler**
+  (`kInternetEventClass`/`kAEGetURL`), installed in
+  `applicationWillFinishLaunching`. Never `application(_:open:)`: a
+  delegate that implements it takes every Finder open away from
+  `NSDocumentController`, which is every `.framejob` and `.fjgraphic` door
+  (#234, G-47 (a)).
+  (k) **No product tool.** `import_graphic {path}` stays the agent's door
+  (G-47 (i)): a tool that fetched a URL would hand an agent a request
+  forger. The tool counts and the parity check do not change.
+  (l) **Dev only** (`FRAMEJOB_DEV_TOOLS`): the dev tool `open_link {url?,
+  wait?}`, which hands the product's receiver a `kAEGetURL` event it built
+  and answers the outcome in place of the alert and of nothing else
+  (`sheet`, `refused` with the sentence, or `pending`; with no `url`, every
+  earlier link's outcome), and the launch argument
+  `-RCDevGraphicLinkLoopbackHTTP YES`, read from the argument domain only,
+  with which `http://127.0.0.1` (that exact host, any port) passes (b) in
+  the link and at a redirect. The member that carries the switch and the
+  branch that reads it are not compiled in Distribution;
+  `dist_check.py` (D44, D45) and `published_check.py` (P26) hold the
+  switch's name out of that binary, and D46, D47 and P27 hold the claimed
+  scheme to exactly `framejob`.
+  (m) **Mutants: twenty-three**, over CLAUDE.md's ten, because the decisions
+  here are refusals of hostile input and #385's batch asks one per refusal:
+  twenty-two on `graphic_link_probe.py` (each a rebuild of three files) and
+  one on the app (`graphic_link_proof.py`'s `loopback-always`). Refusals
+  that share one: the link's user, port, path and fragment (one guard each,
+  one mutant dropping the four); the other key and the repeated `src`. Not
+  mutated: "the link names no src" (without the guard there is no address
+  to go on with, so no mutant compiles to a different answer) and the two
+  2,048-byte tests' twin on `src` (the link's own cap is reached first).
+  A redirect to `file:` is refused by `URLSession` before the delegate is
+  asked; the probe's row accepts either refusal and requires no file.
+  **Accepted:** (c)'s resolving name; a quit during a fetch leaves its
+  folder to the system's temporary-directory clean-up; what delivers the
+  link (Launch Services, the Apple Event, the browser's question, a real
+  certificate) is seen only by a person, GR-18.

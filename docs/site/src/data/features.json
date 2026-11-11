@@ -12938,6 +12938,14 @@
      "where": "Finder"
     },
     {
+     "id": "graphics-open-package-from-link",
+     "name": "Open a .fjgraphic from a link",
+     "summary": "A framejob://graphic?src= link on a web page makes Frame Job download a .fjgraphic from an https address and ask before importing it.",
+     "page": "graphics/share-a-graphic",
+     "anchor": "open-from-a-link",
+     "where": "Web page"
+    },
+    {
      "id": "graphics-import-from-file",
      "name": "Import with From File…",
      "summary": "Choosing a .fjgraphic with From File… puts up the Import Graphic sheet for that same project.",

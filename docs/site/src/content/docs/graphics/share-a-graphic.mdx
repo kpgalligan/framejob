@@ -10,7 +10,7 @@ A `.fjgraphic` file, called a package on this page, carries one graphic with the
 
 <AtAGlance
   menu="Insert ▸ Graphic…"
-  where={['Export… and From File… in the Insert Graphic sheet', 'A .fjgraphic opened from the Finder']}
+  where={['Export… and From File… in the Insert Graphic sheet', 'A .fjgraphic opened from the Finder', 'A framejob:// link on a web page']}
   tools={['export_graphic', 'import_graphic']}
 />
 
@@ -67,6 +67,30 @@ If Frame Job wasn't running, it opens first and the package waits until any proj
 
 **File ▸ Open…** doesn't list `.fjgraphic` files, and there's no menu item for importing one.
 
+## Open from a link
+
+A web page can send a graphic to Frame Job in one click. Write a link that starts `framejob://graphic?src=` and ends with the `https` address of a `.fjgraphic`, percent-encoded:
+
+```html
+<a href="framejob://graphic?src=https%3A%2F%2Fexample.com%2Flower-third.fjgraphic">Add to Frame Job</a>
+```
+
+When someone clicks it, the browser asks whether to open Frame Job. Frame Job then downloads the package itself, [checks it](#package-checks) and puts up the [Import Graphic sheet](#the-import-graphic-sheet), which names the site the file came from. Nothing is copied until you choose **Import**. As from the Finder, the package goes into the front project, or into a new untitled project when none is open.
+
+Frame Job downloads only from a public web address, and it sends no cookies and no sign-in, so the file has to be one anyone can download:
+
+- The address after `src=` must start `https://`. It can't carry a user name or a password.
+- Its host must be a name on the internet, such as `example.com`. A numeric address, a one-word name such as `localhost`, and a name ending in `.local`, `.localhost`, `.internal`, `.lan`, `.home` or `.home.arpa` aren't fetched. Write a name with accented or non-Latin letters in its `xn--` form.
+- The link takes `src` and nothing else: no second `src`, no other key, no port, path or fragment.
+- A link, and the address inside it, can be at most 2,048 bytes.
+- The server may redirect up to 5 times, each time to an address that passes the same rules.
+- The file can be at most 32 MiB (33,554,432 bytes).
+- Frame Job gives up when the server sends nothing for 30 seconds, or when the download takes longer than 120 seconds in all.
+
+Only a reply with status 200 is taken, and only one reply: a server that answers in several parts is refused. Frame Job fetches one link at a time, so a second link clicked while one is downloading isn't opened. There's no progress window.
+
+When a link can't be opened, an alert says why, and nothing is imported. If the link started Frame Job, the Welcome window follows the alert.
+
 ## Import with From File…
 
 <Steps>
@@ -85,6 +109,7 @@ Before anything is copied, the sheet shows the graphic's title and description, 
 
 | Line | What it can read |
 | --- | --- |
+| From | Only for a package that came from [a link](#open-from-a-link): the site it was downloaded from, such as `From: example.com`. When the server redirected to another site, `From: cdn.example.net (the link named example.com)`. |
 | Module | `Module: lower-third`, `Module: lower-third (already in this project)`, or `Module: lower-third-2 (lower-third is taken)` |
 | Fonts | The font files, each plain, marked `(already here)`, or marked `(as Inter-2.ttf)`. With none, `Fonts: none`. |
 | Pictures | The picture files, each plain or marked `(already here)`. With none, `Pictures: none`. |

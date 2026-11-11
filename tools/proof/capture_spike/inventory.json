@@ -1628,6 +1628,20 @@
    ],
    "other_caller": "app/Sources/ProjectDocumentController.swift `GraphicImportSheetController.open(packageAt: url)` — a .fjgraphic opened from the Finder (spec §11 G-47 (a)); no menu item; its plan is refused"
   },
+  "app/Sources/GraphicLinkController+App.swift:97": {
+   "token": "beginSheetModal",
+   "func": "showAlert",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/GraphicLinkController+App.swift `report: Self.showAlert` — a framejob:// link's Apple Event (spec §11 G-49 (h)); no menu item; the link is refused with a project window open"
+  },
+  "app/Sources/GraphicLinkController+App.swift:100": {
+   "token": "runModal",
+   "func": "showAlert",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/GraphicLinkController+App.swift `report: Self.showAlert` — a framejob:// link's Apple Event (spec §11 G-49 (h)); no menu item; the link is refused with no project window"
+  },
   "app/Sources/GraphicPane+Source.swift:216": {
    "token": "runModal",
    "func": "duplicateAsNewGraphic",

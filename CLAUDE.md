@@ -66,7 +66,7 @@ make gate       # the one Full verification command: names (tools/proof/name_res
 make codecs     # tools/codecs/build_codecs.py: SVT-AV1 and libvpx as arm64 static archives (pinned tarballs, SHA-256-checked, built with cmake) into build/codecs/, reused while its stamp's key and output digests match (spec §11 CX-8); app, app-debug, typecheck and test depend on it, so they need cmake (`brew install cmake`), the system perl and, for the first fetch, network
 make project    # xcodegen generate with VERSION injected — never run a bare xcodegen, it leaves the version blank (FrameJob.xcodeproj is generated; project.yml is the source of truth)
 make run        # make app, then launch
-make dist       # make app, then the Distribution build (no dev tools, spec §11 V-1), tools/proof/dist_check.py and tools/proof/published_check.py (the check the publish workflow runs over the app it packs, spec §11 PUB-4), both run even when the first fails; D28–D35 and P17–P21 are Sparkle's (PUB-6..PUB-9: embedded, signed, the feed and key in Distribution only, D35 no Sparkle load command in Release); until the owner's EdDSA public key is in project.yml, D31 and P20 fail and nothing else
+make dist       # make app, then the Distribution build (no dev tools, spec §11 V-1), tools/proof/dist_check.py and tools/proof/published_check.py (the check the publish workflow runs over the app it packs, spec §11 PUB-4), both run even when the first fails; D28–D35 and P17–P21 are Sparkle's (PUB-6..PUB-9: embedded, signed, the feed and key in Distribution only, D35 no Sparkle load command in Release); D44–D47 and P26, P27 are the `framejob://` link's (spec §11 G-49: its dev switch out of Distribution's binary, the one scheme `framejob` in both Info.plists); until the owner's EdDSA public key is in project.yml, D31 and P20 fail and nothing else
 make prices     # NETWORK: regenerate agent/prices/anthropic.json from LiteLLM (spec §11 P-1); its only writer, never run by another target
 ```
 
@@ -371,6 +371,11 @@ reset, each with the milliseconds to its build and to its landing (road map
 "creator-jobs" SW0, spec §11 SW-1), with the dev-only launch default
 `-RCDevRebuildHold <s>`, which holds each rebuild's landing so a proof can
 make two edits inside one flight (SW-4); and
+`open_link`, which hands the app a `framejob://graphic?src=…` link as a
+browser's click does and answers how it ended in place of the alert, with the
+dev-only launch argument `-RCDevGraphicLinkLoopbackHTTP YES`, with which that
+link's `src` and a redirect may be `http://127.0.0.1` so a proof's local
+listener can serve the fetch (spec §11 G-49 (l)); and
 `assistant_send` / `assistant_answer`, which
 drive a window's assistant turn against a stand-in server, with the dev-only
 launch default `-RCDevAssistantSend <text> -RCDevAssistantReport <path>` for

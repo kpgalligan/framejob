@@ -130,7 +130,9 @@ app-debug: rust codecs project
 # and not in Release's, and no Sparkle load command in Release's; and both
 # bundles' Contents/Resources/Acknowledgements.txt naming every shipped crate,
 # npm package, pin, Sparkle, Bun, the model and each font (spec §11 PUB-10,
-# D42/D43). Until the owner's public key lands, D31 and P20 fail
+# D42/D43); and a `framejob://` link's dev switch out of Distribution's binary
+# and both bundles' one scheme, `framejob` (spec §11 G-49, D44–D47, P26, P27).
+# Until the owner's public key lands, D31 and P20 fail
 # by the owner's choice (PUB-8). The file-wide `unexport RC_ASSEMBLYAI_KEY`
 # above covers this recipe too. `published_check.py` is the check the publish
 # workflow runs over the app it is about to pack (spec §11 PUB-4), run here over

@@ -122,6 +122,10 @@ targets:
           PRODUCT_NAME: "Frame Job Debug"
           PRODUCT_BUNDLE_IDENTIFIER: com.kgalligan.FrameJob.debug
           RC_PROJECT_HANDLER_RANK: Alternate
+          # A Debug build claims `framejob-debug://`, never `framejob://` (spec
+          # §11 G-49 (i)), by the same `:default=` read, so a link on a web
+          # page opens the real Frame Job.
+          RC_LINK_SCHEME: framejob-debug
         Release:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) FRAMEJOB_DEV_TOOLS"
           # As Debug's: Sparkle embedded, never loaded (spec §11 PUB-7;
@@ -203,6 +207,13 @@ targets:
             UTTypeConformsTo: [public.data, public.content]
             UTTypeTagSpecification:
               public.filename-extension: [fjgraphic]
+        # A `framejob://graphic?src=<https URL>` link (spec §11 G-49 (i)): the
+        # one scheme, read by GraphicLinkController's Apple Event handler.
+        # Release and Distribution leave RC_LINK_SCHEME unset.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.kgalligan.framejob-link
+            CFBundleTypeRole: Viewer
+            CFBundleURLSchemes: ["$(RC_LINK_SCHEME:default=framejob)"]
         CFBundleDocumentTypes:
           - CFBundleTypeName: Frame Job Project
             LSItemContentTypes: [com.kgalligan.framejob-project]

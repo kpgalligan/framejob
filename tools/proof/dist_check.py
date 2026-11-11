@@ -173,7 +173,15 @@ The forty-three rows, none ever skipped:
 * D42 / D43 — the Release / Distribution bundle's
   `Contents/Resources/Acknowledgements.txt` has a header for every shipped crate
   and npm package (name and version), each pin, Sparkle at `project.yml`'s
-  version, Bun, the model and each bundled font.
+  version, Bun, the model and each bundled font;
+* D44 / D45 — the Release binary holds `RCDevGraphicLinkLoopbackHTTP`, the
+  dev-only switch that lets a `framejob://` link fetch from `http://127.0.0.1`
+  (spec §11 G-49 (l)): the POSITIVE CONTROL, without which D45 would pass for
+  a renamed switch; the Distribution binary does not hold it;
+* D46 / D47 — the Release / Distribution Info.plist has exactly one
+  `CFBundleURLTypes` row and its `CFBundleURLSchemes` is exactly
+  `["framejob"]` (G-49 (i): a Debug build's `framejob-debug` never reaches
+  either).
 
 If D1 fails, D4, D5, D12 and D13 FAIL too, and so does each when its binary
 or helper is missing; D14 FAILs when the Distribution binary is, D25 and
@@ -187,8 +195,10 @@ FAIL when their proxy is missing; D23 and D24 when their snapshot has no
 readable `tools` or the dev names cannot be read. A missing `codesign`, a
 timeout or output that does not parse FAILs the row with the reason.
 `tools/proof/dist_check_mutants.py` makes each helper row, D14 and each of
-D15–D32, D35, D36, D38 and D40–D43 fail on purpose. The last line is
-`dist_check: <passed>/43`; the exit is 0 only at 43/43.
+D15–D32, D35, D36, D38, D40–D43, D46 and D47 fail on purpose; D45 is seen
+failing by naming the Release app as `--dist`. D44 and D45 FAIL when their
+binary is missing, D46 and D47 when their Info.plist does not read. The last
+line is `dist_check: <passed>/47`; the exit is 0 only at 47/47.
 """
 
 import argparse
@@ -268,7 +278,11 @@ BUN_LOCK = os.path.join(ROOT, "agent", "bun.lock")
 FONTS = os.path.join("Contents", "Resources", "Fonts")
 SPARKLE_VERSION = re.compile(r"^  Sparkle:\s*\n(?:    .*\n)*?    exactVersion:\s*\"?([^\"\s]+)\"?\s*$",
                              re.M)
-TOTAL = 43
+TOTAL = 47
+# The dev-only loopback switch of a `framejob://` link's fetch (spec §11 G-49 (l)), and the
+# one scheme a shipped build claims (G-49 (i)).
+LINK_SWITCH = b"RCDevGraphicLinkLoopbackHTTP"
+LINK_SCHEMES = ["framejob"]
 # The CodeDirectory line's flags; `Executable Segment flags=0x1` has no parentheses.
 FLAGS = re.compile(r"flags=0x[0-9a-fA-F]+\(([^)]*)\)")
 TIMEOUT = 120
@@ -479,6 +493,21 @@ def bundle_version(app):
     if not isinstance(version, str):
         return None, f"no string CFBundleShortVersionString in {path}"
     return version, ""
+
+
+def link_schemes(app):
+    """(ok, detail): the bundle's one CFBundleURLTypes row claims exactly LINK_SCHEMES."""
+    path = os.path.join(app, INFO_PLIST)
+    try:
+        with open(path, "rb") as handle:
+            info = plistlib.load(handle)
+    except Exception as error:  # OSError or a plist that does not parse
+        return False, f"{path}: {type(error).__name__}: {error}"
+    rows = info.get("CFBundleURLTypes") if isinstance(info, dict) else None
+    if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict):
+        return False, f"CFBundleURLTypes in {path} is {rows!r}, not one row"
+    schemes = rows[0].get("CFBundleURLSchemes")
+    return schemes == LINK_SCHEMES, f"CFBundleURLSchemes {schemes!r} in {path}"
 
 
 def feed_url():
@@ -1065,6 +1094,23 @@ def main():
         check(f"{row_id} the {side} bundle's Acknowledgements.txt names every shipped crate, "
               "npm package, pin, Sparkle, Bun, the model and each font"
               + (f" ({detail})" if ok else ""), ok, "" if ok else detail)
+
+    switch = LINK_SWITCH.decode("ascii")
+    name = f"D44 the Release binary holds {switch} (the positive control)"
+    if release is None:
+        check(name, False, "no Release binary (D2)")
+    else:
+        check(name, release.count(LINK_SWITCH) > 0, f"0 occurrences in {release_where}")
+    name = f"D45 the Distribution binary does not hold {switch}"
+    if dist is None:
+        check(name, False, "no Distribution binary (D3)")
+    else:
+        count = dist.count(LINK_SWITCH)
+        check(name, count == 0, f"{count} occurrences in {dist_where}")
+    for side, row_id, app in (("Release", "D46", arguments.release),
+                              ("Distribution", "D47", arguments.dist)):
+        ok, detail = link_schemes(app)
+        check(f"{row_id} the {side} Info.plist claims exactly the scheme framejob", ok, detail)
 
     print(f"\ndist_check: {passed}/{TOTAL}")
     return 0 if passed == TOTAL else 1

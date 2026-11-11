@@ -74,7 +74,12 @@ and the exit is 0 only at 25/25:
 * P25 `Contents/Resources/Acknowledgements.txt` names every shipped crate, npm
   package, pin, Sparkle, Bun, the model and each font
   (`dist_check.acknowledgements`, D43's; `cargo metadata --offline` relies on
-  the archive having fetched the crates).
+  the archive having fetched the crates);
+* P26 the binary does not hold `RCDevGraphicLinkLoopbackHTTP`, the dev-only
+  switch of a `framejob://` link's fetch (`dist_check.LINK_SWITCH`, D45's;
+  spec §11 G-49 (l));
+* P27 the Info.plist's one `CFBundleURLTypes` row claims exactly the scheme
+  `framejob` (`dist_check.link_schemes`, D47's; G-49 (i)).
 
 Made to fail on purpose: `tools/proof/README.md`'s section for this script.
 
@@ -90,7 +95,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dist_check  # noqa: E402  (its readers; its rows are not run)
 
-TOTAL = 25
+TOTAL = 27
 SHORT_VERSION = re.compile(r"^[0-9]+\.[0-9]+(\.[0-9]+)?$")
 BUILD = re.compile(r"^[0-9]+$")
 
@@ -285,6 +290,15 @@ def main():
     ok, detail = dist_check.acknowledgements(app)
     check("P25 Acknowledgements.txt names every shipped crate, npm package, pin, Sparkle, Bun, "
           "the model and each font" + (f" ({detail})" if ok else ""), ok, "" if ok else detail)
+
+    name = f"P26 the app's binary does not hold {dist_check.LINK_SWITCH.decode('ascii')}"
+    if binary is None:
+        check(name, False, "no binary (P2)")
+    else:
+        count = binary.count(dist_check.LINK_SWITCH)
+        check(name, count == 0, f"{count} occurrences in {where}")
+    ok, detail = dist_check.link_schemes(app)
+    check("P27 the Info.plist claims exactly the scheme framejob", ok, detail)
 
     print(f"\npublished_check: {passed}/{TOTAL}")
     return 0 if passed == TOTAL else 1

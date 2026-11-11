@@ -1570,6 +1570,34 @@ the key map behind it.
   `whenSettled`, which waits until launch and any reopening (restored
   untitled projects counted apart from #234's per-path count) are done, then
   picks the front project or opens one untitled project.
+- `GraphicLink.swift` · `GraphicLinkDownload.swift` ·
+  `GraphicLinkController.swift` (+`App`) · `AgentServer+GraphicLink.swift` —
+  a `framejob://graphic?src=<https URL>` link (spec §11 G-49, #385).
+  `GraphicLink` is pure: the link's grammar (`parse`), the address rule for
+  `src` and every redirect (`allows`: `https`, no credentials, a public host
+  NAME tested as `URL.host` lowercased), the fetched file's name, and
+  `Policy`, whose `loopbackHTTP` exists only under `FRAMEJOB_DEV_TOOLS`.
+  `GraphicLinkDownload` is the one GET: an ephemeral delegate session (no
+  `async`), redirects held to `allows` and counted, status 200 only, one
+  response only (a multipart body's second part is refused), the cap at the
+  headers and in the body, the idle timeout URLSession's and the total a
+  timer of its own, the body streamed to `<tmp>/FrameJobLink-<UUID>/<name>`;
+  the first refusal wins and removes the folder; state on the delegate queue
+  only. `GraphicLinkController` (Foundation only, every value an initialiser
+  parameter, so `graphic_link_probe.py` builds these three files alone) is
+  one link's course: parsed, one fetch at a time, handed on, the folder
+  removed after the hand-off's read, one `report` per call. `+App` is the
+  app's side: `shared`, the `kAEGetURL` handler `install()`ed from
+  `applicationWillFinishLaunching` — never `application(_:open:)`, which
+  would take every Finder open from `NSDocumentController` — the scheme from
+  the bundle's `CFBundleURLTypes`, the dev switch from the argument domain,
+  the hand-off to
+  `GraphicImportSheetController.open(packageAt:origin:onRead:)`, and
+  `showAlert` (a sheet on the front project's window, else application-modal
+  and then the Welcome window when nothing is open; its two sites are in
+  `capture_spike/inventory.json`). `AgentServer+GraphicLink.swift` is the dev
+  tool `open_link`, off main (`devOffMainTools`), with its own reader in
+  place of the alert.
 - `EditorWindow.swift` — the editor's `NSWindow` subclass: its `sendEvent`
   routes a bare Space to play/pause unless the first responder types or
   presses on it (spec §11 K-1), so Space never beeps when focus has fallen
@@ -3916,7 +3944,10 @@ free.
   ask-first sheet (title, description, module, fonts, assets, Cancel and
   Import); on Import the Graphic dialog opens on This Project with the
   module chosen. Doors: Finder (through `ProjectDocumentController`), the
-  Graphic dialog's From File… and `import_graphic`.
+  Graphic dialog's From File… and `import_graphic`. The Finder door also
+  takes a link's fetched file (`origin`, shown as `graphicimport.origin`;
+  `onRead` is told the read's outcome and then owns showing a refusal, spec
+  §11 G-49).
 - `ExportQueueController.swift` · `ExportQueueWindowController.swift` — the
   controller has NO AppKit in it so a probe can drive it; one job at a time on
   the MAIN thread with a fresh `Exporter` each (two concurrent ones deadlock);
@@ -4657,8 +4688,9 @@ free.
   inline. Its tables hold
   `snapshot_ui` (V2a), `perform_menu_item` and `cancel_sheet` (V2b),
   `select_inspector_tab` (V3), `assistant_send` and `assistant_answer`
-  (road map 12 A1), `play_preview` (#127, G-36), `graphic_memory` (G-37)
-  and `loudness_meter` (road map "audio" AP7, AU-77); a dev tool is counted
+  (road map 12 A1), `play_preview` (#127, G-36), `graphic_memory` (G-37),
+  `loudness_meter` (road map "audio" AP7, AU-77) and `open_link`
+  (`AgentServer+GraphicLink.swift`, G-49); a dev tool is counted
   apart from the product tools (`tools/proof/dev_tools.py`).
 - `AgentServer+PlayPreview.swift` — `play_preview` (dev only, wholly under
   the flag; spec §11 G-36, §7.9c): plays a window's preview forward through
