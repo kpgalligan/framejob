@@ -74,6 +74,14 @@ extension Exporter {
         }
     }
 
+    /// Whether the recipe at `t` lists a matte: PR-19's question of a frame the generator
+    /// answered deep, before it is read again with its key deep, so the coverage is resolved
+    /// at 16 bits as the same frame's export resolves it.
+    static func drawsMatte(_ project: ReelProject, at t: Ticks, options: RecipeOptions) -> Bool {
+        guard let recipe = project.recipe(at: max(0, t), options: options) else { return false }
+        return !recipe.mattes.isEmpty
+    }
+
     /// `.graphicsNotCompiled` when a graphic clip the export will draw has a
     /// module that failed to compile or has none, else nil. Nothing to gate
     /// with no set or an audio-only export. The clips are the top level's in

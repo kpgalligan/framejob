@@ -193,7 +193,10 @@ replaced, the Debug app built there, and the named rows run against it with
 (`shape-never-deep` … `sdr-version-marked`) run the same way against PR-16's
 base, as do #588's two and PR-18's two (`matte-graphic-deep`, the rule;
 `matte-graphic-call-deep`, the compositor's read of membership), whose GM and
-GMg rules are absolute.
+GMg rules are absolute, and PR-19's three (`coverage-never-deep`, the
+coverage's depth read off the frame's; `coverage-always-deep`, its 8-bit
+case; `frame-matte-not-reread`, the frame path's new arm), whose GMc, GMs and
+GMf rules are absolute and GMe's against the base.
 
 Exit 0 when every scored row passes (a mutant: caught); 1 when one failed (a
 mutant: survived); 2 when the control could not be performed.
@@ -448,6 +451,18 @@ APP_MUTANTS = {
     "matte-graphic-call-deep": ([(f"{SOURCES}/Compositor+Sources.swift",
                                   "                matteMember: layer.matte?.into != nil)",
                                   "                matteMember: false)")], ["GMg"]),
+    # #597, spec §11 PR-19: the coverage's depth follows the frame's (GMc, GMs), stays 8-bit in
+    # an 8-bit row (GMe), and a matted frame the generator answers deep is read again (GMf).
+    "coverage-never-deep": ([(f"{SOURCES}/MetalRenderer.swift",
+                              "            deep: RecipeSource.shared.deliversDeep(instruction?."
+                              "recipeKey ?? 0))\n", "            deep: false)\n")],
+                            ["GMc", "GMs"]),
+    "coverage-always-deep": ([(f"{SOURCES}/MetalRenderer.swift",
+                               "            deep: RecipeSource.shared.deliversDeep(instruction?."
+                               "recipeKey ?? 0))\n", "            deep: true)\n")], ["GMe"]),
+    "frame-matte-not-reread": ([(f"{SOURCES}/Exporter+Frame.swift",
+                                 "            let matte = drawsMatte(project, at: t, options: "
+                                 "options)\n", "            let matte = false\n")], ["GMf"]),
 }
 CORE_PATCH = "[patch.crates-io]\n"
 

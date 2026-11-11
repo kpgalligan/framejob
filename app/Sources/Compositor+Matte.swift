@@ -5,8 +5,9 @@ import Metal
 /// The matte pass (spec §11 MT-3, MT-6): every matte the recipe lists drawn
 /// into a destination-sized target BEFORE the destination pass opens, and
 /// each distinct set of mattes a layer is cut by resolved into one
-/// destination-sized `r8Unorm` coverage, which the layer stage samples at
-/// `texture(1)`. Split out of `Compositor.swift` for size, as
+/// destination-sized coverage, which the layer stage samples at `texture(1)`:
+/// `r8Unorm`, or `r16Unorm` in a frame delivered deeper than 8 bits (spec §11
+/// PR-19). Split out of `Compositor.swift` for size, as
 /// `Compositor+Shadow.swift` was; `render` calls `encodeMattes` once per
 /// frame and reads its answer per layer.
 ///
@@ -48,7 +49,8 @@ enum MatteError: LocalizedError {
 }
 
 /// The destination-sized targets the matte pass draws into (spec §11 MT-6,
-/// MT-9): at 3840×2160, 66.4 MB per matte composite and 8.3 MB per coverage.
+/// MT-9): at 3840×2160, 66.4 MB per matte composite and 8.3 MB per coverage,
+/// 16.6 MB in a frame delivered deep (PR-19).
 /// A frame is one `render` call, bracketed by `beginFrame` and `endFrame`.
 /// Within it a composite is taken and given back as `MattePlan` says, so a
 /// later matte draws into one an earlier matte no longer needs; a coverage is
@@ -57,7 +59,8 @@ enum MatteError: LocalizedError {
 /// held at once, and releases the rest when a frame ends. A frame that needs
 /// more targets gets them. A routed dissolve's two halves take composites
 /// from the same pool (MT-8, `Compositor+Dissolve.swift`). Emptied when the
-/// destination size changes. One
+/// destination size changes; its coverages emptied when the frame's depth
+/// does. One
 /// renderer serves one serial render queue and waits for each frame's GPU
 /// work, so every target is free again by the next frame.
 final class MattePool {
@@ -67,6 +70,8 @@ final class MattePool {
     private let device: MTLDevice
     private var width = 0
     private var height = 0
+    /// Whether this frame is delivered deep: its coverages' format (`coverageFormat`).
+    private var deep = false
     private var composites: [MTLTexture] = []
     /// Per composite, whether this frame holds it.
     private var taken: [Bool] = []
@@ -84,13 +89,24 @@ final class MattePool {
         fatalError("MattePool does not support NSCoder")
     }
 
-    /// Starts a frame `width` × `height`: a size change drops every target,
-    /// and every composite is free.
-    func beginFrame(width: Int, height: Int) {
+    /// The coverage's format: `r16Unorm` in a frame delivered deeper than 8
+    /// bits, `r8Unorm` in every other (spec §11 PR-19). Both clamp to [0, 1].
+    static func coverageFormat(deep: Bool) -> MTLPixelFormat {
+        deep ? .r16Unorm : .r8Unorm
+    }
+
+    /// Starts a frame `width` × `height`, `deep` when the frame is delivered
+    /// deeper than 8 bits (`RecipeSource.deliversDeep`): a size change drops
+    /// every target, a depth change every coverage, and every composite is free.
+    func beginFrame(width: Int, height: Int, deep: Bool = false) {
         if width != self.width || height != self.height {
             self.width = width
             self.height = height
             composites = []
+            coverages = []
+        }
+        if deep != self.deep {
+            self.deep = deep
             coverages = []
         }
         taken = Array(repeating: false, count: composites.count)
@@ -121,10 +137,12 @@ final class MattePool {
         taken[index] = false
     }
 
-    /// The `index`th coverage target, one channel.
+    /// The `index`th coverage target, one channel, in this frame's
+    /// `coverageFormat`.
     func coverage(_ index: Int) -> MTLTexture? {
         while coverages.count <= index {
-            guard let made = makeTarget(format: .r8Unorm) else { return nil }
+            guard let made = makeTarget(format: MattePool.coverageFormat(deep: deep))
+            else { return nil }
             coverages.append(made)
         }
         peak.coverages = max(peak.coverages, index + 1)
@@ -184,18 +202,19 @@ struct MatteCoverage {
 
 extension MetalRenderer {
 
-    /// The resolve pipeline: the shadow pass's full-frame quad and
-    /// `framejob_matte_resolve_fragment`, into `r8Unorm`, with source factor
+    /// A resolve pipeline: the shadow pass's full-frame quad and
+    /// `framejob_matte_resolve_fragment`, into the coverage's format at
+    /// `deep` (`MattePool.coverageFormat`, spec §11 PR-19), with source factor
     /// ZERO and destination factor `sourceColor` — the coverage is cleared
     /// to 1 and each matte's value multiplies into it.
     static func matteResolveDescriptor(
-        vertex: MTLFunction, fragment: MTLFunction
+        vertex: MTLFunction, fragment: MTLFunction, deep: Bool
     ) -> MTLRenderPipelineDescriptor {
         let descriptor = MTLRenderPipelineDescriptor()
-        descriptor.label = "Frame Job matte resolve"
+        descriptor.label = deep ? "Frame Job matte resolve, deep" : "Frame Job matte resolve"
         descriptor.vertexFunction = vertex
         descriptor.fragmentFunction = fragment
-        descriptor.colorAttachments[0].pixelFormat = .r8Unorm
+        descriptor.colorAttachments[0].pixelFormat = MattePool.coverageFormat(deep: deep)
         descriptor.colorAttachments[0].isBlendingEnabled = true
         descriptor.colorAttachments[0].rgbBlendOperation = .add
         descriptor.colorAttachments[0].alphaBlendOperation = .add
@@ -300,7 +319,9 @@ extension MetalRenderer {
         guard let encoder = buffer.makeRenderCommandEncoder(descriptor: descriptor) else {
             throw MatteError.noTarget
         }
-        encoder.setRenderPipelineState(matteResolvePipeline)
+        // The pipeline of the coverage's own format, so the two cannot disagree.
+        let deep = texture.pixelFormat == MattePool.coverageFormat(deep: true)
+        encoder.setRenderPipelineState(deep ? matteResolveDeepPipeline : matteResolvePipeline)
         for matte in mattes {
             var u = MatteUniforms()
             u.mode = matte.mode.shaderCode

@@ -47,7 +47,7 @@ extension Exporter {
     /// `graphics` is pinned on the frame's own key, as `export` pins it on
     /// its own; nil draws every graphic's slate, and the pin is marked deep when
     /// the frame comes out deep and `keepsDepth` (PR-15), as the key itself is for a
-    /// gradient shape (PR-16). `keepsDepth` is the caller's
+    /// gradient shape (PR-16) and a matte's coverage (PR-19). `keepsDepth` is the caller's
     /// format (`carriesDepth`): when true and `DeepVideoFrame.reads` the frame (a deep still,
     /// PR-9, or a deep VP9 track, PR-12), `DeepStillFrame.read`'s reader reads it, and
     /// it re-reads a frame the generator answers 8-bit while it shows a deep source (PR-14).
@@ -141,14 +141,15 @@ extension Exporter {
         var image = try? generator.copyCGImage(
             at: CompositionBuilder.time(max(0, t)), actualTime: nil)
         // The generator answered deep with the frame's graphics and gradient shapes drawn at
-        // 8 bits: the reader reads it again with them deep (PR-15, PR-16). A frame with
-        // neither is not read twice.
+        // 8 bits and its mattes resolved at 8 bits: the reader reads it again with them deep
+        // (PR-15, PR-16, PR-19). A frame with none of them is not read twice.
         if keepsDepth, let first = image, first.bitsPerComponent > 8 {
             let graphic = deepens
                 && drawsGraphic(project, at: t, options: options)
             let gradient =
                 drawsGradientShape(project, at: t, options: options)
-            if graphic || gradient {
+            let matte = drawsMatte(project, at: t, options: options)
+            if graphic || gradient || matte {
                 if deepens { GraphicRegistry.shared.markDeep(key) }
                 RecipeSource.shared.markDeep(key)
                 image = DeepStillFrame.read(built, at: t, maxWidth: maxWidth) ?? image

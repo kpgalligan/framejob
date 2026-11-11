@@ -2,7 +2,8 @@
 // file in `app/Sources` (`swift_build.py`). See that script's header.
 //
 // Issue batch B90 phase 3 (#253, spec §11 MT-9): the matte pool's schedule
-// and its frame window, asked of the app's own `MattePlan` and `MattePool`.
+// and its frame window, asked of the app's own `MattePlan` and `MattePool`;
+// and (#597, spec §11 PR-19) its coverages' depth.
 // No app, no metallib, no shader: a plan is arithmetic, and a pool needs only
 // a device to make its targets. Every judgement is the script's; this file
 // only answers what each call returned.
@@ -121,6 +122,48 @@ do {
         "composite_size": [composite?.width ?? 0, composite?.height ?? 0],
         "coverage_size": [coverage?.width ?? 0, coverage?.height ?? 0],
         "composite_is_new": composite != nil && composite !== old,
+    ] as [String: Any]
+}
+
+// P4 (spec §11 PR-19): a depth change empties the coverages, never the
+// composites, and the coverage after it is of the new depth's format; the
+// same depth again keeps it. And one 3840×2160 coverage's allocated bytes at
+// each depth, as the device reports them.
+do {
+    let subject = MattePool(device: device)
+    subject.beginFrame(width: 64, height: 64)
+    let composite = subject.takeComposite()
+    let shallow = subject.coverage(0)
+    subject.endFrame()
+    subject.beginFrame(width: 64, height: 64, deep: true)
+    let emptied = held(subject)
+    let kept = subject.takeComposite()
+    let deep = subject.coverage(0)
+    subject.endFrame()
+    subject.beginFrame(width: 64, height: 64, deep: true)
+    let again = subject.coverage(0)
+    subject.endFrame()
+    subject.beginFrame(width: 64, height: 64, deep: false)
+    let back = subject.coverage(0)
+    subject.endFrame()
+    var bytes: [String: Int] = [:]
+    for (name, isDeep) in [("shallow", false), ("deep", true)] {
+        let uhd = MattePool(device: device)
+        uhd.beginFrame(width: 3840, height: 2160, deep: isDeep)
+        bytes[name] = uhd.coverage(0)?.allocatedSize ?? 0
+        uhd.endFrame()
+    }
+    pool["depth"] = [
+        "shallow_format": shallow?.pixelFormat.rawValue ?? 0,
+        "after_deep_begin": emptied,
+        "composite_kept": composite != nil && kept === composite,
+        "deep_format": deep?.pixelFormat.rawValue ?? 0,
+        "deep_is_new": deep != nil && deep !== shallow,
+        "deep_again_same": again != nil && again === deep,
+        "back_format": back?.pixelFormat.rawValue ?? 0,
+        "back_is_new": back != nil && back !== deep,
+        "r8": MTLPixelFormat.r8Unorm.rawValue, "r16": MTLPixelFormat.r16Unorm.rawValue,
+        "uhd_bytes": bytes,
     ] as [String: Any]
 }
 
