@@ -11,7 +11,8 @@ the fixtures (TX1's `say` phrases) and the launch are `transcript_tab_proof.py`'
 
 Probe rows (`transcript_find_probe.swift`, built through `swift_build.build()`
 with `-D FRAMEJOB_DEV_TOOLS`, the app's `Compositor.metal` beside it): F0
-builds; F1–F13 as its header says.
+builds; F1–F14 as its header says (F14 is #558's: the click-to-clip scroll and
+the follow in 27,000 words).
 
 App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
   Z0  no `Frame Job: ` line; `transcript_view` takes exactly its ten earlier
@@ -33,8 +34,8 @@ App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
   A5  `screens.py --only 11d-transcript-find` exits 0 with "new problems: 0".
 
 Mutants (`--mutant NAME`, or all with `--mutants`): each anchor occurs once; a
-mutant is caught when every row it names fails. All fourteen are probe mutants
-(a copy of `app/Sources` with the edit); TX-39 says why there are fourteen.
+mutant is caught when every row it names fails. All nineteen are probe mutants
+(a copy of `app/Sources` with the edit); TX-39 says why there are nineteen.
   return-leaves         K-4 takes Return from the find field (F4)
   across-paragraphs     paragraphs joined by a space (F1)
   case-sensitive        the comparison options dropped (F1)
@@ -47,9 +48,17 @@ mutant is caught when every row it names fails. All fourteen are probe mutants
   always-enabled        the validator arm removed (F2)
   hide-keeps-bar        hiding the tab leaves the bar open (F9)
   view-esc-passes       Esc in the text does not close the bar (F6)
-  reveal-on-estimate    the current match scrolled to where an estimate puts
-                        it, the text above not laid out (F10)
+  reveal-on-estimate    `layOut(through:)` lays nothing out from the top, so a
+                        scroll lands where an estimate puts it (F10, F14)
   keys-left-behind      leaving the tab does not hand the keys back (F13)
+  reveal-skips-layout   `revealFind` scrolls without `layOut(through:)` (F10)
+  scroll-on-estimate    `scrollToToken` scrolls without `layOut(through:)`,
+                        #558's old behaviour (F14)
+  follow-on-estimate    the follow scrolls without `layOut(through:)` (F14)
+  no-viewport-below     `layOut(through:)` stops at the target's paragraph, so
+                        the view ends there (F14)
+  below-keeps-estimate  the paragraphs below the target not invalidated, so
+                        they keep their estimated places (F14)
 
 Exit: 0 iff every row passed (a mutant run: 0 when caught, 1 when it survived,
 2 when the control could not be performed).
@@ -74,7 +83,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/transcript_find"
 PROBE = ROOT / "tools/proof/transcript_find_probe.swift"
 PROBE_ROWS = ["F0", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
-              "F13"]
+              "F13", "F14"]
 APP_ROWS = ["Z0", "A1", "A2", "A3", "A4"]
 OTHER_ROWS = ["A5"]
 ROWS = PROBE_ROWS + APP_ROWS + OTHER_ROWS
@@ -88,6 +97,8 @@ FI = "TranscriptFind.swift"
 PF = "TranscriptPane+Find.swift"
 TP = "TranscriptPane.swift"
 VF = "TranscriptView+Find.swift"
+VH = "TranscriptView+Highlight.swift"
+VL = "TranscriptView+Layout.swift"
 VK = "TranscriptView+Keys.swift"
 EV = "EditorViewController.swift"
 MUTANTS = {
@@ -123,8 +134,19 @@ MUTANTS = {
     "hide-keeps-bar": (["F9"], [
         (PF, "        guard find.isOpen else { return }  // nothing to close\n",
          "        guard find.isOpen, window == nil, find.window == nil else { return }\n")]),
-    "reveal-on-estimate": (["F10"], [
-        (VF, "            layoutManager.ensureLayout(for: above)\n", "            _ = above\n")]),
+    "reveal-on-estimate": (["F10", "F14"], [
+        (VL, "        layoutManager.ensureLayout(for: all)\n", "        _ = all\n")]),
+    "reveal-skips-layout": (["F10"], [
+        (VF, "        layOut(through: run)\n", "")]),
+    "scroll-on-estimate": (["F14"], [
+        (VL, "        layOut(through: tokenRange(index))\n", "")]),
+    "follow-on-estimate": (["F14"], [
+        (VH, "        layOut(through: tokenRange(valid))\n", "")]),
+    "no-viewport-below": (["F14"], [
+        (VL, "            return below < 0\n", "            return false\n")]),
+    "below-keeps-estimate": (["F14"], [
+        (VL, "        if let stale = NSTextRange(location: start, end: last) {\n",
+         "        if let stale = NSTextRange(location: start, end: end) {\n")]),
     "keys-left-behind": (["F13"], [
         (TP, "            handBackKeys()\n", "")]),
     "view-esc-passes": (["F6"], [

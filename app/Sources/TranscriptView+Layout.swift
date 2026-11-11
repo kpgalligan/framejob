@@ -1,9 +1,10 @@
 import AppKit
 
 /// `TranscriptView`'s geometry: a UTF-16 range's rects, the token or the
-/// paragraph timecode under a point, the top visible token, and the scroll
-/// that brings a token to the top. Every rect is in the view's (flipped)
-/// coordinates: the text container's offset by `TranscriptView.inset`.
+/// paragraph timecode under a point, the top visible token, the layout a far
+/// scroll needs first, and the scroll that brings a token to the top. Every
+/// rect is in the view's (flipped) coordinates: the text container's offset
+/// by `TranscriptView.inset`.
 extension TranscriptView {
 
     /// The text location `offset` UTF-16 units into the document.
@@ -135,14 +136,52 @@ extension TranscriptView {
         return index
     }
 
-    /// Scrolls `index`'s line to the visible top. Laid out twice: the first
-    /// scroll lands on an estimate for text never laid out, which the
-    /// viewport layout there settles.
-    func scrollToToken(_ index: Int) {
-        for _ in 0..<2 {
-            guard let rect = rects(forToken: index).first else { return }
-            scroll(to: rect.minY - 4)
+    /// Lays the text out from the top through `range` and for a viewport's
+    /// height below it, and sizes the view to it. A scroll to a far word
+    /// needs it first: the word's rect is an estimate until the text above is
+    /// laid out, and the view is only as tall as what is laid out from the
+    /// top (measured on 900 paragraphs: the last word estimated at 88,601 pt,
+    /// laid out at 130,078 pt, in a view 979 pt tall), so a scroll onto an
+    /// estimate lands short and is clamped shorter. Laying out 27,000 words
+    /// whole took 0.06 s. The viewport below is what lets a word reach the
+    /// visible top: laid out through the word and no further, the view ends
+    /// at its paragraph (#558: token 18,000 of 27,000 came to rest at the
+    /// visible bottom). `range`'s own paragraph and those below are
+    /// invalidated first: a paragraph laid out on its own, as a measurement
+    /// or the walk here does, keeps the place its estimate gave it until it
+    /// is laid out again in one run from the top (measured: the paragraph
+    /// after one at 86,015 pt placed at 58,837 pt).
+    func layOut(through range: NSRange) {
+        guard range.location != NSNotFound, let start = location(range.location),
+            let end = location(NSMaxRange(range))
+        else { return }
+        // The paragraphs below, a viewport's worth, counted in heights: their
+        // places mean nothing yet.
+        var below = -(enclosingScrollView?.contentView.bounds.height ?? 0)
+        var last: NSTextLocation = end
+        var own = true
+        layoutManager.enumerateTextLayoutFragments(from: end, options: [.ensuresLayout]) {
+            fragment in
+            if !own { below += fragment.layoutFragmentFrame.height }
+            own = false
+            last = fragment.rangeInElement.endLocation
+            return below < 0
         }
+        if let stale = NSTextRange(location: start, end: last) {
+            layoutManager.invalidateLayout(for: stale)
+        }
+        guard let all = NSTextRange(location: contentStorage.documentRange.location, end: last)
+        else { return }
+        layoutManager.ensureLayout(for: all)
+        layoutViewport()  // the view grows to the height laid out
+    }
+
+    /// Scrolls `index`'s line to the visible top, the text from the top
+    /// through it laid out first (`layOut(through:)`, #558).
+    func scrollToToken(_ index: Int) {
+        layOut(through: tokenRange(index))
+        guard let rect = rects(forToken: index).first else { return }
+        scroll(to: rect.minY - 4)
     }
 
     /// The token nearest in x on the laid-out line above (`up`) or below

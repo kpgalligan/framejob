@@ -769,6 +769,20 @@ free" (TX-20), and on 2026-11-10 to begin it. No owner question was asked.
     untouched, bar open or closed. To act on a match the person clicks its word, which works
     with the bar open and leaves it open. Only the matches whose tokens meet the dirty rect are
     measured, so TX-21's viewport layout stands with a match in every word.
+    **Amended 2026-11-11 (#558):** the layout step is `TranscriptView+Layout`'s
+    `layOut(through:)`, and the click-to-clip scroll (TX-20, `scrollToToken`) and the follow's
+    scroll (TX-22, `setHighlight`, only on a tick that scrolls) take it too. Measured before, on
+    the same 27,000 words: `scrollToToken`'s two scrolls left word 18,000 some 1,850 pt below
+    the visible rect, and six ticks of the follow never showed it. The step also lays out a
+    viewport's height below its target and invalidates those paragraphs first: the view is only
+    as tall as what is laid out from the top, so laid out through the word and no further the
+    word came to rest at the visible bottom, and a paragraph laid out on its own keeps its
+    estimated place (the one after a paragraph at 86,015 pt placed at 58,837 pt). The follow's
+    step costs 1.4 ms once the text above is laid out. The scroller's knob is left as it is: it
+    reads the scroll against the height laid out so far (0.995 at word 18,000 of 27,000), since
+    the text below the viewport is not laid out (TX-21). A rebuild's anchor restore is not
+    changed either: it keeps the top word (measured: the same top word, 9 pt lower), and the
+    step there would lay out everything above the anchor on every rebuild.
   - (e) **Keys and focus.** ⌘F opens the bar and gives its field the keys, its text selected;
     with the bar open it only does that again. In the field Return is (c)'s next and ⇧Return its
     previous, and the field keeps the keys: K-4 (3)'s one exception, decided in the window with
@@ -822,3 +836,14 @@ free" (TX-20), and on 2026-11-10 to begin it. No owner question was asked.
   `keys-left-behind` (F13). Each is a probe mutant; the app rows are the same decisions read
   through MCP and name none. How the bar and the marks look, and a real ⌘F, are
   `docs/manual-checks.md`'s JOB-67.
+  **Amended 2026-11-11 (#558):** probe row **F14** — `scrollToToken` on a fresh bare view of
+  F10's 27,000 words, each target measured first where an estimate puts it: word 18,000 at the
+  visible top and the top visible token; the last word in sight with the view's bottom at the
+  visible bottom, at the height every paragraph laid out gives; a paragraph's first word less
+  than a viewport from the end at the top or as the last word; and the follow to word 18,000 a
+  third from the top, the next word's tick scrolling nothing. **Nineteen mutants**: #558 moved
+  the reveal's layout into a step three callers share and gave that step two decisions of its
+  own, each of which is one mutant, and two road-map items now share the instrument.
+  `reveal-on-estimate` moves to the shared step (F10, F14); new are `reveal-skips-layout`
+  (F10), `scroll-on-estimate` (F14), `follow-on-estimate` (F14), `no-viewport-below` (F14) and
+  `below-keeps-estimate` (F14).

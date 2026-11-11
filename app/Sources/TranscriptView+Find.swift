@@ -115,24 +115,14 @@ extension TranscriptView {
 
     /// Scrolls the current match into sight by `setHighlight`'s rule (a third
     /// from the top when it is outside the margins). The text from the top
-    /// through the match is laid out first: a far word's rect, and the view's
-    /// own height, are estimates until the text above is laid out (measured on
-    /// 900 paragraphs: the last word estimated at 88,601 pt, laid out at
-    /// 130,078 pt, in a view 979 pt tall), so one scroll onto an estimate
-    /// lands short. Laying out 27,000 words whole took 0.06 s. The match's own
-    /// paragraph is invalidated first: one measured earlier keeps the place
-    /// its estimate gave it until it is laid out again.
+    /// through the match is laid out first (`layOut(through:)`, which has the
+    /// figures): a far word's rect, and the view's own height, are estimates
+    /// until then, so one scroll onto an estimate lands short.
     func revealFind() {
         guard let current = findCurrent, findMatches.indices.contains(current),
             let run = findRuns(findMatches[current]).first
         else { return }
-        if let end = location(NSMaxRange(run)),
-            let above = NSTextRange(location: contentStorage.documentRange.location, end: end)
-        {
-            if let own = textRange(run) { layoutManager.invalidateLayout(for: own) }
-            layoutManager.ensureLayout(for: above)
-            layoutViewport()  // the view grows to the height laid out
-        }
+        layOut(through: run)
         guard let rect = rects(for: run).first else { return }
         let shown = visibleRect
         let margin = min(shown.height / 4, 48)

@@ -52,6 +52,16 @@
 //       and the current match one on; a press on Done closes the bar.
 //   F13 the transcript's text first responder (no bar), the Clip tab picked:
 //       the content view is first responder and L plays forward.
+//   F14 `scrollToToken` (TX-20's click on a clip, #558) on a fresh bare view of
+//       the same 27,000 words, the token measured first where an estimate puts
+//       it: (a) token 18,000 is at the visible top and is the top visible
+//       token; (b) the last token is in sight with the view's bottom at the
+//       visible bottom, at the height every paragraph laid out gives; (c) a
+//       paragraph's first token less than a viewport from the end is at the
+//       top or as (b); and in each the place does not move when the rest is
+//       laid out. Its detail also reads the scroller's knob. (d) the follow
+//       (`setHighlight`) to token 18,000 puts it a third from the top, and
+//       the next word's tick scrolls nothing.
 import AppKit
 
 final class ProbeDocumentController: NSDocumentController {
@@ -169,7 +179,10 @@ do {
 
 // MARK: - F10 27,000 words, a match in every one
 
-do {
+/// A bare `TranscriptView` in a 304 × 600 scroll view showing 27,000 words in
+/// 900 paragraphs, drawn nowhere yet. F10 and each of F14's targets take a
+/// fresh one: once a reveal has laid a view out, nothing in it is an estimate.
+func longView() -> (window: NSWindow, view: TranscriptView, model: TranscriptTokens) {
     let window = NSWindow(
         contentRect: NSRect(x: -20_000, y: 0, width: 304, height: 600), styleMask: [.titled],
         backing: .buffered, defer: false)
@@ -192,6 +205,11 @@ do {
     let model = TranscriptTokens.build(words, pauses: [:])
     view.show(model, fps: Fps(num: 30, den: 1), timecodeFrames: true)
     spin(0.2)
+    return (window, view, model)
+}
+
+do {
+    let (window, view, model) = longView()
     func laidOut() -> Int {
         var count = 0
         view.layoutManager.enumerateTextLayoutFragments(
@@ -229,6 +247,88 @@ do {
             + "\(String(format: "%.3f", took)) s at \(rect.minY)…\(rect.maxY) in visible "
             + "\(shown.minY)…\(shown.maxY): \(inSight)")
     window.orderOut(nil)
+}
+
+// MARK: - F14 a click-to-clip scroll in 27,000 words (#558)
+
+do {
+    /// The view's height with every paragraph laid out.
+    func finalHeight(_ view: TranscriptView) -> CGFloat {
+        view.layoutManager.ensureLayout(for: view.layoutManager.documentRange)
+        view.layoutViewport()
+        return view.frame.height
+    }
+    func f(_ value: CGFloat) -> String { String(format: "%.1f", value) }
+    var pass = true
+    var detail = ""
+    // (a) far from the end, (b) the last word, (c) a paragraph's first word less
+    // than a viewport from the end (the text below it is an estimate until the
+    // scroll's own viewport pass lays it out).
+    for (name, token) in [("a", 18_000), ("b", 26_999), ("c", 26_910)] {
+        let (window, view, _) = longView()
+        let clipHeight = view.enclosingScrollView?.contentView.bounds.height ?? 0
+        let heightBefore = view.frame.height
+        let estimate = view.rects(forToken: token).first?.minY ?? -1
+        let began = Date()
+        view.scrollToToken(token)
+        let took = Date().timeIntervalSince(began)
+        spin(0.1)
+        let rect = view.rects(forToken: token).first ?? .zero
+        let shown = view.visibleRect
+        let top = view.topVisibleToken()
+        let heightAfter = view.frame.height
+        let knob = view.enclosingScrollView?.verticalScroller?.doubleValue ?? -1
+        let knobWant = Double(shown.minY / max(heightAfter - clipHeight, 1))
+        let final = finalHeight(view)
+        let after = view.rects(forToken: token).first ?? .zero
+        let atTop = rect.height > 0 && abs(rect.minY - 4 - shown.minY) <= 0.5
+        let inSight = rect.height > 0 && rect.minY >= shown.minY && rect.maxY <= shown.maxY
+        let atBottom = abs(shown.maxY - heightAfter) <= 0.5 && abs(heightAfter - final) <= 0.5
+        // A place that a later layout would move was an estimate.
+        let settled = abs(after.minY - rect.minY) <= 0.5
+        let ok: Bool
+        switch name {
+        case "a": ok = atTop && top == token && settled
+        case "b": ok = inSight && atBottom && settled
+        default: ok = (atTop || (inSight && atBottom)) && settled
+        }
+        pass = pass && ok
+        detail += "(\(name)) token \(token): estimate \(f(estimate)), scrolled in "
+            + "\(String(format: "%.3f", took)) s to \(f(rect.minY)) (\(f(after.minY)) all laid "
+            + "out), visible \(f(shown.minY))…\(f(shown.maxY)), top token \(top ?? -1), height "
+            + "\(f(heightBefore)) → \(f(heightAfter)) of \(f(final)), top \(atTop) sight "
+            + "\(inSight) bottom \(atBottom), knob \(String(format: "%.4f", knob)) (computed "
+            + "\(String(format: "%.4f", knobWant))): \(ok). "
+        window.orderOut(nil)
+    }
+    // (d) the follow after a far jump: one tick, then one more on the next word.
+    do {
+        let (window, view, _) = longView()
+        let estimate = view.rects(forToken: 18_000).first?.minY ?? -1
+        let began = Date()
+        view.setHighlight(18_000, follow: true)
+        let took = Date().timeIntervalSince(began)
+        spin(0.1)
+        let rect = view.rects(forToken: 18_000).first ?? .zero
+        let shown = view.visibleRect
+        let third = rect.height > 0 && abs(rect.minY - shown.height / 3 - shown.minY) <= 0.5
+        let again = Date()
+        view.setHighlight(18_001, follow: true)
+        let tick = Date().timeIntervalSince(again)
+        spin(0.05)
+        let still = abs(view.visibleRect.minY - shown.minY) <= 0.5
+        _ = finalHeight(view)
+        let after = view.rects(forToken: 18_000).first ?? .zero
+        let ok = third && still && abs(after.minY - rect.minY) <= 0.5
+        pass = pass && ok
+        detail += "(d) the follow to token 18000: estimate \(f(estimate)), followed in "
+            + "\(String(format: "%.3f", took)) s to \(f(rect.minY)) (\(f(after.minY)) all laid "
+            + "out), visible \(f(shown.minY))…\(f(shown.maxY)), a third from the top \(third); "
+            + "the next word's tick \(String(format: "%.4f", tick)) s, scrolled nothing "
+            + "\(still): \(ok)."
+        window.orderOut(nil)
+    }
+    row("F14", pass, detail)
 }
 
 // MARK: - F11 the marks' pixels

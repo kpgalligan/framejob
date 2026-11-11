@@ -8,7 +8,11 @@ extension TranscriptView {
 
     /// Moves the highlight, invalidating only the old and the new word's
     /// rects; with `follow`, scrolls it into sight unless a person scrolled
-    /// within `followPause` seconds.
+    /// within `followPause` seconds. A word out of sight is placed before the
+    /// scroll (`layOut(through:)`, #558): after a far jump its rect is an
+    /// estimate, and six ticks of scrolling onto estimates never showed it.
+    /// With the text above laid out already that costs 1.4 ms (measured at
+    /// word 18,000 of 27,000), and it is paid only on a tick that scrolls.
     func setHighlight(_ index: Int?, follow: Bool) {
         let valid = index.flatMap { tokenStarts.indices.contains($0) ? $0 : nil }
         if valid != highlighted {
@@ -18,12 +22,19 @@ extension TranscriptView {
             if let valid { invalidate(valid...valid) }
         }
         guard follow, let valid, !personScrolledRecently else { return }
-        guard let rect = rects(forToken: valid).first else { return }
+        guard outOfSight(valid) else { return }
+        layOut(through: tokenRange(valid))
+        guard outOfSight(valid), let rect = rects(forToken: valid).first else { return }
+        scroll(to: rect.minY - visibleRect.height / 3)
+    }
+
+    /// Whether `index`'s first line is outside the follow's margins, where
+    /// the layout now puts it.
+    private func outOfSight(_ index: Int) -> Bool {
+        guard let rect = rects(forToken: index).first else { return false }
         let shown = visibleRect
         let margin = min(shown.height / 4, 48)
-        if rect.minY < shown.minY + margin / 2 || rect.maxY > shown.maxY - margin {
-            scroll(to: rect.minY - shown.height / 3)
-        }
+        return rect.minY < shown.minY + margin / 2 || rect.maxY > shown.maxY - margin
     }
 
     var personScrolledRecently: Bool {
