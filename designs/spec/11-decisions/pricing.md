@@ -27,6 +27,7 @@ and §5.
   They are enforced by the proofs before each request, at the worst case. Tokens are recorded for
   diagnosis and are never the budget. The budgets are the owner's numbers, committed; an agent
   never raises them.
+  **Amended by P-9** (#594): the Anthropic budget is $40.
 - **P-4 — Spend shown in the app is Frame Job's own**, from its ledger, and says so. The Anthropic
   Console is the truth for the account.
 - **P-5 — The spend ledger and the price cache are the person's, and a proof never touches them.**
@@ -110,3 +111,27 @@ and §5.
   streamed output; how the API bills an aborted stream is manual check AS-6's; the month line does
   not say that a line was partial.
   **Amended by NM-5** (rename R0): "· Reelcut's estimate" is now "· Frame Job's estimate".
+- **P-9 — The Anthropic proof budget is $40 a calendar month, and the assistant proofs price their
+  worst POST from a request body of 480,000 bytes** (#594; amends P-3's Anthropic figure). The
+  helper sends the assistant's tool definitions and its system prompt on every POST, and they had
+  grown past the 256,000 bytes the proofs priced from: row H failed in every rehearsal, and the
+  clearing rehearsal was refused at its own suggested cap. The owner, 2026-11-12, verbatim: "Are
+  these tests run every time? If run rarely, increase the limit." They are run rarely: a paid proof
+  runs only with its explicit `--live --cap`, never from `make test` or the gate. So:
+  (a) `BODY_BYTES_BOUND` (`tools/proof/assistant_prompt_eval.py`) is 480,000 bytes, about 20 % over
+  the largest body the three rehearsals sent on 2026-11-11 (399,360 bytes);
+  (b) at the price table's dearest rates the floors are $30.84 for the prompt evaluation, still one
+  run, $4.64 for the clearing proof and $10.96 for the compaction proof, and the suggested caps
+  $32.00, $5.00 and $11.50;
+  (c) the Anthropic budget is $40. The figure is the issue's decision comment's reading of
+  "increase the limit", not a figure in the owner's own words; it leaves room over the $30.84 floor,
+  so `budget_proof.py`'s row P (worst POST ≤ floor ≤ suggested cap ≤ budget), which now holds all
+  three proofs, holds with the evaluation as one run;
+  (d) `make test` compares the request's fixed part, the tools and the system prompt as the app's
+  catalog and prompt make them and the helper sends them, plus `CONVERSATION_BYTES_BOUND` (30,000
+  bytes) of room for the conversation, with the bound (`assistant_lane_proof.py`'s B1), so the next
+  growth fails there and not in a paid run's H.
+  AssemblyAI's $5 and the rest of P-3 stand: an agent never raises a budget, and this raise is the
+  owner's decision, recorded here. No paid run was made for it. Risk accepted: the budget is a
+  ceiling on the worst case, not an expectation (the last full evaluation settled $0.53), and B1's
+  measure mirrors the helper's wire shape by hand until the helper is Swift (#599).
