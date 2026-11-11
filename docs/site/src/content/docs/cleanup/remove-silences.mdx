@@ -78,6 +78,7 @@ Relinking a file starts its analysis again. If an agent relinks one while the sh
 - The cut reaches every unlocked track, not only the clips you measured, and markers stay where they are. See [A ripple across every unlocked track](/cleanup/how-cleanup-cuts-work/#a-ripple-across-every-unlocked-track).
 - Nothing inside a [nest](/editing/nests/) is cut, because a nest plays from its first frame and a cut into one would strand the rest of it. [Transitions are protected](/cleanup/how-cleanup-cuts-work/#transitions-are-protected) too.
 - A quiet stretch broken up by a nest or a transition is measured in its pieces.
+- Frame Job won't make the cut while a track it cuts or moves already has two clips overlapping by more than half the shorter one. Nothing is cut, and the foot of the inspector names the two clips. Shorten that transition, then run Remove Silences again.
 
 ## With an agent
 

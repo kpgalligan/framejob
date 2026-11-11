@@ -93,10 +93,10 @@ extension SilenceDetector {
     /// survives a wall of exactly `[B.start, A.end]`; `clear_range` then
     /// splits A at `B.start` and the shift moves A's `ov`-long tail and B
     /// together, leaving that tail wholly underneath B — an overlap longer
-    /// than half the shorter clip, which neither `ripple_delete_ranges` nor
-    /// `validate` checks. Widened, the nearest legal cut leaves each clip at
-    /// least `2·ov` across the overlap, which is exactly the half rule's own
-    /// bound.
+    /// than half the shorter clip, for which `ripple_delete_ranges` refuses
+    /// the whole cut (spec §11 #427). Widened, the nearest legal cut leaves
+    /// each clip at least `2·ov` across the overlap, which is exactly the
+    /// half rule's own bound, so the sheet never proposes a cut it refuses.
     ///
     /// The transition's `audio` flag is deliberately NOT consulted. The
     /// cases that matter are not about the crossfade making the overlap

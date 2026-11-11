@@ -111,7 +111,9 @@ fn general() -> Handle {
 
 /// A clip with three actions, a transition and non-default base props, on a
 /// track where it overlaps a predecessor — everything `split` has to carry
-/// across a cut. Clip 20 runs 2 400 000 – 14 400 000.
+/// across a cut. Clip 20 runs 2 400 000 – 14 400 000. The overlap is 300 000
+/// ticks, so the earliest cut below (600 000 into clip 20) leaves a first
+/// half the transition still fits, which a cut must (spec §11 #427).
 fn split_project() -> Handle {
     Handle::from_json(
         r#"{
@@ -124,7 +126,7 @@ fn split_project() -> Handle {
   ],
   "tracks": [{"id": 2, "name": "Track 1"}],
   "clips": [
-    {"id": 10, "track": 2, "start": 0, "duration": 3000000,
+    {"id": 10, "track": 2, "start": 0, "duration": 2700000,
      "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {}},
     {"id": 20, "track": 2, "start": 2400000, "duration": 12000000,
      "source": {"kind": "media", "media": 1, "in": 1200000}, "speed": 1.0,

@@ -43,7 +43,7 @@ Two clips on one track may overlap a little, and that overlap is a [transition](
 
 An edit that leaves a clip overlapping the clip before it gives that clip a Cross Dissolve over the overlap, unless it already has a transition.
 
-Moves, trims, nudges, duplicates, gap closes and nests won't break the rule. Paste and Un-nest put a clip that would break it on a new track at the front instead. The rule never stops a ripple delete: a clip it slides onto a neighbour gets a Cross Dissolve.
+Moves, trims, nudges, duplicates, gap closes and nests won't break the rule. Nor will a cut: Frame Job won't split, lift or ripple-delete a range, insert, overwrite, freeze or retime where a cut would leave a piece that breaks it, such as one so short that its transition covers more than half of it. Paste and Un-nest put a clip that would break it on a new track at the front instead. The rule never stops a ripple delete of selected clips: a clip it slides onto a neighbour gets a Cross Dissolve.
 
 ## Times land on frames
 

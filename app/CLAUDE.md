@@ -660,7 +660,10 @@ detail there.
   `ShotSplit` is the planner both doors call — targets, one request per
   media over the union of the played windows, cuts mapped to the canvas
   grid with the edge rule, the ceiling counted with partners on the
-  unscoped project before any op, one `split` per cut latest first;
+  unscoped project before any op, one `split` per cut latest first, tried
+  one at a time on the editing container through `SwitchAngle.Trial`
+  before anything commits, so a cut the overlap rule refuses refuses the
+  whole command (spec §11 #427 (e));
   `AnalyzingSheetController` the generic Analyzing sheet (a row per missed
   media polled from `AnalysisLane.progress(of:)` and `run(of:)`, Stop only
   dismisses, its one owner released in `viewDidDisappear`);

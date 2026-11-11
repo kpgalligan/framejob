@@ -38,9 +38,10 @@
 //! The exit is `finish`, whose `settle_links` clears a link a dropped or
 //! removed piece left one-sided.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::edit_clip::clip_end;
+use crate::edit_cut_rule::Pieces;
 use crate::edit_link::pair_split_halves;
 use crate::edit_split::split_clip;
 use crate::lut::look_media_ids;
@@ -54,27 +55,6 @@ fn nest_of(clip: &Clip) -> Option<u32> {
     match clip.source {
         Source::Nest { project } => Some(project),
         _ => None,
-    }
-}
-
-/// Every piece's SOURCE clip: a second half maps to the clip its original
-/// was cut from, so a piece cut twice still names the clip a person saw.
-/// An uncut clip, absent from the map, is its own source.
-struct Pieces(HashMap<u32, u32>);
-
-impl Pieces {
-    fn source(&self, piece: u32) -> u32 {
-        self.0.get(&piece).copied().unwrap_or(piece)
-    }
-
-    /// The pieces of `source` in `project` satisfying `which`.
-    fn of(&self, project: &Project, source: u32, which: impl Fn(&Clip) -> bool) -> Vec<u32> {
-        project
-            .clips
-            .iter()
-            .filter(|c| self.source(c.id) == source && which(c))
-            .map(|c| c.id)
-            .collect()
     }
 }
 
@@ -109,7 +89,7 @@ impl Project {
 
         // (c) Both bounds cut on every track, locked or not.
         let mut next = self.clone();
-        let mut pieces = Pieces(HashMap::new());
+        let mut pieces = Pieces::new();
         for bound in [from, to] {
             let ids: Vec<u32> = next
                 .clips
@@ -122,8 +102,7 @@ impl Project {
                 // `split_clip` allocates the second half's id first.
                 let second = next.next_id;
                 if split_clip(&mut next, id, bound) {
-                    let source = pieces.source(id);
-                    pieces.0.insert(second, source);
+                    pieces.halved(id, second);
                     halves.push((id, second));
                 }
             }

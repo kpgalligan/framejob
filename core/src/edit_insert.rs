@@ -25,6 +25,7 @@
 //! needs.
 
 use crate::edit_clip::clip_end;
+use crate::edit_cut_rule::Pieces;
 use crate::edit_time::locked_track;
 use crate::model::Project;
 use crate::outcome::Outcome;
@@ -54,7 +55,10 @@ impl Project {
     /// `Err` for an unknown track or media, or a media with no duration; a
     /// locked destination track refuses in [`locked_track`]'s words, and so
     /// does anything the inner `split`, `insert_time` or `add_clip` refused
-    /// — this op answers in the words of whichever step declined.
+    /// — this op answers in the words of whichever step declined. The
+    /// `split` is judged by THE overlap rule as it is cut, which is the
+    /// result's verdict too: the piece right of `at` and everything after it
+    /// move together (spec §11 #427 (a)).
     pub fn insert_clip(&self, track: u32, media: u32, at: Ticks) -> Result<Outcome, String> {
         if self.require_track(track)?.locked {
             return Ok(Outcome::Refused(locked_track(
@@ -113,7 +117,12 @@ impl Project {
     ///
     /// `Err` for an unknown track or media, or a media with no duration;
     /// whatever `add_clip` answered when the clip could not be placed after
-    /// the span was cleared, in its own words.
+    /// the span was cleared, in its own words. **Refused, nothing cut, when
+    /// the cleared span breaks THE overlap rule** on a track the cuts
+    /// changed — the partner's piece left too short for a transition is the
+    /// case — judged once the span is cleared, not at each cut, because a
+    /// piece a cut leaves too short may be one the clearing removes (spec
+    /// §11 #427).
     pub fn overwrite_clip(&self, track: u32, media: u32, at: Ticks) -> Result<Outcome, String> {
         self.require_track(track)?;
         let found = self.require_media(media)?.clone();
@@ -122,6 +131,7 @@ impl Project {
         // Both bounds are already on the frame grid, so the span is too.
         let end = at.saturating_add(length);
 
+        let mut pieces = Pieces::new();
         let mut next = self.clone();
         for bound in [at, end] {
             let cut: Vec<u32> = next
@@ -130,10 +140,8 @@ impl Project {
                 .filter(|c| c.start < bound && bound < clip_end(c))
                 .map(|c| c.id)
                 .collect();
-            match next.split_clips(&cut, bound)? {
-                Outcome::Applied(project) => next = project,
-                Outcome::Identity => {}
-                Outcome::Refused(why) => return Ok(Outcome::Refused(why)),
+            if let Some(project) = next.cut_clips(&cut, bound, &mut pieces)? {
+                next = project;
             }
         }
         let inside: Vec<u32> = next
@@ -143,6 +151,9 @@ impl Project {
             .map(|c| c.id)
             .collect();
         next.clips.retain(|c| !inside.contains(&c.id));
+        if let Some(why) = self.cut_refusal(&next, &pieces) {
+            return Ok(Outcome::Refused(why));
+        }
 
         let placed = match next.add_clip(track, media, at)? {
             Outcome::Applied(placed) => placed,

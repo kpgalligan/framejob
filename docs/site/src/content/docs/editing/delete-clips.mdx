@@ -51,11 +51,15 @@ Set an in/out range, select nothing and press <kbd>⌫</kbd>. Every clip on an u
 
 Lift is the safe cut when a mix or a caption track is already timed, because everything after the range keeps its moment. Clips on locked tracks are neither cut nor removed. If the range held nothing to remove, Frame Job beeps.
 
+Frame Job won't lift a range whose cuts would leave a piece too short for a [transition](/motion/transitions/), the transition covering more than half of it. Nothing is cut, and the foot of the inspector names the two clips. A cut inside a transition is fine when the range removes the piece it leaves.
+
 ## Ripple delete a range
 
 Set an in/out range, select nothing and press <kbd>⌘⌫</kbd>. Every clip on an unlocked track is cut at both ends of the range, what lies between is removed, and the hole closes. It's one undo step, named Ripple Delete.
 
 Clips on locked tracks are neither cut, removed nor moved, even inside the range. Everything else after the range moves left by its length, so a locked track falls out of step with the rest. That's what the lock is for. Frame Job has no separate sync locks: a lock is the one way to leave a track out of a ripple.
+
+As with a lift, Frame Job won't make the cut when it would leave a piece too short for a transition. Nor will it when a track the ripple cuts or moves already has two clips overlapping by more than half the shorter one. The foot of the inspector names the two clips.
 
 ## How a ripple closes holes
 
@@ -65,7 +69,7 @@ Each hole closes with one shift of everything after it, so clips that touched be
 - A clip moves if it starts at or after the end of the hole. When you ripple-delete clips, a clip on another track that spans the hole stays where it is, and isn't shortened.
 - A clip's linked partner on an unlocked track moves with it.
 - Markers stay at their times, because a marker inside a removed stretch would have nowhere to go.
-- A clip that slides onto a neighbour gets a Cross Dissolve over the overlap. A ripple is never stopped by the [overlap rule](/getting-started/refused-edits/).
+- A clip that slides onto a neighbour gets a Cross Dissolve over the overlap. Ripple-deleting selected clips is never stopped by the [overlap rule](/getting-started/refused-edits/). A ripple-deleted range can be, as [above](#ripple-delete-a-range).
 
 :::caution
 Clips that span the hole are why a ripple delete of a selected clip can break sync. A camera or microphone running under the clip isn't cut, so everything after the hole slips against it. To keep synced tracks together, [ripple delete a range](#ripple-delete-a-range) instead.
@@ -77,7 +81,7 @@ One thing does stop a ripple. If it would push a linked clip before the start of
 
 An agent can cut a list of time ranges out of the timeline as one edit and one undo step, with [`ripple_delete_ranges`](/mcp/tools-cut-and-delete/#ripple_delete_ranges). It shows as Ripple Delete under **Edit ▸ Undo**. [Remove Silences](/cleanup/remove-silences/) and [Remove Filler Words](/cleanup/remove-filler-words/) make the same cut from their sheets.
 
-Ranges that touch or overlap merge into one before anything is cut, so two ranges that meet leave one hole, and all the cuts use times from the timeline as it was before the edit. Each range then behaves as [a ripple-deleted range](#ripple-delete-a-range) does: locked tracks are left alone and markers don't move. See [Tools: cutting and deleting](/mcp/tools-cut-and-delete/).
+Ranges that touch or overlap merge into one before anything is cut, so two ranges that meet leave one hole, and all the cuts use times from the timeline as it was before the edit. Each range then behaves as [a ripple-deleted range](#ripple-delete-a-range) does: locked tracks are left alone and markers don't move. If any one range would be stopped, nothing is cut. See [Tools: cutting and deleting](/mcp/tools-cut-and-delete/).
 
 ## When the delete keys do something else
 

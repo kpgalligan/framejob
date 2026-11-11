@@ -76,6 +76,7 @@ Trimming the start of a graphic, or [rolling the cut](/editing/slip-and-roll/#ro
 
 - The cut lands on the project's frame grid.
 - A [transition](/motion/transitions/) into the clip stays on the first piece. The second piece starts with a hard cut.
+- Frame Job won't split a clip so close to a transition that the transition would cover more than half of a piece. It beeps, nothing is cut, and the foot of the inspector names the two clips. Split further from the transition, or shorten it first.
 - [Sound fades](/audio/fades/) are copied to both pieces. A clip with a fade-in fades in again at the cut, and one with a fade-out dips at the cut, so set them again on the side of the cut where you don't want them.
 - A project holds up to 4,096 clips. A split that would pass that shows an error alert, and nothing changes.
 

@@ -29,6 +29,13 @@ on a scratch `CFFIXED_USER_HOME`; its packages are saved under
   not the core's "too many clips"); one filler deleted, it adds 4.
 - S8 two placements playing 0…2 s and 8…10 s: the marker's coverage holds no
   range over index 150 (the union of the windows, never their hull).
+- S9 (spec §11 #427 (e)) `shots.mov` at 0 and a 6 s text clip moved 80 frames
+  onto its tail (a dissolve): the cut at 240 would leave a 140-frame piece
+  under it by 80 frames, so the whole call is refused — "Split at Shot
+  Changes was refused at split: clips A and B would overlap by 1600000
+  ticks, … (1400000 ticks); …" — the project and the undo top unchanged, no
+  split at 60, 120 or 180 either; the text clip moved 10 frames later (an
+  overlap of 70, half of 140) it splits at all four.
 
 **Launch 2** (`-RCDevAnalysisHold 3`), through the menu, each row on its own
 fresh package so every press misses the cache:
@@ -71,7 +78,7 @@ SEC = 600_000
 FRAME = 20_000  # ticks a frame at 30 fps
 ACTION = "Split at Shot Changes"
 MENU = ["Clip", ACTION]
-PLAIN = ["S1", "S2", "S3", "S4", "S4n", "S8"]
+PLAIN = ["S1", "S2", "S3", "S4", "S4n", "S8", "S9"]
 HELD = ["S5", "S6", "S7"]
 ROWS = PLAIN + HELD + ["Z1"]
 HOLD = ["-RCDevAnalysisHold", "3"]
@@ -104,6 +111,10 @@ MUTANTS = {
     "stop-keeps-want": (["S5"], [(
         "app/Sources/AnalyzingSheetController.swift",
         "        lane.release(owner: owner)\n", "")]),
+    "split-trial-removed": (["S9"], [(
+        "app/Sources/ShotSplit.swift",
+        "            if let why = try trial.require(op) { throw Refusal.cut(why) }\n",
+        "            _ = op\n")]),
     "stale-test-removed": (["S7"], [(
         "app/Sources/EditorViewController+ShotSplit.swift",
         "guard document.project === asked, document.scope == scope else {",
@@ -392,9 +403,38 @@ def s8(client):
     doc.close()
 
 
+def s9(client):
+    doc = Doc(client, "s9")
+    media = doc.media(fixtures.shots())
+    track = doc.track()
+    picture = doc.place(media, track)
+    text = doc.call("add_text_clip", track=track, at=380 * FRAME,
+                    duration=180 * FRAME)["new_clips"][0]
+    doc.call("move_clip", clips=[text], delta=-80 * FRAME)
+    before = doc.state()
+    top = undo_top(doc)
+    message = refused(lambda: doc.split(clips=[picture])) or ""
+    after = doc.state()
+    top_after = undo_top(doc)
+    sentence = (f"{ACTION} was refused at split: clips {picture} and {text} would overlap by "
+                f"{80 * FRAME} ticks, more than half of the shorter piece the cut leaves "
+                f"({140 * FRAME // 2} ticks); cut further from their transition, or shorten it "
+                f"first")
+    held = message == f"split_at_shots: {sentence}" and after == before and top_after == top
+    doc.call("move_clip", clips=[text], delta=10 * FRAME)
+    answer = attempt(lambda: doc.split(clips=[picture]), "S9") or {}
+    pictures = [c["start"] / FRAME for c in on_track(doc.state(), track) if c["id"] != text]
+    want = [0] + fixtures.SHOTS_CUTS
+    check("S9", held and answer.get("added") == 4 and pictures == want,
+          f"an 80-frame dissolve over the cut at 240: {message[:260]!r} (want {sentence!r}); "
+          f"project unchanged {after == before}, undo top {top!r} → {top_after!r}; moved to 70 "
+          f"frames: added {answer.get('added')}, picture starts {pictures} (want {want})")
+    doc.close()
+
+
 def plain_rows(client):
     for name, body in (("S1", s1), ("S2", s2), ("S3", s3), ("S4", s4), ("S4n", s4n),
-                       ("S8", s8)):
+                       ("S8", s8), ("S9", s9)):
         if name in selected:
             attempt(lambda: body(client), name)
 

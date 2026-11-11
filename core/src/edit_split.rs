@@ -259,7 +259,8 @@ pub(crate) fn split_clip(project: &mut Project, clip_id: u32, at: Ticks) -> bool
     // Only a re-eased tail can read past the file (a `linear` or `ease_out`
     // one reads what the original did, within the constant clip's ±1 tick
     // of rounding): lowered to the largest end rate that fits, or left for
-    // the plan's clamp when none does. A splitter never refuses.
+    // the plan's clamp when none does. `split_clip` never refuses (the
+    // overlap rule is asked by the op that cut, `edit_cut_rule.rs`).
     if let Some((tail, rate)) = re_eased {
         if project.overrun(&second).is_some() {
             if let Some(fitting) = project.largest_fitting_end_rate(&second, tail, rate) {

@@ -919,6 +919,94 @@ def the_non_edits_that_speak(mcp):
     undo_claim(s, start)
 
 
+# ---- a cut too close to a transition (spec §11 #427) ----------------------
+
+
+def foot(s, name):
+    """The inspector's refusal strip as `snapshot_ui`'s layout dump reads it:
+    every shown text beginning "Refused" (a dev tool, so Debug and Release
+    only, which is where this script runs)."""
+    png = os.path.join(WORK, f"{name}-{os.getpid()}.png")
+    s.op("snapshot_ui", window="editor", view="inspector", path=png)
+    with open(os.path.splitext(png)[0] + ".layout.json") as handle:
+        dump = json.load(handle)
+    return [v.get("text") for v in dump.get("views", [])
+            if (v.get("text") or "").startswith("Refused") and not v.get("hidden")]
+
+
+def the_cut_rule(mcp):
+    """A cut that would leave a piece too short for the transition it
+    carries is refused (spec §11 #427, `core/src/edit_cut_rule.rs`), judged
+    on what the op would store, and the sentence names the clips the pieces
+    were cut from: a second piece's id exists only in the answer that was
+    refused.
+
+    The fixture is the ten-second card twice on one track, the second moved
+    two seconds onto the first, which mints a cross dissolve: a [0, 10 s)
+    and b [8 s, 18 s). A cut at 7 s leaves a's piece [7 s, 10 s), 3 s, under
+    b by 2 s, more than half of it (1.5 s). Every number below is computed
+    here, never read back."""
+    print("\n11 — a cut too close to a transition is refused, naming the clips it cut (#427)")
+    s = Session(mcp, "refusal-cut")
+    media = s.media("A.mov")
+    a = s.place(media, 0)
+    b = s.place(media, 10 * SEC)
+    s.op("move_clip", clips=[b], delta=-2 * SEC)
+    landed("the fixture is a [0, 10 s) and b [8 s, 18 s), dissolving",
+           [[c["start"], c["duration"], c.get("transition_in") is not None]
+            for c in s.project()["clips"]],
+           [[0, 10 * SEC, False], [8 * SEC, 10 * SEC, True]])
+    cut = 7 * SEC
+    sentence = (f"clips {a} and {b} would overlap by {2 * SEC} ticks, more than half of the "
+                f"shorter piece the cut leaves ({(10 * SEC - cut) // 2} ticks); cut further "
+                f"from their transition, or shorten it first")
+
+    print("\n11a — a real edit, whose undo step every answer below must leave alone")
+    start = undo_marker(s, lambda: s.op("set_clip", clips=[a], patch={"name": "Marker"}))
+
+    print("\n11b — split, lift and ripple at 7 s, each refused naming a and b")
+    refused(s, "split", "split", "a split at 7 s", sentence, at=cut)
+    refused(s, "lift_range", "lift_range", "a lift of {0, 7 s}", sentence,
+            **{"from": 0, "to": cut})
+    refused(s, "ripple_delete_range", "ripple_delete_range", "a ripple of {0, 7 s}", sentence,
+            **{"from": 0, "to": cut})
+
+    print("\n11c — a list with one range too close is refused whole")
+    # {12 s, 13 s} alone leaves b's head [8 s, 12 s) holding the dissolve.
+    # With {0, 7 s} beside it, a's 3 s piece meets b's 4 s head at 0 s and
+    # 1 s after the closes: the same 2 s against half of 3 s.
+    refused(s, "ripple_delete_ranges", "ripple_delete_ranges",
+            "the harmless {12 s, 13 s} beside {0, 7 s}", sentence,
+            ranges=[[12 * SEC, 13 * SEC], [0, cut]])
+
+    print("\n11d — the person's door: Edit ▸ Ripple Delete over {0, 7 s}")
+    s.op("set_selection", clips=[])
+    s.op("set_range", start=0, end=cut)
+    before = s.text()
+    s.op("perform_menu_item", path=["Edit", "Ripple Delete"])
+    check(s.text() == before, "Edit ▸ Ripple Delete with the range set changed nothing")
+    strip = foot(s, "refusal-cut-foot")
+    check(strip == [f"Refused: {sentence}"],
+          f"…and the inspector's foot reads the sentence whole; got {strip}")
+    s.op("set_range")
+
+    print("\n11e — the bound is the rule's own, and a range that removes the piece applies")
+    applied(s, "split", "a split at 6 s, whose 4 s piece holds the 2 s dissolve exactly",
+            at=6 * SEC)
+    landed("…and it LANDED, a's piece starting at 6 s",
+           sorted(c["start"] for c in s.project()["clips"]), [0, 6 * SEC, 8 * SEC])
+    s.op("undo")
+    applied(s, "lift_range", "a lift of {7 s, 10 s}, which takes a's piece and b's head",
+            **{"from": cut, "to": 10 * SEC})
+    landed("…and it LANDED: a [0, 7 s), then b's rest from 10 s",
+           sorted([c["start"], c["duration"]] for c in s.project()["clips"]),
+           [[0, cut], [10 * SEC, 8 * SEC]])
+    s.op("undo")
+
+    print("\n11f — and not one refusal was an undo step")
+    undo_claim(s, start)
+
+
 def summary(aborted=None):
     """The last line, and the exit status. An op that unexpectedly refused or
     errored — a `ToolError` no check was waiting for — aborts the run and is
@@ -950,6 +1038,7 @@ def main():
     the_action_rules(mcp)
     off_the_track_stack(mcp)
     the_non_edits_that_speak(mcp)
+    the_cut_rule(mcp)
     summary()
 
 

@@ -53,6 +53,8 @@ Each piece keeps the actions on its side, and an action that crosses the cut bec
 
 **Changes nothing** for a named clip `at` isn't strictly inside, which is skipped. If no clip can be cut, the answer is "Split made no change". An unknown clip id is an error.
 
+**Won't run** when a piece would be too short for the transition it carries, the transition covering more than half of it. Nothing is cut, and the message names the clips the pieces were cut from, not the new piece's id. Nor when a track it cuts already has two clips that break the [overlap rule](/editing/how-edits-work/#the-overlap-rule), which the message names.
+
 ## `split_at_shots`
 
 Cuts clips of a video file at every hard cut inside the part of the file they play, as one undo step named Split at Shot Changes. It shows no sheet.
@@ -86,6 +88,7 @@ With no cut inside any clip, `added` is 0, a `note` says so, and there's no undo
 
 - No clip qualifies. The message says none of the clips shows a moving picture.
 - The splits would pass 4,096 clips. The message gives how many it would add, counting linked partners, and how many fit.
+- One of the splits would leave a piece too short for a transition. The message is the one `split` gives, after "Split at Shot Changes was refused at split:".
 - The analysis takes longer than 60 s. What was covered is kept, so call again to carry on.
 - The analysis failed, was stopped, or the file can't be read.
 - The project or the open nest changed during the wait. Call again.
@@ -139,7 +142,7 @@ Clips on locked tracks are neither cut, removed nor moved, even inside the range
 
 **Answers** `new_clips`, the piece left after the range of any clip cut at `to`. That piece has a new id.
 
-**Won't run** when `to` isn't after `from`, which is an error, or when the shift would push a linked clip before the start of the timeline. The undo step is named Ripple Delete.
+**Won't run** when `to` isn't after `from`, which is an error, or when the shift would push a linked clip before the start of the timeline. Nor when what it leaves would break the overlap rule on a track it cuts or moves: a piece too short for its transition, named by the clips the pieces were cut from, or two clips that already overlap by more than half the shorter one. A cut inside a transition is fine when the range removes the piece it leaves. The undo step is named Ripple Delete.
 
 ## `ripple_delete_ranges`
 
@@ -159,7 +162,7 @@ Each pair is rounded to the frame grid and put in order, so a reversed pair is t
 
 **Answers** `new_clips`, the pieces left after each range of any clip cut at a range's end.
 
-**Won't run** when `ranges` is empty, which is an error, or when a shift would push a linked clip before the start of the timeline. A list whose pairs are all empty changes nothing. Each cut can add a clip, so a list that would pass 4,096 clips is an error and nothing is cut.
+**Won't run** when `ranges` is empty, which is an error, or when a shift would push a linked clip before the start of the timeline. Nor, as a whole, when what the list leaves would break the overlap rule as [`ripple_delete_range`](#ripple_delete_range) says: one range too close to a transition stops them all. A list whose pairs are all empty changes nothing. Each cut can add a clip, so a list that would pass 4,096 clips is an error and nothing is cut.
 
 ## `lift_range`
 
@@ -178,7 +181,7 @@ Clips on locked tracks are neither cut nor removed. To close the hole as well, u
 
 **Answers** `new_clips`, the piece left after the range of any clip cut at `to`. The undo step is named Lift.
 
-**Won't run** when `to` isn't after `from`, which is an error. A range with nothing an unlocked track can give up changes nothing.
+**Won't run** when `to` isn't after `from`, which is an error, or when what it leaves would break the overlap rule on a track it cuts, as [`ripple_delete_range`](#ripple_delete_range) says. A range with nothing an unlocked track can give up changes nothing.
 
 ## `insert_time`
 

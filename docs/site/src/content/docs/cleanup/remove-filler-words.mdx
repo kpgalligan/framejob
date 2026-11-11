@@ -90,6 +90,7 @@ The sheet counts these, one for each run: "2 fillers are left in: too short to c
 - **Protection needs a transcript.** A cut is kept away from speech in another clip only when that clip's file has a kept AssemblyAI transcript, made with or without filler words. Speech on another unlocked track with no such transcript isn't protected, so check the shading there.
 - **The service can miss a filler.** A filler AssemblyAI doesn't return isn't cut. One it returns that isn't on the list stays in, both in the cut and in your captions.
 - **A filler belongs to the clip it starts in.** It's read when it starts inside the part of the file the clip plays.
+- **A track that already breaks the overlap rule stops the cut.** Frame Job won't cut while a track the cut reaches or moves has two clips overlapping by more than half the shorter one. Nothing is cut, and the foot of the inspector names the two clips.
 
 ## With an agent
 

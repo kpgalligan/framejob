@@ -304,11 +304,11 @@ extension AgentServer {
             opTool(
                 "split",
                 "Cuts clips in two at `at` — Clip ▸ Split (⌘T). The second piece keeps playing the source from "
-                    + "where the first stopped, and each keeps the animation actions that fall "
-                    + "on its side (an action straddling the cut becomes two). With no clips "
-                    + "every unlocked clip under the time is split, which is what the menu "
-                    + "command does with nothing selected. Refused when `at` is not strictly "
-                    + "inside a clip.",
+                    + "where the first stopped, and each keeps the animation actions that fall on its side (an "
+                    + "action straddling the cut becomes two). With no clips every unlocked clip under the time is "
+                    + "split, as the menu command does with nothing selected. Refused when `at` is not strictly "
+                    + "inside a clip, and when a piece would be too short for the transition it carries (the "
+                    + "overlap rule), naming the clips it was cut from.",
                 [
                     "clips": "Clip ids; omit to split every unlocked clip at `at`.",
                     "at": "Where to cut, \(ticks) Default: the playhead.",
@@ -327,21 +327,21 @@ extension AgentServer {
                 ["clips": clipsDescription]),
             opTool(
                 "ripple_delete_range",
-                "Cuts a time range out of the whole timeline: every unlocked clip is split at "
-                    + "both bounds, the middles are removed, and the rest slides left by the "
-                    + "range's length. The in/out-range form of ⌘⌫.",
+                "Cuts a time range out of the whole timeline: every unlocked clip is split at both bounds, "
+                    + "the middles are removed, and the rest slides left by the range's length. The in/out-range "
+                    + "form of ⌘⌫. Refused, nothing cut, when a piece left is too short for its transition.",
                 ["from": "Range start, \(ticks)", "to": "Range end, \(ticks)"]),
             opTool(
                 "ripple_delete_ranges",
                 "Cuts SEVERAL time ranges out of the whole timeline as ONE edit — what Clip ▸ "
                     + "Remove Silences… sends. Each pair is put in order (a reversed pair is "
                     + "the same range), the pairs are then MERGED — overlapping and touching "
-                    + "alike — and the survivors are cut right to left exactly as "
-                    + "ripple_delete_range cuts one. So this is NOT the same as calling that "
-                    + "once per pair: two ranges that meet make one shift, not two. It is one "
-                    + "undo step however many ranges there are, which is the point. Markers do "
-                    + "not move, as under every ripple. An empty list, and a list that merges "
-                    + "to nothing, change nothing. detect_silence returns ranges in this shape.",
+                    + "alike — and the survivors are cut right to left exactly as ripple_delete_range cuts "
+                    + "one. So this is NOT the same as calling that once per pair: two ranges that meet make "
+                    + "one shift, not two. It is one undo step however many ranges there are, which is the "
+                    + "point, and one range leaving a piece too short for its transition refuses them all. "
+                    + "Markers do not move, as under every ripple. An empty list, and a list that merges to "
+                    + "nothing, change nothing. detect_silence returns ranges in this shape.",
                 ["ranges": "The spans to cut, each a [from, to] pair \(ticks)"]),
         ]
         // detect_silence and normalize_clip are `AgentCatalog+Audio.swift`'s,
@@ -356,8 +356,8 @@ extension AgentServer {
                     + "selected. Every unlocked clip is split at both bounds and the middles "
                     + "removed, and nothing moves: every clip after the range keeps the moment "
                     + "it had, which is what makes this the safe cut when a mix or a caption "
-                    + "track is already timed. Use ripple_delete_range to close the hole "
-                    + "instead.",
+                    + "track is already timed. Refused, nothing cut, when a piece left is too short "
+                    + "for its transition. Use ripple_delete_range to close the hole instead.",
                 ["from": "Range start, \(ticks)", "to": "Range end, \(ticks)"]),
             opTool(
                 "insert_time",

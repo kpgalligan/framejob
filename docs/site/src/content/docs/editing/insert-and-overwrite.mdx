@@ -73,6 +73,7 @@ The whole edit is one undo step, Overwrite.
 
 - **Locked tracks.** Insert won't work on a locked destination track, because the track can't open up, and the reason appears at the foot of the inspector. Insert elsewhere leaves locked tracks where they are, so their clips can fall out of step with the rest. Overwrite still clears a locked track, because you chose that track and nothing has to move.
 - **When the menu items are dimmed.** They need a selected row in the Media tab, and that row can't be a `.cube` LUT. A LUT is [applied as a look](/color/luts/), so its right-click **Insert at Playhead** and **Overwrite at Playhead** are dimmed too. A filter that hides the selected row clears the selection.
+- **Transitions.** Frame Job won't insert or overwrite where a cut would leave a piece that a [transition](/motion/transitions/) covers more than half of, including a linked sound's piece on its own track. Nothing changes, and the foot of the inspector names the two clips.
 - **The length is the whole file.** Both edits place the file from its first frame to its last. To use part of it, [trim the clip](/editing/trimming/) afterwards. After an Insert, trimming leaves a gap, which [Close Gap](/editing/close-gaps/) removes.
 
 ## With an agent

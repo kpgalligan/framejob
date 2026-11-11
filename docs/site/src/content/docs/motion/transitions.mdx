@@ -43,12 +43,12 @@ Two clips on a track may overlap only as a transition, and two rules limit how:
 - A clip can overlap at most one neighbour on each side.
 - An overlap can be at most half as long as the shorter of the two clips. A 4 s clip and a 10 s clip can overlap by up to 2 s.
 
-Clips never push each other out of the way, so Frame Job won't make a move, trim, nudge, duplicate, gap close or nest that breaks either rule. A drag stops at the last place that fits, and anything else beeps and gives the reason at the foot of the inspector.
+Clips never push each other out of the way, so Frame Job won't make a move, trim, nudge, duplicate, gap close or nest that breaks either rule. Nor will it make a cut that would, such as a split so close to a transition that the piece it leaves is less than twice the overlap. A drag stops at the last place that fits, and anything else beeps and gives the reason at the foot of the inspector.
 
 Two edits work differently:
 
 - **Paste and Un-nest** put a clip that would break the rule on a new track at the front.
-- **A ripple delete** is never stopped by these rules. A clip it slides onto a neighbour gets a Cross Dissolve.
+- **Ripple-deleting selected clips** is never stopped by these rules. A clip it slides onto a neighbour gets a Cross Dissolve. A [ripple-deleted range](/editing/delete-clips/#ripple-delete-a-range) can be stopped, like any other cut.
 
 See [How edits work](/editing/how-edits-work/#the-overlap-rule).
 

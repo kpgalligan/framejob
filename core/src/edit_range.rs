@@ -9,8 +9,16 @@
 //! timeline-wide, locked tracks never move, straddlers stay put) hold here
 //! unchanged. Moved out of `edit_time.rs` whole under the size rule
 //! (`designs/adr/core-file-history.md`).
+//!
+//! **What a range op stores is judged by THE overlap rule, once** (spec
+//! §11 #427): `clear_range` cuts through `cut_under_playhead`, which asks
+//! no rule, because a piece its first cut leaves too short for a transition
+//! may be one the removal then takes; each op asks `edit_cut_rule.rs`'s
+//! `cut_refusal` of its result, and `ripple_delete_ranges` of the result of
+//! every range together, so a list is refused whole.
 
 use crate::edit_clip::clip_end;
+use crate::edit_cut_rule::Pieces;
 use crate::edit_time::{shift_clips, union, unlocked_tracks, Span};
 use crate::model::Project;
 use crate::outcome::Outcome;
@@ -31,7 +39,7 @@ fn ordered_range(project: &Project, from: Ticks, to: Ticks) -> Option<(Ticks, Ti
 }
 
 /// Empties `[start, end)` on every unlocked track: both bounds are cut
-/// first (`split_under_playhead` IS "split every unlocked clip here"), so
+/// first (`cut_under_playhead` is ⌘K's "split every unlocked clip here"), so
 /// afterwards every unlocked clip that touched the range lies entirely
 /// inside it, and those are removed.
 ///
@@ -41,19 +49,22 @@ fn ordered_range(project: &Project, from: Ticks, to: Ticks) -> Option<(Ticks, Ti
 ///
 /// The one thing this does NOT do is decide what happens to the hole, which
 /// is the whole difference between a lift and a ripple delete.
-fn clear_range(project: &Project, start: Ticks, end: Ticks) -> Result<Project, String> {
-    // A splitter has no rule to refuse with — it either cut something or it
-    // did not — so both of its non-applied answers mean "nothing was cut at
-    // this bound". A splitter that ever gains a rule has to be given a way
-    // out of here first: this function answers a `Project`, not an
-    // [`Outcome`], so it has nowhere to put a sentence.
-    let mut current = match project.split_under_playhead(start)? {
-        Outcome::Applied(split) => split,
-        Outcome::Identity | Outcome::Refused(_) => project.clone(),
-    };
-    match current.split_under_playhead(end)? {
-        Outcome::Applied(split) => current = split,
-        Outcome::Identity | Outcome::Refused(_) => {}
+///
+/// Nor does it ask the overlap rule: the cut at `start` can leave a piece
+/// too short for its transition that the removal then takes, so the op
+/// asks of what it would store (spec §11 #427 (a)). `pieces` learns which
+/// clip each piece was cut from, for that sentence.
+fn clear_range(
+    project: &Project,
+    start: Ticks,
+    end: Ticks,
+    pieces: &mut Pieces,
+) -> Result<Project, String> {
+    let mut current = project
+        .cut_under_playhead(start, pieces)?
+        .unwrap_or_else(|| project.clone());
+    if let Some(cut) = current.cut_under_playhead(end, pieces)? {
+        current = cut;
     }
 
     let unlocked = unlocked_tracks(&current);
@@ -71,7 +82,7 @@ impl Project {
     /// Removes everything between `from` and `to` on unlocked tracks and
     /// closes the hole — the range form of ripple delete (spec §6).
     ///
-    /// Both bounds are cut first (`split_under_playhead` IS "split every
+    /// Both bounds are cut first (`cut_under_playhead` is ⌘K's "split every
     /// unlocked clip here"), so afterwards every unlocked clip that touched
     /// the range lies entirely inside it; those are removed, and everything
     /// starting at or after `to` shifts left by the range's length.
@@ -82,7 +93,8 @@ impl Project {
     ///
     /// The bounds are snapped, clamped to 0 and ordered, so a drag that
     /// ended left of where it began is the same range. An empty range is an
-    /// identity.
+    /// identity. Refused, nothing cut, when what it would store breaks THE
+    /// overlap rule on a track it changed (spec §11 #427).
     ///
     /// It is [`Project::ripple_delete_ranges`] with one pair, and nothing
     /// else: with a single span there is nothing for the merge to merge and
@@ -131,6 +143,10 @@ impl Project {
     ///
     /// An empty list, a list of empty ranges, and a list that merges to
     /// nothing all change nothing.
+    ///
+    /// **Refused whole**, nothing cut, when what the whole list would store
+    /// breaks THE overlap rule on a track it changed — one range cut too
+    /// close to a transition refuses every range (spec §11 #427 (e)).
     pub fn ripple_delete_ranges(&self, ranges: &[[Ticks; 2]]) -> Result<Outcome, String> {
         // Snapped FIRST, merged after: two ranges three ticks apart are the
         // same range once both bounds are on the frame grid, and only a
@@ -146,15 +162,19 @@ impl Project {
             return Ok(Outcome::Identity);
         }
 
+        let mut pieces = Pieces::new();
         let mut next = self.clone();
         for span in spans.iter().rev() {
-            next = clear_range(&next, span.start, span.end)?;
+            next = clear_range(&next, span.start, span.end, &mut pieces)?;
             // Negated by subtraction rather than by `-length`, so an absurd
             // range cannot overflow on the negation.
             if let Some(why) = shift_clips(&mut next, span.end, span.start.saturating_sub(span.end))
             {
                 return Ok(Outcome::Refused(why));
             }
+        }
+        if let Some(why) = self.cut_refusal(&next, &pieces) {
+            return Ok(Outcome::Refused(why));
         }
         let unlocked = unlocked_tracks(&next);
         self.finish_placement(next, &unlocked)
@@ -176,12 +196,19 @@ impl Project {
     /// The bounds are snapped, clamped to 0 and ordered, so a drag that
     /// ended left of where it began is the same range. An empty range, or
     /// one that held nothing an unlocked track could give up, is an identity.
+    /// Refused, nothing cut, when what it would store breaks THE overlap
+    /// rule on a track it changed (spec §11 #427).
     pub fn lift_range(&self, from: Ticks, to: Ticks) -> Result<Outcome, String> {
         let Some((start, end)) = ordered_range(self, from, to) else {
             return Ok(Outcome::Identity);
         };
         // No shift, so nothing can be brought into contact with anything
         // and no transition can be gained.
-        self.finish(clear_range(self, start, end)?)
+        let mut pieces = Pieces::new();
+        let next = clear_range(self, start, end, &mut pieces)?;
+        if let Some(why) = self.cut_refusal(&next, &pieces) {
+            return Ok(Outcome::Refused(why));
+        }
+        self.finish(next)
     }
 }

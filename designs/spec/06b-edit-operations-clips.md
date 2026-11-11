@@ -87,7 +87,8 @@ The patch ops (`set_video`, `set_audio`, `set_text`, `set_shape`, `set_graphic` 
   there. Nothing shifts and no other track is touched, but for a cut clip's linked partner on an
   unlocked track, which is cut at the same bounds and paired (§11 AU-92) — the partner's middle
   piece stays, unlinked; the named track is cleared whether or not it is locked, exactly as
-  `ripple_delete` removes the clips it was given.
+  `ripple_delete` removes the clips it was given. Refused, nothing cut, when the cleared span
+  breaks the overlap rule on a track the cuts changed (§6a, §11 #427).
 - **`move_clip {clips, delta, track?}`** — Shifts by `delta` ticks (may be negative; clamps at 0)
   and optionally to another track (all selected clips keep their relative track offsets). **Overlap
   rule** on the destination track: a clip may overlap at most one neighbour on each side, and each
@@ -176,7 +177,7 @@ The patch ops (`set_video`, `set_audio`, `set_text`, `set_shape`, `set_graphic` 
   second half runs on to the original end rate along the original curve from the rate at the cut —
   exact for `linear` and `ease_out`, re-eased for `ease_in` and `ease_in_out`, which alone are lowered
   to the largest end rate that fits when they would read past the file (§11 SR-18 (e)). Refuses when
-  `at` is not strictly inside.
+  `at` is not strictly inside, and when the cut would break the overlap rule (§6a, §11 #427).
   **Omitting** `clips` — not passing a flag — means every unlocked clip `at` is strictly inside, the
   ⌘T-with-no-selection case.
   A linked partner on an unlocked track is cut too, and the halves are paired: both cut, the
@@ -188,7 +189,8 @@ The patch ops (`set_video`, `set_audio`, `set_text`, `set_shape`, `set_graphic` 
   span (union of the removed clips' spans, processed right-to-left) shifts every clip on
   **unlocked** tracks whose start ≥ span end left by the span length. Clips on other tracks that
   straddle a span are left in place. Range form: every unlocked clip is split at both bounds first,
-  the middle pieces removed, then the shift. Every clip a shift moves moves by that ONE delta, so
+  the middle pieces removed, then the shift; refused, nothing cut, when the result breaks the
+  overlap rule (§6a, §11 #427). Every clip a shift moves moves by that ONE delta, so
   clips that abutted still abut — at a rate whose frame is not a whole number of ticks (7 fps) a
   moved start may sit a tick off the grid (§11 #42). Each named clip's linked partner on an unlocked track is removed too, either half named. Every shift (these, `ripple_delete_ranges`, `close_gap`, `insert_time` and `add_transition`'s ripple form) also moves each moved clip's partner on an unlocked track, whatever its own start, and refuses, nothing moved, when a partner would start before 0: "clip S would start before 0: it leads its linked clip P by N ticks" (§11 AU-91).
 
@@ -199,11 +201,13 @@ The patch ops (`set_video`, `set_audio`, `set_text`, `set_shape`, `set_graphic` 
   `ripple_delete_range`s**, and the difference is visible in the document: a cut at a boundary that
   no longer exists would mint a fragment and burn an id. `set_gained_transitions` runs once at the
   end, over the unlocked tracks. Markers do not move, as they do not for the singular. An empty
-  list, and a list that merges to nothing, change nothing. Written by Clip ▸ Remove Silences… as one
+  list, and a list that merges to nothing, change nothing. Refused WHOLE when what the list would
+  store breaks the overlap rule (§6a, §11 #427). Written by Clip ▸ Remove Silences… as one
   undo step, whatever the number of cuts.
 - **`lift_range {from, to}`** — `ripple_delete_range` without the close: every unlocked clip is
   split at both bounds and the middles removed, and NOTHING moves — every clip after the range keeps
   the moment it had, and so do the markers. ⌫ with a range and nothing selected, where ⌘⌫ ripples.
+  Refused as `ripple_delete_range` is under the overlap rule (§6a, §11 #427).
 - **`keep_range {from, to}`** — The project as `[from, to)` of its top-level timeline, moved to
   start at 0 (§11 CJ-50). Both bounds are snapped and clamped to 0; `to` not after `from` is an error.
   Every clip on every track, locked or not, is cut at both bounds by `split`'s rules; at an edge
@@ -240,7 +244,8 @@ The patch ops (`set_video`, `set_audio`, `set_text`, `set_shape`, `set_graphic` 
   a clip that ends after `from`; in clip order, a nest clip, a caption page with timed words or a
   linked clip in the range (AU-94's sentence); a transition touching `[from, to]`; two markers that
   would share a time (unscoped only); a piece whose rate would pass ×0.1–×1000, named by its source
-  clip and the rate, or that would last under one frame.
+  clip and the rate, or that would last under one frame; the overlap rule on what it would store
+  (§6a, §11 #427).
 
 - **`set_speed {clip, rate?, duration?, keep_pitch?}`** — Two arms, exactly one given; both or
   neither is an **error** (§11 #190). `rate` sets the rate. `duration` FITS the clip: it is snapped,

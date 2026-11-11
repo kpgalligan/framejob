@@ -539,7 +539,10 @@ governs a module now.
 - `edit_clip.rs` — clip construction and placement callers: `add_clip`, move,
   duplicate, delete, join (the described clips are `edit_described.rs`'s);
   move, split, delete and duplicate take a linked
-  partner through `edit_link.rs`'s closures. `whole_media_length`,
+  partner through `edit_link.rs`'s closures. `split_clips` is `cut_clips`
+  (the cut alone, `pub(crate)`) then `edit_cut_rule.rs`'s `cut_refusal`;
+  `cut_under_playhead` is ⌘K's selection cut the same way, with no rule.
+  `whole_media_length`,
   `edit_clip_timing.rs`'s `trim_end` and `set_speed` hold a media clip's window INSIDE its file, each
   through `source_window.rs`'s one bound, so
   `in + duration × speed ≤ media.duration` and the plan's segment rate is
@@ -575,7 +578,7 @@ governs a module now.
 - `edit_retime.rs` — `retime_range` (road map creator-jobs CU9a, spec §11
   CU-90).
   - The range `[from, to)` is played at `rate` on every unlocked track.
-  - Both bounds are cut by `split_under_playhead`. The pieces (unlocked
+  - Both bounds are cut by `cut_under_playhead`, asking no rule. The pieces (unlocked
     clips wholly inside) are found before `shift_clips` moves everything at
     or after `to` by `to′ − to`, partners included.
   - Each piece starts at `f(s)` and lasts `f(e) − f(s)`, where
@@ -586,7 +589,8 @@ governs a module now.
   - Markers inside map through `f`; markers after move with the shift. Two
     markers landing on one tick are refused, never dropped. A scoped view
     has none.
-  - Errors, then refusals (1)–(7) in CU-90's order. A rate of 1 is an
+  - Errors, then refusals (1)–(7) in CU-90's order, then THE overlap rule
+    on what it would store (spec §11 #427 (h)). A rate of 1 is an
     identity once in range. AU-94's sentence comes through `edit_link.rs`'s
     `linked_rate_sentence`.
 - `edit_pieces.rs` — `copy_pieces` (road map "creator-jobs" SW1, spec §11
@@ -759,13 +763,10 @@ governs a module now.
   (a rate change
   normalizes top-level and each stored nest's clip times through `frame_grid.rs`
   and drops the second of two top-level markers a coarser grid lands on one tick).
-- `edit_time.rs` — ripple, insert time, `ripple_delete_ranges` (the pairs are
-  ordered, MERGED — touching as well as overlapping — then cut and closed
-  right to left as ONE edit; the singular delegates to it), `lift_range`
-  (the hole left open), `close_gap` (refuses rather than closing part way, and
-  refuses naming what is there when `at` is on a clip or nothing follows it,
-  spec §11 #88),
-  freeze frame, `shift_clips`, `shifted` (what a shift moves: every unlocked
+- `edit_time.rs` — ripple, insert time, `close_gap` (refuses rather than
+  closing part way, and refuses naming what is there when `at` is on a clip
+  or nothing follows it, spec §11 #88), freeze frame, `Span` and `union`
+  (`pub(crate)`, `edit_range.rs` shares them), `shift_clips`, `shifted` (what a shift moves: every unlocked
   clip at or after the boundary and each one's linked partner;
   `shift_clips` moves exactly that set and answers a refusal, nothing moved,
   when a partner would start before 0), and `locked_track` — THE locked-track
@@ -773,6 +774,31 @@ governs a module now.
   (`close_gap`, `edit_insert.rs`'s `insert_clip`, `edit_transition.rs`'s
   rippled form, `edit_retime.rs`'s `retime_range`, `edit_pieces.rs`'s
   `copy_pieces`), each passing the clause after the comma.
+- `edit_range.rs` — the range cuts, moved out of `edit_time.rs` whole
+  (#427's toll): `ripple_delete_ranges` (the pairs are ordered, MERGED —
+  touching as well as overlapping — then cut and closed right to left as ONE
+  edit; the singular delegates to it), `lift_range` (the hole left open),
+  `ordered_range` and `clear_range` (both bounds cut by `edit_clip.rs`'s
+  `cut_under_playhead`, asking no rule, then what lies wholly between
+  removed on unlocked tracks). Each op asks `edit_cut_rule.rs`'s
+  `cut_refusal` once, of its result — `ripple_delete_ranges` of the whole
+  list's, so a list is refused whole (spec §11 #427).
+- `edit_cut_rule.rs` — a cut and THE overlap rule (spec §11 #427): `Pieces`
+  (each second half's SOURCE clip — `new`, `halved`, `source`, `of`; moved
+  from `edit_keep_range.rs`, which shares it) and `Project::cut_refusal`:
+  the rule asked of what a cut would STORE, on each track whose clips' ids,
+  starts or durations changed, judged whole; an over-long pair a cut made (a
+  second half, or a first half shorter than before, its two source clips not
+  already past the limit before the op) named by its source clips in its own
+  sentence ("…more than half of the shorter piece the cut leaves (N ticks);
+  cut further from their transition, or shorten it first"); a pair already
+  past the limit, even one the cut reaches, in the rule's own sentence by
+  its source clips (`transition.rs`'s `past_limit`); any other violation in
+  the rule's own. The cutters that ask no rule are `edit_clip.rs`'s
+  `cut_clips` and `cut_under_playhead` (through `finish`, so `validate` and
+  the caps still judge each cut); `split_clips` (so `split`, `insert_clip`
+  and `freeze_frame`), `edit_range.rs`'s ops, `overwrite_clip` and
+  `retime_range` ask it.
 - `edit_keep_range.rs` — `keep_range` (road map "creator-jobs" CJ5a, spec
   §11 CJ-50): the project as `[from, to)` of its top-level timeline moved to
   0 — both bounds cut on every track, locks ignored, through `split_clip`
@@ -788,7 +814,8 @@ governs a module now.
   compositions of split + insert time + add made ONE op so a drop is one
   undo step and carries the rule neither half states — an insert cuts only
   the destination track (and a cut clip's linked partner, AU-92) and then
-  shifts every unlocked one.
+  shifts every unlocked one. `overwrite_clip` cuts through `cut_clips` and
+  asks `cut_refusal` once the span is cleared (spec §11 #427).
   `roll` is a front trim on its clip, so it advances `graphic.in` as
   `trim_start` does; the predecessor's end is an end trim and keeps `length`.
 - `edit_transition.rs` — the WRITE half of a transition: `set_transition`,
@@ -1044,7 +1071,9 @@ governs a module now.
   `oklab_mix` (G-40); anything else, a malformed end, or a prop
   with no start, held and switched at the end. Total. `names_prop` is
   `set_graphic`'s and `paste_attributes`' question.
-- `transition.rs` — overlap detection, THE overlap rule (spec §11), eased
+- `transition.rs` — overlap detection, THE overlap rule (spec §11),
+  `past_limit`, its over-limit sentence written once (`check_overlap_rule`'s
+  and `edit_cut_rule.rs`'s), eased
   progress at *t*. An overlap with no kind still dissolves
   (`unwrap_or_default`), and `add_clip` onto an overlap mints a
   `cross_dissolve`, so a no-transition baseline is built by moving clips

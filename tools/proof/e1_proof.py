@@ -1403,7 +1403,7 @@ def silence_part(mcp):
     check(worst[0] <= worst[1],
           f"…and it is still inside the overlap rule — {worst[0]} ticks against half of "
           f"the shorter clip ({worst[1]}). An EXACT wall lets the cut leave A's tail "
-          f"wholly under B, which neither ripple_delete_ranges nor validate checks.")
+          f"wholly under B, for which ripple_delete_ranges refuses the whole cut (#427).")
 
     c_session = Session(mcp, "e1-walls-control")
     ctrack = c_session.tracks()[0]

@@ -3577,6 +3577,7 @@ asserted WHOLE and never by keyword:
 | 8 — the action rules | an action inside another and an action past the clip's end, each out of `add_action` AND `set_action` in the same words; and two boundaries that land — abutting is not overlapping, and an action ending exactly at the clip's end fits |
 | 9 — off the track stack | a two-track selection moved one track too far, naming the clip that would go off the top and the index it would land on, in `move_track`'s own words for the same mistake |
 | 10 — the non-edits that speak | spec §11 #88's sentences over MCP: a `roll` across a gap naming the track and where the clip begins; `set_transition_duration` on a track's first clip, and past tick 0 naming the pair's limit — that limit then sent and LANDING; `close_gap` past the track's last clip; `detach_audio` on a text clip, on `A.mov` (no audio track) and on `AV.mov` after one detach that applied (audio switched off), one undo then putting the audio back; and one undo for the batch |
+| 11 — a cut too close to a transition | spec §11 #427 over MCP, on a [0, 10 s) and b [8 s, 18 s) dissolving: `split` at 7 s, `lift_range` and `ripple_delete_range` over {0, 7 s}, and `ripple_delete_ranges` with a harmless {12 s, 13 s} beside it, each refused in `edit_cut_rule.rs`'s whole sentence naming a and b (never the piece's minted id); Edit ▸ Ripple Delete (`perform_menu_item`) with that range set, the project unchanged and the inspector's foot reading "Refused: " and the sentence in `snapshot_ui`'s layout dump; a split at 6 s (the bound) and a lift of {7 s, 10 s} (the short piece removed) LANDING; and one undo for the batch |
 
 Every refusal and every identity also asserts the ABSENCE of two fragments
 of the paragraph D2·2 deleted ("Either the project is already in that
@@ -28124,11 +28125,11 @@ python3 tools/proof/creator_spike/ceiling_spike.py --n 4096 --headroom 1024 --pr
 
 The recorded run is in `designs/creator-jobs.md`'s CJ6 record.
 
-## Road map "creator-jobs" CJ2b — the Analyzing sheet and Clip ▸ Split at Shot Changes (`shot_split_proof.py` S1–S8, S4n, Z1; eight mutants; spec §11 CJ-28, CJ-29)
+## Road map "creator-jobs" CJ2b — the Analyzing sheet and Clip ▸ Split at Shot Changes (`shot_split_proof.py` S1–S9, S4n, Z1; nine mutants; spec §11 CJ-28, CJ-29, #427)
 
 **`shot_split_proof.py`** drives the app (`proof_app.binary()`) on a scratch
 `CFFIXED_USER_HOME` in two launches, its packages saved under
-`tools/proof/work/shot-split-proof/`: plain (S1–S4, S4n, S8, through `split_at_shots`) and
+`tools/proof/work/shot-split-proof/`: plain (S1–S4, S4n, S8, S9, through `split_at_shots`) and
 `-RCDevAnalysisHold 3` (S5–S7, through `perform_menu_item` Clip ▸ Split at Shot Changes and the
 Analyzing sheet, each row on its own fresh package so every press misses the cache). Its
 fixtures are `analysis_fixtures.py`'s `shots.mov` and `shots_sound.mov` (`shots.mov`'s video
@@ -28143,6 +28144,7 @@ each launch's parity grep.
 | S4 | a picture with its detached sound and fillers to 4,091 clips: refused naming 8 and 5, the clip count and the undo top unchanged; three fillers deleted, `added: 8` and the sound cut at the same four times |
 | S4n | a nest holding `shots.mov` and top-level fillers to 4,093 clips (nests counted): inside the nest refused naming 4 and 3 in the composite's sentence; one filler deleted, `added: 4` |
 | S8 | two placements playing 0…2 s and 8…10 s: the shots marker's coverage holds no range over index 150 (the union of the windows, never their hull) |
+| S9 | spec §11 #427 (e): `shots.mov` at 0 with a 6 s text clip moved 80 frames onto its tail (a dissolve): the cut at 240 would leave a 140-frame piece under it by 80, so the call is refused whole in "Split at Shot Changes was refused at split: " and the core's sentence naming the two clips, the project and the undo top unchanged; the text clip moved 10 frames later (70, half of 140) it splits at all four |
 | S5 | the menu puts the Analyzing sheet up; `cancel_sheet` (Stop): for 10 s no clip added and no marker |
 | S6 | the sheet up; within 30 s S1's split lands, and `undo` answers "Split at Shot Changes" |
 | S7 | the sheet up; `add_marker` while it is held: after it goes nothing is split and the marker is kept |
@@ -28152,7 +28154,8 @@ Mutants (each must fail its row; every one builds a tree copy, `tree_copy.py`):
 checked before the splits, so the core's cap refuses only the splits past it after the first
 ones land), `partners-uncounted` S4, `ceiling-counts-scope` S4n (`clipCount` of the scoped
 view), `windows-hulled` S8, `stop-keeps-want` S5 (the sheet's one release of its owner removed),
-`stale-test-removed` S7.
+`stale-test-removed` S7, `split-trial-removed` S9 (the splits not tried one at a time first, so
+the other three land around the refused one).
 
 The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 108, and `split_at_shots` in
 `APP_STATE_TOOLS` of `phase9_proof.py`, `recording_proof.py` and `recording_probe.py`. Every

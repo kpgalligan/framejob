@@ -52,6 +52,16 @@ pub(crate) fn overlap_limit(a: &Clip, b: &Clip) -> Ticks {
     a.duration.min(b.duration) / 2
 }
 
+/// THE overlap rule's sentence for a pair past its limit, written once:
+/// [`Project::check_overlap_rule`] speaks it, and a cut speaks it of the
+/// clips its pieces were cut from (`edit_cut_rule.rs`).
+pub(crate) fn past_limit(earlier: u32, later: u32, overlap: Ticks, limit: Ticks) -> String {
+    format!(
+        "clips {earlier} and {later} would overlap by {overlap} ticks, more than half of the \
+         shorter clip ({limit} ticks)"
+    )
+}
+
 /// The overlap between two clips, `earlier` being the one that starts
 /// first. `None` when they merely touch: a zero-length overlap is not a
 /// transition, it is a cut, and treating it as one would put a degenerate
@@ -309,11 +319,7 @@ impl Project {
                     // over-long overlap is what breaks the A/B assignment.
                     let limit = overlap_limit(a, b);
                     if overlap.duration > limit {
-                        return Err(format!(
-                            "clips {} and {} would overlap by {} ticks, more than half of the \
-                             shorter clip ({} ticks)",
-                            a.id, b.id, overlap.duration, limit
-                        ));
+                        return Err(past_limit(a.id, b.id, overlap.duration, limit));
                     }
                 }
             }

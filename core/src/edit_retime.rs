@@ -7,7 +7,7 @@
 //!
 //! - (a) `from` and `to` are snapped and clamped to 0, and every time inside
 //!   the range maps through `f(t) = snapped(from + round((t − from) ÷
-//!   rate))`, `to′ = f(to)`. Both bounds are cut by `split_under_playhead`
+//!   rate))`, `to′ = f(to)`. Both bounds are cut by `cut_under_playhead`
 //!   (`from`, then `to`), so a straddler splits exactly as `split` splits
 //!   it. The PIECES are the clips on unlocked tracks wholly inside the
 //!   range, found before the shift; everything at or after `to` moves by
@@ -23,11 +23,14 @@
 //!   moves and none is checked.
 //! - (b) Errors, then refusals, in CU-90's order; nothing changes when one
 //!   fires. A rate of exactly 1 is an identity once the rate is known to be
-//!   in range.
+//!   in range. The last refusal is THE overlap rule, asked of what the op
+//!   would store on the tracks it changed (spec §11 #427 (h)): its cuts
+//!   ask no rule as they are made.
 //! - The exit is `finish_placement` over the unlocked tracks.
 
 use crate::edit_clip::clip_end;
 use crate::edit_clip_timing::{SPEED_MAX, SPEED_MIN};
+use crate::edit_cut_rule::Pieces;
 use crate::edit_link::linked_rate_sentence;
 use crate::edit_speed_profile::profile_factors;
 use crate::edit_time::{locked_track, shift_clips, unlocked_tracks};
@@ -106,11 +109,11 @@ impl Project {
             return Ok(Outcome::Refused(why));
         }
 
-        let mut cut = match self.split_under_playhead(from)? {
-            Outcome::Applied(split) => split,
-            Outcome::Identity | Outcome::Refused(_) => self.clone(),
-        };
-        if let Outcome::Applied(split) = cut.split_under_playhead(to)? {
+        let mut cut_from = Pieces::new();
+        let mut cut = self
+            .cut_under_playhead(from, &mut cut_from)?
+            .unwrap_or_else(|| self.clone());
+        if let Some(split) = cut.cut_under_playhead(to, &mut cut_from)? {
             cut = split;
         }
         let unlocked = unlocked_tracks(&cut);
@@ -138,6 +141,9 @@ impl Project {
         }
         for marker in next.markers.iter_mut() {
             marker.time = retime.marker(self, marker.time);
+        }
+        if let Some(why) = self.cut_refusal(&next, &cut_from) {
+            return Ok(Outcome::Refused(why));
         }
         let unlocked = unlocked_tracks(&next);
         self.finish_placement(next, &unlocked)

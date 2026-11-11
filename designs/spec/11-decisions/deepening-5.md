@@ -374,3 +374,71 @@ in one may now point into a sibling file.
   `open_documents_proof.py` O5 (resident memory back under the reading
   before the first document plus three quarters of what the bound added) on
   Release, O6 (`--heap`, Debug) and V1 with the mutant `any-fall`.
+- **#427 — a cut that would break the overlap rule is refused.** (Owner,
+  2026-11-12: refuse, in a sentence naming the clips and lengths, as every
+  other edit does; a batch cut refused whole. Amends CU-90 (b) by one last
+  refusal.) Until now no cut asked the rule: on a track holding A [0, 4 s)
+  and B [3 s, 8 s) with a one-second dissolve, `split` at 2.2 s,
+  `lift_range {0, 2.2 s}` and `ripple_delete_range {0, 2.2 s}` each stored
+  A's piece [2.2 s, 4 s) under B by 1 s, more than half of its 1.8 s.
+  (a) What is judged is what the op would STORE, never a cut on the way
+  there (`core/src/edit_cut_rule.rs`). The cutters (`edit_clip.rs`'s
+  `cut_clips` and `cut_under_playhead`) ask no rule; `split`, `lift_range`,
+  `ripple_delete_range`, `ripple_delete_ranges`, `overwrite_clip` and
+  `retime_range` ask the overlap rule of their result. A range op removes
+  what lies between its cuts, so a piece one cut leaves too short may be
+  one the removal takes: `lift_range {2.2 s, 4 s}` above leaves A [0,
+  2.2 s) and B's rest hard-cut from 4 s, and applies. `insert_clip` and
+  `freeze_frame` ask it of their `split`, because the piece right of the
+  cut and everything after it move together, so the cut's verdict is the
+  result's.
+  (b) Only the tracks the op changed are judged — a track whose clips'
+  ids, starts or durations differ from the input's — as `close_gap` judges
+  only the tracks it moves; a changed track is judged whole, as every
+  placement op judges one. A locked track is never cut or moved, so it is
+  never judged.
+  (c) The sentence. An over-long pair a cut made (one of its clips a
+  piece: a second half, or a first half shorter than the clip it kept the
+  id of; and its two source clips not already past the limit before the
+  op) is named by the clips the pieces were cut from — a second half's
+  id exists only in the refused answer — through CJ-50 (g)'s map, now
+  shared: "clips 10 and 11 would overlap by 600000 ticks, more than half of
+  the shorter piece the cut leaves (540000 ticks); cut further from their
+  transition, or shorten it first". A pair already past the limit before
+  the op — one a ripple only moved, or one whose clip the op also cuts,
+  which no cut position mends — answers the rule's own sentence, by its
+  source clips too; two neighbours on one side answer the rule's own
+  sentence. So `insert_clip` and `freeze_frame`, which were refused at
+  their placement naming the piece the split would have minted, now answer
+  this sentence.
+  (d) Refused, never repaired: the transition is not shortened or removed
+  (the issue's other two options), and nothing is cut.
+  (e) A batch is refused whole. `ripple_delete_ranges` asks once, of its
+  merged result, so Remove Silences, Remove Filler Words and the
+  Transcript tab's Delete Words cut everything or nothing. Clip ▸ Split at
+  Shot Changes and `split_at_shots` send one `split` per cut, and a list
+  of ops does not stop at a refusal (`ReelEdit.swift`), so `ShotSplit.plan`
+  tries its `split`s one at a time on the container's handle
+  (`SwitchAngle.Trial`) before anything is committed: the first refusal
+  refuses the whole command, "Split at Shot Changes was refused at split:
+  <the sentence>", at the inspector's foot and as the tool's error.
+  (f) Where a person meets it: Clip ▸ Split, ⌫ (Lift) and ⌘⌫ with a range,
+  Insert, Overwrite, Freeze Frame, Retime Range and Split at Shot Changes,
+  at the inspector's foot. The clean-up commands' ranges already keep clear
+  of every overlap by its own length each side (`SilenceDetector`'s
+  `overlapWalls`, the half rule's own bound), so they meet it only on a
+  track that already breaks the rule, where (c)'s second sentence names
+  the pair to fix; an agent's own ranges meet it like any cut.
+  (g) Left as they are: `ripple_delete {clips}` (removing a clip with a
+  transition into its next neighbour can slide later clips under that
+  neighbour; a question about what the ripple moves, left for an issue);
+  `keep_range`'s and `copy_pieces`' own cuts and sentences (CJ-50, SW-12).
+  Switch by Speaker's Replace the shots on (SW-23 (a)) clears its range
+  with `split` ops then a `delete`, each tried as it is sent, so a range
+  bound within a transition's own length on the Program track refuses the
+  switch at its `split` although the cleared result would be legal; that
+  is accepted until an op clears a range on one track, left for an issue.
+  (h) `retime_range`'s new refusal comes last, after CU-90 (b)'s (7).
+  Proofs: `core/tests/cut_overlap_rule.rs` C1–C6, with mutants on each
+  call site, the judged moment, the changed-tracks rule and the sentences;
+  `refusal_proof.py`'s cut section; `shot_split_proof.py` S9 on Release.
