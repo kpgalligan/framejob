@@ -13510,6 +13510,16 @@ default; the batch's spec left a new row out of scope, so it is owed.
   `04.3a` 358 → 361, `06b` 348 → 354, `07.6` 42 → 46, `deepening.md`
   556 → 584. The folder cell went from 3065 to 3066 in 13 files, because the
   sentence this batch added to the decisions README is one line.
+- **#548 — the decision rows (2026-11-11).** The same script also reads the
+  "Every decision" table of `designs/spec/11-decisions/README.md`. For a row
+  with an ID, the entry is the line `- **<ID> — ` in the folder's files: where
+  one exists, exactly one file holds it and the row must name that file; where
+  none exists (a decision recorded as an amendment paragraph), the row's file
+  must contain the ID. An "Amends" bullet (`- **<ID>**: …`) is not an entry.
+  A problem names the ID, the file the row names and the file that holds the
+  entry. The selftest has a fifth mutant, M5: the `W-8` row re-pointed at
+  `silence.md` must show exactly one problem naming `decision W-8`, so it
+  reads 6/6. With the new check skipped, M5 is not caught and it reads 5/6.
 - **#218 — `mixed_audio_proof.py` `pending-first`.** It sits between
   `missing-first` and `CONTROL same`, on its own session. `aac.m4a` itself
   (not a copy, and never altered) goes at 0 and `pcm.wav` at the AAC clip's

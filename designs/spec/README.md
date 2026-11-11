@@ -10,7 +10,7 @@ For a decision, look its ID up in `11-decisions/README.md`, or grep this directo
 (`grep -rn "W-8 —" designs/spec/`). A file that grows past ~500 lines splits by subsection into
 lettered files that keep its number (§4.3 is `04.3a`, `04.3b`, `04.3c`, `04.3d` and `04.3e`, §5.2 is `05.2a` and `05.2b`, §6 is `06a`, `06b`, `06c` and `06d`, §7.5 is `07.5a` and `07.5b`, §7.3 is `07.3` and `07.3b`, §7.8 is `07.8`, `07.8b` and `07.8c`, §7.9 is `07.9a`, `07.9b`, `07.9c`, `07.9d`, `07.9e`, `07.9f`, `07.9g`, `07.9h`, `07.9i` and `07.9j`);
 a citation of the bare number names them together, and this index gets their rows in the same
-change. Until #342 (2026-10-24) §4.3b was the Media, Document and Assistant tabs, now §4.3c; an older citation of §4.3b (in `archive/` or git history) means §4.3c.
+change. An index is exempt: this file and `11-decisions/README.md`, which grows a row per decision. A §11 file splits at an entry or phase boundary into `<name>-2.md`, `-3.md` …, or into a lettered `<name>b.md` where the next number is taken (`creator-jobs-9b.md`; `creator-jobs-1b.md` continues `creator-jobs.md`), and a citation of the bare name names them together. Until #342 (2026-10-24) §4.3b was the Media, Document and Assistant tabs, now §4.3c; an older citation of §4.3b (in `archive/` or git history) means §4.3c.
 
 The Lines column is `wc -l`; the `11-decisions/` cell is that folder's total, its README
 included, and `make test` checks both (`tools/proof/spec_index_proof.py`).

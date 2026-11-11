@@ -43,7 +43,8 @@ codecs:
 # menu inventory's sites against app/Sources, each found by its token and
 # enclosing function rather than its line, and its other citations by
 # anchor; no app, no build. `spec_index_proof.py` (issue batch B70) checks the
-# spec indexes' Lines cells against `wc -l` and a row for every spec file.
+# spec indexes' Lines cells against `wc -l`, a row for every spec file and
+# (#548) every decision row naming the file that holds its entry.
 # `proof_defaults.py` (issue batch B83, #238) is the defaults removal recipe
 # on a throwaway domain, its refusals over scratch folders, then the sweep of
 # the proofs' own idle domains, and of the two probes this target ran, out of
