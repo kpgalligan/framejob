@@ -100,6 +100,9 @@ V-4 and V-5 come from the build-velocity road map, now closed: `designs/adr/buil
     passes it and, under dev tools, counts the publishes that waited per (cache folder, kind,
     media id); `analysis_job` answers the count as each job row's `save_waits`. So a row says
     that its publish met a save from a fact of that run, not from two clocks.
+    *Amended by #552:* the count is the ledger's own, keyed by the writer's name; `waited` and
+    the store's count are gone, and `analysis_job`'s `save_waits` reads the ledger's under the
+    store's name, `analysis/<kind>/<media>`, meaning what it meant.
   - **Its row.** `analysis_proof.py` A14: a document made and saved on a plain launch is
     opened on a launch of its own (`-RCDevAnalysisHold 3 -RCDevSaveHold 25`, so the row's is
     the one save held); a job over the fixture's first 100 frames is wanted, then
@@ -112,4 +115,43 @@ V-4 and V-5 come from the build-velocity road map, now closed: `designs/adr/buil
     (`saveBegan` not called).
   - **Not covered.** The other writers through `CacheLedger.publish` (the media passes'
     markers and waveforms, ramp audio, isolation and voice files, device transcripts) have no
-    MCP row against a held save; the hold is what such a row needs.
+    MCP row against a held save; the hold is what such a row needs. *Covered since #552.*
+- **#552 — The cache ledger counts, per writer, the publishes that waited a save out, and can
+  hold a named writer's next publish until a save is in its hold; the dev tool `cache_ledger`
+  answers the counts and arms the gates.** Dev tools only: `CacheLedgerDev.swift` is compiled
+  under `FRAMEJOB_DEV_TOOLS` alone, and Distribution's `publish` reads the name nowhere.
+  - **(a) Every publish names its writer.** `CacheLedger.publish(in:for:as:_:)`: `as` is
+    required, so a new writer that names nothing does not compile. The names: `thumbs` (a
+    strip's marker, both sites), `peaks`, `loudness`, `sync-features`, `speech`,
+    `device-transcript`, an offline audio render's folder (`ramp-audio`, `isolated`, which a mix
+    lands in too, `voiced`), and `analysis/<kind>/<media>` for the analysis store. The `waited`
+    out-parameter of #429 is removed.
+  - **(b) The count.** A publish that finds a save of its folder in flight when it takes the
+    ledger's lock is counted under (cache folder, writer) after the lock is released, whatever
+    the publish then answers. No writer keeps a count of its own.
+  - **(c) The gate.** A writer armed for a folder is held at `publish`'s first line, before the
+    ledger's lock, until a save of that folder is inside its `-RCDevSaveHold` sleep (the `write`
+    override tells the gate when the sleep begins and ends), its gate is disarmed, or its bound
+    passes; it then goes on into `publish`'s ordinary wait. One-shot. A writer at its gate is
+    not a publication, so `saveBegan` does not wait for it.
+  - **(d) The tool.** `cache_ledger {project?, gate?: [string], seconds?}`, on main, answering
+    at once `{ok, cache, save_waits: {writer: n}, gate: {writer: armed | waiting | save |
+    timeout | disarmed}}`. `gate` replaces the folder's armed set (`[]` disarms and releases);
+    `seconds` (above 0, at most 600, default 60, only with `gate`) bounds each wait.
+  - **Why a gate, and not the clock hold the issue expected** (a `-RCDev…Hold` before each
+    media pass's publish): the five media passes publish one after another inside one task, so
+    the first to meet a held save waits it out and the next arrives after it has ended. A clock
+    would put one writer per save into the hold, and which one would turn on decode times. The
+    gate makes each writer's meeting a fact a proof arranges, and adds no launch default.
+  - **Its rows.** `save_hold_proof.py`, on one launch with `-RCDevSaveHold 3`, each document made
+    on a plain launch first: M1–M5 the media passes from one `import_media`, D1 the device
+    transcript from the Transcript tab's fill (a Mac with no on-device model is a named skip),
+    O1–O3 `ramp-audio`, `isolated` and `voiced`. A row passes when its gate ended `save`, its
+    `save_waits` rose by one and its files are in the package afterwards. R1 (#553) reads the
+    same count. Mutants, each an app build that keeps the site's gate and drops the ledger, so
+    the write falls inside the held save: `thumbs-outside`, `peaks-outside`,
+    `loudness-outside`, `sync-outside`, `speech-outside`, `transcript-outside`,
+    `render-move-outside`.
+  - **Not covered.** A thumbnail's frames are written outside the ledger on purpose
+    (`stripHolds` then writes no marker); the reverse render and `AudioRateCopy`'s copy are not
+    ledger writers.

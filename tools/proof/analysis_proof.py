@@ -137,7 +137,8 @@ CANNED = ["-RCDevAnalysisCanned", "YES"]
 
 # The analysis store's one write, inside the ledger and outside it.
 WRITE_INSIDE = ("let published = MediaImporter.CacheLedger.shared.publish(\n"
-                "            in: cacheDir, for: nil, waited: &waited) { body() }")
+                "            in: cacheDir, for: nil, "
+                "as: ledgerWriter(kind, media: mediaID)) { body() }")
 WRITE_OUTSIDE = "body(); let published = true"
 
 MUTANTS = {

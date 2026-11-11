@@ -320,6 +320,9 @@ plus 1 s each side, in shots, faces and subjects — or waits for every such job
 and answers their runs, and always answers `lane_queued`, the requests the
 analysis lane has queued since launch; launch with `-RCDevAnalysisHold <s>`
 to hold each job, `-RCDevAnalysisCanned YES` to honour canned analyses),
+`cache_ledger` (for a project's cache folder, how many publishes of each cache
+writer met a save and waited it out, and a gate that holds a named writer's
+next publish until a save is inside its `-RCDevSaveHold <s>`),
 `transcript_view` (what a window's Transcript tab and its bar show, after
 setting the bar's Words from or Language, pressing Read, focusing its view,
 selecting words or clicking one; `stop_after` presses the bar's Stop that many

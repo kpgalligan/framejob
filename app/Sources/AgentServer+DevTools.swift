@@ -88,6 +88,8 @@ extension AgentServer {
         "playback_rebuilds": { $0.playbackRebuilds },
         // AgentServer+GraphicLink.swift
         "open_link": { $0.openLink },
+        // AgentServer+CacheLedger.swift
+        "cache_ledger": { $0.cacheLedger },
     ]
 
     static let devOffMainTools: Set<String> = [
@@ -104,7 +106,7 @@ extension AgentServer {
     /// (road map "audio" AP6 part 3, AU-69), `analysis_job` (road map
     /// "creator-jobs" CJ2a, CJ-27), `transcript_view` (road map "creator-jobs"
     /// TX2a, TX-23), `playback_rebuilds` (road map "creator-jobs" SW0, SW-1), `open_link`
-    /// (#385, G-49). The log is what keeps `devToolsMarker` in the optimised binary;
+    /// (#385, G-49), `cache_ledger` (#552). The log is what keeps `devToolsMarker` in the optimised binary;
     /// it never says `Frame Job: `, the prefix a proof reads as the parity
     /// check complaining.
     func devTools() -> [[String: Any]] {
@@ -112,7 +114,7 @@ extension AgentServer {
             snapshotUITool(), performMenuItemTool(), cancelSheetTool(), selectInspectorTabTool(),
             assistantSendTool(), assistantAnswerTool(), playPreviewTool(), graphicMemoryTool(),
             loudnessMeterTool(), landRecordingTool(), analysisJobTool(), transcriptViewTool(),
-            playbackRebuildsTool(), openLinkTool(),
+            playbackRebuildsTool(), openLinkTool(), cacheLedgerTool(),
         ]
         NSLog("Frame Job agent server: %@, %ld dev tools", Self.devToolsMarker, rows.count)
         return rows

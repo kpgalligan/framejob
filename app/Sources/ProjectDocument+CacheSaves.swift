@@ -14,7 +14,9 @@ import AppKit
 /// the main thread for s seconds after the new package has been written and
 /// before NSDocument swaps it in, inside `saveBegan` … `saveEnded`: the
 /// window in which a cache file written outside the ledger goes with the old
-/// package. A proof publishes during it (`analysis_proof.py` A14).
+/// package. A proof publishes during it (`analysis_proof.py` A14,
+/// `save_hold_proof.py`), and the hold's start releases a cache writer held
+/// at its gate (`CacheLedgerDev`, spec §11 #552).
 extension ProjectDocument {
     #if FRAMEJOB_DEV_TOOLS
     static let devSaveHoldKey = "RCDevSaveHold"
@@ -27,7 +29,12 @@ extension ProjectDocument {
             to: url, ofType: typeName, for: saveOperation,
             originalContentsURL: absoluteOriginalContentsURL)
         let seconds = UserDefaults.standard.double(forKey: Self.devSaveHoldKey)
-        if seconds > 0 { Thread.sleep(forTimeInterval: seconds) }
+        guard seconds > 0 else { return }
+        // The hold, told to the ledger's gates (spec §11 #552).
+        let directory = intendedCacheDirectory
+        if let directory { CacheLedgerDev.shared.saveHold(true, in: directory) }
+        Thread.sleep(forTimeInterval: seconds)
+        if let directory { CacheLedgerDev.shared.saveHold(false, in: directory) }
     }
     #endif
 

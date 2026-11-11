@@ -191,7 +191,7 @@ extension MediaImporter {
         let file = loudnessURL(for: media.id, in: cacheDir)
         let markerURL = loudnessMarkerURL(for: media.id, in: cacheDir)
         var published = false
-        CacheLedger.shared.publish(in: cacheDir, for: pass) {
+        CacheLedger.shared.publish(in: cacheDir, for: pass, as: "loudness") {
             guard ensureDirectory(file.deletingLastPathComponent()) else { return }
             guard (try? blocks.data.write(to: file, options: .atomic)) != nil else { return }
             guard writeStamp(marker, to: markerURL) else {

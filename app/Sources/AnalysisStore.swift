@@ -12,7 +12,7 @@ import Foundation
 /// ranges (all of them when the file is gone, road map CO1).
 ///
 /// **The publish** (`publishFile`) runs under a lock keyed by (cache folder,
-/// kind, media id) and inside `CacheLedger.publish(in:for: nil)` — never
+/// kind, media id) and inside `CacheLedger.publish(in:for: nil, as:)` — never
 /// mid-save, never waiting on main. It re-reads the marker, deletes marker
 /// then payload when the on-disk stamp is not the job's or its first payload
 /// file is missing, removes any old `.partial`, lets the kind write the
@@ -230,12 +230,8 @@ enum AnalysisStore {
                 failure = error
             }
         }
-        var waited = false
         let published = MediaImporter.CacheLedger.shared.publish(
-            in: cacheDir, for: nil, waited: &waited) { body() }
-        #if FRAMEJOB_DEV_TOOLS
-        if waited { noteSaveWait(kind, media: mediaID, in: cacheDir) }
-        #endif
+            in: cacheDir, for: nil, as: ledgerWriter(kind, media: mediaID)) { body() }
         guard published else { throw StoreError.saveInFlight }
         if let failure { throw failure }
         guard wrote else { return }
@@ -248,26 +244,12 @@ enum AnalysisStore {
         }
     }
 
-    #if FRAMEJOB_DEV_TOOLS
-    private static var saveWaits: [String: Int] = [:]
-
-    private static func noteSaveWait(_ kind: AnalysisKind, media: UInt32, in cacheDir: URL) {
-        let key = "\(cacheDir.standardizedFileURL.path)|\(kind.rawValue)|\(media)"
-        locksLock.lock()
-        defer { locksLock.unlock() }
-        saveWaits[key, default: 0] += 1
+    /// The store's name at the cache ledger, one per kind and media, so
+    /// `analysis_job`'s `save_waits` counts one job's publishes (spec §11
+    /// #429, #552).
+    static func ledgerWriter(_ kind: AnalysisKind, media: UInt32) -> String {
+        "analysis/\(kind.rawValue)/\(media)"
     }
-
-    /// How many publishes of one (cache folder, kind, media id) since launch
-    /// found a save of the package in flight and waited for it:
-    /// `analysis_job`'s `save_waits` (spec §11 #429).
-    static func devSaveWaits(_ kind: AnalysisKind, media: UInt32, in cacheDir: URL) -> Int {
-        let key = "\(cacheDir.standardizedFileURL.path)|\(kind.rawValue)|\(media)"
-        locksLock.lock()
-        defer { locksLock.unlock() }
-        return saveWaits[key] ?? 0
-    }
-    #endif
 
     /// The publish's body; the per-media lock and the ledger are held.
     /// Answers whether it wrote: false only on a merge-only thread

@@ -26,7 +26,7 @@ extension MediaImporter {
             written.insert(0)
         }
         if let stamp, input == nil || drawn != nil {
-            CacheLedger.shared.publish(in: cacheDir, for: pass) {
+            CacheLedger.shared.publish(in: cacheDir, for: pass, as: "thumbs") {
                 if stripHolds(written, in: directory) {
                     writeThumbsStamp(stamp, input: input, fullRange: false, to: marker)
                 }
@@ -55,7 +55,7 @@ extension MediaImporter {
         marker: URL, replaced: Bool
     ) {
         if let stamp, reader.certifies {
-            CacheLedger.shared.publish(in: cacheDir, for: pass) {
+            CacheLedger.shared.publish(in: cacheDir, for: pass, as: "thumbs") {
                 guard stripHolds(written, in: directory) else { return }
                 writeThumbsStamp(stamp, input: reader.input, fullRange: reader.fullRange, to: marker)
             }

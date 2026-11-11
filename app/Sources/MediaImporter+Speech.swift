@@ -106,7 +106,7 @@ extension MediaImporter {
         let file = speechURL(for: media.id, in: cacheDir)
         let data = probabilities.withUnsafeBufferPointer { Data(buffer: $0) }
         // The directory, the `.bin`, its marker and the post: one publication.
-        CacheLedger.shared.publish(in: cacheDir, for: pass) {
+        CacheLedger.shared.publish(in: cacheDir, for: pass, as: "speech") {
             guard ensureDirectory(file.deletingLastPathComponent()) else { return }
             guard (try? data.write(to: file, options: .atomic)) != nil else { return }
             let marker = speechMarkerURL(for: media.id, in: cacheDir)

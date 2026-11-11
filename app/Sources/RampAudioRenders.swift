@@ -273,7 +273,9 @@ final class RampAudioRenders: @unchecked Sendable {
         }
         let cache = request.destination.deletingLastPathComponent().deletingLastPathComponent()
         var renameErrno: Int32 = 0
-        let published = MediaImporter.CacheLedger.shared.publish(in: cache, for: nil) {
+        // The ledger's writer is the render's folder: ramp-audio, isolated, voiced.
+        let writer = request.destination.deletingLastPathComponent().lastPathComponent
+        let published = MediaImporter.CacheLedger.shared.publish(in: cache, for: nil, as: writer) {
             renameErrno = landing.publish(to: request.destination)
         }
         if published, renameErrno == 0 { return .landed }

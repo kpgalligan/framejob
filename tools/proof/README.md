@@ -31597,7 +31597,7 @@ other lanes' builds): 75 packages made, saved and closed in 31 s, then
   `--mutant timeout-only` fails V0 (1/6 verdicts) and calls the first overrun a deadlock at
   38.8 % CPU.
 
-## A cache write against a held save (`save_hold_proof.py`; spec §11 #553, #429)
+## A cache write against a held save (`save_hold_proof.py`; spec §11 #553, #552, #429)
 
 A save of a titled document lists `cache/` and later swaps the new package in, so a file
 written into the package between the two goes with the old one. `-RCDevSaveHold <s>` (dev
@@ -31610,7 +31610,39 @@ launch first and opened on the held one. Needs `tools/proof/media/AV.mov`.
 the render (held 3 s) and `save_project` is the next call, so the render runs inside the held
 save. It passes when no `.caf` is there as the save is sent, the render's `.caf` is in the
 package within 2 s of the save's return and is the folder's one file, and `export audio_wav`
-then succeeds. **Z1**: no `Frame Job: ` line in any instance's log.
+then succeeds; since #552 also `save_waits["ramp-audio"]` rose by one. **Z1**: no
+`Frame Job: ` line in any instance's log.
+
+**The gate rows** (#552). Every cache file is published through `CacheLedger.publish` under
+its writer's name, and the dev tool `cache_ledger` answers per cache folder `save_waits` (the
+publishes of each writer that found a save in flight and waited it out) and arms a gate that
+holds a named writer's next publish until a save of that folder is inside its hold. One launch
+with `-RCDevSaveHold 3`; a row arms its writers, triggers them with a call that returns at
+once, and sends `save_project` whenever a gate reads `waiting`. A row passes when its gate
+ended `save`, its `save_waits` rose by exactly one and its files are in the package.
+
+| Row | Writer | Trigger | Files under `cache/` |
+|---|---|---|---|
+| M1 | `thumbs` | `import_media` of `AV.mov` | `thumbs/<id>/complete.json` |
+| M2 | `peaks` | the same import | `peaks/<id>.bin`, `.complete.json` |
+| M3 | `loudness` | the same import | `loudness/<id>.bin`, `.complete.json` |
+| M4 | `sync-features` | the same import | `sync/<id>.bin`, `.pcm`, `.complete.json` |
+| M5 | `speech` | the same import | `speech/<id>.bin`, `.complete.json` |
+| D1 | `device-transcript` | the Transcript tab shown over 2 s of `speech.mov` | `device-transcripts/<id>-<language>.json` |
+| O1 | `ramp-audio` | `set_speed` ×2, Keep pitch off | one `.caf` in `ramp-audio/` |
+| O2 | `isolated` | `set_audio {isolation: 1, voice: echo}` on a second clip | one `.caf` in `isolated/` |
+| O3 | `voiced` | the same edit, wanted once the isolated render lands | one `.caf` in `voiced/` |
+
+D1 is a named skip, never a pass, on a Mac whose Transcript tab answers `no_model` or
+`failed`. Needs `tools/proof/media/speech.mov` too.
+
+The gate mutants each keep one site's gate and drop the ledger (the mutant adds
+`CacheLedger.outside`), so the write falls inside the held save and is lost at the swap; each
+is caught only when its row fails with its count unchanged: `thumbs-outside` (M1),
+`peaks-outside` (M2), `loudness-outside` (M3), `sync-outside` (M4), `speech-outside` (M5),
+`transcript-outside` (D1), `render-move-outside` (O1–O3, one site). Under the last the three
+files are in the package again by the time the row reads it, because a render whose file is
+gone is wanted and rendered again, with no gate the second time; the count is what fails.
 
 `--mutant NAME` builds the app in a tree copy with the named decision broken (about 40 s) and
 runs its rows: `landing-in-package` (the landing file beside its destination and the folder
@@ -31629,3 +31661,14 @@ NOT there after it returned … the export FAILED: … the file could not be mov
 (errno 2)": that run's render, of the whole 5 s clip, was still writing when the package was
 swapped); with the change R1 passed ("the render there 0.01 s after it returned");
 `landing-in-package` CAUGHT ("the render could not be moved into place").
+
+Recorded 2026-11-11 with #552, on Debug: 11/11 rows (R1 `save_waits 0 → 1`, "the render there
+0.00 s after it returned"; each gate row "its gate ended save; save_waits 0 → 1"; D1 ran, this
+Mac has the on-device model). Mutants: `landing-in-package` CAUGHT, `folder-before-publish`
+SURVIVED as expected, and the seven gate mutants CAUGHT, each row reading `save_waits 0 → 0`
+with its files MISSING (O1–O3 with their files there, as above). `analysis_proof.py --only
+A14,P9` 3/3 and its mutants `write-outside-publish`, `write-outside-publish-app` and
+`save-not-announced` CAUGHT on the new anchor; `cache_pass_probe.py` 13/13.
+`ramp_proof.py` 43/43 on Debug. `make gate` PASS. On Release (`RC_PROOF_APP=release`, after
+the gate's `make app`): `save_hold_proof.py` 11/11, `analysis_proof.py` 26/26,
+`ramp_proof.py` 43/43.

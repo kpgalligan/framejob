@@ -151,8 +151,9 @@ extension AgentServer {
                 "kind": request.kind.rawValue,
                 "ranges": request.ranges.map { [$0.lowerBound, $0.upperBound] },
                 // Publishes of this cache, kind and media that waited a save out (#429).
-                "save_waits": AnalysisStore.devSaveWaits(
-                    request.kind, media: request.media.id, in: request.cacheDir),
+                "save_waits": CacheLedgerDev.shared.saveWaits(
+                    in: request.cacheDir,
+                    writer: AnalysisStore.ledgerWriter(request.kind, media: request.media.id)),
             ]
             if let run = lane.run(of: request) {
                 row["queued_at"] = run.queuedAt
