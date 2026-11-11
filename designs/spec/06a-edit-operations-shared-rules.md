@@ -1,6 +1,6 @@
 # 6a Edit operations — the rules every op shares
 
-The clip ops are §6b; the action, track, marker, canvas and media ops, and the op table's two halves, are §6c.
+The clip ops are §6b and §6e; the action, track, marker, canvas and media ops, and the op table's two halves, are §6c.
 
 All ops take clip/track/marker *ids*. Caller-supplied timeline tick arguments
 are snapped to the document's frame grid before placement or storage, usually
@@ -47,9 +47,9 @@ partner on an UNLOCKED track with it — locks win over links everywhere:
 - Whatever an op leaves one-sided (half a pair deleted, nested or overwritten) is cleared before
   its result is compared or stored, so no op writes a one-sided link.
 
-**How to read a "refuses" in §6b and §6c.** An op the core understood answers one of
+**How to read a "refuses" in §6b, §6c and §6e.** An op the core understood answers one of
 three ways (§5.5): it applies, it is an **identity**, or a rule **refuses**
-it and hands back that rule's own sentence. The rows of §6b and §6c name the RULE,
+it and hands back that rule's own sentence. The rows of §6b, §6c and §6e name the RULE,
 which is what a reader needs — a row that says an op refuses on an empty
 selection or when nothing changes is naming an identity, which carries no
 sentence, and every other "refuses" is a rule that either speaks already or

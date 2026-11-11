@@ -214,7 +214,8 @@ SOURCES = {
     "W10": [(path, ["Title preset"], []) for path in (
         "core/src/edit.rs", "core/src/edit_described.rs", "core/src/model_text.rs",
         APP + "ReelOps.swift", APP + "BehindSubjectPlan.swift", APP + "AgentServer+Clips.swift",
-        "designs/spec/06b-edit-operations-clips.md", "designs/spec/07.10-rust-module-map.md",
+        "designs/spec/06b-edit-operations-clips.md", "designs/spec/06e-edit-operations-clip-patches.md",
+        "designs/spec/07.10-rust-module-map.md",
         "designs/spec/07.9g-agent-behind-subject.md", "designs/spec/09-keys-and-menus.md")],
 }
 

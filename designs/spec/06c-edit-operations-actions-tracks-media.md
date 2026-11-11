@@ -1,6 +1,6 @@
 # 6c Edit operations — actions, tracks, markers, canvas, media
 
-The rules every op shares are §6a; the clip ops are §6b.
+The rules every op shares are §6a; the clip ops are §6b and §6e.
 
 ## Actions
 
@@ -430,7 +430,7 @@ The rules every op shares are §6a; the clip ops are §6b.
 **This table is the SEMANTICS half of the op table, and it has a second
 half.** What an op MEANS is written here and in `core/src/edit.rs`'s module
 doc — including what an absent argument means, which is why the defaults are
-spelled in the rows of §6b and §6c. What an op TAKES — every argument's name, its JSON
+spelled in the rows of §6b, §6c and §6e. What an op TAKES — every argument's name, its JSON
 kind and whether the decoder requires it — is DATA, in `core/src/op_table.rs`,
 one row per op and one `Argument` per argument, published as one JSON Schema
 per op by `rc_op_schemas` (road map 7's D3). An argument carries a range there
