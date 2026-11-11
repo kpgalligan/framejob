@@ -8,8 +8,8 @@ recording into usable audio for a video. Its IDs are the AU- series. Each was re
 its code.
 
 AU-50 on are in [`audio-2.md`](audio-2.md) (AU-50…AU-69), [`audio-3.md`](audio-3.md)
-(AU-70…AU-109) and [`audio-4.md`](audio-4.md) (AU-110…AU-157), moved there unchanged on
-2026-11-09 because this file had passed the spec's ~500-line split rule (#424).
+(AU-70…AU-109), [`audio-4.md`](audio-4.md) (AU-110…AU-159) and [`audio-5.md`](audio-5.md) (AU-160 on), the first three moved
+there unchanged on 2026-11-09 because this file had passed the spec's ~500-line split rule (#424).
 
 The road map that made AU-2…AU-156 is closed (2026-10-31): its condensed record is
 `designs/adr/audio.md`, the original `archive/audio.md` (AP0 the plan and spikes S1–S4, then one

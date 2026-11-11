@@ -65,9 +65,9 @@ is over 6 LU and the steady one at or under it (else the rule is a STOP).
 --mutants runs M1–M10, M12–M15 and M17–M19, each over its own copy of app/Sources,
 scored killed when its named row fails (the step-2 figures and R5 skipped);
 build failures are scored. M11 (`"leveller"` out of `TAP_KEYS`) is by hand
-against core/tests/audio_automation.rs. M16 (the non-repeat's fix reverted)
-has no edit to make: step 3 found nothing to fix (archive/audio.md's AP6b
-record). Needs ffmpeg, `say`, numpy and samples/Rode-usb-mic.m4a. Output is
+against core/tests/audio_automation.rs. M16 has no edit to make: AP6b's step 3
+found nothing to fix; the non-repeat's fix is AU-160's (#567) and its mutant
+is M19. Needs ffmpeg, `say`, numpy and samples/Rode-usb-mic.m4a. Output is
 under tools/proof/work/audio-ap6b-probe.
 
 --soak-r5 <minutes> runs R5 alone (`--r5-only`: a document holding the steady

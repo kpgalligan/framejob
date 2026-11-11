@@ -3722,7 +3722,8 @@ free.
   follow, through `AudioMeasureDoor`; `normalize_clip` names its own mode and
   never reads it.
 - `ProcessedLoudness.swift` — a clip measured through its own chain (spec §11
-  AU-64): `needsRender`, the measurement plan (the clip's segments, pre-fader
+  AU-64): `needsRender` (the base audio, or a stage an action's end switches
+  on, AU-159), the measurement plan (the clip's segments, pre-fader
   but for one constant ramp at the trial's base volume), the render under a
   fresh key through `Exporter.withOfflineAudio`, the build and one float mix
   read into a `StepLoudnessMeter`, and At volume's `Memo`.
