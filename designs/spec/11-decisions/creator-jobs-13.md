@@ -5,11 +5,11 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 
 The IDs continue the series of [`creator-jobs-12.md`](creator-jobs-12.md), so a citation never has
 to say which file. This file holds VR-64…VR-68 (VR6b), the fixes batches c1 and c2 (#456, #458,
-#459, #460, #444, #438), #546 and TX-37…TX-39 (Find in the Transcript tab). It is the series' newest
-file: each new decision is appended here, before its code; `creator-jobs.md` says what the road map
-builds and how its IDs are made (CJ-7). It is new because `creator-jobs-12.md` had passed the spec's
-~500-line split rule (#548, 2026-11-11); the entries moved here unchanged, and an "above" or "below"
-in one may now point into a sibling file.
+#459, #460, #444, #438), #546 and TX-37…TX-39 (Find in the Transcript tab); TX-43 on are in
+[`creator-jobs-14.md`](creator-jobs-14.md), the series' newest file. `creator-jobs.md` says what the
+road map builds and how its IDs are made (CJ-7). This file is new because `creator-jobs-12.md` had
+passed the spec's ~500-line split rule (#548, 2026-11-11); the entries moved here unchanged, and an
+"above" or "below" in one may now point into a sibling file.
 
 ## VR6b — Make Vertical follows the speaker (2026-11-04)
 
