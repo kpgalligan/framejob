@@ -142,9 +142,22 @@ MUTANTS = {
         "    ) -> [AnalysisRequest] {\n        if !previous.isEmpty { return [] }\n"
         "        return previous.filter { request in\n")]),
     "M7-export-previous-empty": (["W9"], [(
-        MASKS, "            let previous = AnalysisLane.shared.openRequests(kind: .masks, "
-        "cacheDir: cacheDir)\n",
-        "            let previous: [AnalysisRequest] = []\n")]),
+        MASKS, "        while true {\n            let (requests, failures) = CutoutWants.wants(\n"
+        "                windows: windows, snapshot: snapshot, urls: urls, cacheDir: cacheDir)\n",
+        # The export's wait alone builds its requests with nothing kept (#572): the read of
+        # the open requests is `CutoutWants.wants`' now, which the document and the frame
+        # wait share, so the export's decision is which builder it calls.
+        "        while true {\n"
+        "            var requests: [AnalysisRequest] = []\n"
+        "            var failures: [CutoutWantFailure] = []\n"
+        "            for kind in [AnalysisKind.masks, .foreground] {\n"
+        "                let made = CutoutWants.requests(\n"
+        "                    windows: windows, snapshot: snapshot, urls: urls, "
+        "cacheDir: cacheDir,\n"
+        "                    keeping: [], kind: kind)\n"
+        "                requests += made.requests\n"
+        "                failures += made.failures\n"
+        "            }\n")]),
     "M8-queued-as-running": (["P2"], [(
         WANTS, "            case .queued:\n                return request.ranges.allSatisfy {\n",
         "            case .queued:\n"

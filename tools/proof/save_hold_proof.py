@@ -75,6 +75,13 @@ to show a row does NOT depend on something, and exits 0 when it survives.
   gate and drops the ledger (`CacheLedger.outside`, added by the mutant), so
   its write falls inside the held save and is lost at the swap. Caught when
   the row fails with its count unchanged.
+- `transcript-no-model` (D1's host-skip arm, #571): the Transcript tab's
+  fill resolves its language against an empty list, which is what a Mac with
+  no on-device model answers, so `transcript_view` says `no_model`. It has a
+  verdict of its own, SKIPPED BY NAME (exit 0): D1 must be skipped with
+  `no_model` in its sentence and never scored, and every other row must be
+  scored and pass; anything else exits 1. The arm's other status, `failed`,
+  takes the same branch and is not forced separately.
 
 Needs `tools/proof/media/AV.mov` and `speech.mov`. Debug by default
 (`RC_PROOF_APP=release` for the record).
@@ -159,6 +166,11 @@ OUTSIDE = ("        @discardableResult\n"
            "            return true\n"
            "        }\n\n")
 UNCHANGED = "did NOT wait"
+TAB_SOURCE = "app/Sources/TranscriptTabSource.swift"
+# The Transcript fill's one resolve of its language; an empty list is a Mac with no model.
+RESOLVE = ("                if language == nil { language = Self.resolve(wanted, "
+           "in: Transcriber.languages()) }\n")
+NO_LANGUAGES = "                if language == nil { language = Self.resolve(wanted, in: []) }\n"
 
 
 def outside(rows, path, anchor):
@@ -196,7 +208,12 @@ MUTANTS = {
         (RENDERS, HOLD_LINE, FOLDER_FIRST + HOLD_LINE)], MOVED, False),
     "folder-before-publish": (["R1"], [
         (RENDERS, HOLD_LINE, FOLDER_FIRST + HOLD_LINE)], None, True),
+    "transcript-no-model": (RENDER_ROWS + GATE_ROWS, [
+        (TAB_SOURCE, RESOLVE, NO_LANGUAGES)], None, False),
 }
+# A mutant whose verdict is a named skip (#571): name: (the row that must be skipped and
+# never scored, the text its skip must carry). Every other row must be scored and pass.
+SKIPS = {"transcript-no-model": ("D1", "no_model")}
 
 results = {}
 skipped = {}
@@ -560,8 +577,12 @@ def main():
     binary = Path(args.app) if args.app else None
     if args.mutant:
         named, _, needle, survivor = MUTANTS[args.mutant]
-        print(f"save holds — the {args.mutant} MUTANT ({', '.join(named)} must "
-              f"{'PASS: an expected survivor' if survivor else 'FAIL'})", flush=True)
+        if args.mutant in SKIPS:
+            print(f"save holds — the {args.mutant} MUTANT ({SKIPS[args.mutant][0]} must be "
+                  "SKIPPED by name, every other row scored)", flush=True)
+        else:
+            print(f"save holds — the {args.mutant} MUTANT ({', '.join(named)} must "
+                  f"{'PASS: an expected survivor' if survivor else 'FAIL'})", flush=True)
         binary, why = mutant_app(args.mutant)
         if why:
             print(f"mutant {args.mutant}: the control could not be performed — {why}")
@@ -580,6 +601,20 @@ def main():
           + (f"; skipped {sorted(skipped)}" if skipped else ""))
     if args.mutant:
         named, _, needle, survivor = MUTANTS[args.mutant]
+        if args.mutant in SKIPS:
+            row, text = SKIPS[args.mutant]
+            others = sorted(selected - {row})
+            wrong = ([f"{row} was scored"] if row in results else []) + (
+                [f"{row} was not skipped"] if row not in skipped else
+                [] if text in skipped[row] else [f"{row}'s skip does not say {text!r}"]) + [
+                f"{n} was not scored" for n in others if n not in results] + [
+                f"{n} failed" for n in others if n in failed]
+            if wrong:
+                print(f"MUTANT {args.mutant} did NOT show the skip: {'; '.join(wrong)}")
+                return 1
+            print(f"MUTANT {args.mutant} SKIPPED {row} BY NAME: {skipped[row]}; "
+                  f"{len(others)} other rows scored")
+            return 0
         hit = [n for n in named if n in failed]
         said = [n for n in hit if needle is None
                 or any(needle in detail for ok, detail in results[n] if not ok)]

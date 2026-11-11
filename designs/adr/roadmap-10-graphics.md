@@ -1719,8 +1719,10 @@ instrument: `section_scene_raster_overhead` beside the phase 5 bench (the
 scene's loading factored into one `load_scene`), `raster_bench.py` with
 its probe, `image_cache_bench.py`'s `dump_scene` (and `covering_clip`'s
 `module`; its cargo line now runs only its own test). `raster_bench.py
---mutant` carries the in-place route's three anchors (`no-clear`,
-`no-swap`, `padded-in-place`) and answers 2 while the route is unbuilt.
+--mutant` carried the in-place route's three anchors (`no-clear`,
+`no-swap`, `padded-in-place`) and answered 2 with the route unbuilt; since
+#580 it carries `no-swap` alone, aimed at G-7's row copy, and the other
+two were dropped with the route they belonged to.
 `image_cache_bench.py --frames 4 --rounds 1` still passes (every frame
 identical across the arms). #127's phases are all done; it can close.
 

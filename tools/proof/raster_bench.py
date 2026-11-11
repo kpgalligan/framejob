@@ -7,7 +7,7 @@ written before the baseline.
 
     python3 tools/proof/raster_bench.py PACKAGE [--from 25120000] [--module NAME]
                                         [--frames 40] [--rounds 5] [--iterations 40]
-    python3 tools/proof/raster_bench.py --mutant {no-clear,no-swap,padded-in-place}
+    python3 tools/proof/raster_bench.py --mutant no-swap
 
 The package is COPIED under `tools/proof/work/raster-bench/` and only the
 copy is opened (`image_cache_bench.dump_scene`: one owned instance, stopped
@@ -40,12 +40,15 @@ does not set it.
 `work/raster-bench/mutant/` beside an `app` symlink, replaces each of its
 anchors in `src/raster.rs` exactly once, and runs `cargo test --release
 --test pixels` there with its own target dir (`work/raster-bench-target/`,
-kept between runs): `no-clear` must fail R1, `no-swap`
-`a_rect_draws_in_bgra_and_nothing_else_is_touched`, `padded-in-place` R2 or
-`bytes_past_the_row_are_untouched`. Exit 0 caught, 1 survived, 2 the
-control was not performed. The anchors are the in-place route's, which the
-spike's STOP (2026-10-22) left unbuilt: today each occurs 0 times in
-`raster.rs` and every mutant answers 2.
+kept between runs). Exit 0 caught, 1 survived, 2 the control was not
+performed. There is one mutant, `no-swap`: the live row copy (G-7) writes
+RGBA where BGRA is owed, and `a_rect_draws_in_bgra_and_nothing_else_is_touched`
+must fail. Until 2026-11-11 (#580) the table held three, anchored in the
+in-place route the spike's STOP (2026-10-22) left unbuilt, so each answered
+2. `no-swap` was re-aimed at the copy that exists; `no-clear` (the clear of
+a dirty caller buffer) and `padded-in-place` (the `stride == row` branch)
+were dropped, because `rasterize` has neither line and the tests they named
+were never written.
 """
 
 import argparse
@@ -73,14 +76,14 @@ BENCH_BOUND = 3600
 PROBE_BOUND = 600
 THRESHOLD = 0.03
 RASTER = "graphic/src/raster.rs"
-R1 = "a_dirty_row_buffer_draws_as_a_clean_one"
-R2 = "the_row_and_padded_strides_draw_the_same_rows"
 MUTANTS = {
-    "no-clear": ([(RASTER, "pixmap.data_mut().fill(0);", "")], [R1]),
-    "no-swap": ([(RASTER, "pixel.swap(0, 2);", "")],
+    # The row copy without its swizzle: RGBA out where BGRA is owed (#580).
+    "no-swap": ([(RASTER,
+                  "            to[0] = from[2];\n            to[1] = from[1];\n"
+                  "            to[2] = from[0];\n",
+                  "            to[0] = from[0];\n            to[1] = from[1];\n"
+                  "            to[2] = from[2];\n")],
                 ["a_rect_draws_in_bgra_and_nothing_else_is_touched"]),
-    "padded-in-place": ([(RASTER, "if stride == row {", "if stride >= row {")],
-                        [R2, "bytes_past_the_row_are_untouched"]),
 }
 
 

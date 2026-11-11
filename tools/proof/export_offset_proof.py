@@ -170,8 +170,10 @@ that does not build or answer is a failed control, never a kill. M19 is
 killed only when X17 fails on each of clicks44-mp3, clicks48-mp3 and
 clicks24-mp3 (`MUTANT_FIXTURES`). M7, M8 and M16–M18 are the core's (`core/tests/pitch_band.rs`), run by hand.
 M25 and M26 (AU-23) are run by hand on a Debug build, each over `app/Sources`
-(`HAND_MUTANTS`): M25 drops the limiter's placement lead and must fail E44; M26
-drops the tap's lookup lead and must fail limiter_proof.py's P4 (its second leg).
+(`HAND_MUTANTS`): M25 drops the clip limiter's placement lead and must fail E44; M26
+drops the clip limiter's term of the tap's lookup lead and must fail limiter_proof.py's
+P4 (its second leg). Each keeps the track limiter's term beside it (AU-153), which
+neither row's fixture has.
 M27 (AU-27) is run the same way: it keeps the export master's first 158 output
 frames (no head drop) and must fail E4 and E46 (+3.29 ms). `--mutant` runs
 `before` and only the named mutants. Exit 0 when every mutant was killed.
@@ -401,13 +403,15 @@ MUTANTS = {
                             "expectedRanges: expectedRanges,"),
 }
 # Run by hand on a Debug build (spec §11 AU-23): name: (the row it must fail, file,
-# before, after). Not in `--mutants`: each needs the app rebuilt and driven.
+# before, after). Not in `--mutants`: each needs the app rebuilt and driven. M25 and M26
+# drop the CLIP limiter's term alone; the track limiter's (AU-153) stays beside it (#574).
 HAND_MUTANTS = {
     "M25-no-limiter-lead": ("E44", "CompositionBuilder+AudioPlacement.swift",
-                            "+ (usesLimiter ? limiterLead : 0),", "+ 0,"),
+                            "(usesLimiter ? limiterLead : 0) +", "0 +"),
     "M26-no-lookup-lead": ("limiter_proof.py P4's second leg", "AudioTapSchedule.swift",
-                           "lookupLead = usesLimiter ? CompositionBuilder.AudioShift.limiterLead : 0",
-                           "lookupLead = 0 * 1"),
+                           "(usesLimiter ? CompositionBuilder.AudioShift.limiterLead : 0) "
+                           "+ trackLead",
+                           "0 * 1 + trackLead"),
     # Road map "audio" AP2 part 2 (spec §11 AU-27): the master's head kept, not dropped.
     "M27-no-master-head-drop": ("E4, E46", "ExportAudioMaster.swift",
                                 "private var toDrop = AudioLimiterStage.latency",

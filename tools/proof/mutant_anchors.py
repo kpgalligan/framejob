@@ -136,23 +136,14 @@ UNANCHORED = {
 }
 
 # A mutant with a known-dead anchor, left for a filed issue. (proof, table, mutant) → where it
-# is filed. The pin is the MUTANT's: its anchors that still count once are counted, its dead ones
-# are held, and the row fails ("drop the row") once none of its anchors counted under that table
-# is dead. A copy's rot is pinned under the first table, where it is counted.
-# These were found by this check's first run (#554) and not re-aimed in it, because a
-# re-aim counts only once its mutant has been run and seen caught: `APP` needs a copy of the tree
-# built as an app and driven, `HAND` an app rebuilt and driven twice by hand, `BENCH` the raster
-# bench over a real package. Each row names the issue it went to.
-APP, HAND, BENCH = ("an app-copy mutant, not run", "a by-hand mutant, not run",
-                    "a bench mutant, not run")
-ROTTED = {
-    ("co2b_proof.py", "MUTANTS", "M7-export-previous-empty"): "#572: " + APP,
-    ("export_offset_proof.py", "HAND_MUTANTS", "M25-no-limiter-lead"): "#574: " + HAND,
-    ("export_offset_proof.py", "HAND_MUTANTS", "M26-no-lookup-lead"): "#574: " + HAND,
-    ("raster_bench.py", "MUTANTS", "no-clear"): "#580: " + BENCH,
-    ("raster_bench.py", "MUTANTS", "no-swap"): "#580: " + BENCH,
-    ("raster_bench.py", "MUTANTS", "padded-in-place"): "#580: " + BENCH,
-}
+# is filed and why it was not re-aimed. The pin is the MUTANT's: its anchors that still count
+# once are counted, its dead ones are held, and the row fails ("drop the row") once none of its
+# anchors counted under that table is dead. A copy's rot is pinned under the first table, where
+# it is counted. A row is for a rot found and not re-aimed in the same change, because a re-aim
+# counts only once its mutant has been run and seen caught. Empty since 2026-11-11: the twelve
+# rows this check's first run (#554) left were re-aimed and run, or dropped with the decision
+# they mutated (#572–#580).
+ROTTED = {}
 
 # Tables whose applier replaces EVERY occurrence of an anchor (`anchor in text`, then
 # `replace`), so an anchor there must occur at least once. proof → [tables].

@@ -2033,7 +2033,7 @@ table and the mutant, and each has one answer:
 instruments (71 mutants); two `UNANCHORED` mutants (`assistant_session_proof.py` `key-echo`,
 which builds nothing, and `raster_dither_proof.py` `core-unpatched`, a file swap); `EVERY` for
 `clip_inspector2_proof.py`; eleven `NOT_TABLES` names; nineteen `NO_TABLE` proofs, whose edits
-sit inline in functions where no table can be read; and twelve `ROTTED` anchors, six since
+sit inline in functions where no table can be read; and twelve `ROTTED` anchors, none since
 2026-11-11 (below).
 
 **The selftest** runs the reader over synthetic proofs and sources in scratch trees under
@@ -2078,6 +2078,8 @@ row MA stay; this check agrees with them (21 mutants and 28 anchors; 10 and 10).
 | On the tree: one character of `qualifier_proof.py`'s first anchor changed; a comment appended to an anchored source line; an entry calling an undefined name | exit 1 each: `occurs 0 times`, `occurs 0 times`, `UNREADABLE, NameError` |
 | 2026-11-11 (#573, #575–#579), the six app-copy anchors re-aimed and their `ROTTED` rows still there | exit 1, 6 failures, each `ROTTED names it … and its anchor occurs once in <file>: drop the row` |
 | The same day, the six rows deleted | exit 0: 196 proofs, 211 tables, 2,095 mutants; 2,114 anchors occur exactly once, 30 copies, 6 pinned as rotted |
+| 2026-11-11 (#572, #574, #580), the last four re-aimed, two dropped, `save_hold_proof.py`'s `transcript-no-model` added (#571), and the six `ROTTED` rows still there | exit 1, 6 failures: four `ROTTED names it … and its anchor occurs once in <file>: drop the row` (M7, M25, M26, `no-swap`) and two `ROTTED names it and it is not there: drop the row` (`no-clear`, `padded-in-place`) |
+| The same day, `ROTTED` emptied | exit 0: 196 proofs, 211 tables, 2,094 mutants; 2,119 anchors occur exactly once, 30 copies, 0 pinned as rotted |
 
 **The twelve re-aimed, each mutant run once and caught:** `camera_recording_probe.py`
 `camera-format-elsewhere-admitted` (T7), `camera-format-alone-admitted` (T9) and
@@ -2090,10 +2092,8 @@ row MA stay; this check agrees with them (21 mutants and 28 anchors; 10 and 10).
 so each anchor now starts at `screenStep`'s signature (`SCREEN_STEP`).
 
 **Twelve were pinned in `ROTTED`,** not re-aimed because a re-aim counts only once its mutant
-has run. **Six are still pinned:** an app-copy build for `co2b_proof.py`
-`M7-export-previous-empty` (#572); by hand, `export_offset_proof.py` `M25-no-limiter-lead` and
-`M26-no-lookup-lead` (#574); and `raster_bench.py`'s three, which need the bench's package
-(#580).
+has run. **None is pinned now:** `ROTTED` is empty, and a row goes there again only for a rot
+found and not yet run, with its issue and its reason.
 
 **Six were re-aimed and run on 2026-11-11,** each in a Debug copy of the tree, each planting the
 defect it always planted, and their rows deleted:
@@ -2106,6 +2106,18 @@ defect it always planted, and their rows deleted:
 | `log_proof.py` `vp9-jpeg-deep` (#577) | `AgentServer+Render.swift`'s `graphics: graphics, keepsDepth: format.carriesDepth,` (the call gained `cutoutWait:`) | `capture` then `--mutant vp9-jpeg-deep --control … --only L18,Z1`, twice | **Survived**, as B103 and spec §11 PR-12 record: the JPEG byte-identical (5,099 bytes), 2/2. A sixth L18 case tried for it, `slog3_fr_vp9e.mp4` as JPEG at `max_width` 512, was byte-identical too (4,328 bytes) and was taken out again. Kept as the recorded equivalent, as `precision_proof.py`'s `jpeg-deep` is; a pin cannot sit on a live anchor |
 | `matte_proof.py` `handler-drops-matte` (#578) | `AgentServer+Tracks.swift`'s `solo: solo, matte: matte,` (the call gained arguments) | `--mutant handler-drops-matte`, then with `--only C0,A1,G0,U0,P6,MM,V5,H0,B0,A2,N0,R0,Z1` | The whole run answered 2 (12/46): every project past P sets its fixture's matte through the handler, so those fixtures cannot hold under this mutant. Over project P's rows: `MUTANT PASS`, 5/13, failed A1 G0 U0 P6 MM B0 A2 N0 |
 | `mixed_audio_proof.py` `old-onset` (#579) | `CompositionBuilder+AudioTracks.swift`'s `let onset = family.sounding.map(\.lowerBound).min()`, the local both its readers take | `--mutant old-onset` | `caught`, exit 0, 20/22: both first-25 ms rows FAIL at −28.8 dBFS, every CONTROL passes |
+
+**The last six on 2026-11-11** (#572, #574, #580): four re-aimed and run on Debug, each planting
+the defect it always planted, and two dropped with the decision they mutated. The same day's run
+of `save_hold_proof.py`'s new `transcript-no-model` (#571) is under that proof's own section.
+
+| Mutant | The anchor now | Run | Result |
+|---|---|---|---|
+| `co2b_proof.py` `M7-export-previous-empty` (#572) | `Exporter+Masks.swift`, `waitForMasks`' `while true {` and its `CutoutWants.wants(` call, replaced by `CutoutWants.requests(… keeping: [], kind:)` per kind. The read of the open requests moved into `CutoutWants.wants`, which the document and the frame wait share; emptying it there would be a wider defect, on `M6-kept-empty`'s ground | `--only W9` on the unmutated app, then `--mutant M7-export-previous-empty` | Control 2/2: the export's rows `[[[0, 2249]]]` include the document's running request, one run. Mutant `CAUGHT: W9 failed`, exit 0: the export's rows `[[[406, 2249]]]` do not include `[[0, 2249]]`, two runs analysing the need; the export completed; the tree's file SHA-256 unchanged |
+| `export_offset_proof.py` `M25-no-limiter-lead` (#574) | `CompositionBuilder+AudioPlacement.swift`'s `(usesLimiter ? limiterLead : 0) +`, the clip limiter's term alone; the track limiter's (AU-153) kept | by hand: a tree copy built Debug, launched on its own socket, `export_offset_proof.py <sock> --only E44` | Control 1/1 (median +0.000 ms). Mutant 0/1: E44 median +3.292 ms, "pin missed" |
+| `export_offset_proof.py` `M26-no-lookup-lead` (#574) | `AudioTapSchedule.swift`'s `(usesLimiter ? CompositionBuilder.AudioShift.limiterLead : 0) + trackLead`, the same term of the tap's lookup lead | by hand, as M25, `limiter_proof.py <sock>` | Control 19/19. Mutant 18/19: P4's second leg FAIL, true peak -0.0000 (Kaiser) / -0.0067 (Annex 2) dBTP against -1 + 0.001; its first leg ok. A first run of the copy ended that leg on "limiter-cut-lead: 4.bin was never written" (the import's waveform not there in 15 s, load average 95 with three lanes building): not a catch, so the copy was launched and run again |
+| `raster_bench.py` `no-swap` (#580) | `graphic/src/raster.rs`, the row copy's three lines `to[0] = from[2];` … `to[2] = from[0];` (G-7), the route that exists | `--mutant no-swap` | "the mutant is CAUGHT: a_rect_draws_in_bgra_and_nothing_else_is_touched FAILED", exit 0 |
+| `raster_bench.py` `no-clear`, `padded-in-place` (#580) | none: the in-place route's clear of a caller's buffer and its `stride == row` branch, which the spike's STOP left unbuilt | not run | Dropped from the table. `rasterize` draws into a fresh pixmap and copies rows, and the tests the two named were never written; `bytes_past_the_row_are_untouched` holds a padded stride on the copy route |
 
 ## The offscreen harness (no running app)
 
@@ -11406,12 +11418,19 @@ own render, and whether drawing in place into the caller's buffer would pay
   else SWIFT if `swift ≥ 0.03` and `> spread`; else STOP. Exit 0 iff the
   dump, the build, the bench and the probe all succeeded; the verdict does
   not set it.
-- `--mutant no-clear|no-swap|padded-in-place`: a copy of `graphic/` under
+- `--mutant no-swap`: a copy of `graphic/` under
   `work/raster-bench/mutant/` (a sibling `app` symlink, the target dir
   `work/raster-bench-target/`), each anchor in `src/raster.rs` exactly once,
-  `cargo test --release --test pixels`. The anchors are the in-place
-  route's, which was not built, so each answers 2 (the control was not
-  performed).
+  `cargo test --release --test pixels`. The one mutant is the live row copy
+  (G-7) without its swizzle, RGBA out where BGRA is owed, which
+  `a_rect_draws_in_bgra_and_nothing_else_is_touched` must fail. Until
+  2026-11-11 (#580) there were three, anchored in the in-place route, which
+  was not built, so each answered 2 (the control was not performed):
+  `no-swap` was re-aimed at the copy that exists, and `no-clear` and
+  `padded-in-place` were dropped, because `rasterize` has no clear of a
+  caller's buffer and no `stride == row` branch, and the tests they named
+  (`a_dirty_row_buffer_draws_as_a_clean_one`,
+  `the_row_and_padded_strides_draw_the_same_rows`) were never written.
 
 Run on 2026-10-22 over `312c44d` plus the instrument, on the owner's parive
 promo (a copy), every instance my own, on a 12-CPU host with 96 GiB,
@@ -11423,6 +11442,7 @@ promo (a copy), every instance my own, on a 12-CPU host with 96 GiB,
 | the same, `--module bg` (for the record) | clip 4 (`bg`), frames 0…3775, 1920 × 1080; load 20.66 24.82 17.17 before, 15.35 23.23 16.82 after; ROW 1 407.5 ms, PADDED 1 401.7 ms, ALLOC 2.1, SWIZZLE 6.7, CLEARSWAP 28.7; spreads 0.0714 and 0.0695; probe Z 0.043, U 0.796, M 0.020. Per frame: row 35.188, net 0, copy 0.776, F 36.027, outside 0.819; share 0.0227, rust 0, swift 0.0227; inplace saving −0.0041. verdict: STOP; exit 0 |
 | `image_cache_bench.py parive-promo.framejob --frames 4 --rounds 1` (after `dump_scene` and `--exact`) | runs only `section_scene_orig_against_cached` (1 passed, 1 filtered out); every frame identical across the arms; exit 0 |
 | `raster_bench.py --mutant no-clear` | exit 2: the anchor occurs 0 times (the route is unbuilt) |
+| 2026-11-11 (#580), `raster_bench.py --mutant no-swap`, re-aimed at the row copy | exit 0: "the mutant is CAUGHT: a_rect_draws_in_bgra_and_nothing_else_is_touched FAILED" (`[255, 128, 0, 255]` against `[0, 128, 255, 255]` at `tests/pixels.rs:26`); the other five `pixels` tests ok |
 | `grep "Frame Job: "` over the dump instances' logs | nothing |
 
 ## Issue batch B38 — the assistant Stop residue: ST's hour fixture, K1 last with its `key-echo` control, `transcribe`'s first-statement read (`assistant_session_proof.py` ST, K1, `--mutant key-echo`; #179 items 1, 2 and 4)
@@ -26298,7 +26318,8 @@ and E45 (the same with noise reduction 0.5) hold every click on its frame
 through the limiter's 158-sample delay, as E22 does the reducer's; each
 prints its difference from E4. Two mutants run by hand on a Debug build
 (`HAND_MUTANTS` there): M25 drops the placement lead and must fail E44; M26
-drops the tap's lookup lead and must fail P4's second leg. `loudness_cache_probe.py`'s C8
+drops the tap's lookup lead and must fail P4's second leg (since #574 each drops the
+clip limiter's term alone and keeps the track limiter's, AU-153, beside it). `loudness_cache_probe.py`'s C8
 is rewritten for the new `plan`, and its two plan mutants re-anchored
 (`no-limiter`, `limited-by-nil`). `phase5_proof.py`, `peaks_proof.py` and
 `refusal_proof.py` name `mode="peak"` on every `normalize_clip` they mean as
@@ -26324,6 +26345,12 @@ both, the owner's recording exporting at −15.91 LUFS and −0.9998 / −0.9999
 92/92 on both; `peaks_proof.py` 21/21 and `refusal_proof.py` 145/145 on Debug;
 `loudness_cache_probe.py` 11/11 and `--mutants` 7/7. By hand on Debug: M25 failed
 E44 (+3.292 ms); M26 failed P4's second leg (+3.5363 dBTP) and passed its first.
+Again on 2026-11-11 (#574), re-aimed at today's lines, each in a Debug copy of the tree
+driven on its own socket; on the unmutated Debug app first, `--only E44` 1/1 (median
++0.000 ms) and `limiter_proof.py` 19/19. M25 failed E44 (median +3.292 ms, "pin missed").
+M26 failed P4's second leg (true peak -0.0000 (Kaiser) / -0.0067 (Annex 2) dBTP against
+-1 + 0.001: the export master, AU-27, now holds what the clip limiter let through at
+0 dBTP) and passed its first, 18/19.
 Again at integration, where the format became 30 (on the merged tree, Release, after
 `make gate` PASS): `limiter_proof.py` 19/19, P6 "the file is version 30, the header's 30";
 `loudness_normalize_proof.py` 37/37, N6 −15.91 LUFS and −0.9998 / −0.9999 dBTP;
@@ -28965,7 +28992,10 @@ Mutants (`--mutant NAME`, each in a tree copy built as the run's configuration, 
 the copy's `app/Sources`; the tree's mutated files' SHA-256 read before and after):
 `M1-no-export-wait` (W4), `M2-wait-after-guard` (W4b), `M3-open-only` (`ensureMasks()` only at
 the open, W2), `M4-unbounded-frame` (W3), `M5-no-release` (W7), `M6-kept-empty` (P2, W8),
-`M7-export-previous-empty` (W9), `M8-queued-as-running` (P2).
+`M7-export-previous-empty` (W9; since #572 the export's wait building its requests through
+`CutoutWants.requests` with nothing kept, in `Exporter+Masks.swift`, because the read of the
+open requests moved into `CutoutWants.wants`, which the document and the frame wait share),
+`M8-queued-as-running` (P2).
 
 ```sh
 python3 tools/proof/co2b_proof.py --only P1,P2
@@ -31868,7 +31898,12 @@ ended `save`, its `save_waits` rose by exactly one and its files are in the pack
 | O3 | `voiced` | the same edit, wanted once the isolated render lands | one `.caf` in `voiced/` |
 
 D1 is a named skip, never a pass, on a Mac whose Transcript tab answers `no_model` or
-`failed`. Needs `tools/proof/media/speech.mov` too.
+`failed`. Needs `tools/proof/media/speech.mov` too. `--mutant transcript-no-model` (#571)
+shows that arm on a Mac that has the model: in a tree copy the Transcript fill resolves its
+language against an empty list (`TranscriptTabSource.swift`), which is what a Mac with no
+model answers. Its verdict is its own, `SKIPPED D1 BY NAME`, exit 0 only when D1 is skipped
+with `no_model` in its sentence and never scored and every other row is scored and passes.
+The arm's `failed` status takes the same branch and is not forced.
 
 The gate mutants each keep one site's gate and drop the ledger (the mutant adds
 `CacheLedger.outside`), so the write falls inside the held save and is lost at the swap; each
@@ -31888,6 +31923,7 @@ the folder is made).
 ```sh
 make app-debug && python3 tools/proof/save_hold_proof.py
 python3 tools/proof/save_hold_proof.py --mutant landing-in-package
+python3 tools/proof/save_hold_proof.py --mutant transcript-no-model
 ```
 
 Recorded 2026-11-11: on the Debug app of d142e3e4, before the change, R1 FAILED ("the render
@@ -31906,6 +31942,13 @@ A14,P9` 3/3 and its mutants `write-outside-publish`, `write-outside-publish-app`
 `ramp_proof.py` 43/43 on Debug. `make gate` PASS. On Release (`RC_PROOF_APP=release`, after
 the gate's `make app`): `save_hold_proof.py` 11/11, `analysis_proof.py` 26/26,
 `ramp_proof.py` 43/43.
+
+Recorded 2026-11-11 with #571, on Debug: `--mutant transcript-no-model` printed "skip D1 this
+Mac's Transcript tab answered no_model: ['This Mac has no speech model installed. Choose
+File ▸ Generate Captions…, pick a language and press Download.']", "10/10 rows passed;
+skipped ['D1']" (R1, M1–M5, O1–O3 and Z1 scored) and "MUTANT transcript-no-model SKIPPED D1
+BY NAME … 10 other rows scored", exit 0. Without the mutant the arm is not taken on this Mac
+(the 11/11 run above, where D1 ran).
 
 ## #399, #549 — a live retimed clip past its limiter's ceiling, and AU-156's residue (`audio_ap6_proof.py` V17, V12; `audio_ap10c_proof.py` U1; `core/tests/link_edges.rs`; three mutants; spec §11 AU-162)
 
