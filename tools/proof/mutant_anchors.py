@@ -115,6 +115,9 @@ SWITCHES = {
     "bt709_fixture.py": {"MUTANTS": 4},
     # `main` rebinds `budget.BUDGETS` or `budget.anthropic_worst_row` in memory.
     "budget_proof.py": {"MUTANTS": 2},
+    # `run` imports one fixture in the other's place.
+    "codec_import_proof.py": {"MUTANTS": 2},
+    "container_import_proof.py": {"MUTANTS": 1},
     "camera_spike/camera_spike.py": {"MUTANTS": 5},
     "constant_render_spike.py": {"MUTANTS": 3},
     "cursor_spike/cursor_spike.py": {"MUTANTS": 15},
@@ -186,8 +189,7 @@ NOT_TABLES = {
 # table to read.
 NO_TABLE = {
     "assistant_clearing_proof.py", "assistant_compaction_proof.py", "assistant_helper_proof.py",
-    "assistant_prompt_proof.py", "codec_import_proof.py",
-    "container_import_proof.py", "defaults_proof.py",
+    "assistant_prompt_proof.py", "defaults_proof.py",
     "makefile_env_proof.py",
     "op_contract_proof.py", "open_documents_proof.py",
 }

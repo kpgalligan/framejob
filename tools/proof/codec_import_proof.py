@@ -52,6 +52,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 SEC = 600_000
 RATE = 48000
 VIDEO_IN = ["-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30:duration=2"]
+# The mutants, as `mutant_anchors.py` reads them: each swaps one fixture for the other in
+# `run`, no tree text.
+MUTANTS = ("p1-as-p0", "p0-as-p1")
 
 rows = []
 
@@ -261,7 +264,7 @@ def run(mcp, where, fixtures, mutant):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mutant", choices=["p1-as-p0", "p0-as-p1"])
+    parser.add_argument("--mutant", choices=MUTANTS)
     parser.add_argument("--app", default=str(proof_app.bundle()))
     args = parser.parse_args()
     binary = str(proof_app.executable(args.app))
