@@ -14,7 +14,7 @@
   - SR5, the UI and #338 (SR-21, SR-22) (`6d1a968`), after its toll, `InspectorLabels.swift` (`a572d3f`)
   - The close: this record (the commit that moved the original to `archive/`)
 - **Original:** `archive/speed-ramps.md` is the full record. It has no section numbers, so it is cited by its own headings: "orig SR2b" is its "SR2b — the renderer wired in" section, and "orig rule I" is the rule I bullet of its "Decided here".
-- **Spec decisions:** SR-1..SR-22 in spec §11: SR-1…SR-12 in `designs/spec/11-decisions/speed-ramps.md`, SR-13…SR-22 in `speed-ramps-2.md` (split at the close by the spec's ~500-line rule). They stay binding, and where the original words them differently, §11's text wins:
+- **Spec decisions:** SR-1..SR-22 in spec §11: SR-1…SR-9 in `designs/spec/11-decisions/speed-ramps.md`, SR-10…SR-12 in `speed-ramps-1b.md` (moved there by the same rule, #585), SR-13…SR-22 in `speed-ramps-2.md` (split at the close by the spec's ~500-line rule). They stay binding, and where the original words them differently, §11's text wins:
   - SR-1: a speed ramp is a Speed action on the action lane, ramping from the rate in force to its end rate along its curve and held after.
   - SR-2: the clip keeps its slot; a ramp changes how much source it plays, and an edit reading past the media's end is refused, naming the rate or end that fits.
   - SR-3: audio follows the clip's own Keep pitch, with no time-stretch of Frame Job's own (SY-41).
