@@ -2307,8 +2307,10 @@ the key map behind it.
   `TranscriptFindState` (view state, never saved) and `openFind`, `closeFind`, `hideFind`,
   `findStep`, `findKeep` / `refreshFind` (a rebuild, called around `show` in `sourceChanged`).
   `TranscriptView+Find` draws the marks under every other mark, measuring only the matches whose
-  tokens meet the dirty rect, and `revealFind` lays out the text from the top through the match
-  before it scrolls (a far rect and the view's height are estimates until then). Find moves only
+  tokens meet the dirty rect, and `revealFind`, `scrollToToken` and the follow's scroll lay out
+  the text from the top through their target and a viewport below it before they scroll
+  (`TranscriptView+Layout`'s `layOut(through:)`: a far rect is an estimate until then, and the
+  view is only as tall as what is laid out). Find moves only
   the scroll and its marks. Out of sight the pane closes the bar and hands the keys to the content
   view when the window itself or the transcript's text holds them (`handBackKeys`).
   `transcript_view`'s `find` / `find_step` are `AgentServer+TranscriptFind.swift`'s.
