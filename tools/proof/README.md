@@ -27203,13 +27203,38 @@ runs only those parts while iterating; a recorded run sets nothing.
 | V15 | At volume (the `option.display` part after the "At volume" label in `snapshot_ui`'s layout, the Sound sub-tab) after Enhance within ±0.2 of −16 with no "≈"; after an EQ change "≈ " and the tooltip |
 
 ```sh
-python3 tools/proof/audio_ap6_probe.py             # E1–E3, E6–E11
-python3 tools/proof/audio_ap6_probe.py --mutants   # M1–M6, M8–M12
+python3 tools/proof/audio_ap6_probe.py             # E1–E3, E6–E14
+python3 tools/proof/audio_ap6_probe.py --mutants   # M1–M6, M8–M20
 make app-debug && python3 tools/proof/proof_app.py launch
 python3 tools/proof/audio_ap6_proof.py <dir>/agent.sock
 ```
 
 The recorded runs are in `archive/audio.md`'s AP6 record.
+
+**A stage only at an action's end (#402, spec §11 AU-159, 2026-11-11).** The probe gains rows and
+six mutants, the proof a part (`AP6_ONLY=actions`):
+
+| Row | What it holds |
+|---|---|
+| E10 | also, on a clip decoded from JSON with no base stage: each of the eight stages an action can switch on, only at an action's end, renders; pan, mono, channels, a limiter, a volume, a null EQ or gate and a 0 isolation or noise reduction at an end do not; a gate at the end of an action of no duration does not |
+| E12 | (unchanged) the memo's key names its document |
+| E13 | the memo's key survives the solve: on a clip with a base gate and an action whose end is a pan, R0's trial and the clip after `set_audio {volume: 2, limiter}` have one key, though their measurement plans differ (the core writes the base limiter into every automation point) |
+| E14 | the key follows an action's audio: another gate threshold or limiter ceiling at an end is another key; another end volume is not; a limiter keyed off at a later action's end is another key than the limiter left on |
+| V16 | the owner's recording with an EQ only at an action's end (1 s for 2 s): (a) At volume "≈" before any press; (b) `normalize_clip` −16: `processed_lufs` ≠ `measured_lufs`, renders ≥ 1, the export at −16 ±0.5, a second call "made no change"; (c) At volume after it −16 ±0.2, no "≈"; (d) the end also naming volume 0.5: one text with the playhead at 0 and inside the action; (e) another shelf gain at the end: "≈" again; (f) an end gate and limiter at −6 dBTP under the clip's own limiter, target −20: renders ≥ 2, `result_lufs` within 0.2 LU of the export, the export at −20 ±0.5, `limited_by` null; (g) an end gate and limiter at −24 dBTP, no limiter on the clip, target −30: the one-render arm (renders 1, no limiter), its miss against the export printed and NOT scored (AU-159 (b), held on #402) |
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M14 | (anchor moved) the memo's key without its document | E12 |
+| M15 | `needsRender` on a clip never reads its actions | E10 |
+| M16 | an action of no duration counts | E10 |
+| M17 | the key keeps the automation points' limiter | E13 |
+| M18 | the key's chain without the action ends' limiters | E14 |
+| M19 | the key's plan with every automation point emptied | E14 |
+| M20 | the key's chain without the limiter key-offs | E14 |
+
+V16 was seen red on three Debug builds with one edit each: M15's edit failed (a), (b), (e), (f)
+and (g); M17's failed (c) and (d); At volume reading the selected action's volume and limiter
+on a clip that renders failed (d) alone.
 
 ## Road map "audio" AP12 — Match Audio (`audio_ap12_probe.py` P1–P9, `audio_ap12_proof.py` A1–A8; twelve mutants; spec §11 AU-120…AU-129)
 
@@ -27430,6 +27455,9 @@ no state (`AudioLevellerRun`).
 | R3 | `needsRender` for a leveller alone; the memo key differs by its chain |
 | R4 | `choose` over one input twice is equal, the leveller on above 6 LU |
 | R5 | (not with `--quick`) the steady fixture's Enhance trial rendered three times through `ProcessedLoudness.render`, its isolated render wiped before the third: byte-identical step energies (AP6b step 3) |
+| R5's detail (#567) | on a failure, per pair of renders and for the steps and the peaks: how many differ of how many, the first one's index and time, both values at 17 digits and the largest difference in dB; and whether the isolated render made again before the third is the same bytes (SHA-256 of `cache/isolated/` before the wipe and after) |
+| R6 | the comparison R5 reports with, over synthetic arrays: equal, one step differing at a known index, another length |
+| R7 | `StepLoudnessMeter` gives byte-identical step energies and peaks for one programme fed whole, a step at a time, in 4,096-frame buffers and in uneven ones (spec §11 AU-160: a step's energy is summed once, in sample order; mutant M19, a sum per feed chunk as it was) |
 
 Then the step-2 figures (AU-67 (d)): the speech range Enhance measures on the owner's recording
 and both fixtures, each through a probe document's own loudness and speech caches, printed, and
@@ -27481,7 +27509,8 @@ stops it. The names after the socket run only those parts (P2 runs P3, P4 runs P
 
 ```sh
 python3 tools/proof/audio_ap6b_probe.py             # L1–L9, R1–R5, the step-2 ranges
-python3 tools/proof/audio_ap6b_probe.py --mutants   # M1–M10, M12–M15, M17
+python3 tools/proof/audio_ap6b_probe.py --soak-r5 9  # R5 alone (`--r5-only`) in fresh processes for 9 minutes or until one fails (#567; run it under other builds)
+python3 tools/proof/audio_ap6b_probe.py --mutants   # M1–M10, M12–M15, M17–M19
 make app-debug && python3 tools/proof/proof_app.py launch
 python3 tools/proof/audio_ap6b_proof.py <dir>/agent.sock
 ```

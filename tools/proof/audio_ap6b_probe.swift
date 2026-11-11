@@ -3,15 +3,17 @@
 // Compiled with every file in `app/Sources` but `main.swift` through
 // `swift_build.py`'s line, copied in as `main.swift`.
 //
-//     audio-ap6b-probe <fixtures> <scratch> [--quick]
+//     audio-ap6b-probe <fixtures> <scratch> [--quick | --r5-only]
 //
 // One line per row, `  ok   <ID> <name>: <detail>` or `  FAIL <ID> …`, and
 // `  note …` lines with the figures. `--quick` skips the step-2 figures and R5 (the
-// probe document, its speech pass and its renders).
+// probe document, its speech pass and its renders). `--r5-only` runs R5 and
+// nothing else, on a document holding the steady fixture alone (#567's soak).
 import AVFoundation
 import Accelerate
 import AppKit
 import CoreMedia
+import CryptoKit
 import Foundation
 
 final class ProbeDocumentController: NSDocumentController {
@@ -23,6 +25,7 @@ NSApplication.shared.setActivationPolicy(.prohibited)
 let fixtures = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
 let scratch = URL(fileURLWithPath: CommandLine.arguments[2], isDirectory: true)
 let quick = CommandLine.arguments.contains("--quick")
+let r5Only = CommandLine.arguments.contains("--r5-only")
 let fs = 48_000.0
 let RATE = 48_000
 let SEC: Ticks = 600_000
@@ -32,6 +35,11 @@ func check(_ row: String, _ name: String, _ good: Bool, _ detail: String = "") {
     fflush(stdout)
 }
 func f3(_ x: Double?) -> String { x.map { String(format: "%.3f", $0) } ?? "nil" }
+
+if r5Only {
+    stepTwoAndR5(only: true)
+    exit(0)
+}
 
 // MARK: - Signals and drivers
 
@@ -833,13 +841,137 @@ do {
     check("R4", "choose over one input twice is equal, the leveller on above 6 LU", good, detail)
 }
 
-// MARK: - The step-2 figures: the owner's recording and the proof's fixtures
+// MARK: - R6 the comparison R5 reports with
+
+/// How two renders' arrays differ: nil when byte-identical. `count` the
+/// differing indices (an index only one array has counts), `first` the first
+/// of them, `largestDB` the largest ratio in dB (`power` true for energies,
+/// false for linear peaks; infinite against a zero or past the shorter end).
+struct StepDifference: Equatable {
+    var count: Int
+    var first: Int
+    var a: Double?
+    var b: Double?
+    var largestDB: Double
+    var lengths: [Int]
+}
+
+func stepDifference(_ a: [Double], _ b: [Double], power: Bool) -> StepDifference? {
+    var out = StepDifference(count: 0, first: -1, a: nil, b: nil, largestDB: 0,
+                             lengths: [a.count, b.count])
+    for k in 0..<max(a.count, b.count) {
+        let x = k < a.count ? a[k] : nil
+        let y = k < b.count ? b[k] : nil
+        if let x, let y, x.bitPattern == y.bitPattern { continue }
+        out.count += 1
+        if out.first < 0 {
+            out.first = k
+            out.a = x
+            out.b = y
+        }
+        var db = Double.infinity
+        if let x, let y, x > 0, y > 0 { db = abs((power ? 10 : 20) * log10(x / y)) }
+        out.largestDB = max(out.largestDB, db)
+    }
+    return out.count == 0 ? nil : out
+}
+
+/// One pair's line: "1–3 steps: 2 of 6900 differ, first at step 412 (4.12 s)
+/// 1.2345678901234567e-05 against 1.2345678901234569e-05, largest 0.000001 dB".
+func describe(_ pair: String, _ what: String, _ d: StepDifference) -> String {
+    func g(_ x: Double?) -> String { x.map { String(format: "%.17g", $0) } ?? "absent" }
+    let total = d.lengths.max() ?? 0
+    let lengths = d.lengths[0] == d.lengths[1] ? "" : " (lengths \(d.lengths[0]) and \(d.lengths[1]))"
+    return "\(pair) \(what): \(d.count) of \(total) differ\(lengths), first at step \(d.first) "
+        + "(\(String(format: "%.2f", Double(d.first) / 100)) s) \(g(d.a)) against \(g(d.b)), "
+        + "largest \(String(format: "%.6f", d.largestDB)) dB"
+}
+
+if !r5Only {
+    let base = [1.0, 2.0, 3.0, 4.0]
+    var one = base
+    one[2] = 3.0000000000000004
+    let same = stepDifference(base, base, power: true)
+    let single = stepDifference(base, one, power: true)
+    let short = stepDifference(base, [1.0, 2.5], power: false)
+    let line = single.map { describe("1–3", "steps", $0) } ?? ""
+    check("R6", "the comparison R5 reports with: equal arrays nil; one step differing named by "
+            + "its index, both values and a finite dB; another length counted past the shorter end",
+          same == nil
+            && single == StepDifference(count: 1, first: 2, a: 3.0, b: 3.0000000000000004,
+                                        largestDB: single?.largestDB ?? -1, lengths: [4, 4])
+            && (single?.largestDB ?? 0) > 0 && (single?.largestDB ?? 1) < 1e-9
+            && short?.count == 3 && short?.first == 1 && short?.largestDB == .infinity
+            && short?.lengths == [4, 2]
+            && line.hasPrefix("1–3 steps: 1 of 4 differ, first at step 2 (0.02 s) 3 against "
+                                + "3.0000000000000004, largest 0.000000 dB"),
+          line)
+}
+
+// MARK: - R7 the step meter does not depend on how it is fed (AU-160, #567)
+
+if !r5Only {
+    // 3 s of stereo noise, fed whole, a step at a time, in 4,096-frame
+    // buffers and in uneven ones that cut every step somewhere else.
+    let frames = 3 * RATE
+    let left = noise(frames, seed: 567, scale: 0.25)
+    let right = noise(frames, seed: 568, scale: 0.2)
+    var interleaved = [Float](repeating: 0, count: 2 * frames)
+    for n in 0..<frames {
+        interleaved[2 * n] = left[n]
+        interleaved[2 * n + 1] = right[n]
+    }
+    func metered(_ sizes: [Int]) -> (steps: [Double], peaks: [Double]) {
+        let meter = StepLoudnessMeter()
+        var at = 0
+        var turn = 0
+        interleaved.withUnsafeBufferPointer { buffer in
+            while at < frames {
+                let take = min(sizes[turn % sizes.count], frames - at)
+                meter.feed(buffer.baseAddress! + 2 * at, frames: take)
+                at += take
+                turn += 1
+            }
+        }
+        return meter.finish()
+    }
+    let whole = metered([frames])
+    var lines: [String] = []
+    for (name, sizes) in [("a step at a time", [480]), ("4,096 frames", [4096]),
+                          ("uneven", [1, 479, 481, 1000, 37, 4096, 263])]
+    {
+        let other = metered(sizes)
+        if let d = stepDifference(whole.steps, other.steps, power: true) {
+            lines.append(describe(name, "steps", d))
+        }
+        if let d = stepDifference(whole.peaks, other.peaks, power: false) {
+            lines.append(describe(name, "peaks", d))
+        }
+    }
+    check("R7", "StepLoudnessMeter gives byte-identical step energies and peaks for one "
+            + "programme fed whole, a step at a time, in 4,096-frame buffers and in uneven ones",
+          whole.steps.count == 300 && lines.isEmpty,
+          "\(whole.steps.count) steps" + (lines.isEmpty ? "" : "; " + lines.joined(separator: "; ")))
+}
 
 // MARK: - The step-2 figures and R5: the owner's recording and the proof's fixtures
 
-if !quick {
-    let files: [(UInt32, String)] = [(91, "rode.m4a"), (92, "ap6b-offmic.wav"),
-                                     (93, "ap6b-steady.wav")]
+/// SHA-256 of each file in `folder` by name; empty when it is absent.
+func digests(_ folder: URL?) -> [String: String] {
+    guard let folder else { return [:] }
+    var out: [String: String] = [:]
+    for name in (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [] {
+        guard let data = try? Data(contentsOf: folder.appendingPathComponent(name)) else { continue }
+        out[name] = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+    return out
+}
+
+/// The step-2 figures and R5; with `only`, R5 alone on the steady fixture.
+func stepTwoAndR5(only: Bool) {
+    let files: [(UInt32, String)] = only
+        ? [(93, "ap6b-steady.wav")]
+        : [(91, "rode.m4a"), (92, "ap6b-offmic.wav"), (93, "ap6b-steady.wav")]
     let package = scratch.appendingPathComponent("ranges.framejob", isDirectory: true)
     try? FileManager.default.removeItem(at: package)
     try? FileManager.default.createDirectory(at: package, withIntermediateDirectories: true)
@@ -870,81 +1002,115 @@ if !quick {
     } catch {
         print("  note step2: the probe document did not open: \(error)")
     }
-    if let cache = document.cacheDirectory {
-        for (id, name) in files {
-            let url = fixtures.appendingPathComponent(name)
-            guard let snapshot = snapshots[id] else { continue }
-            let done = DispatchSemaphore(value: 0)
-            let box = ResultBox()
-            Task.detached {
-                let stamp = MediaImporter.CacheStamp.stamp(for: snapshot, url: url)
-                box.value = await MediaImporter.loudness(
-                    for: snapshot, url: url, stamp: stamp, into: cache)
-                await MediaImporter.speech(for: snapshot, url: url, stamp: stamp, into: cache)
-                done.signal()
-            }
-            _ = done.wait(timeout: .now() + 600)
+    guard let cache = document.cacheDirectory else {
+        if only { check("R5", "the probe document has a cache folder", false) }
+        return
+    }
+    for (id, name) in files {
+        let url = fixtures.appendingPathComponent(name)
+        guard let snapshot = snapshots[id] else { continue }
+        let done = DispatchSemaphore(value: 0)
+        let box = ResultBox()
+        Task.detached {
+            let stamp = MediaImporter.CacheStamp.stamp(for: snapshot, url: url)
+            box.value = await MediaImporter.loudness(
+                for: snapshot, url: url, stamp: stamp, into: cache)
+            await MediaImporter.speech(for: snapshot, url: url, stamp: stamp, into: cache)
+            done.signal()
         }
+        _ = done.wait(timeout: .now() + 600)
+    }
+    if !only {
         let input = AudioEnhance.read(from: document, clips: files.map { $0.0 + 100 })
         for (id, name) in files {
             let range = input?.readings.first { $0.clip == id + 100 }?.measurement.speechRangeLU
             print("  note step2 \(name) speech_range_lu \(f3(range))")
         }
         for problem in input?.problems ?? [] { print("  note step2 skipped \(problem.description)") }
-    
-        // R5 (AP6b step 3, AU-64 (f)): the steady fixture's Enhance trial rendered three times
-        // through `ProcessedLoudness.render`, the isolated render wiped before the third.
-        document.publishReverseResolution()
-        let resolution = ReverseSource.shared.resolution(for: document.recipeKey)
-        var renders: [[Double]] = []
-        var why = ""
-        if let read = AudioEnhance.read(from: document, clips: [193]),
-            var patch = AudioEnhance.choose(read).first?.patch
+    }
+
+    // R5 (AP6b step 3, AU-64 (f)): the steady fixture's Enhance trial rendered three times
+    // through `ProcessedLoudness.render`, the isolated render wiped before the third.
+    document.publishReverseResolution()
+    let resolution = ReverseSource.shared.resolution(for: document.recipeKey)
+    var renders: [(steps: [Double], peaks: [Double])] = []
+    var why = ""
+    var before: [String: String] = [:]
+    if let read = AudioEnhance.read(from: document, clips: [193]),
+        var patch = AudioEnhance.choose(read).first?.patch
+    {
+        patch.limiter = .some(nil)
+        patch.volume = 1
+        if let trial = LoudnessMeasureRun.trial(
+            base: document.project, scope: nil, clip: 193, patch: patch)
         {
-            patch.limiter = .some(nil)
-            patch.volume = 1
-            if let trial = LoudnessMeasureRun.trial(
-                base: document.project, scope: nil, clip: 193, patch: patch)
-            {
-                for round in 0..<3 {
-                    if round == 2, let folder = resolution.isolated {
-                        for name in (try? FileManager.default.contentsOfDirectory(
-                            atPath: folder.path)) ?? []
-                        {
-                            try? FileManager.default.removeItem(
-                                at: folder.appendingPathComponent(name))
-                        }
-                    }
-                    let urls = document.mediaURLs()
-                    let done = DispatchSemaphore(value: 0)
-                    nonisolated(unsafe) var answer: ProcessedLoudness.Rendered = .cancelled
-                    nonisolated(unsafe) var key = 0
-                    ProcessedLoudness.queue.async {
-                        (answer, key) = ProcessedLoudness.render(
-                            trial, clip: 193, urls: urls, resolution: resolution,
-                            cancelled: { false })
-                        done.signal()
-                    }
-                    done.wait()
-                    RampAudioRenders.shared.release(owner: key)
-                    if case .steps(let steps, _) = answer {
-                        renders.append(steps)
-                    } else {
-                        why = "\(answer)"
+            for round in 0..<3 {
+                if round == 2, let folder = resolution.isolated {
+                    before = digests(folder)
+                    for name in (try? FileManager.default.contentsOfDirectory(
+                        atPath: folder.path)) ?? []
+                    {
+                        try? FileManager.default.removeItem(
+                            at: folder.appendingPathComponent(name))
                     }
                 }
-            } else {
-                why = "the trial was refused"
+                let urls = document.mediaURLs()
+                let done = DispatchSemaphore(value: 0)
+                nonisolated(unsafe) var answer: ProcessedLoudness.Rendered = .cancelled
+                nonisolated(unsafe) var key = 0
+                ProcessedLoudness.queue.async {
+                    (answer, key) = ProcessedLoudness.render(
+                        trial, clip: 193, urls: urls, resolution: resolution,
+                        cancelled: { false })
+                    done.signal()
+                }
+                done.wait()
+                RampAudioRenders.shared.release(owner: key)
+                if case .steps(let steps, let peaks) = answer {
+                    renders.append((steps, peaks))
+                } else {
+                    why = "\(answer)"
+                }
             }
         } else {
-            why = "Enhance could not read the steady clip"
+            why = "the trial was refused"
         }
-        let figures = renders.map { f3(StepLoudness.integrated($0)) }
-        check("R5", "the steady fixture's Enhance trial rendered three times through "
-                + "ProcessedLoudness.render (its isolation re-rendered before the third) gives "
-                + "byte-identical step energies",
-              renders.count == 3 && renders[0] == renders[1] && renders[0] == renders[2],
-              "processed \(figures.joined(separator: ", ")) LUFS; " + (why.isEmpty ? "" : why))
+    } else {
+        why = "Enhance could not read the steady clip"
     }
+    // What differed (#567): each pair's steps and peaks, and whether the
+    // isolated render made again before the third is the bytes it was. The
+    // row's condition is the step energies, as it was; the peaks are said.
+    var lines: [String] = []
+    var stepsEqual = true
+    if renders.count == 3 {
+        for (i, j) in [(0, 1), (0, 2), (1, 2)] {
+            let pair = "\(i + 1)–\(j + 1)"
+            if let d = stepDifference(renders[i].steps, renders[j].steps, power: true) {
+                stepsEqual = false
+                lines.append(describe(pair, "steps", d))
+            }
+            if let d = stepDifference(renders[i].peaks, renders[j].peaks, power: false) {
+                lines.append(describe(pair, "peaks", d))
+            }
+        }
+    }
+    let after = digests(resolution.isolated)
+    let remade = before.isEmpty
+        ? "no isolated render was on disk before the wipe"
+        : (before == after
+            ? "same bytes (\(after.count) file(s))"
+            : "different bytes (\(before.count) before, \(after.count) after, "
+                + "\(after.filter { before[$0.key] == $0.value }.count) equal)")
+    let figures = renders.map { f3(StepLoudness.integrated($0.steps)) }
+    check("R5", "the steady fixture's Enhance trial rendered three times through "
+            + "ProcessedLoudness.render (its isolation re-rendered before the third) gives "
+            + "byte-identical step energies",
+          renders.count == 3 && stepsEqual,
+          "processed \(figures.joined(separator: ", ")) LUFS; isolated render re-made: \(remade)"
+            + (lines.isEmpty ? "" : "; " + lines.joined(separator: "; "))
+            + (why.isEmpty ? "" : "; " + why))
 }
+
+if !quick { stepTwoAndR5(only: false) }
 exit(0)

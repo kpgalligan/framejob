@@ -46,6 +46,9 @@ enum StepLoudness {
 ///
 /// Filter state and the interpolator's history run across calls and steps,
 /// as `LoudnessMeter`'s do, so the steps are one programme cut every 10 ms.
+/// A step's energy is summed once, in sample order, when the step closes
+/// (spec §11 AU-160, #567): never per `feed` call, so the steps are the same
+/// bits however a reader cuts its buffers.
 /// A last partial step is kept, its mean over the frames it holds. Pass one
 /// of an export feeds it beside its `LoudnessMeter` (`ExporterLoudness`), on
 /// the build queue.
@@ -56,14 +59,14 @@ final class StepLoudnessMeter {
 
     private var steps: [Double] = []
     private var peaks: [Double] = []
-    /// Σ over channels of Σ y² for the step being filled, its frames, and its
-    /// true peak so far.
-    private var stepSum: Double = 0
+    /// The step being filled: its frames and its true peak so far.
     private var stepFilled = 0
     private var stepPeak: Double = 0
 
     /// Per channel: `history` raw samples, then up to one step of new ones.
     private let channelBuffer: UnsafeMutablePointer<Double>
+    /// Per channel: the K-weighted samples of the step being filled.
+    private let weighted: UnsafeMutablePointer<Double>
     private let phaseBuffer: UnsafeMutablePointer<Double>
     /// The last `taps − 1` raw samples of each channel.
     private let peakHistory: UnsafeMutablePointer<Double>
@@ -78,6 +81,8 @@ final class StepLoudnessMeter {
         let run = StepLoudness.stepFrames + taps - 1
         channelBuffer = .allocate(capacity: run)
         channelBuffer.initialize(repeating: 0, count: run)
+        weighted = .allocate(capacity: Self.channelCount * StepLoudness.stepFrames)
+        weighted.initialize(repeating: 0, count: Self.channelCount * StepLoudness.stepFrames)
         phaseBuffer = .allocate(capacity: StepLoudness.stepFrames)
         phaseBuffer.initialize(repeating: 0, count: StepLoudness.stepFrames)
         peakHistory = .allocate(capacity: Self.channelCount * (taps - 1))
@@ -99,6 +104,7 @@ final class StepLoudnessMeter {
 
     deinit {
         channelBuffer.deallocate()
+        weighted.deallocate()
         phaseBuffer.deallocate()
         peakHistory.deallocate()
         coefficients.deallocate()
@@ -147,9 +153,8 @@ final class StepLoudnessMeter {
             (peakHistory + channel * history).update(
                 from: channelBuffer + frames, count: history)
             weight(channelBuffer + history, frames: frames, channel: channel)
-            var sum: Double = 0
-            vDSP_svesqD(channelBuffer + history, 1, &sum, vDSP_Length(frames))
-            stepSum += sum
+            (weighted + channel * StepLoudness.stepFrames + stepFilled).update(
+                from: channelBuffer + history, count: frames)
         }
         stepFilled += frames
         if stepFilled >= StepLoudness.stepFrames { closeStep() }
@@ -178,10 +183,18 @@ final class StepLoudnessMeter {
         }
     }
 
+    /// Σ over channels of Σ y², each channel's squares added in sample order:
+    /// one sum per step, whatever chunks filled it (AU-160).
     private func closeStep() {
+        var stepSum: Double = 0
+        for channel in 0..<Self.channelCount {
+            let samples = weighted + channel * StepLoudness.stepFrames
+            var sum: Double = 0
+            for n in 0..<stepFilled { sum += samples[n] * samples[n] }
+            stepSum += sum
+        }
         steps.append(stepSum / Double(stepFilled))
         peaks.append(stepPeak)
-        stepSum = 0
         stepFilled = 0
         stepPeak = 0
     }
