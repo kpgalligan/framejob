@@ -14,7 +14,8 @@ code.
 - **AU-70 — The meter reads the TRUE mix, rebuilt from the taps off the audio thread.** Each tap,
   after its chain, copies its block (pre-envelope) and first frame
   (`round(time.value·rate/time.timescale)`; a buffer whose time is not numeric, the player's
-  silent pre-roll, is skipped) into its sink's `MixRing`, a single-producer ring that takes no
+  silent pre-roll, is skipped; amended by AU-161: any buffer with no duration is the player's
+  filler, written as a mark with no samples when it has a time) into its sink's `MixRing`, a single-producer ring that takes no
   lock and allocates nothing. The consumer runs on the meter's existing 30 Hz main-thread timer
   (no new `DispatchQueue` seam): it drains every ring, sums by frame index each track ×
   `MediaPeaks.envelope(ramps, at: frame·600000/rate)` — a mono track at unity in both channels, a
@@ -38,7 +39,8 @@ code.
   (moved into `Loudness.swift`): Tables 1–2 exactly at 48 kHz, libebur128's derivation at any
   other rate in 8–192 kHz, the Annex 2 FIR at 4× the taps' rate. The export's 48 kHz arithmetic
   is unchanged.
-- **AU-72 — It measures only at ×1, and says when it resets.** At any other rate the chunks are
+- **AU-72 — It measures only at ×1, and says when it resets (amended by AU-161: the player's
+  filler is a mark, and after a stop a track is resumed from its own stream).** At any other rate the chunks are
   discarded, M and S read "—", and I and TP hold. It resets on the panel's Reset and
   `loudness_meter {reset}` (`manual`); on its own when a chunk starts more than `behindTolerance`
   (1.0 s) before the frame the sum reached, or more than `aheadTolerance` (0.1 s) after it with
@@ -93,7 +95,8 @@ code.
   rate, momentary_lufs, short_term_lufs, integrated_lufs, true_peak_dbtp, from_frame, to_frame,
   sample_rate, resets, last_reset}`. The View item and Reset are view state, unmirrored (§7.9's
   Preview Quality exemption).
-- **AU-78 — The proof.** `audio_ap7_proof.py`: the probe's rows T1–T16 (EBU Tech 3341 cases 1–5, 9
+- **AU-78 — The proof (amended by AU-161: T17, T18, L2's comparison and eight more
+  mutants).** `audio_ap7_proof.py`: the probe's rows T1–T16 (EBU Tech 3341 cases 1–5, 9
   and 12, true-peak sines, 44.1 kHz, the mix against a reference sum, continuity, the stall,
   overrun, rate, the bars, gaps) and eleven mutants, each anchoring a distinct branch AU-70, AU-72
   or AU-74 adds (the sum, the continuity rules, the rate gate, the bars), killed by its named row;

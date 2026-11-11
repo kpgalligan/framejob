@@ -398,12 +398,10 @@ after a distance change started up to 12 dB off for about 3 s. Both are rewritte
   the glide's end on the bed, and the sentences open 0.2–3.1 dB louder than their middles, which
   AU-66 (c)'s window and smoothing follow as decided; a carry-over across a pause like v1's (a
   segment starting ~12 dB off) still fails it. P3's seek row (8 s from 20 s after 12 s from 0)
-  holds the leveller's own part against a CONTROL on the same play sequence — the levelled
-  export itself placed as a clip with nothing on it, against its own export — its signed ΔI
-  less the control's within 0.01 LU, because after a seek the player hands every tap a silent
-  zero-duration buffer carrying the seek's time, which the live meter places at the seek's
-  frame (filed), so a seek's ΔI depends on the material's level there; the first play's row
-  stays absolute.
+  is absolute, within 0.01 LU of the export over the same frames, as the first play's row is
+  (amended by AU-161, #405: it was held against a control, the levelled export played as a
+  clip of its own, while the live meter placed the player's silent filler at the seek's
+  frame).
   Whether a speaker moving off the mic sounds even, the pauses do not swell and a phrase after a
   pause starts at its level with no audible glide is manual check SE-41.
 
