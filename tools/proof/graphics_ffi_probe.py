@@ -19,15 +19,33 @@ P6  the same frame twice is byte-identical, and frame 0 differs from frame 30;
 P7  a syntax error is one error that names its line;
 P8  a top-level `while (true) {}` at 50 ms fails inside the bound, in the
     budget's sentence;
-P9  `{"size":"big"}` at frame 30 is the one `props.size` warning, frame 30.
+P9  `{"size":"big"}` at frame 30 is the one `props.size` warning, frame 30;
+P10 (spec §11 PR-15) `rasterize(…, deep: true)` of frame 30 answers
+    1920 × 1080 × 4 values, an empty `bgra`, rows 15360 bytes apart, and a
+    `byteCount` twice the 8-bit raster's; every value is within 4 levels of
+    the 8-bit raster's, and it warns nothing;
+P11 `Exporter.graphicsDeep` for every row the core lists: in an SDR project
+    true for `hevc_10bit`, `av1`, `av1_webm`, `prores_422` and `prores_4444`
+    and false for every other row (`h264`, `hevc`, `hevc_alpha`, `vp9_webm`,
+    `vp9_alpha_webm`, the audio rows, `gif`, `apng`); in an HLG project
+    `vp9_webm` true as HLG and as HDR10, and false as the SDR version;
+P12 `LayerRenderers.textureKey` at 8 bits is `graphic:<sha256>:<w>x<h>:<lib>`
+    exactly, and the deep key is that with `:16`;
+P13 the raster budget counts bytes through `GraphicRaster.byteCount`: no
+    `bgra.count` and no `height * 4` is left in `GraphicPrefetch.swift` or
+    `GraphicPrefetch+Memory.swift`, and `byteCount` is read at eight sites.
 
     python3 tools/proof/graphics_ffi_probe.py
     python3 tools/proof/graphics_ffi_probe.py --mutant frame-off-by-one
+    python3 tools/proof/graphics_ffi_probe.py --mutant bytes-uncounted      # P10
+    python3 tools/proof/graphics_ffi_probe.py --mutant frame-form-unread    # P11
+    python3 tools/proof/graphics_ffi_probe.py --mutant a-site-uncounted     # P13
 
 The mutant is built from a COPY of `app/Sources` with one anchor in
 `GraphicModule.svg`, asserted to occur exactly once, replaced so the frame
 crosses the FFI as `frame + 1`; exit 0 means P5 FAILED in the copy, which is
-the pass. A mutant copy that does not build is a FAILURE.
+the pass. A mutant copy that does not build is a FAILURE. PR-15's three
+mutants each name the row that must fail.
 """
 
 import hashlib
@@ -51,6 +69,10 @@ FIXTURE = ROOT / "graphic/tests/graphics/lower-third.js"
 PINS = ROOT / "graphic/tests/pins.json"
 DEADLINE = 600
 SCHEMA_ORDER = ["title", "subtitle", "accent", "size", "boxed", "align"]
+# Every row of `core/src/export_table.rs`.
+EXPORT_ROWS = ["h264", "hevc", "hevc_alpha", "hevc_10bit", "av1", "av1_webm", "vp9_webm",
+               "vp9_alpha_webm", "prores_422", "prores_4444", "audio_m4a", "audio_wav",
+               "audio_aiff", "gif", "apng"]
 SIZE_WARNING = "props.size is a string but the schema says number; the default 64 is used"
 
 rows = {}
@@ -147,6 +169,42 @@ def score(answer, out):
           p9.get("drew") is True and len(w9) == 1 and w9[0].get("level") == "warning"
           and w9[0].get("message") == SIZE_WARNING and w9[0].get("frame") == 30, f"{p9}")
 
+    p10 = answer.get("p10", {})
+    pixels = 1920 * 1080 * 4
+    check("P10 a deep raster: 1920×1080×4 values, no bgra, stride 15360, byteCount twice the "
+          "8-bit raster's, within 4 levels of it, no warning",
+          p10.get("values") == pixels and p10.get("bgra") == 0 and p10.get("deep") is True
+          and p10.get("eight_deep") is False and p10.get("stride") == 15360
+          and p10.get("eight_bytes") == pixels and p10.get("bytes") == 2 * pixels
+          and isinstance(p10.get("far"), int) and p10["far"] <= 4 * 257
+          and p10.get("warnings") == [], f"{p10}")
+
+    p11 = answer.get("p11", {})
+    deep_rows = {"hevc_10bit", "av1", "av1_webm", "prores_422", "prores_4444"}
+    sdr = p11.get("sdr") or {}
+    want = {row: row in deep_rows for row in EXPORT_ROWS}
+    hdr = {name: (p11.get(name) or {}).get("vp9_webm") for name in ("hlg", "pq", "sdr_version")}
+    check("P11 graphicsDeep by row: the five deep rows true and every other false in an SDR "
+          "project; vp9_webm true as HLG and HDR10 and false as the SDR version",
+          sdr == want and hdr == {"hlg": True, "pq": True, "sdr_version": False},
+          f"sdr {sdr}; vp9_webm {hdr}; hlg {p11.get('hlg')}")
+
+    p12 = answer.get("p12", {})
+    key = "graphic:" + hashlib.sha256(b"<svg/>").hexdigest() + ":640x360:v"
+    check("P12 the texture key is today's at 8 bits and gains :16 when deep",
+          p12.get("eight") == key and p12.get("deep") == key + ":16", f"{p12} vs {key}")
+
+
+def scan(sources):
+    """P13, over the two prefetch files of `sources`."""
+    texts = [(Path(sources) / name).read_text()
+             for name in ("GraphicPrefetch.swift", "GraphicPrefetch+Memory.swift")]
+    stale = sum(text.count("bgra.count") + text.count("height * 4") for text in texts)
+    sites = sum(text.count("raster.byteCount") for text in texts)
+    check("P13 the raster budget counts byteCount: no bgra.count or height * 4 in the two "
+          "prefetch files, byteCount read at 8 sites", stale == 0 and sites == 8,
+          f"{stale} stale spellings, {sites} byteCount sites")
+
 
 def probe(sources, out):
     began = time.monotonic()
@@ -168,6 +226,7 @@ def probe(sources, out):
         (out / "answer.json").write_text(json.dumps(answer, indent=1, sort_keys=True))
     if answer.get("ok") is True:
         score(answer, out)
+        scan(sources)
 
 
 def replace_once(path, before, after):
@@ -183,7 +242,19 @@ MUTANTS = {
     "frame-off-by-one": ("ReelCore+Graphics.swift",
                          "            handle, Int64(frame), propsJSON, ctxJSON,",
                          "            handle, Int64(frame + 1), propsJSON, ctxJSON,"),
+    "bytes-uncounted": (
+        "CoreValues.swift",
+        "    var byteCount: Int { bgra.count + rgba16.count * MemoryLayout<UInt16>.stride }",
+        "    var byteCount: Int { bgra.count }"),
+    "frame-form-unread": (
+        "ExporterGraphics.swift",
+        "        case .eightBit?, .straightEightBit?: return false\n", "        case nil: return true\n"),
+    "a-site-uncounted": (
+        "GraphicPrefetch+Memory.swift", "        bytes += raster.byteCount\n",
+        "        bytes += raster.bgra.count\n"),
 }
+MUST_FAIL = {"frame-off-by-one": "P5", "bytes-uncounted": "P10", "frame-form-unread": "P11",
+             "a-site-uncounted": "P13"}
 
 
 def mutant(name):
@@ -194,12 +265,12 @@ def mutant(name):
         replace_once(sources / file, before, after)
         print(f"MUTANT {name}: {file}, anchor replaced once, in {sources}")
         probe(sources, Path(temp) / "out")
-    built = rows.get("P1", False)
-    if built and rows.get("P5") is False:
+    built, row = rows.get("P1", False), MUST_FAIL[name]
+    if built and rows.get(row) is False:
         failed = [k for k, v in rows.items() if not v]
-        print(f"MUTANT PASS: {name} — P5 FAILED in the copy (failed: {', '.join(failed)})")
+        print(f"MUTANT PASS: {name} — {row} FAILED in the copy (failed: {', '.join(failed)})")
         return 0
-    print(f"MUTANT FAILURE: {name} — built {built}, P5 {rows.get('P5')}")
+    print(f"MUTANT FAILURE: {name} — built {built}, {row} {rows.get(row)}")
     return 1
 
 
@@ -211,8 +282,8 @@ def main():
     print("G1d — the graphics engine through ReelCore.swift (probe)")
     probe(ROOT / "app/Sources", WORK)
     passed = sum(rows.values())
-    print(f"{passed}/9")
-    return 0 if len(rows) == 9 and all(rows.values()) else 1
+    print(f"{passed}/13")
+    return 0 if len(rows) == 13 and all(rows.values()) else 1
 
 
 if __name__ == "__main__":

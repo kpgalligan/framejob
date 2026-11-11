@@ -6177,9 +6177,17 @@ the build.
 anchor asserted to occur exactly once) and exits 0 only if P5 FAILED.
 
 ```sh
-python3 tools/proof/graphics_ffi_probe.py                              # → 9/9
+python3 tools/proof/graphics_ffi_probe.py                              # → 13/13
 python3 tools/proof/graphics_ffi_probe.py --mutant frame-off-by-one   # exit 0 = P5 FAILED
 ```
+
+Since spec §11 PR-15 (#374) it also scores P10 (a deep raster through
+`GraphicLibrary.rasterize(…, deep: true)`: its size, its `byteCount`, its
+distance from the 8-bit raster), P11 (`Exporter.graphicsDeep` for every row
+of the export table, in an SDR and an HLG project), P12 (the texture key at
+both depths) and P13 (a scan: the two prefetch files count
+`GraphicRaster.byteCount`), with a mutant each for P10, P11 and P13
+(`bytes-uncounted`, `frame-form-unread`, `a-site-uncounted`).
 
 ## Road map 10's G3a — the package's `graphics/` store (`graphics_store_probe.py`, `graphics_store_probe.swift`, `graphics_store_proof.py`)
 
@@ -25180,6 +25188,50 @@ Exit 0 means caught, 1 survived, and 2 the control could not be performed.
 - The variant tables that chose B4a and B4b (round 1: h264, hevc and ProRes, static and moving,
   at 8 and 16 Mbit/s; round 2: `hevc_10bit`, and spans of ±1 and ±1.5) come from the throwaway
   `work/raster-dither/b4_variants.py`. PR-13 quotes them.
+
+## Issue #374 — graphics drawn deeper than 8 bits (`raster_dither_proof.py` E1, D1–D7; `graphic/tests/deep.rs`; `graphics_ffi_probe.py` P10–P13; fifteen mutants; spec §11 PR-15)
+
+**What it proves.** A frame that leaves Frame Job deeper than 8 bits draws its graphics from a
+16-bit raster with no dither, so a gradient keeps its levels; every 8-bit frame keeps PR-13's
+dithered bytes.
+
+**The base.** E1, D3 and D4 are scored against `--base DIR`: a `capture` made by the app as it
+was before PR-15. Any build of an earlier commit does, named by `RC_PROOF_APP` (a `.app` outside a
+`build/Build/Products` folder is not checked for staleness):
+
+    RC_PROOF_APP=/path/to/the/earlier/Frame\ Job\ Debug.app python3 tools/proof/raster_dither_proof.py capture tools/proof/work/raster-dither-base
+    RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py --base tools/proof/work/raster-dither-base --only E1,D1,D3,D4,D5,D6,D7,Z1
+    python3 tools/proof/raster_dither_proof.py --mutant NAME                 # a crate mutant, cargo only
+    python3 tools/proof/raster_dither_proof.py --app-mutant NAME --base DIR  # the tree copied, Debug built, the named rows run
+
+B1–B4b still need `--control`, a capture of the tree before PR-13; none was made for PR-15, whose
+8-bit claim is E1's equality with the base instead.
+
+**Rows.** The script's module doc has each rule. E1: the 8-bit sheets and frames decode equal to
+the base's. D1, D5, D7: `render_frame` beside a 16-bit still, beside a 10-bit HEVC clip, and
+beside one over an H.264 clip (PR-14's re-read) is a 16-bit PNG with at least 400 distinct greens
+along #374's row, each within 1/8 level of the exact value. D6: the same in an HLG project,
+without the exact-value rule. D3: a `prores_422` export keeps at most half the base's per-pixel
+noise and error, with banding RMS at most 0.15. D4: a `hevc_10bit` export keeps at most 0.85 of
+the base's noise, with banding at most 0.15.
+
+**Recorded** (Release, 2026-11-10, 8/8): D1, D5 and D7 781 distinct values of 801, worst 0.0606 of
+a level (the base 44 values); D6 737 (the base 56); D3 noise 0.0165 against 0.3306, error 0.1115
+against 0.3460, banding 0.0974 against 0.0943, 2,123,379 bytes against 9,195,715; D4 noise 0.0741
+against 0.1059, banding 0.1213 against 0.1185. `graphics_prefetch_proof.py` 7/7 on the same
+build (its `prores_422` exports, now deep, masked-equal with the prefetch on and off),
+`graphic_memory_proof.py` 13/13, `graphics_proof.py` 51/51.
+
+**Mutants** (each caught). Crate, against `graphic/tests/deep.rs`: `dither-in-deep`, `root-only`,
+`lowp-on-deep`, `no-load-mask`, `plain-collapse`, `door-leaks`, `zero-run-drops`. App:
+`never-deep` (D1, D3, D5, D6), `always-deep` (E1), `hevc10-not-deep` (D4),
+`generator-frame-not-deep` (D5), `reread-not-deep` (D7). Probe: `bytes-uncounted` (P10),
+`frame-form-unread` (P11), `a-site-uncounted` (P13). PR-13's `core-unpatched` is now caught by
+the build failing to name `with_deep_pixmaps`.
+
+**Not measured here.** How a gradient looks on a display (`docs/manual-checks.md` GR-17); the
+AV1 and WebM rows' pixels (P11 holds their depth answer, and they pin their key through the same
+line as ProRes); raster time, which `graphic/tests/deep_bench.rs` prints unscored.
 
 ## Codec export C0 — the bundled encoders' link (`codecs_proof.py` L1–L3; `tools/codecs/build_codecs.py --selftest`; spec §11 CX-4, CX-5)
 

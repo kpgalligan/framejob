@@ -6,7 +6,11 @@ sandboxed QuickJS engine and rasterizes the SVG with resvg. The same frame
 with the same props always draws the same pixels. A gradient is dithered
 where it is rounded to 8 bits, by a fixed pattern of pixel position under
 half a level, so dark gradients do not band; flat colours, images, text and
-alpha are not. This page is the whole API. Every `js` block on it is run
+alpha are not. In a 10-bit or ProRes export, and in a frame saved as a 16-bit
+PNG or a 10-bit HEIC, a graphic is drawn at 16 bits a channel instead and a
+gradient keeps its levels with no dither; a group with a `filter`, and what a
+luminance `mask` lets through, stay on 8-bit levels there. This page is the
+whole API. Every `js` block on it is run
 by a test, so the examples work as written.
 
 ## The module

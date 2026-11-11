@@ -4,9 +4,13 @@ graphic is dithered where it is rounded to 8 bits, by a fixed pattern of
 pixel position under half a level (the vendored patch in `graphic/vendor/`);
 flat colours, images and text keep their bytes.
 
-    python3 tools/proof/raster_dither_proof.py [--only ROWS] [--control DIR]
+    python3 tools/proof/raster_dither_proof.py [--only ROWS] [--control DIR] [--base DIR]
     python3 tools/proof/raster_dither_proof.py capture DIR    # the CONTROL tree: every file kept in DIR
     python3 tools/proof/raster_dither_proof.py --mutant NAME  # cargo only, no app
+
+And issue #374, spec §11 PR-15: a frame delivered deeper than 8 bits draws its
+graphics from a 16-bit raster with no dither, and every 8-bit frame keeps
+PR-13's bytes (rows E1 and D1–D6, below, scored against `--base DIR`).
 
 Launches the app `proof_app` picks (Debug unless `RC_PROOF_APP=release`) on
 a scratch socket of its own and stops only that process. The instance runs in
@@ -59,6 +63,37 @@ Rows:
   two cells are equal, and equal to B1's cell.
 - **Z1** no `Frame Job: ` log line; every project closed.
 
+PR-15's rows, scored against `--base DIR`, a `capture` made by the app as it
+was BEFORE PR-15 (any build of a commit before it, named by `RC_PROOF_APP`),
+whose 8-bit raster is PR-13's dithered one:
+- **E1** the 8-bit paths are byte for byte the base's: B1's, S1's and F1's
+  sheets and B3's and F2's frames decode equal to the base's files, and B3's
+  frame is an 8-bit PNG.
+- **D1** `render_frame` at 0.5 s of a `band374` clip with a 64×64 16-bit PNG
+  still at the canvas centre (outside the row read): a 16-bit PNG; row 540,
+  x 0–800, G holds ≥ 400 distinct 16-bit values, every one within 1/8 of an
+  8-bit level of `e`.
+- **D3** the `prores_422` export B4a reads, the frame at 0.5 s as `rgb48le`:
+  the per-pixel noise kept ≤ ½ the base's (the dither is gone); rows 530–550,
+  x 32–768, RMS of G − e less its mean ≤ ½ the base's (each pixel is nearer
+  its exact value); the banding RMS ≤ 0.15 (B4b's bound; printed beside the base's,
+  whose dither that figure cannot tell from 10-bit steps: an undithered 8-bit
+  raster measured 0.3249 there, PR-13's control); and the row-540
+  block means strictly increase.
+- **D4** the `hevc_10bit` export B4b reads, the frame at 2.5 s (its centre at
+  cx 997.5): banding RMS ≤ 0.15 and the noise kept ≤ 0.85 × the base's.
+- **D5** `render_frame` at 0.5 s of a `band374` clip with a 256×144 10-bit
+  HEVC clip at the canvas centre, the only video track (the generator answers
+  deep, PR-14's case): D1's rule.
+- **D7** the same with a 256×144 H.264 clip on a new back-most track under
+  the 10-bit HEVC clip (the generator answers 8 bits and PR-14 re-reads the
+  frame): D1's rule.
+- **D6** an HLG project (`set_canvas {output: "hlg"}`): `render_frame` of the
+  `band374` clip is a 16-bit PNG whose row 540, x 0–800, G holds ≥ 400
+  distinct values (the lift and the layer stage take the 16-bit texture).
+Without `--base` (and not `capture`) E1, D3 and D4 FAIL. A `capture` writes
+D1's, D5's and D6's frames too, so a base folder shows what they were.
+
 `capture DIR` runs every row and keeps every file in DIR; its own files are
 the control it is scored against, so on the control tree B1, B3, B4a and B4b
 are expected to FAIL. Without `--control` (and not `capture`) B1–B4b, F1 and
@@ -69,10 +104,16 @@ per-pixel noise each codec kept (RMS of G less its column mean, rows
 `--mutant NAME` follows `image_cache_proof.run_graphic_mutant`: `graphic/`
 copied (no `target`) to `work/raster-dither/mutant/` beside an `app`
 symlink, each anchor in the vendored crate replaced exactly once, then
-`cargo test --release --test dither` with `CARGO_TARGET_DIR=work/
-raster-dither-target`. `core-unpatched` copies `core/` too, removes core's
-`[patch]` table and runs `cargo test --release --offline --test graphic_ffi
-a_gradient_is_dithered`. MUTANT PASS when every named test FAILED.
+`cargo test --release --test dither` (PR-15's mutants: `--test deep`) with
+`CARGO_TARGET_DIR=work/raster-dither-target`. `core-unpatched` copies `core/`
+too, removes core's `[patch]` table and builds `cargo test --release --offline
+--test graphic_ffi`: since PR-15 the staticlib does not build against the
+registry's tiny-skia at all (`with_deep_pixmaps` is the vendored crate's), so
+the mutant is caught when the build fails naming it. MUTANT PASS when every
+named test FAILED. PR-15's app mutants are `--app-mutant NAME`: `app/`,
+`core/`, `graphic/` and the rest of the tree copied by `tree_copy`, the anchor
+replaced, the Debug app built there, and the named rows run against it with
+`--base`; MUTANT PASS when every named row FAILED.
 
 Exit 0 when every scored row passes (a mutant: caught); 1 when one failed (a
 mutant: survived); 2 when the control could not be performed.
@@ -111,12 +152,15 @@ TOOL_BOUND = 120
 CARGO_BOUND = 1800
 W, H = 1920, 1080
 SEC = 600_000
-ROWS = ["B1", "B2", "B3", "B4a", "B4b", "F1", "F2", "S1", "Z1"]
+ROWS = ["B1", "B2", "B3", "B4a", "B4b", "F1", "F2", "S1", "E1", "D1", "D3", "D4", "D5", "D6",
+        "D7", "Z1"]
 # Every file a run keeps, by the row that writes it (L1–L3 are printed only).
 FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B4a": "b4a-prores.mov",
          "B4b": "b4b-hevc10-moving.mp4", "L1": "l1-h264-static.mp4",
          "L2": "l2-hevc-static.mp4", "L3": "l3-h264-16M-moving.mp4",
-         "F1": "f1-sheet.png", "F2": "f2-frame.png", "S1": "s1-sheet.png"}
+         "F1": "f1-sheet.png", "F2": "f2-frame.png", "S1": "s1-sheet.png",
+         "D1": "d1-frame-still.png", "D5": "d5-frame-hevc10.png", "D6": "d6-frame-hlg.png",
+         "D7": "d7-frame-h264-under-hevc10.png"}
 # The limits: (row, title, which project, export arguments, seek seconds).
 LIMITS = [("L1", "h264, default quality, static 1 s", "band", {"preset": "h264"}, 0.5),
           ("L2", "hevc, default quality, static 1 s", "band", {"preset": "hevc"}, 0.5),
@@ -193,6 +237,58 @@ MUTANTS = {
                       "                p.push(crate::pipeline::Stage::Dither);\n")],
                     ["solid_paints_text_and_images_are_not_dithered"]),
     "core-unpatched": ([], ["a_gradient_is_dithered_through_the_ffi"]),
+}
+# Spec §11 PR-15's crate mutants, run against `--test deep`.
+PIXMAP = f"{VENDOR}/pixmap.rs"
+BLITTER = f"{VENDOR}/pipeline/blitter.rs"
+DEEP_MUTANTS = {
+    "dither-in-deep": ([(GRADIENT, "        if !p.deep_dst {\n", "        {\n")],
+                       ["the_gradient_keeps_its_levels"]),
+    "root-only": ([(PIXMAP, "            lo: if deep_pixmaps() { vec![0; data_len] } else { Vec::new() },",
+                    "            lo: if deep_pixmaps() && width == 1920 && height == 1080 "
+                    "{ vec![0; data_len] } else { Vec::new() },")],
+                  ["the_levels_survive_every_layer"]),
+    "lowp-on-deep": ([(BLITTER, "        let force_hq = paint.force_hq_pipeline || deep;",
+                       "        let force_hq = paint.force_hq_pipeline;")],
+                     ["the_levels_survive_every_layer"]),
+    "no-load-mask": ([(HIGHP, "    p.a = f32x8::from(c) / f32x8::splat(255.0);\n",
+                       "    p.a = f32x8::splat(1.0);\n    let _ = c;\n")],
+                     ["the_levels_survive_every_layer"]),
+    "plain-collapse": ([(PIXMAP, "            px[c] = ((v + offset + 128) >> 8).clamp(0, alpha) as u8;",
+                         "            px[c] = ((v + 128 + offset * 0) >> 8).clamp(0, alpha) as u8;")],
+                       ["a_layer_read_at_eight_bits_is_dithered"]),
+    "door-leaks": ([(PIXMAP, "            DEEP.with(|deep| deep.set(self.0));",
+                     "            let _ = self.0;")],
+                   ["the_eight_bit_raster_is_unchanged_beside_a_deep_one"]),
+    "zero-run-drops": ([(PIXMAP, "            let flat = lo.is_empty() || is_zero(lo);",
+                         "            let flat = lo.is_empty() || is_zero(lo) || is_zero(hi);")],
+                       ["a_fade_to_nothing_keeps_its_tail"]),
+}
+MUTANTS.update(DEEP_MUTANTS)
+# Spec §11 PR-15's app mutants: (file, anchor, replacement), the rows that must FAIL.
+SOURCES = "app/Sources"
+APP_MUTANTS = {
+    "never-deep": ([(f"{SOURCES}/GraphicRegistry.swift",
+                     "budgetMs: Self.offlineBudgetMs, deep: pinned.deep)",
+                     "budgetMs: Self.offlineBudgetMs, deep: false)")], ["D1", "D3", "D5", "D6"]),
+    "always-deep": ([(f"{SOURCES}/GraphicRegistry.swift",
+                      "budgetMs: Self.previewBudgetMs, deep: false)",
+                      "budgetMs: Self.previewBudgetMs, deep: true)"),
+                     (f"{SOURCES}/GraphicRegistry.swift",
+                      "budgetMs: Self.offlineBudgetMs, deep: pinned.deep)",
+                      "budgetMs: Self.offlineBudgetMs, deep: true)")], ["E1"]),
+    "hevc10-not-deep": ([(f"{SOURCES}/ExporterGraphics.swift",
+                          "        default: return true\n        }\n    }\n\n    /// Whether the recipe",
+                          "        default: return settings.preset != \"hevc_10bit\"\n        }\n    }\n\n"
+                          "    /// Whether the recipe")], ["D4"]),
+    "generator-frame-not-deep": ([(f"{SOURCES}/Exporter+Frame.swift",
+                                   "            drawsGraphic(project, at: t, options: options)\n",
+                                   "            drawsGraphic(project, at: t, options: options), "
+                                   "false\n")], ["D5"]),
+    "reread-not-deep": ([(f"{SOURCES}/Exporter+Frame.swift",
+                          "            if deepens { GraphicRegistry.shared.markDeep(key) }\n"
+                          "            image = DeepStillFrame.read(",
+                          "            image = DeepStillFrame.read(")], ["D7"]),
 }
 CORE_PATCH = "[patch.crates-io]\n"
 
@@ -306,6 +402,24 @@ def read_movie(path, seek, deep):
     return Picture(W, H, 3, words, 257.0)
 
 
+def deep_row(picture):
+    """Row 540, x 0–800, G as stored 16-bit values, or None for an 8-bit picture."""
+    if picture is None or picture.scale != 257.0:
+        return None
+    return [picture.samples[(540 * picture.width + x) * picture.channels + 1] for x in range(801)]
+
+
+def fixture(name, arguments):
+    """An ffmpeg-made fixture in WORK, or None."""
+    out = WORK / name
+    got = bounded.run(["ffmpeg", "-nostdin", "-v", "error", "-y", *arguments, str(out)], TOOL_BOUND,
+                      env=bounded.child_env())
+    if got["rc"] != 0 or not out.exists():
+        print(f"       fixture {name}: rc {got['rc']} {got['stderr'][-300:]}", flush=True)
+        return None
+    return out
+
+
 def exact(x, y):
     """`band374`'s exact G in levels at pixel (x, y)'s centre."""
     t = min(math.hypot(x + 0.5 - CX, y + 0.5 - CY) / RADIUS, 1.0)
@@ -374,6 +488,18 @@ def noise(picture):
         mean = sum(column) / len(column)
         gaps.extend(v - mean for v in column)
     return math.sqrt(sum(g * g for g in gaps) / len(gaps))
+
+
+def pixel_error(picture, cx=CX):
+    """Rows 530–550, x 32–768: RMS of G − e less its mean (a decode's constant
+    offset is not the raster's), `e` for a gradient centred at `cx`."""
+    gaps = []
+    for y in range(530, 551):
+        for x in range(32, 769):
+            t = min(math.hypot(x + 0.5 - cx, y + 0.5 - CY) / RADIUS, 1.0)
+            gaps.append(picture.g(x, y) - (INNER[1] + (OUTER[1] - INNER[1]) * t))
+    mean = sum(gaps) / len(gaps)
+    return math.sqrt(sum((g - mean) ** 2 for g in gaps) / len(gaps))
 
 
 def movie_figures(path, seek, deep):
@@ -489,6 +615,25 @@ class Doc:
             return None
         return out
 
+    def media_clip(self, path, index=None):
+        """`path` imported and placed at 0 on a NEW track (at `index`: 0 is the
+        back-most), at its own size at the canvas centre (smaller than the
+        canvas, so nothing fits it)."""
+        if path is None:
+            return False, "no fixture"
+        got = self.call("import_media", path=str(path))
+        media = reply(got).get("media")
+        if media is None:
+            return False, f"import_media: {got.get('error', got)}"
+        before = {track["id"] for track in self.project().get("tracks") or []}
+        self.call("add_track", **({} if index is None else {"index": index}))
+        fresh = [track["id"] for track in self.project().get("tracks") or []
+                 if track["id"] not in before]
+        if not fresh:
+            return False, "no new track"
+        got = self.call("add_clip", track=fresh[0], media=media, at=0)
+        return got["ok"], got.get("error", "")
+
     def close(self):
         return attempt(self.client, "close_project", {"project": str(self.path),
                                                        "discard": True})["ok"]
@@ -510,40 +655,42 @@ def run(client, files):
     band = Doc(client, "band", "band374", BAND_JS)
     if not band.ok:
         print(f"       band project: {band.why}", flush=True)
-    if band.ok and selected & {"B1", "B2", "S1"}:
+    if band.ok and selected & {"B1", "B2", "S1", "E1"}:
         files["B1"] = band.sheet(FILES["B1"], frames=[0])
-    if band.ok and "S1" in selected:
+    if band.ok and selected & {"S1", "E1"}:
         files["S1"] = band.sheet(FILES["S1"], frames=[0, 30], max_width=8192)
-    if band.ok and selected & {"B3", "B4a"}:
+    if band.ok and selected & {"B3", "B4a", "E1", "D3"}:
         made, why = band.clip()
         if not made:
             print(f"       band clip: {why}", flush=True)
         else:
-            if "B3" in selected:
+            if selected & {"B3", "E1"}:
                 files["B3"] = band.frame(FILES["B3"])
-            if "B4a" in selected:
+            if selected & {"B4a", "D3"}:
                 files["B4a"] = band.export(FILES["B4a"], preset="prores_422")
+            if "B4a" in selected:
                 for row, _, project, arguments, _ in LIMITS:
                     if project == "band":
                         files[row] = band.export(FILES[row], **arguments)
     closed = band.close() and closed
-    if "B4b" in selected:
+    if selected & {"B4b", "D4"}:
         moving = Doc(client, "moving", "band374m", MOVING_JS)
         made, why = moving.clip(5) if moving.ok else (False, moving.why)
         if made:
             files["B4b"] = moving.export(FILES["B4b"], preset="hevc_10bit")
             for row, _, project, arguments, _ in LIMITS:
-                if project == "moving":
+                if project == "moving" and "B4b" in selected:
                     files[row] = moving.export(FILES[row], **arguments)
         else:
             print(f"       moving project: {why}", flush=True)
         closed = moving.close() and closed
+    closed = run_deep(client, files) and closed
     flat = Doc(client, "flat", "flat", FLAT_JS)
     if not flat.ok:
         print(f"       flat project: {flat.why}", flush=True)
-    if flat.ok and "F1" in selected:
+    if flat.ok and selected & {"F1", "E1"}:
         files["F1"] = flat.sheet(FILES["F1"], frames=[0])
-    if flat.ok and "F2" in selected:
+    if flat.ok and selected & {"F2", "E1"}:
         made, why = flat.clip()
         if made:
             files["F2"] = flat.frame(FILES["F2"])
@@ -551,6 +698,130 @@ def run(client, files):
             print(f"       flat clip: {why}", flush=True)
     closed = flat.close() and closed
     return closed
+
+
+def run_deep(client, files):
+    """PR-15's frames: D1 (a deep still beside the graphic), D5 (a 10-bit HEVC
+    clip beside it) and D6 (an HLG project)."""
+    closed = True
+    plans = []
+    if "D1" in selected:
+        still = fixture("still16.png", ["-f", "lavfi", "-i", "color=c=gray:size=64x64", "-frames:v",
+                                        "1", "-pix_fmt", "rgb48be"])
+        plans.append(("D1", "deepstill", still, None))
+    if "D5" in selected:
+        movie = fixture("hevc10.mov", [
+            "-f", "lavfi", "-i", "color=c=gray:size=256x144:rate=30:duration=1,format=yuv420p10le",
+            "-c:v", "hevc_videotoolbox", "-profile:v", "main10", "-pix_fmt", "p010le", "-tag:v",
+            "hvc1", "-b:v", "2M"])
+        plans.append(("D5", "deephevc", movie, None))
+    if "D7" in selected:
+        movie = fixture("hevc10b.mov", [
+            "-f", "lavfi", "-i", "color=c=gray:size=256x144:rate=30:duration=1,format=yuv420p10le",
+            "-c:v", "hevc_videotoolbox", "-profile:v", "main10", "-pix_fmt", "p010le", "-tag:v",
+            "hvc1", "-b:v", "2M"])
+        under = fixture("h264.mov", [
+            "-f", "lavfi", "-i", "color=c=gray:size=256x144:rate=30:duration=1,format=yuv420p",
+            "-c:v", "h264_videotoolbox", "-b:v", "2M"])
+        plans.append(("D7", "deepreread", movie, under))
+    if "D6" in selected:
+        plans.append(("D6", "hlg", None, "hlg"))
+    for row, name, media, output in plans:
+        back = output if row == "D7" else None
+        output = None if row == "D7" else output
+        doc = Doc(client, name, "band374", BAND_JS)
+        made, why = doc.clip() if doc.ok else (False, doc.why)
+        if made and output:
+            got = doc.call("set_canvas", output=output)
+            made, why = got["ok"], got.get("error", "")
+        if made and output is None:
+            made, why = doc.media_clip(media)
+        if made and row == "D7":
+            made, why = doc.media_clip(back, index=0)
+        if made:
+            files[row] = doc.frame(FILES[row])
+        else:
+            print(f"       {row} project: {why}", flush=True)
+        closed = doc.close() and closed
+    return closed
+
+
+def deep_frame(row, scope, path, exact_rule):
+    """D1's rule over a rendered frame: a 16-bit PNG, ≥ 400 distinct G values
+    along row 540, and (with `exact_rule`) each within 1/8 level of `e`."""
+    picture = read_png(path)
+    values = deep_row(picture)
+    header = png_header(path) if path and Path(path).exists() else None
+    if values is None:
+        check(f"{row} {scope}: a 16-bit PNG", False,
+              f"header {header}; read {picture is not None}")
+        return
+    distinct = len(set(values))
+    worst = max(abs(v / 257.0 - exact(x, 540)) for x, v in enumerate(values))
+    levels, median, widest = runs(picture)
+    good = distinct >= 400 and (not exact_rule or worst <= 0.125)
+    check(f"{row} {scope}: a 16-bit PNG, row 540 x 0–800 G ≥ 400 distinct values"
+          + (", each within 1/8 level of e" if exact_rule else ""), good,
+          f"{distinct} distinct 16-bit values; worst |G − e| {worst:.4f} levels"
+          f"{'' if exact_rule else ' (not scored: the frame is HLG)'}; rounded to 8 bits "
+          f"{levels} levels, median run {median}, widest {widest}")
+
+
+def score_deep(files, base):
+    """PR-15's rows over this run's files and the base's (or None)."""
+    def theirs(row):
+        path = base / FILES[row] if base else None
+        return path if path and path.exists() else None
+
+    if "E1" in selected:
+        verdicts = []
+        for row in ["B1", "B3", "F1", "F2", "S1"]:
+            here, there = read_png(files.get(row)), read_png(theirs(row))
+            verdicts.append((row, same(here, there)))
+        header = png_header(files["B3"]) if files.get("B3") else None
+        check("E1 the 8-bit paths are the base's byte for byte: B1, B3, F1, F2 and S1 decode equal "
+              "to the base's files, and B3's frame is an 8-bit PNG",
+              all(ok for _, ok in verdicts) and header is not None and header[2] == 8,
+              f"equal to the base's: {verdicts}; B3's PNG header {header}")
+    if "D1" in selected:
+        deep_frame("D1", "render_frame of band374 beside a 16-bit PNG still", files.get("D1"), True)
+    if "D3" in selected:
+        here = movie_figures(files.get("B4a"), 0.5, True)
+        then = movie_figures(theirs("B4a"), 0.5, True)
+        ours, base_movie = (read_movie(files.get("B4a"), 0.5, True),
+                            read_movie(theirs("B4a"), 0.5, True))
+        error = pixel_error(ours) if ours else None
+        was = pixel_error(base_movie) if base_movie else None
+        good = (here is not None and then is not None and here[1] <= then[1] / 2
+                and error <= was / 2 and here[0] <= 0.15 and increasing(here[3]))
+        check("D3 the prores_422 export of the band374 clip, the frame at 0.5 s (16-bit decode): "
+              "noise kept ≤ ½ the base's, RMS of G − e less its mean ≤ ½ the base's, banding RMS "
+              "≤ 0.15, "
+              "row-540 block means strictly increase", good,
+              f"{shown(here)}\n       base: {shown(then)}\n       RMS of G − e "
+              f"{'none' if error is None else f'{error:.4f}'}; base's "
+              f"{'none' if was is None else f'{was:.4f}'}")
+    if "D4" in selected:
+        here = movie_figures(files.get("B4b"), 2.5, True)
+        then = movie_figures(theirs("B4b"), 2.5, True)
+        ours, base_movie = (read_movie(files.get("B4b"), 2.5, True),
+                            read_movie(theirs("B4b"), 2.5, True))
+        error = pixel_error(ours, 997.5) if ours else None
+        was = pixel_error(base_movie, 997.5) if base_movie else None
+        good = (here is not None and then is not None and here[0] <= 0.15
+                and here[1] <= 0.85 * then[1])
+        check("D4 the hevc_10bit export of the 5 s band374m clip, the frame at 2.5 s (16-bit "
+              "decode): banding RMS ≤ 0.15, noise kept ≤ 0.85 × the base's", good,
+              f"{shown(here)}\n       base: {shown(then)}\n       RMS of G − e (not scored) "
+              f"{'none' if error is None else f'{error:.4f}'}; base's "
+              f"{'none' if was is None else f'{was:.4f}'}")
+    if "D5" in selected:
+        deep_frame("D5", "render_frame of band374 beside a 10-bit HEVC clip", files.get("D5"), True)
+    if "D7" in selected:
+        deep_frame("D7", "render_frame of band374 beside a 10-bit HEVC clip over an H.264 clip",
+                   files.get("D7"), True)
+    if "D6" in selected:
+        deep_frame("D6", "render_frame of band374 in an HLG project", files.get("D6"), False)
 
 
 def score(files, control):
@@ -638,7 +909,7 @@ def run_mutant(name):
         manifest.write_text(text[:text.index(CORE_PATCH)].rstrip("\n") + "\n")
         argv = ["cargo", "test", "--release", "--offline", "--test", "graphic_ffi",
                 "a_gradient_is_dithered"]
-        folder, expected = MUTANT_DIR / "core", "running 1 test"
+        folder, expected = MUTANT_DIR / "core", None
     else:
         for path, anchor, replacement in edits:
             target = MUTANT_DIR / path
@@ -648,13 +919,23 @@ def run_mutant(name):
                       f"{text.count(anchor)} times in {path}: {anchor!r}")
                 return 2
             target.write_text(text.replace(anchor, replacement))
-        argv = ["cargo", "test", "--release", "--test", "dither"]
+        deep = name in DEEP_MUTANTS
+        argv = ["cargo", "test", "--release", "--test", "deep" if deep else "dither"]
         folder, expected = MUTANT_DIR / "graphic", "running 7 tests"
     got = bounded.run(argv, CARGO_BOUND, cwd=str(folder),
                       env=bounded.child_env({"CARGO_TARGET_DIR": str(TARGET)}))
     output = got["stdout"] + got["stderr"]
     BASE.mkdir(parents=True, exist_ok=True)
     (BASE / f"mutant-{name}.log").write_text(output)
+    if core:
+        # Spec §11 PR-15: without core's `[patch]` the staticlib does not build, naming the
+        # vendored crate's door; that failure is the catch.
+        caught = (not got["expired"] and got["rc"] not in (0, None)
+                  and "with_deep_pixmaps" in output and "running 1 test" not in output)
+        print(f"{'MUTANT PASS' if caught else 'MUTANT FAILURE'}: {name} — core without its "
+              f"[patch] table {'does not build (with_deep_pixmaps is the vendored crate\'s)' if caught else 'built, or failed another way'} "
+              f"(rc {got['rc']}, expired {got['expired']})")
+        return 0 if caught else 1
     if got["expired"] or expected not in output:
         errors = [line for line in output.splitlines() if line.startswith("error")][:5]
         print(f"mutant {name}: the control could not be performed — the tests did not run "
@@ -668,6 +949,52 @@ def run_mutant(name):
     print(f"{'MUTANT PASS' if caught else 'MUTANT FAILURE'}: {name} — {' '.join(named)} "
           f"{'all FAILED' if caught else 'did not all fail'} (survived: "
           f"{', '.join(survived) or 'none'})")
+    return 0 if caught else 1
+
+
+def run_app_mutant(name, base):
+    """An app mutant (spec §11 PR-15): the tree copied, the anchor replaced,
+    the Debug app built there and the named rows run against it."""
+    edits, named = APP_MUTANTS[name]
+    print(f"#374 — the {name} APP MUTANT ({' '.join(named)} must FAIL)", flush=True)
+    tree = BASE / f"app-mutant-{name}"
+    made, why = tree_copy.make_copy(str(tree))
+    if made is None:
+        print(f"mutant {name}: the control could not be performed — the tree copy: {why}")
+        return 2
+    for path, anchor, replacement in edits:
+        target = tree / path
+        text = target.read_text()
+        if text.count(anchor) != 1:
+            print(f"mutant {name}: the control could not be performed — the anchor occurs "
+                  f"{text.count(anchor)} times in {path}: {anchor!r}")
+            return 2
+        target.write_text(text.replace(anchor, replacement))
+    app, why = tree_copy.build_app(str(tree), CARGO_BOUND,
+                                   env=bounded.child_env({"RC_PROOF_APP": "debug"}))
+    if app is None:
+        print(f"mutant {name}: the control could not be performed — {why}")
+        return 2
+    got = bounded.run(
+        [sys.executable, str(Path(__file__).resolve()), "--only", ",".join(named + ["Z1"]),
+         "--base", str(base)],
+        CARGO_BOUND, cwd=str(ROOT), env=bounded.child_env({"RC_PROOF_APP": str(app)}))
+    output = got["stdout"] + got["stderr"]
+    (BASE / f"app-mutant-{name}.log").write_text(output)
+    for line in output.splitlines():
+        if line.startswith(("  ok ", "  FAIL")):
+            print(f"  {line}")
+    ran = [row for row in named if f"  FAIL {row} " in output or f"  ok   {row} " in output]
+    survived = [row for row in named if f"  FAIL {row} " not in output]
+    if len(ran) != len(named):
+        print(f"mutant {name}: the control could not be performed — rows {named} did not all "
+              f"run (rc {got['rc']}); see {BASE / f'app-mutant-{name}.log'}")
+        return 2
+    caught = not survived
+    print(f"{'MUTANT PASS' if caught else 'MUTANT FAILURE'}: {name} — {' '.join(named)} "
+          f"{'all FAILED' if caught else 'did not all fail'} (survived: "
+          f"{', '.join(survived) or 'none'})")
+    tree_copy.remove_tree(str(tree))
     return 0 if caught else 1
 
 
@@ -686,9 +1013,21 @@ def main():
     parser.add_argument("--control", default=None)
     parser.add_argument("--only", help="comma-separated rows to run and score")
     parser.add_argument("--mutant", choices=list(MUTANTS))
+    parser.add_argument("--base", default=None,
+                        help="a capture made by the app before spec §11 PR-15 (E1, D3, D4)")
+    parser.add_argument("--app-mutant", choices=list(APP_MUTANTS))
     args = parser.parse_args()
+    base = Path(args.base).resolve() if args.base else None
+    if base is not None and not base.is_dir():
+        print(f"instrument failure: no base folder at {base}")
+        return 2
     if args.mutant:
         return run_mutant(args.mutant)
+    if args.app_mutant:
+        if base is None:
+            print("an app mutant needs --base")
+            return 2
+        return run_app_mutant(args.app_mutant, base)
     if args.mode == "capture" and not args.folder:
         print("capture needs a folder")
         return 2
@@ -742,6 +1081,7 @@ def main():
              "files": sorted(p.name for p in files.values())}, indent=1))
         print(f"  captured {len(files)} files into {keep}", flush=True)
     score(files, keep or control)
+    score_deep(files, keep or base)
     found = hdr.complaints(log)
     check("Z1 every project closed and the log holds no `Frame Job: ` line",
           closed and not found, f"closed {closed}; complaints {found}")
