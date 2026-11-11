@@ -188,7 +188,7 @@ NO_TABLE = {
     "assistant_clearing_proof.py", "assistant_compaction_proof.py", "assistant_helper_proof.py",
     "assistant_prompt_proof.py", "codec_import_proof.py",
     "container_import_proof.py", "defaults_proof.py",
-    "graphics_spike/graphics_spike.py", "graphics_spike/rows_local.py", "makefile_env_proof.py",
+    "makefile_env_proof.py",
     "op_contract_proof.py", "open_documents_proof.py",
 }
 

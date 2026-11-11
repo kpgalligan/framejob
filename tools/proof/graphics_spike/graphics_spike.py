@@ -26,6 +26,7 @@ import bounded  # noqa: E402
 import rows_app  # noqa: E402
 import rows_build  # noqa: E402
 import rows_local  # noqa: E402
+from rows_local import MUTANTS  # noqa: E402
 
 ORDER = ["q2", "q8", "q3", "q4", "q5", "q6", "q1", "q9", "q7"]
 ANSWERS = os.path.join(rows_local.WORK, "answers.json")
@@ -75,7 +76,7 @@ def main():
     options = parser.parse_args()
     selected = [r.strip() for r in options.only.split(",")] if options.only else list(ORDER)
     if options.mutant:
-        selected = ["q5"]
+        selected = list(MUTANTS)
     unknown = [r for r in selected if r not in ORDER]
     if unknown:
         parser.error(f"unknown rows {unknown}")
