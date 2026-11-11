@@ -116,10 +116,18 @@ SWITCHES = {
     "camera_spike/camera_spike.py": {"MUTANTS": 5},
     "constant_render_spike.py": {"MUTANTS": 3},
     "cursor_spike/cursor_spike.py": {"MUTANTS": 15},
+    # `MUTANT ==` in the spike's own token strip, classifier and o2 verdict.
+    "filler_spike/filler_spike.py": {"MUTANTS": 3},
+    # `MUTANT` in the gate's own input classes, fingerprint, stamp rule and warning baseline.
+    "gate.py": {"MUTANTS": 4},
     # MUTANT_EDITS edits the spike's own patch text, never a file of the tree.
     "grading_spike/grading_spike.py": {"TREE_MUTANTS": 1, "MUTANTS": 6, "MUTANT_EDITS": 5},
     "grading_verdict.py": {"SIZES_MUTANTS": 1, "MEASURE_MUTANTS": 3},
     "matte_spike/matte_spike.py": {"MUTANTS": 2},
+    # `MUTANT` in its own scan: the pin comparison, the untracked walk, the exempt prefixes.
+    "name_residue.py": {"MUTANTS": 3},
+    # `MUTANT` in its own launch-argument read, input filter and two stale markers.
+    "proof_app.py": {"MUTANTS": 4},
     "proof_defaults.py": {"MUTANTS": 3},
     "ramp_proof.py": {"MUTANTS": 2},
     "ramp_spike/ramp_spike.py": {"MUTANTS": 5},
@@ -172,10 +180,10 @@ NOT_TABLES = {
 NO_TABLE = {
     "assistant_clearing_proof.py", "assistant_compaction_proof.py", "assistant_helper_proof.py",
     "assistant_prompt_proof.py", "budget_proof.py", "codec_import_proof.py",
-    "container_import_proof.py", "defaults_proof.py", "filler_spike/filler_spike.py", "gate.py",
+    "container_import_proof.py", "defaults_proof.py",
     "graphics_spike/graphics_spike.py", "graphics_spike/rows_local.py", "makefile_env_proof.py",
-    "name_residue.py", "op_contract_proof.py", "open_documents_proof.py", "prices_crosscheck.py",
-    "prices_proof.py", "proof_app.py",
+    "op_contract_proof.py", "open_documents_proof.py", "prices_crosscheck.py",
+    "prices_proof.py",
 }
 
 PINS = {"HINTS": HINTS, "SWITCHES": SWITCHES, "UNANCHORED": UNANCHORED, "ROTTED": ROTTED,

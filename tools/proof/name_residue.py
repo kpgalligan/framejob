@@ -132,6 +132,8 @@ COUNTED = {
     "tools/proof/silence_spike/README.md": 1,
 }
 
+# The mutants, as `mutant_anchors.py` reads them: switches on MUTANT, no tree text.
+MUTANTS = ("ge-count", "no-untracked", "text-history-paths")
 MUTANT = None
 
 
@@ -264,7 +266,7 @@ def selftest(mutant: str | None = None) -> int:
 def main(argv=None):
     parser = argparse.ArgumentParser(description="rename R1: the old name's residue (NM-8)")
     parser.add_argument("--selftest", action="store_true")
-    parser.add_argument("--mutant", choices=("ge-count", "no-untracked", "text-history-paths"))
+    parser.add_argument("--mutant", choices=MUTANTS)
     arguments = parser.parse_args(argv)
     if arguments.selftest or arguments.mutant:
         return selftest(arguments.mutant)

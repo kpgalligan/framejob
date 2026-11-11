@@ -56,7 +56,9 @@ O2_SCRIPT = ("Okay, so, um, this is a short test recording for the filler spike.
              "And, er, that's about it.")
 FILLERS = {"um", "umm", "uh", "uhh", "er", "erm", "ah", "hmm", "hm", "mm", "mhm", "uh-huh"}
 STRIP = string.punctuation + "“”‘’…—–«»"
-MUTANT = None  # --mutant: "keep-punctuation", "replaced-as-kept" or "o2-ignored"
+# The mutants, as `mutant_anchors.py` reads them: switches on MUTANT, no tree text.
+MUTANTS = ("keep-punctuation", "replaced-as-kept", "o2-ignored")
+MUTANT = None  # --mutant: one of MUTANTS
 
 
 # ---- the classifier ---------------------------------------------------------
@@ -426,7 +428,7 @@ def main(argv=None):
     global MUTANT
     parser = argparse.ArgumentParser(description="CT-0's filler spike")
     parser.add_argument("--selftest", action="store_true", help="K, D, R, Z, O, V1-V4; no engine, no build")
-    parser.add_argument("--mutant", choices=("keep-punctuation", "replaced-as-kept", "o2-ignored"))
+    parser.add_argument("--mutant", choices=MUTANTS)
     parser.add_argument("--remake", action="store_true", help="remake the three say fixtures")
     parser.add_argument("--no-owner", action="store_true", help="skip o1 and o2 by name")
     args = parser.parse_args(argv)

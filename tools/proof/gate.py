@@ -98,6 +98,8 @@ ERROR_LINE = re.compile(r"^(?!\s*(?:PASS|ok)\b).*(?:error:|error\[|FAILED|(?:^|\
                         r"|Fatal error|\*\*\*)")
 EXPECTED = {"no-tools": {"H2"}, "stamp-always": {"H3"}, "md-counted": {"M4", "M5", "M6"},
             "warning-count": {"W2"}}
+# The mutants, as `mutant_anchors.py` reads them: switches on MUTANT, no tree text.
+MUTANTS = tuple(sorted(EXPECTED))
 MUTANT = None
 
 
@@ -409,7 +411,7 @@ def main(argv=None):
     parser.add_argument("--wait", type=float, default=120.0,
                         help="seconds to wait for another gate's lock (default 120)")
     parser.add_argument("--selftest", action="store_true")
-    parser.add_argument("--mutant", choices=sorted(EXPECTED))
+    parser.add_argument("--mutant", choices=MUTANTS)
     args = parser.parse_args(argv)
     if args.selftest or args.mutant:
         return selftest(args.mutant)

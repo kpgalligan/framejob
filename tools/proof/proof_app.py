@@ -48,6 +48,8 @@ SKIPPED_FILES = {"app/Info.plist", "app/FrameJob.entitlements"}
 KEPT_MD = "docs/graphics-api.md"
 EXPECTED = {"exe-marker": {"F3", "F4"}, "md-counted": {"F5"},
             "exe-mtime-running": {"R1", "R2"}, "bare-number": {"A1"}}
+# The mutants, as `mutant_anchors.py` reads them: switches on MUTANT, no tree text.
+MUTANTS = tuple(sorted(EXPECTED))
 # A launch argument the argument domain reads as a FLAG, not as the value of the
 # key before it: `-16`, `-.5`. No real flag starts with a digit.
 BARE_NUMBER = re.compile(r"^-\.?\d")
@@ -420,7 +422,7 @@ def main(argv=None):
     argv = argv[:argv.index("--")] if "--" in argv else argv
     parser = argparse.ArgumentParser(description="which app a proof drives (B88)")
     parser.add_argument("--selftest", action="store_true")
-    parser.add_argument("--mutant", choices=sorted(EXPECTED))
+    parser.add_argument("--mutant", choices=MUTANTS)
     parser.add_argument("command", nargs="?", choices=("launch", "check"))
     parser.add_argument("--app", help="debug, release or a .app or executable path")
     args = parser.parse_args(argv)
