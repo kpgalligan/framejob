@@ -46,7 +46,7 @@ use framejob_core::ffi_graphic::{
     rc_graphic_compile, rc_graphic_describe, rc_graphic_free, rc_graphic_image_cache,
     rc_graphic_library_add_asset, rc_graphic_library_add_font, rc_graphic_library_families,
     rc_graphic_library_free, rc_graphic_library_new, rc_graphic_library_usage,
-    rc_graphic_rasterize, rc_graphic_svg,
+    rc_graphic_rasterize, rc_graphic_rasterize_deep, rc_graphic_svg,
 };
 use framejob_core::ffi_graphic_package::{rc_graphic_package_read, rc_graphic_package_write};
 use framejob_core::ffi_hdr10::{rc_hdr10_av1_peak, rc_hdr10_peak, rc_hdr10_still_peak};
@@ -2313,6 +2313,57 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
         )
     });
     cover("rc_graphic_rasterize");
+
+    let mut deep = [0u16; 4];
+    let mut diag: *mut c_char = ptr::null_mut();
+    assert!(!unsafe {
+        rc_graphic_rasterize_deep(
+            ptr::null(),
+            svg.as_ptr(),
+            1,
+            1,
+            deep.as_mut_ptr(),
+            4,
+            &mut diag,
+        )
+    });
+    assert_eq!(diag_of(diag), "library is NULL");
+    let mut diag: *mut c_char = ptr::null_mut();
+    assert!(!unsafe {
+        rc_graphic_rasterize_deep(lib, ptr::null(), 1, 1, deep.as_mut_ptr(), 4, &mut diag)
+    });
+    assert_eq!(diag_of(diag), "svg is NULL");
+    let mut diag: *mut c_char = ptr::null_mut();
+    assert!(!unsafe {
+        rc_graphic_rasterize_deep(lib, svg.as_ptr(), 1, 1, ptr::null_mut(), 4, &mut diag)
+    });
+    assert_eq!(diag_of(diag), "out_rgba16 is NULL");
+    let mut diag: *mut c_char = ptr::null_mut();
+    assert!(!unsafe {
+        rc_graphic_rasterize_deep(
+            lib,
+            svg.as_ptr(),
+            1,
+            2,
+            deep.as_mut_ptr(),
+            usize::MAX / 2,
+            &mut diag,
+        )
+    });
+    assert_eq!(diag_of(diag), "height × stride overflows");
+    assert_eq!(deep, [0u16; 4], "a refusal wrote the buffer");
+    assert!(!unsafe {
+        rc_graphic_rasterize_deep(
+            ptr::null(),
+            ptr::null(),
+            1,
+            1,
+            ptr::null_mut(),
+            4,
+            ptr::null_mut(),
+        )
+    });
+    cover("rc_graphic_rasterize_deep");
 
     unsafe { rc_graphic_free(ptr::null_mut()) };
     cover("rc_graphic_free");

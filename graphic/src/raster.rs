@@ -1,6 +1,7 @@
 //! `rasterize`: usvg parse with the Library's options → resvg render → the
-//! RGBA→BGRA swizzle into the caller's strided buffer (G-7), and the
-//! warnings resvg never reports — a family no face answers, an href no
+//! RGBA→BGRA swizzle into the caller's strided buffer (G-7); `draw`, the
+//! parse and render it shares with `deep::rasterize_deep` (spec §11 PR-15);
+//! and the warnings resvg never reports — a family no face answers, an href no
 //! asset answers, a data: URL, an asset that is not an image, a size that
 //! is not the graphic's.
 
@@ -42,17 +43,7 @@ pub fn rasterize(
             out.len()
         )));
     }
-    let probe = Mutex::new(Probe::default());
-    let options = library.options(&probe);
-    let tree = usvg::Tree::from_str(svg, &options)
-        .map_err(|e| Diagnostic::error(format!("the SVG did not parse: {e}")))?;
-    let mut pixmap = tiny_skia::Pixmap::new(width, height)
-        .ok_or_else(|| Diagnostic::error(format!("no pixmap of {width}×{height}")))?;
-    resvg::render(
-        &tree,
-        tiny_skia::Transform::identity(),
-        &mut pixmap.as_mut(),
-    );
+    let (pixmap, warnings) = draw(library, svg, width, height, false)?;
     let rgba = pixmap.data();
     for y in 0..height as usize {
         let src = &rgba[y * row..(y + 1) * row];
@@ -64,6 +55,40 @@ pub fn rasterize(
             to[3] = from[3];
         }
     }
+    Ok(warnings)
+}
+
+/// The draw both entries share: parses `svg` and draws it into a new pixmap
+/// of `width`×`height` — 8-bit, or deep when `deep` (spec §11 PR-15: the
+/// root and every layer resvg makes under it carry tiny-skia's residual
+/// plane, and a gradient takes no dither). Answers the pixmap and the
+/// warnings. The parse runs outside the deep door.
+pub(crate) fn draw(
+    library: &Library,
+    svg: &str,
+    width: u32,
+    height: u32,
+    deep: bool,
+) -> Result<(tiny_skia::Pixmap, Vec<Diagnostic>), Diagnostic> {
+    let probe = Mutex::new(Probe::default());
+    let options = library.options(&probe);
+    let tree = usvg::Tree::from_str(svg, &options)
+        .map_err(|e| Diagnostic::error(format!("the SVG did not parse: {e}")))?;
+    let render = || {
+        let mut pixmap = tiny_skia::Pixmap::new(width, height)?;
+        resvg::render(
+            &tree,
+            tiny_skia::Transform::identity(),
+            &mut pixmap.as_mut(),
+        );
+        Some(pixmap)
+    };
+    let pixmap = if deep {
+        tiny_skia::with_deep_pixmaps(render)
+    } else {
+        render()
+    }
+    .ok_or_else(|| Diagnostic::error(format!("no pixmap of {width}×{height}")))?;
     let probe = lock(&probe);
     let mut warnings = Vec::new();
     let set = library.families().join(", ");
@@ -114,10 +139,10 @@ pub fn rasterize(
             format!("the SVG is {svg_w}×{svg_h} but the graphic is {width}×{height}"),
         );
     }
-    Ok(warnings)
+    Ok((pixmap, warnings))
 }
 
-fn check_side(name: &str, value: u32) -> Result<(), Diagnostic> {
+pub(crate) fn check_side(name: &str, value: u32) -> Result<(), Diagnostic> {
     if value == 0 {
         Err(Diagnostic::error(format!("{name} 0 is not allowed")))
     } else if value > MAX_SIDE {

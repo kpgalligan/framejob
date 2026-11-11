@@ -735,6 +735,15 @@ char *rc_graphic_svg(const RcGraphic *g, int64_t frame, const char *props_json,
 bool rc_graphic_rasterize(const RcGraphicLibrary *lib, const char *svg, uint32_t w, uint32_t h,
                           uint8_t *out_bgra, size_t stride, char **diag_out);
 
+/* The same draw at 16 bits a channel (spec §11 PR-15), for a frame delivered deeper than 8
+ * bits: `out_rgba16` takes `w`×`h` premultiplied RGBA rows of native-endian 16-bit values,
+ * 65535 as 1, `stride` VALUES apart; the buffer holds `h × stride` values, and the values past
+ * `w × 4` in a row are left untouched. A gradient keeps its levels and takes no dither; a
+ * filter's region and a luminance mask's coverage are on 8-bit levels. False with one error
+ * through `diag_out`, and nothing written, on failure. */
+bool rc_graphic_rasterize_deep(const RcGraphicLibrary *lib, const char *svg, uint32_t w,
+                               uint32_t h, uint16_t *out_rgba16, size_t stride, char **diag_out);
+
 /* Releases a graphic. NULL-tolerant. */
 void rc_graphic_free(RcGraphic *g);
 

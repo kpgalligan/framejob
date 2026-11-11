@@ -10,6 +10,7 @@
 
 #![forbid(unsafe_code)]
 
+mod deep;
 mod diagnostic;
 mod exception;
 mod host;
@@ -22,6 +23,7 @@ mod raster;
 mod runtime;
 mod sandbox;
 
+pub use deep::rasterize_deep;
 pub use diagnostic::{Diagnostic, Level};
 pub use images::{
     image_cache_builds, image_cache_bytes, set_image_build_hook, set_image_cache_limit,

@@ -22,7 +22,7 @@ use framejob_core::ffi_graphic::{
     rc_graphic_compile, rc_graphic_describe, rc_graphic_free, rc_graphic_image_cache,
     rc_graphic_library_add_asset, rc_graphic_library_add_font, rc_graphic_library_families,
     rc_graphic_library_free, rc_graphic_library_new, rc_graphic_library_usage,
-    rc_graphic_rasterize, rc_graphic_svg, RcGraphic, RcGraphicLibrary,
+    rc_graphic_rasterize, rc_graphic_rasterize_deep, rc_graphic_svg, RcGraphic, RcGraphicLibrary,
 };
 
 const FONTS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../app/Resources/Fonts");
@@ -302,6 +302,47 @@ fn a_gradient_is_dithered_through_the_ffi() {
         varied > 0,
         "every column of the gradient is one value: not dithered"
     );
+    unsafe { rc_graphic_library_free(lib) };
+}
+
+#[test]
+fn a_gradient_keeps_its_levels_through_the_ffi() {
+    // Spec §11 PR-15: `rc_graphic_rasterize_deep` draws through the vendored tiny-skia's deep
+    // pixmap, so a grey gradient over 1024 px (64 8-bit levels) keeps a value a pixel, each
+    // within 2 of the exact one, and the values past the row are untouched.
+    let lib = library();
+    let text = cstring(
+        r##"<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="4"><defs><linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1024" y2="0"><stop offset="0" stop-color="#202020"/><stop offset="1" stop-color="#606060"/></linearGradient></defs><rect width="1024" height="4" fill="url(#g)"/></svg>"##,
+    );
+    let stride = 1024 * 4 + 8;
+    let mut out = vec![0xABCDu16; stride * 4];
+    let mut diag: *mut c_char = ptr::null_mut();
+    assert!(unsafe {
+        rc_graphic_rasterize_deep(
+            lib,
+            text.as_ptr(),
+            1024,
+            4,
+            out.as_mut_ptr(),
+            stride,
+            &mut diag,
+        )
+    });
+    assert_eq!(take_string(diag), None);
+    let green: Vec<u16> = (0..1024).map(|x| out[2 * stride + x * 4 + 1]).collect();
+    let distinct: std::collections::BTreeSet<u16> = green.iter().copied().collect();
+    assert!(distinct.len() >= 1000, "{} distinct values", distinct.len());
+    for (x, got) in green.iter().enumerate() {
+        let exact = (32.0 + 64.0 * (x as f64 + 0.5) / 1024.0) / 255.0 * 65535.0;
+        assert!(
+            (*got as f64 - exact).abs() <= 2.0,
+            "x {x}: {got} against {exact}"
+        );
+    }
+    for y in 0..4 {
+        assert_eq!(out[y * stride + 1023 * 4 + 3], 65535, "row {y} alpha");
+        assert_eq!(out[y * stride + 1024 * 4..(y + 1) * stride], [0xABCD; 8]);
+    }
     unsafe { rc_graphic_library_free(lib) };
 }
 
