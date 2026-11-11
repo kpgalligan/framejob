@@ -492,11 +492,11 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   the pass's two arms of `draw` and `finish` (as `passDeferred` and `passFinished`, bodies
   unchanged, the guards left at their call sites) out to `GraphicPrefetch+Background.swift`,
   with `Entry`, `Session`, `Job`, `sessions` and `release(_:from:)` made internal; 575 lines
-  after it. The rest of that seam, if the file is at the cap again: `start`'s refusal arm and
-  its `beginAhead` line, `claim`'s and `insert`'s `full` arms, `stop`'s and `work`'s end lines
-  and `logLine`'s pass branch, each one statement inside a lock hold or a wait loop, four of
-  them other proofs' mutant anchors (`background_render_proof.py`), so a move there re-points
-  those tables.
+  after it, 576 once PR-18's worker line landed. The rest of that seam, if the file is at the
+  cap again: `start`'s refusal arm and its `beginAhead` line, `claim`'s and `insert`'s `full`
+  arms, `stop`'s and `work`'s end lines and `logLine`'s pass branch, each one statement inside a
+  lock hold or a wait loop, four of them other proofs' mutant anchors
+  (`background_render_proof.py`), so a move there re-points those tables.
 
 - `ProjectSnapshot.swift`: a property group's snapshot types out, whole. The precedents are
   `TextProps.swift`, `ProjectSnapshot+Graphic.swift`, `MediaSnapshot.swift` (issue batch

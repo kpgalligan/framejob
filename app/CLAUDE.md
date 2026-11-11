@@ -2640,7 +2640,8 @@ the key map behind it.
   for a row `Exporter.graphicsDeep` takes, an offline frame's once it comes
   out deep; never a document's. `MetalRenderer.source(for:)` reads it for a
   shape layer that is not a matte member (`layer.matte?.into == nil`, spec
-  §11 PR-17: the 8-bit coverage would band an exact ramp).
+  §11 PR-17: the 8-bit coverage would band an exact ramp). A graphic layer's
+  membership is passed to `LayerRenderers.graphic` the same way (PR-18).
 - `GraphicRegistry.swift` · `LayerRenderersGraphic.swift` — a graphic layer
   drawn (road map 10). The registry maps a `RecipeSource` key to one
   immutable `GraphicSet` (library, `libraryVersion`, each module `.compiled`
@@ -2657,7 +2658,11 @@ the key map behind it.
   row that keeps more than 8 bits, `Exporter.graphicsDeep`; a `render_frame`
   or Save Frame… that comes out deep in a format that keeps depth). A deep
   key's raster is 16 bits a channel, its texture `.rgba16Unorm`, its texture
-  key ends `:16`. **An offline key draws only what
+  key ends `:16`. A matte member under a deep key is not (spec §11 PR-18:
+  the matte's 8-bit coverage would round the exact raster with no dither):
+  `Resolved.drawsDeep(matteMember:)` is the one rule, asked by
+  `MetalRenderer.source(for:)` with the layer's `matte.into` and by the
+  prefetch's worker off the same layer. **An offline key draws only what
   its caller pinned** (`pin(set, for: key)` with the document's
   `snapshot(for: recipeKey)`, captured on main): every `pin` has its `unpin`
   — `Exporter.releaseRecipeKey` (from `finish` AND `deinit`), and
@@ -2704,8 +2709,13 @@ the key map behind it.
   key and start: a play from it waits in `claim` and `insert` rather than
   push out the frames drawn ahead. A pass's end line (`done`, `full`,
   `stopped`) is written at its stop. `Slot` lives at the foot of
-  `LayerRenderersGraphic.swift` (a pure move under the cap); at 600 lines
-  the file's next cut is the background branches.
+  `LayerRenderersGraphic.swift` (a pure move under the cap) and carries the
+  depth its raster is drawn at (spec §11 PR-18), so `rasterBytes` counts a
+  slot's own raster. `GraphicPrefetch+Background.swift` holds a background
+  session's own branches — `stopBackground`, and the pass's arms of `draw`
+  and `finish` as `passDeferred` and `passFinished`, under `condition` — a
+  pure move under the cap (#596); the rest of that seam is named in
+  `designs/adr/app-file-history.md`.
 - `GraphicPrefetch+Memory.swift` — the graphic rasters' one memory budget and
   the frames a document keeps (spec §11 G-37, #127): a quarter of physical
   memory covers every session's held rasters and the kept frames, which give

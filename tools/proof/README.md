@@ -25572,6 +25572,51 @@ GEa).
 matte beyond GMg's printed figures; `hevc`, `hevc_alpha` and the 8-bit WebM rows, which mark
 through the line GEd holds.
 
+## Issue #596 — a graphic as a matte in a deep export (`raster_dither_proof.py` GMg; `matte_proof.py` F1; three mutants; spec §11 PR-18)
+
+**What it proves.** GMg, printed since #588 and scored since #596: a white full-canvas card under
+the `band374` graphic on a `luma` matte track, exported `prores_422`, the frame at 0.5 s as
+`rgb48le`; the picture's green is the coverage, whose exact value is the radial gradient's
+Rec. 709 luma. GM's rule: banding RMS at most 0.15 and the row-540 block means strictly
+increasing. PR-18 draws a matte member's graphic as PR-13's dithered 8-bit raster in every frame,
+so the 8-bit coverage does not band. `matte_proof.py` F1 (a graphic window on a matte track over
+a card, `prores_422`) is the row that sees the prefetch's worker ask for the slot the compositor
+asks for: hits > 0, mismatched 0.
+
+    tools/proof/work/raster-dither-base596-tree: tree_copy.make_base_copy(dest, "d530de3a^"), then make app-debug there
+    RC_PROOF_APP=<that tree's Frame Job Debug.app> python3 tools/proof/raster_dither_proof.py capture tools/proof/work/raster-dither-base596
+    RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py --base tools/proof/work/raster-dither-base596 --only E1,D1,D3,D4,D5,D6,D7,G0,G1,G3,G5,G6,G7,GEa,GEb,GEc,GEd,GM,GMg,Z1
+    RC_PROOF_APP=release python3 tools/proof/matte_proof.py --only F1,Z1
+    python3 tools/proof/raster_dither_proof.py --app-mutant matte-graphic-deep|matte-graphic-call-deep --base tools/proof/work/raster-dither-base596
+    python3 tools/proof/matte_proof.py --only F1,Z1 --mutant matte-graphic-prefetch-deep
+
+The base is the app before PR-15's app change, which draws every graphic as PR-13's dithered
+raster, so its GMg is the cure's figure, measured before any code; it predates PR-16 too, so it
+serves E1, D3, D4, G3 and GEa–GEd.
+
+**Recorded** (2026-11-11). The base (Debug at d530de3a^): GMg banding RMS 0.1043, 38 levels at
+median run 2 px, noise kept 0.3964, 8,836,195 bytes, under the bound, measured before any code.
+The tree as PR-17 left it (Release, GMg scored, the app unchanged): GMg FAILS at 0.3398, 37
+levels at median run 21 px, noise 0.0437, 3,045,927 bytes. With PR-18 (Release, 20/20 of the
+rows above; Debug gave the same GM and GMg figures): GMg 0.1043, 38 levels at median run 2 px,
+noise 0.3964, the same 8,836,195 bytes, the base's figures exactly; GM 0.0921 as before; E1 and
+GEa–GEd equal to the base's; D1, D5, D7 781 distinct greens, worst 0.0606 of a level from `e`.
+`matte_proof.py` F1 (Release): 1 hit, 0 mismatched, 0 missed. `graphics_proof.py` 51/51,
+`graphics_prefetch_proof.py` 7/7 and `graphic_memory_proof.py` 13/13 (Release), `graphics_ffi_probe.py`
+13/13 (P12, P13). `graphics_pin_probe.swift` (`graphics_proof.py` Q1–Q5) now passes
+`matteMember: false` to `LayerRenderers.graphic`, whose parameter has no default.
+
+**Mutants** (each caught, Debug tree copies): `matte-graphic-deep` (the rule answers the key's
+depth) and `matte-graphic-call-deep` (the compositor reads no member) fail GMg at 0.3398;
+`matte_proof.py`'s `matte-graphic-prefetch-deep` (the worker reads no member, so its slot is deep
+and the compositor's 8-bit) fails F1 at 0 hits, 1 missed. PR-15's `never-deep` (D1, D3, D5, D6) and
+`always-deep` (E1), anchored beside the new method, were run again and caught.
+
+**Not measured here.** A graphic on a matte track and on the canvas in one frame (two slots,
+which the slot's `deep` member keeps apart; nothing over MCP reads the slots); a deep frame
+(`render_frame`) of a graphic matte, which takes the same call; a graphic CUT by a matte, which
+D1–D7's rule covers only without a matte.
+
 ## Codec export C0 — the bundled encoders' link (`codecs_proof.py` L1–L3; `tools/codecs/build_codecs.py --selftest`; spec §11 CX-4, CX-5)
 
 `tools/codecs/build_codecs.py` (`make codecs`, and project.yml's "Build Codecs"

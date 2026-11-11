@@ -62,7 +62,7 @@ This is the opposite of an export, which always writes the whole timeline.
 
 Most frames are saved at 8 bits a channel and labelled BT.709. These are saved with more:
 
-- **A deep frame.** A frame showing a still deeper than 8 bits, or a 10-bit VP9, HEVC or ProRes clip, is saved as a 16-bit PNG or a 10-bit HEIC, still labelled BT.709, on any track. A frame is saved deep too when the lowest track with video on it holds a 10-bit HEVC or ProRes clip, anywhere along the timeline. A graphic on a deep frame is drawn at 16 bits per channel, so its gradients keep their levels; in an SDR project a frame that shows only graphics is saved at 8 bits.
+- **A deep frame.** A frame showing a still deeper than 8 bits, or a 10-bit VP9, HEVC or ProRes clip, is saved as a 16-bit PNG or a 10-bit HEIC, still labelled BT.709, on any track. A frame is saved deep too when the lowest track with video on it holds a 10-bit HEVC or ProRes clip, anywhere along the timeline. A graphic on a deep frame is drawn at 16 bits per channel, so its gradients keep their levels, unless it's on a [matte track](/canvas/matte-tracks/), where it stays at 8 bits; in an SDR project a frame that shows only graphics is saved at 8 bits.
 - **An [HDR project](/hdr/dynamic-range/).** Every PNG and HEIC keeps the HLG picture, as a 16-bit PNG or a 10-bit HEIC labelled BT.2100 HLG.
 
 JPEG is always 8-bit. In an HDR project a JPEG is the project's [SDR version](/hdr/show-sdr-version/), labelled BT.709.

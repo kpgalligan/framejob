@@ -136,9 +136,11 @@ Issue #588, spec §11 PR-17: what PR-16 left unmeasured.
   with no dither and bands; PR-17 keeps a matte member's 8-bit dithered
   draw. Printed, not scored: the noise kept, RMS of G − m less its mean, the
   row-540 runs, and the base's same figures.
-- **GMg**, printed with GM and NOT scored: the same project with `band374`,
-  a graphic, as the `luma` matte (PR-15's deep raster takes no dither
-  either; PR-17 does not cure it).
+- **GMg** (#596, spec §11 PR-18): the same project with `band374`, a
+  graphic, as the `luma` matte, `m` its radial gradient's Rec. 709 luma:
+  GM's rule. PR-15's deep raster takes no dither either, so PR-18 draws a
+  matte member's graphic as PR-13's dithered 8-bit raster in every frame.
+  Until PR-18 it was printed and not scored.
 
 `capture DIR` runs every row and keeps every file in DIR; its own files are
 the control it is scored against, so on the control tree B1, B3, B4a and B4b
@@ -161,7 +163,9 @@ named test FAILED. PR-15's app mutants are `--app-mutant NAME`: `app/`,
 replaced, the Debug app built there, and the named rows run against it with
 `--base`; MUTANT PASS when every named row FAILED. PR-16's seven app mutants
 (`shape-never-deep` … `sdr-version-marked`) run the same way against PR-16's
-base.
+base, as do #588's two and PR-18's two (`matte-graphic-deep`, the rule;
+`matte-graphic-call-deep`, the compositor's read of membership), whose GM and
+GMg rules are absolute.
 
 Exit 0 when every scored row passes (a mutant: caught); 1 when one failed (a
 mutant: survived); 2 when the control could not be performed.
@@ -201,7 +205,7 @@ CARGO_BOUND = 1800
 W, H = 1920, 1080
 SEC = 600_000
 ROWS = ["B1", "B2", "B3", "B4a", "B4b", "F1", "F2", "S1", "E1", "D1", "D3", "D4", "D5", "D6",
-        "D7", "G0", "G1", "G3", "G5", "G6", "G7", "GEa", "GEb", "GEc", "GEd", "GM", "Z1"]
+        "D7", "G0", "G1", "G3", "G5", "G6", "G7", "GEa", "GEb", "GEc", "GEd", "GM", "GMg", "Z1"]
 # Every file a run keeps, by the row that writes it (L1–L3 are printed only).
 FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B4a": "b4a-prores.mov",
          "B4b": "b4b-hevc10-moving.mp4", "L1": "l1-h264-static.mp4",
@@ -400,6 +404,13 @@ APP_MUTANTS = {
                                "        RecipeSource.shared.markDeep(key)\n")], ["GEd"]),
     "matte-shape-deep": ([(f"{SOURCES}/Compositor+Sources.swift",
                            "                && layer.matte?.into == nil\n", "")], ["GM"]),
+    # #596, spec §11 PR-18: the rule (a matte member is never deep), and the compositor's read
+    # of membership (the worker's is `matte_proof.py`'s `matte-graphic-prefetch-deep`).
+    "matte-graphic-deep": ([(f"{SOURCES}/GraphicRegistry.swift", "{ deep && !matteMember }",
+                             "{ deep }")], ["GMg"]),
+    "matte-graphic-call-deep": ([(f"{SOURCES}/Compositor+Sources.swift",
+                                  "                matteMember: layer.matte?.into != nil)",
+                                  "                matteMember: false)")], ["GMg"]),
 }
 CORE_PATCH = "[patch.crates-io]\n"
 
@@ -981,17 +992,20 @@ def run_shapes(client, files):
             row = sorted(wanted)[0]
             files[row] = doc.frame(FILES[row])
         closed = doc.close() and closed
-    if "GM" in selected:
+    if selected & {"GM", "GMg"}:
         closed = run_mattes(client, files) and closed
     return closed
 
 
 def run_mattes(client, files):
-    """Spec §11 PR-17's exports: a white card under `shape563` on a `luma`
-    matte track (GM), and under a `band374` graphic clip on one (GMg)."""
+    """Spec §11 PR-17's and PR-18's exports: a white card under `shape563` on a
+    `luma` matte track (GM), and under a `band374` graphic clip on one (GMg),
+    each only when its row is selected."""
     closed = True
     for row, name, module, source in [("GM", "shapematte", None, None),
                                       ("GMg", "bandmatte", "band374", BAND_JS)]:
+        if row not in selected:
+            continue
         doc = Doc(client, name, module, source)
         made, why = (True, "") if doc.ok else (False, doc.why)
         if made:
@@ -1228,10 +1242,16 @@ def score_mattes(files, base):
               "strictly increase", good,
               f"{text}\n       base: {before}"
               + (f"\n       row-540 block means {[round(m, 2) for m in here[3]]}" if here else ""))
-        _, graphic = matte_shown(files.get("GMg"), band_matte_exact)
-        _, was = matte_shown(theirs("GMg"), band_matte_exact)
-        print("  --   GMg (NOT scored; PR-17 leaves a graphic matte open) the same under a band374 "
-              f"graphic clip on a luma matte track: {graphic}\n       base: {was}", flush=True)
+    if "GMg" in selected:
+        # Spec §11 PR-18: GM's rule, with `band374` (a graphic) as the matte.
+        here, text = matte_shown(files.get("GMg"), band_matte_exact)
+        _, before = matte_shown(theirs("GMg"), band_matte_exact)
+        good = here is not None and here[0] <= MATTE_BOUND and increasing(here[3])
+        check("GMg the prores_422 export of a white card under a band374 graphic clip on a luma "
+              f"matte track, the frame at 0.5 s (16-bit decode): banding RMS ≤ {MATTE_BOUND}, "
+              "row-540 block means strictly increase", good,
+              f"{text}\n       base: {before}"
+              + (f"\n       row-540 block means {[round(m, 2) for m in here[3]]}" if here else ""))
 
 
 def score(files, control):
@@ -1425,7 +1445,7 @@ def main():
     parser.add_argument("--mutant", choices=list(MUTANTS))
     parser.add_argument("--base", default=None,
                         help="a capture made by the app before spec §11 PR-15 (E1, D3, D4) "
-                             "or PR-16 (G3, GEa–GEd; GM prints its figures)")
+                             "or PR-16 (G3, GEa–GEd; GM and GMg print its figures)")
     parser.add_argument("--app-mutant", choices=list(APP_MUTANTS))
     args = parser.parse_args()
     base = Path(args.base).resolve() if args.base else None

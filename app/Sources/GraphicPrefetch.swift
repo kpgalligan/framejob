@@ -408,7 +408,8 @@ final class GraphicPrefetch: @unchecked Sendable {
                 let size = layer.sourceSizeCG ?? CGSize(width: 640, height: 360)
                 let slot = Slot(
                     name: name, frame: frame, width: Int(size.width), height: Int(size.height),
-                    propsJSON: props, ctxJSON: ctx)
+                    propsJSON: props, ctxJSON: ctx,
+                    deep: resolved.drawsDeep(matteMember: layer.matte?.into != nil))
                 wanted.append((slot, module))
             }
             guard !wanted.isEmpty else { continue }
@@ -477,7 +478,7 @@ final class GraphicPrefetch: @unchecked Sendable {
         session.framesWithGraphics += 1
         var jobs: [Job] = []
         for (slot, module) in wanted where session.slots[slot] == nil {
-            let entry = Entry(index: index, bytes: rasterBytes(slot, key: session.key))
+            let entry = Entry(index: index, bytes: rasterBytes(slot))
             session.slots[slot] = entry
             session.heldBytes += entry.bytes
             heldTotal += entry.bytes
@@ -516,7 +517,7 @@ final class GraphicPrefetch: @unchecked Sendable {
             }
             let key = LayerRenderers.textureKey(
                 svg: drawn.svg, width: slot.width, height: slot.height,
-                libraryVersion: resolved.set.libraryVersion, deep: resolved.deep)
+                libraryVersion: resolved.set.libraryVersion, deep: slot.deep)
             condition.lock()
             job.entry.textureKey = key
             let keptAlready = keeping.contains(session.key) && kept.contains(session.key, key)
@@ -536,7 +537,7 @@ final class GraphicPrefetch: @unchecked Sendable {
             condition.unlock()
             let raster = Result<GraphicRaster, any Error>(catching: {
                 try resolved.set.library.rasterize(
-                    drawn.svg, width: slot.width, height: slot.height, deep: resolved.deep)
+                    drawn.svg, width: slot.width, height: slot.height, deep: slot.deep)
             })
             finish(job, in: session, raster: raster)
         }

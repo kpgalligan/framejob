@@ -8,10 +8,12 @@ where it is rounded to 8 bits, by a fixed pattern of pixel position under
 half a level, so dark gradients do not band; flat colours, images, text and
 alpha are not. In a 10-bit or ProRes export, and in a frame saved as a 16-bit
 PNG or a 10-bit HEIC, a graphic is drawn at 16 bits a channel instead and a
-gradient keeps its levels with no dither; a group with a `filter`, and what a
-luminance `mask` lets through, stay on 8-bit levels there, and inside such a
-`filter` group a translucent flat colour or a soft edge that falls between
-two levels takes the same pattern as a gradient. This page is the
+gradient keeps its levels with no dither, unless the clip is on a matte track
+(a matte is 8-bit, so it keeps the dithered 8-bit drawing); a group with a
+`filter`, and what a luminance `mask` lets through, stay on 8-bit levels
+there, and inside such a `filter` group a translucent flat colour or a soft
+edge that falls between two levels takes the same pattern as a gradient. This
+page is the
 whole API. Every `js` block on it is run
 by a test, so the examples work as written.
 

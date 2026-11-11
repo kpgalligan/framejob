@@ -7,7 +7,9 @@
 // **A frame delivered deeper than 8 bits draws its graphics deep** (spec §11
 // PR-15): when the key's `resolve` answers `deep`, the raster is 16 bits a
 // channel and the texture `.rgba16Unorm`, under a key of its own (`:16`).
-// Every other key draws today's dithered 8-bit raster, byte for byte.
+// Every other key draws today's dithered 8-bit raster, byte for byte, and so
+// does a matte member under a deep key (PR-18): the matte's 8-bit coverage
+// would round the exact raster with no dither.
 //
 // **The texture key is the SVG TEXT**, not the recipe's hash — a departure
 // from `LayerRenderers.swift`'s "the recipe's hash is the whole key", made
@@ -40,10 +42,11 @@ import Metal
 extension LayerRenderers {
 
     /// The texture for a `graphic` recipe layer at `size` — the graphic, or
-    /// its error card — or nil when `recipeKey` has no set.
+    /// its error card — or nil when `recipeKey` has no set. `matteMember`: the
+    /// layer is drawn into a matte (its `matte.into` is set, spec §11 PR-18).
     func graphic(
         name: String, frame: Int, propsJSON: String, ctxJSON: String,
-        size: CGSize, recipeKey: Int
+        size: CGSize, recipeKey: Int, matteMember: Bool
     ) -> Rendered? {
         guard let resolved = GraphicRegistry.shared.resolve(recipeKey) else { return nil }
         let set = resolved.set
@@ -72,12 +75,13 @@ extension LayerRenderers {
                 for: recipeKey)
         }
         let width = Int(size.width), height = Int(size.height)
+        let deep = resolved.drawsDeep(matteMember: matteMember)
         let key = LayerRenderers.textureKey(
             svg: drawn.svg, width: width, height: height, libraryVersion: set.libraryVersion,
-            deep: resolved.deep)
+            deep: deep)
         let slot = GraphicPrefetch.Slot(
             name: name, frame: frame, width: width, height: height, propsJSON: propsJSON,
-            ctxJSON: ctxJSON)
+            ctxJSON: ctxJSON, deep: deep)
         var refused: [GraphicDiagnostic]?
         var made = false
         let rendered = cached(key, pool: .graphics) {
@@ -90,7 +94,7 @@ extension LayerRenderers {
                     raster = try prefetched.get()
                 } else {
                     raster = try set.library.rasterize(
-                        drawn.svg, width: width, height: height, deep: resolved.deep)
+                        drawn.svg, width: width, height: height, deep: deep)
                 }
             } catch {
                 refused = GraphicDiagnostic.of(error)
@@ -219,8 +223,11 @@ extension LayerRenderers {
 
 extension GraphicPrefetch {
     /// One graphic layer's inputs — exactly what `LayerRenderers.graphic` is
-    /// called with. Member order is load-bearing (`graphics_proof.py`'s
-    /// `frame-plus-one` anchor in `LayerRenderersGraphic.swift`).
+    /// called with — and the depth it is drawn at (spec §11 PR-18: a matte
+    /// member under a deep key is not, so one graphic drawn both on a matte
+    /// track and on the canvas in one frame is two slots). Member order is
+    /// load-bearing (`graphics_proof.py`'s `frame-plus-one` anchor in
+    /// `LayerRenderersGraphic.swift`).
     struct Slot: Hashable {
         let name: String
         let frame: Int
@@ -228,5 +235,6 @@ extension GraphicPrefetch {
         let height: Int
         let propsJSON: String
         let ctxJSON: String
+        let deep: Bool
     }
 }

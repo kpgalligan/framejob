@@ -118,7 +118,9 @@ window less 8 px and every 16th more than 16 px clear of it within ±8 of
 - **F1** (its own project): a graphic module drawing the same window on
   the matte track over the card: `render_frame` shows the cut, and the
   `prores_422` export's `graphic prefetch:` line has hits > 0 and
-  mismatched 0.
+  mismatched 0. Since #596 (spec §11 PR-18) the window, a matte member, is
+  drawn 8-bit in that deep export, so this is also the row that sees the
+  worker and the compositor agree on a member's depth.
 Issue batch B90 (#252): nested dissolves and zooms. Phase 1 MEASURED them,
 each row asserting the picture of the day ("pre"); since phase 4 (spec §11
 MT-8, the routed dissolve) each row asserts the EXACT mix and prints the
@@ -216,6 +218,10 @@ FAIL:
   members-plain               `encodeMattes` walks its members at a depth past
                               every chain: D6
   zoom-scale-dropped          the mix fragment's z_out and z_in both 1: D8
+  (#596, spec §11 PR-18)
+  matte-graphic-prefetch-deep the prefetch's worker reads no matte member, so
+                              its slot is deep and the compositor's 8-bit:
+                              F1 (no hits)
 (MT3's eighth, coverage-destination-coords, is `matte_probe.py`'s.)
 (B90 phase 3's other four, on the pool and the plan alone, are
 `matte_pool_probe.py`'s.)
@@ -385,6 +391,12 @@ MUTANTS = {
         "app/Resources/Shaders/Compositor.metal",
         "        float zOut = mix(1.0, 1.25, p), zIn = mix(0.75, 1.0, p);\n",
         "        float zOut = 1.0, zIn = 1.0;\n", ["D8"]),
+    # #596, spec §11 PR-18: the prefetch's worker reads matte membership as the compositor
+    # does, so a matte member's slot (8-bit in a deep export) is the one the compositor asks for.
+    "matte-graphic-prefetch-deep": (
+        "app/Sources/GraphicPrefetch.swift",
+        "drawsDeep(matteMember: layer.matte?.into != nil)",
+        "drawsDeep(matteMember: false)", ["F1"]),
 }
 rows = {}
 selected = set(ROWS)

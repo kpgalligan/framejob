@@ -90,9 +90,12 @@ extension MetalRenderer {
             else { return .absent }
             return lifting(rendered.texture, rendered.size)
         case .graphic(let name, _, let frame, let props, let ctx):
+            // Spec §11 PR-18: a matte member's graphic is never deep, for PR-17's reason; the
+            // prefetch's worker reads the same fact off the same layer (`GraphicPrefetch.work`).
             let size = layer.sourceSizeCG ?? CGSize(width: 640, height: 360)
             guard let drawn = renderers.graphic(name: name, frame: frame, propsJSON: props,
-                ctxJSON: ctx, size: size, recipeKey: instruction?.recipeKey ?? 0) else { return .slate(size) }
+                ctxJSON: ctx, size: size, recipeKey: instruction?.recipeKey ?? 0,
+                matteMember: layer.matte?.into != nil) else { return .slate(size) }
             return lifting(drawn.texture, drawn.size)
         case .missing:
             return .slate(layer.sourceSizeCG ?? CGSize(width: 640, height: 360))

@@ -258,7 +258,7 @@ sibling file.
     own batch: about thirty proofs read graphic frames with an 8-bit decoder); (2) whether the
     preview and the 8-bit outputs should draw from the deep raster, which needs the
     compositor's output dither dropped on 2026-10-27 (recommended: leave it).
-  - Amends PR-5 and PR-13.
+  - Amends PR-5 and PR-13. Amended by PR-16 and PR-18.
 
 - **PR-16 — A shape's gradient is drawn at 16-bit float where its frame is delivered deeper
   than 8 bits (#563).**
@@ -397,9 +397,55 @@ sibling file.
     either, and its depth is its key's pin, read by the prefetch ahead of the frame, so the
     fix is not this one condition. `band374` as the `luma` matte in the same project reads
     banding RMS 0.3398, 37 levels at median run 21 px (GMg, printed and not scored), on this
-    tree and on the app before PR-16 alike.
+    tree and on the app before PR-16 alike. Closed by PR-18 (#596).
   - Mutant: `matte-shape-deep` (the condition removed) fails GM at 0.2770. PR-16's
     `shape-never-deep` and `shape-always-deep`, whose anchor is the next line, were run again
     and caught (G1, G3, G5, G6; GEa).
   - No op, catalog, schema, recipe, FFI or format change; `RC_FORMAT_VERSION` is unchanged.
-  - Amends PR-16.
+  - Amends PR-16. Amended by PR-18.
+
+- **PR-18 — A graphic on a matte track keeps its 8-bit dithered raster in every frame
+  (#596).**
+  - What PR-17 left open: a graphic clip that is a matte member (its recipe layer's
+    `matte.into` names a group) was drawn from PR-15's 16-bit raster wherever its frame is
+    delivered deep, and the matte's `r8Unorm` coverage (PR-5, MT-6) rounds that exact raster
+    with no dither, so it banded as PR-16's float ramp did for a shape. A graphic's depth is
+    its key's pin (`GraphicRegistry.pin(_:for:deep:)`), read by the prefetch's workers ahead
+    of the frame as well as by the compositor, so PR-17's one condition did not reach it.
+  - The rule, fixed before the app was changed: GM's, over GMg, a `prores_422` export of a
+    white full-canvas card under `band374` on a `luma` matte track, canvas background black,
+    so the picture's green is the coverage, whose exact value is the radial gradient's Rec. 709
+    luma; the frame at 0.5 s as `rgb48le`: banding RMS at most 0.15 and the row-540 50-px block
+    means strictly increasing (`raster_dither_proof.py` GMg, scored since).
+  - Measured first, the cure's premise: the app before PR-15's app change (Debug at
+    d530de3a^, which draws every graphic as PR-13's dithered 8-bit raster) reads banding RMS
+    0.1043, 38 levels at median run 2 px, noise kept 0.3964, 8,836,195 bytes, under the
+    bound; the tree as PR-17 left it (Release) reads 0.3398, 37 levels at median run 21 px,
+    noise 0.0437, 3,045,927 bytes: GMg fails.
+  - The decision: a graphic layer that is a matte member is PR-13's dithered 8-bit raster in
+    every frame, as in the preview and every 8-bit export; a graphic that a matte cuts, or
+    that no matte touches, is drawn at its key's depth as PR-15 says. The one rule is
+    `GraphicRegistry.Resolved.drawsDeep(matteMember:)`; the compositor
+    (`MetalRenderer.source(for:)`) and the prefetch's worker each read `matte.into` off the same
+    recipe layer and ask it. The depth is per SLOT: `GraphicPrefetch.Slot` carries it, as its
+    last member, so one graphic drawn both on a matte track and on the canvas in one frame is
+    two rasters, each prefetched and each under its own texture key (`:16` for the deep one),
+    and a held entry counts its own raster's bytes. A graphic inside a nest whose clip is on a
+    matte track is a member too: the recipe flattens it with `into` set
+    (`core/src/recipe_matte.rs`).
+  - With it (Release, 2026-11-11, 20/20 of PR-15's to PR-18's rows with `--base`; Debug gave
+    the same figures): GMg reads the base's figures exactly, 0.1043, 38 levels at median run
+    2 px, noise 0.3964, the same 8,836,195 bytes; GM unchanged at 0.0921; `matte_proof.py` F1 (a
+    graphic window on a matte track, `prores_422`) 1 hit, 0 mismatched, so the worker and the
+    compositor ask for the same 8-bit slot.
+  - Mutants, each caught: `matte-graphic-deep` (the rule answering the key's depth) and
+    `matte-graphic-call-deep` (the compositor reading no member) fail GMg at 0.3398;
+    `matte-graphic-prefetch-deep` (the worker reading no member, `matte_proof.py`) fails F1 at
+    0 hits, 1 missed. PR-15's `never-deep` and `always-deep`, anchored beside the new method,
+    were run again and caught (D1, D3, D5, D6; E1).
+  - Not chosen: a 16-bit coverage in deep frames, which would cure a graphic and a shape alike
+    (PR-17's "not chosen"); it is #597, with the owner, and nothing here decides it.
+  - Pixels change for one case only: a graphic on a matte track in a deep export or a deep
+    frame. No op, catalog, schema, recipe, FFI or format change; `RC_FORMAT_VERSION` is
+    unchanged.
+  - Amends PR-15 and PR-17.
