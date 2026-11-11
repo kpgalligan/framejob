@@ -871,7 +871,7 @@ def normalize_part(mcp):
         [row["clip"] for row in answer["normalized"]] == [good]
         and answer.get("skipped") == [
             f"clip {silent}: is silent over the part of it that plays, so there is no "
-            "level to normalise."
+            "level to normalize."
         ],
         "and in a mixed call one job's failure is one job's problem: the good clip is "
         f"normalised and the other is reported under skipped ({answer.get('skipped')})",

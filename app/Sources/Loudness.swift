@@ -151,7 +151,7 @@ final class LoudnessMeter {
     ///
     /// A gating block is 400 ms; blocks overlap by 75 %, so one starts every
     /// 100 ms and a block is exactly four consecutive 100 ms sub-blocks. That
-    /// is why the accumulator below keeps a running sum per sub-block and a
+    /// is why the accumulator below keeps one sum per sub-block and a
     /// ring of the last four rather than re-summing 19 200 samples per block.
     private static let blockSeconds: Double = 0.400
     private static let hopSeconds: Double = 0.100
@@ -259,7 +259,7 @@ final class LoudnessMeter {
     private let channelCount: Int
     /// Frames in one 100 ms sub-block, and the largest chunk `process`
     /// handles: a chunk never straddles a sub-block boundary, which is what
-    /// lets one accumulator serve every channel.
+    /// lets each channel keep one run of samples.
     private let hopFrames: Int
     private let blockFrames: Int
 
@@ -285,8 +285,9 @@ final class LoudnessMeter {
     private var int16Scratch: UnsafeMutablePointer<Float>?
     private var int16Capacity = 0
 
-    /// Σ over channels of Σ y² for the sub-block being filled.
-    private var subBlockSum: Double = 0
+    /// The K-weighted samples of the sub-block being filled, a channel after
+    /// another: summed once, in sample order, when it closes (AU-163).
+    private let weighted: UnsafeMutablePointer<Double>
     private var subBlockFilled = 0
     /// The last four sub-block sums, oldest overwritten.
     private var ring: [Double]
@@ -341,6 +342,8 @@ final class LoudnessMeter {
         }
         filterState = .allocate(capacity: channelCount * 8)
         filterState.initialize(repeating: 0, count: channelCount * 8)
+        weighted = .allocate(capacity: channelCount * hopFrames)
+        weighted.initialize(repeating: 0, count: channelCount * hopFrames)
         ring = Array(repeating: 0, count: Self.subBlocksPerBlock)
         shortRing = Array(repeating: 0, count: Self.shortTermSubBlocks)
     }
@@ -355,6 +358,7 @@ final class LoudnessMeter {
         peakHistory.deallocate()
         peakCoefficients.deallocate()
         filterState.deallocate()
+        weighted.deallocate()
         int16Scratch?.deallocate()
     }
 
@@ -365,9 +369,8 @@ final class LoudnessMeter {
         var offset = 0
         while offset < frames {
             // Never across a sub-block boundary, and never more than one
-            // sub-block: the accumulator then belongs to exactly one
-            // sub-block for the whole chunk, whichever channel is being
-            // walked.
+            // sub-block: the kept samples then belong to exactly one
+            // sub-block for the whole chunk, whichever channel is walked.
             let take = Swift.min(hopFrames - subBlockFilled, frames - offset)
             process(samples + offset * channelCount, frames: take)
             offset += take
@@ -430,12 +433,8 @@ final class LoudnessMeter {
                 from: channelBuffer + frames, count: history)
 
             weight(channelBuffer + history, frames: frames, channel: channel)
-            var sum: Double = 0
-            vDSP_svesqD(channelBuffer + history, 1, &sum, vDSP_Length(frames))
-            // Table 3's Gᵢ is 1.0 for left, right and centre, so the sum over
-            // channels needs no weight at all here; `init` is where the
-            // channel counts that would need one are refused.
-            subBlockSum += sum
+            (weighted + channel * hopFrames + subBlockFilled).update(
+                from: channelBuffer + history, count: frames)
         }
 
         subBlockFilled += frames
@@ -465,11 +464,22 @@ final class LoudnessMeter {
         }
     }
 
+    /// Σ over channels of Σ y², each channel's squares added in sample order:
+    /// one sum per sub-block, whatever chunks filled it (AU-163).
     private func closeSubBlock() {
+        // Table 3's Gᵢ is 1.0 for left, right and centre, so the sum over
+        // channels needs no weight at all here; `init` is where the
+        // channel counts that would need one are refused.
+        var subBlockSum: Double = 0
+        for channel in 0..<channelCount {
+            let samples = weighted + channel * hopFrames
+            var sum: Double = 0
+            for n in 0..<hopFrames { sum += samples[n] * samples[n] }
+            subBlockSum += sum
+        }
         ring[ringWrites % Self.subBlocksPerBlock] = subBlockSum
         shortRing[ringWrites % Self.shortTermSubBlocks] = subBlockSum
         ringWrites += 1
-        subBlockSum = 0
         subBlockFilled = 0
         guard ringWrites >= Self.subBlocksPerBlock else { return }
         blocks.append(ring.reduce(0, +) / Double(blockFrames))
@@ -514,6 +524,14 @@ final class LoudnessMeter {
         guard ringWrites >= Self.shortTermSubBlocks else { return nil }
         return Self.loudness(
             shortRing.reduce(0, +) / Double(hopFrames * Self.shortTermSubBlocks))
+    }
+
+    /// The sub-block sums `shortTermLUFS` is the mean of, oldest first, at most
+    /// the last `shortTermSubBlocks`: what a proof compares bit for bit (#569).
+    var shortTermSubBlockSums: [Double] {
+        guard ringWrites >= shortRing.count else { return Array(shortRing[..<ringWrites]) }
+        let oldest = ringWrites % shortRing.count
+        return Array(shortRing[oldest...] + shortRing[..<oldest])
     }
 
     private func integrated() -> Double? {

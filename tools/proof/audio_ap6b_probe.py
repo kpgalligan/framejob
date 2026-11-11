@@ -55,6 +55,12 @@ pass (Silero VAD) runs for L6, the step-2 figures and R5.
       one programme fed whole, a step at a time, in 4,096-frame buffers and
       in uneven ones (AU-160: R5's non-repeat was the meter summing a step
       per reader buffer, #567).
+  R8  `LoudnessMeter` gives byte-identical sub-block sums
+      (`shortTermSubBlockSums`) and integrated, momentary and short-term
+      loudness for one programme, stereo and its left channel as mono, fed
+      whole, a sub-block at a time, in 4,096- and 1,024-frame buffers and in
+      uneven ones (#569). The two peaks are compared too and a difference
+      printed, not scored: they are maxima, not sub-block sums.
 
 Then, the step-2 figures (AU-67 (d)), printed: the speech range Enhance
 measures on the owner's recording and on the proof's off-mic and steady
@@ -62,12 +68,13 @@ fixtures (`make_fixtures`, shared with audio_ap6b_proof.py), each through a
 probe document's own loudness and speech caches; scored that the off-mic one
 is over 6 LU and the steady one at or under it (else the rule is a STOP).
 
---mutants runs M1–M10, M12–M15 and M17–M19, each over its own copy of app/Sources,
+--mutants runs M1–M10, M12–M15 and M17–M20, each over its own copy of app/Sources,
 scored killed when its named row fails (the step-2 figures and R5 skipped);
 build failures are scored. M11 (`"leveller"` out of `TAP_KEYS`) is by hand
 against core/tests/audio_automation.rs. M16 has no edit to make: AP6b's step 3
 found nothing to fix; the non-repeat's fix is AU-160's (#567) and its mutant
-is M19. Needs ffmpeg, `say`, numpy and samples/Rode-usb-mic.m4a. Output is
+is M19; M20 is AU-163's (#569), the same per-chunk sum restored in
+`LoudnessMeter`. Needs ffmpeg, `say`, numpy and samples/Rode-usb-mic.m4a. Output is
 under tools/proof/work/audio-ap6b-probe.
 
 --soak-r5 <minutes> runs R5 alone (`--r5-only`: a document holding the steady
@@ -94,7 +101,7 @@ RODE = ROOT / "samples/Rode-usb-mic.m4a"
 WORK = ROOT / "tools/proof/work/audio-ap6b-probe"
 FIXTURES = WORK / "fixtures"
 RATE = 48000
-ROWS = [f"L{n}" for n in range(1, 11)] + [f"R{n}" for n in range(1, 8)]
+ROWS = [f"L{n}" for n in range(1, 11)] + [f"R{n}" for n in range(1, 9)]
 
 # The fixtures (spec AP6b's constraints): six 10 s `say` segments, 1.5 s apart,
 # over a −60 dBFS RMS white-noise bed, mono 48 kHz.
@@ -228,6 +235,22 @@ MUTANTS = [
         ("StepLoudness.swift", "        steps.append(stepSum / Double(stepFilled))\n",
          "        steps.append(chunkSum / Double(stepFilled))\n"
          "        chunkSum = 0\n        _ = stepSum\n")]),
+    # #569, AU-163: a sub-block's energy summed per feed chunk, as it was.
+    ("M20 sub-block-summed-per-chunk", "R8", [
+        ("Loudness.swift", "    private var subBlockFilled = 0\n",
+         "    private var subBlockFilled = 0\n    private var chunkSum: Double = 0\n"),
+        ("Loudness.swift",
+         "            (weighted + channel * hopFrames + subBlockFilled).update(\n"
+         "                from: channelBuffer + history, count: frames)\n",
+         "            (weighted + channel * hopFrames + subBlockFilled).update(\n"
+         "                from: channelBuffer + history, count: frames)\n"
+         "            var sum: Double = 0\n"
+         "            vDSP_svesqD(channelBuffer + history, 1, &sum, vDSP_Length(frames))\n"
+         "            chunkSum += sum\n"),
+        ("Loudness.swift",
+         "        ring[ringWrites % Self.subBlocksPerBlock] = subBlockSum\n",
+         "        subBlockSum = chunkSum\n        chunkSum = 0\n"
+         "        ring[ringWrites % Self.subBlocksPerBlock] = subBlockSum\n")]),
 ]
 
 

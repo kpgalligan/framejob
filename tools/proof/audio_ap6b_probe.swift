@@ -954,6 +954,103 @@ if !r5Only {
           "\(whole.steps.count) steps" + (lines.isEmpty ? "" : "; " + lines.joined(separator: "; ")))
 }
 
+// MARK: - R8 the meter does not depend on how it is fed (#569)
+
+if !r5Only {
+    // R7's 3 s of stereo noise, and its left channel alone as mono, each fed
+    // whole, a sub-block at a time, in 4,096- and 1,024-frame buffers and in
+    // uneven ones that cut every sub-block somewhere else.
+    let frames = 3 * RATE
+    let left = noise(frames, seed: 567, scale: 0.25)
+    let right = noise(frames, seed: 568, scale: 0.2)
+    var stereo = [Float](repeating: 0, count: 2 * frames)
+    for n in 0..<frames {
+        stereo[2 * n] = left[n]
+        stereo[2 * n + 1] = right[n]
+    }
+    struct Reading {
+        var sums: [Double]
+        var figures: [(String, Double?)]
+        var peaks: [(String, Double?)]
+    }
+    func metered(_ samples: [Float], channels: Int, _ sizes: [Int]) -> Reading? {
+        guard let meter = LoudnessMeter(sampleRate: fs, channelCount: channels) else { return nil }
+        var at = 0
+        var turn = 0
+        samples.withUnsafeBufferPointer { buffer in
+            while at < frames {
+                let take = min(sizes[turn % sizes.count], frames - at)
+                meter.feed(buffer.baseAddress! + channels * at, frames: take)
+                at += take
+                turn += 1
+            }
+        }
+        let report = meter.finish()
+        return Reading(
+            sums: meter.shortTermSubBlockSums,
+            figures: [("integrated", report.integratedLUFS), ("momentary", meter.momentaryLUFS),
+                      ("short-term", meter.shortTermLUFS)],
+            peaks: [("true peak", report.truePeakDBTP), ("sample peak", report.samplePeakDBFS)])
+    }
+    func g(_ x: Double?) -> String { x.map { String(format: "%.17g", $0) } ?? "nil" }
+    /// The named figures of `b` that are not the bits of `a`'s.
+    func differing(_ a: [(String, Double?)], _ b: [(String, Double?)]) -> [String] {
+        zip(a, b).compactMap { x, y in
+            x.1?.bitPattern == y.1?.bitPattern ? nil : "\(x.0) \(g(x.1)) against \(g(y.1))"
+        }
+    }
+    var lines: [String] = []   // what fails the row: the sums and the loudness figures
+    var notes: [String] = []   // the peaks, which are maxima and not sub-block sums
+    var counts: [String] = []
+    var sane = true
+    for (layout, samples, channels) in [("stereo", stereo, 2), ("mono", left, 1)] {
+        guard let whole = metered(samples, channels: channels, [frames]) else {
+            lines.append("\(layout): no meter")
+            continue
+        }
+        counts.append("\(layout) \(whole.sums.count) sub-blocks")
+        if whole.sums.count != 30 || whole.figures.contains(where: { $0.1 == nil }) {
+            lines.append("\(layout) whole: \(whole.sums.count) sub-blocks, "
+                + whole.figures.map { "\($0.0) \(g($0.1))" }.joined(separator: ", "))
+        }
+        for (name, sizes) in [("a sub-block at a time", [4800]), ("4,096 frames", [4096]),
+                              ("1,024 frames", [1024]),
+                              ("uneven", [1, 479, 481, 1000, 37, 4096, 263])]
+        {
+            guard let other = metered(samples, channels: channels, sizes) else { continue }
+            var found: [String] = []
+            if let d = stepDifference(whole.sums, other.sums, power: true) {
+                found.append("\(d.count) of \(d.lengths.max() ?? 0) sub-blocks differ, first "
+                    + "at sub-block \(d.first) (\(String(format: "%.1f", Double(d.first) / 10)) s) "
+                    + "\(g(d.a)) against \(g(d.b)), largest "
+                    + "\(String(format: "%.6g", d.largestDB)) dB")
+            }
+            found += differing(whole.figures, other.figures)
+            // `feed` cuts at sub-block boundaries, so these two make the same
+            // calls on any tree: a difference here is `feed`'s cut having moved.
+            if sizes == [4800], !found.isEmpty {
+                sane = false
+                found.insert("FED A SUB-BLOCK AT A TIME DIFFERS FROM WHOLE", at: 0)
+            }
+            if !found.isEmpty {
+                lines.append("\(layout) \(name): " + found.joined(separator: ", "))
+            }
+            let peaks = differing(whole.peaks, other.peaks)
+            if !peaks.isEmpty {
+                notes.append("\(layout) \(name): " + peaks.joined(separator: ", "))
+            }
+        }
+    }
+    check("R8", "LoudnessMeter gives byte-identical sub-block sums and integrated, momentary "
+            + "and short-term loudness for one programme, stereo and mono, fed whole, a "
+            + "sub-block at a time, in 4,096- and 1,024-frame buffers and in uneven ones",
+          sane && lines.isEmpty,
+          counts.joined(separator: ", ")
+            + (lines.isEmpty ? "" : "; " + lines.joined(separator: "; "))
+            + (notes.isEmpty ? "; peaks the same bits" : "; PEAKS DIFFER (not scored): "
+                + notes.joined(separator: "; ")))
+}
+
 // MARK: - The step-2 figures and R5: the owner's recording and the proof's fixtures
 
 /// SHA-256 of each file in `folder` by name; empty when it is absent.

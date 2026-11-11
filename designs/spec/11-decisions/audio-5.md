@@ -110,3 +110,25 @@ It is new because [`audio-4.md`](audio-4.md) had reached the spec's ~500-line sp
     (`AudioTapSchedule.swift`) fails the tap row of every leg and the ceiling row of every
     rendered leg; the gate dropped from leg (a)'s chain fails its `renders` clause (the model's
     capped figure would otherwise pass).
+- **AU-163 — A sub-block's energy is summed once per sub-block (#569, 2026-11-11; extends AU-160
+  to `LoudnessMeter`, amends nothing).** `LoudnessMeter` had AU-160's shape: one `vDSP_svesqD`
+  per `process` chunk added to the 100 ms sub-block's sum, the channels added chunk by chunk.
+  `feed` already cuts at sub-block boundaries, so only a reader buffer ending inside a sub-block
+  changed the arithmetic. R8 on the old sources, 3 s of noise against the same sound fed whole,
+  sub-blocks differing by a unit or a few in the last place (largest 4.3e-15 dB): stereo 28 of 30
+  in 4,096-frame buffers, 25 of 30 in 1,024-frame ones, 24 of 30 fed unevenly; mono 27, 29 and
+  28 of 30. The integrated, momentary and short-term figures of that programme were the same
+  bits (the difference rounded away in the mean and the logarithm), and so were both peaks.
+  - **The rule.** A sub-block's K-weighted samples are kept per channel and their squares added
+    in sample order, each channel and then the channels, when the sub-block closes: one sum per
+    sub-block, whatever chunks filled it. A scalar loop, as AU-160's, so the sum is defined by
+    the source and not by a routine's blocking.
+  - **What moved.** Every sub-block's last bits, once, for every feeding (a whole sub-block was
+    one vector sum before): the export's `integrated_lufs`, the unmodelled export gain's input
+    before its rounding, the live meter's M, S and I. True peak and sample peak not at all: they
+    were never per-chunk sums.
+  - **What is the same.** A trailing partial sub-block is still discarded; no format, no cache,
+    no persisted value (the loudness cache is `LoudnessBlocks`, not this meter).
+  - **The proof.** `audio_ap6b_probe.py` R8 (the sums through `shortTermSubBlockSums`, and the
+    three loudness figures, bit for bit across five feedings, stereo and mono; the peaks
+    compared and printed, not scored) and mutant M20, the per-chunk sum restored.
