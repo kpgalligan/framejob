@@ -1045,7 +1045,8 @@ def score_shapes(files, base, capturing):
                             read_movie(theirs("G3"), 0.5, True))
         error = pixel_error(ours, e=shape_exact) if ours else None
         was = pixel_error(base_movie, e=shape_exact) if base_movie else None
-        good = (here is not None and then is not None and here[1] <= then[1] / 2
+        good = (here is not None and then is not None
+                and error is not None and was is not None and here[1] <= then[1] / 2
                 and error <= was / 2 and here[0] <= 0.15 and increasing(here[3]))
         check("G3 the prores_422 export of the shape563 clip, the frame at 0.5 s (16-bit decode): "
               "noise kept ≤ ½ the base's, RMS of G − e less its mean ≤ ½ the base's, banding RMS "

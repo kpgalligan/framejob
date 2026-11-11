@@ -2614,6 +2614,11 @@ the key map behind it.
   clips' tracks of `CursorTracks` (owner the key), `setCursorFiles` an export's
   or a frame's, `cursorFiles(for:)` what the compositor reads; `unregister`
   releases the owner on a utility queue, never on the caller's thread (CU-37 (e)).
+  It also holds the keys whose frames are delivered deeper than 8 bits (spec
+  §11 PR-16; `markDeep`, `deliversDeep`, cleared by `unregister`): an export's
+  for a row `Exporter.graphicsDeep` takes, an offline frame's once it comes
+  out deep; never a document's. `MetalRenderer.source(for:)` reads it for a
+  shape layer.
 - `GraphicRegistry.swift` · `LayerRenderersGraphic.swift` — a graphic layer
   drawn (road map 10). The registry maps a `RecipeSource` key to one
   immutable `GraphicSet` (library, `libraryVersion`, each module `.compiled`
@@ -2943,12 +2948,16 @@ the key map behind it.
   `LayerRenderersImage.swift` — text,
   shape and still descriptions to textures (premultiplied `bgra8Unorm`; a
   still deeper than 8 bits a component is drawn at 16-bit float and
-  uploaded `rgba16Float`, spec §11 PR-6; `LayerRenderersImage` is the still
+  uploaded `rgba16Float`, spec §11 PR-6; a shape that draws a gradient
+  (`ShapeProps.drawsGradient`) is drawn the same way when its frame is
+  delivered deeper than 8 bits, `shape(_:hash:deep:)`, in a six-entry pool of
+  its own, spec §11 PR-16; `LayerRenderersImage` is the still
   arm — the plain, deep and HDR decodes, and a gain-map still's rendition in
   an HLG project, HD-22, whose texture answers its own `peak`),
   keyed by the recipe's `hash` (`RecipeSourceRef.cacheHash` is the WHOLE key;
   nothing here may append to it — a graphic's key is its SVG text instead,
-  `LayerRenderersGraphic.swift`, in its own six-entry pool). Text draws what the recipe computed; the
+  `LayerRenderersGraphic.swift`, in its own six-entry pool; `cached(_:pool:)`
+  takes a `Pool`: `layers`, `graphics` or `deepShapes`). Text draws what the recipe computed; the
   LAYOUT is always the full text's, laid from `laidContent`, cached without
   the reveal or the word, and `reveal = 1` takes the plain `CTFrameDraw` path
   so a full reveal is byte-identical to no animation; a line or token at
@@ -3231,7 +3240,9 @@ the key map behind it.
   `ExportQueueRowView.toolTip(for:)`) and `export`'s `graphic_warnings`
   (G-24 (c)). `ExporterGraphics.swift` also holds `graphicsDeep(_:)` (which
   export rows draw graphics deep, read from `ExportWriter.frameForm` and the
-  bundled encoders' depth) and `drawsGraphic(_:at:options:)` (PR-15).
+  bundled encoders' depth), `drawsGraphic(_:at:options:)` (PR-15) and
+  `drawsGradientShape(_:at:options:)` (PR-16: a frame the generator answers
+  deep that draws a gradient shape is read once more).
   **`ExportWriter.cancel()` and `Exporter.cancel()` only set flags**; the
   measurement's loop cancels its own reader, `ExportWriter` reads each output
   on a reader of its own and each pump cancels its own reader on its own queue
