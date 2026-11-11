@@ -46,7 +46,7 @@ A reversed clip plays from a backwards copy rendered at 10 bits, at the source's
 
 Text, shapes, captions and screen recordings are 8-bit, and so are thumbnails.
 
-A graphic is drawn at 16 bits per channel in an export that keeps the depth (HEVC 10-bit, AV1, ProRes, and VP9 as HLG or HDR10) and in a frame saved deep, so its gradients keep their levels there. Everywhere else, including the preview and the 8-bit exports, it's drawn at 8 bits with its gradients dithered. A group with a `filter` and the coverage of a luminance `mask` are 8-bit in both. A frame that shows only graphics is saved at 8 bits. In an HDR (HLG) project those layers are still [lifted to HDR reference white](/hdr/dynamic-range/), so they sit with the rest of the picture.
+A graphic is drawn at 16 bits per channel in an export that keeps the depth (HEVC 10-bit, AV1, ProRes, and VP9 as HLG or HDR10) and in a frame saved deep, so its gradients keep their levels there. Everywhere else, including the preview and the 8-bit exports, it's drawn at 8 bits with its gradients dithered. A group with a `filter` and the coverage of a luminance `mask` are 8-bit in both. A frame that shows only graphics is saved at 8 bits. In an HDR (HLG) project text, shapes, captions and graphics are still [lifted to HDR reference white](/hdr/dynamic-range/), so they sit with the rest of the picture.
 
 ## Related
 

@@ -641,7 +641,14 @@ of twelve track layouts; it amends PR-4, PR-9 and PR-12.
       its source through a clone, under any `color-interpolation-filters`);
     - a luminance `Mask::from_pixmap`, whose coverage is the one today's dithered raster makes.
     So a filtered group and a luminance mask come out on 8-bit levels, dithered as today, and
-    everything outside them is deep. resvg's filters are not patched: that means vendoring
+    everything outside them is deep. `collapse` cannot tell a gradient from anything else, so
+    the offset goes to every pixel holding a residual: inside a filtered group of a deep raster
+    a flat translucent colour whose premultiplied value sits between two levels (`#336699` at
+    `fill-opacity` 0.8 is 40.8) and a soft edge come out as a fine mix of the two neighbouring
+    levels whose mean is the exact value within a tenth of a level (measured 40.85), where the
+    8-bit raster draws the nearer level flat. A flat
+    opaque colour is on a level and never moves (`graphic/tests/deep.rs`,
+    `a_flat_colour_in_a_filter_takes_the_offset`). resvg's filters are not patched: that means vendoring
     resvg (4,600 lines, eleven filter files), and no bundled template uses a filter. A filter
     under the default `linearRGB` interpolation already takes a dark gradient through an 8-bit
     sRGB-to-linear table (sRGB 21 to 79 is linear 2 to 20), so `band374` inside one has about
@@ -669,7 +676,9 @@ of twelve track layouts; it amends PR-4, PR-9 and PR-12.
   - Limits:
     - The preview and a deep export differ in a graphic's low bits: dithered 8-bit against
       deep. A colour on a level is the same in both.
-    - A filtered group, and a luminance mask's coverage, are 8-bit (above).
+    - A filtered group, and a luminance mask's coverage, are 8-bit (above), and in a deep
+      raster a filtered group's translucent flats and soft edges take the offset as its
+      gradients do: at most one level from the 8-bit raster, no bundled template uses a filter.
     - A `hevc_10bit` file at the default rate gains little: the encoder bands a smooth
       gradient itself (measured below). ProRes and a still keep the levels.
   - No op, catalog, schema, recipe or format change; `RC_FORMAT_VERSION` is unchanged. One new

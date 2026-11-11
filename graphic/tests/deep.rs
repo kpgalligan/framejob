@@ -213,6 +213,49 @@ fn a_layer_read_at_eight_bits_is_dithered() {
     assert!(failures.is_empty(), "{failures:?}");
 }
 
+/// T5b: `collapse` gives the offset to every pixel holding a residual, not
+/// only a gradient's (PR-15's limit). A flat translucent fill inside a
+/// filtered group, premultiplied red 40.8, is a mix of levels 40 and 41
+/// whose mean is within a tenth of a level in a deep raster, flat in the 8-bit one, and an
+/// opaque fill on a level is flat in both.
+#[test]
+fn a_flat_colour_in_a_filter_takes_the_offset() {
+    let lib = library();
+    let scene = |opacity: &str| {
+        svg(
+            256,
+            128,
+            &format!(
+                "<filter id=\"f\" x=\"0\" y=\"0\" width=\"1\" height=\"1\" \
+                 color-interpolation-filters=\"sRGB\"><feComposite in=\"SourceGraphic\" \
+                 in2=\"SourceGraphic\" operator=\"arithmetic\" k1=\"0\" k2=\"1\" k3=\"0\" \
+                 k4=\"0\"/></filter><g filter=\"url(#f)\"><rect width=\"256\" height=\"128\" \
+                 fill=\"#336699\" fill-opacity=\"{opacity}\"/></g>"
+            ),
+        )
+    };
+    let inner = || (32..96usize).flat_map(|y| (32..224usize).map(move |x| (y * 256 + x) * 4));
+    let (out, warnings) = deep(&lib, &scene("0.8"), 256, 128);
+    assert!(warnings.is_empty(), "{warnings:?}");
+    let reds: Vec<u16> = inner().map(|i| out[i]).collect();
+    let levels: BTreeSet<u16> = reds.iter().copied().collect();
+    let mean = reds.iter().map(|v| *v as f64).sum::<f64>() / reds.len() as f64 / 257.0;
+    println!("T5b translucent: levels {levels:?}, mean {mean:.4} of 40.8");
+    assert_eq!(levels, BTreeSet::from([40 * 257, 41 * 257]));
+    assert!((mean - 40.8).abs() < 0.1, "mean {mean}");
+    assert!(inner().all(|i| out[i + 3] == 204 * 257), "alpha moved");
+    let (eight, _) = render(&lib, &scene("0.8"), 256, 128);
+    assert!(
+        inner().all(|i| eight[i + 2] == 41),
+        "the 8-bit raster is not flat"
+    );
+    let (opaque, _) = deep(&lib, &scene("1"), 256, 128);
+    assert!(
+        inner().all(|i| opaque[i] == 51 * 257 && opaque[i + 3] == 65535),
+        "an opaque colour on a level moved"
+    );
+}
+
 /// T6: the door is per call and per thread: an 8-bit raster after a deep
 /// one, and beside deep ones on other threads, is the one taken before.
 #[test]

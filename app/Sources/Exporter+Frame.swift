@@ -147,8 +147,9 @@ extension Exporter {
         }
         // The generator's depth follows the lowest track that has video, so a
         // deep clip above an 8-bit one comes back 8-bit (spec §11 PR-14). A
-        // frame already deep never asks, so HEVC or ProRes alone stays byte
-        // for byte; a read that fails keeps the generator's image.
+        // frame already deep with no graphic on it never asks, so HEVC or
+        // ProRes alone stays byte for byte; a read that fails keeps the
+        // generator's image.
         if keepsDepth, let shallow = image, shallow.bitsPerComponent <= 8,
             DeepVideoFrame.showsDeepSource(project, built, at: t, options: options)
         {

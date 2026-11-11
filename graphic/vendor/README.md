@@ -84,6 +84,11 @@ what the dither patch alone draws.
   pixmap), and in a luminance `Mask::from_pixmap`. A value on a level never
   moves. So a filtered region and a luminance mask's coverage are 8-bit and
   dithered as before, and an owned pixmap is 8-bit after `data_mut`.
+  `collapse` gives the offset to every pixel that holds a residual, not only
+  a gradient's: in a filtered region of a deep raster, a flat translucent
+  colour between two levels and a soft edge come out as a mix of the two
+  neighbouring levels, where the 8-bit raster draws one level flat
+  (`a_flat_colour_in_a_filter_takes_the_offset` pins it).
 - **The output.** `Pixmap::copy_rgba16` writes premultiplied RGBA at 16 bits a
   channel, 65,535 as 1. The residual plane is not public.
 
