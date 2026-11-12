@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Road map "swift-helper" SA2 and SA4 — the Swift helper, driven as the app runs it over
 scripted conversations on the stand-in API, and held to its recordings: every event and every
-request, key order included (spec §11 SA-4, SA-5, SA-6, SA-13; `designs/swift-helper.md` §9 SA2
-and SA4 and their records in §13).
+request, key order included (spec §11 SA-4, SA-5, SA-6, SA-13; `archive/swift-helper.md` §9 SA2
+and SA4 and their records in §13, condensed in `designs/adr/swift-helper.md`).
 
     python3 tools/proof/agent_helper_drive.py                       # every case (make test)
     python3 tools/proof/agent_helper_drive.py --cases text,tools    # these cases (and what they need)

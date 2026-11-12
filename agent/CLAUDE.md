@@ -6,7 +6,7 @@ Applies to everything under `agent/`. The shipped helper is the SwiftPM package 
 `Contents/Helpers/framejob-agent`, started once per window's conversation by
 `AssistantSession`: every app build makes its release product with
 `tools/agent/build_helper.sh` (SA-8). Nothing else lives here: the Bun helper and its
-TypeScript were deleted in road map "swift-helper" (`designs/swift-helper.md`, #599) SA4
+TypeScript were deleted in road map "swift-helper" (`designs/adr/swift-helper.md`, #599) SA4
 (SA-11). The package was ported once from Doctored's helper at that repository's `b524babc`
 (the owner's answer 2 (a)) and has no identity rule with it or with Rasterize. `make
 agent-test` runs its suite through `tools/agent/agent_test.py`, and

@@ -3,14 +3,16 @@
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
 
-The road map is in progress at `designs/swift-helper.md` (#599): the assistant helper becomes a
-Swift executable on Slaude, the owner's Swift client for the Claude API, in place of the
-Bun-compiled TypeScript. Its §8 names the SA- decisions and the phase that writes each; its §13
-holds what each phase measured, SA0's spike first. SA-1..SA-3 are SA0's, decided 2026-11-12 after
-the owner approved the road map and answered its §12 on #599. SA-4 on are appended here by the
-phases §8 names, each before its code. Each entry binds the code from the phase that builds it:
-until SA3's switch lands, the shipped helper is the one AI-1, P-2 and P-8 describe. SA-11 and
-SA-13 are SA4's, the deletion of the Bun helper.
+The road map that made these is closed (2026-11-12, #599): the assistant helper became a Swift
+executable on Slaude, the owner's Swift client for the Claude API, in place of the Bun-compiled
+TypeScript. Its condensed record is `designs/adr/swift-helper.md`, the original
+`archive/swift-helper.md`, whose §8 named the SA- decisions and the phase that wrote each and
+whose §13 holds what each phase measured, SA0's spike first; "road map §n" below cites that
+original. SA-1..SA-3 are SA0's, decided 2026-11-12 after the owner approved the road map and
+answered its §12 on #599. SA-4 on were appended here by the phases §8 named, each before its
+code. Each entry bound the code from the phase that built it: until SA3's switch landed, the
+shipped helper was the one AI-1, P-2 and P-8 describe. SA-11 and SA-13 are SA4's, the deletion
+of the Bun helper.
 
 - **SA-1 — The assistant helper is a Swift executable built from a SwiftPM package in `agent/`,
   on Slaude pinned by exact revision; the process boundary and the stdio protocol stay.** It is
