@@ -8,7 +8,7 @@ Applies to everything under `mcp-proxy/`, the crate that builds
 `make test` and `make lint` run this crate after the core and the graphics
 engine; `project.yml`'s "Build MCP Proxy" phase builds it, copies the binary
 into `Contents/Helpers/` and signs it `--options runtime` with no
-entitlements, as `agent/build.sh helper` signs the assistant's helper.
+entitlements, as `tools/agent/build_helper.sh` signs the assistant's helper.
 
 ## Module map
 

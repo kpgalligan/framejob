@@ -1,16 +1,19 @@
 # agent/CLAUDE.md — the assistant helper's rules
 
-Applies to everything under `agent/`. Two helpers live here until road map "swift-helper"
-(`designs/swift-helper.md`, #599) switches them in its SA3: the shipped one, Bun-compiled
-TypeScript in `src/` (`build.sh`, `package.json`, `bun.lock`, `tsconfig.json`,
-`entitlements.plist`; spec §11 AI-1), and the SwiftPM package that replaces it (`Package.swift`,
-`Sources/`, `Tests/`; spec §11 SA-1..SA-7, SA-12, in `designs/spec/11-decisions/swift-helper.md`),
-the agent loop of `Contents/Helpers/framejob-agent`, started once per window's conversation by
-`AssistantSession`. The package was ported once from Doctored's helper at that repository's
-`b524babc` (the owner's answer 2 (a)) and has no identity rule with it. `make agent-test` runs its
-suite through `tools/agent/agent_test.py`, and `tools/proof/agent_helper_drive.py` (SA2, in
-`make test`) runs it beside the Bun helper over the same conversations on the stand-in API and
-fails any difference outside its allowed list; until SA3 nothing builds it into the app.
+Applies to everything under `agent/`. The shipped helper is the SwiftPM package here
+(`Package.swift`, `Sources/`, `Tests/`; spec §11 SA-1..SA-10, SA-12, in
+`designs/spec/11-decisions/swift-helper.md`), the agent loop of
+`Contents/Helpers/framejob-agent`, started once per window's conversation by
+`AssistantSession`: every app build makes its release product with
+`tools/agent/build_helper.sh` (SA-8). The Bun-compiled TypeScript in `src/` (`build.sh`,
+`package.json`, `bun.lock`, `tsconfig.json`, `entitlements.plist`; spec §11 AI-1) stays beside it
+only for `make typecheck`'s tsc and `tools/proof/agent_helper_drive.py`'s Bun side until road map
+"swift-helper" (`designs/swift-helper.md`, #599) deletes it in its SA4. The package was ported
+once from Doctored's helper at that repository's `b524babc` (the owner's answer 2 (a)) and has
+no identity rule with it. `make agent-test` runs its suite through `tools/agent/agent_test.py`,
+and `tools/proof/agent_helper_drive.py` (SA2, in `make test`) runs the release helper beside the
+Bun helper over the same conversations on the stand-in API and fails any difference outside its
+allowed list.
 
 ## Module map
 
@@ -89,3 +92,9 @@ One line per file; each file's doc comments hold its detail.
   `ClientFactory`, and the 127.0.0.1 `LoopbackServer`. The suite runs on `build/agent-swift-test`
   through `make agent-test`, whose guard empties a scratch path made at another path (SA-12);
   never on `build/agent-swift`, the app build's (SA-8).
+- **The suite reads its price fixtures from `prices/`**, through `PriceFiles`, unless
+  `FJ_AGENT_PRICES` names a whole copy of that folder (`tools/proof/prices_proof.py`'s
+  `swift-disagrees` mutant); the helper itself reads no environment variable.
+- **A proof's helper is built by `tools/agent/build_helper.sh`**: the tree's through
+  `tools/proof/agent_helper_build.release`, a mutant through `agent_helper_build.mutant` on
+  `build/agent-swift-mutant/`; never by editing this folder in place (SA-8).
