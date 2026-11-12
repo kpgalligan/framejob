@@ -955,7 +955,11 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `add_shape_clip` still read through typed locals, `private` for the other sixteen; a pure move
   gated with GR1's other four, the Debug catalog equal before and after, parsed. `wc -l
   app/Sources/AgentCatalog+Clips.swift`: 706 before, 513 after; `AgentCatalog+Properties.swift`
-  is 247. No next seam is named.
+  is 247. #602 paid the next, ahead of `lift_range`'s `tracks` sentence: the three range and
+  time rows (`lift_range`, `insert_time`, `close_gap`) went whole to `AgentCatalog+Range.swift`
+  as `rangeTools(ticks:trackDescription:)`, spliced back in after `audioTools` and before
+  `set_speed`; a pure move gated alone, the Debug catalog equal before and after, parsed.
+  `wc -l`: 592 before, 563 after; `AgentCatalog+Range.swift` is 57. No next seam is named.
 - `AgentServer+Scope.swift`: the envelope rule (`checkCallScope`, `effectiveScope`, `idScope`,
   `addressed`, `checkDocumentLevelTicks`, `scopeLanding`, `scopeFailure`) against `set_scope` the
   tool (`setScope`, `nestScopePath`, `pathToClip`, `applyNestScope`, `commonPrefix`,

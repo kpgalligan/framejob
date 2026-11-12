@@ -349,39 +349,10 @@ extension AgentServer {
         // unchanged — road map 4's toll 2. `ticks` and `clipsProperty` are
         // the two hoisted locals they read.
         rows += audioTools(ticks: ticks, clipsProperty: clipsProperty)
+        // lift_range, insert_time and close_gap are `AgentCatalog+Range.swift`'s,
+        // spliced in HERE for the same reason (spec §11 #602's toll).
+        rows += rangeTools(ticks: ticks, trackDescription: trackDescription)
         rows += [
-            opTool(
-                "lift_range",
-                "Cuts a time range out and LEAVES the hole — ⌫ with an in/out range and nothing "
-                    + "selected. Every unlocked clip is split at both bounds and the middles "
-                    + "removed, and nothing moves: every clip after the range keeps the moment "
-                    + "it had, which is what makes this the safe cut when a mix or a caption "
-                    + "track is already timed. Refused, nothing cut, when a piece left is too short "
-                    + "for its transition. Use ripple_delete_range to close the hole instead.",
-                ["from": "Range start, \(ticks)", "to": "Range end, \(ticks)"]),
-            opTool(
-                "insert_time",
-                "Opens a gap: every unlocked clip starting at or after `at` moves right by "
-                    + "`length`. Straddling clips are left in place, so this makes room without "
-                    + "cutting anything — split first if you want the gap inside a clip. Every "
-                    + "marker at or after `at` moves right by `length` too.",
-                [
-                    "at": "Where the gap opens, \(ticks)",
-                    "length": "How much room, \(ticks)",
-                ]),
-            opTool(
-                "close_gap",
-                "Closes the empty span on `track` that contains `at` — double-clicking a gap in "
-                    + "a lane, or Clip ▸ Close Gap. The gap is bounded by the nearest clip "
-                    + "edges on that track, and everything from its far side slides left by its "
-                    + "length across every unlocked track. Nothing changes when `at` is on a "
-                    + "clip, when the track is locked, when there is no clip after the gap, or "
-                    + "when the shift would break the overlap rule — a gap closes fully or not "
-                    + "at all.",
-                [
-                    "track": trackDescription,
-                    "at": "A time inside the gap, \(ticks)",
-                ]),
             opTool(
                 "set_speed",
                 String(
