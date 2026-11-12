@@ -1,0 +1,479 @@
+{
+ "case": "cancel-tools",
+ "events": [
+  {
+   "type": "prices",
+   "source": {
+    "kind": "bundled",
+    "as_of": "2026-09-28T06:07:45Z",
+    "problem": "no price cache is configured"
+   }
+  },
+  {
+   "type": "ready"
+  },
+  {
+   "type": "context_usage",
+   "used": 0,
+   "limit": 1000000
+  },
+  {
+   "type": "turn_started"
+  },
+  {
+   "type": "message_done",
+   "stop_reason": "tool_use",
+   "usage": {
+    "input_tokens": 100,
+    "output_tokens": 10,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0
+   }
+  },
+  {
+   "type": "cost",
+   "model": "claude-opus-5-5",
+   "usage": {
+    "input_tokens": 100,
+    "output_tokens": 10,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0
+   },
+   "cost": {
+    "kind": "dollars",
+    "dollars": 0.0006,
+    "rows": [
+     "claude-opus-5-5"
+    ]
+   },
+   "prices": {
+    "kind": "bundled",
+    "as_of": "2026-09-28T06:07:45Z",
+    "problem": "no price cache is configured"
+   }
+  },
+  {
+   "type": "context_usage",
+   "used": 110,
+   "limit": 1000000
+  },
+  {
+   "type": "tool_call",
+   "name": "get_project",
+   "arguments": {}
+  },
+  {
+   "type": "tool_request",
+   "call_id": "1",
+   "name": "get_project",
+   "arguments_json": "{}"
+  },
+  {
+   "type": "tool_result",
+   "name": "get_project",
+   "is_error": true,
+   "summary": "Cancelled by the user."
+  },
+  {
+   "type": "turn_finished"
+  },
+  {
+   "type": "turn_started"
+  },
+  {
+   "type": "text_delta",
+   "text": "Fresh."
+  },
+  {
+   "type": "message_done",
+   "stop_reason": "end_turn",
+   "usage": {
+    "input_tokens": 100,
+    "output_tokens": 10,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0
+   }
+  },
+  {
+   "type": "cost",
+   "model": "claude-opus-5-5",
+   "usage": {
+    "input_tokens": 100,
+    "output_tokens": 10,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0
+   },
+   "cost": {
+    "kind": "dollars",
+    "dollars": 0.0006,
+    "rows": [
+     "claude-opus-5-5"
+    ]
+   },
+   "prices": {
+    "kind": "bundled",
+    "as_of": "2026-09-28T06:07:45Z",
+    "problem": "no price cache is configured"
+   }
+  },
+  {
+   "type": "context_usage",
+   "used": 110,
+   "limit": 1000000
+  },
+  {
+   "type": "turn_finished"
+  }
+ ],
+ "requests": [
+  {
+   "method": "GET",
+   "path": "/v1/models/claude-opus-5-5",
+   "headers": {
+    "accept": "application/json",
+    "accept-encoding": "<by presence>",
+    "accept-language": "<by presence>",
+    "anthropic-version": "2026-10-21",
+    "authorization": "Bearer proof-key",
+    "connection": "<by presence>",
+    "host": "<by presence>",
+    "user-agent": "Anthropic/Swift 2.3.0",
+    "x-stainless-arch": "<by presence>",
+    "x-stainless-async": "async:swift-concurrency",
+    "x-stainless-lang": "swift",
+    "x-stainless-os": "<by presence>",
+    "x-stainless-package-version": "2.3.0",
+    "x-stainless-raw-response": "raw",
+    "x-stainless-read-timeout": "600.0",
+    "x-stainless-retry-count": "0",
+    "x-stainless-runtime": "swift",
+    "x-stainless-runtime-version": "<by presence>",
+    "x-stainless-timeout": "NOT_GIVEN"
+   },
+   "body": null,
+   "bytes": 0
+  },
+  {
+   "method": "POST",
+   "path": "/v1/messages",
+   "headers": {
+    "accept": "application/json",
+    "accept-encoding": "<by presence>",
+    "accept-language": "<by presence>",
+    "anthropic-beta": "thinking-display-updates-2026-08-18,server-side-fallback-2026-07-01,compact-2026-09-04",
+    "anthropic-version": "2026-10-21",
+    "authorization": "Bearer proof-key",
+    "connection": "<by presence>",
+    "content-length": "1542",
+    "content-type": "application/json",
+    "host": "<by presence>",
+    "user-agent": "Anthropic/Swift 2.3.0",
+    "x-stainless-arch": "<by presence>",
+    "x-stainless-async": "async:swift-concurrency",
+    "x-stainless-lang": "swift",
+    "x-stainless-os": "<by presence>",
+    "x-stainless-package-version": "2.3.0",
+    "x-stainless-read-timeout": "600.0",
+    "x-stainless-retry-count": "0",
+    "x-stainless-runtime": "swift",
+    "x-stainless-runtime-version": "<by presence>",
+    "x-stainless-timeout": "NOT_GIVEN"
+   },
+   "body": {
+    "model": "claude-opus-5-5",
+    "max_tokens": 32000,
+    "system": [
+     {
+      "type": "text",
+      "text": "You edit the open Frame Job project for the person. «Quotes», é and a\nsecond line.\n\nTool search finds: render_frame, list_graphics, get_media_analysis.",
+      "cache_control": {
+       "type": "ephemeral"
+      }
+     }
+    ],
+    "tools": [
+     {
+      "type": "tool_search_tool_bm25_20251119",
+      "name": "tool_search_tool_bm25"
+     },
+     {
+      "name": "get_project",
+      "description": "Answers the open project as JSON.",
+      "input_schema": {
+       "additionalProperties": false,
+       "properties": {},
+       "type": "object"
+      }
+     },
+     {
+      "name": "set_playhead",
+      "description": "Moves the playhead.",
+      "input_schema": {
+       "properties": {
+        "seconds": {
+         "description": "Where, in seconds.",
+         "minimum": 0,
+         "type": "number"
+        }
+       },
+       "required": [
+        "seconds"
+       ],
+       "type": "object"
+      }
+     },
+     {
+      "name": "render_frame",
+      "description": "Renders the frame at a time to a PNG.",
+      "input_schema": {
+       "properties": {
+        "at": {
+         "type": "number"
+        },
+        "width": {
+         "type": "integer"
+        }
+       },
+       "type": "object"
+      },
+      "defer_loading": true
+     },
+     {
+      "name": "list_graphics",
+      "description": "Lists the project's graphics.",
+      "input_schema": {
+       "properties": {},
+       "type": "object"
+      },
+      "defer_loading": true
+     },
+     {
+      "name": "get_media_analysis",
+      "description": "Answers a media's cached analysis.",
+      "input_schema": {
+       "properties": {
+        "kind": {
+         "enum": [
+          "faces",
+          "shots"
+         ],
+         "type": "string"
+        },
+        "media": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "media",
+        "kind"
+       ],
+       "type": "object"
+      },
+      "defer_loading": true
+     }
+    ],
+    "messages": [
+     {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "Start."
+       }
+      ]
+     }
+    ],
+    "cache_control": {
+     "type": "ephemeral"
+    },
+    "output_config": {
+     "effort": "medium"
+    },
+    "thinking": {
+     "type": "adaptive",
+     "display": "updates"
+    },
+    "fallbacks": "default",
+    "stream": true
+   },
+   "bytes": 1542
+  },
+  {
+   "method": "POST",
+   "path": "/v1/messages",
+   "headers": {
+    "accept": "application/json",
+    "accept-encoding": "<by presence>",
+    "accept-language": "<by presence>",
+    "anthropic-beta": "thinking-display-updates-2026-08-18,server-side-fallback-2026-07-01,compact-2026-09-04",
+    "anthropic-version": "2026-10-21",
+    "authorization": "Bearer proof-key",
+    "connection": "<by presence>",
+    "content-length": "1825",
+    "content-type": "application/json",
+    "host": "<by presence>",
+    "user-agent": "Anthropic/Swift 2.3.0",
+    "x-stainless-arch": "<by presence>",
+    "x-stainless-async": "async:swift-concurrency",
+    "x-stainless-lang": "swift",
+    "x-stainless-os": "<by presence>",
+    "x-stainless-package-version": "2.3.0",
+    "x-stainless-read-timeout": "600.0",
+    "x-stainless-retry-count": "0",
+    "x-stainless-runtime": "swift",
+    "x-stainless-runtime-version": "<by presence>",
+    "x-stainless-timeout": "NOT_GIVEN"
+   },
+   "body": {
+    "model": "claude-opus-5-5",
+    "max_tokens": 32000,
+    "system": [
+     {
+      "type": "text",
+      "text": "You edit the open Frame Job project for the person. «Quotes», é and a\nsecond line.\n\nTool search finds: render_frame, list_graphics, get_media_analysis.",
+      "cache_control": {
+       "type": "ephemeral"
+      }
+     }
+    ],
+    "tools": [
+     {
+      "type": "tool_search_tool_bm25_20251119",
+      "name": "tool_search_tool_bm25"
+     },
+     {
+      "name": "get_project",
+      "description": "Answers the open project as JSON.",
+      "input_schema": {
+       "additionalProperties": false,
+       "properties": {},
+       "type": "object"
+      }
+     },
+     {
+      "name": "set_playhead",
+      "description": "Moves the playhead.",
+      "input_schema": {
+       "properties": {
+        "seconds": {
+         "description": "Where, in seconds.",
+         "minimum": 0,
+         "type": "number"
+        }
+       },
+       "required": [
+        "seconds"
+       ],
+       "type": "object"
+      }
+     },
+     {
+      "name": "render_frame",
+      "description": "Renders the frame at a time to a PNG.",
+      "input_schema": {
+       "properties": {
+        "at": {
+         "type": "number"
+        },
+        "width": {
+         "type": "integer"
+        }
+       },
+       "type": "object"
+      },
+      "defer_loading": true
+     },
+     {
+      "name": "list_graphics",
+      "description": "Lists the project's graphics.",
+      "input_schema": {
+       "properties": {},
+       "type": "object"
+      },
+      "defer_loading": true
+     },
+     {
+      "name": "get_media_analysis",
+      "description": "Answers a media's cached analysis.",
+      "input_schema": {
+       "properties": {
+        "kind": {
+         "enum": [
+          "faces",
+          "shots"
+         ],
+         "type": "string"
+        },
+        "media": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "media",
+        "kind"
+       ],
+       "type": "object"
+      },
+      "defer_loading": true
+     }
+    ],
+    "messages": [
+     {
+      "role": "user",
+      "content": [
+       {
+        "type": "text",
+        "text": "Start."
+       }
+      ]
+     },
+     {
+      "role": "assistant",
+      "content": [
+       {
+        "type": "tool_use",
+        "id": "toolu_1",
+        "name": "get_project",
+        "input": {}
+       }
+      ]
+     },
+     {
+      "role": "user",
+      "content": [
+       {
+        "type": "tool_result",
+        "tool_use_id": "toolu_1",
+        "content": [
+         {
+          "type": "text",
+          "text": "Cancelled by the user."
+         }
+        ],
+        "is_error": true
+       },
+       {
+        "type": "text",
+        "text": "Again."
+       }
+      ]
+     }
+    ],
+    "cache_control": {
+     "type": "ephemeral"
+    },
+    "output_config": {
+     "effort": "medium"
+    },
+    "thinking": {
+     "type": "adaptive",
+     "display": "updates"
+    },
+    "fallbacks": "default",
+    "stream": true
+   },
+   "bytes": 1825
+  }
+ ],
+ "files": {}
+}

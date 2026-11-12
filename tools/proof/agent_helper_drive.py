@@ -15,6 +15,19 @@ SA-5, SA-6; `designs/swift-helper.md` §9 SA2 and its record in §13).
                                                                     # the persistent mutant tree
     python3 tools/proof/agent_helper_drive.py --mutant drive-same-helper   # both sides Swift: every
                                                                     # row allows nothing
+    python3 tools/proof/agent_helper_drive.py --record              # rewrite the recordings (SA-13)
+
+The recordings (spec §11 SA-13). Each case's Swift run is also held to
+`tools/proof/agent_helper_recorded/<case>.json`: its events, every request (method, path, headers,
+body, bytes) and the cache files it wrote (table and bytes), as SA2 compares them. Three
+comparison rules put the same placeholders in the run and the recording: the clock readings below
+are `<clock>`; a cache file's `source`, which must be this run's feed, is `<feed>` (its port is
+chosen per run); and BY_PRESENCE's headers, which the host and the toolchain set, are
+`<by presence>`, the headers a set in no order.
+A case with no recording FAILs, and the `recordings` row FAILs a recording with no case. `--record`
+writes each case's recording from the Swift side of this run, before any allowed row rewrites it,
+and refuses (exit 2, nothing written) when any check of the run other than a recording failed;
+it prints each case `new`, `same` or `changed` with the paths that moved.
 
 The helpers. B0 builds the Bun helper with `agent/build.sh helper` into
 `tools/proof/work/agent_helper_drive/bun-target/` (spend_proof.py's call; no bun is build.sh's own
@@ -101,6 +114,12 @@ MODEL = "claude-opus-5-5"
 KEY = "proof-key"
 WALL_BUILD, WALL_EVENT, WALL_EXIT = 900, 30, 10
 STDERR_PREFIX = "framejob-agent: "
+RECORDED = HERE / "agent_helper_recorded"
+# The headers a recording holds by presence only (spec §11 SA-13): the stand-in's port, and what
+# URLSession, the OS and the toolchain set, which another Mac or Xcode may change.
+BY_PRESENCE = ("host", "accept-language", "accept-encoding", "connection", "x-stainless-arch",
+               "x-stainless-os", "x-stainless-runtime-version")
+PRESENT = "<by presence>"
 SIDES = ("bun", "swift")
 SWITCH = "drive-same-helper"
 MUTANT = None
@@ -808,26 +827,31 @@ def short(value, limit=160):
     return out if len(out) <= limit else out[:limit - 1] + "…"
 
 
-def difference(a, b, path="$"):
-    """Where `a` (bun) and `b` (swift) first differ, and how, or None."""
+def difference(a, b, path="$", sides=("bun", "swift")):
+    """Where `a` (the first side) and `b` (the second) first differ, and how, or None."""
+    return next(iter(differences(a, b, path, sides)), None)
+
+
+def differences(a, b, path="$", sides=("bun", "swift")):
+    """Every place `a` and `b` differ, in order: a key set, a key order, a length or a value."""
     if same(a, b):
-        return None
+        return []
     if isinstance(a, dict) and isinstance(b, dict):
         if set(a) != set(b):
-            return (f"{path}: keys only in bun {[k for k in a if k not in b]}, "
-                    f"only in swift {[k for k in b if k not in a]}")
+            return [f"{path}: keys only in {sides[0]} {[k for k in a if k not in b]}, "
+                    f"only in {sides[1]} {[k for k in b if k not in a]}"]
+        out = []
         for k in a:
-            found = difference(a[k], b[k], f"{path}.{k}")
-            if found:
-                return found
-        return f"{path}: key order {list(a)} / {list(b)}"
+            out += differences(a[k], b[k], f"{path}.{k}", sides)
+        return out or [f"{path}: key order {list(a)} / {list(b)}"]
     if isinstance(a, list) and isinstance(b, list):
+        out = []
         for at, (x, y) in enumerate(zip(a, b)):
-            found = difference(x, y, f"{path}[{at}]")
-            if found:
-                return found
-        return f"{path}: length {len(a)} / {len(b)}"
-    return f"{path}: {short(a)} / {short(b)}"
+            out += differences(x, y, f"{path}[{at}]", sides)
+        if len(a) != len(b):
+            out.append(f"{path}: length {len(a)} / {len(b)}")
+        return out
+    return [f"{path}: {short(a)} / {short(b)}"]
 
 
 def is_clock(value, ctx):
@@ -846,8 +870,9 @@ def is_clock(value, ctx):
 
 
 def unclock(run, ctx):
-    """The comparison rule for clock readings (the module doc): `as_of` of a fetched or cached
-    source, and a cache file's `fetched_at`, checked and then replaced by `<clock>`."""
+    """The comparison rules for clock readings and the feed (the module doc): `as_of` of a
+    fetched or cached source, and a cache file's `fetched_at`, checked and then replaced by
+    `<clock>`; a cache file's `source`, checked and then replaced by `<feed>`."""
     problems = []
 
     def source(value, where):
@@ -878,8 +903,16 @@ def unclock(run, ctx):
             problems.append(f"{name}'s fetched_at {short(stamp)} is not a time in this run")
             continue
         table["fetched_at"] = "<clock>"
+        layout = data.replace(stamp.encode(), b"<clock>")
+        # The table's source is the URL it was fetched from: this drive's own feed, on a port
+        # chosen per run (spec §11 SA-13). Checked, then `<feed>`.
+        url = table.get("source")
+        if url != ctx.feed.url or layout.count(url.encode()) != 1:
+            problems.append(f"{name}'s source {short(url)} is not this run's feed once")
+            continue
+        table["source"] = "<feed>"
         run["tables"][name] = table
-        run["layouts"][name] = data.replace(stamp.encode(), b"<clock>")
+        run["layouts"][name] = layout.replace(url.encode(), b"<feed>")
     return problems
 
 
@@ -893,7 +926,8 @@ class Pair:
 
 
 def compare(name, bun, swift, rows, ctx):
-    """(problems, {row id: the differences it explained}) for one case."""
+    """(problems, {row id: the differences it explained}, the Swift run as a recording holds it)
+    for one case."""
     pair = Pair(name, bun, swift)
     problems = []
     for side in SIDES:
@@ -902,6 +936,7 @@ def compare(name, bun, swift, rows, ctx):
         problems += [f"{side}: {p}" for p in unclock(run, ctx)]
         if run["exit"] != 0:
             problems.append(f"{side}: exit {run['exit']} after stdin closed")
+    seen = recorded_form(pair.swift)
     for line in pair.swift["stderr"]:
         if not line.startswith(STDERR_PREFIX):
             problems.append(f"swift: a stderr line without {STDERR_PREFIX!r}: {short(line)}")
@@ -929,16 +964,18 @@ def compare(name, bun, swift, rows, ctx):
     problems += events_differ(pair.bun["events"], pair.swift["events"])
     problems += requests_differ(pair.bun["requests"], pair.swift["requests"])
     problems += files_differ(pair)
-    return problems, used
+    return problems, used, seen
 
 
-def events_differ(bun, swift):
+def events_differ(bun, swift, sides=("bun", "swift")):
+    first, second = sides
     for at, (b, s) in enumerate(zip(bun, swift)):
         if not same(b, s):
-            return [f"event {at}: {difference(b, s, '$')}; bun {short(b)}, swift {short(s)}"]
+            return [f"event {at}: {difference(b, s, '$', sides)}; {first} {short(b)}, "
+                    f"{second} {short(s)}"]
     if len(bun) != len(swift):
-        side, extra = ("bun", bun[len(swift)]) if len(bun) > len(swift) else ("swift", swift[len(bun)])
-        return [f"events: bun {len(bun)}, swift {len(swift)}; {side}'s next {short(extra)}"]
+        side, extra = (first, bun[len(swift)]) if len(bun) > len(swift) else (second, swift[len(bun)])
+        return [f"events: {first} {len(bun)}, {second} {len(swift)}; {side}'s next {short(extra)}"]
     return []
 
 
@@ -981,6 +1018,129 @@ def files_differ(pair):
         elif b != s:
             out.append(f"{name}: the same table in different bytes ({len(b)} / {len(s)})")
     return out
+
+
+# ---------------------------------------------------------------------------
+# The recordings (spec §11 SA-13).
+
+
+def recorded_form(run):
+    """A run, once `unclock` has put `<clock>` in it, as a recording holds it: its events, every
+    request with BY_PRESENCE's headers `<by presence>` and the headers sorted by name (a set, in
+    no order), and each cache file's table and bytes."""
+    requests = []
+    for request in run["requests"]:
+        headers = request.get("headers") or {}
+        requests.append({"method": request.get("method"), "path": request.get("path"),
+                         "headers": {name: PRESENT if name in BY_PRESENCE else headers[name]
+                                     for name in sorted(headers)},
+                         "body": copy.deepcopy(request.get("body")),
+                         "bytes": request.get("bytes")})
+    files = {name: {"table": copy.deepcopy(table),
+                    "bytes": run["layouts"][name].decode("utf-8", "replace")}
+             for name, table in run.get("tables", {}).items()}
+    return {"events": copy.deepcopy(run["events"]), "requests": requests, "files": files}
+
+
+def recording_path(name):
+    return RECORDED / f"{name}.json"
+
+
+def read_recording(name):
+    """The case's recording, or None when it has none."""
+    path = recording_path(name)
+    if not path.is_file():
+        return None
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def recording_bytes(name, seen):
+    document = {"case": name, "events": seen["events"], "requests": seen["requests"],
+                "files": seen["files"]}
+    return (json.dumps(document, indent=1, ensure_ascii=False) + "\n").encode("utf-8")
+
+
+def against(name, seen, recorded):
+    """How a run, in its recorded form, differs from the case's recording: [] when it does not."""
+    if recorded is None:
+        return [f"no recording {recording_path(name).relative_to(ROOT)}: write it with --record"]
+    sides = ("recorded", "this run")
+    out = [f"against the recording, {p}" for p in
+           events_differ(recorded.get("events", []), seen["events"], sides)]
+    mine, theirs = recorded.get("requests", []), seen["requests"]
+    if len(mine) != len(theirs):
+        out.append(f"against the recording, requests: recorded "
+                   f"{[str(r.get('method')) + ' ' + str(r.get('path')) for r in mine]}, this run "
+                   f"{[str(r.get('method')) + ' ' + str(r.get('path')) for r in theirs]}")
+    for at, (r, s) in enumerate(zip(mine, theirs)):
+        if (r.get("method"), r.get("path")) != (s.get("method"), s.get("path")):
+            out.append(f"against the recording, request {at}: recorded {r.get('method')} "
+                       f"{r.get('path')}, this run {s.get('method')} {s.get('path')}")
+            break
+        if r.get("headers") != s.get("headers"):
+            hr, hs = r.get("headers") or {}, s.get("headers") or {}
+            diff = [f"{n}: {short(hr.get(n), 60)} / {short(hs.get(n), 60)}"
+                    for n in sorted(set(hr) | set(hs)) if hr.get(n) != hs.get(n)]
+            out.append(f"against the recording, request {at} headers: {'; '.join(diff)}")
+            break
+        found = difference(r.get("body"), s.get("body"), "body", sides)
+        if found:
+            out.append(f"against the recording, request {at} {r.get('method')} {r.get('path')}: "
+                       f"{found}")
+            break
+        if r.get("bytes") != s.get("bytes"):
+            out.append(f"against the recording, request {at}: {r.get('bytes')} / "
+                       f"{s.get('bytes')} bytes")
+            break
+    files = recorded.get("files", {})
+    if sorted(files) != sorted(seen["files"]):
+        out.append(f"against the recording, cache files: recorded {sorted(files)}, this run "
+                   f"{sorted(seen['files'])}")
+    for file in sorted(set(files) & set(seen["files"])):
+        found = difference(files[file].get("table"), seen["files"][file]["table"], file, sides)
+        if found:
+            out.append(f"against the recording, {found}")
+        elif files[file].get("bytes") != seen["files"][file]["bytes"]:
+            out.append(f"against the recording, {file}: the same table in other bytes")
+    return out
+
+
+def recordings_row(names):
+    """`recordings`: one recording per case, and none for a case the drive does not have."""
+    held = sorted(path.stem for path in RECORDED.glob("*.json")) if RECORDED.is_dir() else []
+    stray = [name for name in held if name not in CASES]
+    missing = [name for name in CASES if name not in held]
+    if stray:
+        return False, f"a recording with no case: {', '.join(stray)} (remove it)"
+    if missing:
+        return False, f"no recording for {', '.join(missing)}"
+    return True, f"{len(held)} recordings, one per case"
+
+
+def record(names, seen_by_case):
+    """Writes each case's recording; prints `new`, `same` or `changed` with the paths that moved."""
+    RECORDED.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        seen = seen_by_case[name]
+        old = read_recording(name)
+        data = recording_bytes(name, seen)
+        if old is None:
+            said = "new"
+        else:
+            moved = []
+            for key in ("events", "requests", "files"):
+                moved += differences(old.get(key), json.loads(data)[key], key,
+                                     ("recorded", "this run"))
+            if moved:
+                said = (f"changed: {'; '.join(moved[:8])}"
+                        + (f"; and {len(moved) - 8} more" if len(moved) > 8 else ""))
+            elif recording_path(name).read_bytes() != data:
+                said = "changed: the same content in other bytes"
+            else:
+                said = "same"
+        recording_path(name).write_bytes(data)
+        print(f"recorded {name}: {said}", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -1428,15 +1588,18 @@ def ordered(names):
     return out
 
 
-def drive(names, bun, swift, rows, ctx):
-    """Runs and compares each case, printing its line; answers {case: (problems, rows used)}."""
+def drive(names, bun, swift, rows, ctx, held=True):
+    """Runs and compares each case, printing its line; answers {case: (problems, rows used, the
+    Swift run as a recording holds it)}. `held`: the Swift run is also held to its recording."""
     results = {}
     for name in names:
         started = time.monotonic()
         runs = {side: run_case(name, side, path, ctx)
                 for side, path in (("bun", bun), ("swift", swift))}
-        problems, used = compare(name, runs["bun"], runs["swift"], rows, ctx)
-        results[name] = (problems, used)
+        problems, used, seen = compare(name, runs["bun"], runs["swift"], rows, ctx)
+        if held:
+            problems += against(name, seen, read_recording(name))
+        results[name] = (problems, used, seen)
         took = time.monotonic() - started
         rows_said = ", ".join(f"{k} {v}" for k, v in used.items()) or "none"
         print(f"{name} {'ok' if not problems else 'FAIL'} — {took:.1f} s; rows: {rows_said}"
@@ -1507,18 +1670,28 @@ def plain(args, names):
         bun = swift
     ctx = Context()
     try:
-        results = drive(names, bun, swift, ALLOWED, ctx)
+        results = drive(names, bun, swift, ALLOWED, ctx, held=not args.record)
     finally:
         ctx.stop()
-    checks = {name: (not problems, "") for name, (problems, _) in results.items()}
+    checks = {name: (not problems, "") for name, (problems, _, _) in results.items()}
     for check, (ok, detail) in row_checks(names, results, ALLOWED).items():
         checks[check] = (ok, detail)
         print(f"{check} {'ok' if ok else 'FAIL'} — {detail}", flush=True)
+    if not args.record:
+        ok, detail = recordings_row(names)
+        checks["recordings"] = (ok, detail)
+        print(f"recordings {'ok' if ok else 'FAIL'} — {detail}", flush=True)
     passed = sum(1 for ok, _ in checks.values() if ok)
     print(f"{passed}/{len(checks)}", flush=True)
     if MUTANT == SWITCH:
         named = ["row:" + row["id"] for row in ALLOWED if declared(row, names)]
         return verdict(SWITCH, named, checks)
+    if args.record:
+        if passed != len(checks):
+            print("record: refused — a check of this run failed, so nothing was written",
+                  flush=True)
+            return 2
+        record(names, {name: seen for name, (_, _, seen) in results.items()})
     return 0 if passed == len(checks) else 1
 
 
@@ -1547,10 +1720,10 @@ def drop(args, names, row_id):
     rows = [r for r in ALLOWED if r["id"] != row_id]
     ctx = Context()
     try:
-        results = drive(names, bun, swift, rows, ctx)
+        results = drive(names, bun, swift, rows, ctx, held=False)
     finally:
         ctx.stop()
-    failed = sorted(name for name, (problems, _) in results.items() if problems)
+    failed = sorted(name for name, (problems, _, _) in results.items() if problems)
     if failed == want:
         print(f"drop {row_id}: caught — exactly {', '.join(want)} failed", flush=True)
         return 1
@@ -1566,15 +1739,15 @@ def rows_needed(args, names):
         return 1
     ctx = Context()
     try:
-        results = drive(names, bun, swift, ALLOWED, ctx)
-        base = sorted(name for name, (problems, _) in results.items() if problems)
+        results = drive(names, bun, swift, ALLOWED, ctx, held=False)
+        base = sorted(name for name, (problems, _, _) in results.items() if problems)
         good = not base
         if base:
             print(f"with every row, FAIL already: {base}", flush=True)
         for row in ALLOWED:
             want = sorted(declared(row, names))
             again = recompare(names, [r for r in ALLOWED if r is not row], ctx)
-            failed = sorted(name for name, (problems, _) in again.items() if problems)
+            failed = sorted(name for name, (problems, _, _) in again.items() if problems)
             ok = failed == want
             good &= ok
             print(f"row {row['id']} {'needed' if ok else 'FAIL'} — without it {len(failed)} "
@@ -1618,6 +1791,8 @@ def main():
     parser.add_argument("--drop", choices=[row["id"] for row in ALLOWED])
     parser.add_argument("--rows-needed", action="store_true")
     parser.add_argument("--mutant", choices=sorted(SWIFT_MUTANTS) + [SWITCH])
+    parser.add_argument("--record", action="store_true",
+                        help="rewrite the recordings from this run's Swift side (spec §11 SA-13)")
     args = parser.parse_args()
     if args.list:
         listing()
@@ -1627,6 +1802,10 @@ def main():
     if unknown:
         parser.error(f"no case {', '.join(unknown)}")
     names = ordered(args.cases.split(",") if args.cases else list(CASES))
+    if args.record and (args.mutant or args.drop or args.rows_needed):
+        print("record: refused — a recording is written only from a plain run of the tree's "
+              "helper, never with --mutant, --drop or --rows-needed", flush=True)
+        return 2
     if args.drop:
         return drop(args, names, args.drop)
     if args.rows_needed:
