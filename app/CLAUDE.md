@@ -3792,8 +3792,11 @@ free.
   volume alone, any other gets `{volume, limiter}` with the volume solved
   through `AudioLimiterModel`, the clip limiter at block rate over
   `ClipLoudness.Reading.steps` and `stepPeaks`; ×32 the one cap,
-  `limited_by: max_gain`) in, ops out, measured PRE-FADER
-  from the plan segment, REPLACING `volume` so a second press is a no-op,
+  `limited_by: max_gain`; after a run `verifiedLimit` adds `verify_renders`,
+  AU-167, and `limitNote` is the three tools' note, which names a limiter an
+  action's end turns on as the likely reason for a ×32 stop through
+  `actionLimiterHeld` and `endLimiterClips`, AU-168) in, ops out, measured
+  PRE-FADER from the plan segment, REPLACING `volume` so a second press is a no-op,
   always to BASE props; `audioSegments(in:)` and `admit(_:in:segments:)` are
   both modes' admission. `ClipLoudness` is a clip's reading over the window
   that plays (the export's dual mono; the clip's own channel pick, mono fold
@@ -3809,7 +3812,9 @@ free.
 - `ProcessedLoudness.swift` — a clip measured through its own chain (spec §11
   AU-64): `needsRender` (the base audio, or a stage an action's end switches
   on, AU-159, or a limiter an action's end sets or keys off, `endSetsLimiter`,
-  AU-165), the measurement plan (the clip's segments, pre-fader
+  AU-165; `endLimiterOn`, a limiter an action's end turns on, not a null, which
+  the tools' note and Enhance's reason name at a ×32 stop, AU-168), the
+  measurement plan (the clip's segments, pre-fader
   but for one constant ramp at the trial's base volume), the render under a
   fresh key through `Exporter.withOfflineAudio`, the build and one float mix
   read into a `StepLoudnessMeter`, and At volume's `Memo` (R0, and beside it

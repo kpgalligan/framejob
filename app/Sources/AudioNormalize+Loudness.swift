@@ -22,8 +22,10 @@ extension AudioNormalize {
     /// the target gets the clip limiter at this ceiling (AU-24).
     static let ceilingDBTP = -1.0
 
-    /// The cap that bit, when one did: the volume ceiling (AU-24), or the
-    /// verify renders running out away from the target (AU-167).
+    /// The cap that bit, when one did: the volume ceiling (AU-24; the note
+    /// names a limiter an action's end turns on as the likely reason when
+    /// one did the holding, AU-168), or the verify renders running out away
+    /// from the target (AU-167).
     enum Limit: String {
         case maxGain = "max_gain"
         case verifyRenders = "verify_renders"
@@ -237,25 +239,78 @@ extension AudioNormalize {
         return nil
     }
 
+    /// AU-168 (b): whether a limiter an action's end turns on, not the
+    /// ceiling, is the likely reason `result` stopped at ×32 short of the
+    /// target: `endLimiter` (`ProcessedLoudness.endLimiterOn`), and R0 at
+    /// `maxGain` with nothing more holding it would have reached the target,
+    /// so what the last render lacks of that is what a limiter took. A row
+    /// with no R0 (off the cache) has no such end.
+    static func actionLimiterHeld(_ result: LoudnessResult, endLimiter: Bool, targetLUFS: Double)
+        -> Bool
+    {
+        guard endLimiter, result.limit == .maxGain, let r0 = result.processedLUFS else {
+            return false
+        }
+        return r0 + 20 * log10(maxGain) >= targetLUFS - LoudnessMeasureRun.verifyToleranceLU
+    }
+
+    /// The tools' note for `rows` (AU-168 (c)): the clips of `document`'s
+    /// open container an action's end turns a limiter on for, read from the
+    /// project the run measured (each tool's stale test has passed). Main.
+    static func limitNote(_ rows: [LoudnessResult], in document: ProjectDocument, targetLUFS: Double)
+        -> String?
+    {
+        limitNote(
+            rows, endLimiters: endLimiterClips(in: document, rows.map(\.clip)),
+            targetLUFS: targetLUFS)
+    }
+
+    /// The clips of `clips` an action's end turns a limiter on for
+    /// (`ProcessedLoudness.endLimiterOn`), in `document`'s open container.
+    /// Main.
+    static func endLimiterClips(in document: ProjectDocument, _ clips: [UInt32]) -> Set<UInt32> {
+        let snapshot = document.editedProject.snapshot
+        return Set(clips.filter { ProcessedLoudness.endLimiterOn(snapshot.clip($0)) })
+    }
+
     /// The `note` of `normalize_clip`, `enhance_voice` and `match_audio` for
     /// the clips a limit stopped (AU-167): the ceiling's clips in the sentence
-    /// it has always had, the verify bound's in their own with its usual
-    /// cause, then where to read each landing once. nil when none has one.
-    static func limitNote(_ rows: [(clip: UInt32, limit: Limit?)], targetLUFS: Double) -> String? {
-        func ids(_ limit: Limit) -> String? {
-            let clips = rows.filter { $0.limit == limit }
+    /// it has always had, but those an action's limiter likely held under
+    /// (`actionLimiterHeld`, `endLimiters` the clips it turns on for), whose
+    /// sentence names it in the ceiling's place (AU-168 (c)); the verify
+    /// bound's in their own with its usual cause, then where to read each
+    /// landing once. nil when none has one. The target is written to 0.001
+    /// LU, so a caller's −16 or −24.417 reads as it was asked and Match's
+    /// measured one does not run to seventeen figures (AU-168 (c)).
+    static func limitNote(_ rows: [LoudnessResult], endLimiters: Set<UInt32>, targetLUFS: Double)
+        -> String?
+    {
+        let shown = (targetLUFS * 1000).rounded() / 1000
+        func held(_ row: LoudnessResult) -> Bool {
+            actionLimiterHeld(
+                row, endLimiter: endLimiters.contains(row.clip), targetLUFS: targetLUFS)
+        }
+        func ids(_ limit: Limit, heldByAction: Bool = false) -> String? {
+            let clips = rows.filter { $0.limit == limit }.filter { held($0) == heldByAction }
             return clips.isEmpty ? nil : clips.map { String($0.clip) }.joined(separator: ", ")
         }
         var sentences: [String] = []
         if let ceiling = ids(.maxGain) {
             sentences.append(
-                "Clip(s) \(ceiling) stopped short of \(targetLUFS) LUFS: the volume that reaches "
+                "Clip(s) \(ceiling) stopped short of \(shown) LUFS: the volume that reaches "
                     + "it would pass the \(maxGainName) ceiling (limited_by max_gain).")
+        }
+        if let action = ids(.maxGain, heldByAction: true) {
+            sentences.append(
+                "Clip(s) \(action) stopped short of \(shown) LUFS at the \(maxGainName) "
+                    + "ceiling (limited_by max_gain), but the likely reason is a limiter an "
+                    + "action's end turns on: it holds the sound down harder as the volume "
+                    + "rises, so no volume reaches the target.")
         }
         if let bound = ids(.verifyRenders) {
             let tolerance = String(format: "%g", LoudnessMeasureRun.verifyToleranceLU)
             sentences.append(
-                "Clip(s) \(bound) ended more than \(tolerance) LU from \(targetLUFS) LUFS: the "
+                "Clip(s) \(bound) ended more than \(tolerance) LU from \(shown) LUFS: the "
                     + "renders that check the volume ran out before it landed within "
                     + "\(tolerance) LU (limited_by verify_renders), usually because a limiter "
                     + "holds the sound down harder as the volume rises.")

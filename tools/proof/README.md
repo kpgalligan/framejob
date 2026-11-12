@@ -27929,7 +27929,7 @@ runs only those parts while iterating; a recorded run sets nothing.
 
 ```sh
 python3 tools/proof/audio_ap6_probe.py             # E1–E3, E6–E18
-python3 tools/proof/audio_ap6_probe.py --mutants   # M1–M6, M8–M31
+python3 tools/proof/audio_ap6_probe.py --mutants   # M1–M6, M8–M37
 make app-debug && python3 tools/proof/proof_app.py launch
 python3 tools/proof/audio_ap6_proof.py <dir>/agent.sock
 ```
@@ -28017,6 +28017,36 @@ each `limited_by` null with no note, and (l)'s reason ending at its renders. Wit
 21/21 on Debug; after `make gate`, the whole proof 86/86 on Release ((f) −20.11, (g) −30.249,
 (i) and (k) −28.595 and (l) −29.551 at 20.84, each `verify_renders` with the note; V2's export at
 −15.97 and every V17 leg null) and `loudness_normalize_proof.py` 37/37 on Release (N4 and N6 null).
+
+**An action's limiter named at the ×32 stop (#608, spec §11 AU-168, 2026-11-12).** E15 and E18
+gain arms and six mutants, V16 one leg of four tools' answers (`AP6_ONLY=ceiling` runs it alone).
+
+| Row | What it holds |
+|---|---|
+| E15 | also `endLimiterOn` over the same clips: true for a limiter at an end and one beside a gate; false for a null (keyed off), an action of no duration, an end with no `limiter` key, the clip's own limiter alone and no clip |
+| E18 | also `limitNote` with the clips an action's end turns a limiter on for: of two ceiling clips the one in the set named with that limiter in the ceiling's place, the other in the ceiling's sentence, the tail once; both in it, no "would pass"; R0 at −50 (×32 of it short of −16 anyway) the ceiling's sentence byte for byte; ×32 of R0 0.05 LU short of the target the limiter, 0.15 LU short the ceiling; a row with no R0 the ceiling; a landed and a verify bound's clip in the set change nothing; Match's measured target −15.999999999117435 written as −16.0. `loudnessReason` at ×32 with an action's limiter naming it and no "would pass"; the verify bound's clause the same with or without one |
+| V16 | (m) (g)'s clip, a fresh project per leg: `enhance_voice` −16 and −20, `normalize_clip` −16 and `match_audio` (`eq: false`, the reference a plain clip of the recording at the volume that plays it at −16): `limited_by` `max_gain` at ×32 more than 0.1 LU short, as its figures say, R0 + 20·log10 32 at or over the target less 0.1, and the note naming the clip, `max_gain`, an action's end and a limiter, no "would pass"; Enhance's last reason the same; Match's note writing its target as −16.0 |
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M32 | the note ignores the clips set (the old behaviour) | E18 |
+| M33 | `endLimiterOn` counting a null | E15 |
+| M34 | the limiter named for any limit, not `max_gain` alone | E18 |
+| M35 | the reason ignores the clip's action limiter (the old behaviour) | E18 |
+| M36 | the limiter named whatever ×32 of R0 reaches | E18 |
+| M37 | the reach test without the 0.1 LU tolerance | E18 |
+
+Recorded 2026-11-12. Red: the probe did not build on the tree before AU-168 (no `endLimiterOn`,
+no `endLimiters`), and on a Debug build whose three tools passed no clips to the note and whose
+Enhance setup passed none, `AP6_ONLY=ceiling` passed 2 of 8: every leg answered the ceiling's
+sentence and Enhance's reason "the volume would pass 32×" (Enhance −29.118 at ×32 from R0
+−39.437; Normalize and Match −28.343 from R0 −41.643), Match's note printing its target
+−15.999999999117435. The E18 arm for that target was red (15/16) before the note wrote it to
+0.001 LU. With AU-168: the probe 16/16, M32–M37 6/6 killed (every one of the 36 mutants' anchors
+found once), `AP6_ONLY=ceiling` 9/9 on Debug; after `make gate`, the whole proof 94/94 on Release:
+(m) Enhance −16 and −20 at ×32 −29.117 from R0 −39.468 (×32 of it −9.365), Normalize and Match
+−28.343 from R0 −41.643 (−11.540), each note naming the action's limiter, Match's target written
+−16.0; (g) −30.249, (i) and (k) −28.595 and (l) −29.551 as before; V2's export at −15.97.
 
 ## Road map "audio" AP12 — Match Audio (`audio_ap12_probe.py` P1–P9, `audio_ap12_proof.py` A1–A8; twelve mutants; spec §11 AU-120…AU-129)
 

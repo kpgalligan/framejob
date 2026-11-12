@@ -154,7 +154,9 @@ extension AgentServer {
                     + String(format: "%g", LoudnessMeasureRun.verifyToleranceLU)
                     + " LU from the target after its last test render (usually a limiter "
                     + "holding the sound down harder as the volume rises), else null (note names "
-                    + "such clips), result_lufs says where it lands, "
+                    + "such clips, and a max_gain clip's likely reason as a limiter an action's "
+                    + "end turns on when it has one and its processed_lufs at the ceiling would "
+                    + "have reached the target), result_lufs says where it lands, "
                     + "result_true_peak_dbtp is held at the limiter's ceiling, and "
                     + "measured_lufs and true_peak_dbtp are the Volume section's Loudness "
                     + "readout. In loudness mode a clip with an active EQ, a hum notch, voice "

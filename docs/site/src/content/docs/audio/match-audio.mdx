@@ -46,7 +46,7 @@ The reference itself isn't changed. Frame Job measures it once as it sounds in t
 
 **Loudness** runs [Normalize](/audio/normalize/) in Loudness mode on each other clip, with the reference's loudness as the target. It sets the clip's volume, measured through the clip's settings as they'll be after the match. When the clip's peaks would pass −1 dBTP at that loudness, it also sets the clip's limiter at that ceiling.
 
-A clip so quiet that it needs more than the volume's ceiling of 32× stops there and ends up quieter than the reference. A clip whose renders run out more than 0.1 LU from the reference's loudness keeps the last volume, as [Normalize](/audio/normalize/#measure-through-a-clips-processing) does, and `match_audio` names it with `limited_by` `verify_renders`.
+A clip so quiet that it needs more than the volume's ceiling of 32× stops there and ends up quieter than the reference. So does one that a limiter switched on by an action holds down, and `match_audio`'s note then names that limiter as the likely reason. A clip whose renders run out more than 0.1 LU from the reference's loudness keeps the last volume, as [Normalize](/audio/normalize/#measure-through-a-clips-processing) does, and `match_audio` names it with `limited_by` `verify_renders`.
 
 Loudness doesn't need speech, so you can use it on music by unticking **EQ**.
 

@@ -144,6 +144,9 @@ enum AudioMeasureDoor {
         let input: AudioEnhance.Input
         let choices: [AudioEnhance.Choice]
         let targetLUFS: Double
+        /// The clips an action's end turns a limiter on for, read with the
+        /// rest (AU-168 (d)); a plan is landed only on the same project.
+        let endLimiters: Set<UInt32>
 
         /// The measurement run over the choices' jobs. Main.
         func makeRun(document: ProjectDocument) -> LoudnessMeasureRun {
@@ -153,7 +156,9 @@ enum AudioMeasureDoor {
         }
 
         func plan(_ outcome: LoudnessMeasureRun.Outcome) -> AudioEnhance.Plan {
-            AudioEnhance.plan(input, choices: choices, outcome: outcome, targetLUFS: targetLUFS)
+            AudioEnhance.plan(
+                input, choices: choices, outcome: outcome, targetLUFS: targetLUFS,
+                endLimiters: endLimiters)
         }
     }
 
@@ -163,7 +168,8 @@ enum AudioMeasureDoor {
     {
         guard let input = AudioEnhance.read(from: document, clips: clips) else { return nil }
         return EnhanceSetup(
-            input: input, choices: AudioEnhance.choose(input), targetLUFS: targetLUFS)
+            input: input, choices: AudioEnhance.choose(input), targetLUFS: targetLUFS,
+            endLimiters: AudioNormalize.endLimiterClips(in: document, clips))
     }
 
     /// Enhance Voice over a landed recording's voice clips (AU-68 (e)), at

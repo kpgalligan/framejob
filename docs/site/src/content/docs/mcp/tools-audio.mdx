@@ -97,7 +97,7 @@ In loudness mode:
 | `limiter` | The clip's limiter after the edit, or `null` for a volume alone. |
 | `result_lufs` | Where the clip lands. |
 | `result_true_peak_dbtp` | Its true peak after the edit, held at the limiter's ceiling. |
-| `limited_by` | `max_gain` when the volume ceiling stopped it short. `verify_renders` when a clip measured through its processing was still more than 0.1 LU from the target after its test renders, usually because a limiter holds the sound down harder as the volume rises. Otherwise `null`. |
+| `limited_by` | `max_gain` when the volume ceiling stopped it short, even when a limiter that an action switches on is what held the clip down: then `note` names that limiter as the likely reason no volume reaches the target. `verify_renders` when a clip measured through its processing was still more than 0.1 LU from the target after its test renders, usually because a limiter holds the sound down harder as the volume rises. Otherwise `null`. |
 
 Either mode adds `skipped`, one sentence per clip it left out, and `note` when the ceiling stopped a clip short or, in loudness mode, its test renders ran out away from the target. The note names those clips and why. The rest are still normalised.
 
@@ -146,7 +146,7 @@ It overwrites only `eq`, `isolation`, `noise_reduction`, `gate`, `leveller`, `de
 | `set` | Exactly the keys written, in `set_audio`'s spelling. |
 | `reasons` | One sentence per rule: the measurement, the threshold and what it set. |
 | `volume`, `processed_lufs`, `renders` | The volume written, the loudness through the new settings before it, and the renders it took. |
-| `result_lufs`, `result_true_peak_dbtp`, `limited_by` | Where the last render lands, and `limited_by` as `normalize_clip` answers it: `max_gain` when the volume ceiling stopped it short, `verify_renders` when its test renders ran out more than 0.1 LU from the target. |
+| `result_lufs`, `result_true_peak_dbtp`, `limited_by` | Where the last render lands, and `limited_by` as `normalize_clip` answers it: `max_gain` when the volume ceiling stopped it short, `verify_renders` when its test renders ran out more than 0.1 LU from the target. When a limiter that an action switches on held a `max_gain` clip down, the last reason names it, as the note does. |
 
 It adds `skipped` and `note` as `normalize_clip` does. A second call answers "Enhance Voice made no change".
 

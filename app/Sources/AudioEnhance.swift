@@ -346,10 +346,11 @@ enum AudioEnhance {
     /// AU-64): each choice's patch with its solve's volume and limiter, one
     /// `set_audio` per clip; a clip the run skipped is under `skipped`. Pure.
     /// A non-finite target falls back to the default and is reported as
-    /// `targetLUFS`.
+    /// `targetLUFS`. `endLimiters`, the clips an action's end turns a
+    /// limiter on for, shape the loudness reason (AU-168 (d)).
     static func plan(
         _ input: Input, choices: [Choice], outcome: LoudnessMeasureRun.Outcome,
-        targetLUFS: Double
+        targetLUFS: Double, endLimiters: Set<UInt32>
     ) -> Plan {
         let target = targetLUFS.isFinite ? targetLUFS : AudioNormalize.defaultTargetLUFS
         let solved = AudioNormalize.plan(outcome.input, targetLUFS: target, solved: outcome.solved)
@@ -362,7 +363,9 @@ enum AudioEnhance {
             var patch = choice.patch
             patch.limiter = .some(result.limiter ?? choice.limiter)
             patch.volume = result.volume
-            let loudness = loudnessReason(result, limiter: choice.limiter, target: target)
+            let loudness = loudnessReason(
+                result, limiter: choice.limiter, target: target,
+                endLimiter: endLimiters.contains(choice.clip))
             ops.append(.setAudio(clips: [choice.clip], patch: patch))
             rows.append(
                 Row(

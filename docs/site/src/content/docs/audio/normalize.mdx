@@ -99,6 +99,8 @@ With the limiter on as well, or a limiter that an action switches on or off, Nor
 
 If the last of those renders is still more than 0.1 LU from the target, Normalize keeps that volume and the clip lands off the target, above or below it. The usual cause is a limiter holding most of the clip down: turning the clip up makes it hold harder, so the loudness hardly moves. The button and the menu don't say so. `normalize_clip`'s answer does, with `limited_by` set to `verify_renders` and a note naming the clip.
 
+A limiter that an action switches on can also hold a clip down so hard that Normalize turns it up all the way to 3200 % and it still lands well short: no volume reaches the target while that limiter holds. `normalize_clip` answers `limited_by` `max_gain`, and its note names the action's limiter as the likely reason.
+
 This takes a moment per clip, seconds on a long one, and the first press waits for the clip's voice isolation or voice effect to render. A clip with none of this processing is measured from the analysis at once.
 
 Until Normalize or Enhance Voice has measured such a clip, the **At volume** readout shows "≈" in front of its figures, because they're from before the processing. See [Clip volume](/audio/volume/).

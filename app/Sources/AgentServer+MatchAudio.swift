@@ -69,7 +69,7 @@ extension AgentServer {
     }
 
     /// The answer to `plan`, on main: the reference, the rows, the skips,
-    /// the limits' note (AU-167) and the edit.
+    /// the limits' note (AU-167, AU-168) and the edit.
     private func matchAnswer(
         _ plan: AudioMatch.Plan, input: AudioMatch.Input, referenceLUFS: Double,
         document: ProjectDocument
@@ -93,7 +93,7 @@ extension AgentServer {
         }
         if let target = plan.targetLUFS,
             let note = AudioNormalize.limitNote(
-                plan.matched.map { (clip: $0.clip, limit: $0.loudness?.limit) }, targetLUFS: target)
+                plan.matched.compactMap(\.loudness), in: document, targetLUFS: target)
         {
             fields["note"] = note
         }

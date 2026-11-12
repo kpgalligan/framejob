@@ -54,6 +54,8 @@ audio_ap6_proof.py's V2, V12 and V13.
       one at the end of an action of no duration, an end with no `limiter`
       key, the clip's own limiter alone and no clip. `verifiesByRender` over
       its four cases (only no limiter and no end limiter answers from R0).
+      `endLimiterOn` (AU-168 (a), #608) over the same clips: true for a limiter
+      at an end and one beside a gate, false for the null and every other.
   E16 (AU-165 (c)) `Verified.holds` at its own volume and 0.04 dB away
       (true), 0.06 dB away, under another limiter and at volume 0 (false), a
       limited render with no limiter (false); the memo answers a verify
@@ -69,9 +71,17 @@ audio_ap6_proof.py's V2, V12 and V13.
       for byte; a verify clip named with `verify_renders` and a limiter, no
       `max_gain`; both, the tail once. `AudioEnhance.loudnessReason`: landed
       "."; the ceiling's clause kept; the verify bound "short of" or "over"
-      with a limiter and not "would pass".
+      with a limiter and not "would pass". AU-168 (#608): of two ceiling
+      clips the one an action's limiter is on for named with that limiter in
+      the ceiling's place, the other in the ceiling's sentence; both, no
+      "would pass"; R0 at −50, so ×32 of it short of −16 anyway, the ceiling's
+      sentence byte for byte; ×32 of R0 0.05 LU short names the limiter, 0.15
+      LU short the ceiling; a row with no R0 the ceiling; the set changing
+      nothing for a landed or a verify bound's clip; a measured target
+      (Match's, −15.999999999117435) written as −16.0; the reason at ×32 under
+      an action's limiter naming it, and the verify bound's clause unchanged.
 
---mutants runs M1–M6 and M8–M31 (M7 is the loudness probe's), each over its
+--mutants runs M1–M6 and M8–M37 (M7 is the loudness probe's), each over its
 own copy of app/Sources, scored killed when its named row fails. Build failures
 are scored. Needs samples/Rode-usb-mic.m4a. Output is under
 tools/proof/work/audio-ap6-probe.
@@ -183,6 +193,25 @@ MUTANTS = [
      "let clips = rows.filter { $0.limit != nil && limit == .maxGain }"),
     ("M31 reason-every-limit-the-ceiling", "E18", "AudioEnhance+Reasons.swift",
      "case .maxGain?:", "case .maxGain?, .verifyRenders?:"),
+    # AU-168 (#608): a limiter an action's end turns on, named at the ×32 stop.
+    ("M32 note-ignores-end-limiters", "E18", "AudioNormalize+Loudness.swift",
+     "row, endLimiter: endLimiters.contains(row.clip), targetLUFS: targetLUFS)",
+     "row, endLimiter: false, targetLUFS: targetLUFS)"),
+    ("M33 end-limiter-on-counts-a-null", "E15", "ProcessedLoudness.swift",
+     "if case .some(.some) = end.limiter { return true }",
+     "if case .some = end.limiter { return true }"),
+    ("M34 held-at-any-limit", "E18", "AudioNormalize+Loudness.swift",
+     "guard endLimiter, result.limit == .maxGain, let r0",
+     "guard endLimiter, result.limit != nil, let r0"),
+    ("M35 reason-ignores-end-limiter", "E18", "AudioEnhance+Reasons.swift",
+     "result, endLimiter: endLimiter, targetLUFS: target)",
+     "result, endLimiter: false, targetLUFS: target)"),
+    ("M36 held-without-reach", "E18", "AudioNormalize+Loudness.swift",
+     "return r0 + 20 * log10(maxGain) >= targetLUFS - LoudnessMeasureRun.verifyToleranceLU",
+     "return r0 > -.infinity"),
+    ("M37 reach-without-tolerance", "E18", "AudioNormalize+Loudness.swift",
+     "return r0 + 20 * log10(maxGain) >= targetLUFS - LoudnessMeasureRun.verifyToleranceLU",
+     "return r0 + 20 * log10(maxGain) >= targetLUFS"),
 ]
 
 

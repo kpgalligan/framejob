@@ -321,7 +321,8 @@ extension AgentServer {
     /// it took (null and 0 off the cache), the volume written, the clip's
     /// limiter after the edit (AU-24), where it lands, and the volume ceiling
     /// or the verify renders when either stopped it away from the target
-    /// (AU-167); a note names each such clip.
+    /// (AU-167); a note names each such clip, and a limiter an action's end
+    /// turns on as the likely reason for a ×32 stop (AU-168).
     private func normalizeLoudness(
         _ a: [String: Any], document: ProjectDocument, clips: [UInt32], stop: AgentCallCancel?
     ) throws -> String {
@@ -400,7 +401,7 @@ extension AgentServer {
             fields["skipped"] = plan.skipped.map { $0.description }
         }
         if let note = AudioNormalize.limitNote(
-            plan.normalized.map { (clip: $0.clip, limit: $0.limit) }, targetLUFS: plan.targetLUFS)
+            plan.normalized, in: document, targetLUFS: plan.targetLUFS)
         {
             fields["note"] = note
         }

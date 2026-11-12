@@ -93,7 +93,16 @@ samples/Rode-usb-mic.m4a, and `say` speech made here — one low-passed at
        more than 0.1 LU from target_lufs below ×32, and the note as (g). (l)
        enhance_voice −24 on (g)'s clip: limited_by `verify_renders` below ×32,
        the note as (g), the last reason "short of −24.0 LUFS" with a limiter
-       and no "would pass" (AU-167, #607).
+       and no "would pass" (AU-167, #607). (m) (g)'s clip, each leg a fresh
+       project, at a target its end limiter holds it under (AU-168, #608):
+       enhance_voice −16 and −20, normalize_clip −16, and match_audio (eq
+       false) to a plain clip of the recording at the volume that plays it at
+       −16. Each: limited_by `max_gain` at ×32 and over 0.1 LU short, as its
+       figures say, R0 + 20·log10 32 at or over the target less 0.1, and the
+       note naming the clip, `max_gain`, an action's end and a limiter, no
+       "would pass"; Enhance's last reason the same; match_audio's note
+       writes its measured target to 0.001 LU. AP6_ONLY=ceiling runs (m)
+       alone.
   V17  the clip limiter at a speed other than ×1 (#399, spec §11 AU-162): the
        owner's recording, a gate and the limiter at −1 dBTP, normalize_clip
        (loudness, −18), one fresh project per leg: (a) ×1; (b) ×1.5 and (f)
@@ -976,8 +985,8 @@ def enhance_bound_rows(m):
     """(l) enhance_voice on (g)'s clip (an end gate and limiter at −24 dBTP),
     target −24: Enhance's own chain and limiter, its volume checked by
     render, the end limiter holding the sound below ×32 (−16 and −20 climb
-    to ×32 and answer max_gain, AU-167 (e)), so the verify bound is named in
-    the row, the note and the last reason (AU-167)."""
+    to ×32, (m)), so the verify bound is named in the row, the note and the
+    last reason (AU-167)."""
     s = Session(m, "ap6-action-l")
     clip = place(s, "ap6-rode.wav")
     keyed(s, clip, {"gate": {"threshold_db": -30}, "limiter": {"ceiling_db": -24}})
@@ -994,6 +1003,78 @@ def enhance_bound_rows(m):
     check("short of −24.0 LUFS: " in reason and "limiter holds" in reason
           and "would pass" not in reason,
           f"V16 (l) the last reason: {reason!r}")
+
+
+def action_note(answer, clip):
+    """Whether the answer's note names `clip` as stopped at the ceiling with
+    the limiter an action's end turns on as the likely reason, and not the
+    ceiling's "would pass" (AU-168)."""
+    note = answer.get("note") or ""
+    return (f"Clip(s) {clip} " in note and "(limited_by max_gain)" in note
+            and "action's end" in note and "limiter" in note and "would pass" not in note)
+
+
+def ceiling_row(answer, row, clip, target, what):
+    """(m)'s claims on one answer: `max_gain` at ×32 as the figures say,
+    R0 at ×32 reaching the target (so the sentence is the limiter's), and
+    the note."""
+    r0 = row.get("processed_lufs")
+    reach = None if r0 is None else r0 + 20 * np.log10(32)
+    return check(row["limited_by"] == "max_gain" == limit_of(row, target) and row["volume"] >= 32
+                 and row["result_lufs"] < target - 0.1 and reach is not None
+                 and reach >= target - 0.1 and action_note(answer, clip),
+                 f"V16 (m) {what}: limited_by {row['limited_by']} (max_gain) at volume "
+                 f"{f(row['volume'], 4)} (≥ 32), result {f(row['result_lufs'], 3)} against "
+                 f"{f(target, 3)}, R0 {f(r0, 3)} reaching {f(reach, 3)} at ×32, renders "
+                 f"{row.get('renders')}; note {answer.get('note')!r}")
+
+
+def ceiling_rows(m):
+    """(m) (g)'s clip (an end gate and limiter at −24 dBTP) at targets its
+    end limiter holds it under, each leg a fresh project: the ×32 stop's
+    note names that limiter in each tool, and Enhance's reason too
+    (AU-168, #608)."""
+    print("\nV16 (m) — an action's limiter named at the ×32 stop")
+    end = {"gate": {"threshold_db": -30}, "limiter": {"ceiling_db": -24}}
+    for target in (-16, -20):
+        s = Session(m, f"ap6-action-m{-target}")
+        clip = place(s, "ap6-rode.wav")
+        keyed(s, clip, end)
+        answer = enhance(s, [clip], target_lufs=target)
+        m.call("close_project", project=s.path, discard=True)
+        row = answer["enhanced"][0]
+        ceiling_row(answer, row, clip, target, f"enhance_voice {target}")
+        reason = row["reasons"][-1] if row.get("reasons") else ""
+        check(f"short of −{-target}.0 LUFS at 32×" in reason
+              and "action's end" in reason and "limiter" in reason
+              and "would pass" not in reason,
+              f"V16 (m) enhance_voice {target}: the last reason {reason!r}")
+    s = Session(m, "ap6-action-mn")
+    clip = place(s, "ap6-rode.wav")
+    keyed(s, clip, end)
+    answer = s.op("normalize_clip", clips=[clip], mode="loudness", target_lufs=-16)
+    m.call("close_project", project=s.path, discard=True)
+    row = answer["normalized"][0]
+    ceiling_row(answer, row, clip, -16, "normalize_clip -16")
+    # The reference: a plain clip of the recording at the volume that plays it
+    # at -16 (its loudness at volume 1 is the row's measured_lufs, the cache's).
+    material = row["measured_lufs"]
+    s = Session(m, "ap6-action-mm")
+    clip = place(s, "ap6-rode.wav")
+    keyed(s, clip, end)
+    reference = place(s, "ap6-rode.wav", at=s.clip(clip)["duration"] + SECOND)
+    volume = 10 ** ((-16 - material) / 20)
+    s.op("set_audio", clips=[reference], patch={"volume": volume})
+    answer = s.op("match_audio", reference=reference, clips=[clip], eq=False)
+    m.call("close_project", project=s.path, discard=True)
+    aim = answer.get("target_lufs")
+    if check(aim is not None, f"V16 (m) match_audio: target_lufs {aim} (the reference at volume "
+                              f"{f(volume, 4)})"):
+        ceiling_row(answer, answer["matched"][0], clip, aim,
+                    f"match_audio, target_lufs {f(aim, 3)}")
+        # The reference's measured loudness is written to 0.001 LU in the note.
+        check(f"short of {round(aim, 3)} LUFS" in (answer.get("note") or ""),
+              f"V16 (m) match_audio: the note writes target_lufs {aim!r} as {round(aim, 3)}")
 
 
 # ---- V14 the sheet, cancelled and stale -------------------------------------
@@ -1082,7 +1163,7 @@ def main():
     parts = (("owner", owner_rows), ("sibilance", sibilance_rows),
              ("selection", selection_rows), ("speed", speed_rows),
              ("normalize", normalize_rows), ("actions", action_rows),
-             ("limiter", limiter_speed_rows))
+             ("ceiling", ceiling_rows), ("limiter", limiter_speed_rows))
     for name, part in parts:
         if only and name not in only:
             continue

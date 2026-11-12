@@ -10,7 +10,8 @@ import Foundation
 ///
 /// The pieces, in the order a press uses them: `needsRender` (which clips
 /// render at all, (a), an action's end counted since AU-159 and its limiter
-/// since AU-165, `endSetsLimiter`);
+/// since AU-165, `endSetsLimiter`; `endLimiterOn`, a limiter on at an action's end,
+/// is the tools' note's, AU-168);
 /// `measurementPlan` (the trial's plan cut to the clip, pre-fader, (c)); `render` (the export's waits, the build and one mix read,
 /// (d)); and `Memo`, the last R0 per document, clip, plan and chain, which At volume
 /// reads (g), with the verify render that answered a press (`Verified`, AU-165 (c)). The
@@ -44,6 +45,20 @@ enum ProcessedLoudness {
         return clip.actions.contains { action in
             guard action.duration > 0, let end = action.end.audio else { return false }
             if case .some = end.limiter { return true }
+            return false
+        }
+    }
+
+    /// AU-168 (a): whether an action of the clip with a duration above 0
+    /// turns a limiter on at its end — `endSetsLimiter` less a null, which
+    /// keys the clip's own off. The tools' note and Enhance's reason name it
+    /// as the likely reason a ×32 stop fell short (`AudioNormalize
+    /// .actionLimiterHeld`).
+    static func endLimiterOn(_ clip: ClipSnapshot?) -> Bool {
+        guard let clip else { return false }
+        return clip.actions.contains { action in
+            guard action.duration > 0, let end = action.end.audio else { return false }
+            if case .some(.some) = end.limiter { return true }
             return false
         }
     }

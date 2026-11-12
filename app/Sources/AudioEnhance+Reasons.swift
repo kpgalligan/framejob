@@ -8,10 +8,13 @@ extension AudioEnhance {
 
     /// The last reason: what the processed render measured, the limiter, the
     /// volume, where the last render says it lands and how many renders it
-    /// took; the volume ceiling when it stopped short, or the verify renders
+    /// took; the volume ceiling when it stopped short — or, `endLimiter`
+    /// (an action's end turns a limiter on, AU-168 (d)) and the figures
+    /// saying so, that limiter as the likely reason — or the verify renders
     /// when they ran out away from the target (AU-167).
     static func loudnessReason(
-        _ result: AudioNormalize.LoudnessResult, limiter: LimiterProps, target: Double
+        _ result: AudioNormalize.LoudnessResult, limiter: LimiterProps, target: Double,
+        endLimiter: Bool
     ) -> String {
         let through = result.processedLUFS.map {
             "measured through these settings at \(lufs($0)), "
@@ -20,16 +23,23 @@ extension AudioEnhance {
         return "Loudness: " + through + "the limiter at "
             + "\(signed(limiter.ceilingDb, "%.1f dBTP")) and the volume "
             + "\(String(format: "%.3f", result.volume)) take it to "
-            + "\(lufs(result.resultLUFS)) (\(renders))" + limitClause(result, target: target)
+            + "\(lufs(result.resultLUFS)) (\(renders))"
+            + limitClause(result, target: target, endLimiter: endLimiter)
     }
 
     /// How the loudness reason ends: "." when the clip landed, else what
-    /// stopped it (AU-167).
-    private static func limitClause(_ result: AudioNormalize.LoudnessResult, target: Double)
-        -> String
-    {
+    /// stopped it (AU-167, AU-168 (d)).
+    private static func limitClause(
+        _ result: AudioNormalize.LoudnessResult, target: Double, endLimiter: Bool
+    ) -> String {
         switch result.limit {
         case nil: return "."
+        case .maxGain?
+        where AudioNormalize.actionLimiterHeld(
+            result, endLimiter: endLimiter, targetLUFS: target):
+            return ", short of \(lufs(target)) at \(AudioNormalize.maxGainName), likely because a "
+                + "limiter an action's end turns on holds the sound down harder as the volume "
+                + "rises, so no volume reaches it."
         case .maxGain?:
             return ", short of \(lufs(target)): the volume would pass \(AudioNormalize.maxGainName)."
         case .verifyRenders?:

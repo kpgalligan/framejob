@@ -258,7 +258,9 @@ It is new because [`audio-4.md`](audio-4.md) had reached the spec's ~500-line sp
   sound and more renders would not reach T, and each one renders the whole clip.
   (e) **Left as decided.** At ×32 the answer stays `max_gain`, with the ceiling's note, even when
   an action's limiter is what held the last render under T and no volume would reach it: the
-  owner's option bounds the new value to the loop's own stop below the ceiling.
+  owner's option bounds the new value to the loop's own stop below the ceiling. **Amended by
+  AU-168 (#608):** `max_gain` stays, and the note and Enhance's reason name the limiter an
+  action's end turns on as the likely reason when R0 at ×32 would have reached T.
   Proof: `audio_ap6_probe.py` E18 (the rule's arms on both sides of 0.1 LU and at ×32, the note
   by case with the ceiling's sentence byte for byte, Enhance's reason by case) and mutants
   M27–M31 (the threshold at 1 LU, the bound answering nil, the bound before the ceiling, the
@@ -271,3 +273,60 @@ It is new because [`audio-4.md`](audio-4.md) had reached the spec's ~500-line sp
   renders. With it, `AP6_ONLY=actions` 21 of 21 on Debug, each of them `verify_renders` with the
   note. Enhance at −16 and −20 on (g)'s clip climbed to ×32 at −29.12 and answered `max_gain`
   ((e)).
+- **AU-168 — An action's limiter named at the ×32 stop (#608, 2026-11-12; amends AU-167 (c),
+  (e)).** AU-167 (e) left a solve that climbed to ×32 under an action's limiter answering
+  `max_gain` with the ceiling's note, "the volume that reaches it would pass the 32× ceiling": on
+  the owner's recording with an action's end setting a gate and a limiter at −24 dBTP
+  (`audio_ap6_proof.py` V16 (g)'s clip), `enhance_voice` at −16 and at −20 LUFS climbed to ×32
+  and answered −29.12, though under that limiter no volume reaches either target. The owner's
+  decision (2026-11-12, the issue's option 2): `limited_by` stays `max_gain`, since the ceiling
+  did stop the climb, and the note says that an action's limiter was on and is the likely reason
+  no volume reaches the target, for a limiter set by an action's end only.
+  (a) **Which clips.** A clip with an action of a duration above 0 whose end has a limiter, not
+  a null (`ProcessedLoudness.endLimiterOn`). `endSetsLimiter` is not narrowed to it: AU-165 (a)
+  renders a clip on a null too, which keys the clip's own limiter off, and its probe row and
+  mutant hold that. The clip's own limiter alone does not count: it is on for most loud solves,
+  at −1 dBTP, and does not hold a clip this far under. As in AU-165 (a), whether the action lies
+  in the played window is not asked; the sentence says "likely".
+  (b) **When the figures say the ceiling.** The sentence is given only when R0 at ×32 with
+  nothing more holding it would have reached the target, `processed_lufs + 20·log10 32 ≥ T − 0.1`
+  (`AudioNormalize.actionLimiterHeld`): what the last render lacks of that is what a limiter
+  took. A clip so quiet that ×32 of R0 falls short anyway keeps the ceiling's sentence, which is
+  then true (the challenger's case: R0 at −60 LUFS under an action's limiter at −1 dBTP that never
+  touches it, target −16). A row off the cache has no R0 and no such end, so it never gets it.
+  (c) **The note.** Such a clip's sentence takes the place of the ceiling's, not a place beside
+  it: "Clip(s) N stopped short of T LUFS at the 32× ceiling (limited_by max_gain), but the likely
+  reason is a limiter an action's end turns on: it holds the sound down harder as the volume
+  rises, so no volume reaches the target." The ceiling's sentence says that a volume past the
+  ceiling would reach the target, which is the misstatement; kept beside the new one, the note
+  would give two causes. Every other `max_gain` clip keeps the ceiling's sentence byte for byte,
+  and the verify bound's sentence and the tail are AU-167 (c)'s. One note serves the three tools,
+  each reading the clips from the project it measured, after its stale test
+  (`AudioNormalize.limitNote(_:in:targetLUFS:)`). The note writes its target to 0.001 LU: a
+  caller's target keeps its bytes (−16.0, −24.417), and Match's, the reference's measured
+  loudness, no longer runs to seventeen figures (V16 (m) printed −15.999999999117435).
+  (d) **Enhance's reason.** AU-167 (c) treats the note and the reason together, so for such a
+  clip the `max_gain` clause ends ", short of T at 32×, likely because a limiter an action's end
+  turns on holds the sound down harder as the volume rises, so no volume reaches it." in place
+  of ", short of T: the volume would pass 32×." The answer would otherwise give two causes. The
+  reason reads the clips from the press's setup (`AudioMeasureDoor.EnhanceSetup.endLimiters`),
+  the same project by the stale test. The button, the menu and the sheets still say nothing
+  (#609 is the app's own sentence).
+  (e) **Where it shows.** `normalize_clip`'s description, which `enhance_voice`'s and
+  `match_audio`'s cite, and the site's MCP audio page and its Normalize, Enhance Voice and Match
+  Audio pages.
+  Proof: `audio_ap6_probe.py` E15 (`endLimiterOn` over E15's clips, the null false) and E18 (the
+  note by case: one of two ceiling clips named with the limiter and the other with the ceiling,
+  both, R0 at −50 keeping the ceiling's sentence byte for byte, ×32 of R0 0.05 LU short naming
+  the limiter and 0.15 LU short the ceiling, a row with no R0, the set changing nothing for a
+  landed or a verify bound's clip, Match's measured target as −16.0; the reason by case), and
+  mutants M32–M37 (the note ignoring the set, `endLimiterOn` counting a null, the limiter named
+  for any limit, the reason ignoring it, no reach test, the reach test without its 0.1 LU), all
+  killed; `audio_ap6_proof.py` V16 (m), (g)'s clip in a fresh project per leg: `enhance_voice`
+  −16 and −20, `normalize_clip` −16 and `match_audio` with a reference at −16. Red, on a Debug
+  build with each tool passing no clips and Enhance's setup none: every leg answered the
+  ceiling's sentence and Enhance's reason "the volume would pass 32×" (Enhance −29.118 at ×32
+  from R0 −39.437, ×32 of it −9.334; Normalize and Match −28.343 from R0 −41.643, −11.540; Match's
+  target printed −15.999999999117435), and the probe on the tree before this entry did not
+  build (no `endLimiterOn`, no `endLimiters`). With it, `AP6_ONLY=ceiling` 9 of 9 on Debug, each
+  leg naming the action's limiter; the recorded Release run is `tools/proof/README.md`'s.

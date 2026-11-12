@@ -355,19 +355,24 @@ do {
          "actions": [{"id": 90, "start": 600000, "duration": 1200000,
                       "curve": "linear", "end": {"audio": {"pan": 0.5}}}]}
         """)
-    let sets: [(String, ClipSnapshot?, Bool)] = [
-        ("a limiter at an end", clip(#"{"limiter": {"ceiling_db": -6}}"#), true),
-        ("a null limiter at an end (keyed off)", clip(#"{"limiter": null}"#), true),
+    // The last column is AU-168 (a)'s `endLimiterOn`: a null keys the clip's
+    // own limiter off, so it turns none on.
+    let sets: [(String, ClipSnapshot?, Bool, Bool)] = [
+        ("a limiter at an end", clip(#"{"limiter": {"ceiling_db": -6}}"#), true, true),
+        ("a null limiter at an end (keyed off)", clip(#"{"limiter": null}"#), true, false),
         ("a limiter beside a gate at an end",
-         clip(#"{"gate": {"threshold_db": -20}, "limiter": {}}"#), true),
-        ("a limiter at the end of an action of no duration", stillLimiter, false),
-        ("an end with no limiter key", clip(#"{"gate": {"threshold_db": -20}}"#), false),
-        ("the clip's own limiter, an end without one", based, false),
-        ("no clip", nil, false),
+         clip(#"{"gate": {"threshold_db": -20}, "limiter": {}}"#), true, true),
+        ("a limiter at the end of an action of no duration", stillLimiter, false, false),
+        ("an end with no limiter key", clip(#"{"gate": {"threshold_db": -20}}"#), false, false),
+        ("the clip's own limiter, an end without one", based, false, false),
+        ("no clip", nil, false, false),
     ]
-    for (name, snapshot, wanted) in sets {
+    for (name, snapshot, wanted, on) in sets {
         check("E15", "endSetsLimiter: \(name) \(wanted ? "sets" : "does not set") one",
               ProcessedLoudness.endSetsLimiter(snapshot) == wanted
+                && (name == "no clip" || snapshot != nil))
+        check("E15", "endLimiterOn: \(name) \(on ? "turns" : "does not turn") one on",
+              ProcessedLoudness.endLimiterOn(snapshot) == on
                 && (name == "no clip" || snapshot != nil))
     }
     check("E15", "a null limiter at an end decodes as a stored null", nullStored)
@@ -422,16 +427,28 @@ do {
               got?.rawValue ?? "nil")
     }
     // The tools' note: today's sentence for the ceiling's clips, byte for byte.
+    // A row's R0 is −39.4 LUFS unless given: ×32 of it, −9.3, reaches −16.
+    func result(_ clip: UInt32, _ limit: AudioNormalize.Limit?, r0: Double? = -39.4)
+        -> AudioNormalize.LoudnessResult
+    {
+        var r = AudioNormalize.LoudnessResult(
+            clip: clip, media: 1, measuredLUFS: -41.6, truePeakDBTP: -18.5,
+            volume: limit == .maxGain ? 32 : 2, resultLUFS: -29.1, resultTruePeakDBTP: -3.5,
+            limit: limit, limiter: LimiterProps(ceilingDb: -1))
+        r.processedLUFS = r0
+        r.renders = r0 == nil ? 0 : 4
+        return r
+    }
+    func note(_ rows: [AudioNormalize.LoudnessResult], _ ends: Set<UInt32> = [],
+              _ target: Double = -16) -> String? {
+        AudioNormalize.limitNote(rows, endLimiters: ends, targetLUFS: target)
+    }
     let ceilingOnly = "Clip(s) 3, 5 stopped short of -16.0 LUFS: the volume that reaches it would "
         + "pass the 32× ceiling (limited_by max_gain). result_lufs says where each landed."
-    let none = AudioNormalize.limitNote([(clip: 3, limit: nil)], targetLUFS: -16)
-    let ceiling = AudioNormalize.limitNote(
-        [(clip: 3, limit: .maxGain), (clip: 4, limit: nil), (clip: 5, limit: .maxGain)],
-        targetLUFS: -16)
-    let verify = AudioNormalize.limitNote(
-        [(clip: 6, limit: nil), (clip: 7, limit: .verifyRenders)], targetLUFS: -24.417) ?? ""
-    let both = AudioNormalize.limitNote(
-        [(clip: 3, limit: .maxGain), (clip: 7, limit: .verifyRenders)], targetLUFS: -16) ?? ""
+    let none = note([result(3, nil)])
+    let ceiling = note([result(3, .maxGain), result(4, nil), result(5, .maxGain)])
+    let verify = note([result(6, nil), result(7, .verifyRenders)], [], -24.417) ?? ""
+    let both = note([result(3, .maxGain), result(7, .verifyRenders)]) ?? ""
     let tail = "result_lufs says where each landed."
     check("E18", "limitNote: no limit, no note", none == nil, none ?? "nil")
     check("E18", "limitNote: the ceiling's clips alone keep today's sentence exactly",
@@ -446,6 +463,51 @@ do {
           both.hasPrefix("Clip(s) 3 stopped short of -16.0 LUFS") && both.contains("Clip(s) 7 ")
             && both.contains("(limited_by max_gain)") && both.contains("(limited_by verify_renders)")
             && both.hasSuffix(tail) && both.components(separatedBy: tail).count == 2, both)
+    // AU-168 (b), (c): a limiter an action's end turns on, named in the
+    // ceiling's place when R0 at ×32 would have reached the target.
+    let reach = 20 * log10(AudioNormalize.maxGain)
+    let mixed = note([result(3, .maxGain), result(5, .maxGain)], [5]) ?? ""
+    let allHeld = note([result(3, .maxGain), result(5, .maxGain)], [3, 5]) ?? ""
+    let quiet = note([result(3, .maxGain, r0: -50), result(5, .maxGain, r0: -50)], [3, 5])
+    let near = note([result(5, .maxGain, r0: -16 - 0.05 - reach)], [5]) ?? ""
+    let far = note([result(5, .maxGain, r0: -16 - 0.15 - reach)], [5]) ?? ""
+    let cacheRow = note([result(5, .maxGain, r0: nil)], [5]) ?? ""
+    let others = [result(6, nil), result(7, .verifyRenders)]
+    let action = "Clip(s) 5 stopped short of -16.0 LUFS at the 32× ceiling (limited_by max_gain), "
+        + "but the likely reason is a limiter an action's end turns on"
+    check("E18", "limitNote: of two ceiling clips, the one an action's limiter is on for named "
+            + "with that limiter, the other in the ceiling's sentence, the tail once",
+          mixed.hasPrefix("Clip(s) 3 stopped short of -16.0 LUFS: the volume that reaches it "
+            + "would pass") && mixed.contains(action)
+            && mixed.components(separatedBy: "would pass").count == 2
+            && mixed.components(separatedBy: "(limited_by max_gain)").count == 3
+            && mixed.hasSuffix(tail) && mixed.components(separatedBy: tail).count == 2, mixed)
+    check("E18", "limitNote: both under an action's limiter, one sentence naming it, no "
+            + "\"would pass\"",
+          allHeld.hasPrefix("Clip(s) 3, 5 stopped short of -16.0 LUFS at the 32× ceiling "
+            + "(limited_by max_gain), but the likely reason is a limiter an action's end")
+            && allHeld.contains("no volume reaches the target") && !allHeld.contains("would pass")
+            && allHeld.hasSuffix(tail), allHeld)
+    check("E18", "limitNote: R0 at −50, ×32 of it short of −16 anyway: the ceiling's sentence "
+            + "byte for byte, though an action's limiter is on",
+          quiet == ceilingOnly, quiet ?? "nil")
+    check("E18", "limitNote: ×32 of R0 0.05 LU short of −16 names the limiter, 0.15 LU short "
+            + "the ceiling",
+          near.hasPrefix(action) && far.hasPrefix("Clip(s) 5 stopped short of -16.0 LUFS: the "
+            + "volume that reaches it would pass"), near + " | " + far)
+    check("E18", "limitNote: a row with no R0 (off the cache) keeps the ceiling's sentence",
+          cacheRow.contains("would pass") && !cacheRow.contains("action"), cacheRow)
+    // match_audio's target is the reference's measured loudness, unrounded.
+    let measuredTarget = note([result(3, .maxGain), result(7, .verifyRenders)], [],
+                              -15.999999999117435) ?? ""
+    check("E18", "limitNote: a target read from a measurement written to 0.001 LU, as -16.0",
+          measuredTarget.hasPrefix("Clip(s) 3 stopped short of -16.0 LUFS: ")
+            && measuredTarget.contains("Clip(s) 7 ended more than 0.1 LU from -16.0 LUFS: ")
+            && !measuredTarget.contains("99999"), measuredTarget)
+    check("E18", "limitNote: the clips set only bites on max_gain: a landed and a verify "
+            + "bound's clip in it change nothing",
+          note(others, [6, 7], -24.417) == note(others, [], -24.417)
+            && note(others, [6, 7], -24.417) != nil, note(others, [6, 7], -24.417) ?? "nil")
     // Enhance's loudness reason, by case.
     func row(_ lufs: Double, _ limit: AudioNormalize.Limit?) -> AudioNormalize.LoudnessResult {
         var r = AudioNormalize.LoudnessResult(
@@ -456,16 +518,29 @@ do {
         r.renders = 4
         return r
     }
-    func reason(_ lufs: Double, _ limit: AudioNormalize.Limit?) -> String {
-        AudioEnhance.loudnessReason(row(lufs, limit), limiter: LimiterProps(ceilingDb: -1), target: -24)
+    func reason(_ lufs: Double, _ limit: AudioNormalize.Limit?, endLimiter: Bool = false)
+        -> String
+    {
+        AudioEnhance.loudnessReason(
+            row(lufs, limit), limiter: LimiterProps(ceilingDb: -1), target: -24,
+            endLimiter: endLimiter)
     }
     let landed = reason(-24.05, nil)
     let capped = reason(-29.1, .maxGain)
     let short = reason(-29.55, .verifyRenders)
     let over = reason(-23.8, .verifyRenders)
+    let held = reason(-29.1, .maxGain, endLimiter: true)
+    let shortHeld = reason(-29.55, .verifyRenders, endLimiter: true)
     check("E18", "the reason: landed ends at its renders", landed.hasSuffix("(4 renders)."), landed)
     check("E18", "the reason: the ceiling's clause kept",
           capped.hasSuffix("(4 renders), short of −24.0 LUFS: the volume would pass 32×."), capped)
+    check("E18", "the reason: at ×32 under an action's limiter, that limiter as the likely "
+            + "reason, no \"would pass\" (AU-168 (d))",
+          held.hasSuffix("(4 renders), short of −24.0 LUFS at 32×, likely because a limiter an "
+            + "action's end turns on holds the sound down harder as the volume rises, so no "
+            + "volume reaches it.") && !held.contains("would pass"), held)
+    check("E18", "the reason: the verify bound's clause the same with an action's limiter on",
+          shortHeld == short, shortHeld)
     check("E18", "the reason: the verify bound short of the target names a limiter, not the ceiling",
           short.contains("(4 renders), short of −24.0 LUFS: ") && short.contains("limiter holds")
             && !short.contains("would pass"), short)

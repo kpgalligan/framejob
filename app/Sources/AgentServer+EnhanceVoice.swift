@@ -110,7 +110,7 @@ extension AgentServer {
     }
 
     /// The answer to `plan`, on main: the rows, the skips, the limits' note
-    /// (AU-167) and the edit.
+    /// (AU-167, AU-168) and the edit.
     private func enhanceAnswer(_ plan: AudioEnhance.Plan, document: ProjectDocument)
         throws -> String
     {
@@ -123,8 +123,7 @@ extension AgentServer {
             fields["skipped"] = plan.skipped.map { $0.description }
         }
         if let note = AudioNormalize.limitNote(
-            plan.enhanced.map { (clip: $0.clip, limit: $0.loudness.limit) },
-            targetLUFS: plan.targetLUFS)
+            plan.enhanced.map(\.loudness), in: document, targetLUFS: plan.targetLUFS)
         {
             fields["note"] = note
         }
