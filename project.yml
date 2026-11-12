@@ -393,18 +393,21 @@ targets:
           rm -rf "$dest"
           mkdir -p "$dest"
           cp -R "$PROJECT_DIR"/build/codecs/licenses/* "$dest/"
-      # The assistant's agent helper (agent/, spec §11 AI-1): compiled with
-      # Bun, placed in Contents/Helpers and signed by agent/build.sh, before
-      # Xcode signs the app around it — the app's own signature does not
-      # cover a nested executable. Without bun it fails; it never skips.
+      # The assistant's agent helper (agent/, a SwiftPM package on Slaude, spec
+      # §11 SA-1, SA-8): built in release on build/agent-swift by
+      # tools/agent/build_helper.sh, which takes its tree from $PROJECT_DIR,
+      # strips it into Contents/Helpers and signs it with the hardened runtime
+      # and no entitlements, before Xcode signs the app around it — the app's
+      # own signature does not cover a nested executable. A failed SwiftPM
+      # build fails this step; nothing skips it.
       - name: Build Agent Helper
-        # Bun rebuilds the helper in well under a second, so it runs every build.
+        # The script's stamp skips SwiftPM when agent/ is unchanged, so it runs every build.
         basedOnDependencyAnalysis: false
-        script: /bin/sh "$PROJECT_DIR/agent/build.sh" helper
+        script: /bin/bash "$PROJECT_DIR/tools/agent/build_helper.sh" "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/framejob-agent"
       # The stdio MCP server external clients start (road map 14's MC3, spec
       # §11 MC-3): mcp-proxy/ built by cargo, put in Contents/Helpers beside the
-      # assistant's helper and signed as agent/build.sh signs that one (the
-      # hardened runtime, no entitlements), before Xcode signs the app.
+      # assistant's helper and signed as tools/agent/build_helper.sh signs that
+      # one (the hardened runtime, no entitlements), before Xcode signs the app.
       - name: Build MCP Proxy
         basedOnDependencyAnalysis: false
         script: |
@@ -420,21 +423,20 @@ targets:
           if [ "$IDENTITY" != "-" ]; then TIMESTAMP="--timestamp"; fi
           codesign --force --options runtime $TIMESTAMP \
             --sign "$IDENTITY" "$HELPERS/framejob-mcp"
-      # The third-party notices (#376, spec §11 PUB-10): every shipped crate,
-      # npm package, Bun, Sparkle, the encoders, the model and the fonts, into
+      # The third-party notices (#376, spec §11 PUB-10, SA-10): every shipped
+      # crate, Slaude, Sparkle, the encoders, the model and the fonts, into
       # Contents/Resources/Acknowledgements.txt (not Licenses/, which Copy Codec
-      # Licences empties). After Build Agent Helper (its `bun install` makes
-      # agent/node_modules) and before Write Agent Catalog, which reseals the
-      # bundle. Distribution fails on a Bun other than the vendored licence's
-      # (--strict-bun); the others note it. tools/proof/dist_check.py D42/D43.
+      # Licences empties). After Build Agent Helper, whose SwiftPM run resolves
+      # Slaude's checkout under this tree's build/agent-swift, which the
+      # generator reads, and before Write Agent Catalog, which reseals the
+      # bundle. tools/proof/dist_check.py D42/D43.
       - name: Write Acknowledgements
         basedOnDependencyAnalysis: false
         script: |
           set -e
-          export PATH="$HOME/.cargo/bin:$HOME/.bun/bin:$HOME/.local/share/mise/shims:/usr/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
-          STRICT=""
-          if [ "$CONFIGURATION" = Distribution ]; then STRICT="--strict-bun"; fi
-          python3 "$PROJECT_DIR/tools/licenses/acknowledgements.py" $STRICT \
+          export PATH="$HOME/.cargo/bin:/usr/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+          python3 "$PROJECT_DIR/tools/licenses/acknowledgements.py" \
+            --agent-scratch "$PROJECT_DIR/build/agent-swift" \
             --out "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Acknowledgements.txt"
       # The catalog snapshot framejob-mcp lists from while no Frame Job runs
       # (MC-4; MC1 q1): the just-linked executable, ad-hoc signed alone in place

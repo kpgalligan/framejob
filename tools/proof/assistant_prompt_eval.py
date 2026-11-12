@@ -1,14 +1,17 @@
 """Road map 12 A3 — the assistant's evaluation against a real model, and its
 rehearsal against the stand-in. Imported by `assistant_prompt_proof.py`,
 never run as a child: the key is read in THIS process, once, by
-`anthropic_key()`, and leaves it only as the relay's `x-api-key` to
+`anthropic_key()`, and leaves it only as the relay's credential header to
 `LIVE_UPSTREAM`.
 
 **The relay.** A thread in the proof's own process on 127.0.0.1:0. The app is
 pointed at it (`RC_ASSISTANT_BASE_URL`) and its helper sends the dummy
-`proof-key`; the relay answers 401 to anything else (the value is never
-logged), routes `GET /v1/models/*` and `POST /v1/messages*` only, and forwards
-with the real credential. Every POST is priced at its WORST before it is
+`proof-key`, as `x-api-key` or as `Authorization: Bearer` (the Swift helper's,
+road map "swift-helper" SA3, spec §11 SA-5); the relay answers 401 to anything
+else (the value is never logged), routes `GET /v1/models/*` and
+`POST /v1/messages*` only, and forwards with the real credential in the header
+the request arrived with, so a paid run sends upstream the header the helper
+really sends. Every POST is priced at its WORST before it is
 sent — the body less its image data at one token per three bytes plus
 `IMAGE_TOKENS` per image, all at the cache-write rate, plus its `max_tokens`
 at the output rate — and forwarded only when settled spend, what is still
@@ -37,14 +40,15 @@ folded into the dearer. It prices the worst case only; what a reply cost is
 the table's price for its own model.
 
 **The headroom arithmetic** (`headroom_lines`): the helper sends
-`max_tokens` 32,000 on every POST (`agent/src/main.ts`) and all of the
-catalog's definitions, deferred ones included. Since #594 (spec §11 P-9) the
+`max_tokens` 32,000 on every POST (`Request.maxTokens` in the Swift helper's
+`agent/Sources/FrameJobAgentKit/Request.swift`) and all of the catalog's
+definitions, deferred ones included. Since #594 (spec §11 P-9) the
 body is bounded at 480,000 bytes, about 160,000 tokens: the three
 rehearsals' largest body was 399,360 bytes on 2026-11-11, over the 256,000
 bound before it. `assistant_lane_proof.py`'s B1, in `make test`, holds the
-request's tools and system prompt as the app makes them, plus
-`CONVERSATION_BYTES_BOUND`, under the bound. The relay records the largest
-body it saw, and H prints it.
+built helper's first POST, configured with the app's catalog and prompt
+(spec §11 SA-9), plus `CONVERSATION_BYTES_BOUND`, under the bound. The relay
+records the largest body it saw, and H prints it.
 """
 
 import json
@@ -70,8 +74,8 @@ IMAGE_TOKENS = 1600
 # Spec §11 P-9 (#594): about 20 % over the rehearsals' largest body, 399,360 bytes
 # (the compaction rehearsal, 2026-11-11).
 BODY_BYTES_BOUND = 480_000
-# The room B1 keeps under the bound for what the probe does not measure: the
-# conversation, the live-context block and the request's other keys. At least
+# The room B1 keeps under the bound for what its one short message does not hold
+# (spec §11 SA-9): the conversation and the live-context block. At least
 # 30,000 bytes: the one live evaluation on record (#157) priced H's worst POST
 # at $3.1885, a body of about 238,000 bytes, some 11,000 over the stand-in's of
 # the time (H $3.1137 there). Twice the rehearsals' largest body less the
@@ -350,10 +354,14 @@ class Relay:
                 self._send(status, json.dumps(body).encode())
 
             def _forward(self, method, raw):
-                """(status, content type, data, the relay's own answer)."""
+                """(status, content type, data, the relay's own answer). The real credential
+                goes in the header the dummy arrived in (`self.arrived`, set by `_handle`)."""
                 headers = {name: value for name, value in self.headers.items()
                            if name.lower() not in DROPPED_HEADERS}
-                headers["x-api-key"] = relay.credential()
+                if self.arrived == "authorization":
+                    headers["authorization"] = "Bearer " + relay.credential()
+                else:
+                    headers["x-api-key"] = relay.credential()
                 request = urllib.request.Request(
                     relay.upstream + self.path, data=raw if method == "POST" else None,
                     method=method, headers=headers)
@@ -373,7 +381,11 @@ class Relay:
                 length = int(self.headers.get("content-length") or 0)
                 raw = self.rfile.read(length) if length else b""
                 path = self.path.split("?")[0]
-                if self.headers.get("x-api-key") != PROOF_KEY:
+                if self.headers.get("x-api-key") == PROOF_KEY:
+                    self.arrived = "x-api-key"
+                elif self.headers.get("authorization") == "Bearer " + PROOF_KEY:
+                    self.arrived = "authorization"
+                else:
                     return self._error(401, "authentication_error",
                                        "the relay takes the proof's dummy key only")
                 if method == "GET" and path.startswith("/v1/models/"):

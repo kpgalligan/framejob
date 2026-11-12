@@ -11,17 +11,18 @@ SA-5, SA-6; `designs/swift-helper.md` §9 SA2 and its record in §13).
     python3 tools/proof/agent_helper_drive.py --drop ROW            # without one allowed row: exactly
                                                                     # its cases FAIL (exit 1, caught)
     python3 tools/proof/agent_helper_drive.py --rows-needed         # --drop for every row over one run
-    python3 tools/proof/agent_helper_drive.py --mutant NAME         # a SWIFT_MUTANTS edit, applied in
-                                                                    # place to agent/Sources and rebuilt
+    python3 tools/proof/agent_helper_drive.py --mutant NAME         # a SWIFT_MUTANTS edit, built on
+                                                                    # the persistent mutant tree
     python3 tools/proof/agent_helper_drive.py --mutant drive-same-helper   # both sides Swift: every
                                                                     # row allows nothing
 
 The helpers. B0 builds the Bun helper with `agent/build.sh helper` into
 `tools/proof/work/agent_helper_drive/bun-target/` (spend_proof.py's call; no bun is build.sh's own
-error and a FAIL, never a skip). B1 runs `make agent-test`'s guard (spec §11 SA-12) on
-`build/agent-swift-test` and builds the `framejob-agent` product there with the suite's
-environment (`FJ_AGENT_STRICT=1`, the two keys popped), so the suite and this drive share one
-debug build; its path is SwiftPM's `--show-bin-path`. Each case starts each helper once with
+error and a FAIL, never a skip). B1 is the release helper the app bundles, built by
+`tools/agent/build_helper.sh` on the app build's scratch path, `build/agent-swift`
+(`agent_helper_build.release`, road map "swift-helper" SA3, spec §11 SA-8): stripped and signed
+into `work/agent_helper_drive/swift/`, seconds while its stamp matches. Each case starts each
+helper once with
 exactly HOME, TMPDIR (scratch folders) and PATH=/usr/bin:/bin, as `AssistantSession` does, writes
 the app's lines (sorted keys, compact, `writeResult`'s spliced answers) and reads stdout line by
 line. One stand-in (`anthropic_fake.py`) serves the run; each helper's run of a case posts the
@@ -53,12 +54,11 @@ order (SA-5's pinned order holds), so key order is compared strictly. SA-4 (b) h
 the 0.128.0 runner already skips the summary after a final reply that ends in tool calls, and both
 helpers send nothing and say "no summary came back" (case `cut-reply-tool-call`).
 
-Mutants (`SWIFT_MUTANTS`): an edit applied IN PLACE to `agent/Sources`, the Swift helper rebuilt
-on the suite's scratch path, the cases it names run, the file restored from the bytes kept in
-`work/` and checked by digest, and the helper rebuilt. It refuses while `git status --porcelain --
-agent/Sources` is not empty, so a run killed in between is loud. A mutant is caught only when every
-case it names FAILs: `mutant <name>: caught — …`, exit 1; one that passed any SURVIVED, exit 0; one
-that did not build could not perform its control, exit 2. The first five make a difference outside
+Mutants (`SWIFT_MUTANTS`): an edit of the Swift helper's sources, built by
+`agent_helper_build.mutant` on the persistent mutant tree `build/agent-swift-mutant/` (spec §11
+SA-8), never in the tree's own `agent/`; then the cases it names run. A mutant is caught only when
+every case it names FAILs: `mutant <name>: caught — …`, exit 1; one that passed any SURVIVED,
+exit 0; one that did not build could not perform its control, exit 2. The first five make a difference outside
 the list; `system-loses-guide`, `not-run-reworded` and `empty-summary-swapped` show that the
 `system-breakpoint`, `unrun-calls-answered` and `empty-summary` rows are no wider than their
 decisions. `--mutant drive-same-helper` runs the Swift helper on both sides and must fail every
@@ -72,7 +72,6 @@ Nothing is paid. Exit 0 PASS, 1 FAIL.
 import argparse
 import copy
 import datetime
-import hashlib
 import http.server
 import json
 import shutil
@@ -88,13 +87,13 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE / "graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools" / "agent"))
-import agent_test  # noqa: E402
+import agent_helper_build  # noqa: E402
 import assistant_helper_proof as ahp  # noqa: E402
 import bounded  # noqa: E402
 
 WORK = HERE / "work" / "agent_helper_drive"
 AGENT = ROOT / "agent"
-SCRATCH = ROOT / agent_test.SCRATCH
+SWIFT_HELPER = WORK / "swift" / "framejob-agent"
 BUN_TARGET = WORK / "bun-target"
 BUN_HELPER = BUN_TARGET / "Frame Job.app" / "Contents" / "Helpers" / "framejob-agent"
 REDUCE_CASES = AGENT / "prices" / "reduce_cases.json"
@@ -475,23 +474,9 @@ def build_bun():
 
 
 def build_swift():
-    """(helper path, detail) or (None, why): the suite's guard on its scratch path (spec §11
-    SA-12), then the executable product built there with the suite's environment."""
-    said = agent_test.guard(SCRATCH)
-    env = child_env({"FJ_AGENT_STRICT": "1"})  # both keys popped, as agent_test.suite pops them
-    base = ["xcrun", "swift", "build", "--package-path", str(AGENT), "--scratch-path", str(SCRATCH)]
-    built = bounded.run(base + ["--product", "framejob-agent"], WALL_BUILD, cwd=str(ROOT), env=env)
-    if built["expired"] or built["rc"] != 0:
-        lines = (built["stdout"] + built["stderr"]).splitlines()
-        errors = [line for line in lines if "error" in line] or lines
-        return None, f"swift build exit {built['rc']} (expired {built['expired']}): {errors[-3:]}"
-    shown = bounded.run(base + ["--show-bin-path"], 120, cwd=str(ROOT), env=env)
-    helper = Path(shown["stdout"].strip()) / "framejob-agent"
-    if shown["rc"] != 0 or not helper.is_file():
-        return None, f"no framejob-agent at {helper} (--show-bin-path exit {shown['rc']})"
-    complete = [line for line in built["stdout"].splitlines() if "complete" in line]
-    return helper, (f"scratch path {said}; {complete[-1].strip() if complete else 'built'}, "
-                    f"{built['seconds']} s")
+    """(helper path, detail) or (None, why): the release helper the app bundles, built by the
+    app's own script (spec §11 SA-8)."""
+    return agent_helper_build.release(SWIFT_HELPER)
 
 
 # ---------------------------------------------------------------------------
@@ -1428,15 +1413,6 @@ SWIFT_MUTANTS = {
 }
 
 
-def tree_status():
-    ran = bounded.run(["git", "-C", str(ROOT), "status", "--porcelain", "--", "agent/Sources"], 60)
-    return ran["rc"], ran["stdout"].strip()
-
-
-def digest(data):
-    return hashlib.sha256(data).hexdigest()
-
-
 # ---------------------------------------------------------------------------
 # Driving.
 
@@ -1610,50 +1586,24 @@ def rows_needed(args, names):
 
 
 def mutant(args, name):
-    """A SWIFT_MUTANTS edit in place, the named cases, then the file restored and rebuilt."""
+    """A SWIFT_MUTANTS edit built on the persistent mutant tree, then the named cases."""
     file, anchor, replacement, named = SWIFT_MUTANTS[name]
-    path = ROOT / file
-    rc, dirty = tree_status()
-    if rc != 0 or dirty:
-        print(f"mutant {name}: the control could not be performed — agent/Sources is not clean "
-              f"(git status exit {rc}): {dirty[:300]}", flush=True)
-        return 2
-    original = path.read_bytes()
-    source = original.decode("utf-8")
-    if source.count(anchor) != 1:
-        print(f"mutant {name}: the control could not be performed — its anchor occurs "
-              f"{source.count(anchor)} times in {file}", flush=True)
-        return 2
-    keep = WORK / "mutant-original" / path.name
-    keep.parent.mkdir(parents=True, exist_ok=True)
-    keep.write_bytes(original)
     bun = Path(args.bun).resolve() if args.bun else None
     if bun is None:
         bun, why = build_bun()
         print(f"B0 {'ok' if bun else 'FAIL'} — the Bun helper: {why}", flush=True)
-    try:
-        path.write_bytes(source.replace(anchor, replacement).encode("utf-8"))
-        swift, why = build_swift()
-        print(f"B1 {'ok' if swift else 'FAIL'} — the mutated Swift helper: {why}", flush=True)
-        if bun is None or swift is None:
-            print(f"mutant {name}: the control could not be performed — a helper did not build",
-                  flush=True)
-            return 2
-        ctx = Context()
-        try:
-            results = drive(ordered(named), bun, swift, ALLOWED, ctx)
-        finally:
-            ctx.stop()
-    finally:
-        path.write_bytes(original)
-        restored = digest(path.read_bytes()) == digest(original)
-        rebuilt, why = build_swift()
-        print(f"restored {file}: {'byte-identical' if restored else 'DIFFERENT'}; rebuilt "
-              f"{'ok' if rebuilt else 'FAIL'} — {why}", flush=True)
-    if not (restored and rebuilt):
-        print(f"mutant {name}: the control could not be performed — the tree's helper was not "
-              f"put back (its bytes are kept at {keep})", flush=True)
+    swift, why = agent_helper_build.mutant(name, [(file, anchor, replacement)],
+                                           WORK / "mutant" / name / "framejob-agent")
+    print(f"B1 {'ok' if swift else 'FAIL'} — the mutated Swift helper: {why}", flush=True)
+    if bun is None or swift is None:
+        print(f"mutant {name}: the control could not be performed — a helper did not build",
+              flush=True)
         return 2
+    ctx = Context()
+    try:
+        results = drive(ordered(named), bun, swift, ALLOWED, ctx)
+    finally:
+        ctx.stop()
     checks = {case: (not results[case][0], "") for case in named}
     return verdict(name, named, checks)
 

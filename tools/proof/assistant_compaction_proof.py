@@ -51,7 +51,7 @@ to the compaction instructions and runs the right rehearsal against it: rule R â
 anchor or build fails, C3 is never scored or any row is an instrument failure.
 
 Safety: the key is read once, by `assistant_prompt_eval.anthropic_key`, and
-leaves this process only as the relay's `x-api-key`; the app and helper get
+leaves this process only as the relay's credential header; the app and helper get
 the dummy `proof-key`. A rehearsal or mutant never opens the proofs' ledger.
 Rule H: a turn is stopped past 600 s and a build killed past 900 s; only this
 script's process groups are killed.

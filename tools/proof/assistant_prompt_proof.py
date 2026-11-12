@@ -59,7 +59,7 @@ not be performed — <why>`.
 Safety: every child's environment has `ANTHROPIC_API_KEY` and
 `RC_ASSEMBLYAI_KEY` popped; the app and helper get only the dummy
 `proof-key`. The real key is read once, by `assistant_prompt_eval.anthropic_key`,
-and leaves this process only as the relay's `x-api-key` to the live API. Rule
+and leaves this process only as the relay's credential header to the live API. Rule
 H: only this script's process groups are killed, with the helper children
 each app started.
 """

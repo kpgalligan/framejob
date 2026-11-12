@@ -1,8 +1,9 @@
 // swift-tools-version: 6.0
 // The assistant helper in Swift (road map "swift-helper", spec §11 SA-1): the agent loop in its
 // own process, on Slaude (the Claude API in Swift). Ported once from Doctored's helper at its
-// commit b524babc (the owner's answer 2 (a)); agent/CLAUDE.md has the rules. Until SA3's switch
-// the app still ships the Bun helper built from agent/src; `make agent-test` runs this suite.
+// commit b524babc (the owner's answer 2 (a)); agent/CLAUDE.md has the rules. The app bundles its
+// release product, built by tools/agent/build_helper.sh (spec §11 SA-8); `make agent-test` runs
+// this suite.
 import PackageDescription
 
 /// The helper's own targets build warning-free in the suite (`make agent-test` sets

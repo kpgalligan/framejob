@@ -7373,8 +7373,8 @@ and prints the needle and both paths before its rows:
   which an absence check passes against a build that never had the tools;
 - **D5** — the Distribution binary does not hold the needle;
 - **D6–D13** — each bundle's assistant helper: present, signed with the
-  hardened runtime, entitlements exactly `allow-jit`, no needle (road map
-  12's A4, the last section of this file);
+  hardened runtime, no entitlements (`allow-jit` until road map
+  "swift-helper" SA3, spec §11 SA-8), no needle (road map 12's A4);
 - **D14** (#145) — the Distribution app's entitlements, read through its
   `realpath`ed executable with `codesign -d --entitlements - --xml`, are
   exactly `{com.apple.security.device.audio-input: true,
@@ -7437,20 +7437,20 @@ spec §11 PUB-10 added `vector.c-LICENSE`, libvpx's three), byte-identical to
 - **D42 / D43** (the acknowledgements, #376, spec §11 PUB-10) — the Release /
   Distribution bundle's `Contents/Resources/Acknowledgements.txt` (written each
   build by `tools/licenses/acknowledgements.py`) has an `== <kind> <name>
-  <version> ==` header for every shipped crate and npm package, name and
-  version, each pin (`library <name> <version>`), `framework sparkle` at
-  `project.yml`'s `exactVersion`, and `runtime bun`, `model silero-vad` and
-  `font <stem>` for each `*.ttf` in the bundle's `Contents/Resources/Fonts/`
-  at any version. The shipped sets come from readers of dist_check's own,
-  never the generator's code: `shipped_crates()` runs `cargo metadata
-  --format-version 1 --locked --offline --filter-platform aarch64-apple-darwin`
-  in `core/` and `mcp-proxy/` and walks every non-dev edge from the root
-  (Frame Job's three crates left out); `shipped_npm()` reads `agent/bun.lock`
-  from the workspace's `dependencies` through each package's own, each
-  resolved as Node does (bun's nested key under the dependent's chain, else a
-  shorter one, else the hoisted name), so a nested version is expected at its
-  own version. A missing file, `cargo`, metadata or lock FAILs the row with
-  the reason.
+  <version> ==` header for every shipped crate, name and version, each pin
+  (`library <name> <version>`), `framework sparkle` at `project.yml`'s
+  `exactVersion`, `package slaude` at `agent/Package.resolved`'s revision, and
+  `model silero-vad` and `font <stem>` for each `*.ttf` in the bundle's
+  `Contents/Resources/Fonts/` at any version, and no header of another kind
+  (`npm` and `runtime bun` were the Bun helper's, gone since road map
+  "swift-helper" SA3, spec §11 SA-10). The shipped sets come from readers of
+  dist_check's own, never the generator's code: `shipped_crates()` runs `cargo
+  metadata --format-version 1 --locked --offline --filter-platform
+  aarch64-apple-darwin` in `core/` and `mcp-proxy/` and walks every non-dev edge
+  from the root (Frame Job's three crates left out); `slaude_revision()` reads
+  the pin from `agent/Package.resolved`, where the generator reads the helper's
+  SwiftPM `workspace-state.json`. A missing file, `cargo`, metadata or pin file
+  FAILs the row with the reason.
 - **D44 / D45** (a `framejob://` link's dev switch, #385, spec §11 G-49 (l)) —
   the Release binary holds `RCDevGraphicLinkLoopbackHTTP` (the positive
   control) and the Distribution binary does not.
@@ -8023,18 +8023,23 @@ in it calls `start()`, and every row makes its own documents.
   with the prepare line deleted, and the probe's L1 under `--no-prepare`
   (the gate is empty, so `add_marker` is refused for `at` and `name`), must
   BOTH fail.
-- **B1** (#594, spec §11 P-9): L6 also measures the assistant's request as
-  the helper puts it on the wire, its fixed part: `agent/src/main.ts`'s tool
-  search entry and each assistant catalog entry as `runnableTool` wraps it,
-  and the system prompt with the search guide, serialised without escaped
-  slashes as `JSON.stringify` writes them (`request_bytes`, with
-  `tools_bytes` and `system_bytes`). B1 requires `request_bytes` plus
-  `assistant_prompt_eval.CONVERSATION_BYTES_BOUND` (30,000, the room for the
-  conversation) to be within `BODY_BYTES_BOUND`; failing, it says to raise
-  the bound and recompute the floors and caps. A probe that did not build or
-  answered no positive `request_bytes` FAILs it. **M3** (made to fail on
-  purpose): B1's comparison with the bound one byte under the measured
-  request plus that room must FAIL.
+- **B1** (#594, spec §11 P-9 as SA-9 amends it, road map "swift-helper"
+  SA3): L6 writes the `configure` the app writes (`writeConfigure`: the
+  assistant catalog, `AssistantPrompt`'s four pieces, AI-11's default model,
+  `proof-key`, clearing on, no spend fields, sorted keys) to the run folder,
+  and B1 runs the release helper `tools/agent/build_helper.sh` builds
+  (`agent_helper_build.release`, seconds while its stamp matches) on it
+  against `anthropic_fake.py`, sends one short message and reads the first
+  POST's `bytes` from the stand-in's log. That POST must carry the catalog
+  plus tool search and the prompt, a blank line and the guide as its system
+  text; then its bytes plus `assistant_prompt_eval.CONVERSATION_BYTES_BOUND`
+  (30,000, the room for the conversation) must be within `BODY_BYTES_BOUND`;
+  failing, it says to raise the bound and recompute the floors and caps. A
+  probe that did not build, a helper that did not build or a POST that never
+  came FAILs it. **M3** (made to fail on purpose): B1's comparison with the
+  bound one byte under the measured POST plus that room must FAIL.
+  `--mutant b1-empty-catalog` runs B1 alone with the helper configured with
+  no tools, and B1 must FAIL (exit 1).
 
 A probe that does not build is a scored FAIL. Exit 0 only when every row
 passes.
@@ -8046,33 +8051,35 @@ python3 tools/proof/assistant_lane_proof.py --no-prepare  # the mutant alone: L0
 
 ## Road map 12's A1 part 2 — the helper and its build (assistant_helper_proof.py)
 
-The helper (`agent/`, spec §11 AI-1), its build and road map 12 §2's three
-`configure` fields. It launches no app and reads no key: every child's
+The helper (`agent/`, spec §11 AI-1, and since road map "swift-helper" SA3
+the Swift helper `tools/agent/build_helper.sh` builds, SA-8), its build and
+road map 12 §2's three `configure` fields. It launches no app and reads no key: every child's
 environment has `RC_ASSEMBLYAI_KEY` and `ANTHROPIC_API_KEY` popped. The
 helper only ever gets `proof-key`, and every `configure` it is sent points
 `api_base` at a running `anthropic_fake.py`, so no row reaches
 api.anthropic.com. Each child runs under a wall in its own process group
-(rule H): P1 30 s; the helper 20 s to `ready`, 60 s for a turn and 5 s to
-exit; P5 180 s. It works in `work/assistant_helper/`, prints
+(rule H): the helper 20 s to `ready`, 60 s for a turn and 5 s to exit; P1's
+toy builds 600 s each. It works in `work/assistant_helper/`, prints
 `<ID> ok|FAIL|skip — <reason>` per row and then `n/m`, and exits 0 only when
 no row fails. An instrument that cannot run is a scored FAIL.
 
 - **P0**, the wiring, read from the source:
   - `project.yml` has exactly one "Build Agent Helper" item, after "Copy
-    Graphic Templates" and before `schemes:`, with
-    `basedOnDependencyAnalysis: false` and `agent/build.sh" helper`.
-  - The Makefile's `typecheck` runs `/bin/sh agent/build.sh typecheck`.
-  - `unexport ANTHROPIC_API_KEY` occurs once.
-- **P1**, never skips. `build.sh helper` and `build.sh typecheck` run with a
-  fresh empty `HOME`, `PATH=/usr/bin:/bin` and a scratch
-  `TARGET_BUILD_DIR`. Each exits non-zero with a first stderr line
-  `error: bun is not installed …` and places no helper. It skips only as
-  `host: bun at a fixed path`, when bun is at `/opt/homebrew/bin` or
-  `/usr/local/bin`.
+    Graphic Templates" and before `schemes:`, whose own keys are exactly
+    `basedOnDependencyAnalysis: false` and the one line `script: /bin/bash
+    "$PROJECT_DIR/tools/agent/build_helper.sh"
+    "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/framejob-agent"`, so the
+    step's exit is the script's.
+  - `unexport ANTHROPIC_API_KEY` occurs once in the Makefile.
+- **P1**, a failed SwiftPM build fails the app build: P0's one-line step
+  (Xcode fails the build on a run-script phase's non-zero exit) and
+  `agent_build_proof.failing_package()`, its K8, run here by import: a toy
+  package built by the tree's script, then one that does not compile, exits
+  non-zero with no helper at the destination and no stamp.
 - **P2r / P2d**, the Release helper and, with `--dist`, the Distribution
-  one. Each is present, shows `flags=0x10002(adhoc,runtime)`, has
-  entitlements that parse as exactly `{com.apple.security.cs.allow-jit:
-  true}`, and passes `codesign --verify --strict`.
+  one. Each is present, shows `flags=0x10002(adhoc,runtime)`, holds no
+  entitlements (none printed, or an empty dict), and passes `codesign
+  --verify --strict`.
 - **P3**. The Release helper is launched with exactly `HOME`, `TMPDIR` and
   `PATH=/usr/bin:/bin`. It answers a `configure` with `ready` and exits 0
   once stdin closes. The stand-in sees only the Models API `GET`, no POST,
@@ -8087,21 +8094,15 @@ no row fails. An instrument that cannot run is a scored FAIL.
   - The POST after `compaction_started` carries `P4-COMPACTION`. The SDK
     sends that POST inside the same turn, so the second `send`, kept for
     the other case, was not needed.
-- **P5**, the control. A scratch copy of `agent/` without `node_modules`,
-  with `const p5: number = "p5";` appended to `main.ts`, fails `build.sh
-  typecheck` with a tsc error naming `src/main.ts`.
-- **Mutants**, each running only its row, which must FAIL (exit 1). A mutant
-  whose row skipped on this host exits 2 and says the control could not be
-  performed; it is never read as caught:
-  - `skip-without-bun` runs P1 against a scratch `build.sh` whose guard
-    `exit 1` (asserted once) became `exit 0`.
-  - `no-fields` runs P4 with the three fields omitted. The system then ends
-    in "undefined", `get_project` is deferred, and the summary POST lacks
-    the instructions.
+- **The mutant** runs only its row, which must FAIL (exit 1): `no-fields`
+  runs P4 with the three fields omitted, so `get_project` is deferred and
+  the summary POST lacks the instructions. (P1's "never skips" over Bun,
+  its `skip-without-bun` mutant and P5, the TypeScript's type check, left
+  with the Bun build step in road map "swift-helper" SA3; P1's own rule is
+  `agent_build_proof.py`'s, with its mutants.)
 
 ```sh
-python3 tools/proof/assistant_helper_proof.py --dist "build/Build/Products/Distribution/Frame Job.app"  # 7/7
-python3 tools/proof/assistant_helper_proof.py --mutant skip-without-bun  # P1 FAIL, exit 1
+python3 tools/proof/assistant_helper_proof.py --dist "build/Build/Products/Distribution/Frame Job.app"  # 6/6
 python3 tools/proof/assistant_helper_proof.py --mutant no-fields         # P4 FAIL, exit 1
 ```
 
@@ -8642,9 +8643,11 @@ python3 tools/proof/assistant_prompt_proof.py --live --cap 32           # spends
 ## Road map 12's A4 — the helper in both bundles (`dist_check.py` D6–D13, `dist_check_mutants.py`)
 
 Both bundles carry the assistant helper, `Contents/Helpers/framejob-agent`,
-which `agent/build.sh helper` copies in and signs `--options runtime` with
-`agent/entitlements.plist` before Xcode signs the app. `dist_check.py` holds
-each bundle's helper to that contract, after D1–D5 and with none skipped:
+which `tools/agent/build_helper.sh` strips in and signs `--options runtime`
+with no entitlements before Xcode signs the app (road map "swift-helper"
+SA3, spec §11 SA-8; until then `agent/build.sh helper` signed the Bun helper
+with `allow-jit`). `dist_check.py` holds each bundle's helper to that
+contract, after D1–D5 and with none skipped:
 
 - **D6 / D7** — the Release / Distribution helper exists;
 - **D8 / D9** — it is signed with the hardened runtime: the first
@@ -8652,8 +8655,8 @@ each bundle's helper to that contract, after D1–D5 and with none skipped:
   STDERR; the CodeDirectory line) lists `runtime`, and
   `codesign --verify --strict` exits 0. `runtime`, not `adhoc`, so a
   Developer ID signature passes too;
-- **D10 / D11** — `codesign -d --entitlements - --xml`'s stdout, parsed as a
-  plist, is exactly `{com.apple.security.cs.allow-jit: true}`;
+- **D10 / D11** — `codesign -d --entitlements - --xml`'s stdout is empty or
+  parses as an empty dict (`no_entitlements`, the MCP proxy's D19/D20 reader);
 - **D12 / D13** — it does not hold the `devToolsMarker` needle.
 
 A missing helper FAILs its three rows ("no Release helper (D6)"); no needle
@@ -8680,10 +8683,9 @@ PUB-10) a copy of the real `Contents/Resources/Acknowledgements.txt`.
 | `control` | both sides the real apps | none |
 | `skeleton` | both sides skeletons, helpers copied untouched | none |
 | `no-helper-release` / `-dist` | no helper in the skeleton | D6 D8 D10 D12 / D7 D9 D11 D13 |
-| `no-runtime-release` / `-dist` | re-signed with `agent/entitlements.plist`, no `--options runtime` | D8 / D9 |
-| `extra-entitlement-release` / `-dist` | re-signed `--options runtime` with allow-jit plus `disable-library-validation` | D10 / D11 |
-| `no-entitlements-dist` | re-signed `--options runtime`, no entitlements | D11 |
-| `marker-release` / `-dist` | the needle written over the copy at the first `compaction_instructions`, re-signed as `build.sh` signs | D12 / D13 |
+| `no-runtime-release` / `-dist` | re-signed ad hoc with nothing, no `--options runtime` | D8 / D9 |
+| `extra-entitlement-release` / `-dist` | re-signed `--options runtime` with `allow-jit`, the Bun helper's one entitlement (SA-8) | D10 / D11 |
+| `marker-release` / `-dist` | the needle written over the copy at the first `compaction_instructions`, re-signed as `build_helper.sh` signs | D12 / D13 |
 | `app-entitlements-dist` (#145) | the whole Distribution app `ditto`ed to `<case>/dist/Frame Job.app` and re-signed ad hoc `--options runtime` with the pair it carried before B20, `audio-input` and `get-task-allow` | D14 |
 | `app-entitlements-mic-only-release` (B88) | the whole Release app `ditto`ed and re-signed ad hoc `--options runtime` with `audio-input` alone | D25 |
 | `noop-sign-release` (B88) | the whole Release app `ditto`ed, its executable re-signed alone (`codesign -s - -f`, as Write Agent Catalog does), then a byte appended to `agent-catalog.json` — what a no-op build shipped before B88's fix | D25 D26 |
@@ -8701,6 +8703,8 @@ PUB-10) a copy of the real `Contents/Resources/Acknowledgements.txt`.
 | `licence-changed-release` (CX-5) | the Release skeleton's `Licenses/` copy with a byte appended to `svt-av1/PATENTS.md` | D40 |
 | `acknowledgements-missing-release` (PUB-10) | no `Acknowledgements.txt` in the Release skeleton | D42 |
 | `acknowledgements-crate-dropped-dist` (PUB-10) | the Distribution skeleton's `Acknowledgements.txt` copy with its first `== crate ` header line deleted (`crate adler2 2.0.1` today) | D43 |
+| `acknowledgements-slaude-dropped-release` (SA-10) | the Release skeleton's copy with its `== package slaude ` header line deleted | D42 |
+| `acknowledgements-bun-listed-dist` (SA-10) | the Distribution skeleton's copy with `== runtime bun 1.3.6 ==` added, a kind the file no longer holds | D43 |
 
 ```sh
 make dist                                                  # → dist_check: 42/43 (D31) until the owner's key lands
@@ -8768,16 +8772,22 @@ entry prices at its own model (spec §11 P-2).
 - **K** — the committed table: format 1, the unit, the provider, a 40-hex
   commit; `claude-opus-5-5` and `claude-fable-5-1` hold all five base rates
   as finite numbers ≥ 0; 1000 input tokens on opus price as dollars > 0.
-- **T** — `/bin/sh agent/build.sh test` exits 0 (`bun test`, its JUnit report
-  in `build/agent/bun-test.xml`, deleted first; 300 s wall).
-- **A** — every case name has a passing `case: <name>` testcase in the JUnit
-  report AND a passing C row; prints the case count and `cases.json`'s sha256.
+- **T** — the Swift helper's price suites (road map "swift-helper" SA3):
+  `python3 tools/agent/agent_test.py --filter 'PricingTests|PriceTableTests'`
+  (`make agent-test`'s guard, scratch path and warnings as errors, so it
+  shares that build; 900 s wall) exits 0, and its XCTest lines name each test
+  passed.
+- **A** — `PricingTests.testEveryCaseInCasesJSON` (every case within 1e-12,
+  each assertion labelled `case <name>`) passed with no `case <name>` failure,
+  AND every case has a passing C row; prints the case count and
+  `cases.json`'s sha256.
 
 Made to fail on purpose: `--mutant py-disagrees` prices C with every
 `cache_read` rate doubled in memory (the cache-read C rows and A FAIL by
-name); `--mutant ts-disagrees` runs T and A on a scratch copy of `agent/`
-under `work/prices/ts-disagrees/` (`node_modules` ignored) whose `opus-mixed`
-expects its dollars + 0.01 (T and A FAIL naming `opus-mixed`).
+name); `--mutant swift-disagrees` runs T and A with `FJ_AGENT_PRICES` naming a
+scratch copy of `agent/prices` under `work/prices/swift-disagrees/` whose
+`opus-mixed` expects its dollars + 0.01 (`PriceFiles` in the suite reads that
+folder, so nothing is rebuilt; T and A FAIL naming `opus-mixed`).
 
 **`prices_crosscheck.py`** — network, not in `make test`. **X0** fetches
 `https://platform.claude.com/docs/en/about-claude/pricing.md` and parses the
@@ -8793,7 +8803,7 @@ line (X2 FAILs naming `claude-fable-5-1`).
 make prices                                               # network; the table's only writer
 python3 tools/proof/prices_proof.py                       # C × 23, K, T, A: 26/26
 python3 tools/proof/prices_proof.py --mutant py-disagrees # exit 1
-python3 tools/proof/prices_proof.py --mutant ts-disagrees # exit 1
+python3 tools/proof/prices_proof.py --mutant swift-disagrees # exit 1
 python3 tools/proof/prices_crosscheck.py                  # X0–X2 (network)
 python3 tools/proof/prices_crosscheck.py --mutant table   # exit 1
 python3 tools/proof/prices_crosscheck.py --mutant page    # exit 1
@@ -8872,12 +8882,15 @@ dollar is `prices.py`'s, every expected date the local date of the instant.
   folder created, a file as the folder refused); P-5's table over a
   `UserDefaults` answering the argument domain.
 
-Made to fail: `--mutant stale-refresh` builds a scratch `agent/` with
-`REFRESH_AFTER_MS = 0` through its own `build.sh helper` and runs H2 and
-H3 on it (H3 FAILs: a GET and a fetched `prices`); `--mutant
-unknown-as-zero` runs the probe over a copy of `app/Sources` whose cost line
-renders unknown as `$0.0000` (S1 FAILs). Either exits 2 when its instrument
-did not build.
+Made to fail: `--mutant stale-refresh` builds a helper mutant whose
+`PriceTables.refreshAfter` is 0 (`agent_helper_build.mutant` on the
+persistent mutant tree, road map "swift-helper" SA3, spec §11 SA-8) and runs
+H2 and H3 on it (H3 FAILs: a GET and a fetched `prices`); `--mutant
+no-partial` (the catch's partial `emitCost` gone, H10 and H11) and `--mutant
+priced-twice` (a returned response priced a second time as partial, H12)
+build theirs the same way and run H10–H12; `--mutant unknown-as-zero` runs
+the probe over a copy of `app/Sources` whose cost line renders unknown as
+`$0.0000` (S1 FAILs). Each exits 2 when its instrument did not build.
 
 ```sh
 python3 tools/proof/prices_proof.py --mutant reduce-disagrees  # R FAIL, exit 1
@@ -17315,8 +17328,8 @@ at, read with `dist_check.py`'s own readers (imported, not copied):
   --strict` accepts it, which also fails when anything nested was changed
   after the app was sealed; **P5** its entitlements are exactly `audio-input`
   and `camera`;
-- **P6–P9** the assistant helper: present, hardened runtime, entitlements
-  exactly `allow-jit`, no needle;
+- **P6–P9** the assistant helper: present, hardened runtime, no entitlements
+  (`allow-jit` until road map "swift-helper" SA3, spec §11 SA-8), no needle;
 - **P10–P12** the MCP proxy: present, hardened runtime, no entitlements;
 - **P13** the catalog snapshot is at the bundle's version; **P14** it names no
   dev tool;
@@ -32963,10 +32976,10 @@ python3 tools/proof/agent_helper_drive.py --mutant drive-same-helper  # both sid
 ```
 
 **The helpers.** B0 is `agent/build.sh helper` into `work/agent_helper_drive/bun-target/` (no bun
-is `build.sh`'s own error and a FAIL). B1 runs `agent_test.py`'s guard (spec §11 SA-12) on
-`build/agent-swift-test` and builds the `framejob-agent` product there with the suite's
-environment, so `make agent-test` has already built it and B1 takes seconds; the path is
-SwiftPM's `--show-bin-path`. Each helper gets exactly `HOME`, `TMPDIR` (scratch folders) and
+is `build.sh`'s own error and a FAIL). B1 is, since SA3, the release helper the app bundles:
+`agent_helper_build.release` runs `tools/agent/build_helper.sh` on the app build's scratch path
+`build/agent-swift` into `work/agent_helper_drive/swift/` (seconds while its stamp matches, spec
+§11 SA-8). Each helper gets exactly `HOME`, `TMPDIR` (scratch folders) and
 `PATH=/usr/bin:/bin`, as `AssistantSession` gives it, and the app's lines: sorted keys, compact,
 and `writeResult`'s spliced answers.
 
@@ -33045,10 +33058,10 @@ JSON, with `retry-after` and `retry-after-ms` when given), `"cut": "error"` (an 
 mid-stream) and a `thinking` block (one `thinking_delta`, one `signature_delta`). Each is inert
 without its key; no other proof's scenario held one when they were added.
 
-**Mutants** (`SWIFT_MUTANTS`, counted by `mutant_anchors.py`): applied in place to
-`agent/Sources`, refused while that folder has any change `git status --porcelain` shows, the
-file restored from the bytes kept in `work/agent_helper_drive/mutant-original/` and checked by
-digest, and the helper rebuilt on the suite's scratch path. A mutant is caught only when every
+**Mutants** (`SWIFT_MUTANTS`, counted by `mutant_anchors.py`): since SA3 each is built by
+`agent_helper_build.mutant` on the persistent mutant tree `build/agent-swift-mutant/` (its own
+`agent/`, brought to the tree's by content, and its own scratch path), never in the tree's
+`agent/Sources`. A mutant is caught only when every
 case it names FAILs; one that does not build exits 2. `tool-results-reversed` (`tools`),
 `no-defer-loading` (`text`, `tools`, `compaction`, `retry`), `cost-before-done` (`text`, `tools`),
 `two-retries` (`retry`) and `summary-keeps-clearing` (`compaction`) make a difference outside the
@@ -33057,10 +33070,10 @@ list; `system-loses-guide` (`text`, `tools`), `not-run-reworded` (`cut-reply-too
 and `empty-summary` rows no wider than their decisions. `--mutant drive-same-helper` runs the
 Swift helper on both sides: every row must allow nothing.
 
-**When SA3 and SA4 land.** SA3 points `--swift`'s default at the bundled release helper and
-builds the mutants with SA-8's builder; SA4 deletes the Bun side (`--bun`, `ALLOWED`, `--drop`,
-`--rows-needed`, `drive-same-helper`) and keeps the cases with their expectations as the Swift
-helper's drive.
+**When SA3 and SA4 land.** SA3 pointed B1 at the release helper and built the mutants with
+SA-8's builder (above; its section below); SA4 deletes the Bun side (`--bun`, `ALLOWED`,
+`--drop`, `--rows-needed`, `drive-same-helper`) and keeps the cases with their expectations as
+the Swift helper's drive.
 
 Run on 2026-11-12 in a worktree of 8bee8a56, other lanes building (load averages as `uptime`
 printed them):
@@ -33076,3 +33089,87 @@ printed them):
 | `--cases thinking,stream-error,retry` on the stand-in as it was at 8bee8a56 | 15/19, exit 1: all three FAIL; the file put back byte-identical |
 | `mutant_anchors.py` | PASS: `agent_helper_drive.py SWIFT_MUTANTS: 8 mutants, 8 anchors read` |
 | `make gate` (load 39.48 → 61.72), then again after two code edits (load 14.43 → 50.65) | PASS 776 s: names, typecheck, fmt, lint, test 517 s (`Executed 77 tests, with 0 failures`; the drive 43/43), app 201 s (D25, D26); then PASS 135 s: test 132 s (the drive 43/43, 27 cases in 16.3 s), the rest skipped as unchanged |
+
+## Road map "swift-helper" SA3 — the switch (`agent_build_proof.py`, `agent_helper_build.py`; spec §11 SA-8, SA-9, SA-10)
+
+The app's "Build Agent Helper" step is `tools/agent/build_helper.sh` (spec §11 SA-8): SwiftPM
+release on `build/agent-swift`, the tree from `$PROJECT_DIR`, a scrubbed environment, a stamp
+whose key digests the sources through links, the scratch path's own path recorded beside the key
+and read only on a miss (a scratch path made elsewhere is emptied), the destination removed
+first, then `strip -x` and a signature with the hardened runtime and no entitlements. What
+changed in the proofs, each described in its own section above: `dist_check.py` D10/D11 and
+`published_check.py` P8 (no entitlements), D42/D43 and P25 (`package slaude` at
+`agent/Package.resolved`'s revision, no `npm` or `runtime` header) and `dist_check_mutants.py`'s
+cases (39); `tree_copy.py`'s clone of the helper's scratch path and T9; `makefile_env_proof.py`'s
+fifth row and `--cold-helper`; `assistant_helper_proof.py`'s P0–P2; `prices_proof.py`'s T and A
+on the Swift suite and `swift-disagrees`; `assistant_lane_proof.py`'s B1 (SA-9) and
+`b1-empty-catalog`; `spend_proof.py`'s helper mutants; `agent_helper_drive.py`'s B1 and mutants;
+the relay in `assistant_prompt_eval.py` taking `Authorization: Bearer` and `budget_proof.py`'s R1
+and R5; `acknowledgements.py`'s S1 and S2 (SA-10).
+
+**`agent_build_proof.py`** (a line of `make test`) holds the script's rules over toy packages of
+the helper's shape (a kit embedding `table.json` through a relative link, the executable
+`framejob-agent`, a test target), each toy tree under `tools/agent/work/build-proof/` with its own
+copy of the script, no dependency and no network:
+
+- **K1** cold: built, the helper prints the toy's marker and table, `runtime` in its flags, no
+  entitlements, the stamp and the path record written; **K2** the same again: skipped;
+- **K3** a source edit: built in place (a sentinel in the scratch path survives); **K4** an edit
+  of the table the link points at: built (the key reads through links);
+- **K5** a second tree, `agent/` copied with `shutil.copytree` and the scratch path a `cp -cRp`
+  clone: skipped (a clone is served at another path); **K6** a fresh such clone with a source
+  edited: emptied (the clone's sentinel gone), its record now its own;
+- **K7** a tree whose `tools` is a link to another's builds its own `agent/`; `PROJECT_DIR` unset
+  is refused, naming it, with no helper written;
+- **K8** a package that does not compile, after a good build: non-zero, no helper at the
+  destination, no stamp (`failing_package()`, which `assistant_helper_proof.py`'s P1 runs);
+- **K9** both keys and `FJ_AGENT_STRICT` set by the caller: the manifest's `Context.environment`
+  sees no key (its text carries a fresh nonce, so SwiftPM's manifest cache cannot answer);
+- **K10** the script spells no `agent-swift-test`, and a sentinel in the suite's scratch path
+  survives every run.
+
+Mutants (`MUTANTS`, each one anchor of the script replaced in the copies; `EXPECTED` the rows that
+must FAIL, exactly): `path-in-key` K5; `no-table-in-key` K4 K5 (the link's target unread, and the
+copy's regular file read where the tree's link is not); `tree-from-script` K7;
+`miss-keeps-foreign` K6; `failure-masked` K8; `env-not-scrubbed` K9.
+
+**`agent_helper_build.py`** (imported): `release(destination)` runs the script on the tree, so a
+proof's helper shares the app build's scratch path and stamp; `mutant(name, edits, destination)`
+brings the persistent mutant tree `build/agent-swift-mutant/agent/` to the tree's `agent/` by
+content (`Package.swift`, `Package.resolved`, `Sources/`, `Tests/`, links followed), applies the
+edits (each anchor exactly once) and runs the script there, under `build/agent-swift-mutant.lock`.
+
+```sh
+python3 tools/proof/agent_build_proof.py                       # 10/10
+python3 tools/proof/agent_build_proof.py --mutant path-in-key  # exit 1, exactly K5 (and the other five)
+python3 tools/proof/assistant_lane_proof.py --mutant b1-empty-catalog   # B1 FAIL, exit 1
+python3 tools/proof/prices_proof.py --mutant swift-disagrees   # T and A FAIL naming opus-mixed, exit 1
+python3 tools/proof/makefile_env_proof.py --cold-helper --wall 1500     # the copy builds Slaude itself
+```
+
+Run on 2026-11-12 in a worktree of a012946f, other lanes building (load averages as `uptime`
+printed them; none of these is an idle figure):
+
+| Command | Result |
+|---|---|
+| `build_helper.sh` cold on the tree (load 7.40 → 50.92) | 82.53 s (SwiftPM's `complete! (80.09s)`, 2,401 files compiled, Slaude from SwiftPM's cache); the helper 35,610,496 bytes, `flags=0x10002(adhoc,runtime)`, no entitlements, `compaction_instructions` once in its bytes; again: `skipped`, 1.29 s |
+| `agent_build_proof.py`, first run | 10/10 in 14.4 s; its mutants on that instrument: three failed rows past their own (each toy tree ran tree A's script, and K6 inherited K5's emptied clone), so each tree got its own script and K6 its own clone; then each mutant exactly its rows |
+| `agent_build_proof.py` and its six mutants on the final instrument | 10/10; exit 1 each: `path-in-key` K5, `no-table-in-key` K4 K5, `tree-from-script` K7, `miss-keeps-foreign` K6 (SwiftPM failed on the moved clone, as SA0 saw), `failure-masked` K8, `env-not-scrubbed` K9 (`key seen`) |
+| `acknowledgements.py --selftest`, then each `--mutant` | 11/11; `MUTANT PASS` each: `dev-edges` G1, `nested-unchecked` L3, `slaude-missing-ok` S2 |
+| `acknowledgements.py --agent-scratch build/agent-swift` | 109 entries: 95 crates, `package slaude 4c6c2ca4…`, its `LICENSE` (identical to an Apache-2.0 text above), the SDK's `LICENSE` and `LICENSE-MIT`; no `npm`, no `runtime` |
+| `tree_copy.py --selftest` | 9/9 in 32.3 s; T9 FAIL with the clone made a link (8/9) |
+| `makefile_env_proof`'s fifth row over the pre-switch Release notices | FAIL: `agent/node_modules` present, no `package slaude`, `npm` and `runtime` kinds |
+| `prices_proof.py` (load 50.84 → 113.71) | 27/27; T `exit 0 in 80.451 s; 17 tests` (the suite's debug Slaude built cold); `--mutant swift-disagrees`: 25/27, exit 1, T and A naming `opus-mixed`, T in 4.4 s |
+| `assistant_lane_proof.py` | 20/20; B1 `the helper's first POST 399,414 bytes + 30,000 … = 429,414, within … 480,000 (50,586 left)`, 123 tools; `--mutant b1-empty-catalog`: B1 FAIL (`1 tools, not the catalog's 122 plus tool search`), exit 1 |
+| `budget_proof.py` with the relay as committed, then as changed | 20/24, R1–R4 FAIL (401: the relay took `x-api-key` only); 24/24, R1 forwarded with `authorization: Bearer proof-key`, R5 `x-api-key` forwarded and `Bearer wrong-key` 401 with nothing forwarded |
+| `make app` (Release), then again after two comment edits in `agent/` | 226.03 s, the helper step `skipped`; 6.61 s, the helper `built` incrementally |
+| On Release: `assistant_helper_proof.py` | 5/5 (P2d skipped, no `--dist`); P0 over the committed `project.yml`: FAIL (the step's keys are its Bun line) |
+| On Release: `spend_proof.py`, then each helper mutant | 21/21 in 94.9 s; exit 1 each: `stale-refresh` H3, `no-partial` H10 H11, `priced-twice` H12 (each mutant built in 6.5–10.4 s) |
+| `agent_helper_drive.py`, then each of the eight mutants | 43/43 in 18.6 s, B1 `skipped … 0.944 s`; exit 1 each, caught in its named cases; the mutant tree built cold for the first in 158.0 s, then 7.7–14.8 s each; the tree's `agent/` untouched |
+| On Release: session, spend UI, tab, settings, prompt (F, M, S) | 14/14 (KO 398,911 bytes, identical), 10/10, 26/26, 3/3, 18/18 |
+| On Release: the compaction, clearing and prompt rehearsals (the relay, Bearer) | 8/8 (largest body 402,782), 6/6 (401,392), 25/25 (401,310) |
+| On Release: `docs_bugs_c1_proof.py`, then `--mutant no-context-arm` | 35/35; `--mutant no-context-arm`: the copy's `make app` 365 s (its helper step missed on the edited `Turn.swift`, emptied the clone and built Slaude cold: the copy's path record names the copy), `MUTANT no-context-arm CAUGHT: C1 failed`, exit 1 |
+| `makefile_env_proof.py --wall 1500`, then `--cold-helper` | 5/5 in 365 s: the copy's Release build 350 s, its helper step `skipped` (the clone served), 15,179 files read, the notices `package slaude` and no npm or Bun; `--cold-helper`: 5/5 in 384 s, the copy's build 372 s with the helper step `built` from nothing (its own seconds are not printed apart from the build's) |
+| `make dist`, then `dist_check_mutants.py` | `make dist` 266.59 s: `dist_check: 47/47` (D10/D11 `holds no entitlements`, D42/D43 `109 entries, 95 crates, slaude 4c6c2ca4, 9 fonts`), `published_check: 27/27`; the Distribution build's helper step `skipped` on the same stamp; `dist_check_mutants: 39/39` in 71.08 s: `extra-entitlement-*` D10 / D11, `no-runtime-*` D8 / D9, `marker-*` D12 / D13, `acknowledgements-slaude-dropped-release` D42, `acknowledgements-bun-listed-dist` D43 |
+| `mutant_anchors.py` | PASS: `agent_build_proof.py MUTANTS: 6 mutants, 6 anchors read`, `spend_proof.py HELPER_MUTANTS: 3 mutants, 3 anchors read`, the drive's eight |
+| `make gate` | PASS 395 s (load 14.34 28.38 29.26 → 28.59 44.16 37.40): names 2 s, typecheck 10 s (its four warnings), fmt 4 s, lint 19 s, test 350 s (B1 `399,414 bytes`, `agent_build_proof.py` 10/10, `prices_proof.py` 27/27, `Executed 77 tests, with 0 failures`, the drive 43/43, `budget_proof.py` 24/24), app 8 s (the helper step `skipped`; D25, D26 ok) |

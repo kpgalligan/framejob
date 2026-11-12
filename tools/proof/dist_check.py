@@ -18,13 +18,13 @@ a short tool name could never be found in either build and an absence check
 on it would pass for nothing. The marker is at least 16 bytes, and the flag-on
 `devTools()` logs it, which keeps the literal live in the optimised binary.
 
-**The helper (road map 12 A4).** Both bundles carry the assistant helper,
-`Contents/Helpers/framejob-agent`, which `agent/build.sh helper` copies in and
-signs `--options runtime` with `agent/entitlements.plist` before Xcode signs
-the app. Without `com.apple.security.cs.allow-jit` under the hardened runtime
-the helper dies at launch; with more, it holds a right it does not need. The
-rows check `runtime` in the CodeDirectory flags, not `adhoc`, so a Developer
-ID signature passes too. `codesign -dv` writes its display to stderr, so the
+**The helper (road map 12 A4, spec §11 SA-8).** Both bundles carry the assistant
+helper, `Contents/Helpers/framejob-agent`, the Swift executable
+`tools/agent/build_helper.sh` builds, strips into the bundle and signs
+`--options runtime` with NO entitlements before Xcode signs the app: a Swift
+binary needs none, and any one it held would be a right it does not use
+(`allow-jit` was Bun's JavaScriptCore's). The rows check `runtime` in the
+CodeDirectory flags, not `adhoc`, so a Developer ID signature passes too. `codesign -dv` writes its display to stderr, so the
 flags are read there; the entitlements are read from stdout.
 
 **The app's entitlements (#145).** Distribution is the build that ships
@@ -107,12 +107,13 @@ D42 / D43 read it with readers of their own — this script never imports the ge
 so the check is not the generator agreeing with itself: `shipped_crates()` runs `cargo
 metadata --format-version 1 --locked --offline --filter-platform aarch64-apple-darwin` in
 `core/` and `mcp-proxy/` and walks every non-dev edge from the root, Frame Job's own
-crates left out; `shipped_npm()` reads `agent/bun.lock` from the workspace's
-`dependencies` through each package's own. The file must hold an `== <kind> <name>
+crates left out. The file must hold an `== <kind> <name>
 <version> ==` header for each of those, `library <name> <version>` for each pin,
-`framework sparkle <project.yml's exactVersion>`, `runtime bun`, `model silero-vad` and
-`font <stem>` for each `*.ttf` in the bundle's `Contents/Resources/Fonts/` (any version
-for those four).
+`framework sparkle <project.yml's exactVersion>`, `package slaude <revision>` at
+`agent/Package.resolved`'s pin (spec §11 SA-10, `slaude_revision()`), and `model
+silero-vad` and `font <stem>` for each `*.ttf` in the bundle's `Contents/Resources/Fonts/`
+(any version for those), and no header of a kind outside ACK_KINDS (`npm` and `runtime` are
+the Bun helper's, gone since SA3).
 
 The forty-three rows, none ever skipped:
 
@@ -126,7 +127,8 @@ The forty-three rows, none ever skipped:
 * D6 / D7 — the Release / Distribution helper exists;
 * D8 / D9 — it is signed with the hardened runtime (`runtime` in the
   CodeDirectory flags) and `codesign --verify --strict` accepts it;
-* D10 / D11 — its entitlements are exactly `com.apple.security.cs.allow-jit`;
+* D10 / D11 — it holds no entitlements (an empty `codesign -d --entitlements -
+  --xml`, or an empty dict; spec §11 SA-8);
 * D12 / D13 — it does not hold the needle;
 * D14 — the Distribution app's entitlements are exactly
   `com.apple.security.device.audio-input` and
@@ -172,8 +174,9 @@ The forty-three rows, none ever skipped:
   every pin, byte-identical to `build/codecs/licenses/<library>/<file>`;
 * D42 / D43 — the Release / Distribution bundle's
   `Contents/Resources/Acknowledgements.txt` has a header for every shipped crate
-  and npm package (name and version), each pin, Sparkle at `project.yml`'s
-  version, Bun, the model and each bundled font;
+  (name and version), each pin, Sparkle at `project.yml`'s version, Slaude at
+  `agent/Package.resolved`'s revision, the model and each bundled font, and none
+  of another kind;
 * D44 / D45 — the Release binary holds `RCDevGraphicLinkLoopbackHTTP`, the
   dev-only switch that lets a `framejob://` link fetch from `http://127.0.0.1`
   (spec §11 G-49 (l)): the POSITIVE CONTROL, without which D45 would pass for
@@ -190,7 +193,7 @@ and D34 FAIL when their binary is missing, and D35 when the Release binary
 is, or `otool` is missing or fails; D36–D39 FAIL when their binary is missing
 or `nm`/`otool` is missing or fails, and D40 / D41 when `build/codecs/` has no
 licences to compare; D42 / D43 FAIL when the file, `cargo`, its metadata or
-`agent/bun.lock` is missing or unreadable, naming which. D17–D20
+`agent/Package.resolved` is missing or unreadable, naming which. D17–D20
 FAIL when their proxy is missing; D23 and D24 when their snapshot has no
 readable `tools` or the dev names cannot be read. A missing `codesign`, a
 timeout or output that does not parse FAILs the row with the reason.
@@ -225,9 +228,8 @@ DEFAULT_DIST = os.path.join(ROOT, "build", "Build", "Products", "Distribution", 
 DECLARATION = re.compile(r'^\s*static let devToolsMarker = "([^"\\\n]+)"\s*$', re.M)
 # Below this, the literal is stored inline in code and never found as bytes.
 MIN_BYTES = 16
-# The assistant helper, inside each bundle; its one entitlement (agent/entitlements.plist).
+# The assistant helper, inside each bundle; signed with no entitlements (spec §11 SA-8).
 HELPER = os.path.join("Contents", "Helpers", "framejob-agent")
-ENTITLEMENTS = {"com.apple.security.cs.allow-jit": True}
 # The Distribution app's entitlements (#145, spec §11 CAM-3): the microphone and the camera,
 # never get-task-allow.
 APP_ENTITLEMENTS = {"com.apple.security.device.audio-input": True,
@@ -267,14 +269,15 @@ LICENSES = os.path.join("Contents", "Resources", "Licenses")
 CODEC_LICENSES = os.path.join(ROOT, "build", "codecs", "licenses")
 # Each encoder's own string literal (spec §11 PUB-11): bytes `strip` keeps, unlike D37's symbols.
 CODEC_STRINGS = (b"SVT-AV1 Encoder Lib", b"WebM Project VP9 Encoder")
-# The acknowledgements (spec §11 PUB-10): the file, its entry headers, Frame Job's own crates,
-# the cargo roots the shipped crates are read from, and the bundle's fonts.
+# The acknowledgements (spec §11 PUB-10, SA-10): the file, its entry headers (any kind, so one
+# of a kind the file no longer holds is seen) and the kinds it may hold, Frame Job's own crates,
+# the cargo roots the shipped crates are read from, the helper's pin file, and the bundle's fonts.
 ACKNOWLEDGEMENTS = os.path.join("Contents", "Resources", "Acknowledgements.txt")
-ACK_HEADER = re.compile(r"^== (crate|npm|runtime|framework|library|model|font) (\S+) (\S+) ==$",
-                        re.M)
+ACK_HEADER = re.compile(r"^== (\S+) (\S+) (\S+) ==$", re.M)
+ACK_KINDS = ("crate", "package", "framework", "library", "model", "font")
 FIRST_PARTY = ("framejob-core", "graphic", "framejob-mcp")
 CARGO_ROOTS = ("core", "mcp-proxy")
-BUN_LOCK = os.path.join(ROOT, "agent", "bun.lock")
+PACKAGE_RESOLVED = os.path.join(ROOT, "agent", "Package.resolved")
 FONTS = os.path.join("Contents", "Resources", "Fonts")
 SPARKLE_VERSION = re.compile(r"^  Sparkle:\s*\n(?:    .*\n)*?    exactVersion:\s*\"?([^\"\s]+)\"?\s*$",
                              re.M)
@@ -401,13 +404,9 @@ def entitlements(path, want):
     return True, ""
 
 
-def helper_entitlements(path):
-    """Whether the helper's entitlements are exactly ENTITLEMENTS."""
-    return entitlements(path, ENTITLEMENTS)
-
-
-def proxy_entitlements(path):
-    """Whether the proxy holds no entitlements: empty output, or an empty dict."""
+def no_entitlements(path):
+    """Whether the code at `path` (the helper, the MCP proxy) holds no entitlements: empty
+    output, or an empty dict."""
     shown, reason = run_codesign(["-d", "--entitlements", "-", "--xml", path])
     if shown is None:
         return False, reason
@@ -769,36 +768,18 @@ def shipped_crates():
     return shipped, ""
 
 
-def shipped_npm():
-    """({(name, version)} of every npm package agent/bun.lock reaches from the workspace's
-    dependencies through each package's own) or None, with the reason. A dependency is bun's
-    nested key under its dependent's chain (`a/b/c`), else under a shorter one, else hoisted."""
+def slaude_revision():
+    """Slaude's pinned revision in agent/Package.resolved (spec §11 SA-10), or None with the
+    reason. Its own reader: the generator reads the scratch path's workspace-state.json."""
     try:
-        with open(BUN_LOCK, encoding="utf-8") as handle:
-            text = handle.read()
-    except OSError as error:
-        return None, f"{BUN_LOCK}: {error}"
-    try:
-        lock = json.loads(re.sub(r",\s*([}\]])", r"\1", text))
-        packages = lock["packages"]
-        todo = [((), name) for name in lock["workspaces"][""].get("dependencies", {})]
-        shipped, seen = set(), set()
-        while todo:
-            chain, name = todo.pop()
-            level = next((i for i in range(len(chain), -1, -1)
-                          if "/".join(chain[:i] + (name,)) in packages), 0)
-            path = chain[:level] + (name,)
-            key = "/".join(path)
-            if key in seen:
-                continue
-            seen.add(key)
-            spec = packages[key]
-            shipped.add((name, spec[0][spec[0].rindex("@") + 1:]))
-            extra = spec[2] if len(spec) > 2 and isinstance(spec[2], dict) else {}
-            todo.extend((path, dep) for dep in extra.get("dependencies", {}))
-    except (ValueError, KeyError, TypeError, IndexError) as error:
-        return None, f"{BUN_LOCK} does not read as a lock: {error!r}"
-    return shipped, ""
+        with open(PACKAGE_RESOLVED, encoding="utf-8") as handle:
+            pins = json.load(handle)["pins"]
+        found = [p["state"]["revision"] for p in pins if p.get("identity") == "slaude"]
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        return None, f"{PACKAGE_RESOLVED}: {error!r}"
+    if len(found) != 1 or not re.fullmatch(r"[0-9a-f]{40}", str(found[0])):
+        return None, f"{len(found)} slaude pins in {PACKAGE_RESOLVED}: {found}"
+    return found[0], ""
 
 
 def sparkle_version():
@@ -814,8 +795,9 @@ def sparkle_version():
 
 
 def acknowledgements(app):
-    """Whether the bundle's Acknowledgements.txt has a header for every shipped crate and npm
-    package, each pin, Sparkle at project.yml's version, Bun, the model and each font."""
+    """Whether the bundle's Acknowledgements.txt has a header for every shipped crate, each pin,
+    Sparkle at project.yml's version, Slaude at agent/Package.resolved's, the model and each
+    font, and none of a kind outside ACK_KINDS."""
     path = os.path.join(app, ACKNOWLEDGEMENTS)
     try:
         with open(path, encoding="utf-8") as handle:
@@ -825,26 +807,29 @@ def acknowledgements(app):
     crates, reason = shipped_crates()
     if crates is None:
         return False, reason
-    npm, reason = shipped_npm()
-    if npm is None:
+    slaude, reason = slaude_revision()
+    if slaude is None:
         return False, reason
     sparkle, reason = sparkle_version()
     if sparkle is None:
         return False, reason
     held = set(headers)
     named = {(kind, name) for kind, name, _ in headers}
-    exact = ({("crate",) + c for c in crates} | {("npm",) + n for n in npm}
+    exact = ({("crate",) + c for c in crates}
              | {("library", pin.name, pin.version) for pin in build_codecs.PINS}
-             | {("framework", "sparkle", sparkle)})
+             | {("framework", "sparkle", sparkle), ("package", "slaude", slaude)})
     fonts = os.path.join(app, FONTS)
     stems = sorted(f[:-4] for f in (os.listdir(fonts) if os.path.isdir(fonts) else [])
                    if f.endswith(".ttf"))
-    anyversion = {("runtime", "bun"), ("model", "silero-vad")} | {("font", s) for s in stems}
+    anyversion = {("model", "silero-vad")} | {("font", s) for s in stems}
     missing = sorted(" ".join(e) for e in exact - held)
     missing += sorted(" ".join(e) + " <any>" for e in anyversion - named)
-    if missing:
-        return False, f"{len(missing)} missing from {path}: {missing[:8]}"
-    return True, f"{len(headers)} entries, {len(crates)} crates, {len(npm)} npm, {len(stems)} fonts"
+    stray = sorted(" ".join(e) for e in held if e[0] not in ACK_KINDS)
+    if missing or stray:
+        return False, (f"{len(missing)} missing from {path}: {missing[:8]}" if missing else
+                       f"headers of a kind outside {list(ACK_KINDS)} in {path}: {stray[:8]}")
+    return True, (f"{len(headers)} entries, {len(crates)} crates, slaude {slaude[:8]}, "
+                  f"{len(stems)} fonts")
 
 
 def main():
@@ -908,12 +893,11 @@ def main():
             check(name, ok, "" if ok else detail)
     for side, exists_id, _, entitlements_id, _, _ in sides:
         helper, helper_where = helpers[side]
-        name = (f"{entitlements_id} the {side} helper's entitlements are exactly "
-                "com.apple.security.cs.allow-jit")
+        name = f"{entitlements_id} the {side} helper holds no entitlements"
         if helper is None:
             check(name, False, f"no {side} helper ({exists_id})")
         else:
-            ok, detail = helper_entitlements(helper_where)
+            ok, detail = no_entitlements(helper_where)
             check(name, ok, detail)
     for side, exists_id, _, _, needle_id, _ in sides:
         helper, helper_where = helpers[side]
@@ -954,7 +938,7 @@ def main():
         if proxies[side] is None:
             check(name, False, f"no {side} MCP proxy ({exists_id})")
         else:
-            ok, detail = proxy_entitlements(proxies[side])
+            ok, detail = no_entitlements(proxies[side])
             check(name, ok, detail)
     snapshots = {}
     for side, _, _, _, snapshot_id, app in proxy_sides:
@@ -1092,7 +1076,7 @@ def main():
                               ("Distribution", "D43", arguments.dist)):
         ok, detail = acknowledgements(app)
         check(f"{row_id} the {side} bundle's Acknowledgements.txt names every shipped crate, "
-              "npm package, pin, Sparkle, Bun, the model and each font"
+              "pin, Sparkle, Slaude, the model and each font, and no other kind"
               + (f" ({detail})" if ok else ""), ok, "" if ok else detail)
 
     switch = LINK_SWITCH.decode("ascii")

@@ -13,7 +13,8 @@ typecheck`, which builds or reuses the bundled encoders first, `make codecs`, sp
 CX-5, passing only with no `error:` and exactly TYPECHECK_BASELINE's
 warnings, by file and message; `tools/codecs` is among its and `app`'s inputs, and
 `cmake --version` in the tool fingerprint; `tools/licenses`, the acknowledgements' generator
-and its vendored texts, spec §11 PUB-10, is among `app`'s, its `*.md` not), `fmt` (`cargo fmt --check` in core, graphic,
+and its vendored texts, spec §11 PUB-10, is among `app`'s, its `*.md` not, and so is
+`tools/agent`, the helper's build script, spec §11 SA-8), `fmt` (`cargo fmt --check` in core, graphic,
 mcp-proxy), `lint` (`make lint`), `test` (`make test`; of the `*.md` files only those under
 `designs/spec/` and `docs/` and the root `README.md`, which its spelling scan reads, #556, are
 its inputs) and `app` (`make app`,
@@ -53,7 +54,10 @@ HERE = "tools/proof/gate.py"
 GATE = ROOT / "build/gate"
 ALWAYS = (HERE, "Makefile")
 STEPS = ("names", "typecheck", "fmt", "lint", "test", "app")
-BOUNDS = {"names": 120, "typecheck": 600, "fmt": 120, "lint": 600, "test": 900, "app": 1500}
+# `test` builds the release assistant helper (road map "swift-helper" SA3, spec §11 SA-8, SA-9):
+# seconds while its stamp matches, Slaude's cold build (SA0's 122–392 s) in a worktree that has
+# none, on top of the 517–560 s SA1 and SA2 measured; so 1200, where 900 already stopped one run.
+BOUNDS = {"names": 120, "typecheck": 600, "fmt": 120, "lint": 600, "test": 1200, "app": 1500}
 COMMANDS = {
     "names": [["python3", "tools/proof/name_residue.py"],
               ["python3", "tools/proof/docs_site_proof.py", "--guide"]],
@@ -71,7 +75,8 @@ STEP_INPUTS = {
     "fmt": (("core", "graphic", "mcp-proxy"), ()),
     "lint": (("core", "graphic", "mcp-proxy"), ()),
     "test": (("",), ("designs/spec/", "docs/", "README.md")),
-    "app": (("app", "agent", "core", "graphic", "mcp-proxy", "tools/codecs", "tools/licenses",
+    "app": (("app", "agent", "core", "graphic", "mcp-proxy", "tools/agent", "tools/codecs",
+             "tools/licenses",
              "project.yml", "VERSION",
              "docs/graphics-api.md", "docs/graphics-api.d.ts", "tools/proof/dist_check.py"),
             ("docs/graphics-api.md",)),

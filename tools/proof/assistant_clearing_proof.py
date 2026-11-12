@@ -64,7 +64,7 @@ the rows its turn touches naming `cap:` or `budget:`. `--live` without
 with no key SKIPs every row `host: no key`.
 
 Safety: the key is read once, by `assistant_prompt_eval.anthropic_key`, and
-leaves this process only as the relay's `x-api-key`; the app and helper get
+leaves this process only as the relay's credential header; the app and helper get
 the dummy `proof-key`, and every child's environment has the keys popped
 (`assistant_session_proof.child_env`). Only `--live` opens the proofs' ledger.
 Rule H: a turn is stopped past 300 s; only this script's processes are

@@ -27,9 +27,14 @@ proves the real one, `budget.LEDGER`, was not created or changed.
       with no `message_stop` or a body with no `usage` is not whole
   U2  `Evaluation.finish` totals only integer usage values
   R1–R4  the relay over the stand-in: forwarded and settled $0.0006 at the
-      table; two POSTs refused by the budget with no cap reservation leaked;
-      a cap refusal writes no proofs'-ledger line; a dead upstream settles
-      at the reservation
+      table, a post with `Authorization: Bearer proof-key` (the Swift helper's
+      header, spec §11 SA-5) reaching the stand-in as `authorization` and no
+      `x-api-key`; two POSTs refused by the budget with no cap reservation
+      leaked; a cap refusal writes no proofs'-ledger line; a dead upstream
+      settles at the reservation
+  R5  the relay's other header and a stranger: an `x-api-key: proof-key` post
+      is forwarded as `x-api-key`, and `Authorization: Bearer wrong-key` is
+      answered 401 with nothing forwarded and nothing reserved
   A1  `assemblyai_rates()` reads `AssemblyAIRates`; a copy without the
       `static let perHour` line is a ValueError
   A2  `cloud_live_ledger`'s budget CONTROL holds
@@ -78,7 +83,7 @@ UTC = datetime.timezone.utc
 SEPTEMBER = datetime.datetime(2026, 9, 15, 12, 0, 0, tzinfo=UTC)
 AUGUST = datetime.datetime(2026, 8, 31, 23, 59, 0, tzinfo=UTC)
 ROWS = ["P", "F1", "F2", "G1", "G2", "G3", "W", "S1", "S2", "S3", "S4", "U1", "U2",
-        "R1", "R2", "R3", "R4", "A1", "A2", "A3", "A4", "A5", "N"]
+        "R1", "R2", "R3", "R4", "R5", "A1", "A2", "A3", "A4", "A5", "N"]
 RESULTS = []
 # The mutants, as `mutant_anchors.py` reads them: both rebind a name of `budget` in memory
 # (`main`), no tree text.
@@ -431,11 +436,14 @@ def row_u2(ev):
 # R: the relay over the stand-in.
 
 
-def post(base, body):
+def post(base, body, header="authorization", key="proof-key"):
+    """POST `body` with `Authorization: Bearer <key>` (the Swift helper's header), or with
+    `x-api-key: <key>` when `header` names it."""
     raw = json.dumps(body).encode()
+    credential = ({"authorization": f"Bearer {key}"} if header == "authorization"
+                  else {"x-api-key": key})
     request = urllib.request.Request(base + "/v1/messages", data=raw, method="POST",
-                                     headers={"content-type": "application/json",
-                                              "x-api-key": "proof-key"})
+                                     headers={"content-type": "application/json", **credential})
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
             return response.status, response.read(), raw
@@ -444,8 +452,18 @@ def post(base, body):
 
 
 def stand_in_posts(fake):
-    return len([r for r in fake.log().get("requests", [])
-                if r.get("method") == "POST" and r.get("path", "").startswith("/v1/messages")])
+    return len(stand_in_requests(fake))
+
+
+def stand_in_requests(fake):
+    return [r for r in fake.log().get("requests", [])
+            if r.get("method") == "POST" and r.get("path", "").startswith("/v1/messages")]
+
+
+def credential_of(request):
+    """{header: value} of the stand-in's logged credential headers (only dummies are logged)."""
+    return {name: value for name, value in (request.get("headers") or {}).items()
+            if name in ("authorization", "x-api-key")}
 
 
 def message(budget_word):
@@ -478,18 +496,43 @@ def row_r1(budget, ev, fake):
         before = stand_in_posts(fake)
         status, data, raw = post(relay.base, message("forward"))
         worst = ev.measure(raw)[0]
-        forwarded = stand_in_posts(fake) - before
+        sent = stand_in_requests(fake)
+        forwarded = len(sent) - before
     finally:
         relay.stop()
     reserves, settles = kinds(spend.path, "reserve"), kinds(spend.path, "settle")
+    header = credential_of(sent[-1]) if forwarded == 1 else None
     ok = (status == 200 and forwarded == 1 and len(reserves) == 1 and len(settles) == 1
           and abs(reserves[0]["worst"] - worst) < 1e-12
           and abs(settles[0]["dollars"] - 0.0006) < 1e-12 and settles[0]["basis"] == "table"
           and settles[0]["id"] == reserves[0]["id"] and settles[0].get("model")
-          == "claude-opus-5-5")
-    return ok, (f"status {status}, {forwarded} forwarded; reserved "
+          == "claude-opus-5-5" and header == {"authorization": "Bearer proof-key"})
+    return ok, (f"status {status}, {forwarded} forwarded with {header}; reserved "
                 f"{[r['worst'] for r in reserves]} (measure ${worst:.6f}); settled "
                 f"{[(s['dollars'], s['basis'], s.get('usage')) for s in settles]}")
+
+
+def row_r5(budget, ev, fake):
+    fake.scenario([{"content": [{"type": "text", "text": "R5: forwarded."}],
+                    "stop_reason": "end_turn"}])
+    relay, spend = relay_for(budget, ev, fake.base, 10.0, "R5")
+    try:
+        before = stand_in_posts(fake)
+        status, _, _ = post(relay.base, message("x-api-key"), header="x-api-key")
+        sent = stand_in_requests(fake)
+        forwarded = len(sent) - before
+        header = credential_of(sent[-1]) if forwarded == 1 else None
+        lines = len(lines_of(spend.path))
+        stranger, data, _ = post(relay.base, message("stranger"), key="wrong-key")
+        leaked = stand_in_posts(fake) - before - forwarded
+        stranger_lines = len(lines_of(spend.path)) - lines
+    finally:
+        relay.stop()
+    ok = (status == 200 and forwarded == 1 and header == {"x-api-key": "proof-key"}
+          and stranger == 401 and leaked == 0 and stranger_lines == 0)
+    return ok, (f"x-api-key: status {status}, {forwarded} forwarded with {header}; Bearer "
+                f"wrong-key: status {stranger} ({error_text(data)!r:.80}), {leaked} forwarded, "
+                f"{stranger_lines} proofs'-ledger lines")
 
 
 def row_r2(budget, ev, fake):
@@ -716,8 +759,9 @@ def main():
         guarded("R1", row_r1, budget, ev, fake)
         guarded("R2", row_r2, budget, ev, fake)
         guarded("R3", row_r3, budget, ev, fake)
+        guarded("R5", row_r5, budget, ev, fake)
     except Exception as error:  # noqa: BLE001
-        for row in ("R1", "R2", "R3"):
+        for row in ("R1", "R2", "R3", "R5"):
             if row not in [r for r, _, _ in RESULTS]:
                 score(row, False, f"the stand-in could not run: {type(error).__name__}: {error}",
                       instrument=True)

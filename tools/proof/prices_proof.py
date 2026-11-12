@@ -8,22 +8,28 @@
             claude-opus-5-5 and claude-fable-5-1 each hold all five base
             rates as finite numbers >= 0; 1000 input tokens on opus price as
             dollars > 0 (pricing.test.ts's `table: committed`, in Python)
-  T         `/bin/sh agent/build.sh test` (bun test, JUnit into
-            build/agent/bun-test.xml, deleted first) exits 0
-  A         agreement: every case name has a passing `case: <name>` testcase
-            in the JUnit report AND a passing C row; prints the case count
-            and cases.json's sha256
+  T         the Swift helper's price suites (road map "swift-helper" SA3,
+            spec §11 SA-3): `python3 tools/agent/agent_test.py --filter
+            'PricingTests|PriceTableTests'` (`make agent-test`'s guard, scratch
+            path and warnings as errors, so it shares that build) exits 0, and
+            its XCTest lines name each test passed or failed
+  A         agreement: `PricingTests.testEveryCaseInCasesJSON` (every case of
+            cases.json within 1e-12, each assertion labelled `case <name>`)
+            passed with no `case <name>` failure, AND every case has a passing
+            C row; prints the case count and cases.json's sha256
   R         update.py's `reduce_table` over agent/prices/reduce_cases.json's
-            `litellm` block answers exactly its `models` (road map 13 P2: the
-            helper's `reduceLiteLLM` answers the same fixture in bun test)
+            `litellm` block answers exactly its `models` (the helper's
+            reducer answers the same fixture in `PriceTableTests`)
 
     python3 tools/proof/prices_proof.py                          # exit 0 iff every row passes
     python3 tools/proof/prices_proof.py --mutant py-disagrees    # C prices with cache_read
                                                                  # doubled: the cache-read C
                                                                  # rows and A FAIL (exit 1)
-    python3 tools/proof/prices_proof.py --mutant ts-disagrees    # T/A on a scratch agent/ whose
-                                                                 # opus-mixed expects +0.01:
-                                                                 # T and A FAIL naming it (exit 1)
+    python3 tools/proof/prices_proof.py --mutant swift-disagrees # T/A with a scratch copy of
+                                                                 # agent/prices whose opus-mixed
+                                                                 # expects +0.01, handed to the
+                                                                 # suite by FJ_AGENT_PRICES: T and
+                                                                 # A FAIL naming it (exit 1)
     python3 tools/proof/prices_proof.py --mutant reduce-disagrees  # R with the expected opus
                                                                    # input +1: R FAILs (exit 1)
 
@@ -32,7 +38,7 @@ exits 1 when a row failed (caught) and 0 when every row passed (it
 survived); by rule R (issue batch B13) it exits 2 instead, printing `mutant
 <name>: the control could not be performed — <why>`, when any row was scored
 where its own comparison did not run: an instrument that could not run, T
-with no JUnit report, A with no cases read or no JUnit report. Every child
+with no XCTest line, A with no cases read or no XCTest line. Every child
 runs under a wall in its own process group (graphics_spike/bounded.py) with
 `RC_ASSEMBLYAI_KEY` and `ANTHROPIC_API_KEY` popped from its environment.
 """
@@ -46,7 +52,6 @@ import os
 import re
 import shutil
 import sys
-import xml.etree.ElementTree as ElementTree
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -59,19 +64,24 @@ AGENT = os.path.join(ROOT, "agent")
 sys.path.insert(0, os.path.join(AGENT, "prices"))
 
 REDUCE_CASES = os.path.join(AGENT, "prices", "reduce_cases.json")
-JUNIT = os.path.join(ROOT, "build", "agent", "bun-test.xml")
+AGENT_TEST = os.path.join(ROOT, "tools", "agent", "agent_test.py")
+SUITES = "PricingTests|PriceTableTests"
+EVERY_CASE = "PricingTests.testEveryCaseInCasesJSON"
+# XCTest's per-test line, and an assertion's `case <name>` label (PricingTests.swift).
+TEST_LINE = re.compile(r"Test Case '-\[\w+\.(\w+) (\w+)\]' (passed|failed)")
+CASE_FAILED = re.compile(r"error: .* - case ([\w.-]+)\s*$", re.M)
 WORK = os.path.join(HERE, "work", "prices")
 TOLERANCE = 1e-12
-WALL_TEST = 300
+WALL_TEST = 900  # a lane's first run builds Slaude in debug (about two minutes, SA1)
 BASE_KEYS = ("input", "output", "cache_read", "cache_write_5m", "cache_write_1h")
-# The mutants, as `mutant_anchors.py` reads them. `ts-disagrees` is the one with tree text:
-# `scratch_agent` finds TS_CASE in a copy of cases.json by this line (it must be there
+# The mutants, as `mutant_anchors.py` reads them. `swift-disagrees` is the one with tree text:
+# `scratch_prices` finds SWIFT_CASE in a copy of cases.json by this line (it must be there
 # once) and changes the dollars beside it in the parsed copy, so there is no replacement
 # text. The other two change the loaded table or an expected number in memory.
-TS_CASE = "opus-mixed"
+SWIFT_CASE = "opus-mixed"
 MUTANTS = {
     "py-disagrees": None,
-    "ts-disagrees": ("agent/prices/cases.json", f'"name": "{TS_CASE}"', None),
+    "swift-disagrees": ("agent/prices/cases.json", f'"name": "{SWIFT_CASE}"', None),
     "reduce-disagrees": None,
 }
 
@@ -80,10 +90,6 @@ def child_env():
     env = bounded.child_env()
     env.pop("ANTHROPIC_API_KEY", None)
     return env
-
-
-def run(argv, seconds, cwd=None):
-    return bounded.run(argv, seconds, cwd=cwd, env=child_env())
 
 
 def mismatch(got, want):
@@ -143,33 +149,31 @@ def committed():
                   f"${priced['dollars']:.6f}")
 
 
-def junit_cases(path):
-    """{testcase name: passed} from bun's JUnit report."""
-    answer = {}
-    for case in ElementTree.parse(path).getroot().iter("testcase"):
-        bad = [child for child in case if child.tag in ("failure", "error", "skipped")]
-        answer[case.get("name")] = not bad
-    return answer
+def xctest(output):
+    """({"Class.test": passed} from XCTest's lines, [the `case <name>` labels that failed])."""
+    tests = {f"{cls}.{name}": state == "passed" for cls, name, state in TEST_LINE.findall(output)}
+    return tests, sorted(set(CASE_FAILED.findall(output)))
 
 
-def scratch_agent():
-    """The ts-disagrees mutant: a scratch agent/ (node_modules ignored) whose
-    cases.json expects opus-mixed at its dollars + 0.01. Answers (build.sh, junit)."""
-    base = os.path.join(WORK, "ts-disagrees")
-    shutil.rmtree(base, ignore_errors=True)
-    scratch = os.path.join(base, "agent")
-    shutil.copytree(AGENT, scratch, ignore=shutil.ignore_patterns("node_modules"))
-    path = os.path.join(scratch, "prices", "cases.json")
+def scratch_prices():
+    """The swift-disagrees mutant: a whole copy of agent/prices whose cases.json expects
+    opus-mixed at its dollars + 0.01, for FJ_AGENT_PRICES. Answers the folder."""
+    folder = os.path.join(WORK, "swift-disagrees", "prices")
+    shutil.rmtree(os.path.dirname(folder), ignore_errors=True)
+    shutil.copytree(os.path.join(AGENT, "prices"), folder,
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    path = os.path.join(folder, "cases.json")
     with open(path) as f:
-        doc = json.load(f)
-    hits = [c for c in doc["cases"] if c["name"] == TS_CASE]
-    if len(hits) != 1:
-        raise RuntimeError(f"{len(hits)} {TS_CASE} cases in cases.json, not 1")
+        text = f.read()
+    _, anchor, _ = MUTANTS["swift-disagrees"]
+    if text.count(anchor) != 1:
+        raise RuntimeError(f"{anchor} occurs {text.count(anchor)} times in cases.json, not once")
+    doc = json.loads(text)
+    hits = [c for c in doc["cases"] if c["name"] == SWIFT_CASE]
     hits[0]["expect"]["dollars"] += 0.01
     with open(path, "w") as f:
         json.dump(doc, f, indent=2)
-    return (os.path.join(scratch, "build.sh"),
-            os.path.join(base, "build", "agent", "bun-test.xml"))
+    return folder
 
 
 def main():
@@ -219,28 +223,28 @@ def main():
         score("K", False, f"the instrument could not run: {type(error).__name__}: {error}",
               instrument=True)
 
-    # T: bun test, through build.sh.
-    tests = None
+    # T: the Swift helper's price suites, through make agent-test's runner.
+    tests, cases_failed = None, []
     try:
-        script, junit = os.path.join(AGENT, "build.sh"), JUNIT
+        env = child_env()
         label = ""
-        if args.mutant == "ts-disagrees":
-            script, junit = scratch_agent()
-            label = "(scratch agent/, opus-mixed expects +0.01) "
-        if os.path.exists(junit):
-            os.remove(junit)
-        ran = run(["/bin/sh", script, "test"], WALL_TEST)
-        failing = []
-        if os.path.exists(junit):
-            tests = junit_cases(junit)
-            failing = sorted(name for name, passed in tests.items() if not passed)
-        ok = not ran["expired"] and ran["rc"] == 0
+        if args.mutant == "swift-disagrees":
+            env["FJ_AGENT_PRICES"] = scratch_prices()
+            label = "(FJ_AGENT_PRICES a scratch copy, opus-mixed expects +0.01) "
+        ran = bounded.run([sys.executable, AGENT_TEST, "--filter", SUITES], WALL_TEST, env=env)
+        output = ran["stdout"] + ran["stderr"]
+        tests, cases_failed = xctest(output)
+        tests = tests or None
+        failing = sorted(name for name, passed in (tests or {}).items() if not passed)
+        ok = not ran["expired"] and ran["rc"] == 0 and tests is not None and not failing
         detail = (f"exit {ran['rc']}{' (expired)' if ran['expired'] else ''} in "
                   f"{ran['seconds']} s; "
-                  + (f"{len(tests)} testcases, failing {failing or 'none'}" if tests is not None
-                     else "no JUnit report"))
+                  + (f"{len(tests)} tests, failing {failing or 'none'}"
+                     + (f", cases {cases_failed}" if cases_failed else "")
+                     if tests is not None else "no XCTest line"))
         if ran["rc"] != 0 and tests is None:
-            detail += "; " + (ran["stderr"].strip().splitlines() or ["(no stderr)"])[-1][:160]
+            detail += "; " + ([line for line in output.splitlines() if "error" in line]
+                              or output.strip().splitlines() or ["(no output)"])[-1][:160]
         score("T", ok, label + detail, instrument=tests is None)
     except Exception as error:  # noqa: BLE001
         score("T", False, f"the instrument could not run: {type(error).__name__}: {error}",
@@ -250,16 +254,17 @@ def main():
     if not names:
         score("A", False, "no cases were read", instrument=True)
     elif tests is None:
-        score("A", False, "no JUnit report to compare against", instrument=True)
+        score("A", False, "no XCTest line to compare against", instrument=True)
     else:
-        missing = [n for n in names if f"case: {n}" not in tests]
-        ts_bad = [n for n in names if tests.get(f"case: {n}") is False]
+        every = tests.get(EVERY_CASE)
+        swift_bad = [n for n in names if n in cases_failed]
         py_bad = [n for n in names if not c_rows.get(n)]
-        ok = not (missing or ts_bad or py_bad)
+        ok = every is True and not (swift_bad or py_bad)
         detail = (f"{len(names)} cases, cases.json sha256 {cases_sha}; "
                   + ("both readers pass every case" if ok else
-                     f"absent from bun {missing or 'none'}; failing in bun {ts_bad or 'none'}; "
-                     f"failing in prices.py {py_bad or 'none'}"))
+                     f"{EVERY_CASE} {'absent' if every is None else 'passed' if every else 'failed'}; "
+                     f"failing in Swift {swift_bad or 'none'}; failing in prices.py "
+                     f"{py_bad or 'none'}"))
         score("A", ok, detail)
 
     # R: update.py's reducer over the fixture the helper's reducer also answers.

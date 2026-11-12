@@ -148,9 +148,11 @@ MUTANTS = {
     "no-scope-files": (["S1"], [(
         TABLE, ".filter { (try? server.boolArg(arguments, $0.rawValue)) == true }",
         ".filter { _ in false }")]),
+    # The Swift helper's arm (road map "swift-helper" SA3): the copy's helper step misses its
+    # cloned scratch path, empties it and builds Slaude cold, inside BUILD_BOUND.
     "no-context-arm": (["C1"], [(
-        "agent/src/main.ts", "last?.stop_reason === \"model_context_window_exceeded\"",
-        "last?.stop_reason === \"never\"")]),
+        "agent/Sources/FrameJobAgentKit/Turn.swift", "case \"model_context_window_exceeded\":",
+        "case \"never\":")]),
 }
 
 results = {}

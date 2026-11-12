@@ -5,18 +5,20 @@ in a copy gets its copy from.
     python3 tools/proof/tree_copy.py --selftest
 
 A proof that builds a mutant app must not build in the tree: xcodegen writes
-`FrameJob.xcodeproj/`, `app/Info.plist` and `app/FrameJob.entitlements`, and
-the helper's build step runs `bun install` and `bun build`, which write into
-`agent/`. So the copy's `app/` and `agent/` are COPIED (`COPIED`), and every
-other build input is a SYMLINK to the tree's — `core` already built, so
-`project.yml`'s pre-build `cargo build --release` is a no-op and the copy
-links the tree's `libframejob_core.a`.
+`FrameJob.xcodeproj/`, `app/Info.plist` and `app/FrameJob.entitlements`, and a
+mutant may edit the assistant helper's sources in `agent/`. So the copy's `app/`
+and `agent/` are COPIED (`COPIED`; `agent/` with `shutil.copytree`, which follows
+the kit's link to the price table and writes its bytes), and every other build
+input is a SYMLINK to the tree's — `core` already built, so `project.yml`'s
+pre-build `cargo build --release` is a no-op and the copy links the tree's
+`libframejob_core.a`.
 
 **The build inputs are derived from `project.yml`, not listed by hand.**
 `build_inputs` answers every top-level directory of the tree (no leading
 `.`, not in `GENERATED`) whose name `project.yml` spells as `NAME/` not
 preceded by a name character — `app/Sources`, `$PROJECT_DIR/core`,
-`"$PROJECT_DIR/agent/build.sh"`. So a build step that reads a new top-level
+`"$PROJECT_DIR/tools/agent/build_helper.sh"` (`tools`, and `agent` after
+it). So a build step that reads a new top-level
 directory is linked into every copy the day it lands, and no builder's copy
 can miss it (#146: `graphics_proof.py`'s copy missed `agent/` and `docs/`).
 `GENERATED` (`build`, `FrameJob.xcodeproj`) is never linked: a copy writes
@@ -26,13 +28,28 @@ symlink to the tree's, whether or not that exists yet, so a copy never builds
 the encoders itself — `tools/codecs/build_codecs.py` resolves its own path to
 the tree's and reuses (or, on a key change, rebuilds under its lock) the tree's.
 
-`make_copy(dest, agent=True)`, in order: remove `dest` (`remove_tree`), make it; copy `app/`
+**The helper's scratch path is a clone** (road map "swift-helper" SA3, spec §11
+SA-8). The copy's app build runs `tools/agent/build_helper.sh` with the COPY as
+its tree, which builds the helper with SwiftPM on the copy's
+`build/agent-swift`. That would compile Slaude from nothing in every copy, so
+the tree's `build/agent-swift`, when it exists, is cloned there (`cp -cRp`,
+copy-on-write): the script's stamp serves the clone while the copy's `agent/`
+has the tree's key, and on a miss it empties the clone and builds cold, since
+SwiftPM cannot build on a scratch path made at another path. Never a link, as
+`build/codecs` is: a copy that builds a helper mutant changes the helper on
+purpose, and through a link it would become the tree's product. A clone that
+fails is removed and said, and the copy builds cold.
+
+`make_copy(dest, agent=True, helper_clone=True)`, in order: remove `dest` (`remove_tree`), make it; copy `app/`
 without `Info.plist` or `*.entitlements`; copy `project.yml`, `Makefile`
 and `VERSION` (`COPIED_FILES`: the copy's own `make project` reads all
-three, spec §11 PUB-2); when `agent`, copy `agent/` without `node_modules`; link every
-other build input; make `build/` and link `build/codecs` to the tree's. It answers `(dest, None)`, or `(None, reason)` on an
+three, spec §11 PUB-2); when `agent`, copy `agent/` without `node_modules` (the
+Bun helper's install, until SA4) or `.build` (SwiftPM's default scratch path); link every
+other build input; make `build/` and link `build/codecs` to the tree's; when `agent` and
+`helper_clone`, clone the tree's `build/agent-swift`. It answers `(dest, None)`, or `(None, reason)` on an
 `OSError`. `agent=False` is the assistant spike's, which splices
-Rasterize's `agent/` in its place.
+Rasterize's `agent/` in its place; `helper_clone=False` is a cold helper build
+(`makefile_env_proof.py --cold-helper`).
 
 **A copy builds through `build_app(dest, seconds, env=None,
 release_only=None)`** (issue batch B88): `make app-debug` or `make app` in
@@ -58,7 +75,9 @@ The selftest, in a fresh `work/tree_copy/`:
   `graphic` and `tools`, and neither `GENERATED` name;
 * T2 — a copy's `app/` is a real directory holding `Sources/main.swift` and
   no `Info.plist` or `*.entitlements` at its top; its `agent/` is real, holds
-  `build.sh` and no `node_modules`; every other input is a symlink resolving
+  `Package.swift` and no `node_modules`, and its
+  `Sources/FrameJobAgentKit/anthropic.json` is a regular file byte-equal to the
+  tree's price table; every other input is a symlink resolving
   to the tree's; `project.yml`, `Makefile` and `VERSION` are byte-equal to the tree's;
 * T3 — `agent=False` leaves no `agent`;
 * T4 (CONTROL) — the tree's `project.yml` text plus a line
@@ -77,6 +96,11 @@ The selftest, in a fresh `work/tree_copy/`:
   byte-equal to `git show HEAD:…`;
 * T8 (CONTROL) — `make_base_copy` on an id no object has answers a reason and
   leaves no folder; `default_base` answers a commit and the rule that chose it.
+* T9 — the helper's scratch path (spec §11 SA-8): with a stand-in tree whose
+  `build/agent-swift` holds a stamp (`ROOT` pointed at it for the row), a copy's
+  `build/agent-swift` is a real directory, not a link, holding the stamp
+  byte-equal, and a file written into the copy's is not in the stand-in's;
+  `helper_clone=False` leaves the copy none.
 
 **A base copy is the tree as a commit had it, built whole** (#440, #388).
 A proof that compares this build with "the build before the change" (a base
@@ -197,11 +221,29 @@ def remove_tree(path):
     shutil.rmtree(path, ignore_errors=True)
 
 
-def make_copy(dest, agent=True):
+HELPER_SCRATCH = os.path.join("build", "agent-swift")
+
+
+def clone_helper_scratch(dest):
+    """The tree's `build/agent-swift` cloned to the copy's (`cp -cRp`, never a link; spec §11
+    SA-8), when the tree has one; a failed clone is removed and said, and the copy builds the
+    helper cold."""
+    source = os.path.join(ROOT, HELPER_SCRATCH)
+    if not os.path.isdir(source):
+        return
+    target = os.path.join(dest, HELPER_SCRATCH)
+    cloned = bounded.run(["cp", "-cRp", source, target], 600)
+    if cloned["rc"] != 0 or cloned["expired"]:
+        shutil.rmtree(target, ignore_errors=True)
+        print(f"tree_copy: the helper's scratch path could not be cloned (exit {cloned['rc']}); "
+              "the copy builds the helper cold", flush=True)
+
+
+def make_copy(dest, agent=True, helper_clone=True):
     """A copy of the tree at `dest` that the app builds in: `app/` (and,
     when `agent`, `agent/`) copied, `project.yml`, `Makefile` and `VERSION` copied,
-    every other build input a symlink. Answers `(dest, None)` or
-    `(None, reason)`."""
+    every other build input a symlink, and (when `agent` and `helper_clone`) the
+    helper's scratch path cloned. Answers `(dest, None)` or `(None, reason)`."""
     try:
         remove_tree(dest)
         os.makedirs(dest)
@@ -211,13 +253,15 @@ def make_copy(dest, agent=True):
             shutil.copy2(os.path.join(ROOT, one), os.path.join(dest, one))
         if agent:
             shutil.copytree(os.path.join(ROOT, "agent"), os.path.join(dest, "agent"),
-                            ignore=shutil.ignore_patterns("node_modules"))
+                            ignore=shutil.ignore_patterns("node_modules", ".build"))
         for name in build_inputs():
             if name in COPIED:
                 continue
             os.symlink(os.path.join(ROOT, name), os.path.join(dest, name))
         os.makedirs(os.path.join(dest, "build"))
         os.symlink(os.path.join(ROOT, "build", "codecs"), os.path.join(dest, "build", "codecs"))
+        if agent and helper_clone:
+            clone_helper_scratch(dest)
     except OSError as error:
         return None, f"the tree copy at {dest} could not be made: {error}"
     return dest, None
@@ -355,6 +399,46 @@ def build_app(dest, seconds, env=None, release_only=None):
     return app, None
 
 
+def helper_clone_row():
+    """T9: (ok, detail). `clone_helper_scratch` with `ROOT` pointed at a stand-in tree whose
+    `build/agent-swift` holds a stamp, then a copy of the real tree with `helper_clone=False`."""
+    global ROOT
+    tree = ROOT
+    stand_in = os.path.join(WORK, "stand-in")
+    scratch = os.path.join(stand_in, HELPER_SCRATCH)
+    os.makedirs(scratch)
+    with open(os.path.join(scratch, ".framejob-helper-stamp"), "w") as handle:
+        handle.write("T9 stamp\n")
+    dest = os.path.join(WORK, "t9")
+    os.makedirs(os.path.join(dest, "build"))
+    ROOT = stand_in
+    try:
+        clone_helper_scratch(dest)
+    finally:
+        ROOT = tree
+    problems = []
+    copied = os.path.join(dest, HELPER_SCRATCH)
+    if os.path.islink(copied) or not os.path.isdir(copied):
+        problems.append(f"{copied} is not a real directory")
+    elif not filecmp.cmp(os.path.join(scratch, ".framejob-helper-stamp"),
+                         os.path.join(copied, ".framejob-helper-stamp"), shallow=False):
+        problems.append("the copy's stamp is not the stand-in's")
+    else:
+        with open(os.path.join(copied, "written-in-the-copy"), "w") as handle:
+            handle.write("T9\n")
+        if os.path.exists(os.path.join(scratch, "written-in-the-copy")):
+            problems.append("a file written in the copy's scratch path is in the stand-in's")
+    cold, reason = make_copy(os.path.join(WORK, "t9-cold"), helper_clone=False)
+    if cold is None:
+        problems.append(reason)
+    elif os.path.lexists(os.path.join(cold, HELPER_SCRATCH)):
+        problems.append("helper_clone=False left the copy a scratch path")
+    remove_tree(os.path.join(WORK, "t9-cold"))
+    return (not problems, "; ".join(problems) if problems
+            else "the stand-in's scratch path is cloned as a real directory, its stamp byte-equal, "
+                 "a file written in the copy not in the stand-in's; helper_clone=False leaves none")
+
+
 def selftest():
     rows = []
 
@@ -402,10 +486,16 @@ def selftest():
             agent_dir = os.path.join(dest, "agent")
             if os.path.islink(agent_dir) or not os.path.isdir(agent_dir):
                 problems.append("agent/ is not a real directory")
-            if not os.path.isfile(os.path.join(agent_dir, "build.sh")):
-                problems.append("agent/build.sh is missing")
+            if not os.path.isfile(os.path.join(agent_dir, "Package.swift")):
+                problems.append("agent/Package.swift is missing")
             if os.path.exists(os.path.join(agent_dir, "node_modules")):
                 problems.append("agent/node_modules was copied")
+            table = os.path.join(agent_dir, "Sources", "FrameJobAgentKit", "anthropic.json")
+            if os.path.islink(table) or not os.path.isfile(table):
+                problems.append("the kit's anthropic.json is not a regular file")
+            elif not filecmp.cmp(table, os.path.join(ROOT, "agent", "prices", "anthropic.json"),
+                                 shallow=False):
+                problems.append("the kit's anthropic.json differs from the tree's price table")
             linked = []
             for name in build_inputs():
                 if name in COPIED:
@@ -423,7 +513,8 @@ def selftest():
                     problems.append(f"{one} differs from the tree's")
             row("T2", not problems,
                 "; ".join(problems) if problems
-                else f"app/ and agent/ copied, {linked} linked, {', '.join(COPIED_FILES)} equal")
+                else f"app/ and agent/ copied (the price table's bytes in the kit), {linked} "
+                     f"linked, {', '.join(COPIED_FILES)} equal")
     except Exception as error:
         row("T2", False, f"the copy raised {error!r}")
 
@@ -550,6 +641,12 @@ def selftest():
     except Exception as error:
         row("T8", False, f"the control raised {error!r}")
 
+    # T9 — the helper's scratch path is a clone, never a link (spec §11 SA-8)
+    try:
+        row("T9", *helper_clone_row())
+    except Exception as error:
+        row("T9", False, f"the helper's scratch path row raised {error!r}")
+
     print(f"{sum(rows)}/{len(rows)}")
     return 0 if all(rows) else 1
 
@@ -557,7 +654,7 @@ def selftest():
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--selftest", action="store_true",
-                        help="T1–T8 in a fresh work/tree_copy/")
+                        help="T1–T9 in a fresh work/tree_copy/")
     arguments = parser.parse_args(argv)
     if arguments.selftest:
         return selftest()

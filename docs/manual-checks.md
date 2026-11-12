@@ -1526,7 +1526,7 @@ appearance is enough.
 **REL-2 — The downloaded build's microphone, recorder, assistant and MCP helper work**
 - **Do:** In the downloaded app: 1. File ▸ New Recording… with a microphone chosen; answer the Microphone and Screen Recording prompts; record a few seconds while speaking; stop. 2. Open the Assistant tab with your own Anthropic key set and send one short message. 3. Frame Job ▸ Settings… ▸ MCP ▸ Copy MCP Command; paste the line into Terminal, run it, then `claude mcp list`.
 - **Expect:** both prompts name Frame Job; your voice is in the recording's microphone file; the assistant answers (the helper did not die at launch); `claude mcp list` shows `framejob` connected, with its path inside `/Applications/Frame Job.app`.
-- **Source:** spec §11 PUB-4 (`published_check.py` holds that the entitlements are there; this is whether they do their job under a Developer ID signature).
+- **Source:** spec §11 PUB-4, SA-8 (`published_check.py` holds that the entitlements are there and that the Swift assistant helper holds none; this is whether they do their job under a Developer ID signature).
 
 **REL-3 — Permissions survive an update**
 - **Do:** With REL-2's grants given, download the NEXT release's DMG, replace the app in Applications, open it, and start a recording with the same microphone.

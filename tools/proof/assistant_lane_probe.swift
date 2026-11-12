@@ -440,11 +440,10 @@ func rowL6() {
     let ok = !dev.isEmpty && !names.contains("record_screen") && names.isDisjoint(with: dev)
         && !names.contains("close_project")
         && names.contains("transcribe") && names.contains("export") && missingCore.isEmpty
-    let request = requestBytes(tools)
+    let configure = writeConfigure(tools)
     measure["l6"] = ["catalog": tools.count, "assistant": names.count, "dev": dev.sorted(),
                      "core_tools": AssistantPrompt.coreTools,
-                     "request_bytes": request.request, "tools_bytes": request.tools,
-                     "system_bytes": request.system]
+                     "configure": configure.path, "configure_bytes": configure.bytes]
     row("L6", ok,
         "\(tools.count) tools → \(names.count) for the assistant; record_screen "
             + "\(names.contains("record_screen")), close_project "
@@ -454,40 +453,27 @@ func rowL6() {
             + "missing \(missingCore)")
 }
 
-/// The request's fixed part as the helper puts it on the wire, measured for
-/// `assistant_lane_proof.py`'s B1 (#594, spec §11 P-9): `tools` is
-/// `agent/src/main.ts`'s `TOOL_SEARCH` entry and then each assistant catalog
-/// entry as `runnableTool` wraps it (`name`, `description`, `input_schema`,
-/// and `defer_loading: true` unless a core tool), and `system` is what its
-/// `toolRunner` call sends (the prompt, a blank line, the search guide). The
-/// UTF-8 bytes of each as one JSON object's member, written without escaped
-/// slashes, which is what `JSON.stringify` writes. The conversation and the
-/// envelope are not here: the proof keeps `CONVERSATION_BYTES_BOUND` for them.
-/// When the helper becomes Swift (#599) this mirror becomes a call to its
-/// request builder. 0 for a part that would not serialise.
-func requestBytes(_ catalog: [[String: Any]]) -> (request: Int, tools: Int, system: Int) {
-    let core = Set(AssistantPrompt.coreTools)
-    var wire: [[String: Any]] = [
-        ["type": "tool_search_tool_bm25_20251119", "name": "tool_search_tool_bm25"]
+/// The `configure` line the app writes to its helper (`AssistantSession`, spec §11 SA-5), for
+/// `assistant_lane_proof.py`'s B1 (#594, spec §11 P-9 as SA-9 amends it): the assistant catalog,
+/// `AssistantPrompt`'s four pieces, AI-11's default model and the dummy `proof-key`, tool-result
+/// clearing on (the request's largest form), no spend fields (so the helper B1 starts fetches no
+/// price table and writes no cache), serialised with sorted keys as `AssistantSession.write`
+/// writes it, into `<work>/configure.json`. B1 adds `api_base` (the stand-in) and runs the helper
+/// on it; the bytes it measures are the helper's own first POST. ("", 0) when it would not write.
+func writeConfigure(_ catalog: [[String: Any]]) -> (path: String, bytes: Int) {
+    var settings = AssistantChatSettings().helperJSON
+    settings["clear_tool_results"] = true
+    let configure: [String: Any] = [
+        "type": "configure", "api_key": "proof-key", "model": AssistantConfiguration.defaultModel,
+        "system": AssistantPrompt.system, "tools": AssistantToolTable.assistantCatalog(catalog),
+        "core_tools": AssistantPrompt.coreTools, "search_guide": AssistantPrompt.searchGuide,
+        "compaction_instructions": AssistantPrompt.compactionInstructions, "settings": settings,
     ]
-    for entry in AssistantToolTable.assistantCatalog(catalog) {
-        let name = entry["name"] as? String ?? ""
-        var tool: [String: Any] = [
-            "name": name, "description": entry["description"] ?? "",
-            "input_schema": entry["inputSchema"] ?? [String: Any](),
-        ]
-        if !core.contains(name) { tool["defer_loading"] = true }
-        wire.append(tool)
-    }
-    let system = AssistantPrompt.system + "\n\n" + AssistantPrompt.searchGuide
-    func bytes(_ object: [String: Any]) -> Int {
-        (try? JSONSerialization.data(withJSONObject: object, options: [.withoutEscapingSlashes]))?
-            .count ?? 0
-    }
-    let tools = bytes(["tools": wire])
-    let prompt = bytes(["system": system])
-    let both = bytes(["system": system, "tools": wire])
-    return (tools > 0 && prompt > 0 ? both : 0, tools, prompt)
+    let path = (work as NSString).appendingPathComponent("configure.json")
+    guard let data = try? JSONSerialization.data(withJSONObject: configure, options: [.sortedKeys]),
+        (try? data.write(to: URL(fileURLWithPath: path))) != nil
+    else { return ("", 0) }
+    return (path, data.count)
 }
 
 // MARK: - The drag rows: L7, L8 (#144, AI-12), L9 and C1

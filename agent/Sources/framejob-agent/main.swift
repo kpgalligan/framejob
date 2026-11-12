@@ -3,7 +3,7 @@
 // (FrameJobAgentKit's Protocol.swift) and owns no tools: every tool call goes back to the
 // app, which runs it through the dispatcher its MCP server uses. What is specific to the
 // app (its system prompt, its tools, the search guide, the price cache) arrives in
-// `configure`. Until road map "swift-helper" SA3 the bundle still ships the Bun helper.
+// `configure`. Built into the bundle by tools/agent/build_helper.sh (spec §11 SA-8).
 
 import Anthropic
 import FrameJobAgentKit

@@ -2,11 +2,18 @@ import Anthropic
 @testable import FrameJobAgentKit
 import XCTest
 
-/// Where the price fixtures are: agent/prices, beside this package's Tests.
+/// Where the price fixtures are: agent/prices, beside this package's Tests, unless
+/// `FJ_AGENT_PRICES` names a whole copy of that folder (`tools/proof/prices_proof.py`'s
+/// `swift-disagrees` mutant: the suite answers a scratch `cases.json` without a rebuild).
 enum PriceFiles {
-    static let folder = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        .appendingPathComponent("prices")
+    static let folder: URL = {
+        if let copy = ProcessInfo.processInfo.environment["FJ_AGENT_PRICES"], !copy.isEmpty {
+            return URL(fileURLWithPath: copy, isDirectory: true)
+        }
+        return URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("prices")
+    }()
 
     static func data(_ name: String) throws -> Data { try Data(contentsOf: folder.appendingPathComponent(name)) }
     static func json(_ name: String) throws -> RawJSON { try RawJSON.parse(try data(name)) }

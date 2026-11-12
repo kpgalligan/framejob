@@ -3,6 +3,8 @@
 §11 SA-12), a line of `make test`.
 
     python3 tools/agent/agent_test.py                  # the guard, then the suite
+    python3 tools/agent/agent_test.py --filter REGEX   # the same, `swift test --filter REGEX`
+                                                       # (tools/proof/prices_proof.py's row T)
     python3 tools/agent/agent_test.py --tree DIR       # the same over another tree (a measurement)
     python3 tools/agent/agent_test.py --selftest       # the guard over scratch folders, no SwiftPM
     python3 tools/agent/agent_test.py --mutant guard-noop   # the selftest with the guard a no-op;
@@ -64,8 +66,9 @@ def guard(scratch):
     return "emptied: " + ("no marker" if recorded is None else f"made at {recorded}")
 
 
-def suite(tree):
-    """The guard, then `swift test` on the tree's package; the suite's exit status."""
+def suite(tree, only=None):
+    """The guard, then `swift test` on the tree's package (`--filter only` when given); the
+    suite's exit status."""
     tree = Path(tree).resolve()
     scratch = tree / SCRATCH
     print(f"agent-test: scratch path {scratch}: {guard(scratch)}", flush=True)
@@ -74,6 +77,8 @@ def suite(tree):
         env.pop(key, None)
     env["FJ_AGENT_STRICT"] = "1"
     argv = ["xcrun", "swift", "test", "--package-path", str(tree / "agent"), "--scratch-path", str(scratch)]
+    if only:
+        argv += ["--filter", only]
     print("agent-test: " + " ".join(argv), flush=True)
     return subprocess.run(argv, cwd=tree, env=env, stdin=subprocess.DEVNULL).returncode
 
@@ -126,6 +131,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--selftest", action="store_true")
     parser.add_argument("--tree", default=str(ROOT), help="the tree whose agent/ the suite runs")
+    parser.add_argument("--filter", dest="only", help="`swift test --filter`'s regular expression")
     parser.add_argument("--mutant", choices=sorted(EXPECTED))
     args = parser.parse_args()
     if args.mutant:
@@ -138,7 +144,7 @@ def main():
         return 0
     if args.selftest:
         return 1 if selftest() else 0
-    return suite(args.tree)
+    return suite(args.tree, args.only)
 
 
 if __name__ == "__main__":

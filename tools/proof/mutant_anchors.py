@@ -101,8 +101,6 @@ HINTS = {
     "harness_playhead_proof.py": {"MUTANTS": ("tools/proof/harness/main.swift", "anchor")},
     # `run_probe`: `shader_text = SHADER.read_text()`, the count refused unless 1.
     "matte_probe.py": {"MUTANTS": ("app/Resources/Shaders/Compositor.metal", "pair")},
-    # `mutant_helper`: the scratch agent's `src/main.ts`.
-    "spend_proof.py": {"HELPER_MUTANTS": ("agent/src/main.ts", "pair")},
     # `mutant_sources`: `os.path.join(sources, "AssistantSpendMonth.swift")`.
     "spend_ui_proof.py": {"MUTANTS": ("app/Sources/AssistantSpendMonth.swift", "pair")},
     # `build_mutant`: `edit[2] if len(edit) > 2 else RENDERER`, under app/Sources.
@@ -114,6 +112,8 @@ HINTS = {
 SWITCHES = {
     # A launch argument: the app started with clearing off.
     "assistant_clearing_proof.py": {"MUTANTS": 1},
+    # A switch in P4's `configure`: the three fields left out.
+    "assistant_helper_proof.py": {"MUTANTS": 1},
     "bt709_fixture.py": {"MUTANTS": 4},
     # `main` rebinds `budget.BUDGETS` or `budget.anthropic_worst_row` in memory.
     "budget_proof.py": {"MUTANTS": 2},
@@ -155,8 +155,6 @@ SWITCHES = {
 
 # Single mutants with no anchor, in a table that has anchors. proof → table → [names].
 UNANCHORED = {
-    # A switch in P4's `configure`: the three fields left out.
-    "assistant_helper_proof.py": {"MUTANTS": ["no-fields"]},
     # Builds nothing: launch A of the built app, K1 last.
     "assistant_session_proof.py": {"MUTANTS": ["key-echo"]},
     # In memory: every cache_read rate doubled; one expected number of the reducer's case.
@@ -184,6 +182,7 @@ EVERY = {
 
 # Other top-level names containing MUTANT: rows, folders, names, flags. proof → [names].
 NOT_TABLES = {
+    "agent_helper_build.py": ["MUTANT_TREE"],
     "camera_recording_probe.py": ["MUTANT_SECTION"],
     "clip_inspector3_proof.py": ["MUTANT_GROUPS"],
     "clip_inspector4_proof.py": ["MUTANT_EXPECTED"],

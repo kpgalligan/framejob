@@ -1,38 +1,36 @@
 #!/usr/bin/env python3
 """The helper and its build — road map 12 A1, part 2 (spec §11 AI-1, AI-7;
-road map 12 §2).
+road map 12 §2), and road map "swift-helper" SA3 (spec §11 SA-8): the Swift
+helper `tools/agent/build_helper.sh` builds.
 
   P0   the wiring, read from the source: project.yml has exactly one
        "Build Agent Helper" item, after "Copy Graphic Templates" and before
-       `schemes:`, with `basedOnDependencyAnalysis: false` and
-       `agent/build.sh" helper`; the Makefile's `typecheck` runs
-       `/bin/sh agent/build.sh typecheck`, and `unexport ANTHROPIC_API_KEY`
-       occurs once
-  P1   never skips: `build.sh helper` and `build.sh typecheck` with a fresh
-       empty HOME and PATH=/usr/bin:/bin each exit non-zero with a first
-       stderr line `error: bun is not installed…` and leave no helper
-       (skips only when bun sits at /opt/homebrew/bin or /usr/local/bin)
-  P2r  the Release helper: present, `flags=0x10002(adhoc,runtime)`,
-       entitlements exactly {allow-jit: true}, `codesign --verify --strict`
+       `schemes:`, with `basedOnDependencyAnalysis: false` and one `script:`
+       line, exactly `/bin/bash "$PROJECT_DIR/tools/agent/build_helper.sh"`
+       and the bundle's `Helpers/framejob-agent`, and no other key, so the
+       step's exit is the script's; and `unexport ANTHROPIC_API_KEY` occurs
+       once in the Makefile
+  P1   a failed SwiftPM build fails the app build: P0's one-line step (Xcode
+       fails a build whose run-script phase exits non-zero) and
+       `agent_build_proof.failing_package` (its K8): a toy package built by the
+       tree's script, then one that does not compile, exits non-zero and leaves
+       no helper and no stamp
+  P2r  the Release helper: present, `flags=0x10002(adhoc,runtime)`, no
+       entitlements (none printed, or an empty dict), `codesign --verify --strict`
   P2d  the same for the Distribution helper, when --dist is given
   P3   the Release helper, with exactly HOME, TMPDIR and PATH, answers a
        `configure` (api_base at anthropic_fake.py) with `ready` and exits 0
        once stdin closes; the stand-in sees no POST and logs no failures
   P4   the §2 fields reach the API: core_tools, search_guide and
        compaction_instructions, read back from the stand-in's POSTs
-  P5   the control: a scratch agent/ with a type error in main.ts fails
-       `build.sh typecheck`, naming main.ts
 
     python3 tools/proof/assistant_helper_proof.py [--dist APP]
-    python3 tools/proof/assistant_helper_proof.py --mutant skip-without-bun  # P1 alone: FAILS
     python3 tools/proof/assistant_helper_proof.py --mutant no-fields         # P4 alone: FAILS
 
-Each mutant runs only its row, which must fail (exit 1; 0 when it
-survives); a mutant whose row skipped on this host (bun at a fixed path P1
-cannot hide) exits 2, the control not performed — and so, by rule R (issue
-batch B13), does one whose scratch build.sh could not be made or whose row
-was scored by a caught exception, printing `mutant <name>: the control could
-not be performed — <why>`. An instrument that
+The mutant runs only its row, which must fail (exit 1; 0 when it survives);
+by rule R (issue batch B13) one whose row was scored by a caught exception
+exits 2, printing `mutant <name>: the control could not be performed —
+<why>`. An instrument that
 cannot run is a scored FAIL, never an exit. No app is launched. No key is
 read: every child's environment has `RC_ASSEMBLYAI_KEY` and
 `ANTHROPIC_API_KEY` popped, the helper only ever gets `proof-key`, and every
@@ -57,24 +55,22 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
+sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
+import agent_build_proof  # noqa: E402
 import bounded  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "assistant_helper")
-AGENT = os.path.join(ROOT, "agent")
-BUILD_SH = os.path.join(AGENT, "build.sh")
 FAKE = os.path.join(HERE, "anthropic_fake.py")
 HELPER = os.path.join("Contents", "Helpers", "framejob-agent")
 RELEASE_APP = os.path.join(ROOT, "build", "Build", "Products", "Release", "Frame Job.app")
 MODEL = "claude-opus-5-5"
-BUN_ERROR = "error: bun is not installed"
-GUARD_EXIT = "  exit 1\n"
-# The mutants. `skip-without-bun` is tree text (a file from the repo root, the text that
-# must occur there once, its replacement), which `mutant_build_sh` reads and
-# `mutant_anchors.py` counts; `no-fields` is a switch in P4's `configure`.
-MUTANTS = {"skip-without-bun": ("agent/build.sh", GUARD_EXIT, "  exit 0\n"),
-           "no-fields": None}
-WALL_P1, WALL_READY, WALL_TURN, WALL_EXIT, WALL_P5 = 30, 20, 60, 5, 180
+# project.yml's one line for the step (spec §11 SA-8).
+STEP = ('script: /bin/bash "$PROJECT_DIR/tools/agent/build_helper.sh" '
+        '"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/framejob-agent"')
+# The mutant, a switch in P4's `configure` (`mutant_anchors.py` holds it in SWITCHES).
+MUTANTS = {"no-fields": None}
+WALL_READY, WALL_TURN, WALL_EXIT = 20, 60, 5
 
 
 def child_env(extra=None):
@@ -122,69 +118,36 @@ def p0():
             problems.append("the item is not after 'Copy Graphic Templates'")
         if not (0 <= at < schemes):
             problems.append("the item is not before `schemes:`")
-        block = yml[at:schemes]
-        if "basedOnDependencyAnalysis: false" not in block:
-            problems.append("no `basedOnDependencyAnalysis: false`")
-        if 'agent/build.sh" helper' not in block:
-            problems.append("no `agent/build.sh\" helper`")
+        lines = yml[at:schemes].split("\n")[1:]
+        own = []
+        for line in lines:
+            if re.match(r"^      (- |#)", line) or not line.strip():
+                break
+            if not line.strip().startswith("#"):
+                own.append(line.strip())
+        if own != ["basedOnDependencyAnalysis: false", STEP]:
+            problems.append(f"the step's keys are {own}, not dependency analysis off and the "
+                            f"one script line")
     makefile = open(os.path.join(ROOT, "Makefile")).read()
-    recipe = re.search(r"^typecheck:\n((?:\t.*\n)+)", makefile, re.M)
-    if not recipe or "\t/bin/sh agent/build.sh typecheck\n" not in recipe.group(1):
-        problems.append("the Makefile's typecheck does not run `/bin/sh agent/build.sh typecheck`")
     unexports = len(re.findall(r"^unexport ANTHROPIC_API_KEY$", makefile, re.M))
     if unexports != 1:
         problems.append(f"`unexport ANTHROPIC_API_KEY` occurs {unexports} times, not once")
     if problems:
         return False, "; ".join(problems)
     return True, ("one 'Build Agent Helper' item between 'Copy Graphic Templates' and "
-                  "`schemes:`, not dependency-analysed, running build.sh helper; the "
-                  "Makefile's typecheck ends with build.sh typecheck; one unexport")
+                  "`schemes:`, not dependency-analysed, its one key the script line "
+                  "tools/agent/build_helper.sh; one unexport")
 
 
 # ---------------------------------------------------------------------------
-# P1: never skips.
+# P1: a failed SwiftPM build fails the app build.
 
 
-def mutant_build_sh():
-    """A scratch build.sh whose guard `exit 1` became `exit 0`. Answers
-    (path, None) or (None, reason)."""
-    file, anchor, mutated = MUTANTS["skip-without-bun"]
-    text = open(os.path.join(ROOT, file)).read()
-    count = text.count(anchor)
-    if count != 1:
-        return None, f"the guard's `exit 1` occurs {count} times in build.sh, not once"
-    folder = os.path.join(WORK, "p1-mutant")
-    shutil.rmtree(folder, ignore_errors=True)
-    os.makedirs(folder)
-    path = os.path.join(folder, "build.sh")
-    with open(path, "w") as f:
-        f.write(text.replace(anchor, mutated))
-    return path, None
-
-
-def p1(script):
-    for fixed in ("/opt/homebrew/bin/bun", "/usr/local/bin/bun"):
-        if os.path.exists(fixed):
-            return None, f"host: bun at a fixed path ({fixed})"
-    details = []
-    ok = True
-    for mode in ("helper", "typecheck"):
-        base = os.path.join(WORK, "p1", mode)
-        shutil.rmtree(base, ignore_errors=True)
-        home, target = os.path.join(base, "home"), os.path.join(base, "target")
-        os.makedirs(home)
-        os.makedirs(target)
-        env = {"HOME": home, "PATH": "/usr/bin:/bin", "TARGET_BUILD_DIR": target,
-               "CONTENTS_FOLDER_PATH": "Frame Job.app/Contents"}
-        ran = run(["/bin/sh", script, mode], WALL_P1, env=env)
-        first = (ran["stderr"].splitlines() or [""])[0]
-        placed = os.path.exists(os.path.join(target, "Frame Job.app", HELPER))
-        good = (not ran["expired"] and ran["rc"] not in (0, None)
-                and first.startswith(BUN_ERROR) and not placed)
-        ok = ok and good
-        details.append(f"{mode}: exit {ran['rc']}{' (expired)' if ran['expired'] else ''}, "
-                       f"first stderr {first[:40]!r}, helper placed {placed}")
-    return ok, "; ".join(details)
+def p1():
+    wired, why = p0()
+    ok, detail = agent_build_proof.failing_package()
+    return wired and ok, (f"the step is the one script line: {wired}" + ("" if wired else
+                          f" ({why})") + f"; a package that does not compile: {detail}")
 
 
 # ---------------------------------------------------------------------------
@@ -204,9 +167,7 @@ def p2(app):
     except Exception as error:  # noqa: BLE001 — an unreadable answer is the row's failure
         parsed = f"unparsable: {error}"
     verified = run(["codesign", "--verify", "--strict", helper], 30)
-    ok = (flags == "0x10002(adhoc,runtime)"
-          and parsed == {"com.apple.security.cs.allow-jit": True}
-          and verified["rc"] == 0)
+    ok = flags == "0x10002(adhoc,runtime)" and parsed in (None, {}) and verified["rc"] == 0
     return ok, (f"flags={flags}, entitlements {parsed}, verify --strict exit {verified['rc']}")
 
 
@@ -432,24 +393,6 @@ def p4(app, fake, base, no_fields):
 
 
 # ---------------------------------------------------------------------------
-# P5: the control.
-
-
-def p5():
-    scratch = os.path.join(WORK, "p5", "agent")
-    shutil.rmtree(os.path.dirname(scratch), ignore_errors=True)
-    shutil.copytree(AGENT, scratch, ignore=shutil.ignore_patterns("node_modules"))
-    with open(os.path.join(scratch, "src", "main.ts"), "a") as f:
-        f.write('const p5: number = "p5";\n')
-    ran = run(["/bin/sh", os.path.join(scratch, "build.sh"), "typecheck"], WALL_P5)
-    output = ran["stdout"] + ran["stderr"]
-    named = [l for l in output.splitlines() if "main.ts" in l]
-    ok = not ran["expired"] and ran["rc"] not in (0, None) and bool(named)
-    return ok, (f"exit {ran['rc']}{' (expired)' if ran['expired'] else ''} in "
-                f"{ran['seconds']} s; {named[0].strip()[:120] if named else 'main.ts not named'}")
-
-
-# ---------------------------------------------------------------------------
 
 
 def main():
@@ -484,19 +427,12 @@ def main():
         finally:
             kill_group(fake)
 
-    if args.mutant == "skip-without-bun":
-        script, why = mutant_build_sh()
-        if script is None:
-            score("P1", False, why, instrument=True)
-        else:
-            guarded("P1", lambda: (lambda ok, r: (ok, "(scratch build.sh, guard exits 0) " + r))
-                    (*p1(script)))
-    elif args.mutant == "no-fields":
+    if args.mutant == "no-fields":
         with_fake("P4", lambda fake, base: (lambda ok, r: (ok, "(the three fields omitted) " + r))
                   (*p4(RELEASE_APP, fake, base, True)))
     else:
         guarded("P0", p0)
-        guarded("P1", p1, BUILD_SH)
+        guarded("P1", p1)
         guarded("P2r", p2, RELEASE_APP)
         if args.dist:
             guarded("P2d", p2, os.path.abspath(args.dist))
@@ -504,7 +440,6 @@ def main():
             score("P2d", None, "no --dist given")
         with_fake("P3", p3, RELEASE_APP)
         with_fake("P4", lambda fake, base: p4(RELEASE_APP, fake, base, False))
-        guarded("P5", p5)
 
     scored = [r for r in results if r[1] != "skip"]
     passed = sum(1 for r in scored if r[1] == "ok")

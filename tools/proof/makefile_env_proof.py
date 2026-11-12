@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Road map 6 §10.13 (the C1 reader review), H·2, and road map 12 A1 part 2 —
-`make app` does not write the two keys to disk.
+"""Road map 6 §10.13 (the C1 reader review), H·2, road map 12 A1 part 2, and road
+map "swift-helper" SA3 — `make app` does not write the two keys to disk, and a
+tree copy's build writes the acknowledgements with no `agent/node_modules`.
 
 `xcodebuild` records every task's ENVIRONMENT in its build database under
 `build/Build/Intermediates.noindex/XCBuildData/`, so a `make app` run from a
@@ -15,6 +16,7 @@ same kind of value. The `Makefile` carries one directive per key,
     (unset …; python3 tools/proof/makefile_env_proof.py --mutant no-unexport)
     (unset …; python3 tools/proof/makefile_env_proof.py --mutant no-unexport-anthropic)
     (unset …; python3 tools/proof/makefile_env_proof.py --no-sweep)
+    (unset …; python3 tools/proof/makefile_env_proof.py --cold-helper --wall 1500)
 
 **It measures `app` ONLY, and says so.** `app` is the one recipe that runs
 `xcodebuild`, which is the one tool measured to write its environment down.
@@ -31,13 +33,17 @@ nothing but paths and booleans is ever printed.
 
 **The tree is never touched.** Everything happens in a COPY at
 `tools/proof/work/makefile-env/tree`, made by `tree_copy.make_copy`: `app/`
-and `agent/` (without `node_modules`, because the helper's build step runs
-`bun install` and `bun build`, which write into it) are COPIED, and every
+and `agent/` (without `node_modules`, the Bun helper's install, which no build
+step reads since SA3) are COPIED, the helper's SwiftPM scratch path
+`build/agent-swift` is a CLONE of the tree's (`cp -cRp`, spec §11 SA-8: the
+helper step's stamp serves it while the copy's `agent/` is the tree's), and every
 other build input `project.yml` names is a SYMLINK to the tree's (`core`
 already built, so `project.yml`'s pre-build `cargo build --release` is a
-no-op and the copy links the tree's `libframejob_core.a`).
+no-op and the copy links the tree's `libframejob_core.a`). `--cold-helper`
+makes the copy with no clone, so the helper step builds Slaude cold in the copy
+(its seconds are in the fifth row; pass a longer `--wall`).
 
-The four rows:
+The five rows:
 
 * the build made `Frame Job.app`'s binary — a failed build holds nothing, and
   "no file holds the dummy" would be true of it for the wrong reason;
@@ -45,7 +51,12 @@ The four rows:
   `make app` (the sweep below);
 * no file under the copy's `build/` or `FrameJob.xcodeproj/` holds the
   AssemblyAI dummy's bytes;
-* no file there holds the Anthropic dummy's bytes.
+* no file there holds the Anthropic dummy's bytes;
+* the copy has no `agent/node_modules`, and its bundle's `Acknowledgements.txt`
+  holds a `== package slaude <revision> ==` header and no `npm` or `runtime` one
+  (spec §11 SA-10: Write Acknowledgements reads Slaude from the copy's own
+  scratch path); the row prints the line the helper step printed (served by
+  the stamp, built, or emptied and built) and the build's seconds.
 
 Each directive is asserted to occur exactly once in the tree's `Makefile`.
 Under `--mutant no-unexport` the AssemblyAI directive is removed in the
@@ -138,12 +149,12 @@ def child_env():
     return env
 
 
-def make_copy(mutant):
+def make_copy(mutant, helper_clone=True):
     """A COPY of the tree from `tree_copy.make_copy`, and a directive
     removed when the mutant asks for it. Answers the copy's root, or None
     and a reason."""
     tree_copy.remove_tree(WORK)
-    root, reason = tree_copy.make_copy(os.path.join(WORK, "tree"))
+    root, reason = tree_copy.make_copy(os.path.join(WORK, "tree"), helper_clone=helper_clone)
     if root is None:
         return None, reason
 
@@ -166,6 +177,9 @@ def make_copy(mutant):
     return root, None
 
 
+BUILT = {}  # what `build` saw: the helper step's line and the build's seconds
+
+
 def build(root, wall):
     """`make app` inside the copy, with the dummy exported. Answers the
     binary's path, or None and a reason."""
@@ -173,6 +187,9 @@ def build(root, wall):
         os.path.join(root, "build", "Build", "Products", "Release", "Frame Job.app")))
     started = time.time()
     run = bounded.run(["make", "app"], wall, cwd=root, env=child_env())
+    said = [line.strip() for line in run["stdout"].splitlines()
+            if line.strip().startswith("build_helper: ")]
+    BUILT.update(helper=said[-1] if said else None, seconds=time.time() - started)
     if run["expired"]:
         return None, f"the copy's `make app` passed its {wall:.0f} s wall"
     if run["rc"] != 0:
@@ -184,6 +201,25 @@ def build(root, wall):
         return None, f"`make app` succeeded and wrote no binary at {binary}"
     print(f"  built {binary} in {time.time() - started:.0f} s")
     return binary, None
+
+
+def notices(root):
+    """(ok, detail): the copy has no agent/node_modules, and its bundle's Acknowledgements.txt
+    holds a `package slaude` header and no `npm` or `runtime` one (spec §11 SA-10)."""
+    path = os.path.join(root, "build", "Build", "Products", "Release", "Frame Job.app",
+                        "Contents", "Resources", "Acknowledgements.txt")
+    modules = os.path.lexists(os.path.join(root, "agent", "node_modules"))
+    try:
+        with open(path, encoding="utf-8") as handle:
+            headers = re.findall(r"^== (\S+) (\S+) (\S+) ==$", handle.read(), re.M)
+    except OSError as error:
+        return False, f"{path}: {error}"
+    slaude = [version for kind, name, version in headers if (kind, name) == ("package", "slaude")]
+    stray = sorted({kind for kind, _, _ in headers if kind in ("npm", "runtime")})
+    ok = not modules and len(slaude) == 1 and not stray
+    return ok, (f"agent/node_modules in the copy {modules}; {len(headers)} headers, package slaude "
+                f"{slaude}, npm or runtime kinds {stray or 'none'}; the helper step said "
+                f"{BUILT.get('helper')!r}; the build took {BUILT.get('seconds', 0):.0f} s")
 
 
 def _seconds(etime):
@@ -312,6 +348,9 @@ def main():
     parser.add_argument("--mutant", choices=list(MUTANTS),
                         help="remove one key's `unexport` directive in the COPY — the "
                              "CONTROL, under which that key's leak row must FAIL")
+    parser.add_argument("--cold-helper", action="store_true",
+                        help="make the copy without the clone of the helper's scratch path, so "
+                             "its helper step builds Slaude cold (spec §11 SA-8)")
     parser.add_argument("--wall", type=float, default=900,
                         help="the copy's `make app` wall-clock bound in seconds (rule H)")
     parser.add_argument("--no-sweep", action="store_true",
@@ -322,11 +361,12 @@ def main():
     arguments = parser.parse_args()
 
     started = time.time()
-    print("road map 6 §10.13, H·2, and road map 12 A1 part 2 — `make app` and the two keys\n")
+    print("road map 6 §10.13, H·2, road map 12 A1 part 2 and swift-helper SA3 — `make app`, the "
+          "two keys and a copy's notices\n")
     print("  (this measures the `app` recipe ONLY: it is the one that runs xcodebuild, "
           "which is the one tool measured to write its environment down)\n")
 
-    root, reason = make_copy(arguments.mutant)
+    root, reason = make_copy(arguments.mutant, helper_clone=not arguments.cold_helper)
     if root is None:
         check("the tree copy is made and the directive is where it is expected", False, reason)
         print(f"\n{passed}/{passed + failed} checks passed in {time.time() - started:.0f} s")
@@ -361,6 +401,11 @@ def main():
         check(f"no file under the copy's build/ or FrameJob.xcodeproj/ holds the "
               f"{one['label']} dummy ({scanned} files read)",
               not held, "held by:\n       " + "\n       ".join(held[:8]))
+    ok, detail = notices(root)
+    check(f"the copy, with no agent/node_modules, wrote its acknowledgements with Slaude and "
+          f"no npm or Bun entry ({detail})" if ok else
+          "the copy, with no agent/node_modules, wrote its acknowledgements with Slaude and no npm "
+          "or Bun entry", ok, detail)
 
     print(f"\n{passed}/{passed + failed} checks passed in {time.time() - started:.0f} s")
     return 0 if failed == 0 else 1

@@ -14,8 +14,8 @@ broken or wrong app in a DMG that notarizes cleanly:
   `com.apple.security.device.camera`: the microphone or camera grant is
   refused however the person answers the prompt (road map 3, R0; spec §11
   CAM-3);
-* the assistant helper without `com.apple.security.cs.allow-jit`: it dies at
-  launch under the hardened runtime ("Ran out of executable memory");
+* the assistant helper without the hardened runtime, or holding an entitlement
+  it has no use for (spec §11 SA-8: the Swift helper needs none);
 * `framejob-mcp` missing or holding an entitlement it has no use for;
 * the catalog snapshot missing, at another version than the bundle's, or
   naming a dev tool;
@@ -45,8 +45,8 @@ and the exit is 0 only at 25/25:
 * P2  the app's binary exists; P3 it does not hold the needle;
 * P4  the app is signed with the hardened runtime and verifies strictly;
 * P5  the app's entitlements are exactly `audio-input` and `camera`;
-* P6  the helper exists; P7 hardened runtime; P8 entitlements exactly
-  `allow-jit`; P9 it does not hold the needle;
+* P6  the helper exists; P7 hardened runtime; P8 no entitlements (spec §11
+  SA-8); P9 it does not hold the needle;
 * P10 the MCP proxy exists; P11 hardened runtime; P12 no entitlements;
 * P13 the snapshot is `{version, tools}` at the bundle's version;
 * P14 the snapshot names no dev tool;
@@ -71,10 +71,11 @@ and the exit is 0 only at 25/25:
   (`dist_check.system_loads`, D39's);
 * P24 the bundle holds every pin's licence texts, byte-identical to the
   checkout's `build/codecs/licenses/` (`dist_check.codec_licences`, D41's);
-* P25 `Contents/Resources/Acknowledgements.txt` names every shipped crate, npm
-  package, pin, Sparkle, Bun, the model and each font
-  (`dist_check.acknowledgements`, D43's; `cargo metadata --offline` relies on
-  the archive having fetched the crates);
+* P25 `Contents/Resources/Acknowledgements.txt` names every shipped crate, pin,
+  Sparkle, Slaude at `agent/Package.resolved`'s revision, the model and each font,
+  and no other kind of entry (`dist_check.acknowledgements`, D43's, spec §11
+  SA-10; `cargo metadata --offline` relies on the archive having fetched the
+  crates);
 * P26 the binary does not hold `RCDevGraphicLinkLoopbackHTTP`, the dev-only
   switch of a `framejob://` link's fetch (`dist_check.LINK_SWITCH`, D45's;
   spec §11 G-49 (l));
@@ -176,11 +177,11 @@ def main():
     else:
         ok, detail = dist_check.helper_runtime(helper_where)
         check(name, ok, "" if ok else detail)
-    name = "P8 the helper's entitlements are exactly com.apple.security.cs.allow-jit"
+    name = "P8 the helper holds no entitlements"
     if helper is None:
         check(name, False, "no helper (P6)")
     else:
-        ok, detail = dist_check.helper_entitlements(helper_where)
+        ok, detail = dist_check.no_entitlements(helper_where)
         check(name, ok, detail)
     name = "P9 the helper does not hold the needle"
     if needle is None:
@@ -204,7 +205,7 @@ def main():
     if not held:
         check(name, False, "no MCP proxy (P10)")
     else:
-        ok, detail = dist_check.proxy_entitlements(proxy)
+        ok, detail = dist_check.no_entitlements(proxy)
         check(name, ok, detail)
 
     short, build, why = info_strings(app)
@@ -288,8 +289,9 @@ def main():
     check("P24 the bundle holds the encoders' licence texts" + (f" ({detail})" if ok else ""),
           ok, "" if ok else detail)
     ok, detail = dist_check.acknowledgements(app)
-    check("P25 Acknowledgements.txt names every shipped crate, npm package, pin, Sparkle, Bun, "
-          "the model and each font" + (f" ({detail})" if ok else ""), ok, "" if ok else detail)
+    check("P25 Acknowledgements.txt names every shipped crate, pin, Sparkle, Slaude, the model "
+          "and each font, and no other kind" + (f" ({detail})" if ok else ""), ok,
+          "" if ok else detail)
 
     name = f"P26 the app's binary does not hold {dist_check.LINK_SWITCH.decode('ascii')}"
     if binary is None:

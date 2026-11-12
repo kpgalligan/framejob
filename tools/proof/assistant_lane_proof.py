@@ -35,18 +35,26 @@ probe".
           `createDirectory(` and calls `AppSupport.ensureDirectory(` once
   M2      made to fail on purpose: S1's checker over the tree with
           `AssistantSpend.swift`'s call put back to `createDirectory(` must FAIL
-  B1      (#594, spec §11 P-9) the assistant's request as its catalog and prompt
-          make it — the probe's `request_bytes`, L6's measure: the tools and the
-          system prompt as the helper sends them on every POST — plus
-          `assistant_prompt_eval.CONVERSATION_BYTES_BOUND` fits the proofs'
-          `BODY_BYTES_BOUND`, so the request outgrowing the bound fails here and
-          not in a paid run's H
+  B1      (#594, spec §11 P-9 as SA-9 amends it) the assistant's request as its
+          catalog and prompt make it, measured as the helper sends it: the
+          release helper `tools/agent/build_helper.sh` builds
+          (`agent_helper_build.release`, spec §11 SA-8), configured with the
+          `configure` the probe's L6 writes as the app writes it (clearing on,
+          the stand-in as `api_base`), sends one short message to
+          `anthropic_fake.py`; its first POST must carry the catalog plus tool
+          search and the system prompt, a blank line and the search guide, and
+          that POST's bytes plus `assistant_prompt_eval.CONVERSATION_BYTES_BOUND`
+          must fit the proofs' `BODY_BYTES_BOUND`, so the request outgrowing the
+          bound fails here and not in a paid run's H
   M3      made to fail on purpose: B1's comparison with the bound one byte under
-          the measured request plus that room must FAIL
+          the measured POST plus that room must FAIL
 
     python3 tools/proof/assistant_lane_proof.py              # every row; exit 0 when all pass
     python3 tools/proof/assistant_lane_proof.py --no-prepare # the mutant alone: L0 and L1
                                                              # are expected to FAIL (exit 1)
+    python3 tools/proof/assistant_lane_proof.py --mutant b1-empty-catalog
+        # B1 alone, the helper configured with no tools: B1 FAILS (exit 1;
+        # 0 when it passes, 2 when it could not run)
     python3 tools/proof/assistant_lane_proof.py --mutant NAME
         # one of `MUTANTS` (one-queue → L10, no-env-fallback → L11,
         # mode-0755 → L12, no-lane-check → L13, close-ask-first → L4, B44's
@@ -59,7 +67,9 @@ probe".
 
 A probe that does not build is a scored FAIL (exit 1), never a skip. No app
 instance is launched, no media is used, and no key is read: every child gets
-the environment without `RC_ASSEMBLYAI_KEY` and `ANTHROPIC_API_KEY`.
+the environment without `RC_ASSEMBLYAI_KEY` and `ANTHROPIC_API_KEY`, and the
+helper B1 runs gets only the dummy `proof-key` and the stand-in, no spend
+fields, so it fetches no price table and writes nothing.
 """
 
 import argparse
@@ -73,6 +83,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
+import agent_helper_build  # noqa: E402
+import assistant_helper_proof as ahp  # noqa: E402
 import bounded  # noqa: E402
 import swift_build  # noqa: E402
 
@@ -84,7 +96,10 @@ MAIN = os.path.join(SOURCES, "main.swift")
 PROBE_SWIFT = os.path.join(HERE, "assistant_lane_probe.swift")
 LIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
 PREPARE = "AgentLane.prepareAtLaunch()"
-WALL_BUILD, WALL_RUN = 900, 300
+WALL_BUILD, WALL_RUN, WALL_READY, WALL_TURN = 900, 300, 20, 60
+# B1's made-to-fail switch (spec §11 SA-9): the helper configured with no tools.
+B1_SWITCH = "b1-empty-catalog"
+B1_WORK = os.path.join(WORK, "b1")
 
 PROBE_ROWS = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11", "L12", "L13",
               "C1"]
@@ -196,22 +211,68 @@ def tree_texts():
 # B1: the assistant's request against the proofs' body bound (#594, spec §11 P-9).
 
 
-def measured_request(answer):
-    """The probe's `request_bytes` (L6's measure), or None when it is not a
-    positive integer."""
-    value = (((answer or {}).get("measure") or {}).get("l6") or {}).get("request_bytes")
-    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-        return None
-    return value
+def first_post(answer, empty_catalog=False):
+    """(bytes, problems, detail): the release helper's first POST at the stand-in, configured
+    with the `configure` L6 wrote, after one short message; (None, [why], "") when it could not
+    be measured."""
+    path = (((answer or {}).get("measure") or {}).get("l6") or {}).get("configure")
+    if not path or not os.path.isfile(path):
+        return None, [f"no configure from L6: {path!r}"], ""
+    helper, why = agent_helper_build.release(os.path.join(B1_WORK, "framejob-agent"))
+    if helper is None:
+        return None, [f"the helper did not build: {why}"], ""
+    with open(path) as handle:
+        configure = json.load(handle)
+    want_tools = len(configure["tools"]) + 1
+    want_system = configure["system"] + "\n\n" + configure["search_guide"]
+    if empty_catalog:
+        configure["tools"], configure["core_tools"] = [], []
+    fake = running = ready = done = status = None
+    log = {}
+    try:
+        fake, base = ahp.start_fake(os.path.join(B1_WORK, "fake"))
+        ahp.http("POST", base + "/__control/scenario", {"replies": [
+            {"content": [{"type": "text", "text": "B1."}], "stop_reason": "end_turn"}]})
+        configure["api_base"] = base
+        running = ahp.Helper(str(helper))
+        try:
+            running.send(configure)
+            ready = running.wait_for("ready", WALL_READY)
+            running.send({"type": "send", "text": "B1."})
+            done = running.wait_for("turn_finished", WALL_TURN)
+            status = running.close()
+        finally:
+            running.kill()
+        _, log = ahp.http("GET", base + "/__control/log")
+    finally:
+        ahp.kill_group(fake)
+    log = log or {}
+    sent = ahp.posts(log)
+    notes = (f"{why}; ready {ready is not None}, turn_finished {done is not None}, exit {status}, "
+             f"{len(sent)} POSTs")
+    if not sent:
+        errors = running.errors[:2] if running is not None else []
+        return None, [f"no POST reached the stand-in ({notes}; stderr {errors})"], ""
+    body = sent[0].get("body") if isinstance(sent[0].get("body"), dict) else {}
+    tools, system = len(body.get("tools") or []), ahp.system_text(body)
+    problems = []
+    if tools != want_tools:
+        problems.append(f"the first POST carries {tools} tools, not the catalog's "
+                        f"{want_tools - 1} plus tool search")
+    if system != want_system:
+        problems.append("the first POST's system is not the prompt, a blank line and the guide")
+    if log.get("failures"):
+        problems.append(f"stand-in failures {log['failures']}")
+    return sent[0].get("bytes"), problems, f"{notes}; {tools} tools, the system text the prompt's"
 
 
 def body_row(request, bound, conversation):
-    """(ok, detail): `request` bytes of tools and system prompt plus
-    `conversation` bytes of room fit `bound`."""
+    """(ok, detail): the helper's first POST of `request` bytes plus `conversation` bytes of
+    room fit `bound`."""
     need = request + conversation
     left = bound - need
-    detail = (f"the request's tools and system prompt {request:,} bytes + {conversation:,} for "
-              f"the conversation = {need:,}, {'within' if left >= 0 else 'OVER'} the body bound "
+    detail = (f"the helper's first POST {request:,} bytes + {conversation:,} for the "
+              f"conversation = {need:,}, {'within' if left >= 0 else 'OVER'} the body bound "
               f"{bound:,} ({left:,} left)")
     if left < 0:
         detail += ("; raise BODY_BYTES_BOUND in assistant_prompt_eval.py and recompute the "
@@ -219,27 +280,30 @@ def body_row(request, bound, conversation):
     return left >= 0, detail
 
 
-def body_rows(answer, why, score):
+def body_rows(answer, why, score, empty_catalog=False):
     """B1 and M3, scored; an instrument that cannot measure FAILs both."""
-    request = measured_request(answer)
     try:
         import assistant_prompt_eval as ev
         bound, conversation = ev.BODY_BYTES_BOUND, ev.CONVERSATION_BYTES_BOUND
     except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
         problem = f"assistant_prompt_eval could not be read: {type(error).__name__}: {error}"
-        score("B1", False, problem)
-        score("M3", False, problem)
+        score("B1", False, problem, instrument=True)
+        score("M3", False, problem, instrument=True)
         return
-    if request is None:
-        problem = (f"no measured request: L6's request_bytes "
-                   f"{(((answer or {}).get('measure') or {}).get('l6') or {}).get('request_bytes')!r}"
-                   + (f" ({why})" if why else ""))
-        score("B1", False, problem)
-        score("M3", False, problem)
+    try:
+        request, problems, detail = first_post(answer, empty_catalog)
+    except Exception as error:  # noqa: BLE001
+        request, problems, detail = None, [f"{type(error).__name__}: {error}"], ""
+    label = "(the helper configured with no tools) " if empty_catalog else ""
+    if isinstance(request, bool) or not isinstance(request, int) or request <= 0:
+        problem = (f"no measured POST: {'; '.join(problems)}" + (f" ({why})" if why else ""))
+        score("B1", False, label + problem, instrument=True)
+        score("M3", False, problem, instrument=True)
         return
-    score("B1", *body_row(request, bound, conversation))
+    ok, fit = body_row(request, bound, conversation)
+    score("B1", ok and not problems, label + "; ".join(problems + [fit, detail]))
     m3_ok, m3_detail = body_row(request, request + conversation - 1, conversation)
-    score("M3", not m3_ok, f"with the bound one byte under the request and its room, B1's "
+    score("M3", not m3_ok, f"with the bound one byte under the POST and its room, B1's "
                            f"comparison fails {not m3_ok} ({m3_detail})")
 
 
@@ -328,9 +392,9 @@ def main():
     parser.add_argument("--no-prepare", action="store_true",
                         help="the made-to-fail run: L0 on a scratch main.swift without the "
                              "prepare line, and the probe without prepareAtLaunch()")
-    parser.add_argument("--mutant", choices=sorted(MUTANTS),
-                        help="the probe over a copy of app/Sources with one text replaced; "
-                             "its row is expected to FAIL (exit 1)")
+    parser.add_argument("--mutant", choices=sorted(MUTANTS) + [B1_SWITCH],
+                        help="the probe over a copy of app/Sources with one text replaced, or "
+                             "B1's switch; its row is expected to FAIL (exit 1)")
     args = parser.parse_args()
     if args.mutant and args.no_prepare:
         parser.error("--mutant cannot be combined with --no-prepare")
@@ -341,6 +405,8 @@ def main():
         results.append((row_id, ok, detail, instrument))
         print(f"{'PASS' if ok else 'FAIL'} {row_id}: {detail}", flush=True)
 
+    if args.mutant == B1_SWITCH:
+        sys.exit(run_b1_switch(score))
     if args.mutant:
         sys.exit(run_mutant(args.mutant, score))
 
@@ -401,6 +467,28 @@ def main():
     passed = sum(1 for _, ok, _, _ in results if ok)
     print(f"scores: {passed}/{len(results)} pass", flush=True)
     sys.exit(0 if passed == len(results) else 1)
+
+
+def run_b1_switch(score):
+    """B1 with the helper configured with no tools: 1 when it FAILS (caught), 0 when it passes,
+    2 when it could not be measured (rule R)."""
+    binary, why = build_probe()
+    if binary is None:
+        print(f"mutant {B1_SWITCH}: the control could not be performed — the probe did not "
+              f"build: {why}", flush=True)
+        return 2
+    answer, why = run_probe(binary, ["--rows", "L6"])
+    results = []
+    body_rows(answer, why, lambda *a, **k: (results.append((a, k)), score(*a, **k)),
+              empty_catalog=True)
+    b1 = next((a for a, k in results if a[0] == "B1"), None)
+    if b1 is None or any(k.get("instrument") for a, k in results if a[0] == "B1"):
+        print(f"mutant {B1_SWITCH}: the control could not be performed — B1 was not measured",
+              flush=True)
+        return 2
+    print(f"mutant {B1_SWITCH}: B1 {'FAILS (expected)' if not b1[1] else 'PASSES (survived)'}",
+          flush=True)
+    return 1 if not b1[1] else 0
 
 
 def run_mutant(name, score):

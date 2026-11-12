@@ -12,8 +12,9 @@ The probe `assistant_settings_probe.swift` (over `app/Sources`,
        over the suite: "40,000" stores and posts `settings` once, the same
        again nothing, "10000" beeps back writing nothing, each box posts once,
        never `key` or `model`, `sync()` shows the stored three; and the
-       probe's `clearTriggerTokens` equals `CLEAR_TRIGGER_TOKENS` in
-       `agent/src/main.ts`
+       probe's `clearTriggerTokens` equals the Swift helper's
+       `Request.clearTriggerTokens` (`agent/Sources/FrameJobAgentKit/Request.swift`,
+       spec §11 SA-4)
   CS2  a real editor's session: turn 1 (50,000 input tokens) no compaction;
        the pane on `.standard` commits "40,000" and clearing on — posted
        ["settings","settings"], the same session, not closed, the transcript
@@ -79,7 +80,7 @@ asp.WORK = WORK  # App, Fake and the secret folder write under this proof's fold
 atp.WORK = WORK
 RELEASE = os.path.join(ROOT, asp.APP_PATH)
 PROBE_SWIFT = os.path.join(HERE, "assistant_settings_probe.swift")
-MAIN_TS = os.path.join(ROOT, "agent", "src", "main.ts")
+REQUEST_SWIFT = os.path.join(ROOT, "agent", "Sources", "FrameJobAgentKit", "Request.swift")
 WALL_RUN, WALL_TURN = 300, 60
 PROBE_ROWS = ["CS1", "CS2"]
 BETA = "context-management-2025-06-27"
@@ -109,9 +110,9 @@ def compaction_reply(text):
                             "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}]}
 
 
-def clear_trigger_in_main_ts():
-    with open(MAIN_TS) as f:
-        found = re.search(r"const CLEAR_TRIGGER_TOKENS = ([\d_]+);", f.read())
+def clear_trigger_in_helper():
+    with open(REQUEST_SWIFT) as f:
+        found = re.search(r"public static let clearTriggerTokens = ([\d_]+)\n", f.read())
     return int(found.group(1).replace("_", "")) if found else None
 
 
@@ -186,11 +187,11 @@ def rows_probe(score, fake, secrets, sources=None, label=""):
                             f"{ran['stderr'].strip()[-300:]}", instrument=True)
     else:
         probe_trigger = (answer or {}).get("clearTriggerTokens")
-        helper_trigger = clear_trigger_in_main_ts()
+        helper_trigger = clear_trigger_in_helper()
         same = probe_trigger is not None and probe_trigger == helper_trigger
         score("CS1", bool(r["ok"]) and same,
-              f"{label}{r['detail']}; clearTriggerTokens {probe_trigger}, main.ts "
-              f"CLEAR_TRIGGER_TOKENS {helper_trigger} (equal {same})")
+              f"{label}{r['detail']}; clearTriggerTokens {probe_trigger}, the helper's "
+              f"Request.clearTriggerTokens {helper_trigger} (equal {same})")
 
     r = got.get("CS2")
     if r is None:
