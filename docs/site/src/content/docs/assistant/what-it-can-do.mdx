@@ -123,7 +123,7 @@ See [Cut false starts](/cleanup/false-starts/).
 
 ## It looks at rendered frames
 
-The Assistant checks its work by rendering a frame of the finished timeline, drawn the way an export draws it. It's told to look before and after a visual edit. It renders at the playhead unless it picks a time, and it's told to keep the image small.
+The Assistant checks its work by rendering a frame of the finished timeline, drawn the way an export draws it. It's told to look before and after a visual edit. It renders at the playhead unless it picks a time, and it's told to keep the image small. It sees an 8-bit copy of a deeper frame, and it's told never to ask for the full-depth one.
 
 Rendering writes a temporary picture file [without asking](/assistant/what-it-will-not-do/#file-writes-that-do-not-ask). Rendering to a path it chose [asks first](/assistant/what-it-will-not-do/#what-each-question-reads).
 

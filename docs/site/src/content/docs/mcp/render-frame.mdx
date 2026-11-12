@@ -23,7 +23,7 @@ With no arguments it draws the frame under the playhead at the canvas's size and
 { "t": 1200000, "path": "/tmp/shot.png", "max_width": 960 }
 ```
 
-The picture comes back two ways: as an image the model can see, and as a file on disk. The text beside it says what was drawn and ends by naming the file:
+The picture comes back two ways: as an image the model can see, and as a file on disk. The image is an 8-bit PNG copy when the file is a 16-bit PNG or a HEIC, so it stays small enough to send, and the file keeps the frame's full depth. See [`full_depth_image`](#full_depth_image). The text beside it says what was drawn and ends by naming the file:
 
 ```
 Frame at 1200000 ticks of a 1920×1080 px canvas, rendered at 960×540 px. Written to /tmp/shot.png.
@@ -39,6 +39,7 @@ With a [nest](/mcp/nests/) open, it draws that nest at its own size, from its ow
 | [`path`](#path) | string | No | Where to write the file. | A temporary file |
 | [`format`](#format) | string | No | `png`, `jpeg` or `heic`. | From the path, else `png` |
 | [`max_width`](#max_width) | integer | No | Caps the width in pixels, 16 to 8192. | The canvas's width |
+| [`full_depth_image`](#full_depth_image) | boolean | No | Sends the file itself as the image, not its 8-bit copy. | `false` |
 | [`burn_in_timecode`](#burn_in_timecode) | boolean | No | Draws the project timecode over the picture. | `false` |
 | [`ungraded`](#ungraded) | boolean | No | Draws every clip as if it weren't graded. | `false` |
 | [`selection`](#selection) | integer | No | Draws what an adjustment clip's qualifier selects. | None |
@@ -85,6 +86,18 @@ An explicit `format` wins, and the path's extension is replaced rather than adde
 Caps the image's width in pixels, from 16 to 8192. The picture keeps its shape and is never made larger than the canvas. Leave it out for the canvas's own size.
 
 A smaller frame is quicker to send and to look at. The [scopes](#measure-the-frame) measure the frame as written, so their counts cover fewer pixels too.
+
+### `full_depth_image`
+
+Some frames are written deeper than 8 bits. A PNG of a frame that shows a graphic, a shape with a gradient, a still deeper than 8 bits, or a 10-bit VP9, HEVC or ProRes clip is 16-bit, and so is every PNG from an [HDR project](#frames-from-an-hdr-project). A HEIC of such a frame is 10-bit. See [Deep and HDR frames](/export/save-frame/#deep-and-hdr-frames).
+
+By default the image the model sees is an 8-bit PNG copy of the frame whenever the file is a 16-bit PNG or a HEIC of any depth, and the text says so just before its last sentence: "The image here is an 8-bit PNG copy of the 16-bit PNG file." or "… of the HEIC file." The copy is the file's size. An 8-bit PNG, and a JPEG, come back as the file itself, and the text says nothing more.
+
+Pass `full_depth_image: true` to get the file itself as the image instead: the 16-bit PNG, or the HEIC. The file written is the same either way.
+
+:::caution
+A 16-bit PNG of a 1080p frame of camera footage can be larger than the 5 MB the Anthropic API takes for one image. Pass `max_width` with `full_depth_image` to keep it under. The 8-bit copy isn't capped either: at 3840 × 2160 it can pass the limit too.
+:::
 
 ## Change what's drawn
 
@@ -220,6 +233,7 @@ Nothing is drawn in these cases, and the answer says why.
 | "path must name a file to write — omit it for a temporary one." | The `path` was empty. |
 | "format must be one of png, jpeg, heic (got …)." | Use one of the three. |
 | "max_width must be 16…8192 px (got …)." | Use a width in range. |
+| "full_depth_image must be true or false." | Pass `true` or `false`. |
 | "selection must name an adjustment clip of this project; clip … is not one." | Pass an adjustment clip's id. An adjustment clip can't be inside a nest, so close any open nest first. |
 | "vectorscope_zoom must be 1, 2 or 4 (got …)." | Use one of the three. |
 | "vectorscope_zoom needs vectorscope: true." | Add `vectorscope: true`. |

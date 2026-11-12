@@ -445,9 +445,9 @@ extension FrameWriter {
 extension FrameWriter.Format {
     /// True where the container keeps more than 8 bits a component — PNG
     /// (16-bit) and HEIC — so a frame grabbed for it is read through the reader
-    /// when it shows a graphic, a deep still or a deep VP9 track
-    /// (`DeepVideoFrame`, spec §11 PR-20, PR-9, PR-12); JPEG is 8-bit, so its
-    /// frame is built exactly as before.
+    /// when it shows a graphic, a shape with a gradient, a deep still or a deep
+    /// VP9 track (`DeepVideoFrame`, spec §11 PR-20, PR-21, PR-9, PR-12); JPEG is
+    /// 8-bit, so its frame is built exactly as before.
     var carriesDepth: Bool {
         switch self {
         case .png, .heic: return true

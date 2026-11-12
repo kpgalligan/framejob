@@ -158,3 +158,110 @@ into a sibling file.
     L17, L18 and `docs_bugs_b3_proof.py` D1–D8.
   - No op, catalog schema, recipe, FFI or format change; `RC_FORMAT_VERSION` is unchanged.
     `render_frame`'s description gains one sentence. Amends PR-4, PR-9 and PR-15.
+
+- **PR-21 — A gradient shape is a deep source of a saved frame (owner, 2026-11-13, #605:
+  option 1, "Everything else that isn't waiting on files or manual work from me, go with your
+  recommendations").**
+  - The rule: a `render_frame` or File ▸ Save Frame… as PNG or HEIC (`keepsDepth`) whose recipe
+    at the frame time draws a shape layer with a gradient (`ShapeProps.drawsGradient`: a
+    `rectangle` or `ellipse` whose `gradient` has two stops or more) is read through export's
+    reader and is deep, a 16-bit PNG or a 10-bit HEIC, beside anything: alone, over 8-bit video,
+    beside a graphic. Its key is marked deep, so the gradient is PR-16's 16-bit float ramp with
+    no dither. `DeepVideoFrame.reads` asks it second of its `keepsDepth` arms
+    (`Exporter.drawsGradientShape`, which opens no file), after PR-20's graphic and before PR-9's
+    still and PR-12's track.
+  - Why: a person cannot tell a gradient a shape draws from one a graphic draws, so a saved
+    frame's depth does not depend on which drew it. The issue's "about twice the bytes" was
+    measured otherwise for a gradient alone: Core Graphics' dither is noise a PNG cannot
+    compress, so `shape563`'s frame (G0) was an 8-bit PNG of 1,830,922 bytes before this change
+    and is a 16-bit one of 78,836 bytes with it (Debug, one run each); over footage the
+    footage's own 16 bits set the size, as for a graphic (PR-20).
+  - It asks the recipe, as PR-20 does: a gradient shape elsewhere on the timeline is not on the
+    frame; one flattened out of a nest counts; one that is a matte member counts, being a recipe
+    layer (its coverage is then 16 bits, PR-19). A frame of flat shapes, lines, arrows, text or
+    word captions stays 8-bit.
+  - What does not change: JPEG, GIF and APNG, the preview, the eyedropper, Pick from Canvas, look
+    tiles, thumbnails and every export row, which never ask.
+  - Removed as unreachable: a frame that draws a gradient shape no longer reaches the generator
+    in a format that keeps depth, so `renderFrameReported`'s `gradient` term in the re-read of a
+    frame the generator answers deep (PR-16's) is gone, and that re-read is PR-19's matte
+    alone. PR-16's app mutant `shape-generator-frame-not-deep` went with that code. PR-14's
+    re-read and its mark stay: they still serve a matted frame the generator answers 8-bit while
+    it shows a deep source, which `raster_dither_proof.py` GMr now holds (G7, its old row, is
+    read by this arm before the generator).
+  - Seen first (`raster_dither_proof.py`, Debug at aa5a1512 and the app at d530de3a^): G0
+    (`shape563` alone) and GV (the same over a 256×144 8-bit H.264 clip) were 8-bit PNGs, G0's
+    HEIC 8 bits a sample.
+  - With it (Release; Debug read the same figures): G0 and GV 16-bit PNGs, 785 distinct greens
+    of 801 along row 540, worst 0.0296 of a level from the exact ramp; G0's HEIC 10 bits; GEa, an
+    `apng` export's frame of G0's project, equal to the base's (the 8-bit doors keep Core
+    Graphics' dithered bytes); GMr, a matted frame over an 8-bit clip, 689 distinct greens and
+    banding RMS 0.0765, as GMf; DGo's flat shape still an 8-bit PNG. The whole
+    `raster_dither_proof.py --base` (the app at d530de3a^) 37 of 44: the other seven (B1–B4b, F1,
+    F2) need PR-13's `--control`, which was not made.
+  - Mutants (Debug tree copies, each caught): `gradient-not-a-source` (G0, GV, and G5, whose
+    generator path no longer reads a gradient again), `flat-shape-a-source` (DGo). Re-aimed:
+    `shape-always-deep` on GEa's APNG door and GEd, `reread-not-marked` (PR-14's mark) on GMr.
+  - Other proofs whose frames change: `phase6_proof.py` sections 9–13 read a 16-bit PNG to the
+    nearest level, and section 9 compares a one-colour gradient's levels with the flat fill's
+    where it compared digests; `matte_proof.py`'s `rgba` reads through `png_read.rgba8` (L2 missed
+    by 1.63 of a level through ffmpeg's `rgba`); `precision_proof.py` P1 reads its render at 16
+    bits. On Release: `phase6_proof.py` 168/168, `matte_proof.py` 46/46, `precision_proof.py
+    --only C0,D1,P1` 4/4 (P1 at RMS 0.357 10-bit steps).
+  - No op, catalog, recipe, FFI or format change; `RC_FORMAT_VERSION` is unchanged.
+  - Amends PR-16 ("a shapes-only frame stays an 8-bit PNG") and PR-20 ("a shapes-only frame
+    stays 8-bit"): a frame of flat shapes only stays 8-bit.
+
+- **PR-22 — `render_frame`'s image block is an 8-bit PNG copy of a deep frame, and
+  `full_depth_image` asks for the file (owner, 2026-11-13, #604: "Is the api limit ours? If so,
+  I think we should raise it. Perhaps default to 8 bit and have an optional parameter that can
+  pull the full PNG.").**
+  - The limit is the Anthropic API's, 5 MB an image (5,242,880 bytes of base64), not Frame
+    Job's, so it cannot be raised; the second half of the answer applies.
+  - The image block is what the model sees, and it is a copy: the file `render_frame` writes and
+    the path it answers stay as deep as the frame (PR-9, PR-20, PR-21), and File ▸ Save Frame…
+    is unchanged. The block, by the file written:
+    - a PNG of a frame of 8 bits a component: the file's bytes, `image/png`, as before;
+    - a PNG of a deeper frame: an 8-bit PNG copy, `image/png`;
+    - a JPEG: the file's bytes, `image/jpeg`, as before;
+    - a HEIC, of any depth: an 8-bit PNG copy, `image/png`. The API takes JPEG, PNG, GIF and
+      WebP and not HEIC, and PNG keeps the alpha a HEIC frame carries.
+  - `full_depth_image: true` (a boolean, default false) puts the file's own bytes in the block,
+    with the file's type (`image/png`, `image/heic`). It chooses the block only: the file's depth
+    is still never an argument (PR-4's and PR-9's "no `depth` argument").
+  - The copy (`FrameBlock`): the frame labelled as its file is (BT.709, PR-11; an HLG project's
+    BT.2100 HLG), drawn at its own size into an 8-bit premultiplied RGBA context in that space
+    with no interpolation, and encoded PNG with no properties. Same size as the file, so
+    `max_width` bounds both. A copy that cannot be made leaves the file's bytes in the block: a
+    copy never fails the tool.
+  - The text: a block that is a copy adds one sentence before the last, "The image here is an
+    8-bit PNG copy of the 16-bit PNG file." (a HEIC: "… of the HEIC file."); a block that is the
+    file adds nothing, so every call that answered an 8-bit PNG answers the text it did, and
+    "Written to <path>." stays last.
+  - The description says which frames' images are copies, that the full-depth image of a 1080p
+    frame can pass the API's 5 MB image limit, and that `max_width` keeps it under; the
+    assistant's prompt says the image is an 8-bit copy and not to pass `full_depth_image`.
+    `agent/src/main.ts` is unchanged (it forwards the block as given).
+  - Not done: bounding an 8-bit block by size (the issue's option c). An 8-bit copy of a canvas
+    larger than 1080p can still pass the limit, as an 8-bit frame could before PR-20; `max_width`
+    is the way. Measured (BKk, printed): a 3840×2160 frame of noisy generated footage under a
+    graphic, its 8-bit block base64 6,782,656.
+  - Seen first (`raster_dither_proof.py`, Debug at aa5a1512, generated footage `blk1080` under a
+    graphic): the file a 16-bit PNG of 4,804,889 bytes (base64 6,406,520) and the block that file
+    (BK1); a HEIC's block `image/heic` (BK4); `full_depth_image` refused by the argument gate as
+    a stranger (BK2, BK5).
+  - With it (Release; Debug read the same figures): BK1's block an 8-bit PNG of the file's size,
+    base64 2,985,988, every sample within one level of the file's rounded (the worst 1, over
+    8,294,400 samples), with the copy sentence; BK2 the file's bytes; BK3, an 8-bit frame, its
+    file's bytes and no sentence; BK4 the HEIC's default block the 8-bit PNG and with
+    `full_depth_image` `image/heic`, the file's bytes; BK5 "full_depth_image must be true or
+    false." and the argument published as a boolean. On the owner's footage (DGs, printed,
+    Release only), the default block against the file, base64: the title over the 8-bit cut
+    2,326,800 against 5,560,860; the cut beside a 16-bit still 2,806,964 against 6,744,504; the
+    iPhone clip itself 3,210,716 against 9,328,440; all three under the limit unscaled.
+  - Mutants (Debug tree copies, each caught): `block-is-the-file` (BK1, BK4),
+    `full-depth-ignored` (BK2, BK4), `block-always-recoded` (BK3, on the copy sentence alone: an
+    8-bit frame's re-encoded PNG is byte-identical to its file), `heic-block-follows-file` (BK4).
+  - No op, recipe, FFI or format change; the catalog gains one argument of an app-state tool.
+  - Amends PR-4 and PR-9 (no `depth` argument: still none for the file) and PR-20 (whether the
+    image block should be bounded, held for the owner, is decided here).

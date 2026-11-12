@@ -3234,7 +3234,7 @@ the key map behind it.
   (`ExportWriter` REPLACED `AVAssetExportSession` so chapters, bitrate and
   size have one path) and the one-frame offline render (the generator, or
   `DeepStillFrame.read`'s reader for a frame showing a graphic, §11 PR-20,
-  a deep still, §11 PR-9, or a deep VP9 track, §11 PR-12, or re-read when the generator answers 8
+  a shape with a gradient, §11 PR-21, a deep still, §11 PR-9, or a deep VP9 track, §11 PR-12, or re-read when the generator answers 8
   bits for a frame showing a deeper source, §11 PR-14). An export is TWO
   passes wherever the file holds sound: a measurement build of its own in
   32-bit float (its 10 ms steps kept by `StepLoudnessMeter`, AU-28), then
@@ -3297,8 +3297,8 @@ the key map behind it.
   export rows draw graphics deep, read from `ExportWriter.frameForm` and the
   bundled encoders' depth), `drawsGraphic(_:at:options:)` (PR-20: a PNG or
   HEIC frame that draws a graphic is read deep; `DeepVideoFrame.reads` asks
-  it) and `drawsGradientShape(_:at:options:)` (PR-16: a frame the generator answers
-  deep that draws a gradient shape is read once more).
+  it) and `drawsGradientShape(_:at:options:)` (PR-21: a PNG or HEIC frame that
+  draws a gradient shape is read deep; `DeepVideoFrame.reads` asks it).
   **`ExportWriter.cancel()` and `Exporter.cancel()` only set flags**; the
   measurement's loop cancels its own reader, `ExportWriter` reads each output
   on a reader of its own and each pump cancels its own reader on its own queue
@@ -3314,7 +3314,8 @@ the key map behind it.
 - `DeepVideoFrame.swift` — the one question `Exporter.renderFrameReported`
   asks after the build when its caller passes `keepsDepth` (`carriesDepth`:
   `render_frame` and Save Frame… as PNG or HEIC): `reads` is PR-20's graphic
-  (`Exporter.drawsGraphic`), PR-9's deep still or `shows`, a recipe `track` layer whose composition segment at the frame
+  (`Exporter.drawsGraphic`), PR-21's gradient shape (`Exporter.drawsGradientShape`),
+  PR-9's deep still or `shows`, a recipe `track` layer whose composition segment at the frame
   time reads a VP9 file whose `vpcC` bitDepth is above 8 (`isDeep`), spec §11
   PR-12. `showsDeepSource` is PR-14's wider test (`isDeepSource`: a VP9
   `vpcC`, an HEVC `hvcC` or ProRes), asked after the generator answers an
@@ -3328,6 +3329,11 @@ the key map behind it.
   values, and `write` is for snapshots, sheets and tiles. PNG keeps a NIL properties
   dictionary (anything added changes the file); JPEG flattens onto BLACK at
   0.9; HEIC is `UTType.heic`, never `public.heif`.
+- `FrameBlock.swift` — `render_frame`'s image block (spec §11 PR-22): the file's bytes for an
+  8-bit PNG and a JPEG, an 8-bit PNG copy of a 16-bit PNG and of any HEIC (the labelled frame
+  drawn at its size in its own colour space, PNG with no properties) unless
+  `full_depth_image`, and the sentence a copy adds; `mimeType` of a file's bytes. Pure: no
+  AppKit, no file read; `AgentServer+Render.swift` hands it the frame and the file's bytes.
 
 **Captions.** A caption is an ordinary text clip, which is what makes burn-in
 free.

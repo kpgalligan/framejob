@@ -122,9 +122,10 @@ enum AssistantPrompt {
             + "the person asks: say which words you will cut, then cut them in one "
             + "`ripple_delete_ranges` call.",
         "`render_frame` renders one frame of the finished timeline through the compositor an "
-            + "export uses, at the playhead unless you pass `t`, and answers the image and the "
-            + "PNG's path. Look before and after a visual edit, and pass `max_width` to keep "
-            + "the image small.",
+            + "export uses, at the playhead unless you pass `t`, and answers an 8-bit image of "
+            + "it and the PNG's path. Look before and after a visual edit, and pass `max_width` "
+            + "to keep the image small. Never pass `full_depth_image`: its image can be too "
+            + "large for you to be sent.",
         askFirstParagraph,
         "Reply in a sentence or two. Never repeat tool output the person can already see.",
     ].joined(separator: "\n")

@@ -36,7 +36,7 @@ A still deeper than 8 bits per channel, such as a 16-bit PNG or TIFF or a 10-bit
 
 ## Saved frames
 
-**File ▸ Save Frame…** (<kbd>⌥⌘E</kbd>) writes a 16-bit PNG or a 10-bit HEIC when the frame shows a graphic, a deep still or a 10-bit VP9, HEVC or ProRes clip, and always in an HDR (HLG) project. A frame gets the same when the lowest track with video on it holds a 10-bit HEVC or ProRes clip, anywhere along the timeline. A JPEG is always 8-bit. See [Save Frame](/export/save-frame/).
+**File ▸ Save Frame…** (<kbd>⌥⌘E</kbd>) writes a 16-bit PNG or a 10-bit HEIC when the frame shows a graphic, a shape with a gradient, a deep still or a 10-bit VP9, HEVC or ProRes clip, and always in an HDR (HLG) project. A frame gets the same when the lowest track with video on it holds a 10-bit HEVC or ProRes clip, anywhere along the timeline. A JPEG is always 8-bit. See [Save Frame](/export/save-frame/).
 
 ## Reversed clips
 
@@ -46,7 +46,7 @@ A reversed clip plays from a backwards copy rendered at 10 bits, at the source's
 
 Text, captions, shapes with a flat fill and screen recordings are 8-bit, and so are thumbnails.
 
-A shape's gradient is drawn at 16-bit float wherever a graphic is drawn at 16 bits: in an export that keeps the depth and in a frame saved deep. Everywhere else, including the preview and the 8-bit exports, the gradient is drawn at 8 bits and dithered. In an SDR project, a frame that shows only shapes is saved at 8 bits, and in an HDR (HLG) project every PNG and HEIC frame is saved deep.
+A shape's gradient is drawn at 16-bit float wherever a graphic is drawn at 16 bits: in an export that keeps the depth and in a frame saved deep. Everywhere else, including the preview and the 8-bit exports, the gradient is drawn at 8 bits and dithered. A frame that shows a shape's gradient is always saved deep as PNG or HEIC, alone or over anything else. A shape without a gradient doesn't make a frame deep, and in an HDR (HLG) project every PNG and HEIC frame is saved deep.
 
 A graphic is drawn at 16 bits per channel in an export that keeps the depth (HEVC 10-bit, AV1, ProRes, and VP9 as HLG or HDR10) and in a frame saved deep, so its gradients keep their levels there. Everywhere else, including the preview and the 8-bit exports, it's drawn at 8 bits with its gradients dithered. A group with a `filter` and the coverage of a luminance `mask` are 8-bit in both. A frame that shows a graphic is always saved deep as PNG or HEIC, alone or over anything else. In an HDR (HLG) project text, shapes, captions and graphics are still [lifted to HDR reference white](/hdr/dynamic-range/), so they sit with the rest of the picture.
 

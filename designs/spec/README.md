@@ -49,7 +49,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 338 | The composition plan: A/B assignment, speed and freeze, audio envelopes, the tap's isolation and voice pass, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 468 | The per-frame recipe the compositor draws: layers, mattes, nests, the cursor, cutout and blur keys. |
 | [`07.3b-frame-recipe-options.md`](07.3b-frame-recipe-options.md) | 108 | §7.3 continued: the recipe options — burn-in, ungraded, selection and behind, the SDR version — and how an option reaches a frame. |
-| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 109 | The spec's Swift file map (app/CLAUDE.md is the live one). |
+| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 110 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5a-compositor-step-0-output.md`](07.5a-compositor-step-0-output.md) | 205 | The Metal compositor's pixel formats, step 0 (per composition) and camera log, the request and the scopes' tap (the shown set, the kernels, the counting rule), the HLG working space, the output pass and linear light. |
 | [`07.5b-compositor-passes-grades.md`](07.5b-compositor-passes-grades.md) | 439 | The compositor's per-layer passes and pipelines, the cursor and the cutout, the adjustment pass and its qualifier, the encoded-sRGB blend, transitions, mattes, tone, wheels, curves, looks and `.cube` LUTs, and the frame budget. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 70 | What playback does after every edit: rebuild or refresh. |
@@ -68,12 +68,12 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.9i-agent-vertical.md`](07.9i-agent-vertical.md) | 182 | `make_vertical_version`: its arguments, the size, the step's classes and order, a canvas-size graphic re-sized, the caption step (6), the treatments and reasons, the copy and its old template copies updated (§11 VR-42, VR-44), the analysis on the source, the answer and the refusals in order; ask-first only with `path` (§11 VR-30…VR-37); `relay_captions`: the survey, the re-lay, its answer and refusal (§11 VR-40, VR-45). |
 | [`07.9j-agent-analysis-tools.md`](07.9j-agent-analysis-tools.md) | 117 | The media analysis tools, §7.9e's until #448: `get_media_analysis` (every kind: shots, masks, faces, sound_events, subjects, and its refusals), Split at Shot Changes (`split_at_shots`) and `analyze_cutout`. |
 | [`07.9k-agent-dev-tools-continued.md`](07.9k-agent-dev-tools-continued.md) | 134 | The dev tools continued, §7.9c's until #548: `land_recording`, `cache_ledger`, `analysis_job` and the analysis launch defaults, and `transcript_view`. |
-| [`07.9l-agent-render-audio-export.md`](07.9l-agent-render-audio-export.md) | 265 | The app-state tools continued, §7.9e's until #585: `render_frame`, Normalize (`normalize_clip`), Enhance (`enhance_voice`), Match (`match_audio`), Synchronize (`sync_audio`), and `export`, `export_status` and `cancel_export`. |
+| [`07.9l-agent-render-audio-export.md`](07.9l-agent-render-audio-export.md) | 270 | The app-state tools continued, §7.9e's until #585: `render_frame`, Normalize (`normalize_clip`), Enhance (`enhance_voice`), Match (`match_audio`), Synchronize (`sync_audio`), and `export`, `export_status` and `cancel_export`. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 163 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 335 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 27102 in 81 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 27211 in 81 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

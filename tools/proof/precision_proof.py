@@ -70,9 +70,11 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
       is an 8-bit PNG (spec §11 PR-4).
   P1  a full-canvas black→white gradient at opacity 0.5 over black,
       1920×1080, exported `prores_422`: the middle row's luma (ffmpeg
-      `gray16le`, columns 16…W−16) against 0.5·g/255, g the gradient's 8-bit
-      value from `render_frame` at opacity 1, RMS ≤ 1.0 10-bit steps. An 8-bit
-      canvas measures about 1.4 or more; `capture` records the control's.
+      `gray16le`, columns 16…W−16) against 0.5·g/255, g the gradient's
+      value in levels from `render_frame` at opacity 1, RMS ≤ 1.0 10-bit steps
+      (since spec §11 PR-21 that frame is a 16-bit PNG, a gradient shape
+      being a deep source of it, and g is read at 16 bits). An 8-bit canvas
+      measures about 1.4 or more; `capture` records the control's.
   H1  an `hevc` export of K6's clip: ffprobe `profile` Main, `pix_fmt` yuv420p.
   D2  (PR2; a STOP, spec §11 PR-4) D1's project, every source now decoded
       `64RGBAHalf`: its `render_frame` is still an 8-bit PNG.
@@ -1036,6 +1038,20 @@ def rgba(path, width=W, height=H):
     return raw if raw and len(raw) == width * height * 4 else None
 
 
+def green_row(path, depth, width, height):
+    """The middle row's green of an RGBA PNG in 8-bit levels: a 16-bit one's samples / 257
+    (unrounded), an 8-bit one's bytes; None when it does not decode."""
+    if depth != 16:
+        raw = rgba(path, width, height)
+        return None if raw is None else [raw[(height // 2 * width + x) * 4 + 1]
+                                         for x in range(width)]
+    raw = decode(path, "rgba64le")
+    if not raw or len(raw) != width * height * 8:
+        return None
+    words = struct.unpack(f"<{width * height * 4}H", raw)
+    return [words[(height // 2 * width + x) * 4 + 1] / 257 for x in range(width)]
+
+
 def luma_row(path, width, height):
     """The middle row of `path`'s first frame as `gray16le` fractions of full
     scale (`ramp_error.py`'s reading)."""
@@ -1191,18 +1207,20 @@ def p1_figure(client, out_dir):
     full = doc.render(out_dir / "p1-opacity1.png")
     doc.step("set_video", clips=[grad], patch={"opacity": 0.5})
     movie = doc.export("prores_422", out_dir / "p1.mov")
-    ok = doc.ok and full is not None and movie is not None and png_depth(full) == 8
+    depth = png_depth(full)
+    ok = doc.ok and full is not None and movie is not None and depth in (8, 16)
     closed = doc.close()
     if not ok:
-        return None, (f"fixture {doc.why or 'ok'}; render depth {png_depth(full)}; "
+        return None, (f"fixture {doc.why or 'ok'}; render depth {depth}; "
                       f"export {movie}"), closed
-    raw = rgba(out_dir / "p1-opacity1.png", 1920, 1080)
+    # Spec §11 PR-21: the gradient alone is a 16-bit PNG, read at 16 bits; an 8-bit one (a tree
+    # before PR-21) as it was.
+    g = green_row(out_dir / "p1-opacity1.png", depth, 1920, 1080)
     measured = luma_row(movie, 1920, 1080)
-    if raw is None or measured is None:
+    if g is None or measured is None:
         return None, "the render or the export did not decode", closed
-    g = [raw[(540 * 1920 + x) * 4 + 1] for x in range(1920)]
     figure = rms_steps(measured, [0.5 * v / 255 for v in g])
-    return figure, f"g {min(g)}…{max(g)}", closed
+    return figure, f"render {depth}-bit, g {min(g):.2f}…{max(g):.2f}", closed
 
 
 def ramp_controls(client, out_dir):

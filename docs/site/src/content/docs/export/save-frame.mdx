@@ -62,7 +62,7 @@ This is the opposite of an export, which always writes the whole timeline.
 
 Most frames are saved at 8 bits a channel and labelled BT.709. These are saved with more:
 
-- **A deep frame.** A frame showing a graphic, a still deeper than 8 bits, or a 10-bit VP9, HEVC or ProRes clip is saved as a 16-bit PNG or a 10-bit HEIC, still labelled BT.709, on any track and over anything else. A frame is saved deep too when the lowest track with video on it holds a 10-bit HEVC or ProRes clip, anywhere along the timeline. A graphic on a deep frame is drawn at 16 bits per channel, so its gradients keep their levels and a flat colour is exact. A 16-bit PNG is larger than an 8-bit one of the same frame, about two and a half times for a frame of camera footage.
+- **A deep frame.** A frame showing a graphic, a shape with a gradient, a still deeper than 8 bits, or a 10-bit VP9, HEVC or ProRes clip is saved as a 16-bit PNG or a 10-bit HEIC, still labelled BT.709, on any track and over anything else. A frame is saved deep too when the lowest track with video on it holds a 10-bit HEVC or ProRes clip, anywhere along the timeline. A graphic or a shape's gradient on a deep frame is drawn at 16 bits per channel with no dither, so its gradients keep their levels and a flat colour is exact. A shape without a gradient doesn't make a frame deep. A 16-bit PNG of a frame of camera footage is about two and a half times the size of an 8-bit one.
 - **An [HDR project](/hdr/dynamic-range/).** Every PNG and HEIC keeps the HLG picture, as a 16-bit PNG or a 10-bit HEIC labelled BT.2100 HLG.
 
 JPEG is always 8-bit. In an HDR project a JPEG is the project's [SDR version](/hdr/show-sdr-version/), labelled BT.709.
@@ -81,7 +81,7 @@ A graphic that fails draws its error card in the saved frame, and a clip whose c
 
 ## The same still for an agent
 
-`render_frame` writes the same bytes as Save Frame for the same frame and format. It returns the picture itself as well as a file, and with no path it writes a temporary file and names it. The format comes from `format` if you pass it, otherwise from the path's extension, otherwise PNG.
+`render_frame` writes the same bytes as Save Frame for the same frame and format. It returns the picture itself as well as a file, an 8-bit PNG copy of it when the file is a 16-bit PNG or a HEIC, and with no path it writes a temporary file and names it. The format comes from `format` if you pass it, otherwise from the path's extension, otherwise PNG.
 
 It also reports what Save Frame keeps quiet: when a graphic in the frame warned or failed it names the graphic, its frame and the message, and it names a cursor file it couldn't read. Like Save Frame, it waits 30 seconds for masks and says which clip it drew whole. An agent can ask for more than the menu offers, such as a timecode burn-in, an ungraded picture or scope measurements. See [Check the picture: render_frame](/mcp/render-frame/).
 

@@ -229,7 +229,6 @@ plain run exits 0 iff every scored row passed.
 import argparse
 import atexit
 import json
-import struct
 import subprocess
 import sys
 from pathlib import Path
@@ -239,6 +238,7 @@ sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import png_read  # noqa: E402
 import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 from hevc_alpha_proof import own_core  # noqa: E402
@@ -468,16 +468,15 @@ class Doc:
 
 
 def rgba(path):
-    """A PNG at `path` as RGBA bytes through ffmpeg, or None — bounded."""
-    try:
-        width, height = struct.unpack(">II", Path(path).read_bytes()[16:24])
-        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-f", "rawvideo",
-                              "-pix_fmt", "rgba", "-"], capture_output=True, timeout=120,
-                             env=bounded.child_env()).stdout
-    except (OSError, struct.error, subprocess.TimeoutExpired):
+    """A PNG at `path` as RGBA bytes in 8-bit levels, or None — bounded. Read through
+    `png_read.rgba8`, which rounds a 16-bit sample to the nearest level: since spec §11 PR-21 a
+    frame that shows a gradient shape (project L's) is a 16-bit PNG, and ffmpeg's own `rgba`
+    conversion of one is not round-to-nearest, so L2 read that way missed by up to 2 levels."""
+    got = png_read.rgba8(path, env=bounded.child_env())
+    if got is None:
         return None
-    return raw if (width, height) == (WIDTH, HEIGHT) and len(raw) == width * height * 4 \
-        else None
+    width, height, raw = got
+    return raw if (width, height) == (WIDTH, HEIGHT) else None
 
 
 def px(raw, x, y):

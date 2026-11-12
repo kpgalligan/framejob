@@ -25778,6 +25778,87 @@ APNG frame).
 with an image past its limit (no paid call is made); a graphic inside a nest or as a matte member
 on a saved frame, which take the same recipe test.
 
+## Issues #605 and #604 — a gradient shape a deep source of a saved frame, and `render_frame`'s image block a copy (`raster_dither_proof.py` G0, GV, GEa, GMr, BK1–BK5, BKk; `phase6_proof.py` 9–13; `matte_proof.py` L1–L3; `precision_proof.py` P1; six mutants; spec §11 PR-21, PR-22)
+
+**What it proves.** PR-21: a `render_frame` or Save Frame… as PNG or HEIC of a frame whose recipe
+draws a shape with a gradient is read through export's reader and is deep, beside anything, its
+gradient PR-16's 16-bit float ramp; a frame of flat shapes stays 8-bit; every 8-bit door keeps
+Core Graphics' dithered bytes. PR-22: the image block `render_frame` answers is an 8-bit PNG copy
+of a 16-bit PNG and of any HEIC, `full_depth_image: true` puts the file in it, and the file and
+the path are what they were.
+
+**Rows.** G0: `shape563` alone, D1's rule against the shape's `e` (PR-16's measurement until
+PR-21); prints its bytes and G0h, its HEIC's `bitsPerSample`. GV: the same over a 256×144 8-bit
+H.264 clip, D1's rule. GEa: an `apng` export of G0's project (B3's door), its first frame decoded
+equal to the base's same file `gea-apng.png` (G0's own PNG until PR-21), with PR-16's figures of
+it printed. GMr: GMc's project over an 8-bit H.264 clip on a back-most track, GMf's rule: the
+generator answers that frame 8-bit, so PR-14's re-read and its mark are what make the coverage 16
+bits, the one frame left to reach them (G7 is read by the gradient arm first). DGo's flat shape
+at 1.5 s must stay 8-bit. The BK rows read `render_frame`'s whole answer through
+`mcp.MCP.call_content` (`call_with` drops image blocks) and keep each block beside its file
+(`Doc.frame_block`). Their footage is generated, `blk1080`: 1 s of `testsrc2` at 1920×1080 with
+temporal noise 12, 8-bit H.264 at 100 Mbit/s, tuned once on the app before PR-22 so that a 16-bit
+PNG of it is past the API's 5,242,880 base64 bytes and an 8-bit one under (the six settings
+tried are in the script beside `BLOCK_NOISE`). BK1 under `flat`: the file 16-bit and past the
+limit (asserted, so the row cannot pass on an easy picture), the block `image/png`, 8-bit, the
+file's size, within the limit, every sample within 1 level of the file's rounded, the copy
+sentence present and "Written to <path>." still last. BK2: with `full_depth_image: true` the
+block is the file's bytes and no sentence. BK3: the footage alone (8-bit), the block is the file's
+bytes and no sentence. BK4: BK1's frame as HEIC, the file 10 bits a sample, its default block an
+8-bit PNG with the HEIC sentence, and with `full_depth_image: true` `image/heic` and the file's
+bytes. BK5: `full_depth_image: "yes"` refused by name, and `tools/list` publishes it as a
+boolean. BKk, printed: a 3840×2160 frame of the same footage under `flat`, its file's and
+default block's base64. DGs now prints each frame's default block beside its file.
+
+    tools/proof/work/raster-dither-oldbase/tree: tree_copy.make_base_copy(dest, "d530de3a^"), then make app-debug there
+    RC_PROOF_APP=<that tree's Frame Job Debug.app> python3 tools/proof/raster_dither_proof.py capture tools/proof/work/rd-base-d530de3a-parent
+    RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py --base tools/proof/work/rd-base-d530de3a-parent
+    python3 tools/proof/raster_dither_proof.py --app-mutant NAME --base tools/proof/work/rd-base-d530de3a-parent
+
+**The other proofs whose frames changed.** A frame of a gradient shape is a 16-bit PNG since
+PR-21. `phase6_proof.py`'s `Frame` reads a 16-bit PNG through `png_read.rows8` (to the nearest
+level, `depth` 16), and section 9 compares a one-colour gradient's decoded levels with the flat
+fill's where it compared the files' digests (one is 16-bit, the other 8-bit); before, section 9
+failed its four digest checks and its decoder raised on the 16-bit frame. `matte_proof.py`'s
+`rgba` reads through `png_read.rgba8`: with ffmpeg's own `rgba` conversion of the 16-bit frames
+L2 missed by 1.63 of a level at (223, 180). `precision_proof.py` P1 refused its 16-bit render
+(`png_depth == 8`) and now reads `g` at 16 bits (`green_row`).
+
+**Recorded** (2026-11-11). Before the change (Debug at aa5a1512, and the app at d530de3a^): G0
+and GV 8-bit PNGs, G0 1,830,922 bytes and its HEIC 8 bits; BK1's file 4,804,889 bytes, base64
+6,406,520, and the block that file; BK4's block `image/heic`; BK2, BK4's second half and BK5 the
+gate's "render_frame does not take full_depth_image"; BK3 and GMr passed (BK3's block base64
+3,595,204); BKk the file itself, base64 14,241,128. With it (Release, `--base` the app at
+d530de3a^; Debug read the same figures for the rows it ran): G0 and GV 785 distinct greens of
+801, worst 0.0296 of a level; G0 78,836 bytes (the dithered 8-bit PNG did not compress), its HEIC
+10 bits; GEa equal to the base's (26 levels, median run 2 px, RMS of G − e 0.4066); GMr 689
+distinct greens, banding 0.0765, as GMf; BK1's block 8-bit, base64 2,985,988, worst
+|block − file/257| 1 over 8,294,400 samples; BK2 and BK4's second half the files' bytes (BK4's
+HEIC base64 1,212,088); BK5 "full_depth_image must be true or false."; BKk's block 8-bit, base64
+6,782,656, past the limit. DGs's default blocks against their files, base64: 2,326,800 against
+5,560,860 (the title over the 8-bit cut), 2,806,964 against 6,744,504 (beside a 16-bit still),
+3,210,716 against 9,328,440 (the iPhone clip). The whole run 37/44, the other seven (B1–B4b, F1,
+F2) needing PR-13's `--control`, which was not made; D3, D4, G3 and E1 pass against this base.
+`phase6_proof.py` 168/168, `matte_proof.py` 46/46, `precision_proof.py --only C0,D1,P1` 4/4 (P1
+RMS 0.357 10-bit steps), all on Release.
+
+**Mutants** (each caught, Debug tree copies against the d530de3a^ base): `gradient-not-a-source`
+(the arm gone) fails G0 and GV (8-bit PNGs) and G5 (26 distinct greens, worst 0.9602: its
+generator path no longer re-reads a gradient); `flat-shape-a-source` (every shape a source) fails
+DGo (both frames 16-bit); `block-is-the-file` fails BK1 (the 16-bit file in the block, base64
+6,406,520) and BK4 (`image/heic`); `full-depth-ignored` fails BK2 and BK4 (the 8-bit copy where
+the file was asked for); `block-always-recoded` (an 8-bit PNG copied too) fails BK3 on the copy
+sentence alone, the re-encoded 8-bit frame being byte-identical to its file; `heic-block-follows-file`
+fails BK4. `shape-generator-frame-not-deep` went with the code PR-21 removed;
+`shape-reread-not-marked` is `reread-not-marked`, on GMr (banding 0.2930 and 107 distinct greens
+under it: the 8-bit coverage); `shape-always-deep` is scored on GEa's door and GEd (both fail).
+Run again where this change moved their anchors or rows, each caught: `graphic-not-a-source` (DG,
+DGf, DGv, D5, D7), `graphic-anywhere` (DGo), `frame-matte-not-reread` (GMf),
+`sdr-version-marked` (GEb).
+
+**Not measured here.** What the API does with any image (no paid call; `docs/manual-checks.md`
+AS-11 is a person's check with a real key); how a saved gradient looks (PRC-7).
+
 ## Codec export C0 — the bundled encoders' link (`codecs_proof.py` L1–L3; `tools/codecs/build_codecs.py --selftest`; spec §11 CX-4, CX-5)
 
 `tools/codecs/build_codecs.py` (`make codecs`, and project.yml's "Build Codecs"

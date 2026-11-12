@@ -193,6 +193,18 @@ class MCP:
         except json.JSONDecodeError:
             return text
 
+    def call_content(self, tool, arguments):
+        """Call `tool` and answer its `content` list WHOLE — image blocks
+        included, which `call_with` drops (spec §11 PR-22's rows read
+        `render_frame`'s). An error answer raises `ToolError` as `call_with`
+        does."""
+        result = self._request("tools/call", {"name": tool, "arguments": arguments})
+        content = result.get("content", [])
+        if result.get("isError"):
+            text = "".join(part.get("text", "") for part in content if part.get("type") == "text")
+            raise ToolError(f"{tool}: {text}")
+        return content
+
     # ---- export, through the Export Queue (spec §11 #326) ----------------------
 
     def wait_export(self, export_id, seconds=None, interval=0.2):

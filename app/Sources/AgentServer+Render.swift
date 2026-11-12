@@ -48,7 +48,10 @@ extension AgentServer {
     ///
     /// The frame comes back BOTH ways: base64 in an MCP image block, so a
     /// model can look at it, and as a file on disk whose path the result
-    /// names, so a test can diff it or a human can open it.
+    /// names, so a test can diff it or a human can open it. The block is a
+    /// COPY (`FrameBlock`, spec §11 PR-22): an 8-bit PNG of a deep frame and of
+    /// a HEIC, unless `full_depth_image` asks for the file's own bytes, with one
+    /// sentence before the last saying so; the file is what it always was.
     ///
     /// **The write is `FrameWriter`'s, and that is the point of it** (road map
     /// 2's phase 7a). This handler used to hold its own
@@ -152,6 +155,7 @@ extension AgentServer {
             scopes.append(kind)
         }
         let vectorscopeZoom = try vectorscopeZoomArg(a, measured: scopes.contains(.vectorscope))
+        let fullDepth = try boolArg(a, "full_depth_image") ?? false
         // Resolved BEFORE the render, so a mistyped folder is answered in a
         // millisecond rather than after a decode: `exportProject` orders its
         // own two the same way.
@@ -166,9 +170,9 @@ extension AgentServer {
         ).forFrame(format, output: output)
         // Off the main thread by construction — `Exporter.renderFrame` opens
         // asset tracks and decodes, and says so. A PNG or HEIC keeps depth, so
-        // `Exporter` reads a frame showing a graphic, a deep still or a deep VP9
-        // track through the reader (spec §11 PR-20, PR-9, PR-12); Save Frame
-        // passes the same.
+        // `Exporter` reads a frame showing a graphic, a shape with a gradient, a
+        // deep still or a deep VP9 track through the reader (spec §11 PR-20,
+        // PR-21, PR-9, PR-12); Save Frame passes the same.
         let rendered = Exporter.renderFrameReported(
             project: project, urls: urls, at: time, maxWidth: maxWidth, options: options,
             graphics: graphics, keepsDepth: format.carriesDepth,
@@ -233,12 +237,18 @@ extension AgentServer {
         for sentence in Exporter.cutoutSentences(rendered.uncut, foreground: foreground) {
             text += " " + sentence
         }
+        // What the model sees (spec §11 PR-22): the file's bytes, or an 8-bit PNG copy of a deep
+        // frame or a HEIC, which says so here.
+        let block = FrameBlock.block(of: image, format: format, file: data, fullDepth: fullDepth)
+        if let note = block.note {
+            text += " " + note
+        }
         text += " Written to \(url.path)."
         return try callResult(
             content: [
                 [
-                    "type": "image", "data": data.base64EncodedString(),
-                    "mimeType": Self.mimeType(format),
+                    "type": "image", "data": block.data.base64EncodedString(),
+                    "mimeType": block.mimeType,
                 ],
                 ["type": "text", "text": text],
             ], isError: false)
@@ -314,18 +324,5 @@ extension AgentServer {
                     + " (got \"\(name)\").")
         }
         return format
-    }
-
-    /// The image block's `mimeType`, read off the format's own `UTType`
-    /// rather than switched over a second time here: the block and the file
-    /// are then one decision, and a fourth container would arrive described
-    /// correctly without anybody remembering this line.
-    ///
-    /// All three carry one (measured: `image/png`, `image/jpeg`,
-    /// `image/heic`). The fallback exists only because the API is optional,
-    /// and it is deliberately generic rather than a guess: telling a client
-    /// that a HEIC is a PNG is worse than telling it nothing.
-    private static func mimeType(_ format: FrameWriter.Format) -> String {
-        format.contentType.preferredMIMEType ?? "application/octet-stream"
     }
 }

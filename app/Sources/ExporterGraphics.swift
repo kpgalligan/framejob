@@ -62,8 +62,9 @@ extension Exporter {
     }
 
     /// Whether the recipe at `t` draws a shape layer with a gradient (`ShapeProps.drawsGradient`):
-    /// PR-16's question of a frame the generator answered deep, before it is read again with
-    /// that shape deep. A shape flattened out of a nest is a layer of the recipe like any other.
+    /// PR-21's question, asked by `DeepVideoFrame.reads` of a PNG or HEIC frame, which a gradient
+    /// shape makes deep (#605). A shape flattened out of a nest, or a matte member, is a layer of
+    /// the recipe like any other.
     static func drawsGradientShape(
         _ project: ReelProject, at t: Ticks, options: RecipeOptions
     ) -> Bool {

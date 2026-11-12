@@ -1031,10 +1031,10 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 
 **PRC-7 — A gradient shape is smooth in a ProRes file, and unchanged in the preview**
 - **Setup:** A 1920 × 1080 project with a background plate: a rectangle shape filling the canvas with a dark linear gradient (`#0D1512` to `#2A4F3D`), on a display you trust for dark tones, in a dim room.
-- **Do:** 1. Look at the paused preview at 100 %. 2. Export as ProRes 422 and as HEVC 10-bit; open each in QuickTime Player at full size and pause. 3. File ▸ Save Frame… as PNG with a 16-bit PNG still also on the frame; open it in Preview.
+- **Do:** 1. Look at the paused preview at 100 %. 2. Export as ProRes 422 and as HEVC 10-bit; open each in QuickTime Player at full size and pause. 3. File ▸ Save Frame… as PNG with the shape alone on the frame (a gradient shape saves a 16-bit PNG by itself); open it in Preview.
 - **Expect:** the preview looks as it did before (no rings; a fine grain at most); the ProRes file and the saved frame show no rings and no grain at all; the HEVC 10-bit file shows no more banding than the same export of a camera gradient would.
 - **Answer:** for each of the three, rings or none, grain or none; whether the ProRes file looks cleaner than the preview.
-- **Source:** spec §11 PR-16; `tools/proof/raster_dither_proof.py` measures the levels, the noise and the 8-bit paths' bytes (G0–G7, GEa–GEc), not how a dark gradient looks on a display.
+- **Source:** spec §11 PR-16, PR-21; `tools/proof/raster_dither_proof.py` measures the levels, the noise and the 8-bit paths' bytes (G0–G7, GV, GEa–GEc), not how a dark gradient looks on a display.
 
 ## Grading
 
@@ -1416,6 +1416,11 @@ Needs your own Anthropic API key (Setup 3).
 - **Do:** With a real recording that holds a false start, ask the assistant to take out the false starts.
 - **Expect:** it names the words before cutting, cuts only those, and one ⌘Z undoes the cuts it made together (it sends them as one `ripple_delete_ranges`, one undo step).
 - **Source:** #92 (spec §11 TR-5, TR-11).
+
+**AS-11 — The assistant looks at a deep frame**
+- **Do:** With a real key, in a 1920 × 1080 project of camera footage (a 10-bit iPhone clip, or an 8-bit one with a title over it), ask the assistant to look at the frame at the playhead without making it smaller and say what it shows.
+- **Expect:** its tool line shows `render_frame` done, and it describes the picture, with no error from the API about the image's size.
+- **Source:** #604 (spec §11 PR-22); `raster_dither_proof.py` BK1 measures the image's size against the API's limit, not what the API does with it.
 
 ## Agent connections
 

@@ -49,9 +49,9 @@ extension Exporter {
     /// the reader reads the frame and `keepsDepth` (PR-15), as the key itself is for a
     /// gradient shape (PR-16) and a matte's coverage (PR-19). `keepsDepth` is the caller's
     /// format (`carriesDepth`): when true and `DeepVideoFrame.reads` the frame (a graphic,
-    /// PR-20, a deep still, PR-9, or a deep VP9 track, PR-12), `DeepStillFrame.read`'s reader
-    /// reads it, and it re-reads a frame the generator answers 8-bit while it shows a deep
-    /// source (PR-14), or deep while it draws a gradient shape or a matte (PR-16, PR-19).
+    /// PR-20, a gradient shape, PR-21, a deep still, PR-9, or a deep VP9 track, PR-12),
+    /// `DeepStillFrame.read`'s reader reads it, and it re-reads a frame the generator answers
+    /// 8-bit while it shows a deep source (PR-14), or deep while it draws a matte (PR-19).
     static func renderFrame(
         project: ReelProject, urls: [UInt32: URL], at t: Ticks, maxWidth: Int?,
         options: RecipeOptions = .none, graphics: GraphicSet? = nil, keepsDepth: Bool = false
@@ -115,9 +115,9 @@ extension Exporter {
         }
         let reads = DeepVideoFrame.reads(
             project, built, urls: urls, at: t, options: options, keepsDepth: keepsDepth)
-        // Spec §11 PR-15, PR-20: a frame the reader reads, in a format that keeps depth, draws
-        // its graphics deep (a frame that draws one is always read here); every other frame
-        // keeps the dithered 8-bit raster.
+        // Spec §11 PR-15, PR-20, PR-21: a frame the reader reads, in a format that keeps depth,
+        // draws its graphics and its gradient shapes deep (a frame that draws either is always
+        // read here); every other frame keeps the dithered 8-bit raster.
         if reads {
             // PR-16: a gradient shape is drawn deep too, whether or not a graphic set is pinned.
             if keepsDepth { RecipeSource.shared.markDeep(key) }
@@ -141,18 +141,15 @@ extension Exporter {
         }
         var image = try? generator.copyCGImage(
             at: CompositionBuilder.time(max(0, t)), actualTime: nil)
-        // The generator answered deep with the frame's gradient shapes drawn at 8 bits and its
-        // mattes resolved at 8 bits: the reader reads it again with them deep (PR-16, PR-19). A
-        // frame with neither is not read twice, and a frame that draws a graphic never gets
-        // here when `keepsDepth` (PR-20: `reads` took it).
-        if keepsDepth, let first = image, first.bitsPerComponent > 8 {
-            let gradient =
-                drawsGradientShape(project, at: t, options: options)
-            let matte = drawsMatte(project, at: t, options: options)
-            if gradient || matte {
-                RecipeSource.shared.markDeep(key)
-                image = DeepStillFrame.read(built, at: t, maxWidth: maxWidth) ?? image
-            }
+        // The generator answered deep with the frame's mattes resolved at 8 bits: the reader
+        // reads it again with its key deep (PR-19). A frame with no matte is not read twice, and
+        // a frame that draws a graphic or a gradient shape never gets here when `keepsDepth`
+        // (PR-20, PR-21: `reads` took it).
+        if keepsDepth, let first = image, first.bitsPerComponent > 8,
+            drawsMatte(project, at: t, options: options)
+        {
+            RecipeSource.shared.markDeep(key)
+            image = DeepStillFrame.read(built, at: t, maxWidth: maxWidth) ?? image
         }
         // The generator's depth follows the lowest track that has video, so a
         // deep clip above an 8-bit one comes back 8-bit (spec §11 PR-14). A

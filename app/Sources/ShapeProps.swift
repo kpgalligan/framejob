@@ -195,8 +195,8 @@ struct ShapeProps: Codable, Equatable {
     var boxSize: CGSize { CGSize(width: width, height: height) }
     /// Whether the renderer ramps this shape: an area kind whose `gradient` has the two stops
     /// a ramp needs (`line` and `arrow` ignore the field). The ONE test of what is drawn at
-    /// 16-bit float in a frame delivered deep (spec §11 PR-16), read by `LayerRenderers.shape`
-    /// and by `Exporter.drawsGradientShape`.
+    /// 16-bit float in a frame delivered deep (spec §11 PR-16), read by `LayerRenderers.shape`,
+    /// and of what makes a saved frame deep (PR-21), read by `Exporter.drawsGradientShape`.
     var drawsGradient: Bool {
         guard kind == .rectangle || kind == .ellipse, let gradient = gradient else { return false }
         return gradient.stops.count >= 2

@@ -106,20 +106,25 @@ module, one 1 s rectangle shape clip covering the canvas with a linear 0°
 gradient `#0D1512` → `#2A4F3D`, so `e(x) = 21 + 58 × (x + 0.5) / 1920` green
 levels, 24 of them over x 0–800. The rows, scored against `--base DIR`, a
 `capture` made by the app as it was BEFORE PR-16:
-- **G0** (the measurement) `render_frame` of `shape563` alone: an 8-bit PNG.
-  Printed, not scored: row 540's distinct levels and runs, the rows of
-  500–580 that differ from row 540, RMS and worst |G − e|, the worst 16-px
-  block bias.
+- **G0** `render_frame` of `shape563` alone. Until PR-21 (#605, below) it was
+  PR-16's measurement, an 8-bit PNG with its figures printed; since PR-21 a
+  gradient shape is a deep source of a saved frame, so it is D1's rule against
+  the shape's `e`. Printed: its bytes and **G0h**, the same frame as HEIC,
+  `sips -g bitsPerSample`.
 - **G1** the frame beside D1's 16-bit still: D1's rule against the shape's `e`.
 - **G3** a `prores_422` export, the frame at 0.5 s as `rgb48le`: D3's rule
   against the base. **G4**, printed with it and NOT scored (PR-15's limit),
   a `hevc_10bit` export of the same clip.
 - **G5** beside D5's 10-bit HEVC clip, **G7** with D7's H.264 clip under it:
   G1's rule. **G6** an HLG project: a 16-bit PNG, ≥ 400 distinct values.
-- **GEa** G0's frame decodes equal to the base's. **GEb** the HLG project's
-  frame as a JPEG (its SDR version) decodes equal to the base's. **GEc** a
-  frame of flat shapes (a `#336699` rectangle, the same at alpha 0.6, a
-  stroked ellipse) beside the 16-bit still: a 16-bit PNG equal to the base's.
+- **GEa** the 8-bit door keeps Core Graphics' dithered bytes: an `apng` export
+  of `shape563`'s project (B3's door, `APNG_RANGE`), its first frame, decodes
+  equal to the base's same file (`gea-apng.png`). Until PR-21 GEa was G0's own
+  frame equal to the base's. Printed: the base's APNG frame against its own G0
+  PNG, when that is 8-bit (the door's own check, as E1 prints). **GEb** the HLG
+  project's frame as a JPEG (its SDR version) decodes equal to the base's.
+  **GEc** a frame of flat shapes (a `#336699` rectangle, the same at alpha 0.6,
+  a stroked ellipse) beside the 16-bit still: a 16-bit PNG equal to the base's.
 A capture also prints #563's verdict from its own G3 file: the cure is built
 when the 8-bit ramp's ProRes file keeps at least the noise and the error PR-15
 measured for a graphic's dithered raster (`VERDICT_NOISE`, `VERDICT_ERROR`).
@@ -190,16 +195,58 @@ graphic is read through export's reader and is deep, beside anything.
 - **DGv** `band374` with a 256×144 8-bit H.264 clip at the canvas centre and no
   deep source: D1's rule (a graphic beside an 8-bit clip makes the frame deep).
 - **DGo** a `band374` clip from 0 to 1 s and a flat 400×300 shape from 1 s:
-  the frame at 0.5 s is a 16-bit PNG, the frame at 1.5 s (no graphic) an 8-bit
-  PNG (the recipe at the frame time is asked, not the project).
+  the frame at 0.5 s is a 16-bit PNG, the frame at 1.5 s (no graphic, a FLAT
+  shape, which PR-21 leaves 8-bit) an 8-bit PNG (the recipe at the frame time
+  is asked, not the project).
 - **DGj** `band374` alone as a JPEG: decodes equal to the base's.
 - **DGs**, printed and NOT scored (needs the owner's `tools/proof/media/
   owner-sync/IMG_0018.MOV`): the PNG's depth, bytes and base64 bytes beside the
   Anthropic API's 5 MB image limit, unscaled and at `max_width` 1280, of a
   1920×1080 8-bit H.264 cut of that clip under `flat`, of the cut beside a
-  64×64 16-bit still, and of the clip itself (HEVC Main 10).
+  64×64 16-bit still, and of the clip itself (HEVC Main 10); since PR-22 each
+  beside its image block's own base64 bytes, the default block.
 Without `--base` (and not `capture`) DGj FAILS. On a `capture` by an app before
 PR-20, DG, DGf, DGv and DGo FAIL.
+
+Issue #605, spec §11 PR-21: a gradient shape is a deep source of a saved frame,
+beside anything, as a graphic is (G0 above, on D1's rule since).
+- **GV** `shape563` with a 256×144 8-bit H.264 clip at the canvas centre (in
+  front, outside the row read) and no other deep source: D1's rule against the
+  shape's `e` (DGv's twin).
+- **GMr** GMc's project with a 256×144 8-bit H.264 clip on a new back-most
+  track, `render_frame` at 0.5 s: GMf's rule. The generator's depth follows the
+  lowest track that has video, so it answers this frame at 8 bits, and PR-14's
+  re-read, with its mark, is what makes the coverage 16 bits (PR-19). G7, the
+  row that held that mark until PR-21, is now read by the gradient arm first.
+On a `capture` by an app before PR-21, G0 and GV FAIL (8-bit PNGs).
+
+Issue #604, spec §11 PR-22: `render_frame`'s image block (what the model sees)
+is an 8-bit PNG copy of a deep frame, and `full_depth_image: true` asks for the
+file in it; the file and the path stay as deep as the frame. Generated media
+only (`blk1080`: a 1 s 1920×1080 `testsrc2` with temporal noise, 8-bit H.264 at
+20 Mbit/s, which `canvas_media` places covering the canvas), read through
+`mcp.call_content`, which keeps the image block:
+- **BK1** `blk1080` under `flat` (deep by PR-20), default: the file is a 16-bit
+  PNG whose base64 is OVER the API's 5,242,880 bytes (the premise, asserted, so
+  the row cannot pass on an easy picture); the block is `image/png`, an 8-bit
+  PNG of the file's width and height whose base64 is at most 5,242,880 bytes,
+  every sample within 1 level of the file's rounded to 8 bits; the text holds
+  the copy sentence and still ends "Written to <path>.".
+- **BK2** the same with `full_depth_image: true`: the block's bytes are the
+  file's, and no copy sentence.
+- **BK3** `blk1080` alone (an 8-bit frame), default: an 8-bit PNG whose block's
+  bytes are the file's, and no copy sentence (nothing is re-encoded when nothing
+  is deep).
+- **BK4** BK1's frame as `heic`: the file 10 bits a sample (`sips`); the default
+  block an 8-bit PNG, `image/png`, with the HEIC copy sentence; with
+  `full_depth_image: true` the block is `image/heic` and the file's bytes.
+- **BK5** `full_depth_image: "yes"` is refused naming the argument, and
+  `tools/list` publishes `full_depth_image` as a boolean.
+- **BKk**, printed and NOT scored: a 3840×2160 `testsrc2` frame under `flat` on
+  a 3840×2160 canvas, the file's and the default block's base64 bytes beside the
+  limit (an 8-bit block is not bounded by size, PR-22's last bullet).
+On a `capture` by an app before PR-22, BK1, BK2, BK4 and BK5 FAIL (the block is
+the file, an `image/heic` one for a HEIC, and `full_depth_image` is a stranger).
 
 `capture DIR` runs every row and keeps every file in DIR; its own files are
 the control it is scored against, so on the control tree B1, B3, B4a and B4b
@@ -220,9 +267,11 @@ the mutant is caught when the build fails naming it. MUTANT PASS when every
 named test FAILED. PR-15's app mutants are `--app-mutant NAME`: `app/`,
 `core/`, `graphic/` and the rest of the tree copied by `tree_copy`, the anchor
 replaced, the Debug app built there, and the named rows run against it with
-`--base`; MUTANT PASS when every named row FAILED. PR-16's seven app mutants
-(`shape-never-deep` … `sdr-version-marked`) run the same way against PR-16's
-base, as do #588's `export-always-marked` and PR-19's three
+`--base`; MUTANT PASS when every named row FAILED. PR-16's app mutants
+(`shape-never-deep` … `sdr-version-marked`; `shape-always-deep` scored on GEa's
+APNG door and GEd since PR-21, `reread-not-marked`, PR-14's mark, on GMr, and
+`shape-generator-frame-not-deep` gone with the code PR-21 removed) run the same
+way against PR-16's base, as do #588's `export-always-marked` and PR-19's three
 (`coverage-never-deep`, the coverage's depth read off the frame's, which GMc,
 GMs, GM and GMg see; `coverage-always-deep`, its 8-bit case;
 `frame-matte-not-reread`, the frame path's new arm), whose GMc, GMs, GM, GMg
@@ -233,6 +282,11 @@ project instead of the recipe; `graphic-frame-pin-not-marked`, the frame's
 graphics left 8-bit) run against PR-20's base; PR-15's
 `generator-frame-not-deep` and `reread-not-deep` went with the code PR-20
 removed (a frame with a graphic no longer reaches the generator's paths).
+PR-21's two (`gradient-not-a-source`, the arm gone: G0, GV, G5;
+`flat-shape-a-source`, every shape counted: DGo) and PR-22's four
+(`block-is-the-file`: BK1, BK4; `full-depth-ignored`: BK2, BK4;
+`block-always-recoded`, an 8-bit PNG copied too: BK3; `heic-block-follows-file`:
+BK4) run against any base.
 
 Exit 0 when every scored row passes (a mutant: caught); 1 when one failed (a
 mutant: survived); 2 when the control could not be performed.
@@ -241,6 +295,7 @@ mutant: survived); 2 when the control could not be performed.
 import argparse
 import array
 import atexit
+import base64
 import json
 import math
 import os
@@ -273,8 +328,9 @@ CARGO_BOUND = 1800
 W, H = 1920, 1080
 SEC = 600_000
 ROWS = ["B1", "B2", "B3", "B4a", "B4b", "F1", "F2", "S1", "E1", "D1", "D3", "D4", "D5", "D6",
-        "D7", "G0", "G1", "G3", "G5", "G6", "G7", "GEa", "GEb", "GEc", "GEd", "GM", "GMg", "GMc",
-        "GMs", "GMe", "GMf", "DG", "DGf", "DGv", "DGo", "DGj", "DGs", "Z1"]
+        "D7", "G0", "G1", "G3", "G5", "G6", "G7", "GV", "GEa", "GEb", "GEc", "GEd", "GM", "GMg",
+        "GMc", "GMs", "GMe", "GMf", "GMr", "DG", "DGf", "DGv", "DGo", "DGj", "DGs", "BK1", "BK2",
+        "BK3", "BK4", "BK5", "BKk", "Z1"]
 # Every file a run keeps, by the row that writes it (L1–L3 are printed only).
 FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B3a": "b3-apng.png",
          "B4a": "b4a-prores.mov",
@@ -296,7 +352,15 @@ FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B3a": "b3-apng.png",
          "DGv": "dgv-frame-h264.png", "DGo": "dgo-frame-graphic.png", "DGo2": "dgo2-frame-shape.png",
          "DGsg": "dgs-graphic-over-8bit.png", "DGsg1280": "dgs-graphic-over-8bit-1280.png",
          "DGss": "dgs-still-over-8bit.png", "DGss1280": "dgs-still-over-8bit-1280.png",
-         "DGsi": "dgs-iphone.png", "DGsi1280": "dgs-iphone-1280.png"}
+         "DGsi": "dgs-iphone.png", "DGsi1280": "dgs-iphone-1280.png",
+         # Spec §11 PR-21 (#605).
+         "G0h": "g0h-frame-shape.heic", "GV": "gv-frame-shape-h264.png", "GEa": "gea-apng.png",
+         "GMr": "gmr-frame-clip-matte-over-h264.png",
+         # Spec §11 PR-22 (#604): each frame's file, and its image block kept beside it.
+         "BK1": "bk1-frame.png", "BK1b": "bk1-block.png", "BK2": "bk2-frame.png",
+         "BK2b": "bk2-block.png", "BK3": "bk3-frame.png", "BK3b": "bk3-block.png",
+         "BK4": "bk4-frame.heic", "BK4b": "bk4-block.png", "BK4f": "bk4f-frame.heic",
+         "BK4fb": "bk4f-block.heic", "BKk": "bkk-frame.png", "BKkb": "bkk-block.png"}
 # Spec §11 PR-16's fixture: the shape's gradient, and its exact G in levels.
 SHAPE_FROM, SHAPE_TO = (13, 21, 18), (42, 79, 61)    # #0D1512 at x 0, #2A4F3D at x 1920
 SHAPE_563 = {"kind": "rectangle", "stroke": None, "width": W, "height": H, "fill": [1, 1, 1, 1],
@@ -373,6 +437,27 @@ API_IMAGE_LIMIT = 5 * 1024 * 1024
 OWNER_CLIP = ROOT / "tools/proof/media/owner-sync/IMG_0018.MOV"
 # render_frame's wall time per file, in seconds (DG's detail).
 FRAME_SECONDS = {}
+# Spec §11 PR-22 (#604): `Doc.frame_block`'s answers by row, the sentence a copy adds, and the
+# generated footage (`testsrc2` with temporal noise, so its PNG does not compress like a flat
+# card's). Tuned once on the app before PR-22 (Debug at aa5a1512), the 16-bit file of BK1's frame
+# against the 8-bit file of BK3's, base64: noise 8 at 60 Mbit/s 4,894,540 and 2,660,884 (the
+# 16-bit one under the limit); 16 at 60 Mbit/s 2,176,948 and 1,279,260 (the encoder smoothed it);
+# 16 at 100 Mbit/s 7,597,788 and 4,335,348; 12 at 80 Mbit/s 5,202,172 and 2,864,756; 10 at
+# 100 Mbit/s 5,736,776 and 3,165,620; 12 at 100 Mbit/s 6,406,520 and 3,595,204, chosen: its nearer
+# side is 22 % from the limit, the most of the six.
+BLOCKS = {}
+COPY_PNG = "The image here is an 8-bit PNG copy of the 16-bit PNG file."
+COPY_HEIC = "The image here is an 8-bit PNG copy of the HEIC file."
+COPY_SAID = "8-bit PNG copy"    # in either sentence
+BLOCK_NOISE = 12
+BLOCK_RATE = "100M"
+
+
+def block_footage(size):
+    """`fixture`'s arguments for 1 s of `testsrc2` at `size` with temporal noise, 8-bit H.264."""
+    return ["-f", "lavfi", "-i", f"testsrc2=size={size}:rate=30:duration=1,"
+            f"noise=alls={BLOCK_NOISE}:allf=t+u,format=yuv420p", "-c:v", "h264_videotoolbox",
+            "-b:v", BLOCK_RATE]
 
 VENDOR = "graphic/vendor/tiny-skia/src"
 HIGHP = f"{VENDOR}/pipeline/highp.rs"
@@ -463,7 +548,8 @@ APP_MUTANTS = {
                          ["G1", "G3", "G5", "G6"]),
     "shape-always-deep": ([(f"{SOURCES}/Compositor+Sources.swift",
                             "renderers.shape(props, hash: hash, deep: deep)",
-                            "renderers.shape(props, hash: hash, deep: deep || true)")], ["GEa"]),
+                            "renderers.shape(props, hash: hash, deep: deep || true)")],
+                          ["GEa", "GEd"]),
     "flat-shape-deep": ([(f"{SOURCES}/LayerRenderers.swift",
                           "        let deep = deep && props.drawsGradient\n",
                           "        let deep = deep || (false && props.drawsGradient)\n")],
@@ -471,14 +557,14 @@ APP_MUTANTS = {
     "export-not-marked": ([(f"{SOURCES}/Exporter.swift",
                             "        if Exporter.graphicsDeep(settings) { "
                             "RecipeSource.shared.markDeep(key) }\n", "")], ["G3"]),
-    "shape-generator-frame-not-deep": ([(f"{SOURCES}/Exporter+Frame.swift",
-                                         "                drawsGradientShape(project, at: t, "
-                                         "options: options)\n",
-                                         "                false\n")], ["G5"]),
-    "shape-reread-not-marked": ([(f"{SOURCES}/Exporter+Frame.swift",
-                                  "            RecipeSource.shared.markDeep(key)\n"
-                                  "            image = DeepStillFrame.read(",
-                                  "            image = DeepStillFrame.read(")], ["G7"]),
+    # PR-14's re-read mark (spec §11 PR-21: G7 no longer reaches it, so GMr, a matted frame the
+    # generator answers 8-bit, holds it).
+    "reread-not-marked": ([(f"{SOURCES}/Exporter+Frame.swift",
+                            "            DeepVideoFrame.showsDeepSource(project, built, at: t, "
+                            "options: options)\n        {\n            RecipeSource.shared.markDeep("
+                            "key)\n",
+                            "            DeepVideoFrame.showsDeepSource(project, built, at: t, "
+                            "options: options)\n        {\n")], ["GMr"]),
     "sdr-version-marked": ([(f"{SOURCES}/Exporter+Frame.swift",
                              "            if keepsDepth { RecipeSource.shared.markDeep(key) }\n",
                              "            RecipeSource.shared.markDeep(key)\n")], ["GEb"]),
@@ -498,15 +584,15 @@ APP_MUTANTS = {
                                "            deep: RecipeSource.shared.deliversDeep(instruction?."
                                "recipeKey ?? 0))\n", "            deep: true)\n")], ["GMe"]),
     "frame-matte-not-reread": ([(f"{SOURCES}/Exporter+Frame.swift",
-                                 "            let matte = drawsMatte(project, at: t, options: "
-                                 "options)\n", "            let matte = false\n")], ["GMf"]),
+                                 "            drawsMatte(project, at: t, options: options)\n",
+                                 "            false\n")], ["GMf"]),
     # #566, spec §11 PR-20: a graphic is a deep source of a saved frame (DG, DGf, DGv, and D5 and
     # D7, whose generator paths no longer read a graphic again), asked of the recipe at the frame
     # time (DGo), and its frame's pin is marked deep (DG, D1, DGv).
     "graphic-not-a-source": ([(f"{SOURCES}/DeepVideoFrame.swift",
                                "                && (Exporter.drawsGraphic(project, at: t, options: "
-                               "options)\n                    || DeepStillFrame.shows(",
-                               "                && (DeepStillFrame.shows(")],
+                               "options)\n                    || Exporter.drawsGradientShape(",
+                               "                && (Exporter.drawsGradientShape(")],
                              ["DG", "DGf", "DGv", "D5", "D7"]),
     "graphic-anywhere": ([(f"{SOURCES}/DeepVideoFrame.swift",
                            "Exporter.drawsGraphic(project, at: t, options: options)",
@@ -514,6 +600,30 @@ APP_MUTANTS = {
     "graphic-frame-pin-not-marked": ([(f"{SOURCES}/Exporter+Frame.swift",
                                        "            if keepsDepth { GraphicRegistry.shared.markDeep("
                                        "key) }\n", "")], ["DG", "D1", "DGv"]),
+    # #605, spec §11 PR-21: a gradient shape is a deep source of a saved frame (G0, GV, and G5,
+    # whose generator path no longer reads a gradient again), and a flat shape is not (DGo).
+    "gradient-not-a-source": ([(f"{SOURCES}/DeepVideoFrame.swift",
+                                "                    || Exporter.drawsGradientShape(project, at: "
+                                "t, options: options)\n", "")], ["G0", "GV", "G5"]),
+    "flat-shape-a-source": ([(f"{SOURCES}/ExporterGraphics.swift",
+                              "$0.source { return props.drawsGradient }",
+                              "$0.source { return props.drawsGradient || !props.drawsGradient }")],
+                            ["DGo"]),
+    # #604, spec §11 PR-22: the image block is an 8-bit PNG copy of a deep frame (BK1) and of a
+    # HEIC (BK4), the file with `full_depth_image` (BK2, BK4), and the file of an 8-bit PNG (BK3).
+    "block-is-the-file": ([(f"{SOURCES}/FrameBlock.swift",
+                            "        guard !fullDepth, copies(image, as: format),",
+                            "        guard false, !fullDepth, copies(image, as: format),")],
+                          ["BK1", "BK4"]),
+    "full-depth-ignored": ([(f"{SOURCES}/FrameBlock.swift",
+                             "        guard !fullDepth, copies(image, as: format),",
+                             "        guard copies(image, as: format),")], ["BK2", "BK4"]),
+    "block-always-recoded": ([(f"{SOURCES}/FrameBlock.swift",
+                               "        case .png: return image.bitsPerComponent > 8\n",
+                               "        case .png: return true\n")], ["BK3"]),
+    "heic-block-follows-file": ([(f"{SOURCES}/FrameBlock.swift",
+                                  "        case .heic: return true\n",
+                                  "        case .heic: return false\n")], ["BK4"]),
 }
 CORE_PATCH = "[patch.crates-io]\n"
 
@@ -914,6 +1024,29 @@ class Doc:
             return None
         return out
 
+    def frame_block(self, file, block_file, t=SEC // 2, **extra):
+        """`frame` through `mcp.call_content`, which keeps the image block (spec §11 PR-22):
+        {ok, file, block (its decoded bytes kept as `block_file`), mime, b64 (the block's base64
+        length, what the assistant's helper forwards), text}, or {ok: False, error}."""
+        out, kept = WORK / file, WORK / block_file
+        out.unlink(missing_ok=True)
+        kept.unlink(missing_ok=True)
+        try:
+            content = self.client.call_content(
+                "render_frame", dict(extra, t=t, path=str(out), project=str(self.path)))
+        except mcp.ToolError as error:
+            return {"ok": False, "error": str(error)}
+        except Exception as error:  # a socket timeout is the expiry
+            return {"ok": False, "error": f"{type(error).__name__}: {error}"}
+        images = [part for part in content if part.get("type") == "image"]
+        text = "".join(part.get("text", "") for part in content if part.get("type") == "text")
+        if len(images) != 1 or not out.exists():
+            return {"ok": False, "error": f"{len(images)} image blocks, file {out.exists()}: {text}"}
+        data = images[0].get("data") or ""
+        kept.write_bytes(base64.b64decode(data))
+        return {"ok": True, "file": out, "block": kept, "mime": images[0].get("mimeType"),
+                "b64": len(data), "text": text}
+
     def apng(self, file):
         """PR-20's 8-bit door: the in/out range `APNG_RANGE` exported `apng` at
         1920×1080 (its first frame is read), or None."""
@@ -1045,6 +1178,7 @@ def run(client, files):
     closed = run_deep(client, files) and closed
     closed = run_shapes(client, files) and closed
     closed = run_graphic_sources(client, files) and closed
+    closed = run_blocks(client, files) and closed
     flat = Doc(client, "flat", "flat", FLAT_JS)
     if not flat.ok:
         print(f"       flat project: {flat.why}", flush=True)
@@ -1123,11 +1257,69 @@ def run_sizes(client, files):
         elif made and beside is not None:
             made, why = doc.media_clip(beside)
         if made:
-            files[key] = doc.frame(FILES[key])
-            files[key + "1280"] = doc.frame(FILES[key + "1280"], max_width=1280)
+            # Spec §11 PR-22: each frame's default image block is kept beside its file.
+            for suffix, extra in [("", {}), ("1280", {"max_width": 1280})]:
+                got = doc.frame_block(FILES[key + suffix], f"{key.lower()}{suffix}-block.png",
+                                      **extra)
+                BLOCKS[key + suffix] = got
+                files[key + suffix] = got["file"] if got["ok"] else None
+                if not got["ok"]:
+                    print(f"       render_frame {key + suffix}: {got['error']}", flush=True)
         else:
             print(f"       {key} project: {why}", flush=True)
         closed = doc.close() and closed
+    return closed
+
+
+def run_blocks(client, files):
+    """Spec §11 PR-22's frames (#604), each through `Doc.frame_block`: `blk1080` under `flat`
+    (BK1, BK2, BK4), alone (BK3, BK5), and a 3840×2160 one under `flat` (BKk, printed)."""
+    closed = True
+    clip = (fixture("blk1080.mov", block_footage("1920x1080"))
+            if selected & {"BK1", "BK2", "BK3", "BK4", "BK5"} else None)
+    asks = []
+    if selected & {"BK1", "BK2", "BK4"}:
+        asks.append(("blockgraphic", clip, None, [
+            ("BK1", "BK1", "BK1b", {}), ("BK2", "BK2", "BK2b", {"full_depth_image": True}),
+            ("BK4", "BK4", "BK4b", {}), ("BK4", "BK4f", "BK4fb", {"full_depth_image": True})]))
+    if selected & {"BK3", "BK5"}:
+        asks.append(("blockplain", clip, None, [
+            ("BK3", "BK3", "BK3b", {}),
+            ("BK5", "BK5", "BK5b", {"full_depth_image": "yes"})]))
+    if "BKk" in selected:
+        asks.append(("block4k", fixture("blk2160.mov", block_footage("3840x2160")), (3840, 2160),
+                     [("BKk", "BKk", "BKkb", {})]))
+    for name, media, size, frames in asks:
+        graphic = name != "blockplain"
+        doc = Doc(client, name, "flat", FLAT_JS) if graphic else Doc(client, name)
+        made, why = (True, "") if doc.ok else (False, doc.why)
+        if made and size:
+            got = doc.call("set_canvas", width=size[0], height=size[1])
+            made, why = got["ok"], f"set_canvas: {got.get('error', '')}"
+            # At its own size, centred: the canvas's size, so it covers it.
+            made, why = doc.media_clip(media) if made else (made, why)
+        elif made:
+            made, why = doc.canvas_media(media)
+        if made and graphic:
+            made, why = ((False, "no new track") if doc.new_track() is None
+                         else doc.clip(track=doc.track))
+        if not made:
+            print(f"       {name} project: {why}", flush=True)
+        for row, key, block, extra in frames if made else []:
+            if row not in selected:
+                continue
+            BLOCKS[key] = doc.frame_block(FILES.get(key, f"{key.lower()}-frame.png"),
+                                          FILES.get(block, f"{key.lower()}-block.png"), **extra)
+            if BLOCKS[key]["ok"]:
+                files[key], files[block] = BLOCKS[key]["file"], BLOCKS[key]["block"]
+        closed = doc.close() and closed
+    if "BK5" in selected:
+        try:
+            schema = client.schemas().get("render_frame") or {}
+        except Exception as error:  # a socket timeout is the expiry
+            schema = {"error": f"{type(error).__name__}: {error}"}
+        BLOCKS["BK5schema"] = ((schema.get("inputSchema") or {}).get("properties")
+                               or {}).get("full_depth_image") or {}
     return closed
 
 
@@ -1187,15 +1379,16 @@ def run_shapes(client, files):
             "hvc1", "-b:v", "2M"]
     still = ["-f", "lavfi", "-i", "color=c=gray:size=64x64", "-frames:v", "1", "-pix_fmt",
              "rgb48be"]
+    h264 = ["-f", "lavfi", "-i", "color=c=gray:size=256x144:rate=30:duration=1,format=yuv420p",
+            "-c:v", "h264_videotoolbox", "-b:v", "2M"]
     # (the rows that want it, name, the shapes, media in front, media at the back, output)
     plans = [
         ({"G0", "G3", "GEa", "GEd"}, "shape", [(SHAPE_563, None)], None, None, None),
+        ({"GV"}, "shapeh264", [(SHAPE_563, None)], ("gvh264.mov", h264), None, None),
         ({"G1"}, "shapestill", [(SHAPE_563, None)], ("gstill16.png", still), None, None),
         ({"G5"}, "shapehevc", [(SHAPE_563, None)], ("ghevc10.mov", hevc), None, None),
-        ({"G7"}, "shapereread", [(SHAPE_563, None)], ("ghevc10b.mov", hevc),
-         ("gh264.mov", ["-f", "lavfi", "-i",
-                        "color=c=gray:size=256x144:rate=30:duration=1,format=yuv420p", "-c:v",
-                        "h264_videotoolbox", "-b:v", "2M"]), None),
+        ({"G7"}, "shapereread", [(SHAPE_563, None)], ("ghevc10b.mov", hevc), ("gh264.mov", h264),
+         None),
         ({"G6", "GEb"}, "shapehlg", [(SHAPE_563, None)], None, None, "hlg"),
         ({"GEc"}, "shapeflat", FLAT_SHAPES, ("gstill16b.png", still), None, None),
     ]
@@ -1219,6 +1412,11 @@ def run_shapes(client, files):
         elif name == "shape":
             if selected & {"G0", "GEa"}:
                 files["G0"] = doc.frame(FILES["G0"])
+            if "G0" in selected:
+                files["G0h"] = doc.frame(FILES["G0h"])
+            if "GEa" in selected:
+                # Spec §11 PR-21: G0's PNG is deep, so the 8-bit path is read through the APNG door.
+                files["GEa"] = doc.apng(FILES["GEa"])
             if "G3" in selected:
                 files["G3"] = doc.export(FILES["G3"], preset="prores_422")
                 files["G4"] = doc.export(FILES["G4"], preset="hevc_10bit")
@@ -1235,7 +1433,7 @@ def run_shapes(client, files):
         closed = doc.close() and closed
     if selected & {"GM", "GMg"}:
         closed = run_mattes(client, files) and closed
-    if selected & {"GMc", "GMs", "GMe", "GMf"}:
+    if selected & {"GMc", "GMs", "GMe", "GMf", "GMr"}:
         closed = run_source_mattes(client, files) and closed
     return closed
 
@@ -1281,12 +1479,16 @@ def run_source_mattes(client, files):
     clip, still = precision.ramp_clip(), precision.still16_png()
     # (name, the source, the card under it or None, [(row, file, preset or None for a frame)])
     plans = [("clipmatte", clip, WHITE_CARD, [("GMc", "GMc", "prores_422"), ("GMf", "GMf", None)]),
-             ("clipplain", clip, None, [("GMc", "GMc0", "prores_422"), ("GMf", "GMf0", None)]),
+             ("clipplain", clip, None, [("GMc", "GMc0", "prores_422"),
+                                        ("GMf GMr", "GMf0", None)]),
              ("stillmatte", still, WHITE_CARD, [("GMs", "GMs", "prores_422")]),
              ("stillplain", still, None, [("GMs", "GMs0", "prores_422")]),
-             ("clipgrey", clip, GREY_CARD, [("GMe", "GMe", "h264")])]
+             ("clipgrey", clip, GREY_CARD, [("GMe", "GMe", "h264")]),
+             # Spec §11 PR-21: GMc's project over an 8-bit H.264 clip on a back-most track (GMr).
+             ("clipmatteh264", clip, WHITE_CARD, [("GMr", "GMr", None)])]
     for name, source, card, outputs in plans:
-        outputs = [output for output in outputs if output[0] in selected]
+        # An output is made when any row named in its first field is selected.
+        outputs = [output for output in outputs if selected & set(output[0].split())]
         if not outputs:
             continue
         doc = Doc(client, name)
@@ -1301,6 +1503,10 @@ def run_source_mattes(client, files):
             made, why = doc.canvas_media(source)
         if made and card is not None:
             made, why = doc.luma_matte()
+        if made and name == "clipmatteh264":
+            made, why = doc.media_clip(fixture("gmrh264.mov", [
+                "-f", "lavfi", "-i", "color=c=gray:size=256x144:rate=30:duration=1,format=yuv420p",
+                "-c:v", "h264_videotoolbox", "-b:v", "2M"]), index=0)
         if not made:
             print(f"       {name} project: {why}", flush=True)
         for _, file, preset in outputs if made else []:
@@ -1412,7 +1618,8 @@ def read_jpeg(path):
 
 
 def shape_measure(picture):
-    """G0's printed figures over an 8-bit frame of `shape563`."""
+    """PR-16's printed figures over an 8-bit frame of `shape563` (G0's until PR-21, GEa's APNG
+    frame since)."""
     levels, median, widest = runs(picture)
     row = [picture.g(x, 540) for x in range(801)]
     differing = sum(1 for y in range(500, 581)
@@ -1434,11 +1641,12 @@ def score_shapes(files, base, capturing):
         return path if path and path.exists() else None
 
     if "G0" in selected:
-        picture = read_png(files.get("G0"))
-        header = png_header(files["G0"]) if files.get("G0") else None
-        check("G0 render_frame of shape563 alone (the measurement): an 8-bit PNG, read",
-              picture is not None and header is not None and header[2] == 8,
-              f"header {header}; " + (shape_measure(picture) if picture else "not read"))
+        # Spec §11 PR-21: a gradient shape is a deep source of a saved frame.
+        deep_frame("G0", "render_frame of shape563 alone", files.get("G0"), True, shape_exact)
+        size = png_bytes(files.get("G0"))
+        print(f"  --   G0's PNG (NOT scored): {f'{size[3]:,} bytes' if size else 'not read'}; G0h, "
+              f"the same frame as HEIC: bitsPerSample {sample_depth(files.get('G0h'))}",
+              flush=True)
     if "G1" in selected:
         deep_frame("G1", "render_frame of shape563 beside a 16-bit PNG still", files.get("G1"),
                    True, shape_exact)
@@ -1479,12 +1687,23 @@ def score_shapes(files, base, capturing):
     if "G6" in selected:
         deep_frame("G6", "render_frame of shape563 in an HLG project", files.get("G6"), False,
                    shape_exact)
+    if "GV" in selected:
+        deep_frame("GV", "render_frame of shape563 beside a 256×144 8-bit H.264 clip (no deep "
+                   "source but the shape)", files.get("GV"), True, shape_exact)
     if "GEa" in selected:
-        here, there = read_png(files.get("G0")), read_png(theirs("G0"))
-        header = png_header(files["G0"]) if files.get("G0") else None
-        check("GEa render_frame of shape563 alone: an 8-bit PNG that decodes equal to the base's",
-              same(here, there) and header is not None and header[2] == 8,
-              f"read {here is not None}; base {there is not None}; header {header}")
+        # Spec §11 PR-21: the APNG door's frame against the base's same file. Printed: the base's
+        # own APNG frame against its own G0 PNG when that is 8-bit (a base before PR-21).
+        here, there = read_png(files.get("GEa")), read_png(theirs("GEa"))
+        header = png_header(files["GEa"]) if files.get("GEa") else None
+        own = theirs("G0")
+        door = (same(there, read_png(own)) if own and png_header(own)[2] == 8
+                else "the base's G0 is not an 8-bit PNG" if own else "no base G0")
+        check("GEa the apng export's frame of shape563 alone (an 8-bit door): an 8-bit PNG that "
+              "decodes equal to the base's", same(here, there) and header is not None
+              and header[2] == 8,
+              f"read {here is not None}; base {there is not None}; header {header}; the base's "
+              f"APNG frame equal to its own G0 PNG: {door}\n       PR-16's measurement of it: "
+              + (shape_measure(here) if here is not None and here.scale == 1.0 else "not read"))
     if "GEb" in selected:
         here, there = read_jpeg(files.get("GEb")), read_jpeg(theirs("GEb"))
         check("GEb render_frame of shape563 in an HLG project as a JPEG (its SDR version): "
@@ -1606,6 +1825,19 @@ def score_source_mattes(files, base):
               "frame (GMf0)", good,
               f"header {header}; {ramp_figures(files.get('GMf'), here)}\n       GMf0: "
               f"{ramp_figures(files.get('GMf0'), plain)}")
+    if "GMr" in selected:
+        # Spec §11 PR-21: PR-14's re-read and its mark, which a matted frame over an 8-bit clip
+        # (the generator answers it 8-bit) is now the one frame to reach.
+        here, plain = read_png(files.get("GMr")), read_png(files.get("GMf0"))
+        header = png_header(files["GMr"]) if files.get("GMr") else None
+        kept, wanted = deep_distinct(here), deep_distinct(plain)
+        good = (kept is not None and wanted is not None and banding(here) <= MATTE_BOUND
+                and 2 * kept >= wanted)
+        check(f"GMr render_frame at 0.5 s of GMc's project over an 8-bit H.264 clip on a back-most "
+              f"track: a 16-bit PNG, banding RMS ≤ {MATTE_BOUND}, row 540 at least half the "
+              "distinct 16-bit greens of the clip's own frame (GMf0)", good,
+              f"header {header}; {ramp_figures(files.get('GMr'), here)}\n       GMf0: "
+              f"{ramp_figures(files.get('GMf0'), plain)}")
 
 
 def png_bytes(path):
@@ -1682,7 +1914,107 @@ def score_graphic_sources(files, base):
                               f"{size[0]}-bit {size[1]}×{size[2]}, {size[3]:,} bytes, base64 "
                               f"{size[4]:,} ({'OVER' if size[4] > API_IMAGE_LIMIT else 'under'} "
                               f"{API_IMAGE_LIMIT:,})")
-                print(f"  --   DGs (NOT scored) {title}, {scale}: {shown_size}", flush=True)
+                print(f"  --   DGs (NOT scored) {title}, {scale}: {shown_size}; "
+                      f"{block_shown(BLOCKS.get(key + suffix))}", flush=True)
+
+
+def block_shown(got):
+    """An image block's printed size: its type, its PNG depth, its base64 bytes beside the API's
+    limit."""
+    if not got or not got.get("ok"):
+        return f"image block not read ({(got or {}).get('error', 'not asked')})"
+    header = png_header(got["block"])
+    return (f"image block {got['mime']}{f', {header[2]}-bit' if header else ''}, base64 "
+            f"{got['b64']:,} ({'OVER' if got['b64'] > API_IMAGE_LIMIT else 'under'} "
+            f"{API_IMAGE_LIMIT:,})")
+
+
+def written_last(got):
+    """Whether the text's last sentence names the file `got` wrote: "Written to <path>."."""
+    text = got.get("text", "")
+    head, _, tail = text.rpartition(" Written to ")
+    return bool(head) and tail.endswith(".") and Path(tail[:-1]).resolve() == got["file"].resolve()
+
+
+def within_a_level(deep_path, block_path):
+    """(every sample of the 8-bit block within 1 level of the deep file's rounded to 8 bits, the
+    worst gap, the samples compared) or (False, None, 0) when either does not read or the sizes
+    differ."""
+    deep, eight = read_png(deep_path), read_png(block_path)
+    if (deep is None or eight is None or deep.scale != 257.0 or eight.scale != 1.0
+            or (deep.width, deep.height) != (eight.width, eight.height)):
+        return False, None, 0
+    worst = max(abs(b - (v + 128) // 257) for v, b in zip(deep.samples, eight.samples))
+    return worst <= 1, worst, len(eight.samples)
+
+
+def score_blocks(files):
+    """#604's rows (spec §11 PR-22) over `BLOCKS`."""
+    if "BK1" in selected:
+        got = BLOCKS.get("BK1") or {"ok": False, "error": "not run"}
+        file = png_bytes(got["file"]) if got["ok"] else None
+        block = png_header(got["block"]) if got["ok"] else None
+        close, worst, count = (within_a_level(got["file"], got["block"]) if got["ok"]
+                               else (False, None, 0))
+        good = (got["ok"] and file is not None and file[0] == 16 and file[4] > API_IMAGE_LIMIT
+                and got["mime"] == "image/png" and block is not None and block[2] == 8
+                and block[:2] == file[1:3] and got["b64"] <= API_IMAGE_LIMIT and close
+                and COPY_PNG in got["text"] and written_last(got))
+        check(f"BK1 render_frame of 1080p footage under a graphic, default: the file a 16-bit PNG "
+              f"past the API's {API_IMAGE_LIMIT:,} base64 bytes; the block an 8-bit PNG of its "
+              "size within it, every sample within 1 level of the file's; the copy sentence, and "
+              "the text still ends naming the file", good,
+              (f"file {file[0]}-bit {file[1]}×{file[2]}, {file[3]:,} bytes, base64 {file[4]:,}; "
+               f"{block_shown(got)} {block[0]}×{block[1]}; worst |block − file/257| {worst} over "
+               f"{count:,} samples; copy sentence {COPY_PNG in got['text']}; written last "
+               f"{written_last(got)}" if file and block else f"{got.get('error', 'not read')}"))
+    if "BK2" in selected:
+        got = BLOCKS.get("BK2") or {"ok": False, "error": "not run"}
+        equal = got["ok"] and got["block"].read_bytes() == got["file"].read_bytes()
+        check("BK2 the same with full_depth_image: true: the block is the file's bytes, "
+              "image/png, and no copy sentence",
+              equal and got["mime"] == "image/png" and COPY_SAID not in got["text"]
+              and written_last(got),
+              f"{block_shown(got)}; equal to the file {equal}" if got["ok"] else got["error"])
+    if "BK3" in selected:
+        got = BLOCKS.get("BK3") or {"ok": False, "error": "not run"}
+        file = png_header(got["file"]) if got["ok"] else None
+        equal = got["ok"] and got["block"].read_bytes() == got["file"].read_bytes()
+        check("BK3 render_frame of the footage alone (an 8-bit frame), default: an 8-bit PNG whose "
+              "block is the file's bytes, image/png, and no copy sentence",
+              equal and file is not None and file[2] == 8 and got["mime"] == "image/png"
+              and COPY_SAID not in got["text"] and written_last(got),
+              f"file header {file}; {block_shown(got)}; equal to the file {equal}"
+              if got["ok"] else got["error"])
+    if "BK4" in selected:
+        got = BLOCKS.get("BK4") or {"ok": False, "error": "not run"}
+        full = BLOCKS.get("BK4f") or {"ok": False, "error": "not run"}
+        depth = sample_depth(got["file"]) if got["ok"] else None
+        block = png_header(got["block"]) if got["ok"] else None
+        equal = full["ok"] and full["block"].read_bytes() == full["file"].read_bytes()
+        good = (got["ok"] and depth == "10" and got["mime"] == "image/png" and block is not None
+                and block[2] == 8 and COPY_HEIC in got["text"] and written_last(got)
+                and equal and full["mime"] == "image/heic" and COPY_SAID not in full["text"])
+        check("BK4 BK1's frame as HEIC: the file 10 bits a sample, its default block an 8-bit PNG "
+              "with the HEIC copy sentence, and with full_depth_image: true an image/heic block "
+              "that is the file's bytes", good,
+              f"default: file bitsPerSample {depth}; {block_shown(got)}; copy sentence "
+              f"{COPY_HEIC in got.get('text', '')}; full: {block_shown(full)}, equal to the file "
+              f"{equal}" + ("" if got["ok"] and full["ok"]
+                            else f"; {got.get('error', '')} {full.get('error', '')}"))
+    if "BK5" in selected:
+        got = BLOCKS.get("BK5") or {"ok": False, "error": "not run"}
+        schema = BLOCKS.get("BK5schema") or {}
+        refused = not got["ok"] and "full_depth_image must be true or false." in got["error"]
+        check("BK5 full_depth_image: \"yes\" is refused naming the argument, and tools/list "
+              "publishes full_depth_image as a boolean", refused and schema.get("type") == "boolean",
+              f"answer {got.get('error') if not got['ok'] else 'ok'}; schema {schema}")
+    if "BKk" in selected:
+        got = BLOCKS.get("BKk") or {"ok": False, "error": "not run"}
+        file = png_bytes(got["file"]) if got["ok"] else None
+        print(f"  --   BKk (NOT scored) a 3840×2160 frame of footage under a graphic, default: "
+              + (f"file {file[0]}-bit {file[1]}×{file[2]}, {file[3]:,} bytes, base64 "
+                 f"{file[4]:,}; " if file else "file not read; ") + block_shown(got), flush=True)
 
 
 def score(files, control):
@@ -1950,6 +2282,7 @@ def main():
     score_mattes(files, keep or base)
     score_source_mattes(files, keep or base)
     score_graphic_sources(files, keep or base)
+    score_blocks(files)
     found = hdr.complaints(log)
     check("Z1 every project closed and the log holds no `Frame Job: ` line",
           closed and not found, f"closed {closed}; complaints {found}")
