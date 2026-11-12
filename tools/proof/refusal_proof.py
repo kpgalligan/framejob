@@ -500,6 +500,12 @@ def locked_track(mcp):
             "an insert onto the same track, with room to spare",
             f"track {track} is locked, so an insert cannot open room on it",
             track=track, media=media, at=40 * SEC)
+    # spec §11 #602 (c): a lift held to a locked track names it rather than
+    # skipping it, as the plain lift skips every locked track in silence.
+    refused(s, "lift_range", "lift_range",
+            "a lift held to the same track, over a clip it would cut",
+            f"track {track} is locked, so nothing on it can be lifted",
+            **{"from": 2 * SEC, "to": 4 * SEC, "tracks": [track]})
 
     print("\n4c — the lock comes off, and the same call lands")
     # Undone rather than set back, so the only edit left on the stack above
@@ -1003,7 +1009,34 @@ def the_cut_rule(mcp):
            [[0, cut], [10 * SEC, 8 * SEC]])
     s.op("undo")
 
-    print("\n11f — and not one refusal was an undo step")
+    print("\n11f — a lift held to the track named leaves every other track alone (#602)")
+    first = s.project()["tracks"][0]["id"]
+    other = s.op("add_track")["new_tracks"][0]
+    c = s.place(media, cut, track=other)
+    applied(s, "lift_range", "a lift of {7 s, 10 s} held to a and b's track",
+            **{"from": cut, "to": 10 * SEC, "tracks": [first]})
+    after = s.project()["clips"]
+    landed("…and it LANDED there alone: a [0, 7 s), b's rest from 10 s, and c on the other "
+           "track still [7 s, 17 s), uncut",
+           sorted([x["track"] == other, x["start"], x["duration"]] for x in after),
+           [[False, 0, cut], [False, 10 * SEC, 8 * SEC], [True, cut, 10 * SEC]])
+    landed("…the other track's one clip is still c", [x["id"] for x in after
+                                                      if x["track"] == other], [c])
+    s.op("undo")
+    for tracks, wanted in (
+            ([], "lift_range: tracks is empty — name at least one track, or leave it out for "
+                 "every unlocked track."),
+            ([first, 999_999], "lift_range: No track has id 999999. get_project lists the "
+                               "tracks.")):
+        before = s.text()
+        message = s.error("lift_range", **{"from": cut, "to": 10 * SEC, "tracks": tracks})
+        check(message == wanted and s.text() == before,
+              f"tracks {tracks} is an error naming the argument, nothing changed — {wanted!r}; "
+              f"got: {shown(message)}")
+    s.op("undo")
+    s.op("undo")
+
+    print("\n11g — and not one refusal was an undo step")
     undo_claim(s, start)
 
 

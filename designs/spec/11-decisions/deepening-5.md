@@ -437,8 +437,51 @@ in one may now point into a sibling file.
   with `split` ops then a `delete`, each tried as it is sent, so a range
   bound within a transition's own length on the Program track refuses the
   switch at its `split` although the cleared result would be legal; that
-  is accepted until an op clears a range on one track, left for an issue.
+  is accepted until an op clears a range on one track, left for an issue
+  (amended by #602: `lift_range`'s `tracks`, which Replace now sends).
   (h) `retime_range`'s new refusal comes last, after CU-90 (b)'s (7).
   Proofs: `core/tests/cut_overlap_rule.rs` C1–C6, with mutants on each
   call site, the judged moment, the changed-tracks rule and the sentences;
   `refusal_proof.py`'s cut section; `shot_split_proof.py` S9 on Release.
+- **#602 — `lift_range` clears a range on the tracks it is given, and
+  Switch by Speaker's Replace the shots on sends it.** (Recorded before the
+  code, 2026-11-11. Amends #427 (g)'s last sentence and SW-23 (a).) With a
+  Program track P1 [0, 4 s), P2 [3 s, 8 s) and a one-second dissolve, a
+  second switch over {2.2 s, 8 s} replacing that track was refused at its
+  first `split`, although removing the range leaves P1 [0, 2.2 s), which
+  is legal: Replace cleared with `split`s and a `delete`, each tried as it
+  was sent, and a `split` is judged on its own result (#427 (a)).
+  (a) `lift_range` takes `tracks`, a list of track ids, optional. Absent or
+  null: every unlocked track, exactly as before. Given: both bounds are
+  cut, and what lies wholly between them removed, on those tracks alone.
+  (b) A track not named keeps exactly what it had, as a locked track does
+  under the plain form — a linked partner there included: it is neither
+  cut nor removed, and its link follows the uncut-partner rule (AU-92: it
+  names the piece sharing more of its time; cleared when that piece is the
+  one removed, as `finish` settles a one-sided link). A lift is geometric,
+  and a link never widens it to another track.
+  (c) A named locked track refuses the whole op in `locked_track`'s words:
+  "track N is locked, so nothing on it can be lifted", N the first locked
+  id in the caller's order. Naming a track is asking for it, so it is never
+  skipped in silence. An unknown id is invalid input, as `close_gap`'s is.
+  An empty list is an identity, as `split {clips: []}` is, and a repeated
+  id counts once.
+  (d) The order: an unknown id, a locked track, the empty list's and the
+  empty range's identities, the cut, then the overlap rule on what the op
+  would store, on the tracks it changed (#427 (a), (b), unchanged).
+  (e) Replace the shots on sends one `lift_range {from, to, tracks:
+  [track]}` where it sent the `split`s and the `delete`; a refusal there
+  reads "Switch by Speaker was refused at lift_range: …". A picture on the
+  replaced track that Detach Audio split from a sound on another track now
+  leaves that sound whole, where the old `delete` took it (AU-91): the
+  command edits no track but the one it names for the clear. Replace's five
+  tests (SW-23 (e)) keep the core's locked refusal out of its reach.
+  (f) The tool `lift_range` reads `tracks` by name: an empty list is an
+  error naming the argument ("tracks is empty — …"), declared `minItems: 1`,
+  since the core's identity would say only that nothing changed; each id is
+  checked in the call's scope, so inside a nest the ids are the nest's.
+  Proofs: `core/tests/lift_range_tracks.rs` T1–T8 with hand mutants on the
+  cut, the removal, the lock, the links and the unknown id;
+  `switch_speaker_proof.py` S15 on Release with the mutants
+  `replace-lifts-every-track` and `replace-by-split-and-delete`, and
+  `replace-clear-removed` re-anchored; `refusal_proof.py`'s §11g.

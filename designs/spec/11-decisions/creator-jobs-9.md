@@ -356,7 +356,8 @@ header, op or format change. SW-35's stream guard is not added here (SW3a has no
     name: "Program"}`, directly in front of the front-most angle; its id is read from the trial's
     snapshot. With `track` (Replace the shots on): `split {clips: [c], at: from}` for each clip on
     it strictly straddling `from`, then the same at `to`, then one `delete` of every clip on it
-    wholly inside `[from, to)` — a `lift_range` of that track alone.
+    wholly inside `[from, to)` — a `lift_range` of that track alone (amended by #602: one
+    `lift_range {from, to, tracks: [track]}`, judged on its result).
   - (b) The pieces: one `copy_pieces {clip, track: the destination, ranges, video: true, audio:
     false}` per angle clip a shot crosses, its ranges the union over the shots of
     `SwitchAngle.pieceRanges(angle: shot.angle, from: shot.start, to: shot.end)` for that clip

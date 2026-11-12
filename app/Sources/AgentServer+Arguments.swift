@@ -334,6 +334,35 @@ extension AgentServer {
         return track
     }
 
+    /// A list of track ids, `optionalClipsArg`'s shape (`lift_range`'s `tracks`, spec §11
+    /// #602): nil when absent or null, a single number taken as a list of one, each id whole and
+    /// found in the call's container; an empty list is an error naming the argument, since the
+    /// core's identity would say only that nothing changed.
+    func optionalTracksArg(
+        _ a: [String: Any], _ key: String = "tracks", _ document: ProjectDocument
+    ) throws -> [UInt32]? {
+        guard let value = a[key], !(value is NSNull) else { return nil }
+        let raw = value as? [Any] ?? [value]
+        guard !raw.isEmpty else {
+            throw ToolError(
+                message: "\(key) is empty — name at least one track, or leave it out for every "
+                    + "unlocked track.")
+        }
+        let scope = try idScope(document)
+        return try raw.map { value in
+            guard let number = Self.numeric(value).flatMap(Self.whole),
+                number >= 0, number <= Int(UInt32.max)
+            else {
+                throw ToolError(message: "\(key) must contain track ids (integers).")
+            }
+            let id = UInt32(number)
+            guard scope.track(id) != nil else {
+                throw ToolError(message: scope.noSuchId("track", id))
+            }
+            return id
+        }
+    }
+
     /// **Media is deliberately NOT scoped**, and it is the one id reader
     /// that is not. A nest references the parent's `media[]` in the parent's
     /// one id space (spec §5.2), and `scoped_view` hands the view that very

@@ -2,10 +2,10 @@ import Foundation
 
 /// What Switch by Speaker writes (spec §11 SW-23): the planned shots as one undo step "Switch by
 /// Speaker" on a Program track — a new one directly in front of the front-most angle, or the
-/// named track cleared over the range (Replace the shots on) — with the angles hidden, or their
-/// pictures switched off, inside the range only. Clip ▸ Switch by Speaker…
-/// (`SwitchSpeakerSheetController`) and `switch_by_speaker` (`AgentServer+Switch.swift`) both
-/// write through `edit`.
+/// named track cleared over the range by one `lift_range` on it (Replace the shots on, #602) —
+/// with the angles hidden, or their pictures switched off, inside the range only.
+/// Clip ▸ Switch by Speaker… (`SwitchSpeakerSheetController`) and `switch_by_speaker`
+/// (`AgentServer+Switch.swift`) both write through `edit`.
 ///
 /// Every op is tried ONE at a time on the container's handle through `SwitchAngle.Trial`
 /// (`applying([ReelOp])` does not stop at a refusal), so the ids a later op names — the Program
@@ -130,17 +130,12 @@ extension SpeakerSwitch {
         }
         func inside(_ clip: ClipSnapshot) -> Bool { clip.start >= from && clip.end <= to }
 
-        // (a) The destination.
+        // (a) The destination. Replace clears its range with ONE `lift_range` held to its track,
+        // judged on what it leaves (spec §11 #602): split-then-delete was judged at each split,
+        // so a bound inside a transition's own length refused a clear whose result was legal.
         let destination: UInt32
         if let replacing {
-            for at in [from, to] {
-                for clip in trial.project.snapshot.clips(onTrack: replacing)
-                where clip.start < at && at < clip.end {
-                    if let why = try split(clip, at: at) { return .refused(why) }
-                }
-            }
-            let cleared = trial.project.snapshot.clips(onTrack: replacing).filter(inside).map(\.id)
-            if !cleared.isEmpty, let why = try refusal(.delete(clips: cleared)) {
+            if let why = try refusal(.liftRange(from: from, to: to, tracks: [replacing])) {
                 return .refused(why)
             }
             destination = replacing

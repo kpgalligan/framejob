@@ -174,14 +174,15 @@ It mirrors <kbd>⌫</kbd> with an [in/out range](/timeline/in-out-range/) set an
 | --- | --- | --- | --- |
 | `from` | integer, ticks | Yes | Where the range starts. |
 | `to` | integer, ticks | Yes | Where the range ends. It must be after `from` once both are on the frame grid. |
+| `tracks` | array of integers | No | Track ids, to lift the range on those tracks alone. Left out, every unlocked track. |
 | `project` | string | No | The open project to act on, by the path `get_project` reports. Left out, the frontmost. |
 | `scope` | integer | No | A nest's id, to edit inside it. Left out, whatever is open. See [Editing inside a nest](/mcp/nests/). |
 
-Clips on locked tracks are neither cut nor removed. To close the hole as well, use [`ripple_delete_range`](#ripple_delete_range).
+Clips on locked tracks are neither cut nor removed. With `tracks`, every track you don't name keeps exactly what it had. That includes a clip linked to one being cut: it isn't cut or removed, and stays linked to the piece it shares more time with, unless that piece is the one removed. To close the hole as well, use [`ripple_delete_range`](#ripple_delete_range).
 
 **Answers** `new_clips`, the piece left after the range of any clip cut at `to`. The undo step is named Lift.
 
-**Won't run** when `to` isn't after `from`, which is an error, or when what it leaves would break the overlap rule on a track it cuts, as [`ripple_delete_range`](#ripple_delete_range) says. A range with nothing an unlocked track can give up changes nothing.
+**Won't run** when `to` isn't after `from`, which is an error, or when what it leaves would break the overlap rule on a track it cuts, as [`ripple_delete_range`](#ripple_delete_range) says. A range with nothing an unlocked track can give up changes nothing. With `tracks`, an empty list or an id that isn't a track is an error, and a locked track in the list stops the whole lift: "track 3 is locked, so nothing on it can be lifted".
 
 ## `insert_time`
 

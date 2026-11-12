@@ -66,12 +66,20 @@ Rows:
   two angles"): `{mute_cameras: "yes"}` answers exactly "mute_cameras must be true or false."
   and `{apply: "maybe"}` "apply must be true or false." — the argument errors before any plan —
   with the project and its undo top unchanged.
+- S15 (#602) Replace the shots on near a transition: a front track "Earlier" holding a piece of
+  the wide [40 s, 44 s) and a piece of Cam B [43 s, 48 s) dissolving into it for 1 s (a `split`
+  of the wide's piece at 42.2 s alone refused in #427's sentence); `switch_by_speaker {track:
+  Earlier, from: 42.2 s, to: 48 s}` applies, the track holding the wide's piece as [40 s,
+  42.2 s) under its own id followed by exactly that plan's pieces, Cam B's piece gone, both
+  microphone tracks' clips as they were; one undo gives the state before, and the fixture's six
+  edits undone give the base.
 
 `--mutant NAME` edits a `tree_copy.py` copy's Swift, builds its app and runs the named row on it:
-CAUGHT exits 1, SURVIVED 0, a control that could not be performed 2. Eleven mutants:
+CAUGHT exits 1, SURVIVED 0, a control that could not be performed 2. Thirteen mutants:
 min-turn-ignored, crosstalk-never-wide, lead-twice, snap-removed (S1); ceiling-removed (S7);
 whole-track-hidden (S8); sheet-min-shot-not-passed (S10); replace-clear-removed (S11);
-mute-default-inverted (S12); linked-refusal-removed (S13); arguments-after-plan (S14).
+mute-default-inverted (S12); linked-refusal-removed (S13); arguments-after-plan (S14);
+replace-lifts-every-track, replace-by-split-and-delete (S15).
 """
 
 import argparse
@@ -109,8 +117,8 @@ BUILD_BOUND = 1800
 APPLIED = "b18_f55"
 BLEEDY = "b12_f55"
 COLOURS = {"a": (0xC0, 0x39, 0x2B), "b": (0x29, 0x80, 0xB9), "wide": (0x27, 0xAE, 0x60)}
-ROWS = ["Z0"] + [f"S{i}" for i in range(1, 15)]
-MAIN_ROWS = {"S1", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S12"}
+ROWS = ["Z0"] + [f"S{i}" for i in range(1, 16)]
+MAIN_ROWS = {"S1", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S12", "S15"}
 REFUSED = "Switch by Speaker was refused: "
 
 SHOTS = "app/Sources/SpeakerSwitch+Shots.swift"
@@ -118,6 +126,20 @@ PLANNER = "app/Sources/SpeakerSwitch.swift"
 EDIT = "app/Sources/SpeakerSwitch+Edit.swift"
 SHEET = "app/Sources/SwitchSpeakerSheetController.swift"
 HANDLER = "app/Sources/AgentServer+Switch.swift"
+# Replace the shots on's clear, one `lift_range` held to its track (spec §11 #602).
+REPLACE_LIFT = "if let why = try refusal(.liftRange(from: from, to: to, tracks: [replacing])) {"
+# The clear it replaced: a `split` of each straddler at each bound, then one `delete`.
+SPLIT_AND_DELETE = """            for at in [from, to] {
+                for clip in trial.project.snapshot.clips(onTrack: replacing)
+                where clip.start < at && at < clip.end {
+                    if let why = try split(clip, at: at) { return .refused(why) }
+                }
+            }
+            let cleared = trial.project.snapshot.clips(onTrack: replacing).filter(inside).map(\\.id)
+            if !cleared.isEmpty, let why = try refusal(.delete(clips: cleared)) {
+                return .refused(why)
+            }
+"""
 # name → (row, [(path, anchor, replacement)])
 MUTANTS = {
     "min-turn-ignored": ("S1", [(SHOTS, "angle = length >= ticks(settings.minTurn)",
@@ -137,12 +159,17 @@ MUTANTS = {
         "from: document, clips: nil, pairing: chosenPairing, range: nil,\n"
         "            settings: { var s = settings; s.minShot = SpeakerSwitch.Settings().minShot; "
         "return s }())")]),
-    "replace-clear-removed": ("S11", [(EDIT, "if !cleared.isEmpty, let why = try refusal(.delete(clips: cleared)) {",
-                                       "if false, !cleared.isEmpty, let why = try refusal(.delete(clips: cleared)) {")]),
+    "replace-clear-removed": ("S11", [(EDIT, REPLACE_LIFT, "if false, " + REPLACE_LIFT[3:])]),
     "mute-default-inverted": ("S12", [(EDIT, "return !input.microphones.contains { angles.contains($0.track) }",
                                        "return input.microphones.contains { angles.contains($0.track) }")]),
     "linked-refusal-removed": ("S13", [(EDIT, "if let partner = clip.linked {",
                                         "if false, let partner = clip.linked {")]),
+    "replace-lifts-every-track": ("S15", [(
+        EDIT, "refusal(.liftRange(from: from, to: to, tracks: [replacing]))",
+        "refusal(.liftRange(from: from, to: to, tracks: nil))")]),
+    "replace-by-split-and-delete": ("S15", [(
+        EDIT, "            " + REPLACE_LIFT + "\n                return .refused(why)\n            }\n",
+        SPLIT_AND_DELETE)]),
     "arguments-after-plan": ("S14", [(
         HANDLER,
         "        let mute = try boolArg(a, \"mute_cameras\")\n"
@@ -469,6 +496,8 @@ def main_rows(client, manifest):
               f"one undo, named {undone!r}, gives back the project {model(doc.state()) == base}")
         if "S12" in selected:
             attempt(lambda: s12_off(doc, base), "S12")
+        if "S15" in selected:
+            attempt(lambda: s15(doc, base), "S15")
         if "S8" in selected:
             attempt(lambda: s8(doc, base), "S8")
         if "S7" in selected:
@@ -601,6 +630,74 @@ def s11(doc, program, applied):
     doc.call("undo")
     check("S11", why is not None and want_why in why and model(doc.state()) == model(applied),
           f"an empty track refused: {why!r}")
+
+
+def s15(doc, base):
+    """#602: Replace the shots on over a range whose start lies within a transition's own length
+    on the replaced track. A front track "Earlier" holds a piece of the wide [40 s, 44 s) and a
+    piece of Cam B [43 s, 48 s) dissolving into it for 1 s; a switch over {42.2 s, 48 s} onto it
+    must apply, because what the clear leaves — the wide's piece [40 s, 42.2 s) — is legal,
+    although a `split` at 42.2 s alone leaves a 1.8 s piece under a 1 s dissolve."""
+    start, cut, end = t(40), t(42.2), t(48)
+    earlier = doc.call_with("add_track", {"name": "Earlier"})["new_tracks"][0]
+    wide, cam_b = doc.media_of[doc.c_wide], doc.media_of[doc.c_b]
+    p1 = doc.call("add_clip", track=earlier, media=wide, at=start)["new_clips"][0]
+    doc.call("trim_end", clip=p1, to=t(44))
+    p2 = doc.call("add_clip", track=earlier, media=cam_b, at=t(44))["new_clips"][0]
+    doc.call("trim_end", clip=p2, to=t(49))
+    doc.call("move_clip", clips=[p2], delta=-SEC)
+    edits = 6
+    try:
+        fixture = [(c["id"], c["start"], c["start"] + c["duration"],
+                    c.get("transition_in") is not None) for c in doc.on_track(earlier)]
+        check("S15", fixture == [(p1, start, t(44), False), (p2, t(43), end, True)],
+              f"Earlier holds the wide [40 s, 44 s) and Cam B [43 s, 48 s) dissolving into it: "
+              f"{fixture}")
+        # The contrast the issue rests on: the split alone is the rule's refusal.
+        sentence = (f"clips {p1} and {p2} would overlap by {SEC} ticks, more than half of the "
+                    f"shorter piece the cut leaves ({(t(44) - cut) // 2} ticks)")
+        why = refused(lambda: doc.call("split", clips=[p1], at=cut))
+        check("S15", why is not None and sentence in why,
+              f"a split of the wide's piece at 42.2 s alone is refused: {why!r}")
+        doc.select()
+        before = doc.state()
+        mics = [doc.clip(c, before) for c in (doc.c_mb, doc.c_ma)]
+        answer = None
+        try:
+            answer = doc.call_with("switch_by_speaker", {"track": earlier, "from": cut, "to": end})
+        except mcp.ToolError as error:
+            check("S15", False, f"the switch over {{42.2 s, 48 s}} onto Earlier: {error}")
+            return
+        state = doc.state()
+        want = [(start, cut, wide)]
+        media = {doc.wide: wide, doc.b: cam_b}
+        for shot in answer["shots"]:
+            if shot["angle"] == doc.a and shot["start"] < doc.half < shot["end"]:
+                want += [(shot["start"], doc.half, doc.media_of[doc.c_a1]),
+                         (doc.half, shot["end"], doc.media_of[doc.c_a2])]
+            else:
+                a_media = doc.media_of[doc.c_a1 if shot["end"] <= doc.half else doc.c_a2]
+                want.append((shot["start"], shot["end"], media.get(shot["angle"], a_media)))
+        got = [(c["start"], c["start"] + c["duration"], c["source"]["media"])
+               for c in doc.on_track(earlier, state)]
+        kept = doc.on_track(earlier, state)[0]["id"] if got else None
+        mics_after = [doc.clip(c, state) for c in (doc.c_mb, doc.c_ma)]
+        check("S15", answer.get("track") == earlier and got == want and kept == p1
+              and all(c["id"] != p2 for c in state["clips"]) and mics_after == mics,
+              f"applied onto Earlier {answer.get('track') == earlier}: {len(got)} pieces, the "
+              f"wide's [40 s, 42.2 s) kept as clip {kept} then exactly the plan's "
+              f"{len(answer['shots'])} shots {got == want}; Cam B's piece gone "
+              f"{all(c['id'] != p2 for c in state['clips'])}; both microphones' clips as they "
+              f"were {mics_after == mics}")
+        undone = doc.call("undo").get("undone")
+        check("S15", undone == SPEAKER and model(doc.state()) == model(before),
+              f"one undo, named {undone!r}, gives back the project {model(doc.state()) == model(before)}")
+    finally:
+        for _ in range(edits):
+            doc.call("undo")
+        doc.select()
+        check("S15", model(doc.state()) == base,
+              f"the fixture's {edits} edits undone give back the base {model(doc.state()) == base}")
 
 
 def s8(doc, base):

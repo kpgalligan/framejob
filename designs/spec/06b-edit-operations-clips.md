@@ -204,10 +204,15 @@ The patch ops (`set_video`, `set_audio`, `set_text`, `set_shape`, `set_graphic` 
   list, and a list that merges to nothing, change nothing. Refused WHOLE when what the list would
   store breaks the overlap rule (§6a, §11 #427). Written by Clip ▸ Remove Silences… as one
   undo step, whatever the number of cuts.
-- **`lift_range {from, to}`** — `ripple_delete_range` without the close: every unlocked clip is
-  split at both bounds and the middles removed, and NOTHING moves — every clip after the range keeps
-  the moment it had, and so do the markers. ⌫ with a range and nothing selected, where ⌘⌫ ripples.
-  Refused as `ripple_delete_range` is under the overlap rule (§6a, §11 #427).
+- **`lift_range {from, to, tracks?}`** — `ripple_delete_range` without the close: every unlocked
+  clip is split at both bounds and the middles removed, and NOTHING moves — every clip after the
+  range keeps the moment it had, and so do the markers. ⌫ with a range and nothing selected, where
+  ⌘⌫ ripples. With `tracks`, only the clips on those tracks are cut and removed, and every other
+  track keeps exactly what it had, a linked partner there included (its link follows `split`'s
+  uncut-partner rule); a named locked track refuses, "track N is locked, so nothing on it can be
+  lifted", an unknown id is an error and an empty list changes nothing (§11 #602). Switch by
+  Speaker's Replace the shots on clears its track this way. Refused as `ripple_delete_range` is
+  under the overlap rule (§6a, §11 #427).
 - **`keep_range {from, to}`** — The project as `[from, to)` of its top-level timeline, moved to
   start at 0 (§11 CJ-50). Both bounds are snapped and clamped to 0; `to` not after `from` is an error.
   Every clip on every track, locked or not, is cut at both bounds by `split`'s rules; at an edge

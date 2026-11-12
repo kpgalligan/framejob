@@ -39,7 +39,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`05.6-persistence.md`](05.6-persistence.md) | 374 | The package on disk: Consolidate, bookmarks, reversed assets, ramp audio, isolated voice, voiced sound, caches and their markers, transcripts, the analysis cache. |
 | **§6 — Edit operations: exact semantics** | | |
 | [`06a-edit-operations-shared-rules.md`](06a-edit-operations-shared-rules.md) | 123 | The rules every op shares: caller ticks snapped to the frame grid, an omitted argument against `null`, a linked pair moving as one in time (format 28, AU-90…AU-96), a cut judged by the overlap rule on what it would store (#427), how to read a "refuses", the one way a patch is read, and the `scope` envelope key (the view project, the eleven ops that are an error with a scope, the checks on the merged parent). |
-| [`06b-edit-operations-clips.md`](06b-edit-operations-clips.md) | 418 | Every clip op: add, insert and overwrite, the two backgrounds; move and the overlap rule; the trims, roll, slip, rate stretch, speed and reverse; split, the ripple deletes and range cuts; freeze, detach, duplicate, `copy_pieces`, paste and paste attributes; nest and unnest; `retime_range`. The patch ops are §6e and the transition ops §6d. |
+| [`06b-edit-operations-clips.md`](06b-edit-operations-clips.md) | 423 | Every clip op: add, insert and overwrite, the two backgrounds; move and the overlap rule; the trims, roll, slip, rate stretch, speed and reverse; split, the ripple deletes and range cuts; freeze, detach, duplicate, `copy_pieces`, paste and paste attributes; nest and unnest; `retime_range`. The patch ops are §6e and the transition ops §6d. |
 | [`06e-edit-operations-clip-patches.md`](06e-edit-operations-clip-patches.md) | 112 | The clip patch ops, continuing §6b and §6b's until #548: `set_video`, `set_audio`, `set_text` and `set_shape` (the patch merged into the base props, their refusals), `set_graphic`, `set_clip` (a clip's name and label) and `set_enabled`. |
 | [`06d-edit-operations-transitions.md`](06d-edit-operations-transitions.md) | 69 | The transition ops, continuing §6b: `set_transition`, `set_transition_duration`, `add_transition` (handles and the ripple form) and `set_transition_style`. |
 | [`06c-edit-operations-actions-tracks-media.md`](06c-edit-operations-actions-tracks-media.md) | 443 | The action ops (the zoom action, the camera layout switch, end patches and `off`); the track, marker, canvas and media ops; and the op table's two halves (the arguments half is `core/src/op_table.rs`). |
@@ -73,7 +73,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 335 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 26926 in 80 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 26971 in 80 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

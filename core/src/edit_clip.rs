@@ -342,11 +342,48 @@ impl Project {
         at: Ticks,
         pieces: &mut Pieces,
     ) -> Result<Option<Project>, String> {
-        let at = self.snapped(at);
         let ids = self.with_links(clips)?;
+        self.cut_ids(&ids, at, pieces)
+    }
+
+    /// Cuts every clip on the named tracks that `at`, snapped, is strictly
+    /// inside, and nothing else: unlike [`Project::cut_clips`] no linked
+    /// partner is added from another track, so a track not named keeps
+    /// exactly what it had and an uncut partner is paired by
+    /// `pair_split_halves`' uncut arm (spec §11 #602 (b)). A locked track
+    /// is skipped, though `lift_range`, the one caller, refuses one first.
+    pub(crate) fn cut_on_tracks(
+        &self,
+        tracks: &[u32],
+        at: Ticks,
+        pieces: &mut Pieces,
+    ) -> Result<Option<Project>, String> {
+        let snapped = self.snapped(at);
+        let ids: Vec<u32> = self
+            .clips
+            .iter()
+            .filter(|c| tracks.contains(&c.track))
+            .filter(|c| self.track(c.track).is_some_and(|t| !t.locked))
+            .filter(|c| c.start < snapped && snapped < clip_end(c))
+            .map(|c| c.id)
+            .collect();
+        self.cut_ids(&ids, at, pieces)
+    }
+
+    /// The cut both of those share, over `ids` exactly as given: each cut
+    /// at `at`, snapped, the halves paired, each second half's source
+    /// recorded in `pieces`, and the result through `finish`. `None` when
+    /// nothing was cut.
+    fn cut_ids(
+        &self,
+        ids: &[u32],
+        at: Ticks,
+        pieces: &mut Pieces,
+    ) -> Result<Option<Project>, String> {
+        let at = self.snapped(at);
         let mut next = self.clone();
         let mut halves: Vec<(u32, u32)> = Vec::new();
-        for id in ids {
+        for &id in ids {
             // `split_clip` allocates the second half's id first.
             let second = next.next_id;
             if split_clip(&mut next, id, at) {

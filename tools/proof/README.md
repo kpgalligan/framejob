@@ -3570,14 +3570,14 @@ asserted WHOLE and never by keyword:
 | 1 — the overlap rule | the rule's whole sentence, ids and tick counts included, out of `move_clip`, out of `duplicate` (which names the copy it never made) and out of a SCOPED call; an overlap one frame under the limit still applying, so the number in the sentence is the rule's own boundary; the project unchanged either side of every refusal; and ONE undo putting back the marker edit, so not one of them registered a step |
 | 2 — an identity | four doors (`set_video`, `set_clip`, `set_canvas`, `split`) asked for the value the project already holds, each answering that whole sentence and NOTHING else — an equality, which is the only way to measure "says only that" — and naming no rule |
 | 3 — several ops | `normalize_clip` sends one `set_audio` per clip, so it is where the fold over a list is observable: a list of identities answers the identity, one undo puts both clips back, and a later op still runs after an earlier identity |
-| 4 — a locked track | `close_gap` over a gap that is really there and `insert_clip` with room to spare, both naming the track to unlock (`core/src/edit_time.rs`'s `locked_track`, written once for its three callers); the lock undone and both landing; and the same `close_gap` on a time that is ON a clip refused in a different sentence naming that clip (spec §11 #88) — two sentences at one op, not an identity |
+| 4 — a locked track | `close_gap` over a gap that is really there and `insert_clip` with room to spare, both naming the track to unlock (`core/src/edit_time.rs`'s `locked_track`, written once for its callers), and a `lift_range` held to that track by `tracks` naming it too (spec §11 #602 (c)); the lock undone and both landing; and the same `close_gap` on a time that is ON a clip refused in a different sentence naming that clip (spec §11 #88) — two sentences at one op, not an identity |
 | 5 — the track stack | the only track in a project, refused with and without `with_clips: true` — the flag is the way past the OTHER refusal and not past this one — a second track making the same call land, a track that still holds clips naming the CLIP rather than a count, and that flag then taking the track and its clip |
 | 6 — a media row | a media one clip still shows, refused naming that clip and `with_clips: true`, and an unused row still going with no argument at all |
 | 7 — the transition cut | a cut with no unused material, refused naming the request in whole FRAMES (15, hand-computed) and `ripple: true`; the same cut taking a RIPPLED transition, which slides the incoming clip by exactly the overlap asked for; and that rippled form on a LOCKED track, which is `locked_track`'s third caller |
 | 8 — the action rules | an action inside another and an action past the clip's end, each out of `add_action` AND `set_action` in the same words; and two boundaries that land — abutting is not overlapping, and an action ending exactly at the clip's end fits |
 | 9 — off the track stack | a two-track selection moved one track too far, naming the clip that would go off the top and the index it would land on, in `move_track`'s own words for the same mistake |
 | 10 — the non-edits that speak | spec §11 #88's sentences over MCP: a `roll` across a gap naming the track and where the clip begins; `set_transition_duration` on a track's first clip, and past tick 0 naming the pair's limit — that limit then sent and LANDING; `close_gap` past the track's last clip; `detach_audio` on a text clip, on `A.mov` (no audio track) and on `AV.mov` after one detach that applied (audio switched off), one undo then putting the audio back; and one undo for the batch |
-| 11 — a cut too close to a transition | spec §11 #427 over MCP, on a [0, 10 s) and b [8 s, 18 s) dissolving: `split` at 7 s, `lift_range` and `ripple_delete_range` over {0, 7 s}, and `ripple_delete_ranges` with a harmless {12 s, 13 s} beside it, each refused in `edit_cut_rule.rs`'s whole sentence naming a and b (never the piece's minted id); Edit ▸ Ripple Delete (`perform_menu_item`) with that range set, the project unchanged and the inspector's foot reading "Refused: " and the sentence in `snapshot_ui`'s layout dump; a split at 6 s (the bound) and a lift of {7 s, 10 s} (the short piece removed) LANDING; and one undo for the batch |
+| 11 — a cut too close to a transition | spec §11 #427 over MCP, on a [0, 10 s) and b [8 s, 18 s) dissolving: `split` at 7 s, `lift_range` and `ripple_delete_range` over {0, 7 s}, and `ripple_delete_ranges` with a harmless {12 s, 13 s} beside it, each refused in `edit_cut_rule.rs`'s whole sentence naming a and b (never the piece's minted id); Edit ▸ Ripple Delete (`perform_menu_item`) with that range set, the project unchanged and the inspector's foot reading "Refused: " and the sentence in `snapshot_ui`'s layout dump; a split at 6 s (the bound) and a lift of {7 s, 10 s} (the short piece removed) LANDING; §11f (#602) a second track holding c [7 s, 17 s), and the lift of {7 s, 10 s} held to a and b's track by `tracks` LANDING with c uncut, then `tracks: []` and an unknown id each an error naming the argument, nothing changed; and one undo for the batch |
 
 Every refusal and every identity also asserts the ABSENCE of two fragments
 of the paragraph D2·2 deleted ("Either the project is already in that
@@ -30340,7 +30340,7 @@ crosstalk passage never one turn), after SW-22 (a)'s crosstalk bridge its second
 b24_f45's one late cut), and after SW-S4's named limit (the owner's second answer) its third
 (59/75, `CHOSEN bleed_db 15, dominance_db 8, floor_margin_db 6`, the draft). No person check.
 
-## Road map "creator-jobs" SW2b — Switch by Speaker's sheet, tool and Program track (`switch_speaker_proof.py` S1–S14, Z0; eleven mutants; spec §11 SW-23, SW-26, #457)
+## Road map "creator-jobs" SW2b — Switch by Speaker's sheet, tool and Program track (`switch_speaker_proof.py` S1–S15, Z0; thirteen mutants; spec §11 SW-23, SW-26, #457, #602)
 
 **`switch_speaker_proof.py [SOCKET]`** drives the app over F-TURNS (`creator_spike/f_turns.py`,
 run first and reused while its generator hash holds; without `say -v Samantha` or `Daniel` it
@@ -30384,13 +30384,22 @@ analysed". Packages land under `tools/proof/work/sw2b/`.
 - **S14** (#457) one camera clip selected, whose plan is refused ("needs at least two angles"):
   `{mute_cameras: "yes"}` answers exactly "mute_cameras must be true or false." and `{apply:
   "maybe"}` "apply must be true or false.", the project and its undo top unchanged.
+- **S15** (#602) Replace the shots on near a transition: a front track "Earlier" with the wide's
+  piece [40 s, 44 s) and Cam B's [43 s, 48 s) dissolving into it for 1 s (a `split` of the
+  wide's piece at 42.2 s alone refused in #427's sentence); the switch over {42.2 s, 48 s} onto
+  it applies — the wide's piece kept as [40 s, 42.2 s) under its id, then exactly the plan's
+  pieces, Cam B's piece gone, the microphones' clips unchanged — one undo gives it back, and the
+  fixture's six edits undone give the base. Seen red on a build before #602, refused at `split`
+  in that sentence.
 - **Z0** `grep "Frame Job: "` of every instance's log is empty.
 
 Mutants (`--mutant NAME`, each on a `tree_copy.py` copy's built app; CAUGHT exits 1):
 min-turn-ignored, crosstalk-never-wide, lead-twice, snap-removed (S1); ceiling-removed (S7);
-whole-track-hidden (S8); sheet-min-shot-not-passed (S10); replace-clear-removed (S11);
-mute-default-inverted (S12); linked-refusal-removed (S13); arguments-after-plan (S14, `mute_cameras`
-and `apply` read with `try?`, so a malformed value reaches the plan's refusal).
+whole-track-hidden (S8); sheet-min-shot-not-passed (S10); replace-clear-removed (S11, `if false`
+on Replace's `lift_range` since #602); mute-default-inverted (S12); linked-refusal-removed (S13);
+arguments-after-plan (S14, `mute_cameras` and `apply` read with `try?`, so a malformed value
+reaches the plan's refusal); replace-lifts-every-track (S15, `tracks: nil`) and
+replace-by-split-and-delete (S15, the clear before #602).
 
 ```sh
 python3 tools/proof/switch_speaker_proof.py <dir>/agent.sock [--only S1,S8]

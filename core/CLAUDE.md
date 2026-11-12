@@ -542,6 +542,9 @@ governs a module now.
   partner through `edit_link.rs`'s closures. `split_clips` is `cut_clips`
   (the cut alone, `pub(crate)`) then `edit_cut_rule.rs`'s `cut_refusal`;
   `cut_under_playhead` is ⌘K's selection cut the same way, with no rule.
+  Both go through the private `cut_ids` (the cut over ids as given);
+  `cut_on_tracks` is the same cut over the clips on named tracks with no
+  partner added (spec §11 #602).
   `whole_media_length`,
   `edit_clip_timing.rs`'s `trim_end` and `set_speed` hold a media clip's window INSIDE its file, each
   through `source_window.rs`'s one bound, so
@@ -770,17 +773,21 @@ governs a module now.
   clip at or after the boundary and each one's linked partner;
   `shift_clips` moves exactly that set and answers a refusal, nothing moved,
   when a partner would start before 0), and `locked_track` — THE locked-track
-  refusal's sentence, written once here for its five callers
-  (`close_gap`, `edit_insert.rs`'s `insert_clip`, `edit_transition.rs`'s
+  refusal's sentence, written once here for its six callers
+  (`close_gap`, `edit_insert.rs`'s `insert_clip`, `edit_transition_shift.rs`'s
   rippled form, `edit_retime.rs`'s `retime_range`, `edit_pieces.rs`'s
-  `copy_pieces`), each passing the clause after the comma.
+  `copy_pieces`, `edit_range.rs`'s `lift_range` on a track it is given),
+  each passing the clause after the comma.
 - `edit_range.rs` — the range cuts, moved out of `edit_time.rs` whole
   (#427's toll): `ripple_delete_ranges` (the pairs are ordered, MERGED —
   touching as well as overlapping — then cut and closed right to left as ONE
   edit; the singular delegates to it), `lift_range` (the hole left open),
   `ordered_range` and `clear_range` (both bounds cut by `edit_clip.rs`'s
   `cut_under_playhead`, asking no rule, then what lies wholly between
-  removed on unlocked tracks). Each op asks `edit_cut_rule.rs`'s
+  removed on unlocked tracks); `lift_range`'s optional `tracks` holds both
+  the cut (`edit_clip.rs`'s `cut_on_tracks`, no partner added from another
+  track) and the removal to the tracks named, a named locked track refused
+  in `locked_track`'s words (spec §11 #602). Each op asks `edit_cut_rule.rs`'s
   `cut_refusal` once, of its result — `ripple_delete_ranges` of the whole
   list's, so a list is refused whole (spec §11 #427).
 - `edit_cut_rule.rs` — a cut and THE overlap rule (spec §11 #427): `Pieces`

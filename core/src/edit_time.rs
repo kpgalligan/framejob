@@ -68,11 +68,12 @@ pub(crate) fn union(mut spans: Vec<Span>) -> Vec<Span> {
 
 /// THE locked-track refusal, written once (spec §5.5, deepening D2·3).
 ///
-/// Three ops refuse over a lock — `close_gap` and `insert_clip` on their
+/// The ops that refuse over a lock — `close_gap` and `insert_clip` on their
 /// destination track, `add_transition`'s ripple form on the incoming clip's
-/// track — and each has its own consequence to report, so `what` is the
-/// clause after the comma. What every caller acts on is the same: the id of
-/// the track to unlock.
+/// track, `retime_range`, `copy_pieces` on its destination and `lift_range`
+/// on a track it is given (spec §11 #602) — each have their own consequence
+/// to report, so `what` is the clause after the comma. What every caller
+/// acts on is the same: the id of the track to unlock.
 pub(crate) fn locked_track(track: u32, what: &str) -> String {
     format!("track {track} is locked, so {what}")
 }

@@ -10,6 +10,12 @@
 //! unchanged. Moved out of `edit_time.rs` whole under the size rule
 //! (`designs/adr/core-file-history.md`).
 //!
+//! A lift may be held to the tracks it is given (spec §11 #602): then
+//! `clear_range` cuts through `edit_clip.rs`'s `cut_on_tracks`, which adds
+//! no linked partner from another track, and removes on those tracks alone,
+//! so every other track keeps exactly what it had, as a locked track does.
+//! A ripple is timeline-wide by rule and takes no track list.
+//!
 //! **What a range op stores is judged by THE overlap rule, once** (spec
 //! §11 #427): `clear_range` cuts through `cut_under_playhead`, which asks
 //! no rule, because a piece its first cut leaves too short for a transition
@@ -19,7 +25,7 @@
 
 use crate::edit_clip::clip_end;
 use crate::edit_cut_rule::Pieces;
-use crate::edit_time::{shift_clips, union, unlocked_tracks, Span};
+use crate::edit_time::{locked_track, shift_clips, union, unlocked_tracks, Span};
 use crate::model::Project;
 use crate::outcome::Outcome;
 use crate::time::Ticks;
@@ -47,6 +53,11 @@ fn ordered_range(project: &Project, from: Ticks, to: Ticks) -> Option<(Ticks, Ti
 /// inside the range: rule 2 is absolute, and a locked track keeps exactly
 /// what it had.
 ///
+/// `only` holds both halves to the named tracks (unlocked; `lift_range`
+/// has refused a locked one): the cut through `cut_on_tracks`, which adds
+/// no partner from another track, and the removal on those tracks alone
+/// (spec §11 #602). `None` is every unlocked track, as above.
+///
 /// The one thing this does NOT do is decide what happens to the hole, which
 /// is the whole difference between a lift and a ripple delete.
 ///
@@ -58,20 +69,26 @@ fn clear_range(
     project: &Project,
     start: Ticks,
     end: Ticks,
+    only: Option<&[u32]>,
     pieces: &mut Pieces,
 ) -> Result<Project, String> {
-    let mut current = project
-        .cut_under_playhead(start, pieces)?
-        .unwrap_or_else(|| project.clone());
-    if let Some(cut) = current.cut_under_playhead(end, pieces)? {
-        current = cut;
+    let cut = |at: Ticks, from: &Project, pieces: &mut Pieces| match only {
+        None => from.cut_under_playhead(at, pieces),
+        Some(tracks) => from.cut_on_tracks(tracks, at, pieces),
+    };
+    let mut current = cut(start, project, pieces)?.unwrap_or_else(|| project.clone());
+    if let Some(next) = cut(end, &current, pieces)? {
+        current = next;
     }
 
-    let unlocked = unlocked_tracks(&current);
+    let cleared = match only {
+        None => unlocked_tracks(&current),
+        Some(tracks) => tracks.to_vec(),
+    };
     let inside: Vec<u32> = current
         .clips
         .iter()
-        .filter(|c| unlocked.contains(&c.track) && c.start >= start && clip_end(c) <= end)
+        .filter(|c| cleared.contains(&c.track) && c.start >= start && clip_end(c) <= end)
         .map(|c| c.id)
         .collect();
     current.clips.retain(|c| !inside.contains(&c.id));
@@ -165,7 +182,7 @@ impl Project {
         let mut pieces = Pieces::new();
         let mut next = self.clone();
         for span in spans.iter().rev() {
-            next = clear_range(&next, span.start, span.end, &mut pieces)?;
+            next = clear_range(&next, span.start, span.end, None, &mut pieces)?;
             // Negated by subtraction rather than by `-length`, so an absurd
             // range cannot overflow on the negation.
             if let Some(why) = shift_clips(&mut next, span.end, span.start.saturating_sub(span.end))
@@ -180,9 +197,9 @@ impl Project {
         self.finish_placement(next, &unlocked)
     }
 
-    /// Removes everything between `from` and `to` on unlocked tracks and
-    /// leaves the hole open — `ripple_delete_range` without the close
-    /// (spec §6).
+    /// Removes everything between `from` and `to` on unlocked tracks, or on
+    /// the `tracks` given, and leaves the hole open — `ripple_delete_range`
+    /// without the close (spec §6).
     ///
     /// The lift is the cut that costs nothing downstream: every clip that
     /// starts at or after `to` keeps the moment it had, so a mix, a caption
@@ -198,14 +215,56 @@ impl Project {
     /// one that held nothing an unlocked track could give up, is an identity.
     /// Refused, nothing cut, when what it would store breaks THE overlap
     /// rule on a track it changed (spec §11 #427).
-    pub fn lift_range(&self, from: Ticks, to: Ticks) -> Result<Outcome, String> {
+    ///
+    /// **`tracks` holds the lift to the tracks named** (spec §11 #602):
+    /// only their clips are cut and removed, and every other track keeps
+    /// exactly what it had — a linked partner there too, which is neither
+    /// cut nor removed and keeps its link to the piece sharing more of its
+    /// time (AU-92), or loses it when that piece is the one removed. In
+    /// order: an unknown id is an `Err`, as `close_gap`'s is; a named LOCKED
+    /// track refuses the whole op in [`locked_track`]'s words, the first in
+    /// the caller's order, because naming a track is asking for it; an empty
+    /// list is an identity, as `split {clips: []}` is; a repeated id counts
+    /// once. `None` is every unlocked track, as it always was; Switch by
+    /// Speaker's Replace the shots on names its one track.
+    pub fn lift_range(
+        &self,
+        from: Ticks,
+        to: Ticks,
+        tracks: Option<&[u32]>,
+    ) -> Result<Outcome, String> {
+        let only = match tracks {
+            None => None,
+            Some(named) => {
+                let mut ids: Vec<u32> = Vec::new();
+                for &id in named {
+                    self.require_track(id)?;
+                    if !ids.contains(&id) {
+                        ids.push(id);
+                    }
+                }
+                let locked = ids
+                    .iter()
+                    .find(|&&id| self.track(id).is_some_and(|t| t.locked));
+                if let Some(&id) = locked {
+                    return Ok(Outcome::Refused(locked_track(
+                        id,
+                        "nothing on it can be lifted",
+                    )));
+                }
+                if ids.is_empty() {
+                    return Ok(Outcome::Identity);
+                }
+                Some(ids)
+            }
+        };
         let Some((start, end)) = ordered_range(self, from, to) else {
             return Ok(Outcome::Identity);
         };
         // No shift, so nothing can be brought into contact with anything
         // and no transition can be gained.
         let mut pieces = Pieces::new();
-        let next = clear_range(self, start, end, &mut pieces)?;
+        let next = clear_range(self, start, end, only.as_deref(), &mut pieces)?;
         if let Some(why) = self.cut_refusal(&next, &pieces) {
             return Ok(Outcome::Refused(why));
         }

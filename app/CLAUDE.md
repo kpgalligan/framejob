@@ -967,7 +967,8 @@ detail there.
   `ChannelMatrix`, the centred 100 ms level, the speech chunk per step. Since SW2b (spec §11
   SW-23, SW-26): `SpeakerSwitch+Edit.swift` (no `rc_*`) — `canOffer`, `muteDefault`,
   `replaceable` / `replaceRefusal` (Replace's five tests in order) and `edit`, SW-23's ops tried
-  one at a time through `SwitchAngle.Trial` (internal), the linked-angle refusal before any op;
+  one at a time through `SwitchAngle.Trial` (internal), Replace's clear one
+  `lift_range {tracks: [track]}` (spec §11 #602), the linked-angle refusal before any op;
   `SpeakerSwitch+Settings.swift` — the ranges, the four remembered keys
   (`FrameJobSwitchSpeakerMinShot`, `…Lead`, `…Crosstalk`, `…Bleed`, written only when changed),
   `summary`, `titles`, `microphoneChoices`; `SwitchSpeakerSheetController.swift` — the sheet,
@@ -4486,7 +4487,10 @@ free.
   +`Actions`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Render` — `render_frame` and `export`, spliced in place by `renderTools`, a pure move out of `+Files`, grading-2 G2-0 —, +`Recording` — `recordingTools()`, `record_screen`'s row and its four hoisted clauses, spliced back last by `fileTools`, a pure move out of `+Files`, camera-recording CR1-0, its argument descriptions in +`RecordingArguments` (`recordScreenArguments()`, CU0a U4) —, +`Graphics`,
   +`Tracks` — the five track rows, spliced back where they stood by
   `trackTools(trackDescription:)`, a pure move out of `AgentCatalog.swift`,
-  AP10c's toll T2 —, +`Declarations`)
+  AP10c's toll T2 —, +`Range` — `lift_range`, `insert_time` and
+  `close_gap`, spliced back after `audioTools` by
+  `rangeTools(ticks:trackDescription:)`, a pure move out of `+Clips`,
+  #602's toll —, +`Declarations`)
   — the catalog, spliced in ORDER (`+Actions`' rows are appended to
   `+Clips`' array last) (`recording_probe.py` reads the last eleven
   names). **A tool is built one of two ways**: `tool`, which declares its own
@@ -4971,7 +4975,10 @@ free.
 - `OptionDisplayControl+Snapshot.swift` — (dev tools) a read-out's text as an
   `option.display` part in `snapshot_ui`'s layout dump.
 - `AgentServer+Arguments.swift` — the shared argument vocabulary
-  (`intArg`, `intsArg`, `timeArg`, `rangesArg`, `rawPatchArg`, `enumArg` /
+  (`intArg`, `intsArg`, `timeArg`, `rangesArg`, `optionalTracksArg` —
+  `lift_range`'s `tracks`, track ids modelled on `optionalClipsArg`, an
+  empty list refused by name —,
+  `rawPatchArg`, `enumArg` /
   `requiredEnumArg` — the one reader of a string-valued enum, with its
   `label` and `folding` — …), each refusing a
   value it cannot read BY NAME, and ONLY what the core cannot know: target

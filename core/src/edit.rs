@@ -132,7 +132,7 @@
 //! | `ripple_delete` | Removes, then closes each removed span across every unlocked track. Markers do not move. Each clip's linked partner on an unlocked track is removed too, either half named (AU-91). |
 //! | `ripple_delete_range` | Splits every unlocked clip at both bounds, removes the middles, then closes the hole. A reversed range is the same range. Every shift (this, `ripple_delete`, `ripple_delete_ranges`, `close_gap`, `insert_time`, `add_transition`'s ripple form) moves each moved clip's linked partner on an unlocked track too, and refuses, nothing moved, when that would take a partner below 0: "clip S would start before 0: it leads its linked clip P by N ticks" (AU-91). Refused, nothing cut, when what the range op would store breaks THE overlap rule on a track it changed, judged once on the result and not at each cut (#427). |
 //! | `ripple_delete_ranges` | Several `[from, to]` pairs as one edit — the silence cut. Each pair is snapped, clamped and ordered as `ripple_delete_range`'s one is, the pairs are then MERGED (touching as well as overlapping) and the survivors cut and closed right to left, so the op is merge-then-cut and not N `ripple_delete_range`s. Markers do not move. An empty list, and one that merges to nothing, change nothing. Refuses as `ripple_delete_range` does when a shift would take a linked partner below 0, and WHOLE when what the list would store breaks THE overlap rule (#427). |
-//! | `lift_range` | `ripple_delete_range` without the close: every unlocked clip is split at both bounds and the middles removed, and nothing moves. A reversed range is the same range. Refused as `ripple_delete_range` is under THE overlap rule (#427). |
+//! | `lift_range` | `ripple_delete_range` without the close: every unlocked clip is split at both bounds and the middles removed, and nothing moves. A reversed range is the same range. With `tracks`, only the clips on those tracks are cut and removed: every other track keeps exactly what it had, a linked partner there included — not cut, not removed, its link the uncut partner's of `split` (AU-92) — and a named locked track refuses the whole op, "track N is locked, so nothing on it can be lifted"; an unknown id is an `Err`, an empty list an identity, a repeated id counted once (#602). Absent or null, every unlocked track. Refused as `ripple_delete_range` is under THE overlap rule (#427). |
 //! | `keep_range` | The project as `[from, to)` of its top-level timeline, moved to start at 0 (spec §11 CJ-50, `edit_keep_range.rs`): both bounds snapped and clamped to 0, `to` not after `from` an `Err`; every clip on every track, locked or not, cut at both bounds by `split`'s rules; at an edge inside a transition the piece beyond the edge is dropped and the incoming piece starting at `from` hard-starts (no `transition_in`), the incoming piece kept when both bounds lie in one overlap; clips not wholly inside removed, the rest and the markers inside moved by −`from`, markers outside removed; nests no kept clip reaches and media no kept clip plays, names in a look or converts through removed; tracks and canvas unchanged. Refused: a nest clip across an edge, nothing left to play, and a transition inside the range whose clip an edge cut too short for it. Document-level, with no tool: it is applied to a derived document only (CJ5b). |
 //! | `insert_time` | Opens a hole: every unlocked clip, and every marker, at or after `at` moves right by `length`. |
 //! | `close_gap` | Closes the empty span on `track` that contains `at`, bounded by the nearest clip edges there: everything from its far side shifts left by its length, across every unlocked track. Refuses on a locked `track`, on an `at` that is on a clip, with no clip after the gap, and when the shift would break the overlap rule — a gap closes fully or not at all. A linked partner of a moved clip moves too, and a partner the shift would take below 0 refuses (AU-91). |
@@ -397,9 +397,12 @@ pub enum Op {
     RippleDeleteRanges {
         ranges: Vec<[Ticks; 2]>,
     },
+    /// `tracks` absent means every unlocked track (spec §11 #602).
     LiftRange {
         from: Ticks,
         to: Ticks,
+        #[serde(default)]
+        tracks: Option<Vec<u32>>,
     },
     KeepRange {
         from: Ticks,
@@ -950,7 +953,7 @@ impl Project {
             Op::RippleDelete { clips } => self.ripple_delete(clips),
             Op::RippleDeleteRange { from, to } => self.ripple_delete_range(*from, *to),
             Op::RippleDeleteRanges { ranges } => self.ripple_delete_ranges(ranges),
-            Op::LiftRange { from, to } => self.lift_range(*from, *to),
+            Op::LiftRange { from, to, tracks } => self.lift_range(*from, *to, tracks.as_deref()),
             Op::KeepRange { from, to } => self.keep_range(*from, *to),
             Op::InsertTime { at, length } => self.insert_time(*at, *length),
             Op::CloseGap { track, at } => self.close_gap(*track, *at),

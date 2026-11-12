@@ -270,15 +270,18 @@ extension AgentServer {
     }
 
     /// `lift_range` — ⌫ with an in/out range and NOTHING selected
-    /// (`deleteSelection`), the counterpart of `ripple_delete_range`'s ⌘⌫.
+    /// (`deleteSelection`), the counterpart of `ripple_delete_range`'s ⌘⌫; with
+    /// `tracks`, the clear Switch by Speaker's Replace the shots on makes on its
+    /// track (`SpeakerSwitch.edit`, spec §11 #602).
     func liftRange(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let from = try timeArg(a, "from", document)
         let to = try timeArg(a, "to", document)
+        let tracks = try optionalTracksArg(a, "tracks", document)
         guard to > from else {
             throw ToolError(message: "to must be after from (got \(from) and \(to)).")
         }
-        return try editResult(document, "Lift", [.liftRange(from: from, to: to)])
+        return try editResult(document, "Lift", [.liftRange(from: from, to: to, tracks: tracks)])
     }
 
     /// `insert_time` — the gap-opening edit of spec §4.4. It has no menu

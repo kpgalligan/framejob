@@ -27,8 +27,18 @@ extension AgentServer {
                     + "removed, and nothing moves: every clip after the range keeps the moment "
                     + "it had, which is what makes this the safe cut when a mix or a caption "
                     + "track is already timed. Refused, nothing cut, when a piece left is too short "
-                    + "for its transition. Use ripple_delete_range to close the hole instead.",
-                ["from": "Range start, \(ticks)", "to": "Range end, \(ticks)"]),
+                    + "for its transition. Use ripple_delete_range to close the hole instead. "
+                    + "With `tracks`, only the clips on those tracks are cut and removed — "
+                    + "Switch by Speaker's Replace the shots on clears its track this way — and "
+                    + "every other track keeps exactly what it had: a clip there linked to one "
+                    + "being cut (detach_audio's pair) is not cut, and stays linked to the piece "
+                    + "it shares more time with, unless that piece is the one removed. A locked "
+                    + "track in the list refuses the whole lift.",
+                [
+                    "from": "Range start, \(ticks)", "to": "Range end, \(ticks)",
+                    "tracks": "Track ids (get_project lists them) to lift the range on those "
+                        + "tracks alone. Leave it out for every unlocked track.",
+                ]),
             opTool(
                 "insert_time",
                 "Opens a gap: every unlocked clip starting at or after `at` moves right by "
