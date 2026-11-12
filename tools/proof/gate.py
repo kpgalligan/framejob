@@ -387,7 +387,7 @@ def selftest(mutant=None):
         for index, (name, message) in enumerate(pairs):
             lines += [f"app/Sources/{name}:{100 + index}:9: warning: {message}",
                       f"    |    `- warning: {message}"]
-        return "\n".join(lines) + extra + "\n$ tsc --noEmit\n"
+        return "\n".join(lines) + extra + "\n"
 
     row("W0", typecheck_verdict(log(TYPECHECK_BASELINE), 0) is None,
         "CONTROL: the four baseline warnings, at any line, each with its caret line, pass")

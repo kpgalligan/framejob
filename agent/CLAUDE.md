@@ -1,19 +1,18 @@
 # agent/CLAUDE.md — the assistant helper's rules
 
 Applies to everything under `agent/`. The shipped helper is the SwiftPM package here
-(`Package.swift`, `Sources/`, `Tests/`; spec §11 SA-1..SA-10, SA-12, in
+(`Package.swift`, `Sources/`, `Tests/`; spec §11 SA-1..SA-13, in
 `designs/spec/11-decisions/swift-helper.md`), the agent loop of
 `Contents/Helpers/framejob-agent`, started once per window's conversation by
 `AssistantSession`: every app build makes its release product with
-`tools/agent/build_helper.sh` (SA-8). The Bun-compiled TypeScript in `src/` (`build.sh`,
-`package.json`, `bun.lock`, `tsconfig.json`, `entitlements.plist`; spec §11 AI-1) stays beside it
-only for `make typecheck`'s tsc and `tools/proof/agent_helper_drive.py`'s Bun side until road map
-"swift-helper" (`designs/swift-helper.md`, #599) deletes it in its SA4. The package was ported
-once from Doctored's helper at that repository's `b524babc` (the owner's answer 2 (a)) and has
-no identity rule with it. `make agent-test` runs its suite through `tools/agent/agent_test.py`,
-and `tools/proof/agent_helper_drive.py` (SA2, in `make test`) runs the release helper beside the
-Bun helper over the same conversations on the stand-in API and fails any difference outside its
-allowed list.
+`tools/agent/build_helper.sh` (SA-8). Nothing else lives here: the Bun helper and its
+TypeScript were deleted in road map "swift-helper" (`designs/swift-helper.md`, #599) SA4
+(SA-11). The package was ported once from Doctored's helper at that repository's `b524babc`
+(the owner's answer 2 (a)) and has no identity rule with it or with Rasterize. `make
+agent-test` runs its suite through `tools/agent/agent_test.py`, and
+`tools/proof/agent_helper_drive.py` (in `make test`) runs the release helper over scripted
+conversations on the stand-in API and fails any difference from its recordings in
+`tools/proof/agent_helper_recorded/` (SA-13).
 
 ## Module map
 
@@ -39,8 +38,8 @@ One line per file; each file's doc comments hold its detail.
 - `ContextUsage.swift` — the context-meter arithmetic and cleared tool results.
 - `ToolResults.swift` — MCP CallToolResult → tool_result blocks and the tab's summary.
 - `ClientFactory.swift` — the Slaude client per configure, behind the `MessagesAPI` seam.
-- `Pricing.swift` — `PriceTable`, `Price` and `Pricing.price`, `src/pricing.ts`'s steps in order
-  (spec §11 P-2, SA-3).
+- `Pricing.swift` — `PriceTable`, `Price` and `Pricing.price`, the same steps in the same order
+  as `tools/proof/prices.py` (spec §11 P-2, SA-3).
 - `PriceTable.swift` — `PriceSource`, `LoadedPrices`, `PriceOptions` and `PriceTables`: the parse,
   the LiteLLM reducer, the feed rule, the bundled table, the prices at configure.
 - `PriceRefresh.swift` — the daily refresh on URLSession and the cache's write.
@@ -49,7 +48,7 @@ One line per file; each file's doc comments hold its detail.
 - `Tests/FrameJobAgentKitTests/` — XCTest; `Support/` holds the scripted transport, the SSE
   builders and the 127.0.0.1 loopback server.
 - `prices/` — `anthropic.json` (written only by `make prices`), and `cases.json` and
-  `reduce_cases.json`, which both helpers' price code and `tools/proof/prices.py` answer.
+  `reduce_cases.json`, which the helper's price code and `tools/proof/prices.py` answer.
 
 ## Rules
 
@@ -59,10 +58,13 @@ One line per file; each file's doc comments hold its detail.
   loosely, so a renamed type or field fails silently there; change one only with its app side and
   spec §11 (SA-6). The sentences the tab shows (the refusals, `API error <status>: …`,
   `API error: …`, the three end-of-turn sentences) are pinned by tests.
-- **A difference from the Bun helper is a decision first.** Until SA4 deletes the Bun side, a
-  change that makes the Swift helper's events, requests or wording differ from the Bun
-  helper's fails `tools/proof/agent_helper_drive.py`; it lands with its spec §11 SA- entry and
-  a row in the drive's `ALLOWED` naming it, never by widening an existing row.
+- **A change to what the helper sends or says is a decision first.** A change that makes its
+  events, requests or wording differ from the recordings fails
+  `tools/proof/agent_helper_drive.py`; it lands with its spec §11 SA- entry and the recordings
+  rewritten by `--record` in the same commit, whose diff shows the change. Only two re-records
+  need no new entry (SA-13): a `make prices` refresh (only `dollars` and the bundled table's
+  `as_of` move) and a Slaude re-pin (only the client's own headers and its parser's words).
+  Never re-record to make a failure pass.
 - **History is verbatim and append-only**: `[RawJSON]` exactly as received, replayed byte for
   byte. Never route it through typed models, `JSONValue` or sorted keys. The only rewrites are the
   compaction swap at turn end and the `pushUserText` merge into an unanswered user message.
