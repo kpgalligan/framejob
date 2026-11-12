@@ -30,10 +30,10 @@ audio_ap6_proof.py's V2, V12 and V13.
   E10 `needsRender`: each of the nine keys (the leveller since AP6b) true; pan, mono, channels, the
       limiter, the volume, fades, a bypassed or empty EQ and an inert voice
       false. On a clip (AU-159 (a), #402): each of the eight stages an action
-      can switch on, only at an action's end, true; pan, mono, channels, a
-      limiter, a volume, a null EQ or gate and a 0 isolation or noise
-      reduction at an end false; a gate at the end of an action of no
-      duration false.
+      can switch on, and a limiter or a null limiter (AU-165 (a)), only at an
+      action's end, true; pan, mono, channels, a volume, a null EQ or gate
+      and a 0 isolation or noise reduction at an end false; a gate or a
+      limiter at the end of an action of no duration false.
   E11 `plan(solved:)` keeps the clip's volume at 0.04 dB and writes the solve
       at 0.06 dB or with another limiter; a cache row is never kept; the keep
       rule compares the clip's OWN limiter, so a clip with none whose reading
@@ -49,8 +49,21 @@ audio_ap6_proof.py's V2, V12 and V13.
       ceiling at an action's end is another key; another end volume is not;
       a limiter keyed off at a later action's end is another key than the
       limiter left on.
+  E15 (AU-165 (a), (b), #402) `endSetsLimiter`: true for a limiter at an
+      action's end, a null one (keyed off) and one beside a gate; false for
+      one at the end of an action of no duration, an end with no `limiter`
+      key, the clip's own limiter alone and no clip. `verifiesByRender` over
+      its four cases (only no limiter and no end limiter answers from R0).
+  E16 (AU-165 (c)) `Verified.holds` at its own volume and 0.04 dB away
+      (true), 0.06 dB away, under another limiter and at volume 0 (false), a
+      limited render with no limiter (false); the memo answers a verify
+      render stored beside an R0 and the next R0 for the key drops it.
+  E17 (AU-165 (b)) `limiterGoesOn`: R0's peak 0.01 dB under −1 dBTP at the
+      volume stays off, 0.01 dB over goes on, a limiter already on is not
+      asked; `AudioNormalize.ceilingLimiter`: the default at −1 dBTP, a
+      clip's own lowered to −1 or kept under it.
 
---mutants runs M1–M6 and M8–M20 (M7 is the loudness probe's), each over its
+--mutants runs M1–M6 and M8–M26 (M7 is the loudness probe's), each over its
 own copy of app/Sources, scored killed when its named row fails. Build failures
 are scored. Needs samples/Rode-usb-mic.m4a. Output is under
 tools/proof/work/audio-ap6-probe.
@@ -67,7 +80,8 @@ ROOT = Path(__file__).resolve().parents[2]
 RODE = ROOT / "samples/Rode-usb-mic.m4a"
 WORK = ROOT / "tools/proof/work/audio-ap6-probe"
 FIXTURES = WORK / "fixtures"
-ROWS = ["E1", "E2", "E3", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13", "E14"]
+ROWS = ["E1", "E2", "E3", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13", "E14", "E15",
+        "E16", "E17"]
 
 MUTANTS = [
     ("M1 noisy-gap", "E1", "AudioEnhance.swift",
@@ -125,6 +139,25 @@ MUTANTS = [
      'let value = limiter.map { "\\($0.ceilingDb),\\($0.release)" } ?? "off"',
      'guard let held = limiter else { continue }\n'
      '            let value = "\\(held.ceilingDb),\\(held.release)"'),
+    # AU-165 (#402): an action-end limiter renders, is verified by render, and At
+    # volume reads the verify render while the clip is at its volume and limiter.
+    ("M21 end-limiter-not-rendered", "E10", "ProcessedLoudness.swift",
+     "if needsRender(clip.audio) || endSetsLimiter(clip) { return true }",
+     "if needsRender(clip.audio) { return true }"),
+    ("M22 verify-only-under-a-limiter", "E15", "LoudnessMeasureRun.swift",
+     "limiter != nil || endLimiter", "limiter != nil"),
+    ("M23 null-limiter-not-counted", "E15", "ProcessedLoudness.swift",
+     "if case .some = end.limiter { return true }",
+     "if case .some(.some) = end.limiter { return true }"),
+    ("M24 holds-at-any-volume", "E16", "ProcessedLoudness.swift",
+     "return abs(20 * log10(current / volume)) <= AudioNormalize.keepVolumeDB",
+     "return true"),
+    ("M25 r0-keeps-verified", "E16", "ProcessedLoudness.swift",
+     "            verified.removeValue(forKey: key)\n",
+     ""),
+    ("M26 limiter-never-goes-on", "E17", "LoudnessMeasureRun.swift",
+     "limiter == nil && truePeak * volume > pow(10, AudioNormalize.ceilingDBTP / 20)",
+     "false && limiter == nil && truePeak * volume > 0"),
 ]
 
 

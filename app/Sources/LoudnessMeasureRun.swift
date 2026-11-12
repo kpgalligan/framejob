@@ -22,8 +22,9 @@ final class AudioMeasureOutcomeBox<Outcome> {
 }
 
 /// One press's processed measurement (spec §11 AU-64 (b), (e)): clip by
-/// clip, R0 through the clip's chain, the solve, and the limiter's verify
-/// renders. Loudness Normalize and Enhance Voice both build one, through
+/// clip, R0 through the clip's chain, the solve, and the verify renders
+/// under a limiter or an action-end limiter (AU-165 (b)). Loudness Normalize
+/// and Enhance Voice both build one, through
 /// `AudioMeasureDoor` and their tools, so the button, the menu and the tool
 /// solve alike.
 ///
@@ -180,17 +181,40 @@ final class LoudnessMeasureRun: AudioMeasureRunning {
         }
         let key = ProcessedLoudness.key(
             clip: job.reading.clip, project: trial, document: recipeKey)
+        let endLimiter = ProcessedLoudness.endSetsLimiter(trial.snapshot.clip(job.reading.clip))
         render(trial, job.reading.clip) { [weak self] rendered in
             guard let self else { return }
             guard case .steps(let steps, let peaks) = rendered else { return self.settle(job, rendered) }
             if let key { ProcessedLoudness.Memo.shared.store(key, steps: steps, peaks: peaks) }
-            self.solve(job, chain: chain, steps: steps, peaks: peaks)
+            self.solve(
+                job, chain: chain, steps: steps, peaks: peaks,
+                verified: endLimiter ? key : nil, endLimiter: endLimiter)
         }
     }
 
-    /// AU-64 (e): R0's reading through AU-24's plan; with a limiter, the
-    /// verify renders.
-    private func solve(_ job: Job, chain: AudioPatch, steps: [Double], peaks: [Double]) {
+    /// AU-165 (b): whether a solve is checked by render: under the limiter
+    /// the plan sets, or on a clip an action's end sets a limiter on
+    /// (`ProcessedLoudness.endSetsLimiter`), whose threshold follows the base
+    /// volume (AU-22), so R0 at volume 1 does not say how it bites.
+    static func verifiesByRender(limiter: LimiterProps?, endLimiter: Bool) -> Bool {
+        limiter != nil || endLimiter
+    }
+
+    /// AU-165 (b): AU-24's question asked again at a volume the loop steps
+    /// to, for a clip with no limiter: whether R0's true peak (linear, at
+    /// volume 1) times `volume` passes the ceiling, so the limiter goes on.
+    static func limiterGoesOn(_ limiter: LimiterProps?, truePeak: Double, volume: Double) -> Bool {
+        limiter == nil && truePeak * volume > pow(10, AudioNormalize.ceilingDBTP / 20)
+    }
+
+    /// AU-64 (e): R0's reading through AU-24's plan; with a limiter, or an
+    /// action-end limiter (AU-165 (b)), the verify renders. `verified`, the
+    /// R0's memo key on a clip with an action-end limiter, is where the
+    /// answering verify render is kept for At volume (AU-165 (c)).
+    private func solve(
+        _ job: Job, chain: AudioPatch, steps: [Double], peaks: [Double],
+        verified: ProcessedLoudness.Key?, endLimiter: Bool
+    ) {
         let lufs = StepLoudness.integrated(steps) ?? job.reading.lufs
         let peak = max(peaks.max() ?? 0, .leastNormalMagnitude)
         let processed = AudioNormalize.LoudnessReading(
@@ -198,36 +222,55 @@ final class LoudnessMeasureRun: AudioMeasureRunning {
             steps: steps, stepPeaks: peaks, limiter: job.reading.limiter,
             materialLUFS: job.reading.lufs, currentVolume: job.reading.currentVolume,
             currentLimiter: job.reading.currentLimiter)
-        let planned = AudioNormalize.plan(
-            AudioNormalize.LoudnessInput(readings: [processed], problems: []),
-            targetLUFS: targetLUFS)
-        guard let row = planned.normalized.first else {
+        guard let row = planned(processed) else {
             return skip(job, "its processing could not be measured: no volume could be solved.")
         }
-        guard let limiter = row.limiter else {
+        guard Self.verifiesByRender(limiter: row.limiter, endLimiter: endLimiter) else {
             readings.append(processed)
             solved[job.reading.clip] = AudioNormalize.Solved(
                 volume: row.volume, limiter: nil, resultLUFS: row.resultLUFS,
                 resultTruePeakDBTP: row.resultTruePeakDBTP, limit: row.limit, renders: 1)
             return advance()
         }
-        verify(job, processed, chain: chain, volume: row.volume, limiter: limiter, verifies: 0)
+        verify(
+            job, processed, chain: chain, at: Step(volume: row.volume, limiter: row.limiter),
+            verifies: 0, renders: 1, verified: verified)
+    }
+
+    /// AU-24's plan of one reading: its volume and limiter.
+    private func planned(_ reading: AudioNormalize.LoudnessReading)
+        -> AudioNormalize.LoudnessResult?
+    {
+        AudioNormalize.plan(
+            AudioNormalize.LoudnessInput(readings: [reading], problems: []),
+            targetLUFS: targetLUFS
+        ).normalized.first
+    }
+
+    /// The volume and limiter one verify render runs the chain at.
+    private struct Step {
+        let volume: Double
+        let limiter: LimiterProps?
     }
 
     /// One verify render of the chain with `{volume, limiter}` (the stage
-    /// told the volume, AU-22), read through the fader at that volume, so R
-    /// is its loudness as it stands; again, nearer, while it misses the
-    /// target by more than the tolerance, the volume can still move toward it
-    /// (not at the ceiling and short) and fewer than `maximumVerifyRenders`
-    /// have run.
+    /// told the volume, AU-22; a null limiter when there is none, AU-165
+    /// (b)), read through the fader at that volume, so R is its loudness as
+    /// it stands; again, nearer, while it misses the target by more than the
+    /// tolerance, the volume can still move toward it (not at the ceiling and
+    /// short) and fewer than `maximumVerifyRenders` have run since the loop
+    /// began. With no limiter, a step whose volume puts R0's true peak past
+    /// the ceiling starts the loop again under AU-24's limiter, where AU-24's
+    /// plan starts it (`limiterGoesOn`), so a second press runs what this one
+    /// ended on. `renders` counts R0 and every verify before this one.
     private func verify(
-        _ job: Job, _ processed: AudioNormalize.LoudnessReading, chain: AudioPatch,
-        volume: Double, limiter: LimiterProps, verifies: Int
+        _ job: Job, _ processed: AudioNormalize.LoudnessReading, chain: AudioPatch, at step: Step,
+        verifies: Int, renders: Int, verified: ProcessedLoudness.Key?
     ) {
         guard !cancelled.isSet else { return answer(nil) }
         var patch = chain
-        patch.volume = volume
-        patch.limiter = .some(limiter)
+        patch.volume = step.volume
+        patch.limiter = .some(step.limiter)
         guard let trial = trial(job.reading.clip, patch) else {
             return skip(job, "its processing could not be measured: its settings were refused.")
         }
@@ -240,22 +283,41 @@ final class LoudnessMeasureRun: AudioMeasureRunning {
             let peak = peaks.max() ?? 0
             let count = verifies + 1
             let target = self.targetLUFS
+            let volume = step.volume
             let capped = volume >= AudioNormalize.maxGain && result < target
             if abs(result - target) > Self.verifyToleranceLU, !capped,
                 count < Self.maximumVerifyRenders
             {
                 let nearer = min(volume * pow(10, (target - result) / 20), AudioNormalize.maxGain)
+                var next = Step(volume: nearer, limiter: step.limiter)
+                var loop = count
+                if Self.limiterGoesOn(step.limiter, truePeak: processed.truePeak, volume: nearer) {
+                    var limited = processed
+                    limited.limiter = AudioNormalize.ceilingLimiter(nil)
+                    guard let row = self.planned(limited), let chosen = row.limiter else {
+                        return self.skip(
+                            job, "its processing could not be measured: no volume could be solved.")
+                    }
+                    next = Step(volume: row.volume, limiter: chosen)
+                    loop = 0
+                }
                 return self.verify(
-                    job, processed, chain: chain, volume: nearer, limiter: limiter,
-                    verifies: count)
+                    job, processed, chain: chain, at: next, verifies: loop,
+                    renders: renders + 1, verified: verified)
+            }
+            if let verified {
+                ProcessedLoudness.Memo.shared.storeVerified(
+                    verified,
+                    ProcessedLoudness.Verified(
+                        volume: volume, limiter: step.limiter, lufs: result, truePeak: peak))
             }
             self.readings.append(processed)
             self.solved[job.reading.clip] = AudioNormalize.Solved(
-                volume: volume, limiter: limiter, resultLUFS: result,
+                volume: volume, limiter: step.limiter, resultLUFS: result,
                 resultTruePeakDBTP: peak > 0 ? 20 * log10(peak) : -.infinity,
                 limit: volume >= AudioNormalize.maxGain
                     && result < target - Self.verifyToleranceLU ? .maxGain : nil,
-                renders: 1 + count)
+                renders: renders + 1)
             self.advance()
         }
     }

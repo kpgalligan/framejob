@@ -62,6 +62,8 @@ The fast reading can't hear EQ, Hum, Voice Isolation, Noise Reduction, the Gate,
 - If [Normalize](/audio/normalize/) in Loudness mode or [Enhance Voice](/audio/enhance-voice/) has measured the clip as it is now, the row reads that measurement.
 - Otherwise the figure is the one before the processing and starts with "≈". Its tooltip says so.
 
+On a clip where an action switches a [limiter](/audio/limiter/) on or off, that measurement only holds at the **Volume** and **Limiter** it was made at, because how hard an action's limiter works depends on the clip's volume. Change either, and the row shows "≈" again, its tooltip saying the action's limiter hasn't been measured at this volume.
+
 **At volume** doesn't measure on its own, so "≈" stays until you press one of those two.
 
 ### What the readouts can show instead

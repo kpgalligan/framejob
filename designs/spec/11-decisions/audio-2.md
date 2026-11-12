@@ -209,7 +209,7 @@ Enhance at record time (B8) the third, with AU-68 and AU-69.
   has an `eq` with an active slot and not bypassed, `hum`, `isolation` > 0, `noise_reduction` >
   0, a `gate`, a `de_esser`, a `compressor` or a voice that is not inert. Pan, mono, channels
   and the limiter are already counted or modelled by the cache reading (AU-11, AU-24), so a clip
-  with only those plans off the cache, byte for byte as before. Enhance always renders. An action's end counts too: AU-159 (a).
+  with only those plans off the cache, byte for byte as before. Enhance always renders. An action's end counts too: AU-159 (a), and its limiter: AU-165 (a).
   (b) **The trial.** On main, `document.project` with one `set_audio {clips: [c], patch:
   chain}` scoped to the open nest, then `.scoped(nest)`. The first render's (R0) chain is
   Normalize's `{limiter: null}`, or Enhance's chosen patch with `limiter: null`. AU-159 (b).
@@ -241,6 +241,7 @@ Enhance at record time (B8) the third, with AU-68 and AU-69.
   v ← min(v·10^((T − R)/20), ×32) and render again.
   `limited_by` is `max_gain` when the last R is under T − 0.1 at ×32. Enhance and Loudness
   Normalize solve the same way, so Normalize after Enhance measures what Enhance measured.
+  An action-end limiter verifies by render too, and the limiter can go on mid-loop: AU-165 (b).
   (f) **Idempotence.** A rendered clip that already carries the solved limiter and whose volume
   is within 0.05 dB of v keeps its volume, so a second press is an identity. 0.05 dB is twice
   the 0.025 dB a re-rendered isolation window differing by −51 dB (S2) can move a loudness. A
@@ -249,7 +250,8 @@ Enhance at record time (B8) the third, with AU-68 and AU-69.
   reads the last R0 measured for the clip's current plan and chain (`ProcessedLoudness.Memo`, 32
   entries, emptied when a loudness file or an offline render lands), through the limiter model at
   the current volume as AU-26 does; with none it shows the cache figure as "≈ …", its tooltip
-  saying it is before the clip's processing. No background measurement. Amended: AU-159 (g).
+  saying it is before the clip's processing. No background measurement. Amended: AU-159 (g),
+  AU-165 (c).
   (h) `AudioDynamicsModel` stays only for Enhance's makeup (AU-62); nothing else reads it.
   (i) **Repeatability, measured (2026-10-31, AP6b step 3, the owner's order to fix the
   non-repeat).** AP6b's first build recorded three Enhance presses on the steady `say` fixture

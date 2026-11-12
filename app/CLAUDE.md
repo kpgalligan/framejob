@@ -3795,13 +3795,18 @@ free.
   never reads it.
 - `ProcessedLoudness.swift` — a clip measured through its own chain (spec §11
   AU-64): `needsRender` (the base audio, or a stage an action's end switches
-  on, AU-159), the measurement plan (the clip's segments, pre-fader
+  on, AU-159, or a limiter an action's end sets or keys off, `endSetsLimiter`,
+  AU-165), the measurement plan (the clip's segments, pre-fader
   but for one constant ramp at the trial's base volume), the render under a
   fresh key through `Exporter.withOfflineAudio`, the build and one float mix
-  read into a `StepLoudnessMeter`, and At volume's `Memo`.
+  read into a `StepLoudnessMeter`, and At volume's `Memo` (R0, and beside it
+  on a clip with an action-end limiter the verify render that answered a
+  press, `Verified`, AU-165).
 - `LoudnessMeasureRun.swift` — one press's renders, clip by clip: R0, the
-  solve through Loudness Normalize's plan, the limiter's verify renders
-  (±0.1 LU, at most three); cancel; `finish`, which releases the render wants.
+  solve through Loudness Normalize's plan, the verify renders under a limiter
+  or an action-end limiter (±0.1 LU, at most three; `verifiesByRender`, and
+  `limiterGoesOn`, which starts the loop again under AU-24's limiter, AU-165);
+  cancel; `finish`, which releases the render wants.
   It also holds `AudioMeasureRunning`, the protocol the Measuring Sound sheet,
   `AudioMeasureDoor.measure` and `AgentServer.awaitMeasurement` take (this
   run and `AudioMatchRun`), and `AudioMeasureOutcomeBox`; `static trial`

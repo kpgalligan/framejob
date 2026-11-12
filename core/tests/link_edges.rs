@@ -455,6 +455,67 @@ fn an_overwrite_leaves_a_linked_picture_on_a_locked_track_whole() {
     }
 }
 
+/// The 2 s roll overwritten at `at` onto the sound of a pair whose picture's
+/// track is locked.
+fn overwrite_on_a_locked_pair(at: i64) -> Value {
+    pair_and_roll()
+        .apply(&json!({"op": "set_track", "track": 2, "locked": true}))
+        .apply(&json!({"op": "overwrite_clip", "track": 1, "media": 8, "at": at}))
+        .value()
+}
+
+#[test]
+fn an_overwrite_keeps_a_locked_pictures_link_only_where_its_cuts_leave_it() {
+    // Spec §11 AU-166: each cut links the uncut picture to the half sharing
+    // more of its time (the first on a tie), so the link follows the cuts in
+    // order, not the longest piece left. The sound is (2 s, 6 s).
+
+    // L 1, M 2, R 3 s: the first cut (3 s) links the half from 3 s (5 s
+    // against 1), the second (5 s) the tail (3 s against 2), which stays.
+    let after = overwrite_on_a_locked_pair(3 * SEC);
+    assert_eq!(span(&after, 10), (2 * SEC, 6 * SEC), "the picture is whole");
+    assert!(!has(&after, 101), "the sound under the new clip is gone");
+    assert_eq!(span(&after, 102), (5 * SEC, 3 * SEC));
+    assert_eq!(span(&after, 103), (3 * SEC, 2 * SEC), "the new clip");
+    assert_eq!(
+        (linked(&after, 10), linked(&after, 102)),
+        (Some(102), Some(10)),
+        "the picture keeps the tail"
+    );
+    assert_eq!((linked(&after, 100), linked(&after, 103)), (None, None));
+
+    // L 2.5, M 2, R 1.5 s: the first cut (4.5 s) links the half from 4.5 s
+    // (3.5 s against 2.5), the second (6.5 s) its head, the 2 s under the new
+    // clip (2 against 1.5), so the pair is over though L is the longest.
+    let after = overwrite_on_a_locked_pair(4 * SEC + SEC / 2);
+    assert_eq!(span(&after, 10), (2 * SEC, 6 * SEC), "the picture is whole");
+    assert!(!has(&after, 101), "the sound under the new clip is gone");
+    assert_eq!(span(&after, 100), (2 * SEC, 2 * SEC + SEC / 2));
+    assert_eq!(span(&after, 102), (6 * SEC + SEC / 2, SEC + SEC / 2));
+    assert_eq!(
+        span(&after, 103),
+        (4 * SEC + SEC / 2, 2 * SEC),
+        "the new clip"
+    );
+    for id in [10, 100, 102, 103] {
+        assert_eq!(linked(&after, id), None, "clip {id}");
+    }
+
+    // L 4, M 2 s, the file ending where the sound ends: one cut (6 s), and
+    // the head (4 s against 2) keeps the picture.
+    let after = overwrite_on_a_locked_pair(6 * SEC);
+    assert_eq!(span(&after, 10), (2 * SEC, 6 * SEC), "the picture is whole");
+    assert!(!has(&after, 101), "the sound under the new clip is gone");
+    assert_eq!(span(&after, 100), (2 * SEC, 4 * SEC));
+    assert_eq!(span(&after, 102), (6 * SEC, 2 * SEC), "the new clip");
+    assert_eq!(
+        (linked(&after, 10), linked(&after, 100)),
+        (Some(100), Some(10)),
+        "the picture keeps the head"
+    );
+    assert_eq!(linked(&after, 102), None);
+}
+
 #[test]
 fn an_overwrite_on_the_sounds_track_cuts_the_linked_picture_at_both_ends() {
     let after = pair_and_roll()

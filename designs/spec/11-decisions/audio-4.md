@@ -478,16 +478,16 @@ recorded before its code, continuing AU-109's block.
   `isolation` or `noise_reduction` above 0. It is read from the clip in the snapshot, never the
   plan, the playhead or the selected action. It errs toward a render (an end's EQ counts
   whatever its slots; an action outside the played window counts): a render is always a right
-  reading and costs seconds, a missed one is the defect. `voice` stays the base's (AU-88).
+  reading and costs seconds, a missed one is the defect. `voice` stays the base's (AU-88). An end's `limiter`, a null included: AU-165 (a).
   (b) **R0 and an action-end limiter.** R0 clears the BASE limiter only. A limiter an action's
   end switches on stays in the segment's automation and R0 is measured through it, at volume 1.
   Where the solve sets a base limiter, its verify renders run the action's limiter at the
   solved volume and converge (V16 (f): the export at −20.11 LUFS for −20, `result_lufs` the
-  same, four renders). **Open, held for the owner on #402:** where the solve needs no base
-  limiter it answers after R0 alone (AU-64 (e)), and an action-end limiter, whose divisor is the
-  base volume (AU-22), then acts at a volume no render measured: V16 (g) (an end limiter at
-  −24 dBTP, target −30) answered `result_lufs` −30.00 and exported at −32.57 LUFS. That arm is
-  as it was before this entry for a clip with a base stage; no rule is chosen here for it.
+  same, four renders). **Closed by AU-165 (b) (#402):** where the solve needed no base limiter
+  it answered after R0 alone (AU-64 (e)), and an action-end limiter, whose divisor is the base
+  volume (AU-22), then acted at a volume no render measured: V16 (g) (an end limiter at −24
+  dBTP, target −30) answered `result_lufs` −30.00 and exported at −32.57 LUFS. Such a clip now
+  verifies by render with or without a limiter of its own, and a limiter at an end renders.
   (g) **At volume.** Its test is (a)'s, and on a clip that renders it reads the clip's BASE
   volume and limiter (AU-26's model on R0's steps), so it is one figure whatever action is
   selected; an action-end limiter is in R0's steps at volume 1 and is not modelled again. The
@@ -496,5 +496,5 @@ recorded before its code, continuing AU-109's block.
   value or "off" for a null — with the action's start, duration and curve. The core writes the
   base limiter into every automation point, so before this the solve's own limiter changed the
   key of any clip with a tap-key action and At volume stayed "≈" for ever; now the reading
-  survives the solve and is dropped when an action's audio changes.
+  survives the solve and is dropped when an action's audio changes. Amended: AU-165 (c).
   Proof: `audio_ap6_probe.py` E10, E13, E14 and mutants M15–M20; `audio_ap6_proof.py` V16.

@@ -93,9 +93,9 @@ Cleaning up a clip changes how loud it measures, so the analysis alone would mis
 - A [compressor](/audio/compressor/)
 - A [voice effect](/audio/voice-effects/)
 
-Processing that an [action](/motion/actions/) switches on part-way through the clip counts too, even when the clip starts without it.
+Processing that an [action](/motion/actions/) switches on part-way through the clip counts too, even when the clip starts without it. So does a [limiter](/audio/limiter/) that an action switches on or off.
 
-With the limiter on as well, Normalize renders again at the volume it chose, and adjusts until the result is within 0.1 LU of the target, at most three times. A clip measured this way keeps its volume when the new one is within 0.05 dB of it and its limiter hasn't changed, so a second press still changes nothing.
+With the limiter on as well, or a limiter that an action switches on or off, Normalize renders again at the volume it chose, and adjusts until the result is within 0.1 LU of the target, at most three times. How hard an action's limiter holds the sound down depends on the clip's volume, so only a render at that volume can say. If a clip without the limiter would need a volume that takes its true peak past −1 dBTP, Normalize turns the clip's limiter on at −1 dBTP and starts adjusting again from there. A clip measured this way keeps its volume when the new one is within 0.05 dB of it and its limiter hasn't changed, so a second press still changes nothing.
 
 This takes a moment per clip, seconds on a long one, and the first press waits for the clip's voice isolation or voice effect to render. A clip with none of this processing is measured from the analysis at once.
 

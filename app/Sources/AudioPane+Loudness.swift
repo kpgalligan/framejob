@@ -65,25 +65,42 @@ extension AudioPane {
     /// so the same whatever action is selected), the last R0 measured for
     /// its plan and chain (`ProcessedLoudness.Memo`) at the clip's BASE
     /// volume and limiter, else the cache figure at them marked approximate;
-    /// any other clip, the cache figure at the props the fields show.
-    private func atVolumeText(_ audio: AudioProps) -> (text: String, approximate: Bool) {
+    /// any other clip, the cache figure at the props the fields show. On a
+    /// clip an action's end sets a limiter on (AU-165 (c)), R0 is not how
+    /// that limiter bites at the base volume: the last verify render that
+    /// answered a press while the clip is at its volume and limiter, else R0
+    /// marked approximate with `endLimiterTip`.
+    private func atVolumeText(_ audio: AudioProps) -> (text: String, tip: String?) {
         guard let snapshot = readoutSnapshot, ProcessedLoudness.needsRender(snapshot),
             let document = binding.document, case .reading = loudnessAnswer()
-        else { return (loudnessText(gain: audio.decibels, limiter: audio.limiter), false) }
+        else { return (loudnessText(gain: audio.decibels, limiter: audio.limiter), nil) }
         let base = snapshot.audioProps
         guard let processed = ProcessedLoudness.Memo.shared.reading(for: snapshot.id, in: document)
         else {
-            return ("≈ " + loudnessText(gain: base.decibels, limiter: base.limiter), true)
+            let text = "≈ " + loudnessText(gain: base.decibels, limiter: base.limiter)
+            return (text, AudioPane.approximateTip)
+        }
+        let endLimiter = ProcessedLoudness.endSetsLimiter(snapshot)
+        if endLimiter, let verified = processed.verified,
+            verified.holds(volume: base.volume, limiter: base.limiter)
+        {
+            let text = levelText(
+                lufs: verified.lufs, truePeak: verified.truePeak, steps: [], peaks: [], gain: 0,
+                limiter: nil)
+            return (text, nil)
         }
         let text = levelText(
             lufs: StepLoudness.integrated(processed.steps), truePeak: processed.peaks.max() ?? 0,
             steps: processed.steps, peaks: processed.peaks, gain: base.decibels,
             limiter: base.limiter)
-        return (text, false)
+        return endLimiter ? ("≈ " + text, AudioPane.endLimiterTip) : (text, nil)
     }
 
     static let approximateTip =
         "≈ before the clip's processing; Normalize or Enhance Voice measures through it."
+    static let endLimiterTip =
+        "≈ an action's limiter has not been measured at this volume; Normalize or Enhance Voice "
+        + "measures through it."
 
     private func minus(_ text: String) -> String {
         text.replacingOccurrences(of: "-", with: "−")
@@ -98,7 +115,7 @@ extension AudioPane {
         let readout = inspectorReadout(width: 160) { [weak self] in
             guard let self else { return "—" }
             let answer = self.atVolumeText(binding.audioProps)
-            atVolume?.toolTip = answer.approximate ? AudioPane.approximateTip : nil
+            atVolume?.toolTip = answer.tip
             return answer.text
         }
         atVolume = readout

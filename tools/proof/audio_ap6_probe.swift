@@ -7,7 +7,7 @@ import Foundation
 // compiled with app/Sources through swift_build, `app/Resources/Models`
 // beside the binary so the product's own speech pass runs. Arguments: the
 // fixtures folder (`rode.m4a`), a scratch folder. Prints one "ok"/"FAIL" line
-// per row, each row's name first (E1–E3, E6–E12), for audio_ap6_probe.py to
+// per row, each row's name first (E1–E3, E6–E17), for audio_ap6_probe.py to
 // score. Nothing here renders: the processed solve is the proof's (V2, V13).
 
 final class ProbeDocumentController: NSDocumentController {
@@ -313,10 +313,12 @@ do {
         ("noise_reduction", #"{"noise_reduction": 0.5}"#),
         ("gate", #"{"gate": {"threshold_db": -20}}"#), ("de_esser", #"{"de_esser": {}}"#),
         ("compressor", #"{"compressor": {}}"#), ("leveller", #"{"leveller": {}}"#),
+        // AU-165 (a): a limiter at an end, and a null keying the clip's off.
+        ("limiter", #"{"limiter": {"ceiling_db": -6}}"#), ("a null limiter", #"{"limiter": null}"#),
     ]
     let plainEnds: [(String, String)] = [
         ("pan", #"{"pan": 0.5}"#), ("mono", #"{"mono": true}"#),
-        ("channels", #"{"channels": "left"}"#), ("limiter", #"{"limiter": {"ceiling_db": -6}}"#),
+        ("channels", #"{"channels": "left"}"#),
         ("volume", #"{"volume": 2}"#), ("a null eq", #"{"eq": null}"#),
         ("a null gate", #"{"gate": null}"#), ("isolation 0", #"{"isolation": 0}"#),
         ("noise_reduction 0", #"{"noise_reduction": 0}"#),
@@ -335,8 +337,88 @@ do {
     let still = clip(#"{"gate": {"threshold_db": -20}}"#, duration: 0)
     check("E10", "a gate at the end of an action of no duration plans off the cache",
           still?.actions.first?.duration == 0 && !ProcessedLoudness.needsRender(still))
+    let stillLimiter = clip(#"{"limiter": {"ceiling_db": -6}}"#, duration: 0)
+    check("E10", "a limiter at the end of an action of no duration plans off the cache",
+          stillLimiter?.actions.first?.duration == 0 && !ProcessedLoudness.needsRender(stillLimiter))
     check("E10", "no clip plans off the cache",
           !ProcessedLoudness.needsRender(Optional<ClipSnapshot>.none))
+
+    // E15 (AU-165 (a), (b)): which clips an action's end sets a limiter on,
+    // and which solves are checked by render.
+    var nullStored = false
+    if case .some(.none) = clip(#"{"limiter": null}"#)?.actions.first?.end.audio?.limiter {
+        nullStored = true
+    }
+    let based = ReelJSON.decode(ClipSnapshot.self, from: """
+        {"id": 2, "track": 3, "start": 0, "duration": 6000000,
+         "source": {"kind": "media", "media": 1, "in": 0}, "audio": {"limiter": {}},
+         "actions": [{"id": 90, "start": 600000, "duration": 1200000,
+                      "curve": "linear", "end": {"audio": {"pan": 0.5}}}]}
+        """)
+    let sets: [(String, ClipSnapshot?, Bool)] = [
+        ("a limiter at an end", clip(#"{"limiter": {"ceiling_db": -6}}"#), true),
+        ("a null limiter at an end (keyed off)", clip(#"{"limiter": null}"#), true),
+        ("a limiter beside a gate at an end",
+         clip(#"{"gate": {"threshold_db": -20}, "limiter": {}}"#), true),
+        ("a limiter at the end of an action of no duration", stillLimiter, false),
+        ("an end with no limiter key", clip(#"{"gate": {"threshold_db": -20}}"#), false),
+        ("the clip's own limiter, an end without one", based, false),
+        ("no clip", nil, false),
+    ]
+    for (name, snapshot, wanted) in sets {
+        check("E15", "endSetsLimiter: \(name) \(wanted ? "sets" : "does not set") one",
+              ProcessedLoudness.endSetsLimiter(snapshot) == wanted
+                && (name == "no clip" || snapshot != nil))
+    }
+    check("E15", "a null limiter at an end decodes as a stored null", nullStored)
+    let verifies: [(LimiterProps?, Bool, Bool)] = [
+        (LimiterProps(), false, true), (LimiterProps(), true, true), (nil, true, true),
+        (nil, false, false),
+    ]
+    for (limiter, end, wanted) in verifies {
+        check("E15", "verifiesByRender with \(limiter == nil ? "no" : "a") limiter and "
+                + "\(end ? "an" : "no") action-end limiter: \(wanted)",
+              LoudnessMeasureRun.verifiesByRender(limiter: limiter, endLimiter: end) == wanted)
+    }
+
+    // E17 (AU-165 (b)): AU-24's question at a volume the loop steps to.
+    let ceiling = pow(10, AudioNormalize.ceilingDBTP / 20)
+    let peak = pow(10, -18.5 / 20)
+    let under = ceiling / peak * pow(10, -0.01 / 20)
+    let over = ceiling / peak * pow(10, 0.01 / 20)
+    check("E17", "no limiter, R0's peak 0.01 dB under −1 dBTP at the volume: stays off",
+          !LoudnessMeasureRun.limiterGoesOn(nil, truePeak: peak, volume: under))
+    check("E17", "no limiter, R0's peak 0.01 dB over −1 dBTP at the volume: goes on",
+          LoudnessMeasureRun.limiterGoesOn(nil, truePeak: peak, volume: over))
+    check("E17", "a limiter already on is not asked again",
+          !LoudnessMeasureRun.limiterGoesOn(LimiterProps(), truePeak: peak, volume: over * 4))
+    let chosen = AudioNormalize.ceilingLimiter(nil)
+    let lowered = AudioNormalize.ceilingLimiter(LimiterProps(ceilingDb: -0.5, release: 1_200))
+    let kept = AudioNormalize.ceilingLimiter(LimiterProps(ceilingDb: -3, release: 1_200))
+    check("E17", "the limiter that goes on is AU-24's: the default at −1 dBTP; a clip's own "
+            + "lowered to −1 or kept under it",
+          chosen == LimiterProps(ceilingDb: -1) && lowered == LimiterProps(ceilingDb: -1, release: 1_200)
+            && kept == LimiterProps(ceilingDb: -3, release: 1_200),
+          "\(chosen), \(lowered), \(kept)")
+}
+
+// MARK: - E16 the verified figure's test (AU-165 (c))
+
+do {
+    let figures = ProcessedLoudness.Verified(
+        volume: 2, limiter: nil, lufs: -30, truePeak: 0.1)
+    let near = 2 * pow(10, 0.04 / 20)
+    let far = 2 * pow(10, 0.06 / 20)
+    check("E16", "holds at its own volume and limiter, and 0.04 dB away",
+          figures.holds(volume: 2, limiter: nil) && figures.holds(volume: near, limiter: nil))
+    check("E16", "does not hold 0.06 dB away, nor under another limiter, nor at volume 0",
+          !figures.holds(volume: far, limiter: nil)
+            && !figures.holds(volume: 2, limiter: LimiterProps())
+            && !figures.holds(volume: 0, limiter: nil))
+    let limited = ProcessedLoudness.Verified(
+        volume: 2, limiter: LimiterProps(), lufs: -30, truePeak: 0.1)
+    check("E16", "a limited render holds under the same limiter, not with none",
+          limited.holds(volume: 2, limiter: LimiterProps()) && !limited.holds(volume: 2, limiter: nil))
 }
 
 // MARK: - E13, E14 the memo's key and a clip's actions (AU-159 (g))
@@ -622,6 +704,28 @@ do {
                 + "other's \(theirs.map { "\($0.steps)" } ?? "nil")")
     }
     withExtendedLifetime(other) {}
+}
+
+// MARK: - E16 the memo keeps the verify render beside its R0 (AU-165 (c))
+
+do {
+    let key = ProcessedLoudness.key(
+        clip: 2, project: document.editedProject, document: document.recipeKey)
+    let figures = ProcessedLoudness.Verified(volume: 1.5, limiter: nil, lufs: -28, truePeak: 0.2)
+    var stored = false
+    var dropped = false
+    if let key {
+        let memo = ProcessedLoudness.Memo.shared
+        memo.store(key, steps: [0.25], peaks: [0.1])
+        memo.storeVerified(key, figures)
+        stored = memo.reading(for: 2, in: document)?.verified == figures
+        memo.store(key, steps: [0.5], peaks: [0.2])
+        let after = memo.reading(for: 2, in: document)
+        dropped = after?.verified == nil && after?.steps == [0.5]
+    }
+    check("E16", "the memo answers the verify render stored beside an R0, and the next R0 for "
+            + "the key drops it",
+          key != nil && stored && dropped, "stored \(stored), dropped \(dropped)")
 }
 
 // MARK: - E7 the skips, by name

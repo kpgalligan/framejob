@@ -155,3 +155,73 @@ It is new because [`audio-4.md`](audio-4.md) had reached the spec's ~500-line sp
     scored for every feeding of three programmes and for the product's pass, the block-at-a-time
     feeding's Double sums scored bit for bit, the other Double counts printed; mutant
     `weighting-state-per-buffer` (the K-weighting state started afresh at each buffer) fails it.
+- **AU-165 — An action's end that sets a limiter is measured by render (#402, 2026-11-12; amends
+  AU-64 (a), (e), (g) and AU-159 (a), (b), (g)).** The owner's decision on #402: one more
+  render whenever an action's end sets a limiter, so Normalize is measured as it will play. An
+  action end's limiter takes its threshold from the base volume (AU-22), so R0 at volume 1 does
+  not say how it bites at the solved one. On the tree before this entry (`audio_ap6_proof.py`
+  V16 on Debug, the owner's recording): (g) an end gate and limiter at −24 dBTP, no limiter on
+  the clip, target −30, answered after R0 alone (`renders` 1, `result_lufs` −30.00) and
+  exported at −32.57 LUFS, At volume showing −30.0 with no "≈"; (h) an end limiter at −12 dBTP
+  alone planned off the cache (`processed_lufs` null, `renders` 0); (i) the target that puts
+  R0's true peak at −1.3 dBTP at the plan's volume (−24.417) answered −24.42 and exported at
+  −28.47; (j) the clip's limiter at −1 dBTP keyed off at an action's end planned off the cache,
+  the model's limiter running over the whole clip.
+  (a) **Which clips render.** `needsRender` is also true when an action of the clip with a
+  duration above 0 has the `limiter` key at its end (`ProcessedLoudness.endSetsLimiter`): a
+  limiter, or a null keying the clip's own off. The cache's model runs only the clip's own
+  limiter, over the whole clip (AU-24, AU-26), so it sees neither; AU-159 (a)'s rule, a render
+  rather than a miss, covers both. The memo's key already names the same ends (AU-159 (g)).
+  (b) **The verify.** The solve verifies by render when the plan sets a limiter OR the clip has
+  such an end (`LoudnessMeasureRun.verifiesByRender`). With no limiter the verify trial is the
+  chain with `{volume: v, limiter: null}`, the same loop, tolerance and bound as AU-64 (e).
+  Each volume the loop steps to is first asked AU-24's question on R0's reading: when R0's true
+  peak × that volume passes −1 dBTP (`LoudnessMeasureRun.limiterGoesOn`), the limiter goes on —
+  AU-24's choice, the default at −1 dBTP — and the loop starts again where AU-24's plan starts
+  it under that limiter (its model's volume on R0's steps), with three verify renders of its
+  own. The challenger's reason: an end limiter bites harder as the volume rises, so the loop
+  steps up, and the sound before the action is unlimited and rises with it; answering
+  `limiter: null` there would break AU-24's ceiling. Starting again is a second press's own
+  path (R0 is the same and the plan reads the clip's limiter), so a second press is still an
+  identity (AU-64 (f)). A volume the plan chose was asked by the plan, so a `limiter: null`
+  answer never stands at a volume where R0's peak passes the ceiling. The answer is the last
+  render's volume, limiter, loudness and true peak; `renders` counts R0 and every verify.
+  (c) **At volume.** On a clip with such an end, the last verify render that answered a press
+  (`ProcessedLoudness.Verified`, beside the R0 it began from in the memo, dropped by the next
+  R0 for its key) when the clip's base limiter equals the one it rendered and its base volume
+  is within 0.05 dB of it (AU-64 (f)'s figure, so a kept volume still reads it); otherwise "≈"
+  before R0's figure at the base volume through AU-26's model, its tooltip "≈ an action's
+  limiter has not been measured at this volume; Normalize or Enhance Voice measures through
+  it.", or before the cache figure with AU-64 (g)'s tooltip when there is no R0. No model of an
+  action's limiter is added and nothing measures in the background (AU-64 (g)). A clip with no
+  such end reads as AU-159 (g) says.
+  (d) **Where it shows.** `normalize_clip`'s description and the site's Normalize and Clip
+  volume pages. Loudness Normalize, `normalize_clip`, Match Loudness and Enhance Voice share
+  the run; Enhance always sets a limiter and so already verified.
+  Proof: `audio_ap6_probe.py` E10 (a limiter and a null limiter at an end render), E15
+  (`endSetsLimiter`, `verifiesByRender`), E16 (`Verified.holds` and the memo), E17
+  (`limiterGoesOn`) and mutants M21–M26; `audio_ap6_proof.py` V16 (g)–(j), and by hand the
+  restart mutated to carry on at the stepped volume, which made (i)'s second call change the
+  volume. After it, on Release (the whole proof, 81 of 81): (g) four renders, `result_lufs` and
+  the export −30.25 (three verifies, short of the loop's 0.1 LU; the bound is AU-64 (e)'s),
+  At volume −30.2 with no "≈" and "≈" at the volume ×1.2; (h) two renders, −32.00 both; (i)
+  the limiter on at −1 dBTP, five renders, −28.60 both at a true peak of −3.48 dBTP, a second
+  call "made no change"; (j) two renders, −19.96 both.
+- **AU-166 — An overwrite can end a locked partner's link (#589, 2026-11-12; beside AU-92,
+  amends AU-91's "stays linked").** `overwrite_clip` onto a linked sound whose picture is on a
+  locked track cuts the sound twice and leaves the picture whole. Each cut applies AU-92 to the
+  uncut picture: it is linked to the half sharing more of its time, the first on a tie. When
+  the piece it names after both cuts is the one the overwrite removes, `settle_links` clears
+  the link and nothing moves it to a surviving piece. The owner's decision (2026-11-12, the
+  recommended option): leave it, the pair is over, as for an unlocked partner, whose piece
+  beside the new file stays and is no longer linked; re-linking was declined because it needs
+  a locked track to arise and would pick one of two leftovers by a tie rule nobody would
+  predict. Because the rule runs per cut, the answer is not "the longest surviving piece": with
+  pieces L, M (under the new file) and R sharing the picture's time, the first cut keeps L when
+  L ≥ M + R, else the second keeps M when M ≥ R, else R. So L 2, M 2, R 2 s ends unlinked, and
+  so does L 2.5, M 2, R 1.5 s, though L is the longest; L 1, M 2, R 3 s keeps R; and a file
+  ending where the sound ends (L 4, M 2 s, one cut) keeps L. Locks still win: the picture is
+  not cut, moved or deleted. Pinned by `core/tests/link_edges.rs`'s
+  `an_overwrite_leaves_a_linked_picture_on_a_locked_track_whole` (2, 2, 2 s) and
+  `an_overwrite_keeps_a_locked_pictures_link_only_where_its_cuts_leave_it` (the other three);
+  the site's Overwrite section says so.

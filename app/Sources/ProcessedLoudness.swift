@@ -9,25 +9,43 @@ import Foundation
 /// BS.1770's relative gate counts, which the loudness cache cannot see.
 ///
 /// The pieces, in the order a press uses them: `needsRender` (which clips
-/// render at all, (a), an action's end counted since AU-159);
+/// render at all, (a), an action's end counted since AU-159 and its limiter
+/// since AU-165, `endSetsLimiter`);
 /// `measurementPlan` (the trial's plan cut to the clip, pre-fader, (c)); `render` (the export's waits, the build and one mix read,
 /// (d)); and `Memo`, the last R0 per document, clip, plan and chain, which At volume
-/// reads (g). The trial handle itself is made on main by the run, (b).
+/// reads (g), with the verify render that answered a press (`Verified`, AU-165 (c)). The
+/// trial handle itself is made on main by the run, (b).
 enum ProcessedLoudness {
     /// One render at a time, off main.
     static let queue = DispatchQueue(
         label: "com.kgalligan.FrameJob.processed-loudness", qos: .userInitiated)
 
-    /// AU-64 (a) as AU-159 (a) amends it: whether the clip plays through a
-    /// stage the loudness cache leaves out, in its base audio or at the end
-    /// of one of its actions with a duration above 0. Read from the snapshot:
-    /// never the plan, the playhead or a selected action. It errs toward a
-    /// render: an end's EQ counts whatever its slots, and an action outside
-    /// the played window counts.
+    /// AU-64 (a) as AU-159 (a) and AU-165 (a) amend it: whether the clip
+    /// plays through a stage the loudness cache leaves out, in its base audio
+    /// or at the end of one of its actions with a duration above 0, or a
+    /// limiter an action's end sets. Read from the snapshot: never the plan,
+    /// the playhead or a selected action. It errs toward a render: an end's
+    /// EQ counts whatever its slots, and an action outside the played window
+    /// counts.
     static func needsRender(_ clip: ClipSnapshot?) -> Bool {
         guard let clip else { return false }
-        if needsRender(clip.audio) { return true }
+        if needsRender(clip.audio) || endSetsLimiter(clip) { return true }
         return clip.actions.contains { $0.duration > 0 && endNeedsRender($0.end.audio) }
+    }
+
+    /// AU-165 (a): whether an action of the clip with a duration above 0 has
+    /// the `limiter` key at its end, a limiter or a null keying the clip's
+    /// own off. The cache's model runs only the clip's own limiter over the
+    /// whole clip, so it sees neither, and an end limiter's threshold follows
+    /// the base volume (AU-22), so the solve checks it by render. The memo's
+    /// key names the same ends.
+    static func endSetsLimiter(_ clip: ClipSnapshot?) -> Bool {
+        guard let clip else { return false }
+        return clip.actions.contains { action in
+            guard action.duration > 0, let end = action.end.audio else { return false }
+            if case .some = end.limiter { return true }
+            return false
+        }
     }
 
     /// Whether an action's end switches one of (a)'s stages on: a `hum`,
@@ -359,8 +377,32 @@ enum ProcessedLoudness {
 
     // MARK: - The readout's memo
 
+    /// AU-165 (c): the verify render that answered a press on a clip with an
+    /// action-end limiter (`endSetsLimiter`): the volume and limiter it
+    /// rendered at, and its loudness and linear true peak through the fader
+    /// at that volume, as the clip plays at them.
+    struct Verified: Equatable {
+        let volume: Double
+        let limiter: LimiterProps?
+        let lufs: Double
+        let truePeak: Double
+
+        /// Whether a clip at `current` and `own` plays as this render did: the
+        /// same limiter, and the volume within `AudioNormalize.keepVolumeDB`
+        /// (the keep rule's figure, so a kept volume still reads it).
+        func holds(volume current: Double, limiter own: LimiterProps?) -> Bool {
+            guard own == limiter, current > 0, volume > 0 else { return false }
+            return abs(20 * log10(current / volume)) <= AudioNormalize.keepVolumeDB
+        }
+    }
+
+    /// What At volume reads for a clip: R0's steps and step peaks, and the
+    /// verify render that answered the last press since that R0, if any.
+    typealias Reading = (steps: [Double], peaks: [Double], verified: Verified?)
+
     /// AU-64 (g): the last R0 measured per `Key`, which At volume reads on a
-    /// clip that renders. 32 keys, oldest out first; emptied when a loudness
+    /// clip that renders, and beside it the verify render that answered a
+    /// press (AU-165 (c)). 32 keys, oldest out first; emptied when a loudness
     /// file lands or is withdrawn and when an offline render settles. Held
     /// through a live gesture for the same clip of the same document, as
     /// `ClipLoudness.Memo` holds its answer, so a Volume drag decodes no plan
@@ -370,11 +412,12 @@ enum ProcessedLoudness {
         static let capacity = 32
 
         private var entries: [Key: (steps: [Double], peaks: [Double])] = [:]
+        private var verified: [Key: Verified] = [:]
         private var order: [Key] = []
         private weak var heldDocument: ProjectDocument?
         private weak var heldProject: ReelProject?
         private var heldClip: UInt32?
-        private var held: (steps: [Double], peaks: [Double])?
+        private var held: Reading?
 
         private init() {
             NotificationCenter.default.addObserver(
@@ -390,16 +433,30 @@ enum ProcessedLoudness {
             ) { [weak self] _ in self?.removeAll() }
         }
 
+        /// A new R0 for `key`: any verify render stored beside the last one
+        /// goes with it.
         func store(_ key: Key, steps: [Double], peaks: [Double]) {
             assert(Thread.isMainThread)
             if entries.updateValue((steps, peaks), forKey: key) == nil { order.append(key) }
-            while order.count > Self.capacity { entries.removeValue(forKey: order.removeFirst()) }
+            verified.removeValue(forKey: key)
+            while order.count > Self.capacity {
+                let oldest = order.removeFirst()
+                entries.removeValue(forKey: oldest)
+                verified.removeValue(forKey: oldest)
+            }
             forget()
         }
 
-        func reading(for clip: UInt32, in document: ProjectDocument)
-            -> (steps: [Double], peaks: [Double])?
-        {
+        /// AU-165 (c): the verify render that answered a press, beside the R0
+        /// stored under `key`; nothing when no R0 is.
+        func storeVerified(_ key: Key, _ figures: Verified) {
+            assert(Thread.isMainThread)
+            guard entries[key] != nil else { return }
+            verified[key] = figures
+            forget()
+        }
+
+        func reading(for clip: UInt32, in document: ProjectDocument) -> Reading? {
             assert(Thread.isMainThread)
             if heldClip == clip, heldDocument === document,
                 document.isLiveEditing || heldProject === document.editedProject
@@ -408,7 +465,9 @@ enum ProcessedLoudness {
             }
             let project = document.editedProject
             let answer = Self.key(clip: clip, project: project, document: document.recipeKey)
-                .flatMap { entries[$0] }
+                .flatMap { key in
+                    entries[key].map { ($0.steps, $0.peaks, verified[key]) }
+                }
             heldDocument = document
             heldProject = project
             heldClip = clip
@@ -418,6 +477,7 @@ enum ProcessedLoudness {
 
         private func removeAll() {
             entries.removeAll()
+            verified.removeAll()
             order.removeAll()
             forget()
         }

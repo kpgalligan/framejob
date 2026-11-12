@@ -201,8 +201,7 @@ extension AudioNormalize {
                     resultTruePeakDBTP: 20 * log10(reading.truePeak * first),
                     limit: wanted <= maxGain ? nil : .maxGain, limiter: nil)
             } else {
-                var limiter = reading.limiter ?? LimiterProps()
-                limiter.ceilingDb = min(limiter.ceilingDb, ceilingDBTP)
+                let limiter = ceilingLimiter(reading.limiter)
                 let solved = solve(reading, target: target, wanted: first, limiter: limiter)
                 ops.append(
                     .setAudio(
@@ -221,6 +220,15 @@ extension AudioNormalize {
         }
         return LoudnessPlan(
             targetLUFS: target, ops: ops, normalized: normalized, skipped: input.problems)
+    }
+
+    /// AU-24's limiter for a clip that needs one: its own with the ceiling
+    /// lowered to `ceilingDBTP` when above it, else the default there. The
+    /// processed solve puts the same one on mid-loop (AU-165 (b)).
+    static func ceilingLimiter(_ own: LimiterProps?) -> LimiterProps {
+        var limiter = own ?? LimiterProps()
+        limiter.ceilingDb = min(limiter.ceilingDb, ceilingDBTP)
+        return limiter
     }
 
     /// A rendered clip's op and row (AU-64 (e), (f)): the solve's volume,
