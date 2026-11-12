@@ -210,25 +210,57 @@ Xcode 26, Rust, xcodegen and cmake; then `make app`. Everything else is in
 
 ## Languages
 
-The GitHub summary makes this look like a Python project, but Python is basically for tests. The app itself if Swift and Rust.
+The GitHub summary makes this look like a Python project, but Python is basically for tests. The app itself is Swift and Rust.
 
-| Language   |    Code |    Test |
-|------------|--------:|--------:|
-| Swift      |  80,760 |  52,303 |
-| Rust       |  22,400 |  54,131 |
-| Metal      |   1,682 |       — |
-| JavaScript |     755 |   2,669 |
-| TypeScript |     754 |     238 |
-| Python     |     739 | 131,328 |
-| C header   |     144 |       6 |
-| Shell      |      46 |     109 |
-| **Total**  | **107,280** | **240,784** |
+| Language    |    Code |    Test |
+|-------------|--------:|--------:|
+| Swift       | 124,592 |  93,293 |
+| Rust        |  34,468 |  76,997 |
+| Metal       |   1,863 |       — |
+| JavaScript  |     755 |   2,670 |
+| Python      |     709 | 194,464 |
+| C header    |     174 |       6 |
+| Shell       |      90 |     150 |
+| C           |       — |     141 |
+| Objective-C |       — |      37 |
+| **Total**   | **162,651** | **367,758** |
 
-Non-blank, non-comment lines counted by `cloc` over the tracked files
-(2026-10-29), vendored third-party code left out. Test is `core/tests`,
-`graphic/tests`, `mcp-proxy/tests`, the assistant helper's `*.test.ts`, the
-licence generator's self-test and `tools/proof/` (the proof scripts, probes,
-offscreen harness and spikes).
+Non-blank, non-comment lines: `cloc`'s code column over the tracked files
+(`cloc` 2.08, 2026-11-12), each total the sum of its column. Run from the
+repository root, these two commands print every row above:
+
+```sh
+# code
+git ls-files app/Sources app/Bridging app/Resources/Shaders core/src core/include \
+  graphic/src mcp-proxy/src agent/Sources agent/Package.swift agent/prices/update.py \
+  tools/codecs tools/licenses tools/agent/build_helper.sh \
+  ':!tools/licenses/acknowledgements_selftest.py' \
+  | cloc --quiet --timeout=0 --list-file=-
+# test
+git ls-files core/tests graphic/tests mcp-proxy/tests agent/Tests tools/proof \
+  tools/agent/agent_test.py tools/licenses/acknowledgements_selftest.py \
+  | cloc --quiet --timeout=0 --list-file=-
+```
+
+`--timeout=0` keeps the count the same on a busy machine: by default `cloc`
+gives each comment filter a second per thousand lines of the file (one at
+least), and counts the code of a file that runs over as comment.
+
+Code is the app (`app/Sources`, its bridging headers and Metal shaders), the
+three Rust crates' `src` (`graphic/src` holds the graphics engine's
+JavaScript library too) and the core's header, the assistant helper's Swift
+package (`agent/Sources`, `agent/Package.swift`), and the tools that make
+something the app ships (`tools/codecs`, `tools/licenses`,
+`tools/agent/build_helper.sh`, `agent/prices/update.py`). Test is the crates'
+`tests/`, `agent/Tests` and its runner `tools/agent/agent_test.py`, the
+licence generator's self-test, and `tools/proof/` (the proof scripts, probes,
+offscreen harness and spikes). The Markdown, JSON, TOML and text that `cloc`
+also prints are not rows (the code run's JSON is the price table, which the
+helper's sources link to). Left out altogether: `graphic/vendor` (vendored
+third-party code), `docs/` (the documentation site included), `designs/`,
+`archive/`, `samples/`, and the build's own files (`Makefile`, `project.yml`,
+the crates' manifests, `.github/`). Everything else tracked is prose, data or
+media.
 
 ## License
 
