@@ -1769,7 +1769,7 @@ guest's agreement, recorded in the spike's README).
   submission leave no further request? Inputs: S-TH1's transcript, S-ST1's when present, two
   public-domain texts cut into timed sentences at 2.6 words a second (sources in the README); S-PC1
   or S-LONG1 only with the guest's agreement. Ten runs at counts 10, 20 and 30. **Rule:** (a) passes
-  if no request is refused; if `TOOL_SEARCH` beside one non-deferred tool is refused, FC5's diff
+  if no request is refused; if tool search beside one non-deferred tool is refused, FC5's diff
   adds `search: false`; (b) passes if FC-S3's estimate lies within its recorded margin of
   `countTokens` on every input, else FC-S3's constants are refitted on both spikes' inputs; (c)
   passes if ≥ 9 of 10 runs submit a valid ranking (FC-63's checks) on the first call and 10 of 10
@@ -9198,54 +9198,104 @@ person check; nothing filed.
 
 ### FC5 — the helper's estimate, its flags, and one helper plumbing
 
+**Redrafted 2026-11-12 (#616) for the Swift helper.** The first draft placed FC-50 and FC-51 in
+the TypeScript helper shared with Rasterize, which road map "swift-helper" deleted in its SA4
+(spec §11 SA-11). The helper is the SwiftPM package in `agent/`, Frame Job's own, held to the
+drive's recordings (spec §11 SA-13; `agent/CLAUDE.md`). The redraft moves where the work lands and
+the checks that prove it. What FC-50…FC-52 decide is as first drafted, with one precision: FC-50's
+`window` is answered once the model lookup has settled. The question for the owner is closed below.
+
 - **What a person gets:** nothing on screen yet: a paid request can show its cost before it is sent,
   without sending the transcript (FC7b shows it).
 - **Head:** FC-S2 runs (paid, cap $3.00) and its verdicts are recorded (FC-50's constants, FC-51's
   `search`, FC-63's shape).
 - **Decisions (draft):**
-  - **FC-50 — The helper gains one message, `estimate`**, in `agent/src/` and offered to Rasterize
-    as the same diff. `{type: "estimate", id, input_tokens, output_low, output_typical}` answers
+  - **FC-50 — The helper gains one message, `estimate`**, in `agent/Sources/FrameJobAgentKit/`.
+    `{type: "estimate", id, input_tokens, output_low, output_typical}` answers
     `{type: "estimate", id, low, typical, ceiling, window, prices}` or `{… error}`. Every figure is
-    `pricing.ts`'s `price` over a synthetic `usage` per round at the session's model (so an
-    `above_200k` tier applies as on a real response): `low` and `typical` are one round writing
+    `Pricing.price` over a synthetic `usage` per round at the session's model (so an `above_200k`
+    tier applies as on a real response): `low` and `typical` are one round writing
     `input_tokens` to the cache plus `output_low` / `output_typical`; `ceiling` is the dearest the
     run can bill under FC-61 and FC-63 — three rounds, round 1 writing I and outputting M, round 2
     reading I, writing M + R and outputting M, round 3 reading I + M + R, writing M + R and
-    outputting M (I `input_tokens`, M `MAX_TOKENS` since every earlier response is re-sent, R
-    `RANKER_REPLY_MAX` = 2,000); `window` the model's `max_input_tokens` from the Models API, or
-    null. An unpriceable model answers `unknown`, never $0 (P-2). The estimate sends nothing to the
-    Messages API and no transcript text.
+    outputting M (I `input_tokens`, M `Request.maxTokens` since every earlier response is re-sent,
+    R `RANKER_REPLY_MAX` = 2,000); `window` the model's `max_input_tokens`, which the session's
+    Models lookup at `configure` already reads for the context meter (`contextLimit`). That lookup
+    runs after `ready`, and the ranker sends `estimate` straight after `configure` (FC-61's one
+    helper per ranking), so the estimate is answered once the last `configure`'s lookup has
+    settled: `window` is null only when that lookup failed, never because it had not landed, and
+    never the window of a model an earlier `configure` named. An unpriceable model answers
+    `unknown`, never $0 (P-2). The estimate sends nothing to the Messages API, no transcript text
+    and no request of its own.
   - **FC-51 — `configure` gains two optional keys, each absent meaning today's behaviour:**
     `fallbacks: false` sends no `fallbacks` parameter (a classifier refusal ends the turn instead of
-    retrying on another model at its price); `search: false` sends no `TOOL_SEARCH` (only if FC-S2
-    finds it refused beside one non-deferred tool).
+    retrying on another model at its price; `Request` leaves `"fallbacks": "default"` out of the
+    body); `search: false` sends no tool search entry (`Request.toolSearch`, today first in every
+    `tools`; only if FC-S2 finds it refused beside one non-deferred tool). With both keys absent
+    every request is today's, byte for byte, so every existing recording stays as it is (SA-13).
   - **FC-52 — The helper's process plumbing is one type, `HelperProcess`**, owned by
     `AssistantSession` and the ranker; `AssistantSession`'s behaviour does not change.
-- **Helper (`agent/`, one diff applied to Rasterize too):** `protocol.ts` (the message and event,
-  `configure`'s keys); new `estimate.ts` and `estimate.test.ts`; `main.ts` (the handler, the flags);
-  a `kpgalligan/rasterize` issue with the diff.
+- **Helper (`agent/`, Frame Job's own, spec §11 SA-11):** `Protocol.swift` (`HostMessage`'s
+  `estimate`, `HelperEvent`'s `estimate`, `Configure`'s two keys, each absent meaning today's); new
+  `Estimate.swift` (the three figures, each `Pricing.price` round by round); `Session.swift` (the
+  handler: the table in force, and the window of the last `configure`'s lookup, awaited);
+  `Request.swift` (the two flags). Every file stays under 400 lines (`Protocol.swift` is at 319;
+  the estimate's shapes go in `Estimate.swift` if it would pass).
 - **Swift:** new `HelperProcess.swift` (launch with the three-variable environment,
   `F_SETNOSIGPIPE`, the line splitter, the ordered write queue, close with the 2 s terminate);
   `AssistantSession.swift` owns one.
 - **FFI, MCP mirror:** none.
-- **Docs:** spec §7.9b (the helper's messages and keys); root `CLAUDE.md`'s `agent/` map line (the
-  byte-identical claim and its date, or that the two differ by this diff until Rasterize applies
-  it); the record of the Rasterize diff and its issue; `app/CLAUDE.md`.
-- **Acceptance:** `make typecheck` (tsc included); `make test` (`bun test` through
-  `prices_proof.py`); `assistant_session_proof.py`, `assistant_lane_proof.py` and
-  `assistant_tab_proof.py` unchanged against Release; `make gate`.
-- **Proof:** `estimate.test.ts` — `low`, `typical` and `ceiling` at the bundled `claude-opus-5-5`
-  row, each by hand round by round (I = 25,000, M = 32,000, R = 2,000: writes 93,000, reads 84,000,
-  output 96,000 tokens, $2.40), an `above_200k` row priced per round, an unpriced model `unknown`;
-  `helper_estimate_proof.py` against `anthropic_fake.py` — an estimate posts nothing to
-  `/v1/messages` and no `count_tokens`, the model lookup answered and its window reported; a
-  `configure` without the keys sends today's request byte for byte, with `fallbacks: false` no
-  `fallbacks` key, with `search: false` no `TOOL_SEARCH`.
-- **Mutants** (4): the ceiling at two rounds; earlier responses left out of rounds 2 and 3; an
-  unknown model at $0; `fallbacks` sent when `configure` says false.
+- **Docs:** spec §11 before the code: FC-50…FC-52 in the creator-jobs series, and the SA- entry
+  SA-13 asks of a change to what the helper sends or says, naming them and landing in one commit
+  with the new recordings; that entry also adds `estimate`'s `low`, `typical`, `ceiling` and
+  `prices` to what a `make prices` re-record may move. The same widening wherever that re-record
+  rule is written: the Makefile's `prices` comment, `agent/CLAUDE.md`'s re-record sentence,
+  `docs/developing.md`'s `make prices` row and `tools/proof/README.md`'s `--record` paragraph.
+  Spec §7.9b (the helper's messages and keys). `agent/CLAUDE.md`'s map (`Protocol.swift`,
+  `Session.swift`, `Estimate.swift`) and `app/CLAUDE.md`'s (`HelperProcess.swift`).
+- **Acceptance:** `make agent-test`; `make typecheck` (0 errors, the 4 baseline warnings); `make
+  test` (which runs `make agent-test` and `agent_helper_drive.py`, the new cases included);
+  `assistant_session_proof.py`, `assistant_lane_proof.py` and `assistant_tab_proof.py` unchanged
+  against Release; `make gate`.
+- **Proof:**
+  - `agent/Tests/FrameJobAgentKitTests/EstimateTests.swift` (XCTest, `make agent-test`) — `low`,
+    `typical` and `ceiling` at a `claude-opus-5-5` row fixed in the test at today's bundled prices
+    (5-minute cache write $5, cache read $0.20, output $20 per MTok; `make prices` rewrites the
+    bundled table), each by hand round by round (I = 25,000, M = 32,000, R = 2,000: writes 93,000,
+    reads 84,000, output 96,000 tokens, $2.40), an `above_200k` row priced per round, an unpriced
+    model `unknown`. `ProtocolTests` for the message's parse, its error arm and the event's key
+    order; `RequestBodyTests` for the body with neither key (equal to today's pinned body), with
+    `fallbacks: false` and with `search: false`. Session cases on the scripted transport: an
+    `estimate` sent straight after `configure` with the Models lookup held is answered once the
+    lookup lands, with its window; one after a second `configure` for another model answers that
+    model's window; one whose lookup failed answers `window` null.
+  - `agent_helper_drive.py` — new cases, each with its recording: an `estimate` after `configure`
+    (the run's requests are the Models lookup alone: nothing posted to `/v1/messages`, no
+    `count_tokens`; the window reported), an estimate for an unpriced model, and one turn each
+    under `fallbacks: false` and `search: false` (the recorded body has no `fallbacks` key, or no
+    tool search entry). `--record` prints every existing case `same` and only the new ones `new`:
+    that is the proof that a `configure` without the keys sends today's requests byte for byte.
+- **Mutants** (5): the ceiling at two rounds; earlier responses left out of rounds 2 and 3; an
+  unknown model at $0; `fallbacks` sent when `configure` says false — each a `SWIFT_MUTANTS` row
+  caught by the new drive cases' recordings; and the estimate answered from `contextLimit` without
+  awaiting the lookup. No drive case can catch that one (the stand-in answers the Models lookup at
+  once, and a `SWIFT_MUTANTS` row runs drive cases only), so it is a suite mutant: its edit made
+  on the mutant tree by `agent_helper_build.mutant`, never in `agent/` (`agent/CLAUDE.md`), and
+  the held-lookup session case seen failing there through `tools/agent/agent_test.py --tree
+  build/agent-swift-mutant --filter` naming that case.
 - **Manual checks:** none. **Depends on:** FC-S2. **Lane** A.
-- **Question for the owner:** Rasterize applies the same diff through one issue? *Recommended: yes*
-  (`agent/src` stays one file set; Rasterize's own features could use the estimate).
+- **Question for the owner — answered yes, then superseded by spec §11 SA-11.** The first draft
+  asked whether Rasterize applies the same diff through one issue, recommending yes for two
+  reasons: the helper's sources stayed one file set, and Rasterize's own features could use the
+  estimate. The owner answered yes (FC5's line under "Questions asked at phase time", and batch 8
+  under "The owner's answers"); both stand as recorded. SA-11, from the owner's later answer 2 (a)
+  on #599, keeps no file of `agent/` equal to another repository's and records nothing for
+  Rasterize to apply, so there is no diff both could take, and the first reason is gone. The
+  second is kept: FC5 files one `kpgalligan/rasterize` issue (`ai-drafted`, `low-priority`) that
+  describes the `estimate` message and `configure`'s two keys, with FC-50's and FC-51's text, for
+  Rasterize to build in its own helper if it wants a priced estimate. It carries no diff and
+  creates no rule for this tree to keep; FC5's record notes its number once, nothing reads it, and
+  neither FC5 nor the road map's close waits on it. The owner can strike it before FC5 is built.
 
 ### CU9a — retime a range
 
@@ -13927,8 +13977,8 @@ When the last phase built has landed (VR7a–VR9 included only if the owner said
   inside their blocks); the owner runs the list.
 - **Maps and counts.** The three `CLAUDE.md` maps, `app-file-history.md` and `core-file-history.md`
   ("Named next cuts") and every pinned count are current.
-- **Rasterize.** FC5's `agent/` diff is applied there (its issue closed) or the root `CLAUDE.md`'s
-  `agent/` line says how the two differ.
+- **Rasterize.** Nothing is owed there: `agent/` is Frame Job's own (spec §11 SA-11). The issue
+  FC5 files describes the estimate for Rasterize's helper and is not waited on.
 
 ## Samples the owner supplies
 
@@ -14112,8 +14162,10 @@ reframe, a cutout or a switch looks right on real footage — is a JOB row.
   runs, the later of the two to land on main adds a `TutorialTargets` row for each new tab, menu
   item and window that a tutorial could point at, re-checks every existing target that named a tab
   by index, and reconciles `v2_menu.py`'s rows once, in that landing; the record names the rows.
-- **The helper is shared with Rasterize.** FC5's diff must land in both, or `agent/src` stops being
-  one file set.
+- **The helper is held to its recordings** (spec §11 SA-13; it is no longer shared with Rasterize,
+  SA-11). FC5 adds a message, an event and two `configure` keys: with the keys absent every
+  existing recording must stay byte for byte, and the new cases land with their spec §11 entries in
+  the same commit. A recording is never re-recorded to make a failure pass.
 - **The assistant's search guide** is at 1,498 of 1,500 characters; FC's clips row must take words
   from other rows (F6 checks it).
 - **Samples may not come.** Quality claims then rest on JOB rows, and CJ-S2's face share, S-KEY1's
