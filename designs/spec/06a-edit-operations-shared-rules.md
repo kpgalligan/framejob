@@ -33,7 +33,10 @@ partner on an UNLOCKED track with it — locks win over links everywhere:
   (a sound lead is kept), and the track delta is anchored on and applied to the NAMED clips only:
   a partner keeps its own track, so a sound half dragged to a track of its own goes alone.
 - `delete` takes a picture's sound with it, but a linked SOUND half (its picture off) named alone
-  is deleted alone and its picture stays, silent. `ripple_delete` takes both either way.
+  is deleted alone and its picture stays, silent. `ripple_delete` takes both either way, and when
+  the two halves' neighbours would stop the hole at different places (a picture dissolving into
+  its next clip, its sound butting the next sound) the span ends at the first of them, every track
+  shifting by that one amount (§11 #601).
 - A timeline-wide shift — the ripples, `close_gap`, `insert_time`, `retime_range`,
   `add_transition`'s ripple form —
   moves each moved clip's partner too, whatever its own start, and refuses, nothing moved, when
@@ -58,7 +61,8 @@ than half of the shorter piece the cut leaves (540000 ticks); cut further from t
 or shorten it first"; a pair already past the limit before the op, even one whose clip the op
 cuts, answers the rule's own sentence by its source clips, and any other violation on a changed
 track the rule's own sentence. A list is refused whole, and nothing is repaired: no transition is
-shortened or removed.
+shortened or removed. `ripple_delete {clips}` cuts nothing, but is judged the same way on each
+track its shift moved, refused in the rule's own sentence (§11 #601).
 
 **How to read a "refuses" in §6b, §6c and §6e.** An op the core understood answers one of
 three ways (§5.5): it applies, it is an **identity**, or a rule **refuses**

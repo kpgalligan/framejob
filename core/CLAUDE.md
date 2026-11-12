@@ -766,7 +766,12 @@ governs a module now.
   (a rate change
   normalizes top-level and each stored nest's clip times through `frame_grid.rs`
   and drops the second of two top-level markers a coarser grid lands on one tick).
-- `edit_time.rs` — ripple, insert time, `close_gap` (refuses rather than
+- `edit_time.rs` — ripple (`ripple_delete`: a merged span ends at the
+  earliest start of a clip not removed that begins strictly inside a removed
+  clip on that clip's own unlocked track, `closing_end`, every unlocked track
+  shifting by that one amount, and the op refuses in the overlap rule's
+  sentence when a track it moved breaks the rule, spec §11 #601), insert
+  time, `close_gap` (refuses rather than
   closing part way, and refuses naming what is there when `at` is on a clip
   or nothing follows it, spec §11 #88), freeze frame, `Span` and `union`
   (`pub(crate)`, `edit_range.rs` shares them), `shift_clips`, `shifted` (what a shift moves: every unlocked

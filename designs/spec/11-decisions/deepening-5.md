@@ -4,10 +4,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 [`README.md`](README.md).
 
 The entries continue [`deepening.md`](deepening.md), so a citation never has to say which file. This
-file holds #497, #524, #534, #523, #521, #526, #532, #527, #531, #525, #535, #536 and #395, and a
-new decision of this kind is appended here. It is new because `deepening.md` had passed the spec's
-~500-line split rule (#548, 2026-11-11); the entries moved here unchanged, and an "above" or "below"
-in one may now point into a sibling file.
+file holds #497, #524, #534, #523, #521, #526, #532, #527, #531, #525, #535, #536, #395, #568, #592,
+#427 and #602. #601 on are in [`deepening-6.md`](deepening-6.md). It is new because `deepening.md`
+had passed the spec's ~500-line split rule (#548, 2026-11-11); the entries moved here unchanged, and
+an "above" or "below" in one may now point into a sibling file.
 
 - **#497 — a folder at an import door imports the media files directly
   inside it.** A folder dropped on the Media tab, alone or among files, and
@@ -431,7 +431,9 @@ in one may now point into a sibling file.
   the pair to fix; an agent's own ranges meet it like any cut.
   (g) Left as they are: `ripple_delete {clips}` (removing a clip with a
   transition into its next neighbour can slide later clips under that
-  neighbour; a question about what the ripple moves, left for an issue);
+  neighbour; a question about what the ripple moves, left for an issue;
+  amended by #601: it closes up to that neighbour, and is judged on the
+  tracks it moved);
   `keep_range`'s and `copy_pieces`' own cuts and sentences (CJ-50, SW-12).
   Switch by Speaker's Replace the shots on (SW-23 (a)) clears its range
   with `split` ops then a `delete`, each tried as it is sent, so a range

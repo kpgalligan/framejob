@@ -19,12 +19,16 @@
 //! 3. **Straddling clips stay put.** A clip that covers a boundary is not
 //!    cut by a shift; only clips that begin at or after the boundary move.
 //!    Clips never push each other, and a shift never splits anything the
-//!    user did not ask to split.
+//!    user did not ask to split. So a clip ripple's boundary is never left
+//!    inside a surviving neighbour that begins in a removed clip: the span
+//!    closes only up to it (spec §11 #601).
 //!
 //! Everything here is composed from the primitives in `edit_clip.rs` —
 //! `split_clips`, `split_under_playhead`, `snapped`, `finish` — rather than
 //! restating them, so a split made by a range delete is the same split ⌘T
 //! makes.
+
+use std::collections::HashMap;
 
 use crate::cursor_props::with_base_cursor;
 use crate::edit_clip::clip_end;
@@ -150,6 +154,20 @@ impl Project {
     /// processed RIGHT TO LEFT, because shifting for an earlier span moves
     /// the clips a later span's bounds were computed against.
     ///
+    /// **A span ends where its first surviving neighbour begins** (spec
+    /// §11 #601): a clip that begins strictly inside a removed clip on that
+    /// clip's own unlocked track — a transition out of it — would straddle
+    /// the hole and stay while the clip after it slid underneath, so the
+    /// span closes only up to the earliest such start (`closing_end`),
+    /// every unlocked track by that one amount. A removed clip on a locked
+    /// track pulls nothing back: its neighbour cannot move.
+    ///
+    /// **Refused, nothing removed, when a track the shift moved breaks the
+    /// overlap rule**, in the rule's own sentence, as `close_gap` is: a
+    /// clip on another track can still slide under one that straddles the
+    /// span, and a neighbour can be too short for the overlap it inherits
+    /// at the span's start. Only the moved tracks are judged (#427 (b)).
+    ///
     /// The named clips are removed whether or not their track is locked —
     /// the caller named them — while the lock decides only what may SHIFT.
     /// Each one's linked partner on an unlocked track goes too (AU-91).
@@ -177,12 +195,34 @@ impl Project {
                 })
                 .collect(),
         );
+        // Every end is read off the project as the caller saw it, as the
+        // spans are: a span's neighbours begin inside it, and the shift of a
+        // span to its right moves only what starts at or after that span's
+        // end (and those clips' partners).
+        let unlocked = unlocked_tracks(self);
+        let ends: Vec<Ticks> = spans
+            .iter()
+            .map(|span| self.closing_end(*span, &selection, &unlocked))
+            .collect();
 
         let mut next = self.clone();
         next.clips.retain(|c| !ids.contains(&c.id));
-        for span in spans.iter().rev() {
-            let length = span.end.saturating_sub(span.start);
-            if let Some(why) = shift_clips(&mut next, span.end, -length) {
+        for (span, end) in spans.iter().zip(&ends).rev() {
+            if let Some(why) = shift_clips(&mut next, *end, span.start.saturating_sub(*end)) {
+                return Ok(Outcome::Refused(why));
+            }
+        }
+        // The backstop, `close_gap`'s: each track holding a clip the shifts
+        // moved, judged whole, in the project's track order.
+        let was: HashMap<u32, Ticks> = self.clips.iter().map(|c| (c.id, c.start)).collect();
+        let moved: Vec<u32> = next
+            .clips
+            .iter()
+            .filter(|c| was.get(&c.id).is_some_and(|start| *start != c.start))
+            .map(|c| c.track)
+            .collect();
+        for track in next.tracks.iter().filter(|t| moved.contains(&t.id)) {
+            if let Err(why) = next.check_overlap_rule(&[], track.id, &[]) {
                 return Ok(Outcome::Refused(why));
             }
         }
@@ -191,6 +231,31 @@ impl Project {
         // default rather than leaving two stacked layers.
         let unlocked = unlocked_tracks(&next);
         self.finish_placement(next, &unlocked)
+    }
+
+    /// Where a ripple's merged `span` closes to (spec §11 #601): the
+    /// earliest start of a clip NOT removed that begins strictly inside a
+    /// removed clip of the span, on that clip's own unlocked track; else the
+    /// span's own end. One end for the whole span, the first winning, so
+    /// every track shifts by one amount: a later end is exactly the overlap
+    /// this rule exists to prevent (the earlier neighbour stays and the clip
+    /// after it slides under it), where an earlier one leaves at most a gap.
+    fn closing_end(&self, span: Span, removed: &[&Clip], unlocked: &[u32]) -> Ticks {
+        let inside = |c: &Clip| span.start <= c.start && clip_end(c) <= span.end;
+        removed
+            .iter()
+            .filter(|r| inside(r) && unlocked.contains(&r.track))
+            .flat_map(|r| {
+                self.clips.iter().filter(move |n| {
+                    n.track == r.track
+                        && r.start < n.start
+                        && n.start < clip_end(r)
+                        && !removed.iter().any(|x| x.id == n.id)
+                })
+            })
+            .map(|n| n.start)
+            .min()
+            .unwrap_or(span.end)
     }
 
     /// Closes the empty span on `track` that contains `at`: everything from

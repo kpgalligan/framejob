@@ -323,7 +323,11 @@ extension AgentServer {
                 "ripple_delete",
                 "Removes clips and closes the gaps: everything starting after each removed span "
                     + "on an UNLOCKED track slides left by that span's length — ⌘⌫. Clips on "
-                    + "locked tracks and clips that straddle a span stay where they are.",
+                    + "locked tracks and clips that straddle a span stay where they are. A removed "
+                    + "clip with a transition into the next clip closes only up to where that clip "
+                    + "starts (the first such start when several are removed together), so it moves "
+                    + "and nothing slides under it. Refused, nothing removed, when a track it moves "
+                    + "would break the overlap rule.",
                 ["clips": clipsDescription]),
             opTool(
                 "ripple_delete_range",

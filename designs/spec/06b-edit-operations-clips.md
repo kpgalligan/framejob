@@ -188,7 +188,12 @@ The patch ops (`set_video`, `set_audio`, `set_text`, `set_shape`, `set_graphic` 
 - **`ripple_delete {clips}` / `ripple_delete_range {from, to}`** — Removes; then for each removed
   span (union of the removed clips' spans, processed right-to-left) shifts every clip on
   **unlocked** tracks whose start ≥ span end left by the span length. Clips on other tracks that
-  straddle a span are left in place. Range form: every unlocked clip is split at both bounds first,
+  straddle a span are left in place. Clips form: a merged span ENDS at the earliest start of a
+  surviving clip that begins strictly inside one of its removed clips on that clip's own unlocked
+  track (a transition out of it), so that neighbour closes up onto the span's start and nothing
+  slides under it; a removed clip on a locked track pulls nothing back; and the op is refused,
+  nothing removed, when a track it moved breaks the overlap rule, in the rule's own sentence
+  (§11 #601). Range form: every unlocked clip is split at both bounds first,
   the middle pieces removed, then the shift; refused, nothing cut, when the result breaks the
   overlap rule (§6a, §11 #427). Every clip a shift moves moves by that ONE delta, so
   clips that abutted still abut — at a rate whose frame is not a whole number of ticks (7 fps) a

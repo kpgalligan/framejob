@@ -1040,6 +1040,106 @@ def the_cut_rule(mcp):
     undo_claim(s, start)
 
 
+# ---- a clip ripple closes up to its neighbour (spec §11 #601) --------------
+
+
+def the_clip_ripple(mcp):
+    """`ripple_delete {clips}` of a clip with a transition into its next
+    neighbour closes only up to where that neighbour starts, every unlocked
+    track shifting by that one amount, and is refused in THE overlap rule's
+    sentence when a track it moved would still break the rule (spec §11
+    #601, `core/src/edit_time.rs`).
+
+    The fixture is the ten-second card four times on one track, b, c and d
+    moved two seconds onto a, then c and d two more onto b, each move minting
+    a cross dissolve: a [0, 10 s), b [8 s, 18 s), c [16 s, 26 s), d [26 s,
+    36 s). Ripple-deleting b used to shift by b's 10 s at 18 s, leaving c at
+    16 s (it starts inside b) and sliding d to 16 s, wholly under c (the
+    issue). Closing up to c's start shifts by 8 s at 16 s: c to 8 s, still
+    dissolving from a, and d to 18 s. Every number below is computed here,
+    never read back."""
+    print("\n12 — a clip ripple closes up to the neighbour it dissolves into (#601)")
+    s = Session(mcp, "refusal-ripple")
+    media = s.media("A.mov")
+    a = s.place(media, 0)
+    b = s.place(media, 10 * SEC)
+    c = s.place(media, 20 * SEC)
+    d = s.place(media, 30 * SEC)
+    s.op("move_clip", clips=[b, c, d], delta=-2 * SEC)
+    s.op("move_clip", clips=[c, d], delta=-2 * SEC)
+
+    def placements():
+        return [[x["id"], x["start"], x["duration"], x.get("transition_in") is not None]
+                for x in sorted(s.project()["clips"], key=lambda x: (x["track"], x["start"]))]
+
+    def back_to(text, most):
+        """Undo until the project reads `text` again, at most `most` times:
+        exactly the undos the edits above made, and never one past `text`,
+        so a red run (an op that applied where it should refuse, or the
+        reverse) still reaches the rows after it."""
+        for _ in range(most):
+            if s.text() == text:
+                return
+            s.op("undo")
+
+    fixture = [[a, 0, 10 * SEC, False], [b, 8 * SEC, 10 * SEC, True],
+               [c, 16 * SEC, 10 * SEC, True], [d, 26 * SEC, 10 * SEC, False]]
+    landed("the fixture is a [0, 10 s), b [8 s, 18 s), c [16 s, 26 s), d [26 s, 36 s), "
+           "b and c dissolving in", placements(), fixture)
+    closed = [[a, 0, 10 * SEC, False], [c, 8 * SEC, 10 * SEC, True],
+              [d, 18 * SEC, 10 * SEC, False]]
+
+    print("\n12a — a real edit, whose undo step every answer below must leave alone")
+    start = undo_marker(s, lambda: s.op("set_clip", clips=[a], patch={"name": "Marker"}))
+    marked = s.text()
+
+    print("\n12b — ripple-deleting b closes up to c's start, 8 s, not b's 10 s")
+    applied(s, "ripple_delete", "ripple_delete of b", clips=[b])
+    landed("…and it LANDED: c at 8 s still dissolving from a, d at 18 s butting c "
+           "(the issue left c at 16 s and d under it)", placements(), closed)
+
+    print("\n12c — a range cut on that track then applies (the issue's second half)")
+    # {22 s, 23 s} lies inside d alone once closed up, clear of the dissolve.
+    # Unfixed, c and d both sat at [16 s, 26 s) and the cut refused naming
+    # them, as every range cut that moved the track did.
+    applied(s, "ripple_delete_range", "ripple_delete_range {22 s, 23 s}",
+            **{"from": 22 * SEC, "to": 23 * SEC})
+    back_to(marked, 2)
+
+    print("\n12d — the person's door: b selected, Edit ▸ Ripple Delete")
+    s.op("set_selection", clips=[b])
+    s.op("perform_menu_item", path=["Edit", "Ripple Delete"])
+    landed("…and it LANDED where the tool's did", placements(), closed)
+    back_to(marked, 1)
+    s.op("set_selection", clips=[])
+
+    print("\n12e — a track the ripple moves that still breaks the rule refuses it whole")
+    # x straddles 16 s on a second track and stays; y, at 20 s, moves 8 s to
+    # 12 s, under x by 8 s against half of either clip's 10 s.
+    other = s.op("add_track")["new_tracks"][0]
+    x = s.place(media, 10 * SEC, track=other)
+    y = s.place(media, 20 * SEC, track=other)
+    with_xy = s.text()
+    sentence = (f"clips {x} and {y} would overlap by {8 * SEC} ticks, more than half of the "
+                f"shorter clip ({10 * SEC // 2} ticks)")
+    refused(s, "ripple_delete", "ripple_delete", "ripple_delete of b over x and y", sentence,
+            clips=[b])
+    back_to(with_xy, 1)
+    s.op("set_selection", clips=[b])
+    s.op("perform_menu_item", path=["Edit", "Ripple Delete"])
+    check(s.text() == with_xy, "Edit ▸ Ripple Delete with b selected changed nothing")
+    strip = foot(s, "refusal-ripple-foot")
+    check(strip == [f"Refused: {sentence}"],
+          f"…and the inspector's foot reads the sentence whole; got {strip}")
+    back_to(with_xy, 1)
+    s.op("set_selection", clips=[])
+    back_to(marked, 3)             # y, x and the track
+    landed("…and three undos take the second track away again", placements(), fixture)
+
+    print("\n12f — and not one refusal was an undo step")
+    undo_claim(s, start)
+
+
 def summary(aborted=None):
     """The last line, and the exit status. An op that unexpectedly refused or
     errored — a `ToolError` no check was waiting for — aborts the run and is
@@ -1072,6 +1172,7 @@ def main():
     off_the_track_stack(mcp)
     the_non_edits_that_speak(mcp)
     the_cut_rule(mcp)
+    the_clip_ripple(mcp)
     summary()
 
 

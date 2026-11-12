@@ -111,7 +111,7 @@ A clip you name on a locked track is still removed. A picture takes its linked s
 
 ## `ripple_delete`
 
-Removes clips and closes each hole: everything that starts at or after the end of a removed clip's span, on every unlocked track, slides left by that span's length.
+Removes clips and closes each hole: everything that starts at or after the end of a removed clip's span, on every unlocked track, slides left by that span's length. A removed clip that the next clip on its track starts inside, as across a transition, closes only up to where that clip starts, so it moves into the hole. When the clips removed together would stop at different places, the hole ends at the first of them.
 
 It mirrors <kbd>⌘⌫</kbd> and **Edit ▸ Ripple Delete** with clips selected. See [Ripple delete clips](/editing/delete-clips/#ripple-delete-clips).
 
@@ -123,7 +123,7 @@ It mirrors <kbd>⌘⌫</kbd> and **Edit ▸ Ripple Delete** with clips selected.
 
 A clip you name on a locked track is still removed, but clips on locked tracks don't move. Each clip's linked partner on an unlocked track goes too, whichever half you name. A clip on another track that crosses a removed span stays where it is, and two removed clips that touch leave one hole. A clip that slides onto a neighbour gets a Cross Dissolve over the overlap. See [How a ripple closes holes](/editing/delete-clips/#how-a-ripple-closes-holes).
 
-**Won't run** when the shift would push a linked clip before the start of the timeline, as a sound leading its picture in a [J-cut](/audio/j-and-l-cuts/) can. The message names both clips, and nothing moves. An unknown clip id or an empty list is an error.
+**Won't run** when the shift would push a linked clip before the start of the timeline, as a sound leading its picture in a [J-cut](/audio/j-and-l-cuts/) can. The message names both clips, and nothing moves. Nor when a track the shift moves would break the [overlap rule](/getting-started/refused-edits/), such as a clip sliding more than halfway under one that crosses the hole on another track: the message is the rule's own, naming the two clips, and nothing is removed. An unknown clip id or an empty list is an error.
 
 ## `ripple_delete_range`
 
