@@ -3,7 +3,11 @@ import AppKit
 /// The inspector's foot (spec §11 CI-10): "Refused: " and the rule's own
 /// sentence, VERBATIM, when the core refused a person's edit.
 /// `ProjectDocument.applyEdit` has already beeped; this is the one thing a
-/// person sees that an identity does not show them.
+/// person sees that an identity does not show them. Its second form is a
+/// measured press's notice (spec §11 AU-169): Normalize's, Enhance Voice's
+/// or Match Audio's own sentence for the clips it left away from the target
+/// or skipped, with no prefix, its tooltip every clip on a line. The foot
+/// holds the latest of the two.
 ///
 /// It lasts until the PROJECT changes — `clearIfStale` runs at the top of
 /// every inspector refresh and clears it once `editedProject` is another
@@ -69,10 +73,19 @@ final class InspectorRefusalStrip: NSView {
 
     func show(_ refusal: ReelRefusal, under project: ReelProject?) {
         let sentence = "Refused: " + refusal.reason
+        show(sentence, toolTip: sentence, under: project)
+    }
+
+    /// A measured press's notice (AU-169), as it is: no "Refused: ".
+    func show(_ notice: AudioMeasureNotice, under project: ReelProject?) {
+        show(notice.text, toolTip: notice.detail, under: project)
+    }
+
+    private func show(_ sentence: String, toolTip tip: String, under project: ReelProject?) {
         text = sentence
         self.project = project
         label.stringValue = sentence
-        toolTip = sentence
+        toolTip = tip
         isHidden = false
         needsDisplay = true
     }
@@ -109,6 +122,14 @@ extension InspectorViewController {
     func showRefusal(_ refusal: ReelRefusal) {
         guard isViewLoaded else { return }
         refusalStrip.show(refusal, under: document?.editedProject)
+        refusalStrip.span(footContainer)
+    }
+
+    /// The editor's forward of `projectDocumentDidNote` (spec §11 AU-169),
+    /// posted after the commit, so under the handle it left.
+    func showNotice(_ notice: AudioMeasureNotice) {
+        guard isViewLoaded else { return }
+        refusalStrip.show(notice, under: document?.editedProject)
         refusalStrip.span(footContainer)
     }
 }

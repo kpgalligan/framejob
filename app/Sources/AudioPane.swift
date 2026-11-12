@@ -167,9 +167,11 @@ final class AudioPane: InspectorPaneView {
     /// **A run that can normalise nothing beeps**, and so does a second press
     /// on an already-normalised selection: `apply` refuses an empty op list,
     /// and `ProjectDocument.applyEdit` refuses an identity edit — the recorded
-    /// consequence `SpeedSheetController` carries for the same reason. The
-    /// button is not the place that explains WHY a clip was skipped; the tool
-    /// reports each reason by name under `skipped`.
+    /// consequence `SpeedSheetController` carries for the same reason. In
+    /// Loudness mode the inspector's foot then names each clip skipped or
+    /// left away from the target, and says the press changed nothing when it
+    /// did (spec §11 AU-169, `AudioMeasureDoor.land`); the tool reports the
+    /// same under `skipped` and `note`.
     /// The selected clips Normalize is offered for, which is `audioClips`
     /// minus the ones `AudioNormalize` could only refuse.
     ///

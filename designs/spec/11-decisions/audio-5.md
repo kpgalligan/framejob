@@ -253,7 +253,8 @@ It is new because [`audio-4.md`](audio-4.md) had reached the spec's ~500-line sp
   ceiling's clause for `max_gain`, and for `verify_renders` ends ", short of T" (or ", over T")
   with the same cause. The three tools' descriptions and the site's MCP audio page and its
   Normalize, Enhance Voice and Match Audio pages say it. The button, the menu and the Match sheet
-  say nothing, as they say nothing of a skip.
+  say nothing, as they say nothing of a skip. **Amended by AU-169 (#609):** they say both at
+  the inspector's foot.
   (d) **Declined.** More verify renders (the issue's option 3): in (i) the limiter holds the
   sound and more renders would not reach T, and each one renders the whole clip.
   (e) **Left as decided.** At ×32 the answer stays `max_gain`, with the ceiling's note, even when
@@ -311,7 +312,8 @@ It is new because [`audio-4.md`](audio-4.md) had reached the spec's ~500-line sp
   of ", short of T: the volume would pass 32×." The answer would otherwise give two causes. The
   reason reads the clips from the press's setup (`AudioMeasureDoor.EnhanceSetup.endLimiters`),
   the same project by the stale test. The button, the menu and the sheets still say nothing
-  (#609 is the app's own sentence).
+  (#609 is the app's own sentence). **Amended by AU-169:** they now say it, at the inspector's
+  foot, with the same cause.
   (e) **Where it shows.** `normalize_clip`'s description, which `enhance_voice`'s and
   `match_audio`'s cite, and the site's MCP audio page and its Normalize, Enhance Voice and Match
   Audio pages.
@@ -330,3 +332,84 @@ It is new because [`audio-4.md`](audio-4.md) had reached the spec's ~500-line sp
   target printed −15.999999999117435), and the probe on the tree before this entry did not
   build (no `endLimiterOn`, no `endLimiters`). With it, `AP6_ONLY=ceiling` 9 of 9 on Debug, each
   leg naming the action's limiter; the recorded Release run is `tools/proof/README.md`'s.
+- **AU-169 — The app says where a measured press left a clip away from its target (#609,
+  2026-11-12; amends AU-167 (c), AU-168 (d), AU-65 and CI-10).** AU-167 (c) and AU-168 (d) left
+  the Normalize button and Clip ▸ Normalize (Loudness mode), the Enhance Voice button and Clip ▸
+  Enhance Voice, and the Match Audio sheet's Match applying the plan's ops and saying nothing of
+  a clip they left short of the target or skipped, though the tools answer both. The owner's
+  decision (2026-11-12, the issue's last comment): design where the app says it, in a place it
+  already uses for a result sentence, and build it.
+  (a) **Where.** The inspector's foot, CI-10's strip, in a second form: the sentence as it is,
+  no "Refused: " and no beep of its own (`AudioMeasureNotice`, posted by
+  `AudioMeasureDoor.land` as `projectDocumentDidNote`). It is where these doors already put
+  their only sentences (a stale answer, Match's refusals, the follow's); it shows under every
+  tab, which a Clip-menu press needs; and both commit paths reach it. Not a Sound tab Status
+  row, which is read from the project and its caches at each refresh and could hold a press's
+  result only by persisting it; not the Measuring Sound sheet, which is not up when nothing
+  renders and is gone when the answer lands. It is not a refusal, so app/CLAUDE.md's "a refusal
+  is the CORE's sentence" does not reach it: it is the app's own measurement, the facts the
+  tools answer.
+  (b) **When.** After the press's answer lands, for each clip whose row has a limit (`limited_by`
+  set, the tools' own rule, so the app and a tool never disagree about a clip) and each clip the
+  plan skipped. Applied (the project is another handle after the commit), the sentence says
+  what the press left. The same handle and no refusal posted inside the commit is an identity:
+  the beep stands and the sentence comes in (c)'s form, so a second press on a clip already at
+  its stop says why it changed nothing (the challenger's case; `land` watches for the refusal
+  during the commit, `ProjectDocument.swift` is untouched). A core refusal of the press's own
+  ops posts its refusal and no notice. Accepted: an error thrown by the commit (invalid input,
+  a defect for ops the door wrote) shows its alert and the "changed nothing" form beside it.
+  Peak-mode Normalize has no target and is unchanged.
+  (c) **Nothing changed.** A press that changes nothing (every clip skipped, or an identity)
+  keeps its beep and now also says "<Command> changed nothing." and then its clips, below. This
+  amends AU-65's bare beep for Normalize and Enhance Voice. Match's "Nothing could be matched."
+  and the follow's "Nothing could be enhanced." stay refusals as they are.
+  (d) **The form.** A clip is its name in curly quotes and its start as m:ss, the Match Audio
+  sheet's clock, so cuts of one recording read apart: “Rode-usb-mic.m4a” (0:12); an id with no clip
+  is "clip N". Figures through `AudioEnhance.lufs`; a distance to 0.1 LU, under 0.05 LU "less
+  than 0.1 LU". The target is "−16.0 LUFS", for Match "the reference's −18.2 LUFS". No
+  `limited_by` token. The cause ends the clip's clause:
+  - the ceiling: ", with its volume at the 32× ceiling.";
+  - an action's limiter (AU-168 (b)'s `actionLimiterHeld`, the clips read from the project the
+    press measured): " at the 32× ceiling, likely because a limiter an action's end turns on
+    holds the sound down.";
+  - the verify bound: ", likely because a limiter holds the sound down harder as the volume
+    rises."
+  One clip away: "Normalize left “A” (0:12) 13.6 LU short of −16.0 LUFS, with its volume at the
+  32× ceiling." ("over" for a result above the target). Several: "Normalize left 3 clips away
+  from −16.0 LUFS; the furthest, “A” (0:12), is 13.6 LU short, with its volume at the 32×
+  ceiling." (the largest distance, the first on a tie). Skips follow: "It skipped “B” (0:30):
+  <the plan's reason>", or with several "It skipped 2 clips, the first “B” (0:30): <reason>",
+  the reason the tools' own words; with no clip away the subject is the command, "Normalize
+  skipped …". Nothing changed: "Normalize changed nothing." and then "“A” (0:12) is 13.6 LU
+  short of −16.0 LUFS, …", or "3 clips are away from …", and the skips. The strip keeps CI-10's
+  three lines; its tooltip is the whole account, the sentence and then one line per clip
+  ("“A” (0:12) is …", "Skipped “B” (0:30): …"), or the sentence alone for one clip.
+  (e) **How long.** CI-10's lifetime, unchanged: until the project is another handle (an applied
+  edit, undo, redo, a scope change) or the strip is clicked; no timer. It is posted after the
+  commit, so the commit's own refresh does not clear it. The foot holds the latest sentence: a
+  refusal replaces a notice and a notice a refusal. Accepted: anything else that changes the
+  project clears it, the recording polish that follows a landing's Enhance included.
+  (f) **Which doors and paths.** The four presses on both commit paths (in the event when
+  nothing renders, and after the Measuring Sound sheet, `-RCDevMeasureHandBackHold` included),
+  and a landing's follow (AU-68), which speaks only through the foot. A stale answer is refused
+  as today and says only that.
+  (g) **Tools.** Unchanged: no new tool, argument or answer field; `normalize_clip`,
+  `enhance_voice` and `match_audio` keep `limited_by`, `note` and `skipped`, and their handlers'
+  comments name the foot as the UI path's counterpart.
+  Proof: `audio_ap6_probe.py` E19 (the sentence by case) with mutants M38–M43 (the limiter named
+  for any ceiling clip, the first clip in place of the furthest, the skips left out, "short" for
+  a clip over the target, no "changed nothing", a clip without its start), and
+  `audio_ap12_probe.py` P13 (`land` on a `ProjectDocument()`: the notice once after the commit
+  on both paths and on the follow, an identity's "changed nothing", none after a core refusal,
+  the empty press's beep and notice) with M17–M20 (posted before the commit, an identity as
+  applied, a notice after a refusal, the empty press silent); P12 also holds that `measure`
+  posts no notice. `audio_ap6_proof.py` V18 (`AP6_ONLY=foot`) reads the strip from
+  `snapshot_ui` after each door on an instance pinned to Loudness at −16 with the Match sheet's
+  accept, each distance against the tool's own row for the same clip: on Debug 9/9 ((a) Enhance
+  through the sheet on V16 (g)'s clip, "… 13.1 LU short of −16.0 LUFS at the 32× ceiling, likely
+  because a limiter an action's end turns on holds the sound down." against the tool's −29.118;
+  pressed again, "Enhance Voice changed nothing. …"; undo, none; (b) Normalize in the event on a
+  copy 15 dB down, 10.0 LU short against −26.015; (c) the same inside a nest; (d) a silent clip
+  skipped; (e) Match through its sheet, "… 10.6 LU short of the reference's −15.9 LUFS, …"), and
+  red 3/9 on a Debug build with `land`'s post disabled, every leg's foot empty. The mutants' and
+  the Release run's scores are `tools/proof/README.md`'s. Manual check SE-47 is how it reads.

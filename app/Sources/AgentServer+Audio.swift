@@ -322,7 +322,9 @@ extension AgentServer {
     /// limiter after the edit (AU-24), where it lands, and the volume ceiling
     /// or the verify renders when either stopped it away from the target
     /// (AU-167); a note names each such clip, and a limiter an action's end
-    /// turns on as the likely reason for a ×32 stop (AU-168).
+    /// turns on as the likely reason for a ×32 stop (AU-168). The note and
+    /// `skipped` are what the button and the menu say at the inspector's foot
+    /// (AU-169).
     private func normalizeLoudness(
         _ a: [String: Any], document: ProjectDocument, clips: [UInt32], stop: AgentCallCancel?
     ) throws -> String {

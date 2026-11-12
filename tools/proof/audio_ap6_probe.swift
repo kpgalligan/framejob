@@ -7,7 +7,7 @@ import Foundation
 // compiled with app/Sources through swift_build, `app/Resources/Models`
 // beside the binary so the product's own speech pass runs. Arguments: the
 // fixtures folder (`rode.m4a`), a scratch folder. Prints one "ok"/"FAIL" line
-// per row, each row's name first (E1–E3, E6–E18), for audio_ap6_probe.py to
+// per row, each row's name first (E1–E3, E6–E19), for audio_ap6_probe.py to
 // score. Nothing here renders: the processed solve is the proof's (V2, V13).
 
 final class ProbeDocumentController: NSDocumentController {
@@ -969,4 +969,129 @@ do {
           enhanced?.compressor != nil && enhanced?.gate != nil && second?.patch == choice.patch
             && second?.limiter == choice.limiter && answer == "identity",
           "second press \(answer)")
+}
+
+// MARK: - E19 the app's own sentence for a measured press (AU-169, #609)
+
+do {
+    let t = -16.0
+    let reach = 20 * log10(AudioNormalize.maxGain)
+    /// A row `short` LU from −16 (negative: over), at ×32 for `max_gain`.
+    func row(_ clip: UInt32, _ limit: AudioNormalize.Limit?, short: Double, r0: Double? = -39.4)
+        -> AudioNormalize.LoudnessResult
+    {
+        var r = AudioNormalize.LoudnessResult(
+            clip: clip, media: 1, measuredLUFS: -41.6, truePeakDBTP: -18.5,
+            volume: limit == .maxGain ? 32 : 2, resultLUFS: t - short, resultTruePeakDBTP: -3.5,
+            limit: limit, limiter: nil)
+        r.processedLUFS = r0
+        return r
+    }
+    let labels: [UInt32: String] = [3: "“rode” (0:00)", 5: "“rode” (0:12)", 7: "“talk” (1:05)"]
+    func facts(_ rows: [AudioNormalize.LoudnessResult], skipped: [AudioNormalize.Problem] = [],
+               reference: Bool = false, command: String = "Normalize")
+        -> AudioMeasureNotice.Facts
+    {
+        AudioMeasureNotice.Facts(
+            command: command, targetLUFS: reference ? -18.2 : t, reference: reference,
+            rows: rows, skipped: skipped)
+    }
+    func say(_ f: AudioMeasureNotice.Facts, ends: Set<UInt32> = [], changed: Bool = true)
+        -> AudioMeasureNotice?
+    {
+        AudioMeasureNotice.make(f, labels: labels, endLimiters: ends, changed: changed)
+    }
+    /// A tooltip on the probe's one line.
+    func oneLine(_ detail: String?) -> String {
+        detail?.replacingOccurrences(of: "\n", with: " ⏎ ") ?? "nil"
+    }
+    let quiet = AudioNormalize.Problem(
+        clip: 7, reason: "is under −70 LUFS over the part of it that plays, so there is no "
+            + "loudness to normalize.")
+    let short = AudioNormalize.Problem(clip: 9, reason: "plays for under 0.4 s.")
+
+    let none = say(facts([row(3, nil, short: 0.02)]))
+    check("E19", "no limit and no skip: no notice", none == nil, "\(String(describing: none))")
+    let ceiling = say(facts([row(3, .maxGain, short: 13.6)]))?.text ?? ""
+    check("E19", "the ceiling, one clip: named with its start, the distance, the ceiling",
+          ceiling == "Normalize left “rode” (0:00) 13.6 LU short of −16.0 LUFS, with its volume "
+            + "at the 32× ceiling.", ceiling)
+    let held = say(facts([row(3, .maxGain, short: 13.6)]), ends: [3])?.text ?? ""
+    check("E19", "an action's limiter at the ×32 stop, R0 reaching: that limiter named",
+          held == "Normalize left “rode” (0:00) 13.6 LU short of −16.0 LUFS at the 32× ceiling, "
+            + "likely because a limiter an action's end turns on holds the sound down.", held)
+    let tooQuiet = say(facts([row(3, .maxGain, short: 13.6, r0: t - 0.15 - reach)]), ends: [3])?
+        .text ?? ""
+    check("E19", "R0 too quiet to reach at ×32: the ceiling, though an action's limiter is on",
+          tooQuiet.hasSuffix(", with its volume at the 32× ceiling."), tooQuiet)
+    let bound = say(facts([row(3, .verifyRenders, short: 0.4)]))?.text ?? ""
+    let over = say(facts([row(3, .verifyRenders, short: -0.3)]))?.text ?? ""
+    check("E19", "the verify bound short of the target, and over it",
+          bound == "Normalize left “rode” (0:00) 0.4 LU short of −16.0 LUFS, likely because a "
+            + "limiter holds the sound down harder as the volume rises."
+            && over.hasPrefix("Normalize left “rode” (0:00) 0.3 LU over −16.0 LUFS, likely"),
+          bound + " | " + over)
+    let close = say(facts([row(3, .maxGain, short: 0.03)]))?.text ?? ""
+    check("E19", "a cache row 0.03 LU short reads less than 0.1 LU",
+          close.contains("left “rode” (0:00) less than 0.1 LU short of −16.0 LUFS"), close)
+    let three = say(
+        facts([row(3, .maxGain, short: 2), row(5, .verifyRenders, short: -0.4),
+               row(7, .maxGain, short: 9), row(8, nil, short: 0)]), ends: [7])
+    check("E19", "three clips away: counted, the furthest (largest distance) named with its "
+            + "cause, the tooltip the sentence and a line per clip",
+          three?.text == "Normalize left 3 clips away from −16.0 LUFS; the furthest, “talk” "
+            + "(1:05), is 9.0 LU short at the 32× ceiling, likely because a limiter an action's "
+            + "end turns on holds the sound down."
+            && three?.detail.components(separatedBy: "\n").count == 4
+            && three?.detail.contains("\n“rode” (0:12) is 0.4 LU over −16.0 LUFS, likely") == true,
+          oneLine(three?.detail))
+    let tie = say(facts([row(3, .maxGain, short: 5), row(5, .maxGain, short: 5)]))?.text ?? ""
+    check("E19", "two clips of one recording at the same distance: the first, by its start",
+          tie.contains("the furthest, “rode” (0:00), is 5.0 LU short"), tie)
+    // The row lands at −20.0, 1.8 LU short of the reference's −18.2.
+    let match = say(facts([row(3, .maxGain, short: 4)], reference: true, command: "Match Audio"))?
+        .text ?? ""
+    check("E19", "Match: the reference's target",
+          match.hasPrefix("Match Audio left “rode” (0:00) 1.8 LU short of the reference's "
+            + "−18.2 LUFS"), match)
+    let oneSkip = say(facts([row(3, nil, short: 0)], skipped: [quiet]))
+    check("E19", "one skip beside a landed clip: the command skipped it, with the plan's reason",
+          oneSkip?.text == "Normalize skipped “talk” (1:05): " + quiet.reason
+            && oneSkip?.detail == oneSkip?.text, oneSkip?.text ?? "nil")
+    let skips = say(facts([row(3, .maxGain, short: 13.6)], skipped: [quiet, short]))
+    check("E19", "a clip away and two skips: \"It skipped 2 clips, the first …\", an unnamed id "
+            + "as clip N, the tooltip a line per skip",
+          skips?.text.hasSuffix(" It skipped 2 clips, the first “talk” (1:05): " + quiet.reason)
+            == true
+            && skips?.detail.hasSuffix("\nSkipped clip 9: plays for under 0.4 s.") == true,
+          oneLine(skips?.detail))
+    let nothing = say(facts([], skipped: [quiet], command: "Enhance Voice"), changed: false)
+    check("E19", "every clip skipped: changed nothing, then the skip",
+          nothing?.text == "Enhance Voice changed nothing. It skipped “talk” (1:05): "
+            + quiet.reason, nothing?.text ?? "nil")
+    let identity = say(facts([row(3, .maxGain, short: 13.6)]), changed: false)?.text ?? ""
+    check("E19", "an identity: changed nothing, then where the clip is",
+          identity == "Normalize changed nothing. “rode” (0:00) is 13.6 LU short of −16.0 LUFS, "
+            + "with its volume at the 32× ceiling.", identity)
+    let identityMany = say(
+        facts([row(3, .maxGain, short: 2), row(5, .maxGain, short: 3)]), changed: false)?.text
+        ?? ""
+    check("E19", "an identity over two clips: \"2 clips are away\"",
+          identityMany.hasPrefix("Normalize changed nothing. 2 clips are away from −16.0 LUFS; "
+            + "the furthest, “rode” (0:12),"), identityMany)
+    // Over a project: the label and the action limiters read from the snapshot.
+    let snapshot = document.editedProject.snapshot
+    let named = snapshot.clip(2).map { snapshot.name(of: $0) } ?? "?"
+    let fromSnapshot = AudioMeasureNotice.make(
+        facts([row(2, .maxGain, short: 13.6)], skipped: [AudioNormalize.Problem(
+            clip: 400, reason: "is not a clip in this project.")]),
+        in: snapshot, changed: true)?.text ?? ""
+    check("E19", "over a project: the clip's name and m:ss start, an id with no clip as clip N",
+          fromSnapshot.hasPrefix("Normalize left “\(named)” (0:00) 13.6 LU short")
+            && fromSnapshot.hasSuffix("It skipped clip 400: is not a clip in this project."),
+          fromSnapshot)
+    let clocks = [0, 12 * ReelTime.perSecond + 1, 61 * ReelTime.perSecond, -5]
+        .map(AudioMeasureNotice.clock)
+    check("E19", "the clock: m:ss, whole seconds down, never negative",
+          clocks == ["0:00", "0:12", "1:01", "0:00"], clocks.joined(separator: " "))
 }

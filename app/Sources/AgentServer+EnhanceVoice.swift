@@ -23,7 +23,9 @@ extension AgentServer {
     /// then the solve's figures for the volume (`processed_lufs`, `renders`
     /// and where the last render lands); the skips by name. A second
     /// identical call is an identity: "Enhance Voice made no change". One
-    /// main-thread hop reads the arguments and the setup (#412).
+    /// main-thread hop reads the arguments and the setup (#412). `note` and
+    /// `skipped` are what the menu's press says at the inspector's foot
+    /// (spec §11 AU-169).
     func enhanceVoice(_ a: [String: Any]) throws -> String {
         let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16)
         try requireServerThread("enhance_voice")

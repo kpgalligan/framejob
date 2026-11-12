@@ -42,13 +42,23 @@ audio_ap12_proof.py's.
   P12 the menu path's wiring, read from the sources by this runner (so a
       mutant's copy is what it reads): `pressMatch` hands `matchAnswer` to
       `measure` once and says and beeps nothing after it; `measure` neither
-      beeps nor posts a refusal itself — every landing goes through `land`.
+      beeps nor posts a refusal or a notice itself — every landing goes
+      through `land`.
+  P13 the notice (#609, AU-169), on a `ProjectDocument()` with both
+      notifications observed: an applied answer posts its notice once, after
+      the commit (the project already the new handle inside the observer),
+      with no beep and no refusal, in the event and after the sheet; an
+      identity posts it in the "changed nothing" form; a core refusal posts
+      its refusal and no notice; nothing to commit on a press is one beep and
+      the "changed nothing" notice, on a landing's follow the refusal and no
+      notice; the follow's applied answer posts it too; a `.refused` and an
+      answer with no facts post none.
 
---mutants runs M1–M16 (one per independent decision of the speech gate, the
+--mutants runs M1–M20 (one per independent decision of the speech gate, the
 curve, the fit and the write; M12 the shelves' tilt start; M13–M16 #411's and
-#410's fixes), each over its own copy of app/Sources, scored killed when its
-named row fails. Build failures are scored. Output is under
-tools/proof/work/audio-ap12-probe.
+#410's fixes; M17–M20 #609's landing), each over its own copy of app/Sources,
+scored killed when its named row fails; `--mutants M17,M19` runs those alone.
+Build failures are scored. Output is under tools/proof/work/audio-ap12-probe.
 """
 import argparse
 from pathlib import Path
@@ -60,7 +70,7 @@ import swift_build
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/audio-ap12-probe"
-ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12"]
+ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13"]
 
 MUTANTS = [
     ("M1 no-smoothing", "P4", "AudioMatchFit.swift",
@@ -115,6 +125,18 @@ MUTANTS = [
      "answer: { matchAnswer(input, $0) }",
      "answer: { let a = matchAnswer(input, $0); if case .refused(let s) = a { "
      "say(s, command: .matchAudio, document: document, beep: { NSSound.beep() }) }; return a }"),
+    # AU-169 (#609): the notice after the commit, by the handle and the refusal.
+    ("M17 notice-before-commit", "P13", "AudioMeasureDoor.swift",
+     "            let before = document.project\n",
+     "            note(facts, in: snapshot, changed: true, document: document)\n"
+     "            let before = document.project\n"),
+    ("M18 identity-as-applied", "P13", "AudioMeasureDoor.swift",
+     "            if document.project !== before {\n", "            if true {\n"),
+    ("M19 notice-after-refusal", "P13", "AudioMeasureDoor.swift",
+     "            } else if !refused {\n", "            } else if !refused || true {\n"),
+    ("M20 empty-press-silent", "P13", "AudioMeasureDoor.swift",
+     "                return note(facts, in: snapshot, changed: false, document: document)\n",
+     "                return\n"),
 ]
 
 
@@ -145,10 +167,13 @@ def wiring(sources):
     measure = between(text, "private static func measure<", "static func ")
     checks.append(("measure neither beeps nor posts: every landing is land's",
                    measure is not None and "NSSound.beep" not in measure
-                   and "projectDocumentDidRefuse" not in measure,
+                   and "projectDocumentDidRefuse" not in measure
+                   and "projectDocumentDidNote" not in measure and "note(" not in measure,
                    "no measure" if measure is None else
                    f"NSSound.beep {measure.count('NSSound.beep')}, "
-                   f"projectDocumentDidRefuse {measure.count('projectDocumentDidRefuse')}"))
+                   f"projectDocumentDidRefuse {measure.count('projectDocumentDidRefuse')}, "
+                   f"projectDocumentDidNote {measure.count('projectDocumentDidNote')}, "
+                   f"note( {measure.count('note(')}"))
     return checks
 
 
@@ -198,10 +223,11 @@ def run(sources, name, quiet=False):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--sources", type=Path, default=ROOT / "app/Sources")
-    parser.add_argument("--mutants", action="store_true")
+    parser.add_argument("--mutants", nargs="?", const="", default=None, metavar="M17,M19",
+                        help="every mutant, or the ones whose names start with these")
     args = parser.parse_args()
-    if args.mutants:
-        return mutants(args.sources)
+    if args.mutants is not None:
+        return mutants(args.sources, [n for n in args.mutants.split(",") if n])
     rows, problem, _ = run(args.sources, "probe")
     if rows is None:
         check("source probe builds", False, problem)
@@ -218,9 +244,10 @@ def main():
     return 0 if good else 1
 
 
-def mutants(sources):
+def mutants(sources, only=()):
     killed = 0
-    for name, row, file, old, new in MUTANTS:
+    chosen = [m for m in MUTANTS if not only or m[0].split()[0] in only]
+    for name, row, file, old, new in chosen:
         slug = name.split()[0]
         tree = WORK / f"mutant-{slug}" / "Sources"
         shutil.rmtree(tree, ignore_errors=True)
@@ -240,8 +267,8 @@ def mutants(sources):
         check(f"mutant {name} killed by {row}", dead,
               f"{row} {'failed' if dead else 'passed'}; failing rows: "
               + ", ".join(sorted(r for r, ok in rows.items() if not ok)))
-    print(f"\n{killed}/{len(MUTANTS)} mutants killed")
-    return 0 if killed == len(MUTANTS) else 1
+    print(f"\n{killed}/{len(chosen)} mutants killed")
+    return 0 if chosen and killed == len(chosen) else 1
 
 
 if __name__ == "__main__":

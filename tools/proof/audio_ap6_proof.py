@@ -125,6 +125,28 @@ samples/Rode-usb-mic.m4a, and `say` speech made here — one low-passed at
        either way and differently from one render to the next (AU-162). A
        stem is an integer file, so it reads no sample over 0 dBFS.
        AP6_LEGS=a,c runs only those legs.
+  V18  the inspector's foot after a measured press (spec §11 AU-169, #609), read
+       from snapshot_ui's layout (the strip's label and its tooltip), on an
+       instance launched with Loudness mode and a −16 target in its argument
+       domain and the Match sheet's dev accept, each leg a fresh project, the
+       tool first and undone so the strip's distance is the tool's row's: (a)
+       the sheet path, Clip ▸ Enhance Voice on V16 (g)'s clip (an action's end
+       limiter at −24 dBTP): "Enhance Voice left “ap6-rode.wav” (0:00) …
+       short of −16.0 LUFS at the 32× ceiling, likely because a limiter an
+       action's end turns on …", no "Refused", the clip changed; again: the
+       identity, "Enhance Voice changed nothing. …"; undo: no sentence. (b)
+       the in-event path, Clip ▸ Normalize on a copy of the recording 15 dB
+       down (ap6-quiet.wav: ×32 falls short of −16 by more than 0.1 LU and
+       it is over −70): no sheet, "Normalize left …,
+       with its volume at the 32× ceiling.", the tooltip the same; (c) (b)
+       inside a nest (`set_scope`): the same sentence after the commit's
+       refresh; (d) a silent clip: "Normalize changed nothing. It skipped
+       “ap6-silence.wav” (0:00): is under −70 LUFS …"; (e) Clip ▸ Match
+       Audio… with the reference first (the sheet takes the earliest) and
+       normalized to −16, the quiet copy after it, Loudness and EQ on as the
+       sheet has them (`match_audio` with `eq` true first: `max_gain`):
+       "Match Audio left “ap6-quiet.wav” (…) … short of the reference's …".
+       AP6_ONLY=foot runs it alone.
 """
 
 import json
@@ -194,6 +216,12 @@ def fixtures():
            "-ar", str(RATE), "-ac", "1", os.path.join(out, "ap6-hiss.wav"))
     ffmpeg("-f", "lavfi", "-i", f"anullsrc=r={RATE}:cl=mono", "-t", "2", "-c:a", "pcm_s16le",
            os.path.join(out, "ap6-silence.wav"))
+    # V18's quiet copy: 15 dB down, so ×32 (+30.1 dB) stops short of −16 by
+    # far more than 0.1 LU (10.0 LU, measured: −26.015 at ×32) while its
+    # reading stays over −70, and its true peak fits −1 dBTP at ×32 (no
+    # limiter, so Normalize answers off the cache, in the event).
+    ffmpeg("-i", RODE, "-af", "volume=-15dB", "-c:a", "pcm_s16le", "-ar", str(RATE), "-ac", "1",
+           os.path.join(out, "ap6-quiet.wav"))
 
 
 def ready(s, clip):
@@ -1077,6 +1105,168 @@ def ceiling_rows(m):
               f"V16 (m) match_audio: the note writes target_lufs {aim!r} as {round(aim, 3)}")
 
 
+# ---- V18 the inspector's foot (AU-169, #609) ---------------------------------
+
+FOOT_ARGUMENTS = ["-FrameJobNormalizeTargetLUFS", "<real>-16</real>",
+                  "-FrameJobNormalizeMode", "loudness", "-RCDevMatchAudioAccept", "YES"]
+
+
+def foot(s, label):
+    """[(text, tooltip)] of the inspector foot's strip, shown: its label's
+    text and the strip's tooltip (InspectorRefusalStrip, spec §11 CI-10)."""
+    views = layout(s, "editor", f"foot-{label}")
+    out = []
+    for v in views:
+        parent = views[v["parent"]] if 0 <= v.get("parent", -1) < len(views) else {}
+        if (parent.get("class") == "InspectorRefusalStrip" and v.get("text")
+                and not v.get("hidden") and not parent.get("hidden")):
+            out.append((v["text"], parent.get("tooltip")))
+    return out
+
+
+def gap_of(text, after):
+    """The distance in LU a sentence prints after `after`, or None."""
+    try:
+        return float(text.split(after, 1)[1].split(" LU ", 1)[0])
+    except (IndexError, ValueError):
+        return None
+
+
+def press(s, path):
+    """perform_menu_item, then the sheet's going: (its answer, seconds)."""
+    menu = s.op("perform_menu_item", path=path)
+    return menu, wait_no_sheet(s)
+
+
+def foot_rows():
+    print("\nV18 — the inspector's foot after Normalize, Enhance Voice and Match Audio")
+    launched = mcp_module.launch(proof_app.binary(), arguments=FOOT_ARGUMENTS)
+    try:
+        if not check(launched.client is not None, "V18 an instance pinned to Loudness at −16 "
+                                                  "with the Match sheet's accept comes up"):
+            return
+        other = launched.client
+        foot_enhance(other)
+        foot_normalize(other)
+        foot_match(other)
+    finally:
+        launched.stop()
+
+
+def foot_enhance(client):
+    """(a) the sheet path, the identity and undo."""
+    s = Session(client, "ap6-foot-a")
+    clip = place(s, "ap6-rode.wav")
+    keyed(s, clip, {"gate": {"threshold_db": -30}, "limiter": {"ceiling_db": -24}})
+    tool = enhance(s, [clip], target_lufs=-16)
+    row = tool["enhanced"][0]
+    s.undo()
+    s.op("set_selection", clips=[clip])
+    before = audio(s, clip)
+    menu, gone = press(s, ["Clip", "Enhance Voice"])
+    shown = foot(s, "a")
+    text, tip = shown[0] if len(shown) == 1 else ("", None)
+    lead = "Enhance Voice left “ap6-rode.wav” (0:00) "
+    gap = gap_of(text, lead)
+    want = -16 - row["result_lufs"]
+    check(gone is not None and audio(s, clip) != before and text.startswith(lead)
+          and "short of −16.0 LUFS at the 32× ceiling, likely because a limiter an action's "
+              "end turns on holds the sound down." in text
+          and gap is not None and abs(gap - want) <= 0.1 and tip == text
+          and row["limited_by"] == "max_gain" and "Refused" not in text,
+          f"V18 (a) Clip ▸ Enhance Voice through the Measuring Sound sheet (sheet "
+          f"{menu.get('sheet')!r}, gone after {gone if gone is None else round(gone, 2)} s): the "
+          f"foot {shown!r}; the tool's row {f(row['result_lufs'], 3)} LUFS, {f(want, 3)} LU short "
+          f"(±0.1), limited_by {row['limited_by']}")
+    menu, gone = press(s, ["Clip", "Enhance Voice"])
+    again = foot(s, "a-again")
+    check(gone is not None and len(again) == 1
+          and again[0][0].startswith("Enhance Voice changed nothing. “ap6-rode.wav” (0:00) is ")
+          and "at the 32× ceiling, likely because a limiter an action's end" in again[0][0],
+          f"V18 (a) pressed again, the identity: the foot {again!r}")
+    s.undo()
+    gone = foot(s, "a-undone")
+    check(not gone, f"V18 (a) undo: the foot {gone!r} (none)")
+    client.call("close_project", project=s.path, discard=True)
+
+
+def foot_normalize(client):
+    """(b) the in-event path, (c) inside a nest, (d) a skip."""
+    s = Session(client, "ap6-foot-b")
+    clip = place(s, "ap6-quiet.wav")
+    tool = s.op("normalize_clip", clips=[clip], mode="loudness", target_lufs=-16)
+    row = tool["normalized"][0]
+    s.undo()
+    s.op("set_selection", clips=[clip])
+    menu = s.op("perform_menu_item", path=["Clip", "Normalize"])
+    shown = foot(s, "b")
+    text, tip = shown[0] if len(shown) == 1 else ("", None)
+    lead = "Normalize left “ap6-quiet.wav” (0:00) "
+    gap = gap_of(text, lead)
+    want = -16 - row["result_lufs"]
+    check(menu.get("sheet") is None and text.startswith(lead)
+          and text.endswith(" short of −16.0 LUFS, with its volume at the 32× ceiling.")
+          and gap is not None and abs(gap - want) <= 0.1 and tip == text
+          and row["limited_by"] == "max_gain" and row.get("renders") == 0
+          and audio(s, clip).get("volume") == 32,
+          f"V18 (b) Clip ▸ Normalize in the event (sheet {menu.get('sheet')!r}): the foot "
+          f"{shown!r}; the tool's row {f(row['result_lufs'], 3)} LUFS, {f(want, 3)} LU short "
+          f"(±0.1), limited_by {row['limited_by']}, renders {row.get('renders')}, the clip at "
+          f"volume {audio(s, clip).get('volume')}")
+    s.undo()
+    nest = s.op("nest", clips=[clip])
+    outer = [c["id"] for c in s.project()["clips"]]
+    s.op("set_scope", clip=outer[0])
+    inner = [c["id"] for c in s.project()["clips"]]
+    s.op("set_selection", clips=inner)
+    menu = s.op("perform_menu_item", path=["Clip", "Normalize"])
+    nested = foot(s, "c")
+    check(len(inner) == 1 and len(nested) == 1 and nested[0][0].startswith(lead)
+          and nested[0][0].endswith(", with its volume at the 32× ceiling."),
+          f"V18 (c) inside a nest ({json.dumps(nest)[:80]}), Clip ▸ Normalize: the foot "
+          f"{nested!r}")
+    s.op("set_scope")
+    client.call("close_project", project=s.path, discard=True)
+
+    s = Session(client, "ap6-foot-d")
+    silent = place_silent(s)
+    s.op("set_selection", clips=[silent])
+    s.op("perform_menu_item", path=["Clip", "Normalize"])
+    skipped = foot(s, "d")
+    check(len(skipped) == 1 and skipped[0][0] == "Normalize changed nothing. It skipped "
+          "“ap6-silence.wav” (0:00): is under −70 LUFS over the part of it that plays, so "
+          "there is no loudness to normalize.",
+          f"V18 (d) a silent clip, Clip ▸ Normalize: the foot {skipped!r}")
+    client.call("close_project", project=s.path, discard=True)
+
+
+def foot_match(client):
+    """(e) Match Audio through its sheet, the reference first."""
+    s = Session(client, "ap6-foot-e")
+    reference = place(s, "ap6-rode.wav")
+    s.op("normalize_clip", clips=[reference], mode="loudness", target_lufs=-16)
+    quiet = place(s, "ap6-quiet.wav", at=s.clip(reference)["duration"] + SECOND)
+    tool = s.op("match_audio", reference=reference, clips=[quiet], eq=True)
+    row = tool["matched"][0]
+    aim = tool.get("target_lufs")
+    s.undo()
+    s.op("set_selection", clips=[reference, quiet])
+    menu, gone = press(s, ["Clip", "Match Audio…"])
+    shown = foot(s, "e")
+    text, tip = shown[0] if len(shown) == 1 else ("", None)
+    start = s.clip(quiet)["start"] // 600_000
+    lead = f"Match Audio left “ap6-quiet.wav” ({start // 60}:{start % 60:02d}) "
+    gap = gap_of(text, lead)
+    want = None if aim is None else aim - row["result_lufs"]
+    check(gone is not None and text.startswith(lead) and " short of the reference's " in text
+          and text.endswith(", with its volume at the 32× ceiling.") and want is not None
+          and gap is not None and abs(gap - want) <= 0.1 and row["limited_by"] == "max_gain",
+          f"V18 (e) Clip ▸ Match Audio… with its sheet's accept (gone after "
+          f"{gone if gone is None else round(gone, 2)} s): the foot {shown!r}; the tool's row "
+          f"{f(row['result_lufs'], 3)} against {f(aim, 3)}, limited_by {row['limited_by']}")
+    client.call("close_project", project=s.path, discard=True)
+
+
 # ---- V14 the sheet, cancelled and stale -------------------------------------
 
 HOLD = 3
@@ -1184,6 +1374,11 @@ def main():
             hold_rows()
         except errors as error:
             check(False, f"hold_rows aborted: {type(error).__name__}: {error}")
+    if not only or "foot" in only:
+        try:
+            foot_rows()
+        except errors as error:
+            check(False, f"foot_rows aborted: {type(error).__name__}: {error}")
     log_rows()
     print(f"\n{checks - len(failures)}/{checks} checks passed")
     for line in failures:

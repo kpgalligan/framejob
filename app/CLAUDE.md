@@ -1867,7 +1867,10 @@ the key map behind it.
   core's sentence verbatim, remembered with the `editedProject` handle it
   was shown under and cleared on the first refresh under another handle or
   a click; `showRefusal` is the editor's forward of
-  `projectDocumentDidRefuse`) · `InspectorTabBadge.swift` (spec §11 AI-19: the
+  `projectDocumentDidRefuse`; its second form, spec §11 AU-169, is a
+  measured press's `AudioMeasureNotice` as it is, no prefix and no beep,
+  its tooltip every clip on a line: `showNotice`, the forward of
+  `projectDocumentDidNote`) · `InspectorTabBadge.swift` (spec §11 AI-19: the
   Assistant tab's question dot, a passive view over the tab strip — `hitTest`
   nil — mirroring `PanelTabsView.tabRect`'s arithmetic, since `Controls.swift`
   is not forked; the dot sits right of the title while it fits there, else
@@ -3837,7 +3840,20 @@ free.
   §11 AU-68), through the same `measure` with refusals in place of beeps.
   `land`, the one landing of a measured answer (a refusal said once, #410),
   and `enhanceSetup`, Enhance Voice's read, choices, run builder and plan,
-  which `enhance_voice` shares (#412).
+  which `enhance_voice` shares (#412). `Answer.ops` carries the plan's
+  `AudioMeasureNotice.Facts`, and `land` posts the notice
+  (`projectDocumentDidNote`, spec §11 AU-169) after the commit: applied when
+  the project is another handle, "changed nothing" when it is the same and no
+  refusal was posted inside the commit (`refusedInside`), none after a
+  refusal; an empty press beeps and posts it too.
+- `AudioMeasureNotice.swift` — the app's own sentence for a measured press
+  (spec §11 AU-169): `Facts` (the command, the target, the plan's rows and
+  skips), `make` (each clip with `limited_by` set and each skip, a clip as
+  `“name” (m:ss)`, the distance to 0.1 LU, the cause through
+  `AudioNormalize.actionLimiterHeld`, the furthest of several, the "changed
+  nothing" form; pure, and `make(_:in:changed:)` over the snapshot the press
+  read) and `Notification.Name.projectDocumentDidNote`. It is never a
+  refusal.
 - `AudioMeasureSheetController.swift` — the Measuring Sound sheet (a bar,
   "Clip n of N…", Cancel), in `AudioSyncSheetController`'s shape. Generic
   over `AudioMeasureRunning`. One of `finished` or `stopped` is called a
@@ -5222,7 +5238,9 @@ fonts and metrics come from `DS` tokens; shared controls go in
 and neither makes an undo step — that is what makes a person's experience of
 the two alike, and it is deliberate (spec §5.5); a refusal ALSO shows its
 sentence at the inspector's foot (CI-10), the one difference a person
-sees; only invalid input throws, and errors never crash.
+sees; a measured press (Normalize, Enhance Voice, Match Audio) also says
+there which clip it left away from the target or skipped, on an identity
+too (AU-169); only invalid input throws, and errors never crash.
 4-space indent, ~100 columns.
 
 **`make typecheck` is authoritative for TYPE errors, and only those.** It

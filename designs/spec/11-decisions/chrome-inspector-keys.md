@@ -187,7 +187,9 @@ on 2026-11-11 because this file had passed the spec's ~500-line split rule (#548
   plus what to do" phrasing and has no timer: the sentence is the core's
   (app/CLAUDE.md "A refusal is the CORE's sentence"). Agent edits never
   reach it (`AgentServer.performGroupedEdit` answers its refusal before any
-  document call) and a live drag's refused tick stays swallowed.
+  document call) and a live drag's refused tick stays swallowed. **Amended by
+  AU-169 (#609):** the strip also shows a measured press's notice (Normalize,
+  Enhance Voice, Match Audio), as it is, with no prefix and no beep.
 - **CI-11 — A band is dragged: its body moves the action, its outer 5 pt
   resize it, in the timeline's lane and the Clip tab's lane alike** (road
   map 9 §9, the clip inspector redesign's phase 4). A band 15 pt wide or

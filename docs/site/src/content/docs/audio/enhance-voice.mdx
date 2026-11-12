@@ -33,6 +33,8 @@ However many clips are selected, it's one undo step, named "Enhance Voice". **Ca
 
 Everything it writes is an ordinary setting, so you can see and change each one in its own section. Pressing it again changes nothing and beeps, and so does [Normalize](/audio/normalize/) at the same target afterwards.
 
+When a clip ends up away from the target, or is [skipped](#clips-enhance-voice-skips), a sentence at the foot of the inspector says which clip, by its name and start time, how far off it is and the likely cause, as [Normalize's does](/audio/normalize/#normalize-a-clip): for example "Enhance Voice left “Interview.m4a” (0:00) 13.1 LU short of −16.0 LUFS at the 32× ceiling, likely because a limiter an action's end turns on holds the sound down." A press that changes nothing starts it "Enhance Voice changed nothing." It stays until the project changes or you click it.
+
 To run it on a recording as soon as the recording lands, see [Polish when a recording lands](/recording/when-it-lands/).
 
 ## What it measures
@@ -73,7 +75,7 @@ Every clip it enhances gets all three, whatever else it measured.
 
 - A [compressor](/audio/compressor/) at 3:1, its threshold at the speech's median true peak, with makeup that gives back the loudness it takes.
 - The [limiter](/audio/limiter/). The clip keeps its own, with the ceiling at most −1 dBTP, or gets the default.
-- The volume that takes the clip to the **Normalize** row's target, measured through everything above as the export plays it. It's checked by rendering, to within 0.1 LU, up to three times. A clip still further off after that keeps the last volume, as [Normalize](/audio/normalize/#measure-through-a-clips-processing) does, and `enhance_voice` names it with `limited_by` `verify_renders`. A clip that a limiter switched on by an action holds down can reach the 3200 % ceiling and still land short. `enhance_voice` answers `limited_by` `max_gain` there, and its note and last reason name the action's limiter as the likely cause.
+- The volume that takes the clip to the **Normalize** row's target, measured through everything above as the export plays it. It's checked by rendering, to within 0.1 LU, up to three times. A clip still further off after that keeps the last volume, as [Normalize](/audio/normalize/#measure-through-a-clips-processing) does, and `enhance_voice` names it with `limited_by` `verify_renders`. A clip that a limiter switched on by an action holds down can reach the 3200 % ceiling and still land short. The foot of the inspector names the action's limiter as the likely cause, and so do `enhance_voice`'s note and last reason, with `limited_by` `max_gain`.
 
 The target is used even when the row is set to Peak and the field is greyed out. Enhance Voice always aims at a loudness.
 
@@ -83,7 +85,7 @@ Hum removal, the channel choice, pan, mono, fades, ducking, **Mute**, **Keep pit
 
 ## Clips Enhance Voice skips
 
-It's offered where [Normalize](/audio/normalize/#clips-normalize-skips) is, and it leaves out the same clips as Normalize in Loudness mode, plus two more. The rest of the selection is still enhanced. With nothing to enhance, the press beeps, and neither the button nor the menu says why.
+It's offered where [Normalize](/audio/normalize/#clips-normalize-skips) is, and it leaves out the same clips as Normalize in Loudness mode, plus two more. The rest of the selection is still enhanced. A nest or a clip that plays no sound is left out without a word. The foot of the inspector names every other clip it skips, with its reason. When it skips every clip it tried, the press beeps and the sentence starts "Enhance Voice changed nothing."
 
 | Skipped | Why |
 | --- | --- |

@@ -21,6 +21,9 @@ import AppKit
 ///   `finishSynchronizeAudio` does.
 ///
 /// Nothing to do, a second press, no window and a sheet already up all beep.
+/// A landed answer that left a clip away from its target or skipped one, or
+/// a press that changed nothing, also says so at the inspector's foot (spec
+/// §11 AU-169, `land`).
 ///
 /// **A landing's follow** (spec §11 AU-68) is another caller:
 /// `enhanceLanded`, Enhance Voice over a recording's voice clips once their
@@ -81,7 +84,12 @@ enum AudioMeasureDoor {
                 document: document, jobs: normalizeJobs(input, in: document),
                 problems: input.problems, targetLUFS: target)
             measure(command, run: run, document: document, window: window) {
-                .ops(AudioNormalize.plan($0.input, targetLUFS: target, solved: $0.solved).ops)
+                let plan = AudioNormalize.plan($0.input, targetLUFS: target, solved: $0.solved)
+                return .ops(
+                    plan.ops,
+                    notice: AudioMeasureNotice.Facts(
+                        command: command.name, targetLUFS: plan.targetLUFS,
+                        rows: plan.normalized, skipped: plan.skipped))
             }
         case .enhanceVoice:
             guard
@@ -90,7 +98,7 @@ enum AudioMeasureDoor {
             else { return NSSound.beep() }
             let run = setup.makeRun(document: document)
             measure(command, run: run, document: document, window: window) {
-                .ops(setup.plan($0).ops)
+                enhanceAnswer(setup.plan($0))
             }
         case .matchAudio:
             // Its reference comes from the Match Audio sheet: `pressMatch`.
@@ -133,7 +141,22 @@ enum AudioMeasureDoor {
         if let refusal = outcome.refusal { return .refused(refusal.sentence) }
         let plan = AudioMatch.plan(input, outcome: outcome)
         guard !plan.matched.isEmpty else { return .refused(AudioMatch.nothingMatched(plan.skipped)) }
-        return .ops(plan.ops)
+        return .ops(
+            plan.ops,
+            notice: AudioMeasureNotice.Facts(
+                command: AudioMatch.actionName, targetLUFS: plan.targetLUFS ?? 0,
+                reference: true, rows: plan.matched.compactMap(\.loudness),
+                skipped: plan.skipped))
+    }
+
+    /// Enhance Voice's answer to its plan: the ops, and the facts its notice
+    /// is made of (spec §11 AU-169), on a press and a landing's follow alike.
+    static func enhanceAnswer(_ plan: AudioEnhance.Plan) -> Answer {
+        .ops(
+            plan.ops,
+            notice: AudioMeasureNotice.Facts(
+                command: AudioEnhance.actionName, targetLUFS: plan.targetLUFS,
+                rows: plan.enhanced.map(\.loudness), skipped: plan.skipped))
     }
 
     /// Enhance Voice's one setup (AU-68 (e), #412), shared by the press, a
@@ -195,7 +218,7 @@ enum AudioMeasureDoor {
         measure(
             .enhanceVoice, run: run, document: document, window: window, refuse: refuse,
             empty: { nothingReason(setup.plan($0).skipped) }, done: done
-        ) { .ops(setup.plan($0).ops) }
+        ) { enhanceAnswer(setup.plan($0)) }
     }
 
     /// `enhance_voice`'s sentence for nothing measured or nothing planned.
@@ -218,20 +241,25 @@ enum AudioMeasureDoor {
         }
     }
 
-    /// What a measured press answers: the ops to commit, or a refusal's
-    /// sentence known only after the measurement.
+    /// What a measured press answers: the ops to commit, with the facts of
+    /// the clips it left away from the target or skipped (spec §11 AU-169),
+    /// or a refusal's sentence known only after the measurement.
     enum Answer {
-        case ops([ReelOp])
+        case ops([ReelOp], notice: AudioMeasureNotice.Facts? = nil)
         case refused(String)
     }
 
     /// The one landing of a measured answer, on main. `.refused` says its
     /// sentence once: through `refuse` on a landing's follow, else one `beep`
     /// and the sentence at the inspector's foot (`say`). `.ops([])` fails
-    /// with `empty()`: `refuse` gets it, or a press gets a bare beep.
-    /// Otherwise it commits: `applyEdit` when `inEvent` and `refuse` is nil
-    /// (which beeps at an identity), else `performGroupedEdit`. `beep` is the
-    /// probe's seam; the app passes none.
+    /// with `empty()`: `refuse` gets it, or a press gets a beep and its
+    /// notice in the "changed nothing" form (AU-169 (c)). Otherwise it
+    /// commits: `applyEdit` when `inEvent` and `refuse` is nil (which beeps
+    /// at an identity), else `performGroupedEdit`; then the notice, if the
+    /// facts make one, under the handle the commit left (AU-169 (b)): applied
+    /// when the project is another handle, "changed nothing" when it is the
+    /// same and the core refused nothing, none after a refusal. `beep` is
+    /// the probe's seam; the app passes none.
     static func land(
         _ answer: Answer, command: Command, document: ProjectDocument, inEvent: Bool,
         refuse: ((String) -> Void)?, empty: @autoclosure () -> String,
@@ -241,17 +269,53 @@ enum AudioMeasureDoor {
         case .refused(let reason):
             if let refuse { return refuse(reason) }
             say(reason, command: command, document: document, beep: beep)
-        case .ops(let ops):
+        case .ops(let ops, let facts):
+            // The names and the action limiters as the press read them.
+            let snapshot = document.editedProject.snapshot
             guard !ops.isEmpty else {
                 if let refuse { return refuse(empty()) }
-                return beep()
+                beep()
+                return note(facts, in: snapshot, changed: false, document: document)
             }
-            if inEvent, refuse == nil {
-                document.applyEdit(command.name, ops)
-            } else {
-                document.performGroupedEdit(command.name, ops)
+            let before = document.project
+            let refused = refusedInside(document) {
+                if inEvent, refuse == nil {
+                    document.applyEdit(command.name, ops)
+                } else {
+                    document.performGroupedEdit(command.name, ops)
+                }
+            }
+            if document.project !== before {
+                note(facts, in: snapshot, changed: true, document: document)
+            } else if !refused {
+                note(facts, in: snapshot, changed: false, document: document)
             }
         }
+    }
+
+    /// Whether the core refused `commit`: `ProjectDocument` posts its
+    /// refusal inside the commit, on this thread (spec §11 CI-10).
+    private static func refusedInside(_ document: ProjectDocument, _ commit: () -> Void) -> Bool {
+        final class Seen { var refused = false }
+        let seen = Seen()
+        let token = NotificationCenter.default.addObserver(
+            forName: .projectDocumentDidRefuse, object: document, queue: nil
+        ) { _ in seen.refused = true }
+        commit()
+        NotificationCenter.default.removeObserver(token)
+        return seen.refused
+    }
+
+    /// The notice `facts` make, if any, at the inspector's foot: no beep, no
+    /// "Refused: " (spec §11 AU-169 (a)).
+    private static func note(
+        _ facts: AudioMeasureNotice.Facts?, in snapshot: ProjectSnapshot, changed: Bool,
+        document: ProjectDocument
+    ) {
+        guard let facts, let notice = AudioMeasureNotice.make(facts, in: snapshot, changed: changed)
+        else { return }
+        NotificationCenter.default.post(
+            name: .projectDocumentDidNote, object: document, userInfo: ["notice": notice])
     }
 
     /// One beep and `reason` at the inspector's foot, as `command`'s tool.

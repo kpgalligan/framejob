@@ -36,6 +36,8 @@ However many clips are selected, it's one undo step, named "Normalize". That ste
 
 It replaces the clip's volume rather than adding to it, so pressing it a second time changes nothing, and that second press beeps. **Mute** is left as it is.
 
+In Loudness mode, when a clip ends up away from the target or is [skipped](#clips-normalize-skips), a sentence at the foot of the inspector says which clip, by its name and start time, how far off it is and the likely cause, for example "Normalize left “Interview.m4a” (0:12) 13.6 LU short of −16.0 LUFS, with its volume at the 32× ceiling." Hold the pointer over it to see every clip on a line of its own. A press that changes nothing still beeps, and its sentence starts "Normalize changed nothing." The sentence stays until the project changes, an undo included, or you click it. Peak mode shows no sentence.
+
 ## Choose a mode
 
 The first control in the **Normalize** row picks what Normalize aims at.
@@ -97,9 +99,9 @@ Processing that an [action](/motion/actions/) switches on part-way through the c
 
 With the limiter on as well, or a limiter that an action switches on or off, Normalize renders again at the volume it chose, and adjusts until the result is within 0.1 LU of the target, at most three times. How hard an action's limiter holds the sound down depends on the clip's volume, so only a render at that volume can say. If a clip without the limiter would need a volume that takes its true peak past −1 dBTP, Normalize turns the clip's limiter on at −1 dBTP and starts adjusting again from there. A clip measured this way keeps its volume when the new one is within 0.05 dB of it and its limiter hasn't changed, so a second press still changes nothing.
 
-If the last of those renders is still more than 0.1 LU from the target, Normalize keeps that volume and the clip lands off the target, above or below it. The usual cause is a limiter holding most of the clip down: turning the clip up makes it hold harder, so the loudness hardly moves. The button and the menu don't say so. `normalize_clip`'s answer does, with `limited_by` set to `verify_renders` and a note naming the clip.
+If the last of those renders is still more than 0.1 LU from the target, Normalize keeps that volume and the clip lands off the target, above or below it. The usual cause is a limiter holding most of the clip down: turning the clip up makes it hold harder, so the loudness hardly moves. The foot of the inspector says how far off the clip landed and names a limiter as the likely cause. `normalize_clip`'s answer says so too, with `limited_by` set to `verify_renders` and a note naming the clip.
 
-A limiter that an action switches on can also hold a clip down so hard that Normalize turns it up all the way to 3200 % and it still lands well short: no volume reaches the target while that limiter holds. `normalize_clip` answers `limited_by` `max_gain`, and its note names the action's limiter as the likely reason.
+A limiter that an action switches on can also hold a clip down so hard that Normalize turns it up all the way to 3200 % and it still lands well short: no volume reaches the target while that limiter holds. The foot of the inspector and `normalize_clip`'s note both name the action's limiter as the likely reason, and `normalize_clip` answers `limited_by` `max_gain`.
 
 This takes a moment per clip, seconds on a long one, and the first press waits for the clip's voice isolation or voice effect to render. A clip with none of this processing is measured from the analysis at once.
 
@@ -113,7 +115,7 @@ Nothing changes until every clip is measured, and **Cancel** leaves everything a
 
 ## Clips Normalize skips
 
-Normalize leaves out the clips below and still does the rest. The button and the menu item are greyed out when no selected clip plays sound, or when only nests are selected. A press that changes nothing beeps, and neither the button nor the menu says which clips were skipped or why.
+Normalize leaves out the clips below and still does the rest. The button and the menu item are greyed out when no selected clip plays sound, or when only nests are selected. Nests and clips with no sound, the first two rows, are left out without a word. In Loudness mode the foot of the inspector names every other clip it skips, and why. When it skips every clip it tried, the press beeps and the sentence starts "Normalize changed nothing." In Peak mode a press that changes nothing beeps and says nothing.
 
 | Skipped | Why | Mode |
 | --- | --- | --- |

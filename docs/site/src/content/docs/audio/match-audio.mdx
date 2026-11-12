@@ -46,7 +46,7 @@ The reference itself isn't changed. Frame Job measures it once as it sounds in t
 
 **Loudness** runs [Normalize](/audio/normalize/) in Loudness mode on each other clip, with the reference's loudness as the target. It sets the clip's volume, measured through the clip's settings as they'll be after the match. When the clip's peaks would pass −1 dBTP at that loudness, it also sets the clip's limiter at that ceiling.
 
-A clip so quiet that it needs more than the volume's ceiling of 32× stops there and ends up quieter than the reference. So does one that a limiter switched on by an action holds down, and `match_audio`'s note then names that limiter as the likely reason. A clip whose renders run out more than 0.1 LU from the reference's loudness keeps the last volume, as [Normalize](/audio/normalize/#measure-through-a-clips-processing) does, and `match_audio` names it with `limited_by` `verify_renders`.
+A clip so quiet that it needs more than the volume's ceiling of 32× stops there and ends up quieter than the reference. So does one that a limiter switched on by an action holds down, and the foot of the inspector and `match_audio`'s note then name that limiter as the likely reason. A clip whose renders run out more than 0.1 LU from the reference's loudness keeps the last volume, as [Normalize](/audio/normalize/#measure-through-a-clips-processing) does, and `match_audio` names it with `limited_by` `verify_renders`.
 
 Loudness doesn't need speech, so you can use it on music by unticking **EQ**.
 
@@ -70,7 +70,7 @@ Choosing **Match** again with the same choice changes nothing. Frame Job beeps a
 
 ## When a clip can't be matched
 
-A clip that can't be matched is skipped, and the others are still matched. No message names a skipped clip, so if one sounds unchanged, check it against the list below.
+A clip that can't be matched is skipped, and the others are still matched. The foot of the inspector names each skipped clip with its reason, and each matched clip that ended up away from the reference's loudness, for example "Match Audio left “Phone.m4a” (0:31) 10.6 LU short of the reference's −15.9 LUFS, with its volume at the 32× ceiling." Hold the pointer over it to see every clip on a line of its own. It stays until the project changes or you click it.
 
 If the reference can't be used, or nothing can be matched, Frame Job beeps, changes nothing and puts the reason at the foot of the inspector. When the reference is the problem, the message starts "The reference, clip 12,". When every clip fails, it starts "Nothing could be matched." and gives each clip's reason.
 

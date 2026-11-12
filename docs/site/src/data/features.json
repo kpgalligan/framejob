@@ -7403,7 +7403,7 @@
     {
      "id": "audio-normalize-skips",
      "name": "Clips Normalize skips",
-     "summary": "Clips Normalize can't measure, such as nests, silent clips and clips not analysed yet, are left out and the rest are done.",
+     "summary": "Clips Normalize can't measure, such as nests, silent clips and clips not analysed yet, are left out and the rest are done. In Loudness mode the foot of the inspector names each clip left away from the target and each one skipped, except a nest or a clip with no sound.",
      "page": "audio/normalize",
      "anchor": "clips-normalize-skips",
      "where": "Clip ▸ Normalize"
@@ -7459,7 +7459,7 @@
     {
      "id": "audio-enhance-skips",
      "name": "Clips Enhance Voice skips",
-     "summary": "Enhance Voice leaves out what Normalize in Loudness mode does, plus clips with under 1 second of speech or not analysed yet.",
+     "summary": "Enhance Voice leaves out what Normalize in Loudness mode does, plus clips with under 1 second of speech or not analysed yet. The foot of the inspector names each clip left away from the target and each one skipped, except a nest or a clip with no sound.",
      "page": "audio/enhance-voice",
      "anchor": "clips-enhance-voice-skips",
      "where": "Clip ▸ Enhance Voice"
@@ -7507,7 +7507,7 @@
     {
      "id": "audio-match-refusals",
      "name": "When a clip can't be matched",
-     "summary": "A clip that can't be matched is skipped. If the reference can't be used or nothing matches, the foot of the inspector says why.",
+     "summary": "A clip that can't be matched is skipped, and the foot of the inspector names it and each clip left away from the reference's loudness. If the reference can't be used or nothing matches, it says why.",
      "page": "audio/match-audio",
      "anchor": "when-a-clip-cant-be-matched",
      "where": "Clip ▸ Match Audio…"

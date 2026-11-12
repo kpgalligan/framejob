@@ -39,9 +39,10 @@ extension EditorViewController {
     /// be measured in produces no ops, and a second press on an
     /// already-normalised selection produces ops that change nothing: the first
     /// is an empty list and the second an identity edit, and `applyEdit` refuses
-    /// both without registering an undo step. The menu is not the place that
-    /// explains WHY a clip was skipped; `normalize_clip` reports each reason by
-    /// name under `skipped`.
+    /// both without registering an undo step. In Loudness mode the inspector's
+    /// foot names each skipped clip and each one left away from the target,
+    /// and says the press changed nothing (spec §11 AU-169); `normalize_clip`
+    /// reports the same under `skipped` and `note`.
     ///
     /// The press is `AudioMeasureDoor.press` (spec §11 AU-64, AU-65), the
     /// button's body: Peak at once; Loudness at once when no clip has a stage
@@ -59,7 +60,8 @@ extension EditorViewController {
     /// passes, measured through their chosen settings under the Measuring
     /// Sound sheet (AU-64), committed at the Normalize row's Target as ONE
     /// undo step. Nothing to enhance and a second press beep, Normalize's two
-    /// answers; the tool reports each skip by name.
+    /// answers; the inspector's foot says why, and names a clip left away
+    /// from the target (spec §11 AU-169), as the tool does.
     @objc func enhanceVoice(_ sender: Any?) {
         guard let document = document else { return }
         let snapshot = document.editedProject.snapshot

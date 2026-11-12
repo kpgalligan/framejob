@@ -18,7 +18,9 @@ extension AgentServer {
     /// The reference's loudness, then each target's row: `set` (exactly the
     /// patch's keys in `set_audio`'s spelling), the EQ and its fit, and
     /// Normalize's figures for the volume; the skips by name. A second
-    /// identical call is an identity: "Match Audio made no change".
+    /// identical call is an identity: "Match Audio made no change". `note`
+    /// and `skipped` are what the sheet's Match says at the inspector's foot
+    /// (spec §11 AU-169).
     func matchAudio(_ a: [String: Any]) throws -> String {
         let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16)
         try requireServerThread("match_audio")

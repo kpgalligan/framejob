@@ -80,8 +80,18 @@ audio_ap6_proof.py's V2, V12 and V13.
       nothing for a landed or a verify bound's clip; a measured target
       (Match's, −15.999999999117435) written as −16.0; the reason at ×32 under
       an action's limiter naming it, and the verify bound's clause unchanged.
+  E19 (AU-169, #609) the app's own sentence, `AudioMeasureNotice.make`: no
+      limit and no skip nil; the ceiling, an action's limiter (R0 reaching)
+      and the verify bound short and over, each its cause; R0 too quiet to
+      reach keeps the ceiling; a cache row 0.03 LU short "less than 0.1 LU";
+      three clips counted, the furthest named with its cause, the tooltip a
+      line per clip; two cuts of one recording at one distance, the first by
+      its start; Match's "the reference's"; one skip, a clip and two skips
+      (an unnamed id "clip N"), every clip skipped and an identity in the
+      "changed nothing" form; over the probe document's snapshot the clip's
+      name and m:ss start; the clock.
 
---mutants runs M1–M6 and M8–M37 (M7 is the loudness probe's), each over its
+--mutants runs M1–M6 and M8–M43 (M7 is the loudness probe's), each over its
 own copy of app/Sources, scored killed when its named row fails. Build failures
 are scored. Needs samples/Rode-usb-mic.m4a. Output is under
 tools/proof/work/audio-ap6-probe.
@@ -99,7 +109,7 @@ RODE = ROOT / "samples/Rode-usb-mic.m4a"
 WORK = ROOT / "tools/proof/work/audio-ap6-probe"
 FIXTURES = WORK / "fixtures"
 ROWS = ["E1", "E2", "E3", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13", "E14", "E15",
-        "E16", "E17", "E18"]
+        "E16", "E17", "E18", "E19"]
 
 MUTANTS = [
     ("M1 noisy-gap", "E1", "AudioEnhance.swift",
@@ -212,6 +222,24 @@ MUTANTS = [
     ("M37 reach-without-tolerance", "E18", "AudioNormalize+Loudness.swift",
      "return r0 + 20 * log10(maxGain) >= targetLUFS - LoudnessMeasureRun.verifyToleranceLU",
      "return r0 + 20 * log10(maxGain) >= targetLUFS"),
+    # AU-169 (#609): the app's own sentence, by case.
+    ("M38 notice-limiter-for-any-max-gain", "E19", "AudioMeasureNotice.swift",
+     "row, endLimiter: endLimiters.contains(row.clip), targetLUFS: target)",
+     "row, endLimiter: true, targetLUFS: target)"),
+    ("M39 first-not-furthest", "E19", "AudioMeasureNotice.swift",
+     "            abs($0.resultLUFS - target) < abs($1.resultLUFS - target)\n",
+     "            abs($0.resultLUFS - target) < abs($1.resultLUFS - target) && false\n"),
+    ("M40 skips-left-out", "E19", "AudioMeasureNotice.swift",
+     "        if let skip = facts.skipped.first {\n",
+     "        if let skip = facts.skipped.first, false {\n"),
+    ("M41 short-for-over", "E19", "AudioMeasureNotice.swift",
+     'row.resultLUFS < target ? (of ? "short of" : "short") : "over"',
+     '(of ? "short of" : "short")'),
+    ("M42 no-changed-nothing", "E19", "AudioMeasureNotice.swift",
+     "        if !changed {", "        if false, !changed {"),
+    ("M43 label-without-start", "E19", "AudioMeasureNotice.swift",
+     '"“\\(snapshot.name(of: clip))” (\\(clock(clip.start)))"',
+     '"“\\(snapshot.name(of: clip))”"'),
 ]
 
 

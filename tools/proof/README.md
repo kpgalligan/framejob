@@ -28048,6 +28048,56 @@ found once), `AP6_ONLY=ceiling` 9/9 on Debug; after `make gate`, the whole proof
 −28.343 from R0 −41.643 (−11.540), each note naming the action's limiter, Match's target written
 −16.0; (g) −30.249, (i) and (k) −28.595 and (l) −29.551 as before; V2's export at −15.97.
 
+**The app's own sentence at the inspector's foot (#609, spec §11 AU-169, 2026-11-12).** E19 and
+six mutants here, `audio_ap12_probe.py` P13 and four mutants (P12 also holds that `measure` posts
+no notice), and V18 in this proof (`AP6_ONLY=foot`), on its own instance launched with
+`-FrameJobNormalizeTargetLUFS <real>-16</real> -FrameJobNormalizeMode loudness
+-RCDevMatchAudioAccept YES`, each leg a fresh project and each distance checked against the
+tool's own row for the same clip.
+
+| Row | What it holds |
+|---|---|
+| E19 | `AudioMeasureNotice.make`: no limit and no skip nil; the ceiling, an action's limiter (R0 reaching) and the verify bound short and over, each its cause; R0 too quiet to reach keeps the ceiling; a cache row 0.03 LU short "less than 0.1 LU"; three clips counted, the furthest named, the tooltip a line per clip; two cuts of one recording at one distance, the first by its start; Match's "the reference's"; one skip, a clip and two skips (an unnamed id "clip N"), every clip skipped and an identity in the "changed nothing" form; over the probe document the clip's name and m:ss start; the clock |
+| P13 | `AudioMeasureDoor.land` on a `ProjectDocument()`: the notice once, after the commit, no beep and no refusal, in the event and after the sheet and on a landing's follow; an identity "changed nothing"; a core refusal its refusal and no notice; the empty press one beep and the notice, the empty follow its refusal and none; `.refused` and a facts-less answer none |
+| V18 | (a) Clip ▸ Enhance Voice through the Measuring Sound sheet on V16 (g)'s clip; pressed again, "changed nothing"; undo, no sentence. (b) Clip ▸ Normalize in the event on `ap6-quiet.wav` (the recording 15 dB down); (c) the same inside a nest (`set_scope`); (d) a silent clip skipped; (e) Clip ▸ Match Audio… through its sheet, the reference first and normalized to −16, `match_audio {eq: true}` on the pair first answering `max_gain` |
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M38 | the action's limiter named for any ceiling clip | E19 |
+| M39 | the first clip in place of the furthest | E19 |
+| M40 | the skips left out | E19 |
+| M41 | "short" for a clip over the target | E19 |
+| M42 | no "changed nothing" | E19 |
+| M43 | a clip named without its start | E19 |
+| M17 (`audio_ap12_probe.py`) | the notice posted before the commit as well | P13 |
+| M18 | an identity posted as applied | P13 |
+| M19 | a notice after a core refusal | P13 |
+| M20 | the empty press silent | P13 |
+
+Recorded 2026-11-12 in a worktree of 943bb2e0. Red: neither probe builds on the tree before
+AU-169 (no `AudioMeasureNotice`, no `Answer.ops(_:notice:)`), and on a Debug build whose `land`
+never posted (`guard false` in `note`) `AP6_ONLY=foot` passed 3 of 9, every leg's foot empty. With
+AU-169: `audio_ap6_probe.py` 17/17 and `audio_ap12_probe.py` 13/13; M38 and M40–M43 killed, M39
+(its first edit did not compile; written as `… && false`) killed on its own run, M14–M20 7/7
+killed (M14–M16 re-run beside the new landing); `AP6_ONLY=foot` 9/9 on Debug; after `make gate`
+(PASS; its first run's `test` step ran past the 900 s bound under a load average over 200 and
+passed in 264 s on the second), the whole proof 102/102 on Release with no `Frame Job: ` line. V18
+on Release: (a) "Enhance Voice left “ap6-rode.wav” (0:00) 13.1 LU short of −16.0 LUFS at the 32×
+ceiling, likely because a limiter an action's end turns on holds the sound down." and again
+"Enhance Voice changed nothing. “ap6-rode.wav” (0:00) is 13.1 LU short …"; (b) and (c)
+"Normalize left “ap6-quiet.wav” (0:00) 10.0 LU short of −16.0 LUFS, with its volume at the 32×
+ceiling." against the tool's −26.015 (renders 0, no sheet); (d) "Normalize changed nothing. It
+skipped “ap6-silence.wav” (0:00): is under −70 LUFS …"; (e) "Match Audio left “ap6-quiet.wav”
+(0:31) 10.6 LU short of the reference's −15.9 LUFS, with its volume at the 32× ceiling." against
+the tool's −26.511 and −15.904. V16 (m)'s Enhance at −16 −29.117 as AU-168's record.
+
+```sh
+python3 tools/proof/audio_ap6_probe.py                       # E1–E3, E6–E19
+python3 tools/proof/audio_ap6_probe.py --mutants M38,M39     # or --mutants for M1–M6, M8–M43
+python3 tools/proof/audio_ap12_probe.py --mutants M17,M18    # or --mutants for M1–M20
+AP6_ONLY=foot python3 tools/proof/audio_ap6_proof.py <dir>/agent.sock
+```
+
 ## Road map "audio" AP12 — Match Audio (`audio_ap12_probe.py` P1–P9, `audio_ap12_proof.py` A1–A8; twelve mutants; spec §11 AU-120…AU-129)
 
 **`audio_ap12_probe.py`** compiles `audio_ap12_probe.swift` with `app/Sources` through

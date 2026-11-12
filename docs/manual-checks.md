@@ -717,6 +717,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** does the Voice menu read clearly, with its headings, checkmark and dash where expected?
 - **Source:** #390 (spec §11 AU-158); `tools/proof/voice_proof.py` V12–V14 and M1–M5 read the items, their marks and what a choice writes, never how the open menu draws.
 
+**SE-47 — The inspector's foot says where Normalize, Enhance Voice and Match Audio left a clip** (provisional)
+- **Do:** 1. Make a quiet copy of `samples/Rode-usb-mic.m4a`: put it on the timeline, set its Volume to −15 dB, export Audio only (WAV) and add the export to the project (Normalize replaces a clip's volume, so a clip only turned down would come straight back). Put the recording on the timeline as well. 2. Select the quiet copy and press Normalize (Loudness, −16) in its Sound tab. 3. Press it again. 4. On the other copy, add an action from 1 s for 2 s whose end turns on Limit peaks at −24 dBTP, select the clip and choose Clip ▸ Enhance Voice. 5. Select both copies and choose Clip ▸ Match Audio…, the plain one as the reference. 6. Hover over each sentence, then click it. 7. Look at the foot in light and dark appearance, at the inspector's narrowest and widest.
+- **Expect:** after step 2 the foot reads "Normalize left “Rode-usb-mic.m4a” (0:00) … LU short of −16.0 LUFS, with its volume at the 32× ceiling." with no beep and no "Refused:"; step 3 beeps and reads "Normalize changed nothing. …"; step 4 names a limiter an action's end turns on; step 5 says "the reference's"; each tooltip holds the whole account, a clip on a line; a click, an undo or the next edit clears it. Each sentence reads whole within its three lines, or its tooltip finishes it.
+- **Answer:** does each sentence read clearly, say which clip and why, and go when it should?
+- **Source:** #609 (spec §11 AU-169); `audio_ap6_probe.py` E19 and `audio_ap12_probe.py` P13 score the sentences and when they are posted, and `audio_ap6_proof.py` part `foot` reads the foot's text after each door, never how it reads to a person.
+
 ## Speed ramps
 
 **RMP-1 — A ramp sounds right with Keep pitch off and on**

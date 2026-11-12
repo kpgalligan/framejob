@@ -3,7 +3,7 @@ import Foundation
 
 // Match Audio's probe (road map "audio" AP12, spec §11 AU-124…AU-128),
 // compiled with app/Sources through swift_build. No arguments. Prints one
-// "ok"/"FAIL" line per check, each row's name first (P1–P11; P12 is the
+// "ok"/"FAIL" line per check, each row's name first (P1–P11, P13; P12 is the
 // runner's own, read from the sources), for
 // audio_ap12_probe.py to score. Nothing renders: the speech spectrum is fed
 // synthetic buffers, the fit synthetic curves made by the EQ's own response.
@@ -477,7 +477,7 @@ do {
         AudioMatchRun.Outcome(
             referenceLUFS: -20, fits: [2: fit], loudness: measured, problems: [], refusal: nil))
     var count = -1
-    if case .ops(let ops) = matched { count = ops.count }
+    if case .ops(let ops, _) = matched { count = ops.count }
     check("P11", "a match is one op", count == 1, "\(matched)")
 
     let document = ProjectDocument()
@@ -506,4 +506,93 @@ do {
           beeps == 1 && posted.isEmpty && document.project === before,
           "\(beeps) beep(s), \(posted.count) refusal(s)")
     NotificationCenter.default.removeObserver(token)
+}
+
+// MARK: - P13 the notice after a measured press lands (AU-169, #609)
+
+do {
+    let document = ProjectDocument()
+    var row = AudioNormalize.LoudnessResult(
+        clip: 7, media: 1, measuredLUFS: -59.7, truePeakDBTP: -33.5, volume: 32,
+        resultLUFS: -29.6, resultTruePeakDBTP: -3.4, limit: .maxGain, limiter: nil)
+    row.renders = 0
+    let facts = AudioMeasureNotice.Facts(
+        command: "Normalize", targetLUFS: -16, rows: [row], skipped: [])
+    var beeps = 0
+    var refusals = 0
+    var notices: [(text: String, after: Bool)] = []
+    var before = document.project
+    let center = NotificationCenter.default
+    let refused = center.addObserver(
+        forName: .projectDocumentDidRefuse, object: document, queue: nil
+    ) { _ in refusals += 1 }
+    let noted = center.addObserver(
+        forName: .projectDocumentDidNote, object: document, queue: nil
+    ) { note in
+        let notice = note.userInfo?["notice"] as? AudioMeasureNotice
+        notices.append((notice?.text ?? "no notice", document.project !== before))
+    }
+    func reset() {
+        beeps = 0
+        refusals = 0
+        notices = []
+        before = document.project
+    }
+    func land(_ answer: AudioMeasureDoor.Answer, inEvent: Bool, follow: Bool = false)
+        -> [String]
+    {
+        var said: [String] = []
+        AudioMeasureDoor.land(
+            answer, command: .normalize, document: document, inEvent: inEvent,
+            refuse: follow ? { said.append($0) } : nil, empty: "nothing", beep: { beeps += 1 })
+        return said
+    }
+    func seen() -> String {
+        "\(beeps) beep(s), \(refusals) refusal(s), notices "
+            + notices.map { "(\($0.after ? "a new handle" : "the same handle")) \($0.text)" }
+                .joined(separator: " | ")
+    }
+    let applied = "Normalize left clip 7 13.6 LU short of −16.0 LUFS, with its volume at the "
+        + "32× ceiling."
+    for inEvent in [true, false] {
+        reset()
+        _ = land(.ops([.addMarker(at: inEvent ? 0 : 600_000)], notice: facts), inEvent: inEvent)
+        check("P13", "an applied answer \(inEvent ? "in the event" : "after the sheet") posts its "
+                + "notice once, after the commit, no beep and no refusal",
+              document.project !== before && beeps == 0 && refusals == 0 && notices.count == 1
+                && notices.first?.after == true && notices.first?.text == applied, seen())
+    }
+    reset()
+    let marker = document.project.snapshot.markers.first { $0.time == 0 }?.id ?? 0
+    _ = land(.ops([.setMarker(marker: marker, time: 0)], notice: facts), inEvent: true)
+    check("P13", "an identity (the project the same handle, nothing refused): its notice in the "
+            + "\"changed nothing\" form, no refusal",
+          document.project === before && refusals == 0 && notices.count == 1
+            && notices.first?.text.hasPrefix("Normalize changed nothing. clip 7 is 13.6 LU short")
+                == true, seen())
+    reset()
+    _ = land(.ops([.addMarker(at: 0)], notice: facts), inEvent: false)
+    check("P13", "a core refusal of the press's ops: its refusal and no notice",
+          document.project === before && refusals == 1 && notices.isEmpty, seen())
+    reset()
+    _ = land(.ops([], notice: facts), inEvent: false)
+    check("P13", "nothing to commit on a press: one beep and the \"changed nothing\" notice",
+          beeps == 1 && refusals == 0 && notices.count == 1
+            && notices.first?.text.hasPrefix("Normalize changed nothing.") == true, seen())
+    reset()
+    let empty = land(.ops([], notice: facts), inEvent: false, follow: true)
+    check("P13", "nothing to commit on a landing's follow: its refusal through refuse, no notice",
+          empty == ["nothing"] && beeps == 0 && notices.isEmpty, seen())
+    reset()
+    let follow = land(.ops([.addMarker(at: 1_200_000)], notice: facts), inEvent: false, follow: true)
+    check("P13", "a landing's follow that applies posts its notice too, no refusal",
+          follow.isEmpty && document.project !== before && notices.count == 1
+            && notices.first?.after == true && notices.first?.text == applied, seen())
+    reset()
+    _ = land(.refused("The reference, clip 1, holds no speech."), inEvent: false)
+    _ = land(.ops([.addMarker(at: 1_800_000)]), inEvent: true)
+    check("P13", "a refusal, and an answer with no facts, post no notice",
+          beeps == 1 && refusals == 1 && notices.isEmpty, seen())
+    center.removeObserver(refused)
+    center.removeObserver(noted)
 }
