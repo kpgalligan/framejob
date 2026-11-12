@@ -156,6 +156,9 @@ in §6).
   Risk accepted: about sixty tokens on every message, and the block is the state at send time,
   so after its own edits the model re-reads with `get_project`.
   **Amended by NM-5** (rename R0): `<reelcut_context>` is now `<framejob_context>`.
+  **Amended by SA-11** (2026-11-12, road map "swift-helper" SA4): "`agent/` is one diff with
+  Rasterize (#147)" is struck; `agent/` is Frame Job's own package, with no identity rule. The
+  rest stands: `configure` is still the helper's only system channel.
 - **AI-16 — Stop stops a running `export` or on-device `transcribe`; any other running call
   finishes.** Each call the session submits carries a per-call token through
   `AgentLane.submit`, and Stop cancels the running call's token. The lane answers a call whose

@@ -432,6 +432,7 @@ each later one is appended.
 | SA-10 | SA3 | The Acknowledgements and the publish runner, in the commit that switches the build step (§2: the npm reader reads what that step installs): npm and Bun out, Slaude in, `setup-bun` gone. Amends PUB-10 (its npm and Bun sentences and the LGPL risk line) and PUB-12 (`setup-bun`). |
 | SA-11 | SA4 | What the tie to Doctored becomes: the owner's answer 2 (a), Frame Job's package its own, ported once from Doctored at `b524babc`, with no identity rule. Amends AI-15's "`agent/` is one diff with Rasterize" and NM-10. |
 | SA-12 | SA1 | `make agent-test`'s own scratch path, `build/agent-swift-test`, emptied before SwiftPM runs when its marker is missing or names another path, because every lane copies `build/` (§13, SA1's record); SA-8's `build/agent-swift` and its rule untouched. Written by SA1, numbered after the four reserved here. |
+| SA-13 | SA4 | The drive once the Bun helper is gone: each case's run held to a committed recording of the Swift helper's events and requests, key order included, written from the last two-helper run that passed; three comparison rules; `--record` and its refusals; the two re-records that need no new decision. Written by SA4 from its plan's challenge, because a case's `expect` holds only types and counts and five of the eight mutants change only a body. |
 
 ## 9. Phases
 

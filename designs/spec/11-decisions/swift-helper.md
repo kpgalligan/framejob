@@ -9,7 +9,8 @@ Bun-compiled TypeScript. Its §8 names the SA- decisions and the phase that writ
 holds what each phase measured, SA0's spike first. SA-1..SA-3 are SA0's, decided 2026-11-12 after
 the owner approved the road map and answered its §12 on #599. SA-4 on are appended here by the
 phases §8 names, each before its code. Each entry binds the code from the phase that builds it:
-until SA3's switch lands, the shipped helper is the one AI-1, P-2 and P-8 describe.
+until SA3's switch lands, the shipped helper is the one AI-1, P-2 and P-8 describe. SA-11 and
+SA-13 are SA4's, the deletion of the Bun helper.
 
 - **SA-1 — The assistant helper is a Swift executable built from a SwiftPM package in `agent/`,
   on Slaude pinned by exact revision; the process boundary and the stdio protocol stay.** It is
@@ -276,3 +277,72 @@ until SA3's switch lands, the shipped helper is the one AI-1, P-2 and P-8 descri
   (`tree_copy.make_base_copy`), which passes no `--agent-scratch`, reads the tree's scratch path,
   so the tree's helper must have been built; and a real publish is the first run of SwiftPM on the
   runner (road map §10).
+- **SA-11 — The helper's package is Frame Job's own, ported once from Doctored at `b524babc`, with
+  no identity rule; the Bun helper, its TypeScript and its build are deleted, and Bun and
+  TypeScript are no build tool of this tree** (SA4, the owner's answer 2 (a), road map §12). No
+  file of `agent/` is kept equal to another repository's, and nothing checks it against
+  Doctored's or Rasterize's: a change either makes reaches this tree only as a Frame Job phase that
+  decides it. Deleted: `agent/src/` (the TypeScript helper and its `bun test` files),
+  `agent/package.json`, `agent/bun.lock`, `agent/tsconfig.json`, `agent/entitlements.plist` and
+  `agent/build.sh`, with `.gitignore`'s `/agent/node_modules/`. `make typecheck` is the `swiftc`
+  check of `app/Sources` alone (W-8's four warnings, SA-7); `gate.py`'s tool fingerprint holds no
+  `bun --version`, and `agent` leaves the `typecheck` step's inputs and stays in `app`'s. SA2's
+  two-helper comparison goes with the Bun helper, and its cases stay as the Swift helper's drive,
+  held to recordings (SA-13). Road map 12's A0 spike, `tools/proof/assistant_spike/`, is retired:
+  it builds a copy around Rasterize's TypeScript `agent/`, which has held a SwiftPM package since
+  Doctored's `33af04c1`, so it could not pass, and nothing in `make test` or `make gate` ran it;
+  its record stays in `designs/adr/roadmap-12-assistant.md`. kpgalligan/rasterize#654 (NM-10's
+  three lines) and kpgalligan/rasterize#325 (road maps 12 and 13's hand-over of the helper and of
+  its price code) have nothing left to apply and are the owner's to close. **Amends AI-15** (its
+  "`agent/` is one diff with Rasterize (#147)" is struck; the rest stands: `configure` is the
+  helper's only system channel, and a prompt that changed per turn would still break AI-9's
+  unchanged prefix) **and NM-10** (struck whole: there is no shared `agent/src`, and nothing is
+  recorded for Rasterize to apply). Why: the owner's answer 2 (a), "the two already differ in
+  pricing, #484's sentence, the platform and their names, and a shared rule with no checker is the
+  kind that rots"; and after SA3's switch nothing built from the TypeScript ships, so keeping it
+  only typechecked a dead helper and kept Bun on every machine that builds. Risk accepted: a fix
+  Doctored makes to the loop both share reaches Frame Job only when a phase here ports it, and
+  nothing in this tree says when one is made.
+- **SA-13 — The drive holds the Swift helper to its recordings: every event and every request,
+  key order included** (SA4; the challenge of SA4's plan). `tools/proof/agent_helper_drive.py` (in
+  `make test`) runs the release helper over its cases on the stand-in as SA2 did, and holds each
+  run to `tools/proof/agent_helper_recorded/<case>.json`: the event stream, every request (method,
+  path, headers, body and its byte count) and, for a case that writes the price cache, its table
+  and its bytes, compared by SA2's comparison (parsed JSON with each object's key order at every
+  level, numbers by value). The case's own `expect` (event types, POST and request counts, the
+  stand-in's failures, feed GETs) is checked first, as before. A recording holds the run as the
+  helper made it, except where one of three comparison rules, applied the same way to the run and
+  to the recording, puts a placeholder: a clock reading (a fetched or cached table's `as_of`, the
+  cache file's `fetched_at`) must be an instant inside the run and is then `<clock>`; the cache
+  file's `source` must be the URL of the drive's own price feed, whose port is chosen per run, and
+  is then `<feed>`; and seven headers set by the host or the toolchain, not by the helper, are
+  held by presence only — `host` (the stand-in's port), `accept-language`, `accept-encoding`,
+  `connection`, `x-stainless-arch`, `x-stainless-os` and `x-stainless-runtime-version` — the
+  headers compared as a set, in no order, and every other header by value. Nothing else has a
+  rule: the words after "Bad message from the app: " for a line that is not JSON are Slaude's own
+  parser's ("key must be a string at line 1 column 2"), not Foundation's, so they are held by
+  value like every other event. A field found to vary between runs or hosts joins a rule by name,
+  with its reason, in an entry here; a rule is never widened to a pattern. **The bridge:** the
+  recordings were written by `--record` from the Swift side of a run of SA2's two-helper drive
+  that passed whole, before the Bun side was deleted, so each holds a stream equal to the Bun
+  helper's but for SA2's sixteen allowed differences, and SA-6's "SA2's allowed differences" are
+  from SA4 the history of how the recordings were reached. **`--record`** rewrites the recordings of every case or of
+  `--cases`; it refuses, writing nothing and exiting 2, with `--mutant` or when any case it ran
+  fails a check other than its recording (its `expect`, an exit other than 0, a stderr line without
+  `framejob-agent: `), and it prints each case as `new`, `same` or `changed` with the paths that
+  changed. `make test` never passes it. A case with no recording fails, and a recording with no
+  case fails the run's `recordings` row. `prices-cached` starts on the cache file the Swift helper
+  wrote in `prices-fetched`, where it started on the other helper's; reading a cache in the Bun
+  helper's indented layout, which a person's spend folder may hold, stays held by the suite's
+  `PriceTableTests`. **Re-recording without a new decision** is for two changes only, each of which
+  the printed paths show: `make prices` refreshing `agent/prices/anthropic.json` (only `cost`'s
+  `dollars` and the bundled table's `as_of` move), and a re-pin of Slaude (only the client's own
+  `user-agent` and the `x-stainless-*` headers held by value, and its parser's words in
+  `bad-lines`, move), which lands with the re-pin's own record. Any other change to a recording is a change to what the
+  helper sends or says: it lands with its own SA- entry in the same commit, the recordings' diff
+  showing it, and a failure is never re-recorded to make it pass. Why: SA2's comparison with the
+  Bun helper held every byte of both streams, while a case's `expect` holds only types and counts,
+  and five of the drive's eight mutants change only a request body; a recording keeps what SA2
+  held once the helper it compared with is gone. Risk accepted: a Slaude re-pin or a toolchain
+  that changes a request legitimately fails `make test` until re-recorded; `x-stainless-timeout:
+  NOT_GIVEN` (#614) is now held by value and no longer compared with the TypeScript SDK's header.
