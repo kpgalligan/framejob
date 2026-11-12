@@ -43,13 +43,13 @@ fails is removed and said, and the copy builds cold.
 `make_copy(dest, agent=True, helper_clone=True)`, in order: remove `dest` (`remove_tree`), make it; copy `app/`
 without `Info.plist` or `*.entitlements`; copy `project.yml`, `Makefile`
 and `VERSION` (`COPIED_FILES`: the copy's own `make project` reads all
-three, spec §11 PUB-2); when `agent`, copy `agent/` without `node_modules` (the
-Bun helper's install, until SA4) or `.build` (SwiftPM's default scratch path); link every
+three, spec §11 PUB-2); when `agent`, copy `agent/` without `node_modules` (a
+checkout may still hold the deleted Bun helper's, spec §11 SA-11) or `.build` (SwiftPM's
+default scratch path); link every
 other build input; make `build/` and link `build/codecs` to the tree's; when `agent` and
 `helper_clone`, clone the tree's `build/agent-swift`. It answers `(dest, None)`, or `(None, reason)` on an
-`OSError`. `agent=False` is the assistant spike's, which splices
-Rasterize's `agent/` in its place; `helper_clone=False` is a cold helper build
-(`makefile_env_proof.py --cold-helper`).
+`OSError`. `agent=False` is for a copy that never builds the helper (four proofs pass it);
+`helper_clone=False` is a cold helper build (`makefile_env_proof.py --cold-helper`).
 
 **A copy builds through `build_app(dest, seconds, env=None,
 release_only=None)`** (issue batch B88): `make app-debug` or `make app` in

@@ -468,7 +468,7 @@ ONE_COLOUR_RECT = (1110, 110, 1490, 390)
 # 0.48 s is the one at 0.5 s.
 APNG_RANGE = (288_000, 336_000)
 # DGs (printed): the Anthropic API's limit on one image, set beside the base64 the assistant's
-# helper forwards (`agent/src/main.ts`); and the owner's iPhone clip (1920×1080 HEVC Main 10,
+# helper forwards (`agent/Sources/FrameJobAgentKit/ToolResults.swift`); and the owner's iPhone clip (1920×1080 HEVC Main 10,
 # HLG), which the 8-bit fixture is made from. Absent media prints "no fixture".
 API_IMAGE_LIMIT = 5 * 1024 * 1024
 OWNER_CLIP = ROOT / "tools/proof/media/owner-sync/IMG_0018.MOV"

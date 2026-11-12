@@ -1,7 +1,8 @@
 import Foundation
 
 /// The texts the assistant's session hands the helper in `configure`
-/// (`agent/src/protocol.ts`), the tools it loads up front, and the live
+/// (`agent/Sources/FrameJobAgentKit/Protocol.swift`), the tools it loads up
+/// front, and the live
 /// context each person message carries (spec §11 AI-15). Road map 12 A3.
 ///
 /// **Every fact here is interpolated from the code that decides it, or

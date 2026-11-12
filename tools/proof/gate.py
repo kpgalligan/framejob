@@ -13,8 +13,9 @@ typecheck`, which builds or reuses the bundled encoders first, `make codecs`, sp
 CX-5, passing only with no `error:` and exactly TYPECHECK_BASELINE's
 warnings, by file and message; `tools/codecs` is among its and `app`'s inputs, and
 `cmake --version` in the tool fingerprint; `tools/licenses`, the acknowledgements' generator
-and its vendored texts, spec §11 PUB-10, is among `app`'s, its `*.md` not, and so is
-`tools/agent`, the helper's build script, spec §11 SA-8), `fmt` (`cargo fmt --check` in core, graphic,
+and its vendored texts, spec §11 PUB-10, is among `app`'s, its `*.md` not, and so are
+`agent` and `tools/agent`, the helper's package and its build script, spec §11 SA-8, which
+`typecheck` does not read since the TypeScript went, SA-11), `fmt` (`cargo fmt --check` in core, graphic,
 mcp-proxy), `lint` (`make lint`), `test` (`make test`; of the `*.md` files only those under
 `designs/spec/` and `docs/` and the root `README.md`, which its spelling scan reads, #556, are
 its inputs) and `app` (`make app`,
@@ -71,7 +72,7 @@ FOLDERS = {"fmt": ("core", "graphic", "mcp-proxy")}
 # The step's own files: folders and files, then which `*.md` count (none, unless named).
 STEP_INPUTS = {
     "names": (("",), ("",)),
-    "typecheck": (("app/Sources", "app/Bridging", "core/include", "agent", "tools/codecs"), ()),
+    "typecheck": (("app/Sources", "app/Bridging", "core/include", "tools/codecs"), ()),
     "fmt": (("core", "graphic", "mcp-proxy"), ()),
     "lint": (("core", "graphic", "mcp-proxy"), ()),
     "test": (("",), ("designs/spec/", "docs/", "README.md")),
@@ -84,7 +85,7 @@ STEP_INPUTS = {
 EXCLUDED = ("archive/", ".secrets/")
 TOOLS = (["xcrun", "swiftc", "--version"], ["xcodebuild", "-version"],
          ["xcrun", "--show-sdk-path"], ["rustc", "-Vv"], ["cargo", "clippy", "-V"],
-         ["bun", "--version"], ["xcodegen", "--version"], ["cargo", "fmt", "--version"],
+         ["xcodegen", "--version"], ["cargo", "fmt", "--version"],
          ["cmake", "--version"])
 # `make typecheck`'s warnings at HEAD 0b380d2, verbatim (CLAUDE.md: "0 errors and 4 warnings",
 # deliberate, spec §11 W-8): (file basename, message). A fifth, or one gone, fails the step.
@@ -334,7 +335,7 @@ def selftest(mutant=None):
         ("M1", "app/Sources/Clip.swift", {"names", "typecheck", "test", "app"}),
         ("M1", "app/Bridging/x.h", {"names", "typecheck", "test", "app"}),
         ("M1", "core/include/framejob_core.h", every),
-        ("M1", "agent/src/agent.ts", {"names", "typecheck", "test", "app"}),
+        ("M1", "agent/Sources/FrameJobAgentKit/Turn.swift", {"names", "test", "app"}),
         ("M8", "tools/codecs/build_codecs.py", {"names", "typecheck", "test", "app"}),
         ("M8", "tools/licenses/acknowledgements.py", {"names", "test", "app"}),
         ("M2", "core/src/lib.rs", {"names", "fmt", "lint", "test", "app"}),

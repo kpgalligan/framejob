@@ -19,10 +19,10 @@ enum PriceFiles {
     static func json(_ name: String) throws -> RawJSON { try RawJSON.parse(try data(name)) }
 }
 
-/// The price function against agent/prices/cases.json, the fixture pricing.test.ts and
-/// tools/proof/prices.py answer too (spec §11 P-2, SA-3), and the table compiled in.
+/// The price function against agent/prices/cases.json, the fixture tools/proof/prices.py
+/// answers too (spec §11 P-2, SA-3), and the table compiled in.
 final class PricingTests: XCTestCase {
-    /// pricing.test.ts's tolerance.
+    /// prices_proof.py's tolerance, as the TypeScript helper's tests had it.
     static let tolerance = 1e-12
 
     /// Empty when `got` answers `want`, else what differs.

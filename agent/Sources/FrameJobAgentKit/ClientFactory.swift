@@ -19,7 +19,7 @@ public protocol MessagesAPI: Sendable {
 /// Makes the client for one `configure`.
 public struct ClientFactory: Sendable {
     public static let defaultBaseURL = "https://api.anthropic.com"
-    /// Slaude's default is 2; the contract's is 3 (agent/src/main.ts's `maxRetries`).
+    /// Slaude's default is 2; the contract's is 3, the TypeScript helper's `maxRetries`.
     public static let maxRetries = 3
 
     /// The transport each client gets; nil is Slaude's URLSessionTransport.

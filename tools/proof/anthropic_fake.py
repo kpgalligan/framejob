@@ -3,9 +3,10 @@
 
 `http.server`, no dependencies, in `assemblyai_fake.py`'s shape. It binds
 `127.0.0.1` on port 0, prints `port <n>` as its FIRST stdout line and
-flushes, and answers the three routes the assistant helper (Rasterize's
-`agent/`, the Anthropic TypeScript SDK's Tool Runner) calls, plus a control
-endpoint. `assistant_spike/assistant_spike.py` drives it; A1 reuses it.
+flushes, and answers the three routes the assistant helper (`agent/`, the
+Swift package on Slaude, spec §11 SA-1) calls, plus a control endpoint. Road
+map 12's A0 spike was its first caller; the assistant proofs since A1 and
+`agent_helper_drive.py` drive it.
 
     python3 tools/proof/anthropic_fake.py --dir <logdir>
 
@@ -14,8 +15,8 @@ Routes:
 * `GET /v1/models/<id>` answers
   `{"type":"model","id","display_name","created_at","max_input_tokens"}`,
   the last from the scenario.
-* `POST /v1/messages` (any query string: the SDK's beta calls add
-  `?beta=true`) answers the NEXT scripted reply. With `"stream": true` in the
+* `POST /v1/messages` (any query string: the TypeScript SDK's beta calls
+  added `?beta=true`) answers the NEXT scripted reply. With `"stream": true` in the
   body it answers server-sent events and then closes the connection:
   `message_start` (usage input 100 unless the reply says otherwise, output
   0, `cache_*` 0); per content

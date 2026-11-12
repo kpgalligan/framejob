@@ -13,7 +13,8 @@ struct AssistantOpenError: Error {
 
 /// One window's assistant conversation (spec §11 AI-4), run by the helper in
 /// `Contents/Helpers` (AI-1): Rasterize's `AssistantHelperSession`, ported.
-/// JSON lines over the helper's stdin and stdout (`agent/src/protocol.ts`):
+/// JSON lines over the helper's stdin and stdout (spec §7.9b,
+/// `agent/Sources/FrameJobAgentKit/Protocol.swift`):
 /// the helper streams events and asks for tool calls, and each call goes
 /// through `AgentLane.submit` (AI-2), never `AgentServer.execute`, pinned to
 /// this window's project (AI-5). Road map 12 A1.

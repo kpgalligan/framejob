@@ -31,7 +31,8 @@ enum AssistantConfiguration {
     static let environmentKey = "ANTHROPIC_API_KEY"
 
     /// The helper's `api_base` (AI-13): the stand-in server's address in a
-    /// proof. `protocol.ts` calls it "an environment variable of its own".
+    /// proof: the app's own environment variable, which the helper never
+    /// reads; it gets the address as `configure`'s `api_base`.
     static let baseURLVariable = "RC_ASSISTANT_BASE_URL"
 
     /// The persisted model, Settings' Assistant pane from A2.
@@ -40,7 +41,7 @@ enum AssistantConfiguration {
     /// AI-11's default.
     static let defaultModel = "claude-opus-5-5"
 
-    /// The helper's `ChatSettings` (`agent/src/protocol.ts`): the person's
+    /// The helper's `ChatSettings` (`agent/Sources/FrameJobAgentKit/Protocol.swift`): the person's
     /// chat settings from Settings' Assistant pane (AI-20). A dev build's
     /// `-RCDevAssistantAutoCompact <tokens>` replaces the threshold, even
     /// with compaction off, for a proof (AI-18).
@@ -150,7 +151,7 @@ struct AssistantChatSettings: Equatable {
     /// AI-9's threshold, and the one 300 000 in the app.
     static let defaultCompactTokens = 300_000
     static let compactTokensRange = 20_000...900_000
-    /// `agent/src/main.ts`'s `CLEAR_TRIGGER_TOKENS` (the settings proof's CS1).
+    /// The helper's `Request.clearTriggerTokens` (the settings proof's CS1).
     static let clearTriggerTokens = 150_000
     /// Bool; absent = true.
     static let autoCompactKey = "FrameJobAssistantAutoCompact"
@@ -183,7 +184,7 @@ struct AssistantChatSettings: Equatable {
         defaults.set(clearToolResults, forKey: Self.clearToolResultsKey)
     }
 
-    /// `protocol.ts`'s `ChatSettings`: the threshold, or null when compaction
+    /// The helper's `ChatSettings` (`Protocol.swift`): the threshold, or null when compaction
     /// is off, and whether old tool results are cleared.
     var helperJSON: [String: Any] {
         [

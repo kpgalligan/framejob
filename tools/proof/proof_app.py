@@ -259,7 +259,7 @@ BASE = float(int(time.time()) - 10000)
 def _tree(name, folder="Debug", marker=True, exe=100, built=100, newer=()):
     """Inputs at BASE, skipped files at +500, the exe and marker, then `newer`."""
     files = {"app/Sources/a.swift": 0, "app/CLAUDE.md": 0, "docs/graphics-api.md": 0,
-             "project.yml": 0, "agent/src/x.ts": 0, "core/target/release/libframejob_core.a": 0,
+             "project.yml": 0, "agent/Sources/x.swift": 0, "core/target/release/libframejob_core.a": 0,
              "agent/node_modules/y.js": 500, "app/Info.plist": 500, "app/.DS_Store": 500,
              "app/FrameJob.entitlements": 500, "core/target/debug/z.o": 500, "README.md": 500}
     app = WORK / name / "build/Build/Products" / folder / f"{PRODUCTS[folder]}.app"
@@ -307,8 +307,8 @@ def selftest(mutant=None):
         said = refusal(_tree("nomarker", marker=False)) or ""
         row("F3", "no complete build" in said and said.endswith(
             "_CodeSignature/CodeResources is missing); rebuild with `make app-debug`"), said)
-        said = refusal(_tree("failed-helper", built=-10, newer=[("agent/src/x.ts", 50)])) or ""
-        row("F4", f"agent/src/x.ts (modified {_when(BASE + 50)})" in said,
+        said = refusal(_tree("failed-helper", built=-10, newer=[("agent/Sources/x.swift", 50)])) or ""
+        row("F4", f"agent/Sources/x.swift (modified {_when(BASE + 50)})" in said,
             f"executable newer than the input, marker older: {said}")
         said = refusal(_tree("claude-md", newer=[("app/CLAUDE.md", 200)]))
         row("F5", said is None, f"an app/CLAUDE.md newer than the marker: {said}")

@@ -2,9 +2,9 @@ import Anthropic
 @testable import FrameJobAgentKit
 import XCTest
 
-/// The LiteLLM reducer against agent/prices/reduce_cases.json (the fixture update.py's and
-/// priceTable.ts's reducers answer), and the refresh in each of priceTable.test.ts's cases,
-/// against a feed on 127.0.0.1 only. No test reaches the network.
+/// The LiteLLM reducer against agent/prices/reduce_cases.json (the fixture update.py's reducer
+/// answers too), and the refresh in each case the TypeScript helper's tests held, against a
+/// feed on 127.0.0.1 only. No test reaches the network.
 final class PriceTableTests: XCTestCase {
     private var scratch: URL!
 
@@ -204,8 +204,9 @@ final class PriceTableTests: XCTestCase {
         XCTAssertTrue(initial.prices.source.problem?.hasPrefix("the price cache is unreadable: ") == true)
     }
 
-    /// The TypeScript helper writes the cache indented (`JSON.stringify(table, null, 2)`), with
-    /// `toISOString`'s milliseconds; this helper reads that file, and its own compact one.
+    /// The TypeScript helper wrote the cache indented (`JSON.stringify(table, null, 2)`), with
+    /// `toISOString`'s milliseconds, and a person's spend folder may still hold one; this helper
+    /// reads that file, and its own compact one.
     func testACacheInTheBunHelpersLayoutIsRead() throws {
         let cache = try folder().appendingPathComponent("anthropic-prices.json")
         let table = try reduced("https://feed.example/p.json", "2026-09-28T12:00:00.000Z")

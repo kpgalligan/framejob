@@ -42,7 +42,7 @@ final class SessionTests: XCTestCase {
     }
 
     /// Spec §11 SA-6: `reset`, which the app never sends, is ignored like any unknown type. The
-    /// TypeScript's arm aborted the turn, emptied the history and reported the context at 0.
+    /// TypeScript helper's arm aborted the turn, emptied the history and reported the context at 0.
     func testResetIsIgnoredAndTheHistoryKept() async throws {
         let h = Harness(ScriptedAPI([.sse(SSE.reply(SSE.text(0, "One"))), .sse(SSE.reply(SSE.text(0, "Two")))]))
         await h.configure()

@@ -17,7 +17,7 @@ public struct ConvertedToolResult: Sendable, Equatable {
 
 public enum ToolResults {
     /// How much of a tool's first text the panel's summary keeps, in UTF-16 code units
-    /// (the protocol contract's 200; agent/src/main.ts's `convertToolResult`).
+    /// (the protocol contract's 200, which the TypeScript helper's `convertToolResult` kept).
     public static let summaryLength = 200
 
     /// MCP CallToolResult -> tool_result content. Text becomes a text block and an

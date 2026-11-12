@@ -76,10 +76,10 @@ codecs:
 # `agent_build_proof.py` (SA3, spec §11 SA-8) is tools/agent/build_helper.sh's rules over toy
 # packages (seconds, no network): the stamp, the clone served at another path, a foreign scratch
 # path emptied, the tree from PROJECT_DIR, a failed build, the scrubbed environment.
-# `agent_helper_drive.py` (road map "swift-helper" SA2, spec §11 SA-4..SA-6) runs the Bun helper
-# and the Swift helper over the same scripted conversations on the stand-in API and fails any
-# difference outside its allowed list; its Swift helper is the release one the app bundles
-# (SA3). Loopback only, dummy keys, nothing paid.
+# `agent_helper_drive.py` (road map "swift-helper" SA2 and SA4, spec §11 SA-4..SA-6, SA-13) runs
+# the release helper the app bundles over scripted conversations on the stand-in API and fails any
+# difference from its recordings in tools/proof/agent_helper_recorded/: every event and every
+# request, key order included. Loopback only, dummy keys, nothing paid.
 test: rust codecs
 	cd core && cargo test --release
 	cd graphic && cargo test --release
@@ -197,9 +197,9 @@ gate:
 # flag-OFF path, what Distribution ships, is compiled only by `make dist`, and
 # so is `FRAMEJOB_UPDATER` (AppDelegate+Updates.swift, Sparkle, Distribution
 # alone, spec §11 PUB-7): this check has no Sparkle module to import.
-# The last line is agent/'s `tsc --noEmit`, through bun (agent/build.sh),
-# which fails rather than skips when bun is missing. `codecs` first: the
-# bridging header includes the encoders' headers (CX-4), found by `-Xcc -I`.
+# It reads app/Sources alone: the assistant helper in agent/ is checked by its
+# own build and suite (spec §11 SA-11). `codecs` first: the bridging header
+# includes the encoders' headers (CX-4), found by `-Xcc -I`.
 typecheck: codecs
 	swiftc -typecheck -enable-batch-mode -j "$$(sysctl -n hw.logicalcpu)" \
 		-D FRAMEJOB_DEV_TOOLS \
@@ -208,11 +208,13 @@ typecheck: codecs
 		-import-objc-header app/Bridging/FrameJob-Bridging-Header.h \
 		-Xcc -Ibuild/codecs/include \
 		app/Sources/*.swift
-	/bin/sh agent/build.sh typecheck
 
 # Regenerates agent/prices/anthropic.json from LiteLLM's table over the
 # network (spec §11 P-1); the only writer of that file. Never a prerequisite
-# of app, test, typecheck or dist.
+# of app, test, typecheck or dist. A refresh moves the `cost` and `prices`
+# events of tools/proof/agent_helper_drive.py's recordings, so it is followed
+# by `python3 tools/proof/agent_helper_drive.py --record`, whose printed paths
+# must be only `dollars` and the bundled table's `as_of` (spec §11 SA-13).
 prices:
 	python3 agent/prices/update.py
 

@@ -205,7 +205,7 @@ claude mcp add --scope user framejob -- '/Applications/Frame Job.app/Contents/He
 
 ## Building
 
-Xcode 26, Rust, xcodegen and bun; then `make app`. Everything else is in
+Xcode 26, Rust, xcodegen and cmake; then `make app`. Everything else is in
 [docs/developing.md](docs/developing.md).
 
 ## Languages

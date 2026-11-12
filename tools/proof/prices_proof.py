@@ -7,7 +7,7 @@
             the unit, the provider, a 40-hex LiteLLM commit;
             claude-opus-5-5 and claude-fable-5-1 each hold all five base
             rates as finite numbers >= 0; 1000 input tokens on opus price as
-            dollars > 0 (pricing.test.ts's `table: committed`, in Python)
+            dollars > 0 (PricingTests' testTheCommittedTable, in Python)
   T         the Swift helper's price suites (road map "swift-helper" SA3,
             spec §11 SA-3): `python3 tools/agent/agent_test.py --filter
             'PricingTests|PriceTableTests'` (`make agent-test`'s guard, scratch
@@ -93,7 +93,7 @@ def child_env():
 
 
 def mismatch(got, want):
-    """Empty when `got` answers `want` (pricing.test.ts's rule), else what differs."""
+    """Empty when `got` answers `want` (PricingTests' rule), else what differs."""
     if got.get("kind") != want["kind"]:
         return f"kind {got.get('kind')}, expected {want['kind']} ({json.dumps(got)})"
     if want["kind"] == "dollars":

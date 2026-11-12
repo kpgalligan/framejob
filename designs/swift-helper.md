@@ -7,7 +7,10 @@ the spike, has landed: its record is in §13, and it wrote SA-1..SA-3 in
 with SA-4..SA-7 and SA-12; its record is in §13. SA2, the drive that runs both helpers and
 compares them, has landed; its record is in §13. SA3, the switch, has landed with SA-8..SA-10:
 the app bundles the Swift helper and the notices and the publish runner have left Bun; its
-record is in §13. SA4 is next.
+record is in §13. SA4, the deletion, has landed with SA-11 and SA-13: the Bun helper, its
+TypeScript and its build are gone, road map 12's A0 spike is retired, and the drive holds the
+Swift helper to its recordings; its record is in §13. Next: the paid acceptance, the three live
+proofs of §12 answer 3, run by the orchestrator; then SA5, the close.
 
 **Source.** The owner, on #599 (2026-11-12): "We're going to replace Bun with the Swift Anthropic
 API we wrote. See ~/devel/doctored for background info. That had the same Typescript Anthropic
@@ -1310,5 +1313,117 @@ relay's credential header". The diff read follows this record's build.
 - **The integrator:** the CLAUDE.md edits in the build notes.
 
 ### SA4 — record
+
+**What landed** (2026-11-12, on `3833b404`, as three commits: the decisions, the bridge, the
+deletion). **SA-11 and SA-13** in `designs/spec/11-decisions/swift-helper.md` with their index
+rows, an "Amended by SA-11" paragraph appended to AI-15 and to NM-10, and SA-13's row in §8.
+**The bridge:** `tools/proof/agent_helper_drive.py` gained the recordings — each case's Swift run,
+after its clock readings, the cache file's feed URL and seven host headers are put as
+placeholders, held to `tools/proof/agent_helper_recorded/<case>.json` by SA2's comparison — and
+`--record`, run once on the two-helper drive, which passed 43/43, so the recordings were written
+from the last passing comparison with the Bun helper. **The deletion:** `agent/src/` (six
+files), `agent/package.json`, `agent/bun.lock`, `agent/tsconfig.json`, `agent/entitlements.plist`
+and `agent/build.sh`; `.gitignore`'s `/agent/node_modules/`; the `Makefile`'s tsc line;
+`gate.py`'s `bun --version`, `agent` out of `typecheck`'s inputs (it stays in `app`'s) and its
+selftest's M1 row on `agent/Sources`; `mutant_anchors.py`'s `agent/src` base; `proof_app.py`'s
+selftest path; road map 12's A0 spike, `tools/proof/assistant_spike/` (four files), with its
+section of `tools/proof/README.md` (the stand-in's paragraph moved to A1's head). **The drive**
+lost its Bun side (B0, `--bun`, `ALLOWED` and its sixteen rows, `--drop`, `--rows-needed`,
+`drive-same-helper`, the pair comparison): its 27 cases keep their expectations, each held to its
+recording, `prices-cached` now starting on the cache file the Swift helper wrote; `--control`
+and six `CONTROLS` show each comparison rule as narrow as it says. **Comments** that cited the
+TypeScript as the contract were repointed: `app/Sources` (`AssistantSession.swift`,
+`AssistantPrompt.swift`, `AssistantConfiguration.swift` four, `AssistantSpend.swift` two),
+`agent/Sources` and `agent/Tests` (the twelve files SA1 wrote citing `protocol.ts`, `main.ts`,
+`pricing.ts` or `priceTable.ts`), `tools/proof/prices.py`, `prices_proof.py`,
+`raster_dither_proof.py`, `anthropic_fake.py`, `tree_copy.py`, `makefile_env_proof.py` and
+`assistant_prompt_proof.py`; no line a mutant anchors on moved. **The documents:** spec §7.9b's
+helper paragraph (the Swift helper alone, the protocol's messages and events as SA-6 has them),
+spec §8, `docs/developing.md` (the requirement, `make typecheck`, `make test`, `make prices`, the
+layout), `README.md`'s Building line (cmake in, bun out), the `Makefile`'s comments (the drive,
+`typecheck`, `prices`) and `tools/proof/README.md` (the gate, the closed spikes, the anchors'
+bases, the price sections, SA2's section marked its record, and a new SA4 section). **No Slaude
+change**: the pin lacked nothing, so no branch or pull request was opened and no re-pin is owed.
+
+**What was measured.** On the same 12-core, 96 GB host, Xcode 26.2, Swift 6.2.3, beside other
+lanes: no figure is an idle one. `df -g /`: 63 GB available at the start, 47 GB at the end (other
+lanes build on the same volume; this worktree's three SwiftPM scratch paths hold 1.6, 2.1 and 1.7
+GB).
+
+1. **The bridge** (both helpers on one tree, commit 2): `--record` `43/43` (B0 `agent/build.sh
+   helper, 0.629 s`, B1 `skipped`), 27 recordings `new`, 20.4 s. The first recording held the
+   feed's port in `prices-fetched`'s cache file (`"source":"http://127.0.0.1:53705/litellm.json"`),
+   so the feed rule was added; `--record` again `43/43`, 26 `same` and `prices-fetched` `changed:
+   files.prices.json.table.source: 'http://127.0.0.1:53705/litellm.json' / '<feed>'` and its bytes
+   alone; then the plain run `44/44` (27 cases, 16 rows, `recordings`). 27 files, 578,829 bytes,
+   `round-cap.json` 341,361 of them.
+2. **The final drive:** B1 `emptied, then built: the scratch path was made at
+   …/framejob-int/build/agent-swift, 126.884 s` (the comment edits in `agent/` missed the stamp of
+   a lane's copied scratch path), `28/28` (27 cases and `recordings`), 135 s with the build (load
+   29.25 → 49.95). `--record` on the same helper: `27/27`, every case `same`, no file changed.
+   `bad-lines`' parser words are Slaude's own (`key must be a string at line 1 column 2`), so the
+   rule the plan proposed for them was not needed and is not in SA-13.
+3. **The recordings hold the bodies.** `--mutant tool-results-reversed` with the recording
+   comparison skipped by a hand edit (reverted): `SURVIVED — tools passed`; on the final drive:
+   `caught — tools failed` (`body.messages[2].content[0]: keys only in recorded [], only in this
+   run ['is_error']`).
+4. **The eight mutants** on the final drive, each on the mutant tree (its first build here took
+   95.6 s, in item 3's red run; then 5.4–6.5 s each; load 16.55 → 10.58): exit 1 each, `caught`
+   in every case it names.
+   `no-defer-loading`, `summary-keeps-clearing`, `system-loses-guide`, `not-run-reworded` and
+   `tool-results-reversed` are caught by the recordings alone (`body.tools[3]: keys only in
+   recorded ['defer_loading']`, `body: … only in this run ['context_management']`,
+   `body.system[0].text`, `body.messages[2].content[0].content`, the `is_error` above);
+   `cost-before-done`, `empty-summary-swapped` and `two-retries` by the expectations too.
+5. **The controls**, exit 0 each (`held`): `recorded-event-field`, `recorded-header`,
+   `recorded-key-order`, `recorded-host-header-missing` and `feed-elsewhere` FAIL their case;
+   `recorded-host-header-value` (other values for three by-presence headers, the headers in
+   reverse order) passes.
+6. **`--record` and the recordings' set:** `--record --swift <the two-retries mutant> --cases
+   retry`: `record: refused — a case of this run failed, so nothing was written`, exit 2;
+   `--record --mutant two-retries`: refused, exit 2; `git status` showed no recording changed.
+   `text.json` moved aside: `text FAIL — no recording …`, `recordings FAIL — no recording for
+   text`, exit 1; a copy as `no-such-case.json`: `recordings FAIL — a recording with no case`,
+   exit 1; both restored.
+7. **The gate's inputs.** `gate.py --selftest` with `agent` put back in `typecheck`'s inputs: `FAIL
+   M1 agent/Sources/FrameJobAgentKit/Turn.swift moves ['app', 'names', 'test', 'typecheck']`, exit
+   1; as committed: PASS.
+8. **No Bun to build with.** `make typecheck` under `PATH=/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin`
+   (`command -v bun` exit 1 there): exit 0, 0 errors, the four baseline warnings.
+9. **`make gate`** (the fingerprint lost `bun --version`, so every step ran): `names pass 2s`,
+   `typecheck pass 9s`, `fmt pass 5s`, `lint pass 22s`, `test pass 465s` (B1 `399,414 bytes`, the
+   suite's `Executed 77 tests, with 0 failures` on its scratch path built cold, the drive `28/28`
+   with B1 `skipped`), `app pass 218s` (the helper step `skipped`; D25, D26 ok), `gate: PASS 722s`
+   (load 5.25 22.31 29.55 → 19.35 28.65 32.63). **`make dist`**: 208.6 s, `dist_check: 47/47`
+   (D10/D11 no entitlements; D42/D43 `109 entries, 95 crates, slaude 4c6c2ca4, 9 fonts`),
+   `published_check: 27/27`.
+10. **The grep for Bun** (`bun|bunx` as whole words, and a second grep for the TypeScript's file
+    names, its build lines and the spike's name) over the final tree, each hit classified: history
+    (`archive/`, `designs/adr/`, `.dupscan/`, spec §11's decisions, this road map and
+    `designs/creator-jobs.md`, the dated records of `tools/proof/README.md`), a sentence saying
+    Bun is gone, a check that holds Bun out (`dist_check_mutants.py`, `makefile_env_proof.py`'s
+    fifth row), a file not ours (the design handoffs' generated `support.js`, an image's bytes,
+    the closed MC1 spike's host list, the documentation site's own `tsconfig.json`), and the
+    `CLAUDE.md` lines the integrator replaces; none unclassified (the batch's `03-checks.txt`
+    holds the listing).
+
+**What its review found.** The challenge made three objections, all accepted: SA-13 and the
+`agent/CLAUDE.md` rule name the two re-records that need no new decision (a `make prices`
+refresh, a Slaude re-pin), `--record` prints the paths that changed, and the `Makefile`'s and
+`docs/developing.md`'s `make prices` say a refresh is followed by `--record`; the second grep
+holds `assistant_spike`, and `tools/proof/README.md`'s closed-spike list says three; and the
+bridge's and the final run's counts are stated apart (43/43 with `--record`, 44/44 plain, 28/28
+after the deletion). The diff read follows this record's build.
+
+**What is owed.**
+- **The paid acceptance** (§12 answer 3), the orchestrator's: compaction `--cap 11.50`, clearing
+  `--cap 5`, the prompt evaluation `--cap 32`, serially, each run's dollars reported; then SA5.
+- **The integrator:** the `CLAUDE.md` and `agent/CLAUDE.md` edits in the build notes; and
+  `agent/node_modules`, untracked and no longer ignored, removed from the integration worktree
+  and the main checkout.
+- **#614** (`x-stainless-timeout: NOT_GIVEN`) stays blocked on SA5's live run; the recordings now
+  hold that header by value, so its re-pin re-records them under SA-13.
+- **Found, not this phase's:** `README.md`'s Languages table (a `cloc` count dated 2026-10-29)
+  still counts the deleted TypeScript and not the Swift package; filed with the residue.
 
 ### SA5 — record

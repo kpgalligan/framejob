@@ -6,9 +6,9 @@ import Foundation
 // `.embedInCode`), a cached copy of LiteLLM's table that the helper refreshes at most once a
 // day (PriceRefresh.swift), and the source it priced from, which is always reported so a stale
 // table is never silent. The cache path comes from `configure`; without one the helper prices
-// from the bundled table and fetches nothing. agent/src/priceTable.ts, step for step;
-// `reduceLiteLLM` is agent/prices/update.py's `reduce_table` with the feed and the fetch time
-// in place of a LiteLLM commit, and both answer agent/prices/reduce_cases.json.
+// from the bundled table and fetches nothing. `reduceLiteLLM` is agent/prices/update.py's
+// `reduce_table` with the feed and the fetch time in place of a LiteLLM commit, and both answer
+// agent/prices/reduce_cases.json.
 
 /// The table a price came from: the bundled snapshot (as of its LiteLLM commit's date), the
 /// cached copy or a fresh fetch (as of `fetched_at`), and why it was not refreshed, if it was not.
@@ -24,7 +24,7 @@ public struct PriceSource: Sendable, Equatable {
         self.problem = problem
     }
 
-    /// `{kind, as_of, problem?}`, protocol.ts's shape.
+    /// `{kind, as_of, problem?}`, the protocol's shape (spec §7.9b).
     public var json: RawJSON {
         var o: RawJSONObject = ["kind": .string(kind.rawValue), "as_of": .string(asOf)]
         if let problem { o["problem"] = .string(problem) }
@@ -66,7 +66,7 @@ public struct PriceOptions: Sendable {
 public enum PriceTables {
     public static let liteLLMURL =
         "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
-    /// A day, priceTable.ts's REFRESH_AFTER_MS.
+    /// A day (spec §11 P-1: the table is refreshed daily).
     public static let refreshAfter: TimeInterval = 86_400
     public static let fetchTimeout: TimeInterval = 30
     public static let userAgent = "framejob-agent"

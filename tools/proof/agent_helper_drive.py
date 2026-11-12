@@ -1,85 +1,75 @@
 #!/usr/bin/env python3
-"""Road map "swift-helper" SA2 — the two helpers, driven: the Bun helper the app ships today and
-the Swift helper that replaces it, each run as the app runs it, over the same scripted
-conversations on the stand-in API, their events and their requests compared (spec §11 SA-4,
-SA-5, SA-6; `designs/swift-helper.md` §9 SA2 and its record in §13).
+"""Road map "swift-helper" SA2 and SA4 — the Swift helper, driven as the app runs it over
+scripted conversations on the stand-in API, and held to its recordings: every event and every
+request, key order included (spec §11 SA-4, SA-5, SA-6, SA-13; `designs/swift-helper.md` §9 SA2
+and SA4 and their records in §13).
 
-    python3 tools/proof/agent_helper_drive.py                       # build both, every case (make test)
+    python3 tools/proof/agent_helper_drive.py                       # every case (make test)
     python3 tools/proof/agent_helper_drive.py --cases text,tools    # these cases (and what they need)
-    python3 tools/proof/agent_helper_drive.py --bun PATH --swift PATH   # helpers already built
-    python3 tools/proof/agent_helper_drive.py --list                # the cases, the rows, the mutants
-    python3 tools/proof/agent_helper_drive.py --drop ROW            # without one allowed row: exactly
-                                                                    # its cases FAIL (exit 1, caught)
-    python3 tools/proof/agent_helper_drive.py --rows-needed         # --drop for every row over one run
+    python3 tools/proof/agent_helper_drive.py --swift PATH          # a helper already built
+    python3 tools/proof/agent_helper_drive.py --list                # the cases, mutants and controls
     python3 tools/proof/agent_helper_drive.py --mutant NAME         # a SWIFT_MUTANTS edit, built on
                                                                     # the persistent mutant tree
-    python3 tools/proof/agent_helper_drive.py --mutant drive-same-helper   # both sides Swift: every
-                                                                    # row allows nothing
-    python3 tools/proof/agent_helper_drive.py --record              # rewrite the recordings (SA-13)
+    python3 tools/proof/agent_helper_drive.py --control NAME        # a run or a recording altered in
+                                                                    # memory (CONTROLS)
+    python3 tools/proof/agent_helper_drive.py --record              # rewrite the recordings
 
-The recordings (spec §11 SA-13). Each case's Swift run is also held to
-`tools/proof/agent_helper_recorded/<case>.json`: its events, every request (method, path, headers,
-body, bytes) and the cache files it wrote (table and bytes), as SA2 compares them. Three
-comparison rules put the same placeholders in the run and the recording: the clock readings below
-are `<clock>`; a cache file's `source`, which must be this run's feed, is `<feed>` (its port is
-chosen per run); and BY_PRESENCE's headers, which the host and the toolchain set, are
-`<by presence>`, the headers a set in no order.
-A case with no recording FAILs, and the `recordings` row FAILs a recording with no case. `--record`
-writes each case's recording from the Swift side of this run, before any allowed row rewrites it,
-and refuses (exit 2, nothing written) when any check of the run other than a recording failed;
-it prints each case `new`, `same` or `changed` with the paths that moved.
+The helper. B1 is the release helper the app bundles, built by `tools/agent/build_helper.sh` on the
+app build's scratch path, `build/agent-swift` (`agent_helper_build.release`, spec §11 SA-8):
+stripped and signed into `work/agent_helper_drive/swift/`, seconds while its stamp matches. Each
+case starts it once with exactly HOME, TMPDIR (scratch folders) and PATH=/usr/bin:/bin, as
+`AssistantSession` does, writes the app's lines (sorted keys, compact, `writeResult`'s spliced
+answers) and reads stdout line by line. One stand-in (`anthropic_fake.py`) serves the run; each
+case posts its scenario first, which resets its log. The price feed is this drive's own loopback
+server, holding its answer until the drive has read the helper's `context_usage`, so the
+refresh's `prices` and the Models lookup's `context_usage` cannot race. Every wait is bounded; a
+hang, a crash, an exit other than 0 after stdin closes, or a stderr line without
+`framejob-agent: ` FAILs the case and the drive goes on. Only children this drive started are
+signalled.
 
-The helpers. B0 builds the Bun helper with `agent/build.sh helper` into
-`tools/proof/work/agent_helper_drive/bun-target/` (spend_proof.py's call; no bun is build.sh's own
-error and a FAIL, never a skip). B1 is the release helper the app bundles, built by
-`tools/agent/build_helper.sh` on the app build's scratch path, `build/agent-swift`
-(`agent_helper_build.release`, road map "swift-helper" SA3, spec §11 SA-8): stripped and signed
-into `work/agent_helper_drive/swift/`, seconds while its stamp matches. Each case starts each
-helper once with
-exactly HOME, TMPDIR (scratch folders) and PATH=/usr/bin:/bin, as `AssistantSession` does, writes
-the app's lines (sorted keys, compact, `writeResult`'s spliced answers) and reads stdout line by
-line. One stand-in (`anthropic_fake.py`) serves the run; each helper's run of a case posts the
-case's scenario first, which resets its log. The price feed is this drive's own loopback server,
-holding its answer until the drive has read that helper's `context_usage`, so the refresh's
-`prices` and the Models lookup's `context_usage` cannot race. Every wait is bounded; a hang, a
-crash, an exit other than 0 after stdin closes, or a Swift stderr line without `framejob-agent: `
-FAILs the case and the drive goes on. Only children this drive started are signalled.
+What a case checks:
+- its `expect`, so the run is not vacuous: the event types are the case's list, the POSTs and all
+  the requests the case's counts, the stand-in's failures the case's list, the feed's GETs the
+  case's count;
+- its recording, `tools/proof/agent_helper_recorded/<case>.json` (spec §11 SA-13): the event
+  stream line for line, as parsed JSON with each object's key order (numbers by value, so
+  `1e-07` is `1e-7`, SA-6); every request's method, path, headers, body (parsed JSON with its key
+  order at every level) and byte count; and the cache files the case names, their table once
+  parsed and their bytes.
+Three comparison rules put the same placeholders in the run and the recording, and nothing else
+does. A fetched or cached table's `as_of` (in `prices` and in `cost`) and a cache file's
+`fetched_at` are clock readings: each must be an ISO 8601 instant inside this run, and is then
+`<clock>`. A cache file's `source` must be this run's feed, whose port is chosen per run, and is
+then `<feed>`. BY_PRESENCE's headers, which the host, URLSession and the toolchain set, are held
+by presence only, as `<by presence>`; a request's headers are a set, in no order. A case with no
+recording FAILs, and the `recordings` row FAILs a recording with no case.
 
-What a case compares, after the allowed rows below have rewritten what they explain:
-- not vacuous: the Swift helper's event types are the case's list, its POSTs and all its requests
-  the case's counts, and both runs' stand-in failures the case's list, so two helpers failing
-  alike cannot pass;
-- the two event streams line for line, as parsed JSON with each object's key order (numbers by
-  value, so `1e-07` is `1e-7`, SA-6);
-- the requests: the same count, method and path, the headers as a set (`anthropic-beta` as a
-  list), every body as parsed JSON with its key order at every level;
-- the price cache files the case names, once parsed and as bytes.
-A refreshed table's `as_of` (in `prices` and in `cost`) and the cache file's `fetched_at` are clock
-readings: each must be an ISO 8601 instant inside this run, and is then compared as `<clock>`.
-That is a comparison rule, not a row.
+`--record` writes each case's recording from this run, in that form, and prints each case `new`,
+`same` or `changed` with the paths that moved. It refuses, writing nothing and exiting 2, with
+`--mutant` or `--control`, and when any case of the run fails a check other than its recording.
+`make test` never passes it. Spec §11 SA-13 says which re-records need no new decision (a `make
+prices` refresh, a Slaude re-pin): any other change to a recording lands with its own SA- entry.
 
-The allowed differences are `ALLOWED`, each row naming its decision and rewriting exactly what it
-explains and nothing wider; any other difference fails. Each row declares the cases it serves,
-and a run of every case fails a row that explained nothing in one of them ("allows nothing") or
-anything in another. `--drop ROW` must FAIL exactly the row's cases, and `--rows-needed` shows that
-for every row from one run. No key-order row: neither the bodies nor the events differ in key
-order (SA-5's pinned order holds), so key order is compared strictly. SA-4 (b) has no row either:
-the 0.128.0 runner already skips the summary after a final reply that ends in tool calls, and both
-helpers send nothing and say "no summary came back" (case `cut-reply-tool-call`).
+The recordings were written by the last run of SA2's two-helper drive that passed whole, from its
+Swift side, before SA4 deleted the Bun helper; so each holds a stream equal to the Bun helper's
+but for SA2's sixteen allowed differences (its record in road map §13).
 
-Mutants (`SWIFT_MUTANTS`): an edit of the Swift helper's sources, built by
-`agent_helper_build.mutant` on the persistent mutant tree `build/agent-swift-mutant/` (spec §11
-SA-8), never in the tree's own `agent/`; then the cases it names run. A mutant is caught only when
-every case it names FAILs: `mutant <name>: caught — …`, exit 1; one that passed any SURVIVED,
-exit 0; one that did not build could not perform its control, exit 2. The first five make a difference outside
-the list; `system-loses-guide`, `not-run-reworded` and `empty-summary-swapped` show that the
-`system-breakpoint`, `unrun-calls-answered` and `empty-summary` rows are no wider than their
-decisions. `--mutant drive-same-helper` runs the Swift helper on both sides and must fail every
-row as "allows nothing".
+Mutants (`SWIFT_MUTANTS`): an edit of the helper's sources, built by `agent_helper_build.mutant`
+on the persistent mutant tree `build/agent-swift-mutant/` (spec §11 SA-8), never in the tree's
+own `agent/`; then the cases it names run. A mutant is caught only when every case it names
+FAILs: `mutant <name>: caught — …`, exit 1; one that passed any SURVIVED, exit 0; one that did not
+build could not perform its control, exit 2. Five of the eight change only a request body, which
+only the recordings hold.
+
+Controls (`CONTROLS`): one case run on the tree's helper with its run or its recording altered in
+memory, to show each comparison rule is as narrow as it says. `control <name>: held — …`, exit 0,
+when the case FAILed or passed as the control expects; `NOT held`, exit 1; exit 2 when it could not
+be performed.
 
 No network: the API is the stand-in, the feed is on 127.0.0.1, the only keys are the dummies
-`proof-key` and `wrong-key`, and every child has ANTHROPIC_API_KEY and RC_ASSEMBLYAI_KEY popped.
-Nothing is paid. Exit 0 PASS, 1 FAIL.
+`proof-key` and `wrong-key`; the helper's environment is HOME, TMPDIR and PATH alone, and every
+build child has ANTHROPIC_API_KEY and RC_ASSEMBLYAI_KEY popped (`agent_helper_build`). Nothing is
+paid. Exit 0 PASS, 1 FAIL.
 """
 
 import argparse
@@ -98,21 +88,17 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
-sys.path.insert(0, str(HERE / "graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools" / "agent"))
 import agent_helper_build  # noqa: E402
 import assistant_helper_proof as ahp  # noqa: E402
-import bounded  # noqa: E402
 
 WORK = HERE / "work" / "agent_helper_drive"
 AGENT = ROOT / "agent"
 SWIFT_HELPER = WORK / "swift" / "framejob-agent"
-BUN_TARGET = WORK / "bun-target"
-BUN_HELPER = BUN_TARGET / "Frame Job.app" / "Contents" / "Helpers" / "framejob-agent"
 REDUCE_CASES = AGENT / "prices" / "reduce_cases.json"
 MODEL = "claude-opus-5-5"
 KEY = "proof-key"
-WALL_BUILD, WALL_EVENT, WALL_EXIT = 900, 30, 10
+WALL_EVENT, WALL_EXIT = 30, 10
 STDERR_PREFIX = "framejob-agent: "
 RECORDED = HERE / "agent_helper_recorded"
 # The headers a recording holds by presence only (spec §11 SA-13): the stand-in's port, and what
@@ -120,9 +106,7 @@ RECORDED = HERE / "agent_helper_recorded"
 BY_PRESENCE = ("host", "accept-language", "accept-encoding", "connection", "x-stainless-arch",
                "x-stainless-os", "x-stainless-runtime-version")
 PRESENT = "<by presence>"
-SIDES = ("bun", "swift")
-SWITCH = "drive-same-helper"
-MUTANT = None
+SIDES = ("recorded", "this run")
 
 # ---------------------------------------------------------------------------
 # What the app sends: a small catalog, a system prompt and a search guide.
@@ -456,8 +440,9 @@ CASES = {
         "files": ["prices.json"],
         "expect": expect(["ready", "context_usage", "prices"], 0, 1, feed_gets=1),
     },
-    # Each helper started on the cache file the OTHER wrote in `prices-fetched`: it reads it,
-    # reports it before `ready` and prices a turn from it, with no refresh.
+    # The helper started on the cache file it wrote in `prices-fetched`: it reads it, reports
+    # it before `ready` and prices a turn from it, with no refresh. (SA2 started each helper on
+    # the other's; reading the TypeScript helper's indented layout is PriceTableTests' now.)
     "prices-cached": {
         "requires": "prices-fetched",
         "scenario": {"replies": [reply([text("Priced.")], "end_turn")]},
@@ -469,27 +454,7 @@ CASES = {
 
 
 # ---------------------------------------------------------------------------
-# The helpers' builds.
-
-
-def child_env(extra=None):
-    """`bounded.child_env` (RC_ASSEMBLYAI_KEY popped) with ANTHROPIC_API_KEY popped too."""
-    env = bounded.child_env(extra)
-    env.pop("ANTHROPIC_API_KEY", None)
-    return env
-
-
-def build_bun():
-    """(helper path, detail) or (None, why): `agent/build.sh helper` into a scratch target."""
-    shutil.rmtree(BUN_TARGET, ignore_errors=True)
-    BUN_TARGET.mkdir(parents=True)
-    built = bounded.run(["/bin/sh", str(AGENT / "build.sh"), "helper"], WALL_BUILD,
-                        env=child_env({"TARGET_BUILD_DIR": str(BUN_TARGET),
-                                       "CONTENTS_FOLDER_PATH": "Frame Job.app/Contents"}))
-    if built["expired"] or built["rc"] != 0 or not BUN_HELPER.is_file():
-        tail = [line for line in (built["stdout"] + built["stderr"]).splitlines() if line.strip()]
-        return None, f"build.sh helper exit {built['rc']} (expired {built['expired']}): {tail[-3:]}"
-    return BUN_HELPER, f"agent/build.sh helper, {built['seconds']} s"
+# The helper's build.
 
 
 def build_swift():
@@ -655,7 +620,7 @@ class Context:
         self.feed = Feed()
         self.closed = closed_url()
         self.started = datetime.datetime.now(datetime.timezone.utc)
-        self.runs = {}  # (case, side) -> run
+        self.runs = {}  # case -> run
 
     def stop(self):
         self.feed.stop()
@@ -758,17 +723,16 @@ def perform(step, helper, state, ctx, folder):
     return f"no such step {kind!r}"
 
 
-def run_case(name, side, path, ctx):
+def run_case(name, path, ctx):
     case = CASES[name]
-    folder = WORK / "runs" / name / side
+    folder = WORK / "runs" / name
     shutil.rmtree(folder, ignore_errors=True)
     folder.mkdir(parents=True)
     run = {"problems": [], "files": {}, "exit": None}
     if "requires" in case:
-        other = "swift" if side == "bun" else "bun"
-        made = ctx.runs.get((case["requires"], other), {}).get("files", {}).get("prices.json")
+        made = ctx.runs.get(case["requires"], {}).get("files", {}).get("prices.json")
         if made is None:
-            run["problems"].append(f"{case['requires']} left no cache file from the {other} helper")
+            run["problems"].append(f"{case['requires']} left no cache file")
         else:
             (folder / "spend").mkdir(parents=True)
             (folder / "spend" / "prices.json").write_bytes(made)
@@ -800,7 +764,7 @@ def run_case(name, side, path, ctx):
         path_ = folder / "spend" / file
         if path_.is_file():
             run["files"][file] = path_.read_bytes()
-    ctx.runs[(name, side)] = run
+    ctx.runs[name] = run
     return run
 
 
@@ -827,12 +791,12 @@ def short(value, limit=160):
     return out if len(out) <= limit else out[:limit - 1] + "…"
 
 
-def difference(a, b, path="$", sides=("bun", "swift")):
+def difference(a, b, path="$", sides=SIDES):
     """Where `a` (the first side) and `b` (the second) first differ, and how, or None."""
     return next(iter(differences(a, b, path, sides)), None)
 
 
-def differences(a, b, path="$", sides=("bun", "swift")):
+def differences(a, b, path="$", sides=SIDES):
     """Every place `a` and `b` differ, in order: a key set, a key order, a length or a value."""
     if same(a, b):
         return []
@@ -916,108 +880,47 @@ def unclock(run, ctx):
     return problems
 
 
-class Pair:
-    """Copies of one case's two runs, which the allowed rows rewrite in place."""
-
-    def __init__(self, name, bun, swift):
-        self.name, self.case = name, CASES[name]
-        self.bun, self.swift = copy.deepcopy(bun), copy.deepcopy(swift)
-        self.replies = self.case["scenario"].get("replies", [])
-
-
-def compare(name, bun, swift, rows, ctx):
-    """(problems, {row id: the differences it explained}, the Swift run as a recording holds it)
-    for one case."""
-    pair = Pair(name, bun, swift)
-    problems = []
-    for side in SIDES:
-        run = getattr(pair, side)
-        problems += [f"{side}: {p}" for p in run["problems"]]
-        problems += [f"{side}: {p}" for p in unclock(run, ctx)]
-        if run["exit"] != 0:
-            problems.append(f"{side}: exit {run['exit']} after stdin closed")
-    seen = recorded_form(pair.swift)
-    for line in pair.swift["stderr"]:
+def compare(name, run, ctx):
+    """(problems, the run as a recording holds it) for one case: everything but the recording."""
+    case = CASES[name]
+    run = copy.deepcopy(run)
+    problems = list(run["problems"]) + unclock(run, ctx)
+    if run["exit"] != 0:
+        problems.append(f"exit {run['exit']} after stdin closed")
+    for line in run["stderr"]:
         if not line.startswith(STDERR_PREFIX):
-            problems.append(f"swift: a stderr line without {STDERR_PREFIX!r}: {short(line)}")
+            problems.append(f"a stderr line without {STDERR_PREFIX!r}: {short(line)}")
             break
-    wanted = pair.case["expect"]
-    types = [e.get("type") for e in swift["events"]]
+    wanted = case["expect"]
+    types = [e.get("type") for e in run["events"]]
     if types != wanted["types"]:
-        problems.append(f"swift's event types {types} are not the case's {wanted['types']}")
-    posts = len([r for r in swift["requests"] if r.get("method") == "POST"])
-    if (posts, len(swift["requests"])) != (wanted["posts"], wanted["requests"]):
-        problems.append(f"swift sent {posts} POSTs of {len(swift['requests'])} requests, the "
-                        f"case expects {wanted['posts']} of {wanted['requests']}")
-    for side in SIDES:
-        run = getattr(pair, side)
-        if run["failures"] != wanted["failures"]:
-            problems.append(f"{side}: the stand-in's failures {run['failures']}")
-        if wanted["feed_gets"] is not None and run["feed_gets"] != wanted["feed_gets"]:
-            problems.append(f"{side}: {run['feed_gets']} price feed GETs, the case expects "
-                            f"{wanted['feed_gets']}")
-    used = {}
-    for row in rows:
-        explained = row["apply"](pair)
-        if explained:
-            used[row["id"]] = explained
-    problems += events_differ(pair.bun["events"], pair.swift["events"])
-    problems += requests_differ(pair.bun["requests"], pair.swift["requests"])
-    problems += files_differ(pair)
-    return problems, used, seen
+        problems.append(f"event types {types} are not the case's {wanted['types']}")
+    posts = len([r for r in run["requests"] if r.get("method") == "POST"])
+    if (posts, len(run["requests"])) != (wanted["posts"], wanted["requests"]):
+        problems.append(f"{posts} POSTs of {len(run['requests'])} requests, the case expects "
+                        f"{wanted['posts']} of {wanted['requests']}")
+    if run["failures"] != wanted["failures"]:
+        problems.append(f"the stand-in's failures {run['failures']}")
+    if wanted["feed_gets"] is not None and run["feed_gets"] != wanted["feed_gets"]:
+        problems.append(f"{run['feed_gets']} price feed GETs, the case expects "
+                        f"{wanted['feed_gets']}")
+    for file in case.get("files", []):
+        if file not in run["files"]:
+            problems.append(f"no {file} was written")
+    return problems, recorded_form(run)
 
 
-def events_differ(bun, swift, sides=("bun", "swift")):
-    first, second = sides
-    for at, (b, s) in enumerate(zip(bun, swift)):
-        if not same(b, s):
-            return [f"event {at}: {difference(b, s, '$', sides)}; {first} {short(b)}, "
-                    f"{second} {short(s)}"]
-    if len(bun) != len(swift):
-        side, extra = (first, bun[len(swift)]) if len(bun) > len(swift) else (second, swift[len(bun)])
-        return [f"events: {first} {len(bun)}, {second} {len(swift)}; {side}'s next {short(extra)}"]
+def events_differ(first, second, sides=SIDES):
+    one, two = sides
+    for at, (a, b) in enumerate(zip(first, second)):
+        if not same(a, b):
+            return [f"event {at}: {difference(a, b, '$', sides)}; {one} {short(a)}, "
+                    f"{two} {short(b)}"]
+    if len(first) != len(second):
+        side, extra = ((one, first[len(second)]) if len(first) > len(second)
+                       else (two, second[len(first)]))
+        return [f"events: {one} {len(first)}, {two} {len(second)}; {side}'s next {short(extra)}"]
     return []
-
-
-def headers_of(request):
-    headers = dict(request.get("headers") or {})
-    if "anthropic-beta" in headers:
-        headers["anthropic-beta"] = [b.strip() for b in headers["anthropic-beta"].split(",")]
-    return headers
-
-
-def requests_differ(bun, swift):
-    if len(bun) != len(swift):
-        return [f"requests: bun {[r.get('method') + ' ' + r.get('path', '') for r in bun]}, "
-                f"swift {[r.get('method') + ' ' + r.get('path', '') for r in swift]}"]
-    for at, (b, s) in enumerate(zip(bun, swift)):
-        if (b.get("method"), b.get("path")) != (s.get("method"), s.get("path")):
-            return [f"request {at}: bun {b.get('method')} {b.get('path')}, "
-                    f"swift {s.get('method')} {s.get('path')}"]
-        hb, hs = headers_of(b), headers_of(s)
-        if hb != hs:
-            diff = [f"{n}: {short(hb.get(n), 60)} / {short(hs.get(n), 60)}"
-                    for n in sorted(set(hb) | set(hs)) if hb.get(n) != hs.get(n)]
-            return [f"request {at} {b.get('method')} headers: {'; '.join(diff)}"]
-        found = difference(b.get("body"), s.get("body"), "body")
-        if found:
-            return [f"request {at} {b.get('method')} {b.get('path')}: {found}"]
-    return []
-
-
-def files_differ(pair):
-    out = []
-    for name in pair.case.get("files", []):
-        b, s = pair.bun["layouts"].get(name), pair.swift["layouts"].get(name)
-        if b is None or s is None:
-            out.append(f"{name}: a table from bun {b is not None}, from swift {s is not None}")
-            continue
-        found = difference(pair.bun["tables"][name], pair.swift["tables"][name], name)
-        if found:
-            out.append(f"{name}: {found}")
-        elif b != s:
-            out.append(f"{name}: the same table in different bytes ({len(b)} / {len(s)})")
-    return out
 
 
 # ---------------------------------------------------------------------------
@@ -1065,7 +968,7 @@ def against(name, seen, recorded):
     """How a run, in its recorded form, differs from the case's recording: [] when it does not."""
     if recorded is None:
         return [f"no recording {recording_path(name).relative_to(ROOT)}: write it with --record"]
-    sides = ("recorded", "this run")
+    sides = SIDES
     out = [f"against the recording, {p}" for p in
            events_differ(recorded.get("events", []), seen["events"], sides)]
     mine, theirs = recorded.get("requests", []), seen["requests"]
@@ -1073,21 +976,23 @@ def against(name, seen, recorded):
         out.append(f"against the recording, requests: recorded "
                    f"{[str(r.get('method')) + ' ' + str(r.get('path')) for r in mine]}, this run "
                    f"{[str(r.get('method')) + ' ' + str(r.get('path')) for r in theirs]}")
+    # Per request, the first difference: the body before the headers, so a changed body is named
+    # by what changed in it rather than by its content-length.
     for at, (r, s) in enumerate(zip(mine, theirs)):
         if (r.get("method"), r.get("path")) != (s.get("method"), s.get("path")):
             out.append(f"against the recording, request {at}: recorded {r.get('method')} "
                        f"{r.get('path')}, this run {s.get('method')} {s.get('path')}")
+            break
+        found = difference(r.get("body"), s.get("body"), "body", sides)
+        if found:
+            out.append(f"against the recording, request {at} {r.get('method')} {r.get('path')}: "
+                       f"{found}")
             break
         if r.get("headers") != s.get("headers"):
             hr, hs = r.get("headers") or {}, s.get("headers") or {}
             diff = [f"{n}: {short(hr.get(n), 60)} / {short(hs.get(n), 60)}"
                     for n in sorted(set(hr) | set(hs)) if hr.get(n) != hs.get(n)]
             out.append(f"against the recording, request {at} headers: {'; '.join(diff)}")
-            break
-        found = difference(r.get("body"), s.get("body"), "body", sides)
-        if found:
-            out.append(f"against the recording, request {at} {r.get('method')} {r.get('path')}: "
-                       f"{found}")
             break
         if r.get("bytes") != s.get("bytes"):
             out.append(f"against the recording, request {at}: {r.get('bytes')} / "
@@ -1106,7 +1011,7 @@ def against(name, seen, recorded):
     return out
 
 
-def recordings_row(names):
+def recordings_row():
     """`recordings`: one recording per case, and none for a case the drive does not have."""
     held = sorted(path.stem for path in RECORDED.glob("*.json")) if RECORDED.is_dir() else []
     stray = [name for name in held if name not in CASES]
@@ -1130,8 +1035,7 @@ def record(names, seen_by_case):
         else:
             moved = []
             for key in ("events", "requests", "files"):
-                moved += differences(old.get(key), json.loads(data)[key], key,
-                                     ("recorded", "this run"))
+                moved += differences(old.get(key), json.loads(data)[key], key)
             if moved:
                 said = (f"changed: {'; '.join(moved[:8])}"
                         + (f"; and {len(moved) - 8} more" if len(moved) > 8 else ""))
@@ -1144,391 +1048,16 @@ def record(names, seen_by_case):
 
 
 # ---------------------------------------------------------------------------
-# The allowed differences. Each row rewrites, in the Pair's copies, exactly the difference its
-# decision names, and answers how many it rewrote; whatever is left is compared strictly.
-
-CLIENT_HEADERS = ("user-agent", "x-stainless-arch", "x-stainless-async", "x-stainless-helper",
-                  "x-stainless-lang", "x-stainless-os", "x-stainless-package-version",
-                  "x-stainless-raw-response", "x-stainless-read-timeout",
-                  "x-stainless-retry-count", "x-stainless-runtime", "x-stainless-runtime-version",
-                  "x-stainless-timeout", "accept-encoding", "accept-language", "connection",
-                  "content-length", "host")
-PARSE_PREFIX = "Bad message from the app: "
-NOT_OBJECT = PARSE_PREFIX + "expected a JSON object"
-NO_KEY = PARSE_PREFIX + "configure needs a string api_key"
-EMPTY_SUMMARY = "the summary came back empty"
-SDK_CUT = "stream ended without producing a Message with role=assistant"
-EVENT_STATUS = {"overloaded_error": 529}
-
-
-def request_pairs(pair):
-    return list(zip(pair.bun["requests"], pair.swift["requests"]))
-
-
-def bodies(pair):
-    return [(b["body"], s["body"]) for b, s in request_pairs(pair)
-            if b.get("method") == s.get("method") == "POST"
-            and isinstance(b.get("body"), dict) and isinstance(s.get("body"), dict)]
-
-
-def row_system_breakpoint(pair):
-    explained = 0
-    for b, s in bodies(pair):
-        system = b.get("system")
-        block = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
-        if isinstance(system, str) and same(s.get("system"), block):
-            s["system"] = system
-            explained += 1
-    return explained
-
-
-def row_credential(pair):
-    explained = 0
-    for b, s in request_pairs(pair):
-        hb, hs = b["headers"], s["headers"]
-        key = hb.get("x-api-key")
-        if (key in ("proof-key", "wrong-key") and "authorization" not in hb
-                and hs.get("authorization") == f"Bearer {key}" and "x-api-key" not in hs):
-            del hs["authorization"]
-            hs["x-api-key"] = key
-            explained += 1
-    return explained
-
-
-def row_version(pair):
-    explained = 0
-    for b, s in request_pairs(pair):
-        if (b["headers"].get("anthropic-version") == "2023-06-01"
-                and s["headers"].get("anthropic-version") == "2026-10-21"):
-            s["headers"]["anthropic-version"] = "2023-06-01"
-            explained += 1
-    return explained
-
-
-def row_beta_query(pair):
-    explained = 0
-    for b, s in request_pairs(pair):
-        if (b.get("method") == s.get("method") == "POST"
-                and b.get("path") == "/v1/messages?beta=true" and s.get("path") == "/v1/messages"):
-            s["path"] = b["path"]
-            explained += 1
-    return explained
-
-
-def row_client_headers(pair):
-    explained = 0
-    for b, s in request_pairs(pair):
-        hb, hs = b["headers"], s["headers"]
-        if any(hb.get(name) != hs.get(name) for name in CLIENT_HEADERS):
-            explained += 1
-        for name in CLIENT_HEADERS:
-            hb.pop(name, None)
-            hs.pop(name, None)
-    return explained
-
-
-def scripted_stop(pair, uses):
-    """The stop reason of the scripted reply whose tool_use ids are `uses`', or None."""
-    ids = [u.get("id") for u in uses]
-    for given in pair.replies:
-        if [b.get("id") for b in given.get("content", []) if b.get("type") == "tool_use"] == ids:
-            return given.get("stop_reason")
-    return None
-
-
-def row_unrun_calls(pair):
-    """SA-4 (a): after a final reply that ends in tool calls, Swift's next user message starts
-    with one "Not run: …" error result per call, then what Bun sent as that message."""
-    explained = 0
-    for b, s in bodies(pair):
-        bm, sm = b.get("messages"), s.get("messages")
-        if not (isinstance(bm, list) and isinstance(sm, list) and len(bm) == len(sm)):
-            continue
-        for at in range(1, len(bm)):
-            before, mine, theirs = bm[at - 1], bm[at], sm[at]
-            uses = [c for c in before.get("content", []) if isinstance(c, dict)
-                    and c.get("type") == "tool_use"] if before.get("role") == "assistant" else []
-            stop = scripted_stop(pair, uses) if uses else None
-            if (stop in (None, "tool_use") or mine.get("role") != "user"
-                    or not isinstance(mine.get("content"), list)):
-                continue
-            if any(isinstance(c, dict) and c.get("type") == "tool_result" for c in mine["content"]):
-                continue
-            answers = [{"type": "tool_result", "tool_use_id": u["id"],
-                        "content": f"Not run: the reply stopped with {stop} before this call "
-                                   "could run.", "is_error": True} for u in uses]
-            got = theirs.get("content")
-            if (theirs.get("role") == "user" and isinstance(got, list)
-                    and same(got[:len(answers)], answers)
-                    and same(got[len(answers):], mine.get("content"))):
-                theirs["content"] = copy.deepcopy(mine["content"])
-                explained += 1
-    return explained
-
-
-def row_summary_needs_stop(pair):
-    """SA-4, success needs both: a summary that holds a compaction block but stopped with another
-    reason swaps Bun's history for that block, and leaves Swift's as it was."""
-    wrong = [g for g in pair.replies if g.get("stop_reason") != "compaction"
-             and any(c.get("type") == "compaction" and isinstance(c.get("content"), str)
-                     and c["content"] for c in g.get("content", []))]
-    if not wrong:
-        return 0
-    explained, summarised = 0, None
-    for b, s in bodies(pair):
-        if "compaction" in b and "compaction" in s:
-            summarised = s.get("messages")
-            continue
-        bm, sm = b.get("messages"), s.get("messages")
-        if summarised is None or not (isinstance(bm, list) and isinstance(sm, list) and bm):
-            continue
-        head = bm[0]
-        blocks = [{k: v for k, v in c.items() if k != "encrypted_content"}
-                  for c in head.get("content", []) if isinstance(c, dict)]
-        if (head.get("role") == "assistant"
-                and any(same(blocks, g["content"]) for g in wrong)
-                and same(sm[:len(summarised)], summarised)
-                and same(sm[len(summarised):], bm[1:])):
-            s["messages"] = copy.deepcopy(bm)
-            explained += 1
-    return explained
-
-
-def row_empty_summary(pair):
-    """SA-4 (c): a `compaction` stop whose block holds null or "" — Bun's `compacted` and its
-    `context_usage` against Swift's `compaction_failed` "the summary came back empty"."""
-    if not any(g.get("stop_reason") == "compaction"
-               and any(c.get("type") == "compaction" and not c.get("content")
-                       for c in g.get("content", [])) for g in pair.replies):
-        return 0
-    explained = 0
-    bun, swift = pair.bun["events"], pair.swift["events"]
-    for at in range(min(len(bun) - 1, len(swift))):
-        failed = swift[at]
-        if not same(failed, {"type": "compaction_failed", "reason": EMPTY_SUMMARY}):
-            continue
-        done, usage = bun[at], bun[at + 1]
-        if (done.get("type") == "compacted" and list(done) == ["type", "before", "after"]
-                and same(usage, {"type": "context_usage", "used": done["after"],
-                                 "limit": usage.get("limit")})):
-            swift[at:at + 1] = [copy.deepcopy(done), copy.deepcopy(usage)]
-            explained += 1
-    return explained
-
-
-def row_configure_validated(pair):
-    """SA-6: `configure` without `api_key` — Swift's one error against Bun's `prices`, `ready`
-    and `context_usage` with no limit (its lookup fails with no key and sends nothing)."""
-    bun, swift = pair.bun["events"], pair.swift["events"]
-    if len(swift) < 1 or len(bun) < 3 or not same(swift[0], {"type": "error", "message": NO_KEY}):
-        return 0
-    if [e.get("type") for e in bun[:3]] != HELLO or not same(
-            bun[2], {"type": "context_usage", "used": 0, "limit": None}):
-        return 0
-    swift[0:1] = copy.deepcopy(bun[:3])
-    return 1
-
-
-def row_non_object(pair):
-    """SA-6: a line that is JSON but not an object — Swift's error against Bun's silence."""
-    bun, swift = pair.bun["events"], pair.swift["events"]
-    explained = 0
-    at = 0
-    while at < len(swift):
-        if same(swift[at], {"type": "error", "message": NOT_OBJECT}) and not (
-                at < len(bun) and same(bun[at], swift[at])):
-            del swift[at]
-            explained += 1
-            continue
-        at += 1
-    return explained
-
-
-def row_reset(pair):
-    """SA-6: `reset` — Bun's `context_usage` of 0 straight after the turn it ends, against
-    Swift's silence; and every later `context_usage` until the next response, Bun's `used` 0
-    against the context Swift kept."""
-    bun, swift = pair.bun["events"], pair.swift["events"]
-    explained = 0
-    for at in range(1, len(bun)):
-        event = bun[at]
-        if not (bun[at - 1].get("type") == "turn_finished" and event.get("type") == "context_usage"
-                and event.get("used") == 0):
-            continue
-        if at < len(swift) and same(swift[at], event):
-            continue
-        kept = next((e.get("used") for e in reversed(swift[:at])
-                     if e.get("type") == "context_usage"), None)
-        del bun[at]
-        explained += 1
-        for later in range(at, min(len(bun), len(swift))):
-            if bun[later].get("type") == "message_done":
-                break
-            if (bun[later].get("type") == swift[later].get("type") == "context_usage"
-                    and bun[later].get("used") == 0 and swift[later].get("used") == kept):
-                swift[later]["used"] = 0
-                explained += 1
-        break
-    return explained
-
-
-def row_parser_text(pair):
-    """SA-6: a line that is not JSON — both say "Bad message from the app: ", Bun with its JSON
-    parser's message and Swift with Foundation's."""
-    explained = 0
-    for b, s in zip(pair.bun["events"], pair.swift["events"]):
-        if (b.get("type") == s.get("type") == "error"
-                and str(b.get("message", "")).startswith(PARSE_PREFIX + "JSON Parse error")
-                and str(s.get("message", "")).startswith(PARSE_PREFIX)
-                and s.get("message") not in (NOT_OBJECT, NO_KEY) and not same(b, s)):
-            s["message"] = b["message"]
-            explained += 1
-    return explained
-
-
-def row_error_no_status(pair):
-    """SA-6: an API error with no status (a failed connection) — Bun's `API error : <m>`
-    against Swift's `API error: <m>`, the same message."""
-    explained = 0
-    for b, s in zip(pair.bun["events"], pair.swift["events"]):
-        mine, theirs = str(b.get("message", "")), str(s.get("message", ""))
-        if (b.get("type") == s.get("type") == "error" and mine.startswith("API error : ")
-                and theirs == "API error: " + mine[len("API error : "):]):
-            s["message"] = mine
-            explained += 1
-    return explained
-
-
-def row_error_stream_cut(pair):
-    """SA-6: a stream cut short — Bun's SDK sentence alone against Swift's `API error: <m>`."""
-    if not any(g.get("cut") == "drop" for g in pair.replies):
-        return 0
-    explained = 0
-    for b, s in zip(pair.bun["events"], pair.swift["events"]):
-        if (b.get("type") == s.get("type") == "error" and b.get("message") == SDK_CUT
-                and str(s.get("message", "")).startswith("API error: ")):
-            s["message"] = b["message"]
-            explained += 1
-    return explained
-
-
-def row_error_event_status(pair):
-    """SA-6: an `error` event mid-stream — Bun's `API error : <m>` against Swift's
-    `API error <its type's status>: <m>`."""
-    statuses = {g["error"]["message"]: EVENT_STATUS.get(g["error"].get("type"))
-                for g in pair.replies if g.get("cut") == "error" and g.get("error")}
-    explained = 0
-    for b, s in zip(pair.bun["events"], pair.swift["events"]):
-        mine = str(b.get("message", ""))
-        said = mine[len("API error : "):]
-        if (b.get("type") == s.get("type") == "error" and mine.startswith("API error : ")
-                and statuses.get(said) is not None
-                and s.get("message") == f"API error {statuses[said]}: {said}"):
-            s["message"] = mine
-            explained += 1
-    return explained
-
-
-def row_cache_layout(pair):
-    """SA-6: the price cache — the same table, compact from Swift and indented from Bun."""
-    explained = 0
-    for name in pair.case.get("files", []):
-        b, s = pair.bun["tables"].get(name), pair.swift["tables"].get(name)
-        if b is not None and s is not None and same(b, s) and (
-                pair.bun["layouts"][name] != pair.swift["layouts"][name]):
-            pair.swift["layouts"][name] = pair.bun["layouts"][name]
-            explained += 1
-    return explained
-
-
-def with_posts(name):
-    return CASES[name]["expect"]["posts"] > 0
-
-
-def with_requests(name):
-    return CASES[name]["expect"]["requests"] > 0
-
-
-# Row order matters only where a row adds or removes events: those come before the rows that
-# compare events at one index.
-ALLOWED = [
-    {"id": "system-breakpoint", "decision": "SA-5", "apply": row_system_breakpoint,
-     "cases": with_posts,
-     "lets": "Bun's `system` string against Swift's list of one text block of the same string "
-             "carrying `cache_control {type: ephemeral}`"},
-    {"id": "credential-header", "decision": "SA-5", "apply": row_credential,
-     "cases": with_requests,
-     "lets": "`x-api-key: <dummy>` against `authorization: Bearer <the same dummy>`"},
-    {"id": "api-version", "decision": "SA-5", "apply": row_version, "cases": with_requests,
-     "lets": "`anthropic-version` exactly 2023-06-01 against exactly 2026-10-21"},
-    {"id": "beta-query", "decision": "SA-5", "apply": row_beta_query, "cases": with_posts,
-     "lets": "a POST to /v1/messages?beta=true against one to /v1/messages"},
-    {"id": "client-headers", "decision": "SA-1", "apply": row_client_headers,
-     "cases": with_requests,
-     "lets": "the headers that name the HTTP client and the SDK, by name: "
-             + ", ".join(CLIENT_HEADERS)},
-    {"id": "unrun-calls-answered", "decision": "SA-4 (a)", "apply": row_unrun_calls,
-     "cases": ("cut-reply-tool-call",),
-     "lets": "after a final reply that ends in tool calls, Swift's next user message beginning "
-             "with one error result per call, \"Not run: the reply stopped with <its stop "
-             "reason> before this call could run.\", then exactly what Bun sent"},
-    {"id": "summary-needs-compaction-stop", "decision": "SA-4", "apply": row_summary_needs_stop,
-     "cases": ("compaction-wrong-stop-block",),
-     "lets": "a summary holding a non-empty compaction block that stopped with another reason: "
-             "Bun's later requests starting from that block, Swift's from the conversation the "
-             "summary request sent, the rest the same"},
-    {"id": "empty-summary", "decision": "SA-4 (c)", "apply": row_empty_summary,
-     "cases": ("compaction-empty",),
-     "lets": "a `compaction` stop whose block is null or empty: Bun's `compacted` and the "
-             "`context_usage` of its `after`, against Swift's `compaction_failed` \"the summary "
-             "came back empty\""},
-    {"id": "configure-validated", "decision": "SA-6", "apply": row_configure_validated,
-     "cases": ("configure-no-key",),
-     "lets": "`configure` with no `api_key`: Swift's error \"" + NO_KEY + "\" against Bun's "
-             "`prices`, `ready` and `context_usage` with no limit"},
-    {"id": "non-object-line", "decision": "SA-6", "apply": row_non_object,
-     "cases": ("bad-lines",),
-     "lets": "a line that is JSON but not an object: Swift's error \"" + NOT_OBJECT + "\" "
-             "against Bun's silence"},
-    {"id": "reset-ignored", "decision": "SA-6", "apply": row_reset, "cases": ("bad-lines",),
-     "lets": "`reset`: Bun's `context_usage` of 0 against Swift's silence, and later "
-             "`context_usage` until the next response, Bun's `used` 0 against the context Swift "
-             "kept"},
-    {"id": "parser-text", "decision": "SA-6", "apply": row_parser_text, "cases": ("bad-lines",),
-     "lets": "a line that is not JSON: \"" + PARSE_PREFIX + "\" and Bun's JSON Parse error "
-             "against Swift's parser's own words"},
-    {"id": "error-no-status", "decision": "SA-6", "apply": row_error_no_status,
-     "cases": ("no-connection",),
-     "lets": "an API error with no status: `API error : <m>` against `API error: <m>`"},
-    {"id": "error-stream-cut", "decision": "SA-6", "apply": row_error_stream_cut,
-     "cases": ("stream-drop",),
-     "lets": "a stream cut short: Bun's \"" + SDK_CUT + "\" against Swift's `API error: <m>`"},
-    {"id": "error-event-status", "decision": "SA-6", "apply": row_error_event_status,
-     "cases": ("stream-error",),
-     "lets": "an `error` event mid-stream: `API error : <m>` against `API error <its type's "
-             "status>: <m>` (529 for overloaded_error)"},
-    {"id": "cache-file-layout", "decision": "SA-6", "apply": row_cache_layout,
-     "cases": ("prices-fetched",),
-     "lets": "the price cache file: the same table once parsed, indented by Bun and compact from "
-             "Swift"},
-]
-
-
-def declared(row, names):
-    serves = row["cases"]
-    return {n for n in names if (serves(n) if callable(serves) else n in serves)}
-
-
-# ---------------------------------------------------------------------------
 # Mutants: an edit to the Swift helper's sources, and the cases that must FAIL with it.
 
 KIT = "agent/Sources/FrameJobAgentKit/"
 SWIFT_MUTANTS = {
-    # The tool results in reverse order: a body difference no row explains.
+    # The tool results in reverse order: a body difference only the recording holds.
     "tool-results-reversed": (KIT + "Turn.swift", "        return answers.compactMap { $0 }\n",
                               "        return Array(answers.compactMap { $0 }.reversed())\n",
                               ["tools"]),
-    # Every tool sent up front (`core` still read, as the suite's warnings are errors).
+    # Every tool sent up front (`core` still read, as the suite's warnings are errors): a body
+    # difference.
     "no-defer-loading": (KIT + "Request.swift",
                          "            if !core.contains(tool.name) { o[\"defer_loading\"] = true }\n",
                          "            _ = core\n", ["text", "tools", "compaction", "retry"]),
@@ -1544,7 +1073,8 @@ SWIFT_MUTANTS = {
     # Slaude's default retries, where the contract's are three.
     "two-retries": (KIT + "ClientFactory.swift", "    public static let maxRetries = 3\n",
                     "    public static let maxRetries = 2\n", ["retry"]),
-    # The summary request with a clearing edit, which the API refuses beside a compaction.
+    # The summary request with a clearing edit, which the API refuses beside a compaction: a
+    # body difference.
     "summary-keeps-clearing": (KIT + "Request.swift",
                                "        o[\"compaction\"] = [\"type\": \"summarize\", "
                                "\"instructions\": .string(instructions)]\n",
@@ -1553,23 +1083,90 @@ SWIFT_MUTANTS = {
                                "        o[\"compaction\"] = [\"type\": \"summarize\", "
                                "\"instructions\": .string(instructions)]\n",
                                ["compaction"]),
-    # The system block without the search guide: `system-breakpoint` must not swallow it.
+    # The system block without the search guide: a body difference (SA2's `system-breakpoint`
+    # row was shown no wider than SA-5 by it).
     "system-loses-guide": (KIT + "Request.swift",
                            "            \"text\": .string(\"\\(configure.system)\\n\\n\\(configure.searchGuide)\"),\n",
                            "            \"text\": .string(configure.system),\n",
                            ["text", "tools"]),
-    # Another sentence for an unrun call: `unrun-calls-answered` must not swallow it.
+    # Another sentence for an unrun call: a body difference (SA2's `unrun-calls-answered`).
     "not-run-reworded": (KIT + "ToolResults.swift",
                          "         \"content\": .string(\"Not run: the reply stopped with \\(stopReason) "
                          "before this call could run.\"),\n",
                          "         \"content\": .string(\"Not run: stopped with \\(stopReason).\"),\n",
                          ["cut-reply-tool-call"]),
-    # An empty summary swapped in, as SA-4 (c) says the runner would: `empty-summary` lets the
-    # events through and must not let the swap through.
+    # An empty summary swapped in, as SA-4 (c) says the TypeScript runner would: the events and
+    # the next request change.
     "empty-summary-swapped": (KIT + "Compaction.swift",
                               "        guard Self.holdsSummary(reply.message) else {\n",
                               "        guard Self.holdsSummary(reply.message) || true else {\n",
                               ["compaction-empty"]),
+}
+
+
+# ---------------------------------------------------------------------------
+# Controls: one case with its run or its recording altered in memory, and whether it must FAIL.
+# Their names stay out of every identifier holding MUTANT, so `mutant_anchors.py` reads only
+# SWIFT_MUTANTS.
+
+
+def what(how):
+    """An alteration's docstring on one line, without its full stop."""
+    return " ".join(how.__doc__.split()).rstrip(".")
+
+
+def first_of(items, test):
+    return next((item for item in items if test(item)), None)
+
+
+def alter_cost(run, recorded):
+    """The recording's first `cost` charging twice the dollars."""
+    cost = first_of(recorded["events"], lambda e: e.get("type") == "cost")
+    cost["cost"]["dollars"] = cost["cost"]["dollars"] * 2
+
+
+def alter_header(run, recorded):
+    """The recording's POST holding the TypeScript SDK's API version."""
+    post = first_of(recorded["requests"], lambda r: r.get("method") == "POST")
+    post["headers"]["anthropic-version"] = "2023-06-01"
+
+
+def alter_key_order(run, recorded):
+    """The recording's POST body with its top-level keys in reverse order, the same values."""
+    post = first_of(recorded["requests"], lambda r: r.get("method") == "POST")
+    post["body"] = dict(reversed(list(post["body"].items())))
+
+
+def drop_host_header(run, recorded):
+    """The recording's first request without a header held by presence."""
+    del recorded["requests"][0]["headers"]["host"]
+
+
+def move_host_headers(run, recorded):
+    """The run's first request with other values for the headers held by presence, and its
+    headers in reverse order."""
+    request = run["requests"][0]
+    headers = dict(request["headers"], **{"host": "203.0.113.9:1",
+                                         "accept-language": "fr-FR,fr;q=0.9",
+                                         "x-stainless-runtime-version": "9.9"})
+    request["headers"] = dict(reversed(list(headers.items())))
+
+
+def move_feed(run, recorded):
+    """The run's cache file naming another feed than this run's."""
+    data = run["files"]["prices.json"]
+    url = json.loads(data)["source"]
+    run["files"]["prices.json"] = data.replace(url.encode(), b"http://127.0.0.1:1/litellm.json")
+
+
+# name: (the case, the alteration, whether the case must FAIL)
+CONTROLS = {
+    "recorded-event-field": ("text", alter_cost, True),
+    "recorded-header": ("text", alter_header, True),
+    "recorded-key-order": ("text", alter_key_order, True),
+    "recorded-host-header-missing": ("text", drop_host_header, True),
+    "recorded-host-header-value": ("text", move_host_headers, False),
+    "feed-elsewhere": ("prices-fetched", move_feed, True),
 }
 
 
@@ -1588,115 +1185,77 @@ def ordered(names):
     return out
 
 
-def drive(names, bun, swift, rows, ctx, held=True):
-    """Runs and compares each case, printing its line; answers {case: (problems, rows used, the
-    Swift run as a recording holds it)}. `held`: the Swift run is also held to its recording."""
+def drive(names, swift, ctx, held=True, alter=None):
+    """Runs each case and checks it, and when `held` holds it to its recording, printing its
+    line; answers {case: (problems, the run as a recording holds it)}. `alter`: (case,
+    function) applied to that case's run and recording before they are compared."""
     results = {}
     for name in names:
         started = time.monotonic()
-        runs = {side: run_case(name, side, path, ctx)
-                for side, path in (("bun", bun), ("swift", swift))}
-        problems, used, seen = compare(name, runs["bun"], runs["swift"], rows, ctx)
+        run = run_case(name, swift, ctx)
+        recorded = read_recording(name) if held else None
+        if alter is not None and alter[0] == name:
+            run, recorded = copy.deepcopy(run), copy.deepcopy(recorded)
+            alter[1](run, recorded)
+        problems, seen = compare(name, run, ctx)
         if held:
-            problems += against(name, seen, read_recording(name))
-        results[name] = (problems, used, seen)
+            problems += against(name, seen, recorded)
+        results[name] = (problems, seen)
         took = time.monotonic() - started
-        rows_said = ", ".join(f"{k} {v}" for k, v in used.items()) or "none"
-        print(f"{name} {'ok' if not problems else 'FAIL'} — {took:.1f} s; rows: {rows_said}"
+        print(f"{name} {'ok' if not problems else 'FAIL'} — {took:.1f} s"
               + ("; " + "; ".join(problems) if problems else ""), flush=True)
     return results
-
-
-def recompare(names, rows, ctx):
-    return {name: compare(name, ctx.runs[(name, "bun")], ctx.runs[(name, "swift")], rows, ctx)
-            for name in names}
-
-
-def row_checks(names, results, rows):
-    """Each row against the cases it declares: it must have explained something in each of
-    them and nothing elsewhere. Answers {"row:<id>": (ok, detail)}."""
-    out = {}
-    for row in rows:
-        want = declared(row, names)
-        got = {name for name in names if results[name][1].get(row["id"])}
-        total = sum(results[name][1].get(row["id"], 0) for name in names)
-        if not want and not got:
-            continue  # none of its cases ran
-        if want and not got:
-            out["row:" + row["id"]] = (False, f"allows nothing: remove it (declared for "
-                                              f"{len(want)} cases)")
-        elif got != want:
-            out["row:" + row["id"]] = (False, f"explained differences in {sorted(got)}, "
-                                              f"declared for {sorted(want)}")
-        else:
-            where = ", ".join(sorted(got)) if len(got) <= 3 else f"{len(got)} cases"
-            out["row:" + row["id"]] = (True, f"{row['decision']}: {total} explained, in {where}")
-    return out
 
 
 def listing():
     print("cases:")
     for name, case in CASES.items():
         print(f"  {name}: {len(case['steps'])} steps, {len(case['scenario'].get('replies', []))} "
-              f"replies, swift {len(case['expect']['types'])} events, "
-              f"{case['expect']['posts']} POSTs")
-    print("allowed rows:")
-    for row in ALLOWED:
-        print(f"  {row['id']} ({row['decision']}): {row['lets']}")
+              f"replies, {len(case['expect']['types'])} events, {case['expect']['posts']} POSTs")
     print("mutants:")
     for name, (file, _, _, cases) in SWIFT_MUTANTS.items():
         print(f"  {name}: {file}; must FAIL {', '.join(cases)}")
-    print(f"  {SWITCH}: both sides the Swift helper; every row must allow nothing")
+    print("controls:")
+    for name, (case, how, fails) in CONTROLS.items():
+        print(f"  {name}: {case}, {what(how)}; must {'FAIL' if fails else 'pass'}")
 
 
-def build_both(args):
-    bun = Path(args.bun).resolve() if args.bun else None
-    swift = Path(args.swift).resolve() if args.swift else None
-    if bun is None:
-        bun, why = build_bun()
-        print(f"B0 {'ok' if bun else 'FAIL'} — the Bun helper: {why}", flush=True)
-    if swift is None:
-        swift, why = build_swift()
-        print(f"B1 {'ok' if swift else 'FAIL'} — the Swift helper: {why}", flush=True)
-    return bun, swift
+def built(args):
+    if args.swift:
+        return Path(args.swift).resolve()
+    swift, why = build_swift()
+    print(f"B1 {'ok' if swift else 'FAIL'} — the Swift helper: {why}", flush=True)
+    return swift
 
 
 def plain(args, names):
-    bun, swift = build_both(args)
-    if bun is None or swift is None:
+    swift = built(args)
+    if swift is None:
         print("0/1", flush=True)
         return 1
-    if MUTANT == SWITCH:
-        bun = swift
     ctx = Context()
     try:
-        results = drive(names, bun, swift, ALLOWED, ctx, held=not args.record)
+        results = drive(names, swift, ctx, held=not args.record)
     finally:
         ctx.stop()
-    checks = {name: (not problems, "") for name, (problems, _, _) in results.items()}
-    for check, (ok, detail) in row_checks(names, results, ALLOWED).items():
-        checks[check] = (ok, detail)
-        print(f"{check} {'ok' if ok else 'FAIL'} — {detail}", flush=True)
+    checks = {name: not problems for name, (problems, _) in results.items()}
     if not args.record:
-        ok, detail = recordings_row(names)
-        checks["recordings"] = (ok, detail)
+        ok, detail = recordings_row()
+        checks["recordings"] = ok
         print(f"recordings {'ok' if ok else 'FAIL'} — {detail}", flush=True)
-    passed = sum(1 for ok, _ in checks.values() if ok)
+    passed = sum(1 for ok in checks.values() if ok)
     print(f"{passed}/{len(checks)}", flush=True)
-    if MUTANT == SWITCH:
-        named = ["row:" + row["id"] for row in ALLOWED if declared(row, names)]
-        return verdict(SWITCH, named, checks)
     if args.record:
         if passed != len(checks):
-            print("record: refused — a check of this run failed, so nothing was written",
+            print("record: refused — a case of this run failed, so nothing was written",
                   flush=True)
             return 2
-        record(names, {name: seen for name, (_, _, seen) in results.items()})
+        record(names, {name: seen for name, (_, seen) in results.items()})
     return 0 if passed == len(checks) else 1
 
 
 def verdict(name, named, checks):
-    survived = [check for check in named if checks.get(check, (True, ""))[0]]
+    survived = [check for check in named if checks.get(check, True)]
     if survived:
         print(f"mutant {name}: SURVIVED — {', '.join(survived)} passed", flush=True)
         return 0
@@ -1704,95 +1263,61 @@ def verdict(name, named, checks):
     return 1
 
 
-def drop(args, names, row_id):
-    """Without one row: exactly its declared cases FAIL."""
-    row = next(r for r in ALLOWED if r["id"] == row_id)
-    want = sorted(declared(row, names))
-    if not want:
-        print(f"drop {row_id}: the control could not be performed — none of its cases is in "
-              f"this run", flush=True)
-        return 2
-    bun, swift = build_both(args)
-    if bun is None or swift is None:
-        print(f"drop {row_id}: the control could not be performed — a helper did not build",
-              flush=True)
-        return 2
-    rows = [r for r in ALLOWED if r["id"] != row_id]
-    ctx = Context()
-    try:
-        results = drive(names, bun, swift, rows, ctx, held=False)
-    finally:
-        ctx.stop()
-    failed = sorted(name for name, (problems, _, _) in results.items() if problems)
-    if failed == want:
-        print(f"drop {row_id}: caught — exactly {', '.join(want)} failed", flush=True)
-        return 1
-    print(f"drop {row_id}: SURVIVED — failed {failed}, its cases {want}", flush=True)
-    return 0
-
-
-def rows_needed(args, names):
-    """One run, then the comparison again without each row: every row's own cases FAIL and no
-    other. Exit 0 when that holds for every row."""
-    bun, swift = build_both(args)
-    if bun is None or swift is None:
-        return 1
-    ctx = Context()
-    try:
-        results = drive(names, bun, swift, ALLOWED, ctx, held=False)
-        base = sorted(name for name, (problems, _, _) in results.items() if problems)
-        good = not base
-        if base:
-            print(f"with every row, FAIL already: {base}", flush=True)
-        for row in ALLOWED:
-            want = sorted(declared(row, names))
-            again = recompare(names, [r for r in ALLOWED if r is not row], ctx)
-            failed = sorted(name for name, (problems, _, _) in again.items() if problems)
-            ok = failed == want
-            good &= ok
-            print(f"row {row['id']} {'needed' if ok else 'FAIL'} — without it {len(failed)} "
-                  f"FAIL: {', '.join(failed) or 'none'}" + ("" if ok else f"; its cases {want}"),
-                  flush=True)
-    finally:
-        ctx.stop()
-    return 0 if good else 1
-
-
 def mutant(args, name):
     """A SWIFT_MUTANTS edit built on the persistent mutant tree, then the named cases."""
     file, anchor, replacement, named = SWIFT_MUTANTS[name]
-    bun = Path(args.bun).resolve() if args.bun else None
-    if bun is None:
-        bun, why = build_bun()
-        print(f"B0 {'ok' if bun else 'FAIL'} — the Bun helper: {why}", flush=True)
     swift, why = agent_helper_build.mutant(name, [(file, anchor, replacement)],
                                            WORK / "mutant" / name / "framejob-agent")
     print(f"B1 {'ok' if swift else 'FAIL'} — the mutated Swift helper: {why}", flush=True)
-    if bun is None or swift is None:
-        print(f"mutant {name}: the control could not be performed — a helper did not build",
+    if swift is None:
+        print(f"mutant {name}: the control could not be performed — the helper did not build",
               flush=True)
         return 2
     ctx = Context()
     try:
-        results = drive(ordered(named), bun, swift, ALLOWED, ctx)
+        results = drive(ordered(named), swift, ctx)
     finally:
         ctx.stop()
-    checks = {case: (not results[case][0], "") for case in named}
-    return verdict(name, named, checks)
+    return verdict(name, named, {case: not results[case][0] for case in named})
+
+
+def control(args, name):
+    """One case on the tree's helper, its run or its recording altered: it FAILs or passes as
+    the control says."""
+    case, how, fails = CONTROLS[name]
+    if read_recording(case) is None:
+        print(f"control {name}: could not be performed — {case} has no recording", flush=True)
+        return 2
+    swift = built(args)
+    if swift is None:
+        print(f"control {name}: could not be performed — the helper did not build", flush=True)
+        return 2
+    ctx = Context()
+    try:
+        try:
+            results = drive(ordered([case]), swift, ctx, alter=(case, how))
+        except (KeyError, IndexError, TypeError, AttributeError, ValueError) as error:
+            print(f"control {name}: could not be performed — {error!r}", flush=True)
+            return 2
+    finally:
+        ctx.stop()
+    problems = results[case][0]
+    held = bool(problems) == fails
+    said = (f"{case} FAILed: {problems[0]}" if problems else f"{case} passed")
+    print(f"control {name}: {'held' if held else 'NOT held'} — {what(how)}; {said}",
+          flush=True)
+    return 0 if held else 1
 
 
 def main():
-    global MUTANT
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--cases", help="a comma-separated subset of the cases")
-    parser.add_argument("--bun", help="a built Bun helper, in place of B0")
     parser.add_argument("--swift", help="a built Swift helper, in place of B1")
     parser.add_argument("--list", action="store_true")
-    parser.add_argument("--drop", choices=[row["id"] for row in ALLOWED])
-    parser.add_argument("--rows-needed", action="store_true")
-    parser.add_argument("--mutant", choices=sorted(SWIFT_MUTANTS) + [SWITCH])
+    parser.add_argument("--mutant", choices=sorted(SWIFT_MUTANTS))
+    parser.add_argument("--control", choices=sorted(CONTROLS))
     parser.add_argument("--record", action="store_true",
-                        help="rewrite the recordings from this run's Swift side (spec §11 SA-13)")
+                        help="rewrite the recordings from this run (spec §11 SA-13)")
     args = parser.parse_args()
     if args.list:
         listing()
@@ -1801,19 +1326,15 @@ def main():
     unknown = [n for n in (args.cases or "").split(",") if n and n not in CASES]
     if unknown:
         parser.error(f"no case {', '.join(unknown)}")
-    names = ordered(args.cases.split(",") if args.cases else list(CASES))
-    if args.record and (args.mutant or args.drop or args.rows_needed):
-        print("record: refused — a recording is written only from a plain run of the tree's "
-              "helper, never with --mutant, --drop or --rows-needed", flush=True)
+    if args.record and (args.mutant or args.control):
+        print("record: refused — a recording is written only from a plain run, never with "
+              "--mutant or --control", flush=True)
         return 2
-    if args.drop:
-        return drop(args, names, args.drop)
-    if args.rows_needed:
-        return rows_needed(args, names)
-    if args.mutant and args.mutant != SWITCH:
+    if args.mutant:
         return mutant(args, args.mutant)
-    MUTANT = args.mutant
-    return plain(args, names)
+    if args.control:
+        return control(args, args.control)
+    return plain(args, ordered(args.cases.split(",") if args.cases else list(CASES)))
 
 
 if __name__ == "__main__":

@@ -6,8 +6,8 @@ import Foundation
 /// The tool list and the system prompt are built once per configure and reused as
 /// the same `RawJSON` on every round, so the cached prefix (tools, system, history)
 /// is the same bytes on every request of a conversation and in every process. The
-/// body's keys are in agent/src/main.ts's order, with the system block's own cache
-/// breakpoint (spec §11 SA-5), which the request-body tests pin.
+/// body's keys are in spec §11 SA-5's order, with the system block's own cache
+/// breakpoint, which the request-body tests pin.
 public struct Request: Sendable {
     /// Thinking counts toward this as well as the reply.
     public static let maxTokens = 32_000

@@ -67,7 +67,7 @@ extension AgentSession {
                 rounds += 1
                 let reply = try await stream(turn.setup.request.round(messages: history.messages, settings: turn.settings), turn)
                 last = reply
-                // Per response, in protocol.ts's order: done, its price, the context, any clearing.
+                // Per response, in SA-6's order: done, its price, the context, any clearing.
                 emit(.messageDone(stopReason: reply.message["stop_reason"] ?? .null, usage: reply.message["usage"]))
                 emitCost(reply.message, turn, partial: false)
                 contextUsed = ContextUsage.used(by: reply.message)

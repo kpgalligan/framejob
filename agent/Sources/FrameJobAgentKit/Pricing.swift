@@ -3,8 +3,8 @@ import Foundation
 
 // What one Messages API response cost, from its own `usage` and `model` and a price table of
 // LiteLLM's Anthropic rows in US dollars per million tokens (agent/prices/anthropic.json; spec
-// §11 P-2, SA-3). agent/src/pricing.ts's `price`, step for step, and tools/proof/prices.py's
-// second reading of it: both answer agent/prices/cases.json. Pure: no I/O, and `price` never
+// §11 P-2, SA-3). tools/proof/prices.py is its second reading, step for step, and both answer
+// agent/prices/cases.json. Pure: no I/O, and `price` never
 // throws and never answers NaN, whatever JSON value `usage` is. A model the table does not hold,
 // and usage the table cannot price (fast mode, a batch or priority tier, a US-only request, a
 // malformed count, a class whose rate the row lacks), answers `unknown` with its cause, never $0.
@@ -16,7 +16,7 @@ import Foundation
 //
 // Numbers are doubles throughout, as JavaScript's are: a count is any finite, whole,
 // non-negative JSON number (`1.0` and `1e3` are counts), and a class's cost is added in
-// `classes`' order, so the sums round as the TypeScript's and the Python's do.
+// `classes`' order, so the sums round as the Python's do (and the TypeScript's did).
 
 /// A price table as read from JSON: the object `PriceTables.parse` accepted, kept as it came.
 public struct PriceTable: Sendable, Equatable {
@@ -38,7 +38,7 @@ public enum Price: Sendable, Equatable {
     /// `cause` is one of model, rate, usage, speed, service_tier, inference_geo.
     case unknown(cause: String, detail: String)
 
-    /// `{kind, dollars, rows}` or `{kind, cause, detail}`, pricing.ts's shapes.
+    /// `{kind, dollars, rows}` or `{kind, cause, detail}`, the protocol's `cost` shapes.
     public var json: RawJSON {
         switch self {
         case .dollars(let dollars, let rows):

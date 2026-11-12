@@ -1,11 +1,11 @@
 import Anthropic
 import Foundation
 
-// The price table's daily refresh (spec §11 P-1, P-5, SA-3): priceTable.ts's `refreshPrices`,
-// on URLSession, with the same URL, user-agent, 30 s timeout, feed rule and write: the cache's
-// missing folders made 0700, the table written to `<cache>.tmp-<pid>` and renamed over the cache
-// as the last step. A cache file either helper wrote is read by the other: the JSON is the same
-// table, written compact here and indented by the TypeScript.
+// The price table's daily refresh (spec §11 P-1, P-5, SA-3), on URLSession, with the URL,
+// user-agent, 30 s timeout, feed rule and write the TypeScript helper's `refreshPrices` had: the
+// cache's missing folders made 0700, the table written to `<cache>.tmp-<pid>` and renamed over
+// the cache as the last step. The JSON is written compact here; a cache the TypeScript helper
+// wrote, indented, holds the same table and is read too (PriceTableTests).
 
 extension PriceTables {
     /// A fresh table from the feed, written to the cache as the last step; on any failure,

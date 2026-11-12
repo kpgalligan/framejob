@@ -33,8 +33,8 @@ nothing but paths and booleans is ever printed.
 
 **The tree is never touched.** Everything happens in a COPY at
 `tools/proof/work/makefile-env/tree`, made by `tree_copy.make_copy`: `app/`
-and `agent/` (without `node_modules`, the Bun helper's install, which no build
-step reads since SA3) are COPIED, the helper's SwiftPM scratch path
+and `agent/` (without `node_modules`, which a checkout may still hold from the
+deleted Bun helper and no build step reads, spec §11 SA-11) are COPIED, the helper's SwiftPM scratch path
 `build/agent-swift` is a CLONE of the tree's (`cp -cRp`, spec §11 SA-8: the
 helper step's stamp serves it while the copy's `agent/` is the tree's), and every
 other build input `project.yml` names is a SYMLINK to the tree's (`core`

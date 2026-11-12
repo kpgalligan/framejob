@@ -83,7 +83,7 @@ final class ProtocolTests: XCTestCase {
     }
 
     func testEventBytesAreTheContractsBytes() {
-        // Compact JSON, `type` first, then the fields in protocol.ts's order.
+        // Compact JSON, `type` first, then the fields in the contract's order (spec §11 SA-6).
         XCTAssertEqual(String(decoding: HelperEvent.contextUsage(used: 5, limit: nil).line, as: UTF8.self),
                        "{\"type\":\"context_usage\",\"used\":5,\"limit\":null}\n")
         XCTAssertEqual(HelperEvent.toolRequest(callID: "3", name: "render_frame", argumentsJSON: "{}").json.serializedString,
@@ -96,7 +96,7 @@ final class ProtocolTests: XCTestCase {
                        #"{"type":"message_done","stop_reason":"tool_use","usage":{"output_tokens":5}}"#)
         XCTAssertEqual(HelperEvent.prices(PriceSource(kind: .bundled, asOf: "d", problem: "p")).json.serializedString,
                        #"{"type":"prices","source":{"kind":"bundled","as_of":"d","problem":"p"}}"#)
-        // `partial` only when true, after `prices`; `cost` is pricing.ts's shape.
+        // `partial` only when true, after `prices`; `cost` is the protocol's shape.
         let cost = HelperEvent.cost(model: "m", usage: ["input_tokens": 1], cost: .dollars(0.5, rows: ["m"]),
                                     prices: PriceSource(kind: .fetched, asOf: "t"), partial: true)
         XCTAssertEqual(cost.json.serializedString,

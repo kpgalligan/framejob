@@ -11,7 +11,7 @@ A3 (spec §11 AI-7, AI-9, AI-15).
           `none`/`null` literal to double quotes and the no-scope word to the
           live context block's; F8 holds each ask-first row's reason to a
           write (#158). `--probe` runs these alone:
-          no app, no bun — the line `make test` runs.
+          no app — the line `make test` runs.
 Launch S (the built app `proof_app` picks, a scratch socket, a dummy
 `-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in):
   S0  no `Frame Job: ` line

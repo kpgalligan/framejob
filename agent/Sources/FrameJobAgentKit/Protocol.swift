@@ -3,7 +3,7 @@ import Foundation
 
 // The stdio protocol between the app (AssistantSession) and this helper: one JSON object per
 // line in each direction. The name "tool_result" is used both ways, with different shapes. Spec
-// §7.9b and agent/src/protocol.ts hold the contract; spec §11 SA-6 says what changed with Swift.
+// §7.9b and this file hold the contract; spec §11 SA-6 says what changed from the TypeScript.
 
 /// The Assistant tab's Chat Settings that shape requests (spec §11 AI-20).
 public struct ChatSettings: Sendable, Equatable {
@@ -223,7 +223,7 @@ public enum HelperEvent: Sendable, Equatable {
     case cost(model: RawJSON?, usage: RawJSON?, cost: Price, prices: PriceSource, partial: Bool)
     case turnFinished
 
-    /// The event's JSON, its keys in protocol.ts's order: `type` first, then the fields.
+    /// The event's JSON, its keys in the contract's order (SA-6): `type` first, then the fields.
     public var json: RawJSON {
         switch self {
         case .ready: return ["type": "ready"]

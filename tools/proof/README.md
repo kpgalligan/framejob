@@ -1717,10 +1717,11 @@ bridging header or staticlib, now gets both (one line for every build).
 caches) and the closed spikes (`*_spike/`, `recording_spike.py`). A swiftc
 line that compiles no app source also stays: `phase8_proof.py`'s extracted
 `PreviewQuality.swift` and `v2_snapshot.py`'s `v2_cover`. Since codec-export C0
-the four closed spikes that compile `app/Sources` on their own line
-(`assistant_spike.py`, `capture_spike.py`, `words_spike/text_rows.py`,
-`speed_spike.py`) append `swift_build.codec_args()`, and `speed_spike.py`'s
-mtime check counts the two archives.
+the three closed spikes that compile `app/Sources` on their own line
+(`capture_spike.py`, `words_spike/text_rows.py`, `speed_spike.py`) append
+`swift_build.codec_args()`, and `speed_spike.py`'s mtime check counts the two
+archives (a fourth, road map 12's `assistant_spike.py`, was retired by road map
+"swift-helper" SA4, spec §11 SA-11).
 
 **The selftest** (`--selftest`, a line of `make test`), over a scratch cache
 in `work/swift-build-selftest/`: K0 (CONTROL) the same inputs give the same
@@ -1918,15 +1919,16 @@ seal) and the rest of dist_check still run only there.
 **Skip and stamp.** A step's hash is sha256 over the content of its own
 files among `git ls-files -co --exclude-standard` and a tool fingerprint
 (the output of `xcrun swiftc --version`, `xcodebuild -version`, `xcrun
---show-sdk-path`, `rustc -Vv`, `cargo clippy -V`, `bun --version`,
-`xcodegen --version`, `cargo fmt --version` and `cmake --version`).
+--show-sdk-path`, `rustc -Vv`, `cargo clippy -V`, `xcodegen --version`,
+`cargo fmt --version` and `cmake --version`; road map "swift-helper" SA4 took
+the helper's old build tool out, spec §11 SA-11).
 `gate.py` and the `Makefile` are in every step's files. `typecheck`:
-`app/Sources`, `app/Bridging`, `core/include`, `agent`, `tools/codecs`. `fmt`,
+`app/Sources`, `app/Bridging`, `core/include`, `tools/codecs` (`make
+typecheck` reads nothing in `agent` since SA4). `fmt`,
 `lint`: `core`, `graphic`, `mcp-proxy`. `test`: everything but `archive/`. `app`:
-`app`, `agent`, `core`, `graphic`, `mcp-proxy`, `tools/codecs`,
+`app`, `agent`, `core`, `graphic`, `mcp-proxy`, `tools/agent`, `tools/codecs`,
 `tools/licenses` (the acknowledgements' generator and its vendored texts, spec
-§11 PUB-10; Bun's licence is vendored as `LICENSE.txt` because a `*.md` there
-would not count), `project.yml`, `VERSION`,
+§11 PUB-10; a `*.md` there does not count), `project.yml`, `VERSION`,
 `docs/graphics-api.md`, `docs/graphics-api.d.ts` and
 `tools/proof/dist_check.py`. A `*.md` counts only under `designs/spec/` and
 `docs/`, and as the root `README.md`, which the spelling scan reads (#556)
@@ -2014,7 +2016,7 @@ whose file is implicit in its applier has a row in `HINTS`, read off that applie
 (anchor, replacement, …), `anchor` (anchor, …) or `pairs` ([(anchor, replacement) or (anchor,
 replacement, file), …], …). A file is a path from the repo root, a `Path`, or a bare name found
 under exactly one of `app/Sources`, the shaders, the bridging folder, a crate's `src` or root,
-`agent/src` or `tools/proof`. The same mutant name with the same anchor in the same file in a
+`agent` or `tools/proof`. The same mutant name with the same anchor in the same file in a
 second table is a copy, counted once under the first table in path and source order.
 
 **The count.** Each anchor occurs exactly once in its file. A table in `EVERY` has an applier
@@ -5389,8 +5391,9 @@ Anthropic key, and B42 the sweep row). It builds a tree COPY at
 `project.yml` and `Makefile` are copied; every other build input
 `project.yml` names is a SYMLINK to the tree's (`core` already built, so the
 copy links the tree's staticlib); and `agent/` is COPIED without
-`node_modules`, because the helper's build step runs `bun install` and
-`bun build`, which write into it, and a copy keeps bun out of the tree. It
+`node_modules` (at B42 the helper's build step ran `bun install` there; since
+road map "swift-helper" SA3 it builds with SwiftPM on a clone of the tree's
+`build/agent-swift`, and SA4 deleted the Bun helper, spec §11 SA-8, SA-11). It
 runs `make app` inside the copy with both keys POPPED and a dummy in each
 place, `RCDUMMY-makefile-env-proof-5d1c` for `RC_ASSEMBLYAI_KEY` and
 `RCDUMMY-makefile-env-proof-anthropic-9b3e` for `ANTHROPIC_API_KEY`. Then it
@@ -7946,38 +7949,17 @@ shows Picture's rows); `UISnapshot.openWindow(.recorder)` answering
 `RecorderPanelController.shared.window` fails R1 alone (the capture is taken
 instead of refused).
 
-## Road map 12's A0 — the assistant spike (`assistant_spike/`, `anthropic_fake.py`)
-
-The spike behind A1's plumbing: Rasterize's Bun helper (`agent/`, renamed
-`framejob-agent`) built, placed in `Contents/Helpers` and signed by Rasterize's
-own build step, in a COPY of the tree under `work/assistant_spike/tree/`
-(`tree_copy.make_copy` with `agent=False`, the copy's own agent step removed
-from its `project.yml` before Rasterize's is spliced in) with a hook (`AssistantSpikeHook.swift`) that exists only there. It answers
-whether the helper launches from a Release and a Distribution bundle under
-the hardened runtime and needs its one entitlement (B, H), how big the
-catalog is and whether it wants tool search (C), whether a stand-in Messages
-server scripts a whole turn — a `tool_use`, the tool's result, then text —
-against the built app (F, T), whether `export` replaces an existing file
-(E), and what an agent edit does to a timeline drag in progress (D, a probe
-built from `app/Sources`). 32 scored rows, a digest. Its README has the rows,
-the copy, the run order and the output; the answers are in
-`archive/roadmap-12.md` §7 (condensed in
-`designs/adr/roadmap-12-assistant.md`). `anthropic_fake.py` is the stand-in, at
-the top level because A1 reuses it: `port <n>` first, a scripted reply per
-`POST /v1/messages` (SSE when the body asks to stream), and R6-9(e)'s
-credential rule — only `proof-key` and `wrong-key` are ever logged.
-`ANTHROPIC_API_KEY` is popped from every child's environment; with it
-present, C3 counts the catalog through `count_tokens` and L1 searches every
-file the spike and the builds wrote for it, and without it C3 estimates and
-L1 skips as `host: no key`.
-
-```sh
-python3 tools/proof/assistant_spike/assistant_spike.py [--only B,H,C,F,T,E,D,L] [--rasterize ~/devel/rasterize]
-```
-
 ## Road map 12's A1 — the agent lane (`assistant_lane_proof.py`, `assistant_lane_probe.swift`)
 
-A line of `make test` (spec §11 AI-3's "`make test`-reachable
+**The stand-in, `anthropic_fake.py`.** It came with road map 12's A0 spike, which
+road map "swift-helper" SA4 retired with its folder (spec §11 SA-11; the spike's
+answers are in `designs/adr/roadmap-12-assistant.md`), and it stays at the top
+level because every assistant proof since A1, and `agent_helper_drive.py`, reuses
+it: `port <n>` first, a scripted reply per `POST /v1/messages` (SSE when the body
+asks to stream), and R6-9(e)'s credential rule — only `proof-key` and `wrong-key`
+are ever logged.
+
+`assistant_lane_proof.py` is a line of `make test` (spec §11 AI-3's "`make test`-reachable
 probe"). It launches no app instance, reads no key and uses no media: every
 child gets the environment without `RC_ASSEMBLYAI_KEY` and
 `ANTHROPIC_API_KEY`. The probe is compiled AS `main.swift` over every file in
@@ -8498,7 +8480,7 @@ text clip "Welcome", two shapes, an action on the text clip, a marker, a
   (F1), the timescale's digits → 60000 (F2), the first topic's last tool
   dropped (F4), `system + " record_screen"` (F1).
 
-`--probe` runs these alone (no app, no bun): it is a line of
+`--probe` runs these alone (no app): it is a line of
 `make test`.
 
 **Launch S** (Release, a scratch socket, `proof-key` in a
@@ -8757,7 +8739,8 @@ file beside the table and `os.replace`s it. It prints `commit <sha> <date>`,
 failure is `error: …` on stderr, exit 1, and the file's bytes untouched.
 
 `tools/proof/prices.py` is the proofs' reader (importable: `load`,
-`match_model`, `price`); `agent/src/pricing.ts` is the helper's. Both answer
+`match_model`, `price`); the helper's is its `Pricing.swift` (the TypeScript
+`pricing.ts` until road map "swift-helper" SA3, spec §11 SA-3). Both answer
 `agent/prices/cases.json`, the hand-checked cases over a pinned fixture
 table, and never re-derive a rate. A model matches by exact id, or by the id
 less a trailing `-YYYYMMDD` when that is a key; nothing else is stripped.
@@ -8827,7 +8810,8 @@ Fable 5.1' row", each 2/3, exit 1.
 
 ## Road map 13's P2 — the helper prices every response (`spend_proof.py`, `spend_probe.swift`; `prices_proof.py` R)
 
-The helper keeps the price table in force (`agent/src/priceTable.ts`): the
+The helper keeps the price table in force (its `PriceTable.swift` and
+`PriceRefresh.swift` since road map "swift-helper" SA3, spec §11 SA-3): the
 bundled `anthropic.json`, or the cache `configure`'s `price_cache` names,
 refreshed at most once a day from LiteLLM's raw `main` file (or
 `price_feed`). It emits `prices` once per `configure` and a `cost` for every
@@ -8840,8 +8824,9 @@ folder and ends each turn's transcript with the cost line
 `agent/prices/reduce_cases.json`'s `litellm` block answers exactly its
 `models` — the opus and fable rows, an `_above_200k_tokens` row, a row with
 no `…_above_1hr`, a bedrock row dropped and batch fields dropped. The
-helper's `reduceLiteLLM` answers the same fixture in `bun test`
-(`reduce:` tests). `--mutant reduce-disagrees` raises the expected opus
+helper's `reduceLiteLLM` answers the same fixture in `PriceTableTests`
+(`make agent-test`; the TypeScript helper's `reduce:` tests until road map
+"swift-helper" SA3). `--mutant reduce-disagrees` raises the expected opus
 input by 1: R FAILs, exit 1.
 
 **`spend_proof.py`** — no network: the API is `anthropic_fake.py`, the feed
@@ -9273,6 +9258,7 @@ mutants (`work/cloudproof/mutants/<name>`) and graphics' `frame-plus-one`
 (`work/graphics/mutant`), the last two now built by the copy's own
 `make app` (whose `unexport` keeps both keys out of the copy's build
 database) instead of xcodegen and xcodebuild; and the assistant spike's
+(retired by road map "swift-helper" SA4, spec §11 SA-11)
 `make_tree` (`agent=False`), which removes the copy's own `Build Agent
 Helper` item from its `project.yml` before splicing Rasterize's in (B3's
 anchors "project.yml's own Build Agent Helper item" and "one Build Agent
@@ -32958,6 +32944,10 @@ shape agrees with the bodies the relay measured. No paid run was made.
 
 ## Road map "swift-helper" SA2 — the two helpers, driven (`agent_helper_drive.py`; sixteen allowed rows; eight mutants and `drive-same-helper`; spec §11 SA-4, SA-5, SA-6)
 
+**This section is SA2's record.** The comparison it describes ran until road map "swift-helper"
+SA4, which wrote the recordings from its last passing run and deleted the Bun side; the drive as
+it is now is the section "Road map "swift-helper" SA4" below (spec §11 SA-13).
+
 The Bun helper the app still ships and the Swift helper of `agent/Package.swift` that replaces it
 at SA3, each run as the app runs it, over the same scripted conversations on the stand-in API
 (`anthropic_fake.py`); their events and their requests are compared, and any difference outside
@@ -33070,10 +33060,11 @@ list; `system-loses-guide` (`text`, `tools`), `not-run-reworded` (`cut-reply-too
 and `empty-summary` rows no wider than their decisions. `--mutant drive-same-helper` runs the
 Swift helper on both sides: every row must allow nothing.
 
-**When SA3 and SA4 land.** SA3 pointed B1 at the release helper and built the mutants with
-SA-8's builder (above; its section below); SA4 deletes the Bun side (`--bun`, `ALLOWED`,
-`--drop`, `--rows-needed`, `drive-same-helper`) and keeps the cases with their expectations as
-the Swift helper's drive.
+**When SA3 and SA4 landed.** SA3 pointed B1 at the release helper and built the mutants with
+SA-8's builder (above; its section below). SA4 first ran this comparison once more with
+`--record`, 43/43, writing each case's recording from its Swift side; then it deleted the Bun side
+(B0, `--bun`, `ALLOWED`, `--drop`, `--rows-needed`, `drive-same-helper`) and kept the cases with
+their expectations, each now held to its recording (its section below).
 
 Run on 2026-11-12 in a worktree of 8bee8a56, other lanes building (load averages as `uptime`
 printed them):
@@ -33173,3 +33164,97 @@ printed them; none of these is an idle figure):
 | `make dist`, then `dist_check_mutants.py` | `make dist` 266.59 s: `dist_check: 47/47` (D10/D11 `holds no entitlements`, D42/D43 `109 entries, 95 crates, slaude 4c6c2ca4, 9 fonts`), `published_check: 27/27`; the Distribution build's helper step `skipped` on the same stamp; `dist_check_mutants: 39/39` in 71.08 s: `extra-entitlement-*` D10 / D11, `no-runtime-*` D8 / D9, `marker-*` D12 / D13, `acknowledgements-slaude-dropped-release` D42, `acknowledgements-bun-listed-dist` D43 |
 | `mutant_anchors.py` | PASS: `agent_build_proof.py MUTANTS: 6 mutants, 6 anchors read`, `spend_proof.py HELPER_MUTANTS: 3 mutants, 3 anchors read`, the drive's eight |
 | `make gate` | PASS 395 s (load 14.34 28.38 29.26 → 28.59 44.16 37.40): names 2 s, typecheck 10 s (its four warnings), fmt 4 s, lint 19 s, test 350 s (B1 `399,414 bytes`, `agent_build_proof.py` 10/10, `prices_proof.py` 27/27, `Executed 77 tests, with 0 failures`, the drive 43/43, `budget_proof.py` 24/24), app 8 s (the helper step `skipped`; D25, D26 ok) |
+
+## Road map "swift-helper" SA4 — the deletion, and the drive held to its recordings (`agent_helper_drive.py`, `agent_helper_recorded/`; eight mutants, six controls; spec §11 SA-11, SA-13)
+
+SA4 deleted the Bun helper (`agent/src/`, `package.json`, `bun.lock`, `tsconfig.json`,
+`entitlements.plist`, `build.sh`), `make typecheck`'s tsc, `gate.py`'s `bun --version` and road map
+12's A0 spike, `assistant_spike/` (spec §11 SA-11). The drive SA2 built (its section above) lost
+its Bun side and kept its 27 cases, each now held to a committed recording of the Swift helper
+(SA-13). In `make test`, straight after `make agent-test`. Loopback only, the dummy keys
+`proof-key` and `wrong-key`, nothing paid.
+
+```
+python3 tools/proof/agent_helper_drive.py                     # B1, the 27 cases, `recordings` (make test): 28/28
+python3 tools/proof/agent_helper_drive.py --cases text,tools  # a subset (and the case each needs), and `recordings`
+python3 tools/proof/agent_helper_drive.py --swift PATH        # a built helper in place of B1
+python3 tools/proof/agent_helper_drive.py --list              # the cases, the mutants, the controls
+python3 tools/proof/agent_helper_drive.py --mutant NAME       # a SWIFT_MUTANTS edit on the mutant tree (exit 1 caught)
+python3 tools/proof/agent_helper_drive.py --control NAME      # one case, its run or its recording altered (exit 0 held)
+python3 tools/proof/agent_helper_drive.py --record            # rewrite the recordings (never in make test)
+```
+
+**B1** is the release helper the app bundles (`agent_helper_build.release`, spec §11 SA-8), seconds
+while its stamp matches. Each case runs it as `AssistantSession` does, as SA2's section says.
+
+**A case** checks its `expect` first (event types, POSTs and requests, the stand-in's failures,
+the feed's GETs), then its recording, `agent_helper_recorded/<case>.json`: the event stream line
+for line, every request's method, path, body (parsed JSON with its key order at every level),
+headers and byte count, and the cache files the case names (their table and their bytes);
+numbers by value, so `1e-07` is `1e-7`. A request's first difference is named body first, then
+headers. A case with no recording FAILs, and the `recordings` row FAILs a recording with no case.
+
+**The three comparison rules**, the same placeholders put in the run and in the recording, and
+nothing else:
+- a fetched or cached table's `as_of` and a cache file's `fetched_at` must be an instant inside
+  the run, then `<clock>`;
+- a cache file's `source` must be this run's feed (its port is chosen per run), then `<feed>`;
+- `host`, `accept-language`, `accept-encoding`, `connection`, `x-stainless-arch`,
+  `x-stainless-os` and `x-stainless-runtime-version` (BY_PRESENCE: the stand-in's port,
+  URLSession, the OS, the toolchain) are held by presence, as `<by presence>`; a request's headers
+  are a set, written sorted. Every other header is held by value, `user-agent`,
+  `anthropic-version`, `authorization`, `anthropic-beta`, `content-length` and
+  `x-stainless-timeout` (#614's `NOT_GIVEN`) among them.
+
+The words after "Bad message from the app: " for a line that is not JSON are Slaude's parser's
+(`key must be a string at line 1 column 2`), so they are held by value with no rule.
+
+**`--record`** writes the recordings of the cases it runs, in that form, `json.dumps(indent=1)`,
+and prints each `new`, `same` or `changed: <the paths that moved>`. It refuses, writing nothing
+and exiting 2, with `--mutant` or `--control`, or when any case of the run fails a check other
+than its recording. Spec §11 SA-13 names the two re-records that need no new decision: `make
+prices` (only `cost`'s `dollars` and the bundled table's `as_of` may move) and a Slaude re-pin
+(only `user-agent`, the `x-stainless-*` held by value and the parser's words); any other change
+lands with its own SA- entry, the recordings' diff showing it.
+
+**Mutants** (`SWIFT_MUTANTS`, unchanged since SA3 and counted by `mutant_anchors.py`): each built by
+`agent_helper_build.mutant` on `build/agent-swift-mutant/`; caught only when every case it names
+FAILs. Five change only a request body, which only the recordings hold: `tool-results-reversed`,
+`no-defer-loading`, `summary-keeps-clearing`, `system-loses-guide`, `not-run-reworded`;
+`cost-before-done`, `two-retries` and `empty-summary-swapped` move the expectations too.
+
+**Controls** (`CONTROLS`; their names stay out of every identifier holding `MUTANT`):
+
+| Control | Case | Altered | Must |
+|---|---|---|---|
+| `recorded-event-field` | `text` | the recording's first `cost` at twice the dollars | FAIL |
+| `recorded-header` | `text` | the recording's POST with `anthropic-version: 2023-06-01` | FAIL |
+| `recorded-key-order` | `text` | the recording's POST body, its top-level keys reversed | FAIL |
+| `recorded-host-header-missing` | `text` | the recording's first request without `host` | FAIL |
+| `recorded-host-header-value` | `text` | the run's first request with other `host`, `accept-language` and `x-stainless-runtime-version`, its headers reversed | pass |
+| `feed-elsewhere` | `prices-fetched` | the run's cache file naming another feed | FAIL |
+
+**The bridge.** Before the deletion, the two-helper drive ran with `--record` (43/43: the 27
+cases and SA2's sixteen rows), so every recording is the Swift side of a run whose comparison with
+the Bun helper passed; then the plain run, 44/44 with the `recordings` row. `prices-cached` then
+started on the other helper's cache file and now on the one the Swift helper wrote; reading the
+Bun helper's indented cache stays `PriceTableTests`' (`make agent-test`).
+
+Run on 2026-11-12 in a worktree of 3833b404, other lanes building (load averages as `uptime`
+printed them):
+
+| Command | Result |
+|---|---|
+| Two helpers, `--record` (B0 `agent/build.sh helper, 0.629 s`) | 43/43, exit 0, 20.4 s; 27 `new`. The cache file held the feed's port, so the feed rule was added; `--record` again 43/43, 26 `same`, `prices-fetched` `changed: files.prices.json.table.source: 'http://127.0.0.1:53705/litellm.json' / '<feed>'` and its bytes |
+| Two helpers, plain | 44/44, exit 0, 20.0 s |
+| After the deletion, plain (load 29.25 → 49.95) | 28/28, exit 0, 135 s: B1 `emptied, then built: the scratch path was made at …/framejob-int/build/agent-swift, 126.884 s` |
+| `--record` on the same helper | 27/27, 27 `same`, no file changed |
+| `--mutant tool-results-reversed` with the recording comparison skipped by hand (reverted) | `SURVIVED — tools passed`, exit 0 |
+| `--mutant` each of the eight (load 16.55 → 10.58) | exit 1 each, caught in every named case; built in 5.4–6.5 s each; the five body mutants named by body paths, e.g. `body.tools[3]: keys only in recorded ['defer_loading']` |
+| `--control` each of the six | exit 0 each, `held`: five FAIL their case (e.g. `event 6: $.cost.dollars: 0.0012 / 0.0006`), `recorded-host-header-value` passes |
+| `--record --swift <the two-retries mutant> --cases retry`; `--record --mutant two-retries` | `record: refused — a case of this run failed, so nothing was written`, exit 2; refused, exit 2; no recording changed |
+| `text.json` moved aside, `--cases text`; a stray `no-such-case.json`, `--cases handshake` | 0/2, `no recording …` and `recordings FAIL — no recording for text`; 1/2, `recordings FAIL — a recording with no case: no-such-case`; both restored |
+| `gate.py --selftest` with `agent` back in `typecheck`'s inputs, then as committed | `FAIL M1 agent/Sources/FrameJobAgentKit/Turn.swift moves ['app', 'names', 'test', 'typecheck']`; PASS |
+| `make typecheck` with no bun on `PATH` | exit 0, 0 errors, the four baseline warnings |
+| `make gate` | PASS 722 s: names 2 s, typecheck 9 s, fmt 5 s, lint 22 s, test 465 s (the suite `Executed 77 tests, with 0 failures`, the drive 28/28), app 218 s (D25, D26 ok) |
+| `make dist` | 208.6 s: `dist_check: 47/47`, `published_check: 27/27` |

@@ -1,7 +1,6 @@
 /core/target/
 /graphic/target/
 /mcp-proxy/target/
-/agent/node_modules/
 # The Swift helper's package (road map "swift-helper"): SwiftPM's own folders, should it be run
 # without --scratch-path; `make agent-test` builds in build/agent-swift-test. The guard's selftest.
 /agent/.build/

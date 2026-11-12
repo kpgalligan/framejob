@@ -70,7 +70,7 @@ SOURCE = re.compile(r"^[\w+./-]+\.(?:swift|rs|metal|ts|js|mjs|h|m|c|py|toml|yml|
 # Where a bare file name may live. A name found under two of them is ambiguous, never guessed.
 BASES = ("", "app/Sources", "app/Resources/Shaders", "app/Bridging", "app", "core/src",
          "core/include", "core", "graphic/src", "graphic", "mcp-proxy/src", "mcp-proxy",
-         "agent/src", "agent", "tools/proof")
+         "agent", "tools/proof")
 MUTATORS = {"update", "append", "extend", "add", "insert", "setdefault", "pop", "remove",
             "discard", "clear"}
 EXPECTED = {
