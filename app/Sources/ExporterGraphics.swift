@@ -52,8 +52,8 @@ extension Exporter {
         }
     }
 
-    /// Whether the recipe at `t` draws a graphic layer: PR-15's question of a frame the
-    /// generator answered deep, before it is read again with its graphics deep.
+    /// Whether the recipe at `t` draws a graphic layer: PR-20's question, asked by
+    /// `DeepVideoFrame.reads` of a PNG or HEIC frame, which a graphic makes deep (#566).
     static func drawsGraphic(_ project: ReelProject, at t: Ticks, options: RecipeOptions) -> Bool {
         guard let recipe = project.recipe(at: max(0, t), options: options) else { return false }
         return recipe.layers.contains {

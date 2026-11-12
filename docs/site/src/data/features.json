@@ -17245,7 +17245,7 @@
     {
      "id": "export-save-frame-deep",
      "name": "Deep and HDR frames",
-     "summary": "A frame showing a deep still or 10-bit VP9 clip, and any PNG or HEIC from an HDR project, saves as 16-bit PNG or 10-bit HEIC.",
+     "summary": "A frame showing a graphic, a deep still or a 10-bit VP9, HEVC or ProRes clip, and any PNG or HEIC from an HDR project, saves as 16-bit PNG or 10-bit HEIC.",
      "page": "export/save-frame",
      "anchor": "deep-and-hdr-frames",
      "where": "File ▸ Save Frame…"

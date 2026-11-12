@@ -166,8 +166,9 @@ extension AgentServer {
         ).forFrame(format, output: output)
         // Off the main thread by construction — `Exporter.renderFrame` opens
         // asset tracks and decodes, and says so. A PNG or HEIC keeps depth, so
-        // `Exporter` reads a frame showing a deep still or a deep VP9 track
-        // through the reader (spec §11 PR-9, PR-12); Save Frame passes the same.
+        // `Exporter` reads a frame showing a graphic, a deep still or a deep VP9
+        // track through the reader (spec §11 PR-20, PR-9, PR-12); Save Frame
+        // passes the same.
         let rendered = Exporter.renderFrameReported(
             project: project, urls: urls, at: time, maxWidth: maxWidth, options: options,
             graphics: graphics, keepsDepth: format.carriesDepth,

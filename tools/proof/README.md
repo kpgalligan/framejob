@@ -25703,6 +25703,71 @@ lines PR-19 changed, were run again and caught. PR-19 withdrew PR-17's and PR-18
 the measurement of their own mutants on the new coverage, which survived: GM 0.0839 and GMg 0.0836,
 under the bound, with no dither noise.
 
+## Issue #566 — a graphic is a deep source of a saved frame (`raster_dither_proof.py` DG, DGf, DGv, DGo, DGj, DGs; `png_read.py` R1–R5; four mutants; spec §11 PR-20)
+
+**What it proves.** A `render_frame` or Save Frame… as PNG or HEIC of a frame whose recipe draws
+a graphic is read through export's reader and is deep, beside anything, its graphics from the
+16-bit raster; a JPEG, the APNG and GIF frames and every 8-bit path keep their bytes. DG:
+`band374` alone (B3's project, `b3-frame.png`), D1's rule. DGf: `flat` alone, a 16-bit PNG whose
+one-colour gradient rect holds one value within 1/8 level of (51, 102, 153). DGv: `band374` over a
+256×144 8-bit H.264 clip, D1's rule. DGo: a `band374` clip then a flat shape, 16-bit at 0.5 s and
+8-bit at 1.5 s (the recipe at the frame time). DGj: the JPEG of DG's frame equal to the base's.
+DGs, printed: the PNG's bytes and base64 bytes against the Anthropic API's 5 MB image limit, for
+a 1920×1080 cut of the owner's iPhone clip (`media/owner-sync/IMG_0018.MOV`, "no fixture" without
+it) under a title, beside a 16-bit still, and the clip itself, unscaled and at `max_width` 1280.
+Since PR-20 B3, F2 and E1 read their 8-bit frame through an `apng` export of the in/out range
+0.48–0.56 s at 1920×1080 (`APNG_RANGE`), which `renderFrameReported` draws with `keepsDepth`
+false; E1 compares it with the base's `render_frame` PNG of the same frame.
+
+    tools/proof/work/raster-dither-base566-tree: tree_copy.make_base_copy(dest, "d530de3a^"), then make app-debug there
+    RC_PROOF_APP=<that tree's Frame Job Debug.app> python3 tools/proof/raster_dither_proof.py capture tools/proof/work/raster-dither-base566
+    RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py --base tools/proof/work/raster-dither-base566
+    python3 tools/proof/raster_dither_proof.py --app-mutant graphic-not-a-source|graphic-anywhere|graphic-frame-pin-not-marked --base tools/proof/work/raster-dither-base566
+    python3 tools/proof/png_read.py --selftest [--mutant bpp-channels]
+
+The base is the app before PR-15 (as #596's and #597's), captured with this script so it holds the
+APNG frames and DGj's JPEG; it serves E1, D3, D4, G3, GEa–GEd, GMe and DGj. Its own capture
+scored E1 (its APNG frames against its own 8-bit `render_frame` PNGs) and F2 green.
+
+**`png_read.py`** is the proofs' one 8- and 16-bit PNG reader (pure Python; `rgba8` reads a whole
+frame through ffmpeg with the same round-to-nearest, since ffmpeg's own `rgba` conversion of a
+16-bit PNG is not). Its selftest: R1 every sample of 8- and 16-bit PNGs of colour types 0, 2, 4 and
+6 under each filter decoded as encoded; R2 16-bit samples rounded to the nearest level; R3 `upto`;
+R4 interlaced, palette and 4-bit PNGs refused by name; R5 `rgba8` equal to `rows8`. Its mutant
+`bpp-channels` (the 8-bit reader's filter distance) fails R1, R2 and R5. `graphics_proof.py`'s
+pixels and `decode_rgba` and `cu8_proof.py`'s O5 read through it (`graphic_prop_action_proof.py`
+imports `graphics_proof`'s); the other hand PNG decoders in this folder read harness and
+`snapshot_ui` captures or frames with no graphic, and were left as they are.
+
+**Recorded** (2026-11-11). Before the change (Debug at 3cacf181): DG, DGf, DGv and DGo FAIL as
+8-bit PNGs (DG 1,765,486 bytes, its HEIC 8 bits a sample), DGj and E1 pass. With it (Release;
+Debug read the same figures): DG and DGv 781 distinct greens of 801, worst 0.0606 of a level; DG
+2,372,532 bytes, its HEIC 10 bits; DGf (13104, 26208, 39295), worst 0.1012 of a level; DGo 16-bit
+then 8-bit; DGj and E1 equal to the base's; the whole run 30/37, the other seven (B1–B4b, F1, F2)
+needing PR-13's `--control`, which was not made. DGs: the title over the 8-bit cut 1,743,875 bytes
+at 8 bits before, 4,170,643 bytes at 16 bits after (base64 5,560,860, past 5,242,880), 2,918,745
+at `max_width` 1280; the cut beside a 16-bit still base64 6,744,504 and the iPhone clip 9,328,440
+before and after (4,728,408 and 4,994,044 at 1280). `graphics_proof.py` 51/51,
+`graphic_prop_action_proof.py` 20/20, `matte_proof.py` 46/46, `image_cache_proof.py` 6/6,
+`graphics_files_proof.py` 10/10, `paste_graphic_proof.py` 8/8, `cu8_proof.py` 12/12 (O5 failed
+on every row with ffmpeg's `rgba` reading of the 16-bit frame, and reads 44 differing rows, all in
+the bottom half, through `png_read.rgba8`), `derived_proof.py` 13/13, `docs_bugs_c1_proof.py`
+35/35, `debug_release_proof.py` 10/10, `precision_proof.py --only D1,S8,S10,S14,S15,S16,Z1` 7/7,
+`log_proof.py --only L17,L18,Z1` 2/2, `docs_bugs_b3_proof.py --only D1,…,D8,Z1` 9/9.
+
+**Mutants** (each caught, Debug tree copies against the base): `graphic-not-a-source` fails DG,
+DGf, DGv (8-bit PNGs), D5 and D7 (44 distinct greens, worst 0.8918); `graphic-anywhere` (the arm
+asks `Playback.drawsGraphics` of the project) fails DGo, both frames 16-bit;
+`graphic-frame-pin-not-marked` fails DG, D1 and DGv (the 8-bit dithered raster in a 16-bit
+frame). PR-15's `generator-frame-not-deep` and `reread-not-deep` went with the code PR-20 removed;
+`shape-reread-not-marked`'s anchor lost that code's line. Run again and caught: it (G7),
+`sdr-version-marked` (GEb), `frame-matte-not-reread` (GMf) and `always-deep` (E1, through B3's
+APNG frame).
+
+**Not measured here.** How a deep frame looks (`docs/manual-checks.md` GR-17); what the API does
+with an image past its limit (no paid call is made); a graphic inside a nest or as a matte member
+on a saved frame, which take the same recipe test.
+
 ## Codec export C0 — the bundled encoders' link (`codecs_proof.py` L1–L3; `tools/codecs/build_codecs.py --selftest`; spec §11 CX-4, CX-5)
 
 `tools/codecs/build_codecs.py` (`make codecs`, and project.yml's "Build Codecs"

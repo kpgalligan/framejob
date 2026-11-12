@@ -176,6 +176,8 @@ of twelve track layouts; it amends PR-4, PR-9 and PR-12.
   **Amended by PR-14** (docs bugs b3, #488): "any source is deeper" was not what the generator did.
   A 10-bit HEVC or ProRes clip above an 8-bit clip came back 8-bit; such a frame is now re-read
   through export's reader, so it is deep in `render_frame` and Save Frame… (PNG, HEIC).
+  **Amended by PR-20** (#566): a frame whose recipe draws a graphic is read through export's
+  reader too, so it is deep in `render_frame` and Save Frame… (PNG, HEIC), beside anything.
 - **PR-5 — What stays 8-bit, and the frozen references (choice 6).**
   - These stay 8-bit:
     - graphics (G-7's BGRA8);

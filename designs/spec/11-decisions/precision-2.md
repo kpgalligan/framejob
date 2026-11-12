@@ -151,6 +151,7 @@ entries moved here unchanged, and an "above" or "below" in one may now point int
   Everything else here stands.
   **Amended by PR-14** (docs bugs b3, #488): the reader also re-reads a frame the generator answers
   at 8 bits while it shows a 10-bit HEVC or ProRes source.
+  **Amended by PR-20** (#566): the reader also reads a frame whose recipe draws a graphic.
   - Measured in B97 (Release, 2026-10-14, `precision_proof.py` against the control
     `ctl-b97`, captured on the tree before any PR-9 code): S4, `ramp16.png` alone, a 16-bit PNG
     with 1,920 distinct middle-row greens (256 before), its RGB scaled to 8 bits equal to the

@@ -44,8 +44,8 @@ import AppKit
 /// unrelated commands in one line for no gain; both are named in
 /// `app/CLAUDE.md`'s seam list.
 ///
-/// **A frame showing a deep still or a deep VP9 track is saved deep** (spec
-/// §11 PR-9, PR-12): a PNG or HEIC passes `keepsDepth`, the same expression
+/// **A frame showing a graphic, a deep still or a deep VP9 track is saved
+/// deep** (spec §11 PR-20, PR-9, PR-12): a PNG or HEIC passes `keepsDepth`, the same expression
 /// `render_frame` passes (`format.carriesDepth`), and `renderFrame` reads such
 /// a frame through the reader, so the two still write one frame's bytes; a
 /// JPEG never does.

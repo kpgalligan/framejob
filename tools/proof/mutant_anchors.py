@@ -138,6 +138,8 @@ SWITCHES = {
     # `MUTANT` in `verdict` (a hang decided by the timeout alone) and in `memory_fell` (O5
     # passed by any fall).
     "open_documents_proof.py": {"MUTANTS": 2},
+    # `MUTANT` in its own decoder's filter distance (#566).
+    "png_read.py": {"MUTANTS": 1},
     # `main` changes the loaded table or the fetched page in memory, after its one network GET.
     "prices_crosscheck.py": {"MUTANTS": 2},
     # `MUTANT` in its own launch-argument read, input filter and two stale markers.

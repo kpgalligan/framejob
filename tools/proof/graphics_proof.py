@@ -261,7 +261,6 @@ import struct
 import subprocess
 import sys
 import time
-import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -269,6 +268,7 @@ sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import png_read  # noqa: E402
 import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 import swift_build  # noqa: E402
@@ -517,67 +517,11 @@ def render_text(client, project, t, tag):
     return str(text), data, seconds
 
 
-def decode_png(data, upto=None):
-    """`e1_proof.py`'s 8-bit non-interlaced PNG reader, stopping after row
-    `upto` — a pixel near the top needs only the rows above it, which keeps a
-    bounded poll from spending its bound on decoding. (width, channels, rows)."""
-    pos, idat, header = 8, [], None
-    while pos < len(data):
-        length = struct.unpack(">I", data[pos:pos + 4])[0]
-        kind = data[pos + 4:pos + 8]
-        body = data[pos + 8:pos + 8 + length]
-        pos += 12 + length
-        if kind == b"IHDR":
-            header = struct.unpack(">IIBBBBB", body)
-        elif kind == b"IDAT":
-            idat.append(body)
-        elif kind == b"IEND":
-            break
-    width, height, depth, colour, _, _, interlace = header
-    if depth != 8 or interlace != 0:
-        raise RuntimeError("an 8-bit non-interlaced PNG is the only kind read here")
-    channels = {0: 1, 2: 3, 4: 2, 6: 4}[colour]
-    raw = zlib.decompress(b"".join(idat))
-    stride = width * channels
-    bpp = channels
-    out, prev, pos = [], bytearray(stride), 0
-    for _ in range(height if upto is None else min(height, upto + 1)):
-        kind = raw[pos]
-        cur = bytearray(raw[pos + 1:pos + 1 + stride])
-        pos += 1 + stride
-        if kind == 1:
-            for i in range(bpp, stride):
-                cur[i] = (cur[i] + cur[i - bpp]) & 255
-        elif kind == 2:
-            for i in range(stride):
-                cur[i] = (cur[i] + prev[i]) & 255
-        elif kind == 3:
-            for i in range(bpp):
-                cur[i] = (cur[i] + (prev[i] >> 1)) & 255
-            for i in range(bpp, stride):
-                cur[i] = (cur[i] + ((cur[i - bpp] + prev[i]) >> 1)) & 255
-        elif kind == 4:
-            for i in range(bpp):
-                cur[i] = (cur[i] + prev[i]) & 255
-            for i in range(bpp, stride):
-                a, b, c = cur[i - bpp], prev[i], prev[i - bpp]
-                p = a + b - c
-                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
-                pred = a if pa <= pb and pa <= pc else (b if pb <= pc else c)
-                cur[i] = (cur[i] + pred) & 255
-        elif kind != 0:
-            raise RuntimeError(f"unknown PNG filter {kind}")
-        out.append(bytes(cur))
-        prev = cur
-    return width, channels, out
-
-
 def pixel(data, x, y):
-    if data is None:
-        return None
-    _, channels, found = decode_png(data, upto=y)
-    row = found[y]
-    return tuple(row[x * channels:x * channels + 3])
+    """(r, g, b) at (x, y) of a `render_frame` PNG in 8-bit levels: since spec
+    §11 PR-20 a frame showing a graphic is a 16-bit PNG, read by the shared
+    reader (`png_read.py`) and rounded to the nearest level; None for None."""
+    return png_read.pixel8(data, x, y)
 
 
 def poll_pixel(client, project, x, y, want, tag):
@@ -593,18 +537,11 @@ def poll_pixel(client, project, x, y, want, tag):
 
 
 def decode_rgba(path):
-    """A PNG at `path` as (width, height, RGBA bytes) through ffmpeg — the
-    sheets are up to 3848 px wide, too slow for `decode_png`'s loops — or
-    None. Binary output, so not `bounded.run`; bounded all the same."""
-    try:
-        data = Path(path).read_bytes()
-        width, height = struct.unpack(">II", data[16:24])
-        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-f", "rawvideo",
-                              "-pix_fmt", "rgba", "-"], capture_output=True, timeout=120,
-                             env=bounded.child_env()).stdout
-    except (OSError, struct.error, subprocess.TimeoutExpired):
-        return None
-    return (width, height, raw) if len(raw) == width * height * 4 else None
+    """A PNG at `path` as (width, height, RGBA bytes) in 8-bit levels through
+    ffmpeg (`png_read.rgba8`: the sheets are up to 3848 px wide, too slow for
+    the pure decoder's loops; a 16-bit `render_frame` of a graphic, spec §11
+    PR-20, rounded to the nearest level), or None. Bounded."""
+    return png_read.rgba8(path, env=bounded.child_env())
 
 
 def rgb_at(image, x, y):
@@ -834,7 +771,7 @@ def run_f1(client, pf):
         print(f"  F1 measured: no comparison — {FFI_BGRA} absent (run graphics_ffi_probe.py)",
               flush=True)
         return
-    width, channels, found = decode_png(frame)
+    width, channels, found = png_read.rows8(frame)
     bgra = FFI_BGRA.read_bytes()
     mismatched, worst = 0, 0
     for y, row in enumerate(found):

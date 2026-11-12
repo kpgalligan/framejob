@@ -961,10 +961,10 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 
 **GR-17 — A gradient graphic is smooth in a 10-bit or ProRes file, and unchanged in the preview**
 - **Setup:** A 1920 × 1080 project with a graphic that fills the canvas with a dark radial gradient (`#2A4F3D` at the centre to `#0D1512`), on a display you trust for dark tones, in a dim room.
-- **Do:** 1. Look at the paused preview at 100 %. 2. Export as ProRes 422 and as HEVC 10-bit; open each in QuickTime Player at full size and pause. 3. File ▸ Save Frame… as PNG with a 16-bit PNG still also on the frame; open it in Preview.
+- **Do:** 1. Look at the paused preview at 100 %. 2. Export as ProRes 422 and as HEVC 10-bit; open each in QuickTime Player at full size and pause. 3. File ▸ Save Frame… as PNG; open it in Preview.
 - **Expect:** the preview looks as it did before (no rings, no visible grain, GR-12); the ProRes file and the saved frame show no rings and no grain at all; the HEVC 10-bit file shows no more banding than the same export of a camera gradient would.
 - **Answer:** for each of the three, rings or none, grain or none; whether the ProRes file looks cleaner than the preview.
-- **Source:** spec §11 PR-15; `tools/proof/raster_dither_proof.py` measures the levels, the noise and the 8-bit paths' bytes (E1, D1–D7), not how a dark gradient looks on a display.
+- **Source:** spec §11 PR-15, PR-20; `tools/proof/raster_dither_proof.py` measures the levels, the noise and the 8-bit paths' bytes (E1, D1–D7, DG), not how a dark gradient looks on a display.
 
 **GR-18 — A `framejob://` link on a web page sends a graphic to Frame Job**
 - **Setup:** GR-15's first package uploaded where anyone can download it over `https` (a public repository's raw file link, or any static host), and a page of your own with three links, each `<a href="framejob://graphic?src=…">` with `src` percent-encoded: one to that package, one to the same address written `http://`, one to an address on that host that answers 404. A fourth link written `framejob-debug://graphic?src=…` to the package. The installed Frame Job (Release or a published build) in /Applications, and a Debug build made with `make app-debug` in the same session (so both are registered).

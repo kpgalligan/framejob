@@ -41,8 +41,10 @@ Rows:
   [floor(e − 1/16), ceil(e + 1/16)].
 - **B2** the same cell, rows 500–580, 16-px column blocks over x 0–800: max
   |mean(G − e)| ≤ 0.1; the control's printed.
-- **B3** `render_frame` at 0.5 s of a 1 s `band374` clip covering the
-  canvas: B1's and B2's rules.
+- **B3** a 1 s `band374` clip covering the canvas, its 8-bit frame: B1's and
+  B2's rules. Since PR-20 (below) a `render_frame` PNG of it is 16-bit, so B3
+  reads the 8-bit door: an `apng` export of the in/out range 0.48–0.56 s at
+  1920×1080 (`APNG_RANGE`), its first frame (the fixture ignores `frame`).
 - **B4a** a `prores_422` export of that project, the frame at 0.5 s decoded
   by ffmpeg to `rgb48le` (16 bits; its `rgb24` conversion of 10-bit ProRes
   adds a dither of its own): the banding RMS — column means of G over rows
@@ -57,8 +59,8 @@ Rows:
   control's. L1 and L2 run with B4a, L3 with B4b.
 - **F1** `render_graphic flat`: the decoded RGBA equals the control's, and
   the one-colour rect is exactly (51, 102, 153, 255).
-- **F2** `render_frame` of a `flat` clip: the decoded RGBA equals the
-  control's.
+- **F2** a `flat` clip's 8-bit frame (B3's APNG door): the decoded RGBA
+  equals the control's.
 - **S1** `render_graphic band374` frames [0, 30] with `max_width` 8192: the
   two cells are equal, and equal to B1's cell.
 - **Z1** no `Frame Job: ` log line; every project closed.
@@ -67,8 +69,11 @@ PR-15's rows, scored against `--base DIR`, a `capture` made by the app as it
 was BEFORE PR-15 (any build of a commit before it, named by `RC_PROOF_APP`),
 whose 8-bit raster is PR-13's dithered one:
 - **E1** the 8-bit paths are byte for byte the base's: B1's, S1's and F1's
-  sheets and B3's and F2's frames decode equal to the base's files, and B3's
-  frame is an 8-bit PNG.
+  sheets decode equal to the base's files, and B3's and F2's APNG frames
+  (PR-20's 8-bit door) decode equal to the base's `render_frame` PNGs of those
+  frames. On a `capture` by an app before PR-20 that comparison is the door's
+  own check: the app's APNG frame against its own 8-bit PNG. Printed: each
+  APNG's header, and the base's own APNG frame against its PNG when it has both.
 - **D1** `render_frame` at 0.5 s of a `band374` clip with a 64×64 16-bit PNG
   still at the canvas centre (outside the row read): a 16-bit PNG; row 540,
   x 0–800, G holds ≥ 400 distinct 16-bit values, every one within 1/8 of an
@@ -172,6 +177,30 @@ luma is its own value.
   frame deep with its key unmarked, so it is read again with the key deep).
 Without `--base` (and not `capture`) GMe FAILS.
 
+Issue #566, spec §11 PR-20: a graphic is a deep source of a saved frame, so a
+`render_frame` or Save Frame… as PNG or HEIC of a frame whose recipe draws a
+graphic is read through export's reader and is deep, beside anything.
+- **DG** `render_frame` at 0.5 s of `band374` alone (B3's project, its file
+  `b3-frame.png`): D1's rule. Printed: its bytes and wall time, and **DGh**,
+  the same frame as HEIC, `sips -g bitsPerSample`.
+- **DGf** `render_frame` of `flat` alone (F2's project, `f2-frame.png`): a
+  16-bit PNG whose one-colour gradient rect (x 1110–1489, y 110–389) holds one
+  RGB value, each channel within 1/8 level of (51, 102, 153): exact levels, no
+  dither.
+- **DGv** `band374` with a 256×144 8-bit H.264 clip at the canvas centre and no
+  deep source: D1's rule (a graphic beside an 8-bit clip makes the frame deep).
+- **DGo** a `band374` clip from 0 to 1 s and a flat 400×300 shape from 1 s:
+  the frame at 0.5 s is a 16-bit PNG, the frame at 1.5 s (no graphic) an 8-bit
+  PNG (the recipe at the frame time is asked, not the project).
+- **DGj** `band374` alone as a JPEG: decodes equal to the base's.
+- **DGs**, printed and NOT scored (needs the owner's `tools/proof/media/
+  owner-sync/IMG_0018.MOV`): the PNG's depth, bytes and base64 bytes beside the
+  Anthropic API's 5 MB image limit, unscaled and at `max_width` 1280, of a
+  1920×1080 8-bit H.264 cut of that clip under `flat`, of the cut beside a
+  64×64 16-bit still, and of the clip itself (HEVC Main 10).
+Without `--base` (and not `capture`) DGj FAILS. On a `capture` by an app before
+PR-20, DG, DGf, DGv and DGo FAIL.
+
 `capture DIR` runs every row and keeps every file in DIR; its own files are
 the control it is scored against, so on the control tree B1, B3, B4a and B4b
 are expected to FAIL. Without `--control` (and not `capture`) B1–B4b, F1 and
@@ -198,7 +227,12 @@ base, as do #588's `export-always-marked` and PR-19's three
 GMs, GM and GMg see; `coverage-always-deep`, its 8-bit case;
 `frame-matte-not-reread`, the frame path's new arm), whose GMc, GMs, GM, GMg
 and GMf rules are absolute and GMe's against the base. PR-17's and PR-18's
-matte mutants went with the code PR-19 withdrew.
+matte mutants went with the code PR-19 withdrew. PR-20's three
+(`graphic-not-a-source`, the arm gone; `graphic-anywhere`, the arm asking the
+project instead of the recipe; `graphic-frame-pin-not-marked`, the frame's
+graphics left 8-bit) run against PR-20's base; PR-15's
+`generator-frame-not-deep` and `reread-not-deep` went with the code PR-20
+removed (a frame with a graphic no longer reaches the generator's paths).
 
 Exit 0 when every scored row passes (a mutant: caught); 1 when one failed (a
 mutant: survived); 2 when the control could not be performed.
@@ -240,12 +274,13 @@ W, H = 1920, 1080
 SEC = 600_000
 ROWS = ["B1", "B2", "B3", "B4a", "B4b", "F1", "F2", "S1", "E1", "D1", "D3", "D4", "D5", "D6",
         "D7", "G0", "G1", "G3", "G5", "G6", "G7", "GEa", "GEb", "GEc", "GEd", "GM", "GMg", "GMc",
-        "GMs", "GMe", "GMf", "Z1"]
+        "GMs", "GMe", "GMf", "DG", "DGf", "DGv", "DGo", "DGj", "DGs", "Z1"]
 # Every file a run keeps, by the row that writes it (L1–L3 are printed only).
-FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B4a": "b4a-prores.mov",
+FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B3a": "b3-apng.png",
+         "B4a": "b4a-prores.mov",
          "B4b": "b4b-hevc10-moving.mp4", "L1": "l1-h264-static.mp4",
          "L2": "l2-hevc-static.mp4", "L3": "l3-h264-16M-moving.mp4",
-         "F1": "f1-sheet.png", "F2": "f2-frame.png", "S1": "s1-sheet.png",
+         "F1": "f1-sheet.png", "F2": "f2-frame.png", "F2a": "f2-apng.png", "S1": "s1-sheet.png",
          "D1": "d1-frame-still.png", "D5": "d5-frame-hevc10.png", "D6": "d6-frame-hlg.png",
          "D7": "d7-frame-h264-under-hevc10.png",
          "G0": "g0-frame-shape.png", "G1": "g1-frame-shape-still.png",
@@ -257,7 +292,11 @@ FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B4a": "b4a-prores.mov",
          "GMc": "gmc-clip-matte-prores.mov", "GMc0": "gmc0-clip-prores.mov",
          "GMs": "gms-still-matte-prores.mov", "GMs0": "gms0-still-prores.mov",
          "GMe": "gme-clip-matte-grey-h264.mp4", "GMf": "gmf-frame-clip-matte.png",
-         "GMf0": "gmf0-frame-clip.png"}
+         "GMf0": "gmf0-frame-clip.png", "DGj": "dgj-frame.jpg", "DGh": "dgh-frame.heic",
+         "DGv": "dgv-frame-h264.png", "DGo": "dgo-frame-graphic.png", "DGo2": "dgo2-frame-shape.png",
+         "DGsg": "dgs-graphic-over-8bit.png", "DGsg1280": "dgs-graphic-over-8bit-1280.png",
+         "DGss": "dgs-still-over-8bit.png", "DGss1280": "dgs-still-over-8bit-1280.png",
+         "DGsi": "dgs-iphone.png", "DGsi1280": "dgs-iphone-1280.png"}
 # Spec §11 PR-16's fixture: the shape's gradient, and its exact G in levels.
 SHAPE_FROM, SHAPE_TO = (13, 21, 18), (42, 79, 61)    # #0D1512 at x 0, #2A4F3D at x 1920
 SHAPE_563 = {"kind": "rectangle", "stroke": None, "width": W, "height": H, "fill": [1, 1, 1, 1],
@@ -320,6 +359,20 @@ export function render(frame, props, ctx) {
 }
 """
 ONE_COLOUR_AT = (1300, 250)
+# The one-colour gradient rect's interior, x0, y0, x1, y1 (DGf).
+ONE_COLOUR_RECT = (1110, 110, 1490, 390)
+# Spec §11 PR-20's 8-bit door for B3, F2 and E1: an `apng` export of the in/out range 0.48–0.56 s
+# (the preset's 25 fps: two frames) at 1920×1080, which `renderFrameReported` draws with
+# `keepsDepth` false, read at its first frame. The fixtures ignore `frame`, so the frame at
+# 0.48 s is the one at 0.5 s.
+APNG_RANGE = (288_000, 336_000)
+# DGs (printed): the Anthropic API's limit on one image, set beside the base64 the assistant's
+# helper forwards (`agent/src/main.ts`); and the owner's iPhone clip (1920×1080 HEVC Main 10,
+# HLG), which the 8-bit fixture is made from. Absent media prints "no fixture".
+API_IMAGE_LIMIT = 5 * 1024 * 1024
+OWNER_CLIP = ROOT / "tools/proof/media/owner-sync/IMG_0018.MOV"
+# render_frame's wall time per file, in seconds (DG's detail).
+FRAME_SECONDS = {}
 
 VENDOR = "graphic/vendor/tiny-skia/src"
 HIGHP = f"{VENDOR}/pipeline/highp.rs"
@@ -403,14 +456,6 @@ APP_MUTANTS = {
                           "        default: return true\n        }\n    }\n\n    /// Whether the recipe",
                           "        default: return settings.preset != \"hevc_10bit\"\n        }\n    }\n\n"
                           "    /// Whether the recipe")], ["D4"]),
-    "generator-frame-not-deep": ([(f"{SOURCES}/Exporter+Frame.swift",
-                                   "                && drawsGraphic(project, at: t, options: "
-                                   "options)\n",
-                                   "                && false\n")], ["D5"]),
-    "reread-not-deep": ([(f"{SOURCES}/Exporter+Frame.swift",
-                          "            if deepens { GraphicRegistry.shared.markDeep(key) }\n"
-                          "            image = DeepStillFrame.read(",
-                          "            image = DeepStillFrame.read(")], ["D7"]),
     # Spec §11 PR-16's seven, one per decision it adds.
     "shape-never-deep": ([(f"{SOURCES}/Compositor+Sources.swift",
                            "renderers.shape(props, hash: hash, deep: deep)",
@@ -432,9 +477,7 @@ APP_MUTANTS = {
                                          "                false\n")], ["G5"]),
     "shape-reread-not-marked": ([(f"{SOURCES}/Exporter+Frame.swift",
                                   "            RecipeSource.shared.markDeep(key)\n"
-                                  "            if deepens { GraphicRegistry.shared.markDeep(key) }\n"
                                   "            image = DeepStillFrame.read(",
-                                  "            if deepens { GraphicRegistry.shared.markDeep(key) }\n"
                                   "            image = DeepStillFrame.read(")], ["G7"]),
     "sdr-version-marked": ([(f"{SOURCES}/Exporter+Frame.swift",
                              "            if keepsDepth { RecipeSource.shared.markDeep(key) }\n",
@@ -457,6 +500,20 @@ APP_MUTANTS = {
     "frame-matte-not-reread": ([(f"{SOURCES}/Exporter+Frame.swift",
                                  "            let matte = drawsMatte(project, at: t, options: "
                                  "options)\n", "            let matte = false\n")], ["GMf"]),
+    # #566, spec §11 PR-20: a graphic is a deep source of a saved frame (DG, DGf, DGv, and D5 and
+    # D7, whose generator paths no longer read a graphic again), asked of the recipe at the frame
+    # time (DGo), and its frame's pin is marked deep (DG, D1, DGv).
+    "graphic-not-a-source": ([(f"{SOURCES}/DeepVideoFrame.swift",
+                               "                && (Exporter.drawsGraphic(project, at: t, options: "
+                               "options)\n                    || DeepStillFrame.shows(",
+                               "                && (DeepStillFrame.shows(")],
+                             ["DG", "DGf", "DGv", "D5", "D7"]),
+    "graphic-anywhere": ([(f"{SOURCES}/DeepVideoFrame.swift",
+                           "Exporter.drawsGraphic(project, at: t, options: options)",
+                           "Playback.drawsGraphics(project.snapshot)")], ["DGo"]),
+    "graphic-frame-pin-not-marked": ([(f"{SOURCES}/Exporter+Frame.swift",
+                                       "            if keepsDepth { GraphicRegistry.shared.markDeep("
+                                       "key) }\n", "")], ["DG", "D1", "DGv"]),
 }
 CORE_PATCH = "[patch.crates-io]\n"
 
@@ -780,8 +837,8 @@ class Doc:
     def project(self):
         return reply(self.call("get_project")).get("project") or {}
 
-    def clip(self, seconds=1, track=None):
-        """A `seconds` clip of the module at 0, covering the canvas, on the
+    def clip(self, seconds=1, track=None, at=0):
+        """A `seconds` clip of the module at `at`, covering the canvas, on the
         first track (made when there is none) or on `track`."""
         tracks = self.project().get("tracks") or []
         if not tracks:
@@ -791,21 +848,21 @@ class Doc:
             return False, "no track"
         deadline, got = time.monotonic() + 5, {"error": "not tried"}
         while time.monotonic() < deadline:
-            got = self.call("add_graphic_clip", track=track or tracks[0]["id"], at=0,
+            got = self.call("add_graphic_clip", track=track or tracks[0]["id"], at=at,
                             duration=seconds * SEC, name=self.module)
             if got["ok"]:
                 return True, ""
             time.sleep(0.2)
         return False, got.get("error")
 
-    def shape_clip(self, shape, video=None, seconds=1):
-        """A `seconds` shape clip at 0 on a NEW track (kept as `self.track`),
+    def shape_clip(self, shape, video=None, seconds=1, at=0):
+        """A `seconds` shape clip at `at` on a NEW track (kept as `self.track`),
         with `video` patched on it."""
         fresh = [self.new_track()]
         if fresh[0] is None:
             return False, "no new track"
         clips = {clip["id"] for clip in self.project().get("clips") or []}
-        got = self.call("add_shape_clip", track=fresh[0], at=0, duration=seconds * SEC,
+        got = self.call("add_shape_clip", track=fresh[0], at=at, duration=seconds * SEC,
                         shape=shape)
         made = [clip["id"] for clip in self.project().get("clips") or []
                 if clip["id"] not in clips]
@@ -846,14 +903,25 @@ class Doc:
             return None
         return out
 
-    def frame(self, file):
+    def frame(self, file, t=SEC // 2, **extra):
         out = WORK / file
         out.unlink(missing_ok=True)
-        got = self.call("render_frame", t=SEC // 2, path=str(out))
+        started = time.monotonic()
+        got = self.call("render_frame", t=t, path=str(out), **extra)
+        FRAME_SECONDS[file] = time.monotonic() - started
         if not (got["ok"] and out.exists()):
             print(f"       render_frame {file}: {got.get('error', 'no file')}", flush=True)
             return None
         return out
+
+    def apng(self, file):
+        """PR-20's 8-bit door: the in/out range `APNG_RANGE` exported `apng` at
+        1920×1080 (its first frame is read), or None."""
+        got = self.call("set_range", start=APNG_RANGE[0], end=APNG_RANGE[1])
+        if not got["ok"]:
+            print(f"       set_range for {file}: {got.get('error')}", flush=True)
+            return None
+        return self.export(file, preset="apng", range="in_out", size=[W, H])
 
     def export(self, file, **arguments):
         out = WORK / file
@@ -942,13 +1010,20 @@ def run(client, files):
         files["B1"] = band.sheet(FILES["B1"], frames=[0])
     if band.ok and selected & {"S1", "E1"}:
         files["S1"] = band.sheet(FILES["S1"], frames=[0, 30], max_width=8192)
-    if band.ok and selected & {"B3", "B4a", "E1", "D3"}:
+    if band.ok and selected & {"B3", "B4a", "E1", "D3", "DG", "DGj"}:
         made, why = band.clip()
         if not made:
             print(f"       band clip: {why}", flush=True)
         else:
-            if selected & {"B3", "E1"}:
+            # B3's frame is PR-20's DG since a graphic is a deep source; B3 and E1 read the
+            # APNG door's frame of the same project.
+            if "DG" in selected:
                 files["B3"] = band.frame(FILES["B3"])
+                files["DGh"] = band.frame(FILES["DGh"])
+            if "DGj" in selected:
+                files["DGj"] = band.frame(FILES["DGj"])
+            if selected & {"B3", "E1"}:
+                files["B3a"] = band.apng(FILES["B3a"])
             if selected & {"B4a", "D3"}:
                 files["B4a"] = band.export(FILES["B4a"], preset="prores_422")
             if "B4a" in selected:
@@ -969,18 +1044,90 @@ def run(client, files):
         closed = moving.close() and closed
     closed = run_deep(client, files) and closed
     closed = run_shapes(client, files) and closed
+    closed = run_graphic_sources(client, files) and closed
     flat = Doc(client, "flat", "flat", FLAT_JS)
     if not flat.ok:
         print(f"       flat project: {flat.why}", flush=True)
     if flat.ok and selected & {"F1", "E1"}:
         files["F1"] = flat.sheet(FILES["F1"], frames=[0])
-    if flat.ok and selected & {"F2", "E1"}:
+    if flat.ok and selected & {"F2", "E1", "DGf"}:
         made, why = flat.clip()
         if made:
-            files["F2"] = flat.frame(FILES["F2"])
+            # F2's frame is PR-20's DGf; F2 and E1 read the APNG door's frame.
+            if "DGf" in selected:
+                files["F2"] = flat.frame(FILES["F2"])
+            if selected & {"F2", "E1"}:
+                files["F2a"] = flat.apng(FILES["F2a"])
         else:
             print(f"       flat clip: {why}", flush=True)
     closed = flat.close() and closed
+    return closed
+
+
+def run_graphic_sources(client, files):
+    """Spec §11 PR-20's projects (#566): `band374` over an 8-bit H.264 clip (DGv), a `band374`
+    clip followed by a flat shape (DGo), and DGs's printed sizes, each when selected."""
+    closed = True
+    if "DGv" in selected:
+        doc = Doc(client, "graphich264", "band374", BAND_JS)
+        made, why = doc.clip() if doc.ok else (False, doc.why)
+        if made:
+            made, why = doc.media_clip(fixture("dgvh264.mov", [
+                "-f", "lavfi", "-i", "color=c=gray:size=256x144:rate=30:duration=1,format=yuv420p",
+                "-c:v", "h264_videotoolbox", "-b:v", "2M"]))
+        if made:
+            files["DGv"] = doc.frame(FILES["DGv"])
+        else:
+            print(f"       DGv project: {why}", flush=True)
+        closed = doc.close() and closed
+    if "DGo" in selected:
+        doc = Doc(client, "graphicthenshape", "band374", BAND_JS)
+        made, why = doc.clip() if doc.ok else (False, doc.why)
+        if made:
+            made, why = doc.shape_clip(*FLAT_SHAPES[0], at=SEC)
+        if made:
+            files["DGo"] = doc.frame(FILES["DGo"])
+            files["DGo2"] = doc.frame(FILES["DGo2"], t=3 * SEC // 2)
+        else:
+            print(f"       DGo project: {why}", flush=True)
+        closed = doc.close() and closed
+    if "DGs" in selected:
+        closed = run_sizes(client, files) and closed
+    return closed
+
+
+def run_sizes(client, files):
+    """DGs (printed, not scored): the PNG `render_frame` answers, and the assistant's helper
+    forwards as base64, for a 1920×1080 frame of camera footage: an 8-bit H.264 cut of the
+    owner's iPhone clip under the `flat` graphic (PR-20's new case), the same cut beside a 64×64
+    16-bit still, and the iPhone clip itself (10-bit HEVC; both already deep before PR-20);
+    each unscaled and at `max_width` 1280."""
+    if not OWNER_CLIP.exists():
+        print(f"  --   DGs (NOT scored) no fixture: {OWNER_CLIP} is absent", flush=True)
+        return True
+    closed = True
+    cut = fixture("dgs-owner-8bit.mov", [
+        "-i", str(OWNER_CLIP), "-t", "1", "-an", "-vf", "format=yuv420p", "-c:v",
+        "h264_videotoolbox", "-b:v", "20M", "-color_primaries", "bt709", "-color_trc", "bt709",
+        "-colorspace", "bt709"])
+    still = fixture("dgs-still16.png", ["-f", "lavfi", "-i", "color=c=gray:size=64x64",
+                                        "-frames:v", "1", "-pix_fmt", "rgb48be"])
+    for key, name, source, beside in [("DGsg", "sizegraphic", cut, "graphic"),
+                                      ("DGss", "sizestill", cut, still),
+                                      ("DGsi", "sizeiphone", OWNER_CLIP, None)]:
+        doc = Doc(client, name, "flat", FLAT_JS) if beside == "graphic" else Doc(client, name)
+        made, why = doc.canvas_media(source) if doc.ok else (False, doc.why)
+        if made and beside == "graphic":
+            made, why = ((False, "no new track") if doc.new_track() is None
+                         else doc.clip(track=doc.track))
+        elif made and beside is not None:
+            made, why = doc.media_clip(beside)
+        if made:
+            files[key] = doc.frame(FILES[key])
+            files[key + "1280"] = doc.frame(FILES[key + "1280"], max_width=1280)
+        else:
+            print(f"       {key} project: {why}", flush=True)
+        closed = doc.close() and closed
     return closed
 
 
@@ -1194,14 +1341,25 @@ def score_deep(files, base):
 
     if "E1" in selected:
         verdicts = []
-        for row in ["B1", "B3", "F1", "F2", "S1"]:
+        for row in ["B1", "F1", "S1"]:
             here, there = read_png(files.get(row)), read_png(theirs(row))
             verdicts.append((row, same(here, there)))
-        header = png_header(files["B3"]) if files.get("B3") else None
-        check("E1 the 8-bit paths are the base's byte for byte: B1, B3, F1, F2 and S1 decode equal "
-              "to the base's files, and B3's frame is an 8-bit PNG",
-              all(ok for _, ok in verdicts) and header is not None and header[2] == 8,
-              f"equal to the base's: {verdicts}; B3's PNG header {header}")
+        # Spec §11 PR-20: a `render_frame` PNG of a graphic is deep, so the 8-bit frame path is
+        # read through the APNG door, against the base's `render_frame` PNG of the same frame.
+        doors = []
+        for row, door in [("B3", "B3a"), ("F2", "F2a")]:
+            here, there = read_png(files.get(door)), read_png(theirs(row))
+            verdicts.append((f"{door} = the base's {row}", same(here, there)))
+            header = png_header(files[door]) if files.get(door) else None
+            # Printed: the base's own APNG frame against its own PNG, when it has both.
+            doors.append((door, header, same(read_png(theirs(door)), there)
+                          if theirs(door) else "no base APNG"))
+        check("E1 the 8-bit paths are the base's byte for byte: B1's, F1's and S1's sheets, and "
+              "the APNG frames of B3's and F2's projects, decode equal to the base's sheets and "
+              "its render_frame PNGs of those frames",
+              all(ok for _, ok in verdicts),
+              f"equal to the base's: {verdicts}\n       APNG header, and at the base its own "
+              f"APNG frame equal to its PNG: {doors}")
     if "D1" in selected:
         deep_frame("D1", "render_frame of band374 beside a 16-bit PNG still", files.get("D1"), True)
     if "D3" in selected:
@@ -1450,6 +1608,83 @@ def score_source_mattes(files, base):
               f"{ramp_figures(files.get('GMf0'), plain)}")
 
 
+def png_bytes(path):
+    """(bit depth, width, height, bytes, base64 bytes) of a PNG, or None."""
+    header = png_header(path) if path and Path(path).exists() else None
+    if header is None:
+        return None
+    size = Path(path).stat().st_size
+    return header[2], header[0], header[1], size, 4 * ((size + 2) // 3)
+
+
+def sample_depth(path):
+    """`sips -g bitsPerSample` of an image, or None."""
+    if path is None or not Path(path).exists():
+        return None
+    got = bounded.run(["sips", "-g", "bitsPerSample", str(path)], TOOL_BOUND,
+                      env=bounded.child_env())
+    found = [line.split(":")[-1].strip() for line in got["stdout"].splitlines()
+             if "bitsPerSample" in line]
+    return found[0] if got["rc"] == 0 and found else None
+
+
+def score_graphic_sources(files, base):
+    """#566's rows (spec §11 PR-20) over this run's files and the base's (or None)."""
+    def theirs(row):
+        path = base / FILES[row] if base else None
+        return path if path and path.exists() else None
+
+    if "DG" in selected:
+        deep_frame("DG", "render_frame at 0.5 s of band374 alone (B3's project)", files.get("B3"),
+                   True)
+        size = png_bytes(files.get("B3"))
+        seconds = FRAME_SECONDS.get(FILES["B3"])
+        print(f"  --   DG's PNG (NOT scored): {f'{size[3]:,} bytes' if size else 'not read'}, "
+              f"render_frame {f'{seconds:.2f} s' if seconds is not None else 'not timed'}; DGh, "
+              f"the same frame as HEIC: bitsPerSample {sample_depth(files.get('DGh'))}",
+              flush=True)
+    if "DGf" in selected:
+        picture = read_png(files.get("F2"))
+        header = png_header(files["F2"]) if files.get("F2") else None
+        x0, y0, x1, y1 = ONE_COLOUR_RECT
+        values = ({tuple(picture.samples[(y * picture.width + x) * 4 + c] for c in range(3))
+                   for y in range(y0, y1) for x in range(x0, x1)}
+                  if picture is not None and picture.scale == 257.0 else set())
+        worst = max((abs(v / 257.0 - want) for value in values
+                     for v, want in zip(value, (51, 102, 153))), default=None)
+        check("DGf render_frame of a flat clip (F2's project): a 16-bit PNG whose one-colour "
+              "gradient rect holds one RGB value, each channel within 1/8 level of (51, 102, 153)",
+              header is not None and header[2] == 16 and len(values) == 1
+              and worst is not None and worst <= 0.125,
+              f"header {header}; the rect's distinct values {sorted(values)[:4]}"
+              f"{' …' if len(values) > 4 else ''} ({len(values)}); worst |v/257 − level| "
+              f"{'none' if worst is None else f'{worst:.4f}'}")
+    if "DGv" in selected:
+        deep_frame("DGv", "render_frame of band374 beside a 256×144 8-bit H.264 clip (no deep "
+                   "source)", files.get("DGv"), True)
+    if "DGo" in selected:
+        on, off = (png_header(files[row]) if files.get(row) else None for row in ("DGo", "DGo2"))
+        check("DGo a band374 clip from 0 to 1 s and a flat shape from 1 s: the frame at 0.5 s is a "
+              "16-bit PNG and the frame at 1.5 s, which draws no graphic, an 8-bit PNG",
+              on is not None and off is not None and on[2] == 16 and off[2] == 8,
+              f"0.5 s header {on}; 1.5 s header {off}")
+    if "DGj" in selected:
+        here, there = read_jpeg(files.get("DGj")), read_jpeg(theirs("DGj"))
+        check("DGj render_frame of band374 alone as a JPEG: decodes equal to the base's",
+              same(here, there), f"read {here is not None}; base {there is not None}")
+    if "DGs" in selected and files.get("DGsg") is not None:
+        for key, title in [("DGsg", "an 8-bit H.264 cut of the iPhone clip under the flat graphic"),
+                           ("DGss", "the same cut beside a 64×64 16-bit still"),
+                           ("DGsi", "the iPhone clip itself (HEVC Main 10, HLG)")]:
+            for suffix, scale in [("", "unscaled"), ("1280", "max_width 1280")]:
+                size = png_bytes(files.get(key + suffix))
+                shown_size = ("not read" if size is None else
+                              f"{size[0]}-bit {size[1]}×{size[2]}, {size[3]:,} bytes, base64 "
+                              f"{size[4]:,} ({'OVER' if size[4] > API_IMAGE_LIMIT else 'under'} "
+                              f"{API_IMAGE_LIMIT:,})")
+                print(f"  --   DGs (NOT scored) {title}, {scale}: {shown_size}", flush=True)
+
+
 def score(files, control):
     """Every row but Z1, over this run's files and the control's (or None)."""
     def theirs(row):
@@ -1461,8 +1696,9 @@ def score(files, control):
         there = cell(read_png(theirs("B1")))
         band_rows("B1", here, there, "render_graphic band374 frame 0, the cell at scale 1")
     if "B3" in selected:
-        band_rows("B3", read_png(files.get("B3")), read_png(theirs("B3")),
-                  "render_frame at 0.5 s of a band374 clip")
+        # Since spec §11 PR-20 the APNG door's frame (0.48 s), against the control's PNG.
+        band_rows("B3", read_png(files.get("B3a")), read_png(theirs("B3")),
+                  "the apng export's frame at 0.48 s of a band374 clip")
     if "B4a" in selected:
         here = movie_figures(files.get("B4a"), 0.5, True)
         then = movie_figures(theirs("B4a"), 0.5, True)
@@ -1498,8 +1734,8 @@ def score(files, control):
               f"equal to the control's: {equal if there else 'no control'}; one-colour rect "
               f"{one}")
     if "F2" in selected:
-        here, there = read_png(files.get("F2")), read_png(theirs("F2"))
-        check("F2 render_frame of a flat clip: decoded RGBA equals the control's",
+        here, there = read_png(files.get("F2a")), read_png(theirs("F2"))
+        check("F2 the apng export's frame of a flat clip: decoded RGBA equals the control's",
               same(here, there),
               f"read {here is not None}; control {there is not None}")
     if "S1" in selected:
@@ -1641,7 +1877,7 @@ def main():
     parser.add_argument("--mutant", choices=list(MUTANTS))
     parser.add_argument("--base", default=None,
                         help="a capture made by the app before spec §11 PR-15 (E1, D3, D4) "
-                             "or PR-16 (G3, GEa–GEd, GMe; GM, GMg, GMc and GMs print its "
+                             "or PR-16 (G3, GEa–GEd, GMe, DGj; GM, GMg, GMc and GMs print its "
                              "figures)")
     parser.add_argument("--app-mutant", choices=list(APP_MUTANTS))
     args = parser.parse_args()
@@ -1713,6 +1949,7 @@ def main():
     score_shapes(files, keep or base, keep is not None)
     score_mattes(files, keep or base)
     score_source_mattes(files, keep or base)
+    score_graphic_sources(files, keep or base)
     found = hdr.complaints(log)
     check("Z1 every project closed and the log holds no `Frame Job: ` line",
           closed and not found, f"closed {closed}; complaints {found}")

@@ -147,7 +147,8 @@ sibling file.
     memory as they are, and moves no 8-bit proof baseline. It is one switch:
     `GraphicRegistry.resolve` answers `deep` false for a document's own key.
   - A frame showing only graphics is still an 8-bit PNG (PR-4 and PR-9 stand): a graphic is not
-    a deep source. Held for the owner, below.
+    a deep source. Held for the owner, below. **Amended by PR-20** (#566): a graphic is a deep
+    source of a saved frame, so a PNG or HEIC of a frame that draws one is deep, beside anything.
   - The patch: a second diff on the vendored tiny-skia, `graphic/vendor/tiny-skia-deep.diff`,
     applied after PR-13's (which stays byte-identical); every hunk marked `// Frame Job (spec
     §11 PR-15):`.
@@ -257,8 +258,9 @@ sibling file.
     should be saved as a 16-bit PNG, counting a graphic as a deep source (recommended, as its
     own batch: about thirty proofs read graphic frames with an 8-bit decoder); (2) whether the
     preview and the 8-bit outputs should draw from the deep raster, which needs the
-    compositor's output dither dropped on 2026-10-27 (recommended: leave it).
-  - Amends PR-5 and PR-13. Amended by PR-16 and PR-18.
+    compositor's output dither dropped on 2026-10-27 (recommended: leave it). Both answered by
+    the owner 2026-11-12 (#566): (1) yes, PR-20; (2) no.
+  - Amends PR-5 and PR-13. Amended by PR-16, PR-18 and PR-20.
 
 - **PR-16 — A shape's gradient is drawn at 16-bit float where its frame is delivered deeper
   than 8 bits (#563).**
@@ -302,7 +304,8 @@ sibling file.
     an exact ramp rounded to 8 bits there would band (median run about 33 px on this fixture)
     where Core Graphics' own dither does not.
   - A frame showing only shapes is still an 8-bit PNG: a gradient shape is not a deep source
-    (PR-4). PR-15's held question (1) covers it and is not reopened.
+    (PR-4). PR-15's held question (1) covers it and is not reopened. PR-20 answered (1) for
+    graphics only; this bullet stands.
   - How: the "delivered deep" fact is a set of keys on `RecipeSource` (`markDeep`,
     `deliversDeep`, cleared by `unregister`), because PR-15's flag lives on a graphic pin and a
     project with no graphic set has none. It is marked beside each of PR-15's marks and never on

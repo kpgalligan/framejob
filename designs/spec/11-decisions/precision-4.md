@@ -84,3 +84,77 @@ into a sibling file.
     level, and a gradient shape or graphic on a matte track is drawn deep. No op, catalog,
     schema, recipe, FFI or format change; `RC_FORMAT_VERSION` is unchanged.
   - Amends PR-1 and PR-5 (the `r8` coverage), MT-6 and MT-9; withdraws PR-17 and PR-18.
+
+- **PR-20 — A graphic is a deep source of a saved frame (owner, 2026-11-12, #566: "go with your
+  recommendations").**
+  - The rule: a `render_frame` or File ▸ Save Frame… as PNG or HEIC (`keepsDepth`) whose recipe
+    at the frame time draws a graphic layer is read through export's reader (`DeepStillFrame.read`)
+    and is deep, a 16-bit PNG or a 10-bit HEIC, its graphics drawn from PR-15's 16-bit raster
+    with no dither. Its key is marked deep, so a gradient shape (PR-16) and a matte's coverage
+    (PR-19) on the same frame are deep too. `DeepVideoFrame.reads` asks it first of its
+    `keepsDepth` arms (`Exporter.drawsGraphic`, which opens no file), beside PR-9's still and
+    PR-12's VP9 track.
+  - The reading, which the owner's answer carries: a deep source makes its frame deep beside
+    anything (PR-9's shape), so a graphic over 8-bit video is a 16-bit PNG too, not only a frame
+    that shows graphics alone.
+  - It asks the recipe, not the project: a graphic elsewhere on the timeline, or one Show
+    Selection leaves out, is not on the frame; a graphic drawn as its slate or its error card
+    counts, being a graphic layer; one inside a nest counts, the recipe flattening it.
+  - What does not change: JPEG, GIF and APNG (8-bit containers; an image sequence's frames are
+    drawn with `keepsDepth` false), the eyedropper, Pick from Canvas, look tiles, thumbnails,
+    `render_graphic`, the preview and every export row, which never ask. A frame showing only
+    shapes stays 8-bit: PR-16's bullet stands, and whether a gradient shape should count too is
+    a question of its own (#566 asked about graphics). The issue's second question, drawing the
+    preview and the 8-bit outputs from the deep raster, stays no (PR-13's last bullet, PR-15).
+  - Removed with the arm: a frame that draws a graphic no longer reaches the generator in a
+    format that keeps depth, so `renderFrameReported`'s `graphic` term in the re-read of a frame
+    the generator answers deep, and its two graphics marks there and in PR-14's re-read, could
+    not run and are gone; the reader's branch marks the graphics pin whenever `keepsDepth` (a
+    no-op for a key with no pin). PR-15's app mutants `generator-frame-not-deep` and
+    `reread-not-deep` went with that code.
+  - The proofs: `tools/proof/png_read.py` is the proofs' one 8- and 16-bit PNG reader;
+    `graphics_proof.py`'s pixels are read through it (`graphic_prop_action_proof.py` imports
+    them). Of the 26 hand decoders in `tools/proof/`, it was the one that read a `render_frame`
+    of a graphic; the rest read harness and `snapshot_ui` captures or frames of projects with no
+    graphic, and were left as they are. `raster_dither_proof.py`'s B3, F2 and E1 read their 8-bit
+    frame through an `apng` export of the same project (an 8-bit door drawn with `keepsDepth`
+    false). The app at d530de3a^ (Debug) wrote APNG frames that decode equal to its own 8-bit
+    `render_frame` PNGs of the same frames, and the app before and after this change writes APNG
+    frames equal to those PNGs (E1).
+  - Seen first (Debug at 3cacf181, `--base` a capture by the app at d530de3a^): `render_frame`
+    of `band374` alone (DG), of `flat` alone (DGf), of `band374` over an 8-bit H.264 clip (DGv)
+    and of a graphic's frame (DGo) were 8-bit PNGs, DG's 1,765,486 bytes and its HEIC 8 bits a
+    sample.
+  - With it (Release; Debug read the same figures): DG and DGv 16-bit PNGs, 781 distinct greens
+    of 801 along row 540, worst 0.0606 of a level from the exact value (D1's figures), DG
+    2,372,532 bytes and its HEIC 10 bits; DGf one value in its one-colour rect, (13104, 26208,
+    39295), worst 0.1012 of a level from (51, 102, 153); DGo's frame at 0.5 s 16-bit and at 1.5 s
+    (no graphic) 8-bit; a JPEG of DG's frame (DGj) and E1's sheets and APNG frames equal to the
+    base's. `raster_dither_proof.py --base` 30 of 37: the other seven (B1–B4b, F1, F2) need
+    PR-13's `--control`, which was not made. DG's `render_frame` took 2.04 s on Debug before
+    (the generator) and 0.38 s on Debug and 0.35 s on Release after (the reader), one call each.
+  - Sizes (`raster_dither_proof.py` DGs, printed): a 1920×1080 8-bit H.264 cut of the owner's
+    iPhone clip under a title was an 8-bit PNG of 1,743,875 bytes (base64 2,325,168) and is a
+    16-bit one of 4,170,643 bytes (base64 5,560,860), past the Anthropic API's 5 MB limit on an
+    image, which the assistant's helper forwards unscaled; at `max_width` 1280 it is 2,918,745
+    bytes (base64 3,891,660). Frames already deep before this change are past it too: the same
+    cut beside a 64×64 16-bit still, base64 6,744,504 (4,728,408 at 1280), and the iPhone clip
+    itself (HEVC Main 10), base64 9,328,440 (4,994,044 at 1280). The assistant's prompt asks for
+    `max_width`; whether `render_frame`'s image block should be bounded is held for the owner.
+  - Mutants (Debug tree copies, each caught): `graphic-not-a-source` (DG, DGf, DGv 8-bit PNGs;
+    D5, D7 at 44 distinct greens, worst 0.8918 of a level), `graphic-anywhere` (DGo: both frames
+    16-bit) and `graphic-frame-pin-not-marked` (DG, D1, DGv: 16-bit PNGs of the 8-bit dithered
+    raster, 44 distinct greens). Run again where this change touched their anchors or rows:
+    `shape-reread-not-marked` (G7), `sdr-version-marked` (GEb), `frame-matte-not-reread` (GMf),
+    `always-deep` (E1, through B3's APNG frame). `png_read.py`'s `bpp-channels` fails R1, R2 and
+    R5.
+  - The proofs whose frames change, on Release: `graphics_proof.py` 51/51,
+    `graphic_prop_action_proof.py` 20/20, `matte_proof.py` 46/46, `image_cache_proof.py` 6/6,
+    `graphics_files_proof.py` 10/10, `paste_graphic_proof.py` 8/8, `cu8_proof.py` 12/12 (its O5
+    compares a 16-bit frame with an 8-bit one, so both are now read to the nearest level,
+    `png_read.rgba8`; with ffmpeg's own `rgba` conversion every row differed),
+    `derived_proof.py` 13/13, `docs_bugs_c1_proof.py` 35/35, `debug_release_proof.py` 10/10;
+    and, sharing the edited function, `precision_proof.py` D1, S8, S10, S14–S16, `log_proof.py`
+    L17, L18 and `docs_bugs_b3_proof.py` D1–D8.
+  - No op, catalog schema, recipe, FFI or format change; `RC_FORMAT_VERSION` is unchanged.
+    `render_frame`'s description gains one sentence. Amends PR-4, PR-9 and PR-15.

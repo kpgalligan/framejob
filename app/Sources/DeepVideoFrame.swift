@@ -7,8 +7,10 @@ import CoreMedia
 /// its caller's format keeps depth (`keepsDepth`, `FrameWriter.Format`'s
 /// `carriesDepth`: `render_frame` and File ▸ Save Frame… as PNG or HEIC).
 ///
-/// Two things make a frame deep. PR-9's: the recipe draws a still deeper than
-/// 8 bits a component (`DeepStillFrame.shows`). PR-12's (issue batch B103,
+/// Three things make a frame deep. PR-20's (#566): the recipe draws a graphic
+/// (`Exporter.drawsGraphic`), whose 16-bit raster (PR-15) the frame then keeps,
+/// beside anything. PR-9's: the recipe draws a still deeper than 8 bits a
+/// component (`DeepStillFrame.shows`). PR-12's (issue batch B103,
 /// #294): the frame shows a VP9 track deeper than 8 bits. The generator hands
 /// back an 8-bit image of a 10-bit VP9 file, alone or beside anything, where
 /// it hands back a 16-bit one of HEVC Main 10, HEVC Rext and ProRes 422 HQ
@@ -31,15 +33,17 @@ enum DeepVideoFrame {
 
     /// Every frame of an HLG project (spec §11 HD-13 (i): 16-bit, labelled
     /// BT.2100 HLG, whatever the caller's format); otherwise, when the
-    /// caller's format `keepsDepth`, PR-9's still (`DeepStillFrame.shows`) or
-    /// PR-12's track (`shows`), asked in that order.
+    /// caller's format `keepsDepth`, PR-20's graphic (`Exporter.drawsGraphic`,
+    /// which opens no file), PR-9's still (`DeepStillFrame.shows`) or PR-12's
+    /// track (`shows`), asked in that order.
     static func reads(
         _ project: ReelProject, _ built: BuiltComposition, urls: [UInt32: URL], at t: Ticks,
         options: RecipeOptions, keepsDepth: Bool
     ) -> Bool {
         project.plan?.output == .hlg
             || (keepsDepth
-                && (DeepStillFrame.shows(project, urls: urls, at: t, options: options)
+                && (Exporter.drawsGraphic(project, at: t, options: options)
+                    || DeepStillFrame.shows(project, urls: urls, at: t, options: options)
                     || shows(project, built, at: t, options: options)))
     }
 
