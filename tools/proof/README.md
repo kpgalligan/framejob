@@ -25703,6 +25703,15 @@ lines PR-19 changed, were run again and caught. PR-19 withdrew PR-17's and PR-18
 the measurement of their own mutants on the new coverage, which survived: GM 0.0839 and GMg 0.0836,
 under the bound, with no dither noise.
 
+**Since #600**: `MattePool.beginFrame(width:height:deep:)` has no default, so a call that leaves
+the frame's depth out does not compile; the probe's six shallow frames and
+`cursor_spike/blur_spike.swift` pass `deep: false`, the value the default gave. With the default
+gone and those calls unchanged, `matte_pool_probe.py` scored B0 FAIL, "missing argument for
+parameter 'deep' in call" at the probe's lines 60, 76, 95, 109, 114 and 134, and `swift_build.py
+typecheck --define FRAMEJOB_DEV_TOOLS` of the spike failed with it at line 182. With them passing
+`deep: false`: 5/5, the coverages 8,880,128 and 17,235,968 bytes as above, `depth-kept` still
+fails P4, and the spike typechecks.
+
 ## Issue #566 — a graphic is a deep source of a saved frame (`raster_dither_proof.py` DG, DGf, DGv, DGo, DGj, DGs; `png_read.py` R1–R5; four mutants; spec §11 PR-20)
 
 **What it proves.** A `render_frame` or Save Frame… as PNG or HEIC of a frame whose recipe draws

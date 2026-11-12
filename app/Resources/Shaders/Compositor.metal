@@ -2013,7 +2013,8 @@ static inline float4 layerColorPremultiplied(Varyings in,
     }
 
     // (7c) The matte coverage (spec §11 MT-3, MT-6): the product of every
-    // matte cutting this layer, resolved into one r8 texture the size of the
+    // matte cutting this layer, resolved into one coverage texture (`r8Unorm`,
+    // or `r16Unorm` in a frame delivered deep, spec §11 PR-19) the size of the
     // destination, sampled at the fragment's canvas-normalised position — so
     // Preview Quality, the shadow's canvas-sized silhouette pass and the
     // reflection, which lands where it lands, all read one coverage. An
@@ -2367,9 +2368,10 @@ struct MatteUniforms {
 };
 
 // One matte's value at this pixel, from its composite — PREMULTIPLIED, in
-// encoded sRGB like every stage above — multiplied into the r8 coverage by
-// the pipeline (source factor zero, destination factor sourceColor), so a
-// layer cut by two mattes reads their product. The composite and the
+// encoded sRGB like every stage above — multiplied into the coverage
+// (`r8Unorm`, or `r16Unorm` in a frame delivered deep, spec §11 PR-19) by the
+// pipeline (source factor zero, destination factor sourceColor), so a layer
+// cut by two mattes reads their product. The composite and the
 // coverage are both the destination's size, so the pixel is read, not
 // sampled. Luma is Rec. 709 over the premultiplied colour, the saturation
 // stage's weights, so a transparent pixel counts as black.

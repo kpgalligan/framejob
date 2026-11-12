@@ -98,7 +98,7 @@ final class MattePool {
     /// Starts a frame `width` × `height`, `deep` when the frame is delivered
     /// deeper than 8 bits (`RecipeSource.deliversDeep`): a size change drops
     /// every target, a depth change every coverage, and every composite is free.
-    func beginFrame(width: Int, height: Int, deep: Bool = false) {
+    func beginFrame(width: Int, height: Int, deep: Bool) {
         if width != self.width || height != self.height {
             self.width = width
             self.height = height

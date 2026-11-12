@@ -57,7 +57,7 @@ var pool: [String: Any] = ["device": device.name]
 // give are two targets.
 do {
     let subject = MattePool(device: device)
-    subject.beginFrame(width: 64, height: 64)
+    subject.beginFrame(width: 64, height: 64, deep: false)
     let first = subject.takeComposite()
     if let first { subject.giveComposite(first) }
     let second = subject.takeComposite()
@@ -73,7 +73,7 @@ do {
     let subject = MattePool(device: device)
     var after: [String: [Int]] = [:]
     for frame in 1...31 {
-        subject.beginFrame(width: 64, height: 64)
+        subject.beginFrame(width: 64, height: 64, deep: false)
         if frame == 1 {
             _ = subject.takeComposite()
             _ = subject.takeComposite()
@@ -92,7 +92,7 @@ do {
     let subject = MattePool(device: device)
     var after: [String: [Int]] = [:]
     for frame in 1...50 {
-        subject.beginFrame(width: 64, height: 64)
+        subject.beginFrame(width: 64, height: 64, deep: false)
         if frame == 20 {
             _ = subject.takeComposite()
             _ = subject.coverage(0)
@@ -106,12 +106,12 @@ do {
 // P3: a new size empties the pool and makes targets of that size.
 do {
     let subject = MattePool(device: device)
-    subject.beginFrame(width: 64, height: 64)
+    subject.beginFrame(width: 64, height: 64, deep: false)
     let old = subject.takeComposite()
     _ = subject.coverage(0)
     subject.endFrame()
     let before = held(subject)
-    subject.beginFrame(width: 32, height: 16)
+    subject.beginFrame(width: 32, height: 16, deep: false)
     let emptied = held(subject)
     let composite = subject.takeComposite()
     let coverage = subject.coverage(0)
@@ -131,7 +131,7 @@ do {
 // each depth, as the device reports them.
 do {
     let subject = MattePool(device: device)
-    subject.beginFrame(width: 64, height: 64)
+    subject.beginFrame(width: 64, height: 64, deep: false)
     let composite = subject.takeComposite()
     let shallow = subject.coverage(0)
     subject.endFrame()
