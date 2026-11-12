@@ -25778,7 +25778,7 @@ APNG frame).
 with an image past its limit (no paid call is made); a graphic inside a nest or as a matte member
 on a saved frame, which take the same recipe test.
 
-## Issues #605 and #604 — a gradient shape a deep source of a saved frame, and `render_frame`'s image block a copy (`raster_dither_proof.py` G0, GV, GEa, GMr, BK1–BK5, BKk; `phase6_proof.py` 9–13; `matte_proof.py` L1–L3; `precision_proof.py` P1; six mutants; spec §11 PR-21, PR-22)
+## Issues #605 and #604 — a gradient shape a deep source of a saved frame, and `render_frame`'s image block a copy (`raster_dither_proof.py` G0, GV, GEa, GMr, BK1–BK6, BKk; `phase6_proof.py` 9–13; `matte_proof.py` L1–L3; `precision_proof.py` P1; seven mutants; spec §11 PR-21, PR-22)
 
 **What it proves.** PR-21: a `render_frame` or Save Frame… as PNG or HEIC of a frame whose recipe
 draws a shape with a gradient is read through export's reader and is deep, beside anything, its
@@ -25807,13 +25807,20 @@ block is the file's bytes and no sentence. BK3: the footage alone (8-bit), the b
 bytes and no sentence. BK4: BK1's frame as HEIC, the file 10 bits a sample, its default block an
 8-bit PNG with the HEIC sentence, and with `full_depth_image: true` `image/heic` and the file's
 bytes. BK5: `full_depth_image: "yes"` refused by name, and `tools/list` publishes it as a
-boolean. BKk, printed: a 3840×2160 frame of the same footage under `flat`, its file's and
-default block's base64. DGs now prints each frame's default block beside its file.
+boolean. BK6 (#611): an HLG project, D6's recipe under its own name (a `band374` clip,
+`set_canvas {output: "hlg"}`, the output read back), BK1's rule without its size premise (a
+graphic's frame is small): the file 16-bit, the block `image/png`, 8-bit, the file's size, every
+sample within 1 level of the file's rounded, the copy sentence and "Written to <path>." last. It
+is the one row whose copy is drawn in BT.2100 HLG. BKk, printed: a 3840×2160 frame of the same
+footage under `flat`, its file's and default block's base64. DGs now prints each frame's default
+block beside its file. An app mutant may name rows it must leave passing (`KEPT_ROWS`): they run
+beside the rows it must fail, and MUTANT PASS needs both.
 
     tools/proof/work/raster-dither-oldbase/tree: tree_copy.make_base_copy(dest, "d530de3a^"), then make app-debug there
     RC_PROOF_APP=<that tree's Frame Job Debug.app> python3 tools/proof/raster_dither_proof.py capture tools/proof/work/rd-base-d530de3a-parent
     RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py --base tools/proof/work/rd-base-d530de3a-parent
     python3 tools/proof/raster_dither_proof.py --app-mutant NAME --base tools/proof/work/rd-base-d530de3a-parent
+    python3 tools/proof/raster_dither_proof.py --app-mutant hlg-block-not-copied --base <any folder: the BK rows read none>
 
 **The other proofs whose frames changed.** A frame of a gradient shape is a 16-bit PNG since
 PR-21. `phase6_proof.py`'s `Frame` reads a 16-bit PNG through `png_read.rows8` (to the nearest
@@ -25842,6 +25849,15 @@ F2) needing PR-13's `--control`, which was not made; D3, D4, G3 and E1 pass agai
 `phase6_proof.py` 168/168, `matte_proof.py` 46/46, `precision_proof.py --only C0,D1,P1` 4/4 (P1
 RMS 0.357 10-bit steps), all on Release.
 
+**Recorded, #611** (2026-11-12, Release; Debug read the same figures). BK6: the canvas read back
+`hlg`; the file a 16-bit PNG of 2,479,136 bytes (base64 3,305,516); the block `image/png`, an
+8-bit PNG of 1920×1080, base64 458,472, worst |block − file/257| 1 over 8,294,400 samples (the
+copy in BT.2100 HLG rounds only, as BK1's in BT.709 does), the copy sentence present and
+"Written to <path>." last. No app code changed, so BK6 is green on the tree before the row too:
+the mutant below is its red. The whole run with no `--base` and no `--control` 28/45: the
+seventeen failing are B1–B4b, F1 and F2 (PR-13's `--control`) and E1, D3, D4, G3, GEa–GEd, GMe
+and DGj (a base capture), neither made; BK1–BK6, D6, G6 and Z1 pass.
+
 **Mutants** (each caught, Debug tree copies against the d530de3a^ base): `gradient-not-a-source`
 (the arm gone) fails G0 and GV (8-bit PNGs) and G5 (26 distinct greens, worst 0.9602: its
 generator path no longer re-reads a gradient); `flat-shape-a-source` (every shape a source) fails
@@ -25854,7 +25870,13 @@ fails BK4. `shape-generator-frame-not-deep` went with the code PR-21 removed;
 under it: the 8-bit coverage); `shape-always-deep` is scored on GEa's door and GEd (both fail).
 Run again where this change moved their anchors or rows, each caught: `graphic-not-a-source` (DG,
 DGf, DGv, D5, D7), `graphic-anywhere` (DGo), `frame-matte-not-reread` (GMf),
-`sdr-version-marked` (GEb).
+`sdr-version-marked` (GEb). #611 (2026-11-12, Debug tree copies, `--base` an empty folder):
+`hlg-block-not-copied` (`eightBitPNG` refusing a frame labelled BT.2100 HLG) fails BK6, its block
+the 16-bit file (base64 3,305,516) with no copy sentence, while BK1–BK5, its `KEPT_ROWS`, pass
+under it. `block-is-the-file` scored the same way (BK6 to fail, BK1–BK5 kept; in memory, the
+table not edited) is MUTANT FAILURE, BK1 and BK4 broken: the kept rows are what tell a copy
+refused in one space from one refused in all. `heic-block-follows-file`, run again under the
+changed `run_app_mutant`, still fails BK4 alone and prints as before.
 
 **Not measured here.** What the API does with any image (no paid call; `docs/manual-checks.md`
 AS-11 is a person's check with a real key); how a saved gradient looks (PRC-7).

@@ -258,10 +258,16 @@ into a sibling file.
     false." and the argument published as a boolean. On the owner's footage (DGs, printed,
     Release only), the default block against the file, base64: the title over the 8-bit cut
     2,326,800 against 5,560,860; the cut beside a 16-bit still 2,806,964 against 6,744,504; the
-    iPhone clip itself 3,210,716 against 9,328,440; all three under the limit unscaled.
+    iPhone clip itself 3,210,716 against 9,328,440; all three under the limit unscaled. In an HLG
+    project (BK6, #611, a graphic alone): the block an 8-bit PNG of the file's size, the copy
+    drawn in BT.2100 HLG, base64 458,472 against the 16-bit file's 3,305,516, every sample within
+    one level of the file's rounded (the worst 1, over 8,294,400), with the copy sentence.
   - Mutants (Debug tree copies, each caught): `block-is-the-file` (BK1, BK4),
     `full-depth-ignored` (BK2, BK4), `block-always-recoded` (BK3, on the copy sentence alone: an
-    8-bit frame's re-encoded PNG is byte-identical to its file), `heic-block-follows-file` (BK4).
+    8-bit frame's re-encoded PNG is byte-identical to its file), `heic-block-follows-file` (BK4),
+    `hlg-block-not-copied` (#611: the copy refused in BT.2100 HLG only, so BK6's block is the
+    16-bit file with no sentence, while BK1–BK5 pass under it; `block-is-the-file` scored the
+    same way breaks BK1 and BK4).
   - No op, recipe, FFI or format change; the catalog gains one argument of an app-state tool.
   - Amends PR-4 and PR-9 (no `depth` argument: still none for the file) and PR-20 (whether the
     image block should be bounded, held for the owner, is decided here).

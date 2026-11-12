@@ -242,11 +242,18 @@ only (`blk1080`: a 1 s 1920×1080 `testsrc2` with temporal noise, 8-bit H.264 at
   `full_depth_image: true` the block is `image/heic` and the file's bytes.
 - **BK5** `full_depth_image: "yes"` is refused naming the argument, and
   `tools/list` publishes `full_depth_image` as a boolean.
+- **BK6** (#611) an HLG project, D6's recipe under its own name (a `band374`
+  clip, `set_canvas {output: "hlg"}`), default: the canvas reads back `hlg`;
+  the file is a 16-bit PNG; the block, the copy drawn in BT.2100 HLG, is
+  `image/png`, an 8-bit PNG of the file's width and height, every sample within
+  1 level of the file's rounded to 8 bits; the copy sentence, and "Written to
+  <path>." last. BK1's size premise is not asserted: a graphic's frame is small.
 - **BKk**, printed and NOT scored: a 3840×2160 `testsrc2` frame under `flat` on
   a 3840×2160 canvas, the file's and the default block's base64 bytes beside the
   limit (an 8-bit block is not bounded by size, PR-22's last bullet).
-On a `capture` by an app before PR-22, BK1, BK2, BK4 and BK5 FAIL (the block is
-the file, an `image/heic` one for a HEIC, and `full_depth_image` is a stranger).
+On a `capture` by an app before PR-22, BK1, BK2, BK4, BK5 and BK6 FAIL (the
+block is the file, an `image/heic` one for a HEIC, and `full_depth_image` is a
+stranger).
 
 `capture DIR` runs every row and keeps every file in DIR; its own files are
 the control it is scored against, so on the control tree B1, B3, B4a and B4b
@@ -267,7 +274,8 @@ the mutant is caught when the build fails naming it. MUTANT PASS when every
 named test FAILED. PR-15's app mutants are `--app-mutant NAME`: `app/`,
 `core/`, `graphic/` and the rest of the tree copied by `tree_copy`, the anchor
 replaced, the Debug app built there, and the named rows run against it with
-`--base`; MUTANT PASS when every named row FAILED. PR-16's app mutants
+`--base`; MUTANT PASS when every named row FAILED, and every row `KEPT_ROWS`
+names for the mutant (run beside them) passed (#611). PR-16's app mutants
 (`shape-never-deep` … `sdr-version-marked`; `shape-always-deep` scored on GEa's
 APNG door and GEd since PR-21, `reread-not-marked`, PR-14's mark, on GMr, and
 `shape-generator-frame-not-deep` gone with the code PR-21 removed) run the same
@@ -283,10 +291,11 @@ graphics left 8-bit) run against PR-20's base; PR-15's
 `generator-frame-not-deep` and `reread-not-deep` went with the code PR-20
 removed (a frame with a graphic no longer reaches the generator's paths).
 PR-21's two (`gradient-not-a-source`, the arm gone: G0, GV, G5;
-`flat-shape-a-source`, every shape counted: DGo) and PR-22's four
+`flat-shape-a-source`, every shape counted: DGo) and PR-22's five
 (`block-is-the-file`: BK1, BK4; `full-depth-ignored`: BK2, BK4;
 `block-always-recoded`, an 8-bit PNG copied too: BK3; `heic-block-follows-file`:
-BK4) run against any base.
+BK4; `hlg-block-not-copied`, #611, the copy refused in BT.2100 HLG only: BK6,
+with BK1–BK5 kept passing) run against any base.
 
 Exit 0 when every scored row passes (a mutant: caught); 1 when one failed (a
 mutant: survived); 2 when the control could not be performed.
@@ -330,7 +339,7 @@ SEC = 600_000
 ROWS = ["B1", "B2", "B3", "B4a", "B4b", "F1", "F2", "S1", "E1", "D1", "D3", "D4", "D5", "D6",
         "D7", "G0", "G1", "G3", "G5", "G6", "G7", "GV", "GEa", "GEb", "GEc", "GEd", "GM", "GMg",
         "GMc", "GMs", "GMe", "GMf", "GMr", "DG", "DGf", "DGv", "DGo", "DGj", "DGs", "BK1", "BK2",
-        "BK3", "BK4", "BK5", "BKk", "Z1"]
+        "BK3", "BK4", "BK5", "BK6", "BKk", "Z1"]
 # Every file a run keeps, by the row that writes it (L1–L3 are printed only).
 FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B3a": "b3-apng.png",
          "B4a": "b4a-prores.mov",
@@ -360,7 +369,9 @@ FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B3a": "b3-apng.png",
          "BK1": "bk1-frame.png", "BK1b": "bk1-block.png", "BK2": "bk2-frame.png",
          "BK2b": "bk2-block.png", "BK3": "bk3-frame.png", "BK3b": "bk3-block.png",
          "BK4": "bk4-frame.heic", "BK4b": "bk4-block.png", "BK4f": "bk4f-frame.heic",
-         "BK4fb": "bk4f-block.heic", "BKk": "bkk-frame.png", "BKkb": "bkk-block.png"}
+         "BK4fb": "bk4f-block.heic", "BKk": "bkk-frame.png", "BKkb": "bkk-block.png",
+         # #611: an HLG project's deep frame and its block.
+         "BK6": "bk6-frame-hlg.png", "BK6b": "bk6-block-hlg.png"}
 # Spec §11 PR-16's fixture: the shape's gradient, and its exact G in levels.
 SHAPE_FROM, SHAPE_TO = (13, 21, 18), (42, 79, 61)    # #0D1512 at x 0, #2A4F3D at x 1920
 SHAPE_563 = {"kind": "rectangle", "stroke": None, "width": W, "height": H, "fill": [1, 1, 1, 1],
@@ -624,7 +635,17 @@ APP_MUTANTS = {
     "heic-block-follows-file": ([(f"{SOURCES}/FrameBlock.swift",
                                   "        case .heic: return true\n",
                                   "        case .heic: return false\n")], ["BK4"]),
+    # #611: the copy cannot be made in the BT.2100 HLG space only, so an HLG project's block
+    # falls back to the 16-bit file (BK6) while every BT.709 block is a copy (`KEPT_ROWS`).
+    "hlg-block-not-copied": ([(f"{SOURCES}/FrameBlock.swift",
+                               "        guard labelled.width > 0, labelled.height > 0,",
+                               "        guard !FrameWriter.isHLG(labelled), labelled.width > 0, "
+                               "labelled.height > 0,")], ["BK6"]),
 }
+# The rows an app mutant must leave PASSING, beside the ones it must fail: what tells a mutant
+# that acts in one case from one that acts in all (#611: `block-is-the-file` fails BK6 too).
+# A mutant with no row here is scored on its failing rows alone.
+KEPT_ROWS = {"hlg-block-not-copied": ["BK1", "BK2", "BK3", "BK4", "BK5"]}
 CORE_PATCH = "[patch.crates-io]\n"
 
 rows = {}
@@ -1273,7 +1294,8 @@ def run_sizes(client, files):
 
 def run_blocks(client, files):
     """Spec §11 PR-22's frames (#604), each through `Doc.frame_block`: `blk1080` under `flat`
-    (BK1, BK2, BK4), alone (BK3, BK5), and a 3840×2160 one under `flat` (BKk, printed)."""
+    (BK1, BK2, BK4), alone (BK3, BK5), a 3840×2160 one under `flat` (BKk, printed), and an HLG
+    project's `band374` clip, D6's recipe under its own name (BK6, #611)."""
     closed = True
     clip = (fixture("blk1080.mov", block_footage("1920x1080"))
             if selected & {"BK1", "BK2", "BK3", "BK4", "BK5"} else None)
@@ -1312,6 +1334,22 @@ def run_blocks(client, files):
                                           FILES.get(block, f"{key.lower()}-block.png"), **extra)
             if BLOCKS[key]["ok"]:
                 files[key], files[block] = BLOCKS[key]["file"], BLOCKS[key]["block"]
+        closed = doc.close() and closed
+    if "BK6" in selected:
+        # A graphic alone is deep (PR-20), and the HLG project's frame is labelled BT.2100 HLG,
+        # the space the copy is drawn in. The canvas is read back, or the row is BK1 again.
+        doc = Doc(client, "blockhlg", "band374", BAND_JS)
+        made, why = doc.clip() if doc.ok else (False, doc.why)
+        if made:
+            got = doc.call("set_canvas", output="hlg")
+            made, why = got["ok"], f"set_canvas: {got.get('error', '')}"
+        if made:
+            BLOCKS["BK6output"] = (doc.project().get("canvas") or {}).get("output")
+            BLOCKS["BK6"] = doc.frame_block(FILES["BK6"], FILES["BK6b"])
+            if BLOCKS["BK6"]["ok"]:
+                files["BK6"], files["BK6b"] = BLOCKS["BK6"]["file"], BLOCKS["BK6"]["block"]
+        else:
+            print(f"       blockhlg project: {why}", flush=True)
         closed = doc.close() and closed
     if "BK5" in selected:
         try:
@@ -2009,6 +2047,28 @@ def score_blocks(files):
         check("BK5 full_depth_image: \"yes\" is refused naming the argument, and tools/list "
               "publishes full_depth_image as a boolean", refused and schema.get("type") == "boolean",
               f"answer {got.get('error') if not got['ok'] else 'ok'}; schema {schema}")
+    if "BK6" in selected:
+        # BK1's rule in the BT.2100 HLG space (#611), less its size premise: a graphic's frame
+        # is small, and the limit is BK1's subject.
+        got = BLOCKS.get("BK6") or {"ok": False, "error": "not run"}
+        output = BLOCKS.get("BK6output")
+        file = png_bytes(got["file"]) if got["ok"] else None
+        block = png_header(got["block"]) if got["ok"] else None
+        close, worst, count = (within_a_level(got["file"], got["block"]) if got["ok"]
+                               else (False, None, 0))
+        good = (got["ok"] and output == "hlg" and file is not None and file[0] == 16
+                and got["mime"] == "image/png" and block is not None and block[2] == 8
+                and block[:2] == file[1:3] and close and COPY_PNG in got["text"]
+                and written_last(got))
+        check("BK6 render_frame of an HLG project's band374 clip (D6's recipe), default: the "
+              "canvas reads back hlg; the file a 16-bit PNG; the block an 8-bit PNG of its size, "
+              "every sample within 1 level of the file's; the copy sentence, and the text still "
+              "ends naming the file", good,
+              (f"canvas output {output}; file {file[0]}-bit {file[1]}×{file[2]}, {file[3]:,} "
+               f"bytes, base64 {file[4]:,}; {block_shown(got)} {block[0]}×{block[1]}; worst "
+               f"|block − file/257| {worst} over {count:,} samples; copy "
+               f"sentence {COPY_PNG in got['text']}; written last {written_last(got)}"
+               if file and block else f"canvas output {output}; {got.get('error', 'not read')}"))
     if "BKk" in selected:
         got = BLOCKS.get("BKk") or {"ok": False, "error": "not run"}
         file = png_bytes(got["file"]) if got["ok"] else None
@@ -2148,9 +2208,12 @@ def run_mutant(name):
 
 def run_app_mutant(name, base):
     """An app mutant (spec §11 PR-15): the tree copied, the anchor replaced,
-    the Debug app built there and the named rows run against it."""
+    the Debug app built there and the named rows run against it, with its `KEPT_ROWS`,
+    which must pass (#611)."""
     edits, named = APP_MUTANTS[name]
-    print(f"#374, #563 — the {name} APP MUTANT ({' '.join(named)} must FAIL)", flush=True)
+    kept = KEPT_ROWS.get(name, [])
+    print(f"#374, #563 — the {name} APP MUTANT ({' '.join(named)} must FAIL"
+          + (f"; {' '.join(kept)} must pass" if kept else "") + ")", flush=True)
     tree = BASE / f"app-mutant-{name}"
     made, why = tree_copy.make_copy(str(tree))
     if made is None:
@@ -2170,24 +2233,28 @@ def run_app_mutant(name, base):
         print(f"mutant {name}: the control could not be performed — {why}")
         return 2
     got = bounded.run(
-        [sys.executable, str(Path(__file__).resolve()), "--only", ",".join(named + ["Z1"]),
-         "--base", str(base)],
+        [sys.executable, str(Path(__file__).resolve()), "--only",
+         ",".join(named + kept + ["Z1"]), "--base", str(base)],
         CARGO_BOUND, cwd=str(ROOT), env=bounded.child_env({"RC_PROOF_APP": str(app)}))
     output = got["stdout"] + got["stderr"]
     (BASE / f"app-mutant-{name}.log").write_text(output)
     for line in output.splitlines():
         if line.startswith(("  ok ", "  FAIL")):
             print(f"  {line}")
-    ran = [row for row in named if f"  FAIL {row} " in output or f"  ok   {row} " in output]
+    ran = [row for row in named + kept
+           if f"  FAIL {row} " in output or f"  ok   {row} " in output]
     survived = [row for row in named if f"  FAIL {row} " not in output]
-    if len(ran) != len(named):
-        print(f"mutant {name}: the control could not be performed — rows {named} did not all "
-              f"run (rc {got['rc']}); see {BASE / f'app-mutant-{name}.log'}")
+    broken = [row for row in kept if f"  ok   {row} " not in output]
+    if len(ran) != len(named + kept):
+        print(f"mutant {name}: the control could not be performed — rows {named + kept} did not "
+              f"all run (rc {got['rc']}); see {BASE / f'app-mutant-{name}.log'}")
         return 2
-    caught = not survived
+    caught = not survived and not broken
     print(f"{'MUTANT PASS' if caught else 'MUTANT FAILURE'}: {name} — {' '.join(named)} "
-          f"{'all FAILED' if caught else 'did not all fail'} (survived: "
-          f"{', '.join(survived) or 'none'})")
+          f"{'all FAILED' if not survived else 'did not all fail'} (survived: "
+          f"{', '.join(survived) or 'none'})"
+          + (f"; {' '.join(kept)} {'all passed' if not broken else 'did not all pass'} "
+             f"(broken: {', '.join(broken) or 'none'})" if kept else ""))
     tree_copy.remove_tree(str(tree))
     return 0 if caught else 1
 
