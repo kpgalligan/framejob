@@ -62,8 +62,16 @@ audio_ap6_proof.py's V2, V12 and V13.
       volume stays off, 0.01 dB over goes on, a limiter already on is not
       asked; `AudioNormalize.ceilingLimiter`: the default at −1 dBTP, a
       clip's own lowered to −1 or kept under it.
+  E18 (AU-167, #607) `verifiedLimit`: at ×2 0.11 LU short or over
+      `verify_renders`, 0.09 nil; at ×32 0.11 short `max_gain`, 0.09 nil,
+      0.11 over `verify_renders`; at ×31.9 5 LU short `verify_renders`.
+      `limitNote`: none nil; the ceiling's clips alone today's sentence byte
+      for byte; a verify clip named with `verify_renders` and a limiter, no
+      `max_gain`; both, the tail once. `AudioEnhance.loudnessReason`: landed
+      "."; the ceiling's clause kept; the verify bound "short of" or "over"
+      with a limiter and not "would pass".
 
---mutants runs M1–M6 and M8–M26 (M7 is the loudness probe's), each over its
+--mutants runs M1–M6 and M8–M31 (M7 is the loudness probe's), each over its
 own copy of app/Sources, scored killed when its named row fails. Build failures
 are scored. Needs samples/Rode-usb-mic.m4a. Output is under
 tools/proof/work/audio-ap6-probe.
@@ -81,7 +89,7 @@ RODE = ROOT / "samples/Rode-usb-mic.m4a"
 WORK = ROOT / "tools/proof/work/audio-ap6-probe"
 FIXTURES = WORK / "fixtures"
 ROWS = ["E1", "E2", "E3", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13", "E14", "E15",
-        "E16", "E17"]
+        "E16", "E17", "E18"]
 
 MUTANTS = [
     ("M1 noisy-gap", "E1", "AudioEnhance.swift",
@@ -158,6 +166,23 @@ MUTANTS = [
     ("M26 limiter-never-goes-on", "E17", "LoudnessMeasureRun.swift",
      "limiter == nil && truePeak * volume > pow(10, AudioNormalize.ceilingDBTP / 20)",
      "false && limiter == nil && truePeak * volume > 0"),
+    # AU-167 (#607): the verify bound named, apart from the ceiling, in every reader.
+    ("M27 verify-threshold-1lu", "E18", "AudioNormalize+Loudness.swift",
+     "if abs(resultLUFS - targetLUFS) > tolerance { return .verifyRenders }",
+     "if abs(resultLUFS - targetLUFS) > 1.0 { return .verifyRenders }"),
+    ("M28 verify-bound-unnamed", "E18", "AudioNormalize+Loudness.swift",
+     "if abs(resultLUFS - targetLUFS) > tolerance { return .verifyRenders }",
+     "if abs(resultLUFS - targetLUFS) > tolerance { return nil }"),
+    ("M29 verify-before-ceiling", "E18", "AudioNormalize+Loudness.swift",
+     "        if volume >= maxGain && resultLUFS < targetLUFS - tolerance { return .maxGain }\n"
+     "        if abs(resultLUFS - targetLUFS) > tolerance { return .verifyRenders }\n",
+     "        if abs(resultLUFS - targetLUFS) > tolerance { return .verifyRenders }\n"
+     "        if volume >= maxGain && resultLUFS < targetLUFS - tolerance { return .maxGain }\n"),
+    ("M30 note-every-limit-the-ceiling", "E18", "AudioNormalize+Loudness.swift",
+     "let clips = rows.filter { $0.limit == limit }",
+     "let clips = rows.filter { $0.limit != nil && limit == .maxGain }"),
+    ("M31 reason-every-limit-the-ceiling", "E18", "AudioEnhance+Reasons.swift",
+     "case .maxGain?:", "case .maxGain?, .verifyRenders?:"),
 ]
 
 

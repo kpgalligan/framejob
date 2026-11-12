@@ -315,8 +315,8 @@ final class LoudnessMeasureRun: AudioMeasureRunning {
             self.solved[job.reading.clip] = AudioNormalize.Solved(
                 volume: volume, limiter: step.limiter, resultLUFS: result,
                 resultTruePeakDBTP: peak > 0 ? 20 * log10(peak) : -.infinity,
-                limit: volume >= AudioNormalize.maxGain
-                    && result < target - Self.verifyToleranceLU ? .maxGain : nil,
+                limit: AudioNormalize.verifiedLimit(
+                    volume: volume, resultLUFS: result, targetLUFS: target),
                 renders: renders + 1)
             self.advance()
         }

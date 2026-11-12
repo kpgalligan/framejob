@@ -27763,7 +27763,7 @@ runs only those parts while iterating; a recorded run sets nothing.
 | Row | What it holds |
 |---|---|
 | V1 | the owner's row (measurements, `set`, reasons, `processed_lufs`, `renders`) printed; `set` exactly the nine keys (the leveller since AP6b), held by `get_project` |
-| V2 | its export at −16 ±0.5 LUFS, ≤ −1 dBTP by both meters, `limited_by` null, `result_lufs` within 0.2 LU of the export, renders ≥ 2; the press timed three times (two more on fresh projects, each rendering its isolation window cold) |
+| V2 | its export at −16 ±0.5 LUFS, ≤ −1 dBTP by both meters, `limited_by` what its figures say (null within 0.1 LU of −16; AU-167, below), `result_lufs` within 0.2 LU of the export, renders ≥ 2; the press timed three times (two more on fresh projects, each rendering its isolation window cold) |
 | V3 | the pause floor at least 10 dB under a Normalize-only export's |
 | V4 | a second `enhance_voice` and `normalize_clip` after it: "made no change" |
 | V5 | one undo, "Enhance Voice", then the import's audio group |
@@ -27778,8 +27778,8 @@ runs only those parts while iterating; a recorded run sets nothing.
 | V15 | At volume (the `option.display` part after the "At volume" label in `snapshot_ui`'s layout, the Sound sub-tab) after Enhance within ±0.2 of −16 with no "≈"; after an EQ change "≈ " and the tooltip |
 
 ```sh
-python3 tools/proof/audio_ap6_probe.py             # E1–E3, E6–E17
-python3 tools/proof/audio_ap6_probe.py --mutants   # M1–M6, M8–M26
+python3 tools/proof/audio_ap6_probe.py             # E1–E3, E6–E18
+python3 tools/proof/audio_ap6_probe.py --mutants   # M1–M6, M8–M31
 make app-debug && python3 tools/proof/proof_app.py launch
 python3 tools/proof/audio_ap6_proof.py <dir>/agent.sock
 ```
@@ -27795,7 +27795,7 @@ six mutants, the proof a part (`AP6_ONLY=actions`):
 | E12 | (unchanged) the memo's key names its document |
 | E13 | the memo's key survives the solve: on a clip with a base gate and an action whose end is a pan, R0's trial and the clip after `set_audio {volume: 2, limiter}` have one key, though their measurement plans differ (the core writes the base limiter into every automation point) |
 | E14 | the key follows an action's audio: another gate threshold or limiter ceiling at an end is another key; another end volume is not; a limiter keyed off at a later action's end is another key than the limiter left on |
-| V16 | the owner's recording with an EQ only at an action's end (1 s for 2 s): (a) At volume "≈" before any press; (b) `normalize_clip` −16: `processed_lufs` ≠ `measured_lufs`, renders ≥ 1, the export at −16 ±0.5, a second call "made no change"; (c) At volume after it −16 ±0.2, no "≈"; (d) the end also naming volume 0.5: one text with the playhead at 0 and inside the action; (e) another shelf gain at the end: "≈" again; (f) an end gate and limiter at −6 dBTP under the clip's own limiter, target −20: renders ≥ 2, `result_lufs` within 0.2 LU of the export, the export at −20 ±0.5, `limited_by` null; (g)–(j) AU-165's, below (until it, (g) printed the one-render arm's miss, NOT scored) |
+| V16 | the owner's recording with an EQ only at an action's end (1 s for 2 s): (a) At volume "≈" before any press; (b) `normalize_clip` −16: `processed_lufs` ≠ `measured_lufs`, renders ≥ 1, the export at −16 ±0.5, a second call "made no change"; (c) At volume after it −16 ±0.2, no "≈"; (d) the end also naming volume 0.5: one text with the playhead at 0 and inside the action; (e) another shelf gain at the end: "≈" again; (f) an end gate and limiter at −6 dBTP under the clip's own limiter, target −20: renders ≥ 2, `result_lufs` within 0.2 LU of the export, the export at −20 ±0.5, `limited_by` what its figures say (AU-167, below); (g)–(j) AU-165's, below (until it, (g) printed the one-render arm's miss, NOT scored) |
 
 | Mutant | Edit | Must fail |
 |---|---|---|
@@ -27820,7 +27820,7 @@ rows and six mutants, V16 four legs (`AP6_ONLY=actions`):
 | E15 | `endSetsLimiter` true for a limiter at an end, a null one and one beside a gate; false for an action of no duration, an end with no `limiter` key, the clip's own limiter alone and no clip; `verifiesByRender` over its four cases |
 | E16 | `Verified.holds` at its own volume and 0.04 dB away, not 0.06 dB away, under another limiter or at volume 0; a limited render not with none; the memo answers a verify render beside its R0 and the next R0 for the key drops it |
 | E17 | `limiterGoesOn`: R0's peak 0.01 dB under −1 dBTP at the volume stays off, 0.01 dB over goes on, a limiter already on is not asked; `AudioNormalize.ceilingLimiter`: the default at −1, a clip's own lowered to −1 or kept under it |
-| V16 | (g) an end gate and limiter at −24 dBTP, no limiter on the clip, target −30: renders ≥ 2, `limited_by` null, `result_lufs` within 0.2 LU of the export, the export at −30 ±0.5; At volume "≈" before the press, within 0.2 of the export with no "≈" after it, and "≈" with the action's-limiter tooltip at the volume ×1.2; (h) an end limiter at −12 dBTP alone, target −32: At volume "≈" before any press, `processed_lufs` not null, renders ≥ 2, `result_lufs` within 0.2 of the export, the export at −32 ±0.5, a second call "made no change"; (i) (g)'s clip with the target that puts R0's true peak at −1.3 dBTP at the plan's volume: the limiter on at −1 dBTP, the verify render's true peak ≤ −1 + 0.001, renders ≥ 2, `result_lufs` within 0.2 of the export, a second call "made no change"; (j) the clip's own limiter keyed off at an action's end (`off: ["audio.limiter"]`), target −20: renders ≥ 2, `result_lufs` within 0.2 of the export |
+| V16 | (g) an end gate and limiter at −24 dBTP, no limiter on the clip, target −30: renders ≥ 2, `limited_by` `verify_renders` since AU-167 (below), `result_lufs` within 0.2 LU of the export, the export at −30 ±0.5; At volume "≈" before the press, within 0.2 of the export with no "≈" after it, and "≈" with the action's-limiter tooltip at the volume ×1.2; (h) an end limiter at −12 dBTP alone, target −32: At volume "≈" before any press, `processed_lufs` not null, renders ≥ 2, `result_lufs` within 0.2 of the export, the export at −32 ±0.5, a second call "made no change"; (i) (g)'s clip with the target that puts R0's true peak at −1.3 dBTP at the plan's volume: the limiter on at −1 dBTP, the verify render's true peak ≤ −1 + 0.001, renders ≥ 2, `result_lufs` within 0.2 of the export, a second call "made no change"; (j) the clip's own limiter keyed off at an action's end (`off: ["audio.limiter"]`), target −20: renders ≥ 2, `result_lufs` within 0.2 of the export |
 
 | Mutant | Edit | Must fail |
 |---|---|---|
@@ -27840,6 +27840,33 @@ verifies, within its ±0.5; (i) five renders, the limiter on, −28.60 at −3.4
 started again from AU-24's plan, its count reset) was mutated by hand on a Debug build, the
 loop carrying on at the stepped volume under the limiter instead: (i)'s second call changed
 the volume (it answered "", not "made no change").
+
+**The verify bound named (#607, spec §11 AU-167, 2026-11-13).** The probe gains a row and five
+mutants, V16 two legs and four claims (`AP6_ONLY=actions`); `limit_of(row, target)` restates the
+rule from a row's own figures, and the rows that asserted `limited_by` null (V2, V13 (c), V16
+(f), V17's legs) assert it instead.
+
+| Row | What it holds |
+|---|---|
+| E18 | `verifiedLimit`: at ×2 0.11 LU short or over `verify_renders`, 0.09 nil; at ×32 0.11 short `max_gain`, 0.09 nil, 0.11 over `verify_renders`; at ×31.9 5 LU short `verify_renders`. `limitNote`: none nil; the ceiling's clips alone today's sentence byte for byte; a verify clip named with `verify_renders` and a limiter, no `max_gain`; both, the tail once. `AudioEnhance.loudnessReason`: landed "."; the ceiling's clause kept; the verify bound "short of" or "over" with a limiter, no "would pass" |
+| V16 | (g) also `limited_by` `verify_renders` more than 0.1 LU from −30 below ×32, and the note naming the clip, `verify_renders` and a limiter, no `max_gain`; (i) the same against its target; (k) `match_audio` on (i)'s clip, `eq: false`, the reference a plain clip of the recording placed after it at the volume that plays it at (i)'s target: `verify_renders` more than 0.1 LU from `target_lufs` below ×32 and the note; (l) `enhance_voice` −24 on (g)'s clip: `verify_renders` below ×32, the note, and the last reason "short of −24.0 LUFS" with a limiter and no "would pass" |
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M27 | the verify bound's threshold 1 LU | E18 |
+| M28 | the verify bound answers nil (the old behaviour) | E18 |
+| M29 | the verify bound tested before the ceiling | E18 |
+| M30 | the note puts every limited clip in the ceiling's sentence | E18 |
+| M31 | the reason gives the verify bound the ceiling's clause | E18 |
+
+Recorded 2026-11-11. Red on the tree before AU-167: the probe did not build (E18, `Limit` has no
+`verifyRenders`), and `AP6_ONLY=actions` on Debug passed 15 of 21: (f) −20.11 after four renders,
+(g) −30.249, (i) and (k) −28.595 at volume 28.37 after five, (l) −29.551 at 20.84 after four,
+each `limited_by` null with no note, and (l)'s reason ending at its renders. With it: the probe
+16/16, M27–M31 5/5 killed (every one of the 30 mutants' anchors found once), `AP6_ONLY=actions`
+21/21 on Debug; after `make gate`, the whole proof 86/86 on Release ((f) −20.11, (g) −30.249,
+(i) and (k) −28.595 and (l) −29.551 at 20.84, each `verify_renders` with the note; V2's export at
+−15.97 and every V17 leg null) and `loudness_normalize_proof.py` 37/37 on Release (N4 and N6 null).
 
 ## Road map "audio" AP12 — Match Audio (`audio_ap12_probe.py` P1–P9, `audio_ap12_proof.py` A1–A8; twelve mutants; spec §11 AU-120…AU-129)
 
@@ -32563,7 +32590,7 @@ decided: the owner's recording with a gate and the limiter at −1 dBTP, `normal
 
 | Row | What it holds |
 |---|---|
-| every leg | renders ≥ 2 and `limited_by` null (a verify render's reading, not the model's capped figure); R0's peak at the solved volume 3 dB or more over the ceiling (the limiter is working); the `audio_wav` export ≤ −1 dBTP by both meters; the tap's own output at the ceiling: `loudness_meter`'s true peak over a 6 s `play_preview` around the pre-master stem's largest sample ≤ −1 + 0.001 |
+| every leg | renders ≥ 2 and `limited_by` not `max_gain` and what its figures say (`limit_of`, AU-167: null within 0.1 LU of the target; a verify render's reading, not the model's capped figure); R0's peak at the solved volume 3 dB or more over the ceiling (the limiter is working); the `audio_wav` export ≤ −1 dBTP by both meters; the tap's own output at the ceiling: `loudness_meter`'s true peak over a 6 s `play_preview` around the pre-master stem's largest sample ≤ −1 + 0.001 |
 | (a) ×1, (b) ×1.5 and (f) ×0.75 Keep pitch off, (g) a Speed Dip to ×0.7 with Keep pitch on | rendered ahead of the tap: the verify render and the stem (`stems: tracks`) ≤ −1 + 0.001 |
 | (c) ×1.5, (d) ×0.5, (e) ×1.02 Keep pitch on, (h) ×1.5 Keep pitch on with #399's chain (target −16) | live: the verify render and the stem against the ceiling printed, NOT scored (AU-162) |
 

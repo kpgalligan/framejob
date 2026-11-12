@@ -239,8 +239,9 @@ Enhance at record time (B8) the third, with AU-68 and AU-69.
   v, AU-22) read through the fader at v gives R; while |R − T| > 0.1 LU, the volume can still
   move toward T (not at ×32 and short) and fewer than three verify renders have run,
   v ← min(v·10^((T − R)/20), ×32) and render again.
-  `limited_by` is `max_gain` when the last R is under T − 0.1 at ×32. Enhance and Loudness
-  Normalize solve the same way, so Normalize after Enhance measures what Enhance measured.
+  `limited_by` is `max_gain` when the last R is under T − 0.1 at ×32, else `verify_renders` when
+  it is more than 0.1 LU from T (AU-167). Enhance and Loudness Normalize solve the same way, so
+  Normalize after Enhance measures what Enhance measured.
   An action-end limiter verifies by render too, and the limiter can go on mid-loop: AU-165 (b).
   (f) **Idempotence.** A rendered clip that already carries the solved limiter and whose volume
   is within 0.05 dB of v keeps its volume, so a second press is an identity. 0.05 dB is twice

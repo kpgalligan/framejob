@@ -22,9 +22,11 @@ extension AudioNormalize {
     /// the target gets the clip limiter at this ceiling (AU-24).
     static let ceilingDBTP = -1.0
 
-    /// The cap that bit, when one did: only the volume ceiling is left (AU-24).
+    /// The cap that bit, when one did: the volume ceiling (AU-24), or the
+    /// verify renders running out away from the target (AU-167).
     enum Limit: String {
         case maxGain = "max_gain"
+        case verifyRenders = "verify_renders"
     }
 
     /// One clip's measurement, before any target.
@@ -220,6 +222,46 @@ extension AudioNormalize {
         }
         return LoudnessPlan(
             targetLUFS: target, ops: ops, normalized: normalized, skipped: input.problems)
+    }
+
+    /// AU-167, AU-64 (e): what stopped a solve the verify renders checked,
+    /// from its last render. The ceiling first: at `maxGain` and short by
+    /// more than the loop's tolerance. Otherwise a miss past the tolerance,
+    /// over or under, is the loop's bound: the loop goes on while it misses
+    /// and the volume can move, so it ended there only because
+    /// `LoudnessMeasureRun.maximumVerifyRenders` had run. nil when it landed.
+    static func verifiedLimit(volume: Double, resultLUFS: Double, targetLUFS: Double) -> Limit? {
+        let tolerance = LoudnessMeasureRun.verifyToleranceLU
+        if volume >= maxGain && resultLUFS < targetLUFS - tolerance { return .maxGain }
+        if abs(resultLUFS - targetLUFS) > tolerance { return .verifyRenders }
+        return nil
+    }
+
+    /// The `note` of `normalize_clip`, `enhance_voice` and `match_audio` for
+    /// the clips a limit stopped (AU-167): the ceiling's clips in the sentence
+    /// it has always had, the verify bound's in their own with its usual
+    /// cause, then where to read each landing once. nil when none has one.
+    static func limitNote(_ rows: [(clip: UInt32, limit: Limit?)], targetLUFS: Double) -> String? {
+        func ids(_ limit: Limit) -> String? {
+            let clips = rows.filter { $0.limit == limit }
+            return clips.isEmpty ? nil : clips.map { String($0.clip) }.joined(separator: ", ")
+        }
+        var sentences: [String] = []
+        if let ceiling = ids(.maxGain) {
+            sentences.append(
+                "Clip(s) \(ceiling) stopped short of \(targetLUFS) LUFS: the volume that reaches "
+                    + "it would pass the \(maxGainName) ceiling (limited_by max_gain).")
+        }
+        if let bound = ids(.verifyRenders) {
+            let tolerance = String(format: "%g", LoudnessMeasureRun.verifyToleranceLU)
+            sentences.append(
+                "Clip(s) \(bound) ended more than \(tolerance) LU from \(targetLUFS) LUFS: the "
+                    + "renders that check the volume ran out before it landed within "
+                    + "\(tolerance) LU (limited_by verify_renders), usually because a limiter "
+                    + "holds the sound down harder as the volume rises.")
+        }
+        guard !sentences.isEmpty else { return nil }
+        return (sentences + ["result_lufs says where each landed."]).joined(separator: " ")
     }
 
     /// AU-24's limiter for a clip that needs one: its own with the ceiling

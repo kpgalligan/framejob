@@ -97,9 +97,9 @@ In loudness mode:
 | `limiter` | The clip's limiter after the edit, or `null` for a volume alone. |
 | `result_lufs` | Where the clip lands. |
 | `result_true_peak_dbtp` | Its true peak after the edit, held at the limiter's ceiling. |
-| `limited_by` | `max_gain` when the volume ceiling stopped it short, otherwise `null`. |
+| `limited_by` | `max_gain` when the volume ceiling stopped it short. `verify_renders` when a clip measured through its processing was still more than 0.1 LU from the target after its test renders, usually because a limiter holds the sound down harder as the volume rises. Otherwise `null`. |
 
-Either mode adds `skipped`, one sentence per clip it left out, and `note` when the ceiling stopped a clip short. The rest are still normalised.
+Either mode adds `skipped`, one sentence per clip it left out, and `note` when the ceiling stopped a clip short or, in loudness mode, its test renders ran out away from the target. The note names those clips and why. The rest are still normalised.
 
 **Skips** by name a clip that plays no sound and a nest. Peak mode also skips one that's silent over the part that plays, or whose waveform hasn't been analysed yet. Loudness mode also skips one that plays under 0.4 s, is under −70 LUFS over the part that plays, or whose loudness hasn't been measured yet. In loudness mode a clip with processing is also skipped when its reversed copy is still being made, its processing can't be rendered, or it's under −70 LUFS after it. When every clip is skipped, the call fails with "Nothing could be normalized" and every reason.
 
@@ -146,7 +146,7 @@ It overwrites only `eq`, `isolation`, `noise_reduction`, `gate`, `leveller`, `de
 | `set` | Exactly the keys written, in `set_audio`'s spelling. |
 | `reasons` | One sentence per rule: the measurement, the threshold and what it set. |
 | `volume`, `processed_lufs`, `renders` | The volume written, the loudness through the new settings before it, and the renders it took. |
-| `result_lufs`, `result_true_peak_dbtp`, `limited_by` | Where the last render lands, and `max_gain` when the volume ceiling stopped it short. |
+| `result_lufs`, `result_true_peak_dbtp`, `limited_by` | Where the last render lands, and `limited_by` as `normalize_clip` answers it: `max_gain` when the volume ceiling stopped it short, `verify_renders` when its test renders ran out more than 0.1 LU from the target. |
 
 It adds `skipped` and `note` as `normalize_clip` does. A second call answers "Enhance Voice made no change".
 

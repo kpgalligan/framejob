@@ -7,7 +7,7 @@ import Foundation
 // compiled with app/Sources through swift_build, `app/Resources/Models`
 // beside the binary so the product's own speech pass runs. Arguments: the
 // fixtures folder (`rode.m4a`), a scratch folder. Prints one "ok"/"FAIL" line
-// per row, each row's name first (E1–E3, E6–E17), for audio_ap6_probe.py to
+// per row, each row's name first (E1–E3, E6–E18), for audio_ap6_probe.py to
 // score. Nothing here renders: the processed solve is the proof's (V2, V13).
 
 final class ProbeDocumentController: NSDocumentController {
@@ -400,6 +400,77 @@ do {
           chosen == LimiterProps(ceilingDb: -1) && lowered == LimiterProps(ceilingDb: -1, release: 1_200)
             && kept == LimiterProps(ceilingDb: -3, release: 1_200),
           "\(chosen), \(lowered), \(kept)")
+}
+
+// MARK: - E18 what stopped a verified solve away from its target (AU-167, #607)
+
+do {
+    let t = -16.0
+    let cases: [(String, Double, Double, AudioNormalize.Limit?)] = [
+        ("×2, 0.11 LU short", 2, t - 0.11, .verifyRenders),
+        ("×2, 0.11 LU over", 2, t + 0.11, .verifyRenders),
+        ("×2, 0.09 LU short", 2, t - 0.09, nil),
+        ("×2, 0.09 LU over", 2, t + 0.09, nil),
+        ("×32, 0.11 LU short", 32, t - 0.11, .maxGain),
+        ("×32, 0.09 LU short", 32, t - 0.09, nil),
+        ("×32, 0.11 LU over", 32, t + 0.11, .verifyRenders),
+        ("×31.9, 5 LU short", 31.9, t - 5, .verifyRenders),
+    ]
+    for (name, volume, result, wanted) in cases {
+        let got = AudioNormalize.verifiedLimit(volume: volume, resultLUFS: result, targetLUFS: t)
+        check("E18", "verifiedLimit at \(name): \(wanted?.rawValue ?? "nil")", got == wanted,
+              got?.rawValue ?? "nil")
+    }
+    // The tools' note: today's sentence for the ceiling's clips, byte for byte.
+    let ceilingOnly = "Clip(s) 3, 5 stopped short of -16.0 LUFS: the volume that reaches it would "
+        + "pass the 32× ceiling (limited_by max_gain). result_lufs says where each landed."
+    let none = AudioNormalize.limitNote([(clip: 3, limit: nil)], targetLUFS: -16)
+    let ceiling = AudioNormalize.limitNote(
+        [(clip: 3, limit: .maxGain), (clip: 4, limit: nil), (clip: 5, limit: .maxGain)],
+        targetLUFS: -16)
+    let verify = AudioNormalize.limitNote(
+        [(clip: 6, limit: nil), (clip: 7, limit: .verifyRenders)], targetLUFS: -24.417) ?? ""
+    let both = AudioNormalize.limitNote(
+        [(clip: 3, limit: .maxGain), (clip: 7, limit: .verifyRenders)], targetLUFS: -16) ?? ""
+    let tail = "result_lufs says where each landed."
+    check("E18", "limitNote: no limit, no note", none == nil, none ?? "nil")
+    check("E18", "limitNote: the ceiling's clips alone keep today's sentence exactly",
+          ceiling == ceilingOnly, ceiling ?? "nil")
+    check("E18", "limitNote: a verify bound's clip named with verify_renders and a limiter, no "
+            + "max_gain, the tail once",
+          verify.hasPrefix("Clip(s) 7 ") && verify.contains("-24.417 LUFS")
+            && verify.contains("(limited_by verify_renders)") && verify.contains("limiter")
+            && !verify.contains("max_gain") && verify.hasSuffix(tail)
+            && verify.components(separatedBy: tail).count == 2, verify)
+    check("E18", "limitNote: both, each clip in its own sentence, the tail once",
+          both.hasPrefix("Clip(s) 3 stopped short of -16.0 LUFS") && both.contains("Clip(s) 7 ")
+            && both.contains("(limited_by max_gain)") && both.contains("(limited_by verify_renders)")
+            && both.hasSuffix(tail) && both.components(separatedBy: tail).count == 2, both)
+    // Enhance's loudness reason, by case.
+    func row(_ lufs: Double, _ limit: AudioNormalize.Limit?) -> AudioNormalize.LoudnessResult {
+        var r = AudioNormalize.LoudnessResult(
+            clip: 1, media: 1, measuredLUFS: -41.6, truePeakDBTP: -18.5, volume: 20.8,
+            resultLUFS: lufs, resultTruePeakDBTP: -3.5, limit: limit,
+            limiter: LimiterProps(ceilingDb: -1))
+        r.processedLUFS = -39.4
+        r.renders = 4
+        return r
+    }
+    func reason(_ lufs: Double, _ limit: AudioNormalize.Limit?) -> String {
+        AudioEnhance.loudnessReason(row(lufs, limit), limiter: LimiterProps(ceilingDb: -1), target: -24)
+    }
+    let landed = reason(-24.05, nil)
+    let capped = reason(-29.1, .maxGain)
+    let short = reason(-29.55, .verifyRenders)
+    let over = reason(-23.8, .verifyRenders)
+    check("E18", "the reason: landed ends at its renders", landed.hasSuffix("(4 renders)."), landed)
+    check("E18", "the reason: the ceiling's clause kept",
+          capped.hasSuffix("(4 renders), short of −24.0 LUFS: the volume would pass 32×."), capped)
+    check("E18", "the reason: the verify bound short of the target names a limiter, not the ceiling",
+          short.contains("(4 renders), short of −24.0 LUFS: ") && short.contains("limiter holds")
+            && !short.contains("would pass"), short)
+    check("E18", "the reason: the verify bound over the target says over",
+          over.contains("(4 renders), over −24.0 LUFS: ") && !over.contains("would pass"), over)
 }
 
 // MARK: - E16 the verified figure's test (AU-165 (c))

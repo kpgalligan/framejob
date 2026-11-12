@@ -97,6 +97,8 @@ Processing that an [action](/motion/actions/) switches on part-way through the c
 
 With the limiter on as well, or a limiter that an action switches on or off, Normalize renders again at the volume it chose, and adjusts until the result is within 0.1 LU of the target, at most three times. How hard an action's limiter holds the sound down depends on the clip's volume, so only a render at that volume can say. If a clip without the limiter would need a volume that takes its true peak past −1 dBTP, Normalize turns the clip's limiter on at −1 dBTP and starts adjusting again from there. A clip measured this way keeps its volume when the new one is within 0.05 dB of it and its limiter hasn't changed, so a second press still changes nothing.
 
+If the last of those renders is still more than 0.1 LU from the target, Normalize keeps that volume and the clip lands off the target, above or below it. The usual cause is a limiter holding most of the clip down: turning the clip up makes it hold harder, so the loudness hardly moves. The button and the menu don't say so. `normalize_clip`'s answer does, with `limited_by` set to `verify_renders` and a note naming the clip.
+
 This takes a moment per clip, seconds on a long one, and the first press waits for the clip's voice isolation or voice effect to render. A clip with none of this processing is measured from the analysis at once.
 
 Until Normalize or Enhance Voice has measured such a clip, the **At volume** readout shows "≈" in front of its figures, because they're from before the processing. See [Clip volume](/audio/volume/).

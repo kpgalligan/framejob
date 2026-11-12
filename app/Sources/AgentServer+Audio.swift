@@ -320,7 +320,8 @@ extension AgentServer {
     /// true peak is the processed one), its processed loudness and the renders
     /// it took (null and 0 off the cache), the volume written, the clip's
     /// limiter after the edit (AU-24), where it lands, and the volume ceiling
-    /// when it stopped it short; a note names each such clip.
+    /// or the verify renders when either stopped it away from the target
+    /// (AU-167); a note names each such clip.
     private func normalizeLoudness(
         _ a: [String: Any], document: ProjectDocument, clips: [UInt32], stop: AgentCallCancel?
     ) throws -> String {
@@ -398,13 +399,10 @@ extension AgentServer {
         if !plan.skipped.isEmpty {
             fields["skipped"] = plan.skipped.map { $0.description }
         }
-        let limited = plan.normalized.filter { $0.limit != nil }
-        if !limited.isEmpty {
-            let ids = limited.map { String($0.clip) }.joined(separator: ", ")
-            fields["note"] =
-                "Clip(s) \(ids) stopped short of \(plan.targetLUFS) LUFS: the volume that reaches "
-                + "it would pass the \(AudioNormalize.maxGainName) ceiling (limited_by max_gain). "
-                + "result_lufs says where each landed."
+        if let note = AudioNormalize.limitNote(
+            plan.normalized.map { (clip: $0.clip, limit: $0.limit) }, targetLUFS: plan.targetLUFS)
+        {
+            fields["note"] = note
         }
         return try editResult(document, "Normalize", plan.ops, fields)
     }

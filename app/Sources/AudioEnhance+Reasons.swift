@@ -8,7 +8,8 @@ extension AudioEnhance {
 
     /// The last reason: what the processed render measured, the limiter, the
     /// volume, where the last render says it lands and how many renders it
-    /// took; the volume ceiling when it stopped short.
+    /// took; the volume ceiling when it stopped short, or the verify renders
+    /// when they ran out away from the target (AU-167).
     static func loudnessReason(
         _ result: AudioNormalize.LoudnessResult, limiter: LimiterProps, target: Double
     ) -> String {
@@ -19,9 +20,25 @@ extension AudioEnhance {
         return "Loudness: " + through + "the limiter at "
             + "\(signed(limiter.ceilingDb, "%.1f dBTP")) and the volume "
             + "\(String(format: "%.3f", result.volume)) take it to "
-            + "\(lufs(result.resultLUFS)) (\(renders))"
-            + (result.limit == nil ? "." : ", short of \(lufs(target)): the volume "
-                + "would pass \(AudioNormalize.maxGainName).")
+            + "\(lufs(result.resultLUFS)) (\(renders))" + limitClause(result, target: target)
+    }
+
+    /// How the loudness reason ends: "." when the clip landed, else what
+    /// stopped it (AU-167).
+    private static func limitClause(_ result: AudioNormalize.LoudnessResult, target: Double)
+        -> String
+    {
+        switch result.limit {
+        case nil: return "."
+        case .maxGain?:
+            return ", short of \(lufs(target)): the volume would pass \(AudioNormalize.maxGainName)."
+        case .verifyRenders?:
+            let side = result.resultLUFS < target ? "short of" : "over"
+            let tolerance = String(format: "%g", LoudnessMeasureRun.verifyToleranceLU)
+            return ", \(side) \(lufs(target)): the renders that check the volume ran out before "
+                + "it landed within \(tolerance) LU, usually because a limiter holds the sound "
+                + "down harder as the volume rises."
+        }
     }
 
     // MARK: - The sentences' numbers

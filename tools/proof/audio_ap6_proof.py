@@ -14,7 +14,8 @@ samples/Rode-usb-mic.m4a, and `say` speech made here — one low-passed at
        reasons, processed_lufs, renders) printed; `set` holds the nine keys
        and get_project holds them.
   V2   its export at −16 ±0.5 LUFS and ≤ −1 dBTP by both meters; limited_by
-       null; |result_lufs − the export| ≤ 0.2 LU; renders ≥ 2 (R0 and a verify
+       what its figures say (`limit_of`, AU-167: null within 0.1 LU of the
+       target); |result_lufs − the export| ≤ 0.2 LU; renders ≥ 2 (R0 and a verify
        render); the press timed three times (this one and two fresh projects,
        each rendering its isolation window cold) and printed.
   V3   its export's pause floor at least 10 dB under a Normalize-only export's.
@@ -65,10 +66,13 @@ samples/Rode-usb-mic.m4a, and `say` speech made here — one low-passed at
        shelf gain at the end: "≈" again. (f) an action end that is a gate
        AND a limiter at −6 dBTP, on a clip whose own limiter is on, so the
        solve verifies by render (target −20): renders ≥ 2, |result_lufs − the
-       export| ≤ 0.2, the export at −20 ±0.5 and limited_by null. (g) the same end at
+       export| ≤ 0.2, the export at −20 ±0.5 and limited_by what its figures
+       say. (g) the same end at
        −24 dBTP on a clip with no limiter, target −30 (AU-165, #402): verified
-       by render though the clip has no limiter, renders ≥ 2, limited_by
-       null, |result_lufs − the export| ≤ 0.2 and the export at −30 ±0.5; At
+       by render though the clip has no limiter, renders ≥ 2,
+       |result_lufs − the export| ≤ 0.2 and the export at −30 ±0.5; limited_by
+       `verify_renders` (AU-167: more than 0.1 LU from −30 below ×32) and the
+       note naming the clip, `verify_renders` and a limiter, no `max_gain`; At
        volume "≈" before the press, within 0.2 of the export with no "≈"
        after it, and "≈" with the action's-limiter tooltip once the volume
        moves (×1.2). (h) an end limiter at −12 dBTP alone, nothing else on
@@ -79,10 +83,17 @@ samples/Rode-usb-mic.m4a, and `say` speech made here — one low-passed at
        the loop's step up would pass −1 dBTP: the limiter on at −1 dBTP, the
        verify render's true peak ≤ −1 + 0.001, renders ≥ 2, |result_lufs −
        the export| ≤ 0.2, and a second call "made no change" (the loop
-       started again where a second press starts). (j) the clip's own
+       started again where a second press starts); limited_by `verify_renders`
+       and its note, as (g). (j) the clip's own
        limiter at −1 dBTP keyed off
        (`off: ["audio.limiter"]`) at an action's end and nothing else, target
-       −20: renders ≥ 2 and |result_lufs − the export| ≤ 0.2.
+       −20: renders ≥ 2 and |result_lufs − the export| ≤ 0.2. (k) match_audio
+       on (i)'s clip, eq false, the reference a plain clip of the recording at
+       the volume that plays it at (i)'s target: limited_by `verify_renders`
+       more than 0.1 LU from target_lufs below ×32, and the note as (g). (l)
+       enhance_voice −24 on (g)'s clip: limited_by `verify_renders` below ×32,
+       the note as (g), the last reason "short of −24.0 LUFS" with a limiter
+       and no "would pass" (AU-167, #607).
   V17  the clip limiter at a speed other than ×1 (#399, spec §11 AU-162): the
        owner's recording, a gate and the limiter at −1 dBTP, normalize_clip
        (loudness, −18), one fresh project per leg: (a) ×1; (b) ×1.5 and (f)
@@ -90,8 +101,9 @@ samples/Rode-usb-mic.m4a, and `say` speech made here — one low-passed at
        all three RENDERED ahead of the tap (AU-55); (c) ×1.5, (d) ×0.5 and (e)
        ×1.02 Keep pitch on, LIVE; (h) ×1.5 Keep pitch on with #399's own chain
        (the Rumble Cut, noise reduction 0.5, Enhance's gate and compressor,
-       target −16). Every leg: renders ≥ 2 and limited_by null (the reading is
-       a verify render's, not the model's capped figure), the limiter has
+       target −16). Every leg: renders ≥ 2 and limited_by not `max_gain` and
+       what its figures say (the reading is a verify render's, not the
+       model's capped figure), the limiter has
        3 dB or more to take off (R0's peak at the solved volume over the
        ceiling), the audio_wav export ≤ −1 dBTP by both meters (its master),
        and the TAP's own output holds the ceiling: the live meter's true peak
@@ -245,6 +257,27 @@ def mismatches(audio_group, set_, volume_db=1e-6):
     return out
 
 
+def limit_of(row, target):
+    """What `limited_by` must be (spec §11 AU-167, AU-64 (e)), from the row's
+    own figures: `max_gain` at ×32 and over 0.1 LU short, `verify_renders`
+    over 0.1 LU from the target, else None. For a row checked by render or
+    planned exactly; a row's figures are unrounded (`jsonLevel`)."""
+    result = row["result_lufs"]
+    if row["volume"] >= 32 and result < target - 0.1:
+        return "max_gain"
+    if abs(result - target) > 0.1:
+        return "verify_renders"
+    return None
+
+
+def bound_note(answer, clip):
+    """Whether the answer's note names `clip` as stopped by the verify bound
+    and a limiter as the cause, and says nothing of the ceiling (AU-167)."""
+    note = answer.get("note") or ""
+    return (f"Clip(s) {clip} " in note and "(limited_by verify_renders)" in note
+            and "limiter" in note and "max_gain" not in note)
+
+
 def print_row(row):
     measured = {k: row[k] for k in ("measured_lufs", "true_peak_dbtp", "speech_seconds",
                                     "floor_lufs", "floor_gap_db", "pause_peak_dbfs",
@@ -335,8 +368,9 @@ def owner_rows(m):
           f"V1 the row sets exactly {OWNED}, get_project holds them, one reason per rule "
           f"{mismatches(audio(s, clip), row['set'])}")
     lufs, kaiser, annex, floor = measure(s.export("enhanced")["path"])
-    check(abs(lufs + 16) <= 0.5 and row["limited_by"] is None,
-          f"V2 the export at {f(lufs)} LUFS (−16 ±0.5), limited_by {row['limited_by']}")
+    check(abs(lufs + 16) <= 0.5 and row["limited_by"] == limit_of(row, -16),
+          f"V2 the export at {f(lufs)} LUFS (−16 ±0.5), limited_by {row['limited_by']} "
+          f"(its figures say {limit_of(row, -16)})")
     check(kaiser <= -1 + 0.001 and annex <= -1 + 0.001,
           f"V2 true peak {f(kaiser, 4)} (Kaiser) / {f(annex, 4)} (Annex 2) dBTP ≤ −1")
     check(abs(row["result_lufs"] - lufs) <= 0.2 and (row.get("renders") or 0) >= 2
@@ -626,10 +660,12 @@ def limiter_speed_rows(m):
               f"its largest sample at {f(peak_at)} s; the preview from {f(at)} s: the tap "
               f"{f(tap, 4)} dBTP over {f(measured)} s, the stem there {f(window[0], 4)} / "
               f"{f(window[1], 4)} dBTP")
-        check(renders >= 2 and row["limited_by"] is None and work >= 3,
+        target = ISSUE_TARGET if chain is ISSUE_CHAIN else LIMITER_TARGET
+        check(renders >= 2 and row["limited_by"] != "max_gain"
+              and row["limited_by"] == limit_of(row, target) and work >= 3,
               f"{label}: the reading is a verify render's and the limiter is working "
-              f"(renders {renders} ≥ 2, limited_by {row['limited_by']}, {f(work)} dB to take "
-              f"off, ≥ 3)")
+              f"(renders {renders} ≥ 2, limited_by {row['limited_by']}, its figures say "
+              f"{limit_of(row, target)}, {f(work)} dB to take off, ≥ 3)")
         check(max(mix) <= CEILING + 0.001,
               f"{label}: the export (its master) {f(mix[0], 4)} / {f(mix[1], 4)} dBTP ≤ −1")
         check(tap is not None and measured >= PLAY_SECONDS / 2 and tap <= CEILING + TAP_TOLERANCE,
@@ -675,7 +711,8 @@ def normalize_rows(m):
     s.op("set_audio", clips=[clip], patch={"volume": 2})
     row = s.op("normalize_clip", clips=[clip], mode="loudness", target_lufs=-16)["normalized"][0]
     check(row.get("processed_lufs") is None and row.get("renders") == 0
-          and abs(row["result_lufs"] + 16) <= 0.05 and row["limited_by"] is None,
+          and abs(row["result_lufs"] + 16) <= 0.05 and row["limited_by"] is None
+          and limit_of(row, -16) is None,
           f"V13 (c) a plain clip: processed {row.get('processed_lufs')}, renders "
           f"{row.get('renders')}, the cache plan's volume {f(row['volume'], 4)} to "
           f"{f(row['result_lufs'])} LUFS")
@@ -752,18 +789,22 @@ def action_rows(m):
                target_lufs=-20)["normalized"][0]
     lufs = integrated(channels(pcm(s.export("normalized")["path"])))
     check((row.get("renders") or 0) >= 2 and abs(row["result_lufs"] - lufs) <= 0.2
-          and abs(lufs + 20) <= 0.5 and row["limited_by"] is None,
+          and abs(lufs + 20) <= 0.5 and row["limited_by"] == limit_of(row, -20),
           f"V16 (f) an end gate and limiter at −6 dBTP under the clip's own limiter, target "
           f"−20: the export at {f(lufs)} LUFS (−20 ±0.5), renders "
           f"{row.get('renders')} (≥ 2), volume {f(row['volume'], 4)}, result "
           f"{f(row['result_lufs'])} against the export {f(lufs)} LUFS "
-          f"({f(row['result_lufs'] - lufs)} LU, ≤ 0.2), limited_by {row['limited_by']}")
+          f"({f(row['result_lufs'] - lufs)} LU, ≤ 0.2), limited_by {row['limited_by']} (its "
+          f"figures say {limit_of(row, -20)})")
     m.call("close_project", project=s.path, discard=True)
 
     # (g)–(j) an action's end that sets a limiter (AU-165, #402).
     r0 = end_limiter_rows(m)
     switch_rows(m, r0)
     keyed_off_rows(m)
+    # (k), (l) the verify bound named by match_audio and enhance_voice (AU-167, #607).
+    match_bound_rows(m, r0)
+    enhance_bound_rows(m)
 
 
 def solved(row):
@@ -787,14 +828,22 @@ def end_limiter_rows(m):
     s.op("set_selection", clips=[clip])
     s.op("select_inspector_tab", tab="clip", sub_tab="sound")
     before, _ = at_volume(s)
-    row = s.op("normalize_clip", clips=[clip], mode="loudness",
-               target_lufs=-30)["normalized"][0]
+    answer = s.op("normalize_clip", clips=[clip], mode="loudness", target_lufs=-30)
+    row = answer["normalized"][0]
     lufs = integrated(channels(pcm(s.export("normalized")["path"])))
-    check((row.get("renders") or 0) >= 2 and row["limited_by"] is None
+    check((row.get("renders") or 0) >= 2
           and abs(row["result_lufs"] - lufs) <= 0.2 and abs(lufs + 30) <= 0.5,
           f"V16 (g) an end gate and limiter at −24 dBTP, no limiter on the clip, target −30: "
           f"the export at {f(lufs)} LUFS (−30 ±0.5), result − export "
           f"{f(row['result_lufs'] - lufs)} LU (≤ 0.2); {solved(row)}")
+    # AU-167 (#607): three verifies left it 0.25 LU short below ×32, so the
+    # answer names the verify bound.
+    check(row["limited_by"] == "verify_renders" == limit_of(row, -30)
+          and abs(row["result_lufs"] + 30) > 0.1 and row["volume"] < 32
+          and bound_note(answer, clip),
+          f"V16 (g) limited_by {row['limited_by']} (verify_renders) at volume "
+          f"{f(row['volume'], 4)} (< 32), result {f(row['result_lufs'], 3)} against −30; note "
+          f"{answer.get('note')!r}")
     after, tip = at_volume(s)
     shown = lufs_of(after)
     check((before or "").startswith("≈ ") and shown is not None and abs(shown - lufs) <= 0.2
@@ -844,8 +893,8 @@ def switch_rows(m, r0):
     s = Session(m, "ap6-action-i")
     clip = place(s, "ap6-rode.wav")
     keyed(s, clip, {"gate": {"threshold_db": -30}, "limiter": {"ceiling_db": -24}})
-    row = s.op("normalize_clip", clips=[clip], mode="loudness",
-               target_lufs=round(target, 3))["normalized"][0]
+    answer = s.op("normalize_clip", clips=[clip], mode="loudness", target_lufs=round(target, 3))
+    row = answer["normalized"][0]
     lufs = integrated(channels(pcm(s.export("normalized")["path"])))
     limiter = row.get("limiter") or {}
     check(limiter.get("ceiling_db") == -1 and (row.get("renders") or 0) >= 2
@@ -855,6 +904,14 @@ def switch_rows(m, r0):
           f"limiter on at −1 dBTP, the verify render's true peak ≤ −1; the export at "
           f"{f(lufs)} LUFS, result − export {f(row['result_lufs'] - lufs)} LU (≤ 0.2); "
           f"{solved(row)}")
+    # AU-167 (#607): the end limiter holds the sound, so three verifies leave it
+    # LU short below ×32, and the answer names the verify bound and a limiter.
+    check(row["limited_by"] == "verify_renders" == limit_of(row, round(target, 3))
+          and abs(row["result_lufs"] - round(target, 3)) > 0.1 and row["volume"] < 32
+          and bound_note(answer, clip),
+          f"V16 (i) limited_by {row['limited_by']} (verify_renders) at volume "
+          f"{f(row['volume'], 4)} (< 32), result {f(row['result_lufs'], 3)} against "
+          f"{f(target, 3)}; note {answer.get('note')!r}")
     # The loop started again where a second press starts (AU-165 (b)), so a second
     # press keeps the volume.
     again = s.error("normalize_clip", clips=[clip], mode="loudness",
@@ -883,6 +940,60 @@ def keyed_off_rows(m):
           f"target −20: the export at {f(lufs)} LUFS, result − export "
           f"{f(row['result_lufs'] - lufs)} LU (≤ 0.2); {solved(row)}")
     m.call("close_project", project=s.path, discard=True)
+
+
+def match_bound_rows(m, r0):
+    """(k) match_audio on (i)'s clip, the reference a plain clip of the same
+    recording placed after it at the volume that plays it at (i)'s target
+    (L + 20·log10 v), eq off: Match's loudness is the same run (AU-123), so
+    the verify bound is named as (i)'s (AU-167)."""
+    processed, peak = r0.get("processed_lufs"), r0.get("true_peak_dbtp")
+    if processed is None or peak is None:
+        check(False, f"V16 (k) (g)'s R0 figures to aim from: {processed}, {peak}")
+        return
+    target = round(processed + (-1 - peak) - 0.3, 3)
+    s = Session(m, "ap6-action-k")
+    clip = place(s, "ap6-rode.wav")
+    keyed(s, clip, {"gate": {"threshold_db": -30}, "limiter": {"ceiling_db": -24}})
+    reference = place(s, "ap6-rode.wav", at=s.clip(clip)["duration"] + SECOND)
+    volume = 10 ** ((target - r0["measured_lufs"]) / 20)
+    s.op("set_audio", clips=[reference], patch={"volume": volume})
+    answer = s.op("match_audio", reference=reference, clips=[clip], eq=False)
+    row = answer["matched"][0]
+    aim = answer.get("target_lufs")
+    m.call("close_project", project=s.path, discard=True)
+    check(aim is not None and row["limited_by"] == "verify_renders" == limit_of(row, aim)
+          and abs(row["result_lufs"] - aim) > 0.1 and row["volume"] < 32
+          and bound_note(answer, clip),
+          f"V16 (k) match_audio, the reference at volume {f(volume, 4)}: target_lufs "
+          f"{f(aim, 3)} (aimed {f(target, 3)}), limited_by {row['limited_by']} "
+          f"(verify_renders) at volume {f(row['volume'], 4)} (< 32), result "
+          f"{f(row['result_lufs'], 3)}, renders {row.get('renders')}; note "
+          f"{answer.get('note')!r}")
+
+
+def enhance_bound_rows(m):
+    """(l) enhance_voice on (g)'s clip (an end gate and limiter at −24 dBTP),
+    target −24: Enhance's own chain and limiter, its volume checked by
+    render, the end limiter holding the sound below ×32 (−16 and −20 climb
+    to ×32 and answer max_gain, AU-167 (e)), so the verify bound is named in
+    the row, the note and the last reason (AU-167)."""
+    s = Session(m, "ap6-action-l")
+    clip = place(s, "ap6-rode.wav")
+    keyed(s, clip, {"gate": {"threshold_db": -30}, "limiter": {"ceiling_db": -24}})
+    answer = enhance(s, [clip], target_lufs=-24)
+    row = answer["enhanced"][0]
+    m.call("close_project", project=s.path, discard=True)
+    reason = row["reasons"][-1] if row.get("reasons") else ""
+    check(row["limited_by"] == "verify_renders" == limit_of(row, -24)
+          and abs(row["result_lufs"] + 24) > 0.1 and row["volume"] < 32
+          and bound_note(answer, clip),
+          f"V16 (l) enhance_voice −24: limited_by {row['limited_by']} (verify_renders) at "
+          f"volume {f(row['volume'], 4)} (< 32), result {f(row['result_lufs'], 3)}, renders "
+          f"{row.get('renders')}; note {answer.get('note')!r}")
+    check("short of −24.0 LUFS: " in reason and "limiter holds" in reason
+          and "would pass" not in reason,
+          f"V16 (l) the last reason: {reason!r}")
 
 
 # ---- V14 the sheet, cancelled and stale -------------------------------------

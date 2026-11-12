@@ -225,3 +225,49 @@ It is new because [`audio-4.md`](audio-4.md) had reached the spec's ~500-line sp
   `an_overwrite_leaves_a_linked_picture_on_a_locked_track_whole` (2, 2, 2 s) and
   `an_overwrite_keeps_a_locked_pictures_link_only_where_its_cuts_leave_it` (the other three);
   the site's Overwrite section says so.
+- **AU-167 — `limited_by` names a solve the verify renders left away from its target (#607,
+  2026-11-13; amends AU-64 (e)).** AU-64 (e) ends the verify loop after three verify renders and
+  named only the ×32 stop, so a solve the bound stopped more than 0.1 LU from T answered its last
+  render's honest `result_lufs` with `limited_by` null and no note: on Release (AU-165's record)
+  V16 (i), an action-end limiter at −24 dBTP holding most of the clip, answered −28.60 against
+  −24.417, and (g) −30.25 against −30. The owner's decision (2026-11-13, the issue's option 1):
+  the answer names the miss and its likely cause, in Normalize, Enhance Voice and Match Audio
+  alike.
+  (a) **The rule.** After the verify loop, `limited_by` is `max_gain` when the volume is at ×32
+  and the last R is under T − 0.1 (AU-64 (e)'s, unchanged and tested first); else
+  `verify_renders` when the last R is more than 0.1 LU from T; else null
+  (`AudioNormalize.verifiedLimit`). These are AU-64 (e)'s own tolerance and bound, so the value
+  is set exactly when the loop stopped on its third verify render. The loop's step is not
+  one-sided, so a last R can be over T as well as under it; the rule says "from", and at ×32 a
+  last R more than 0.1 LU over T is `verify_renders` too. The issue's "below ×32" is read as
+  "not the ceiling's stop": that miss is not the ceiling's, and null would be the defect again.
+  (b) **The other paths are unchanged.** A clip with no limiter and no action-end limiter takes
+  R0 + 20·log10 v (no verify render, exact), and a clip planned off the cache takes AU-24's
+  arithmetic or `AudioLimiterModel.gain`, which is short of T only at ×32; both keep `max_gain`
+  or null.
+  (c) **Where it shows.** `limited_by` in `normalize_clip`, `enhance_voice` and `match_audio`
+  (one run, AU-123). Their `note`, built once (`AudioNormalize.limitNote`), keeps the ceiling's
+  sentence byte for byte for its clips, names the verify bound's clips in a second sentence with
+  `verify_renders` and the usual cause (a limiter holding the sound down harder as the volume
+  rises), then "result_lufs says where each landed." once. Enhance's loudness reason keeps the
+  ceiling's clause for `max_gain`, and for `verify_renders` ends ", short of T" (or ", over T")
+  with the same cause. The three tools' descriptions and the site's MCP audio page and its
+  Normalize, Enhance Voice and Match Audio pages say it. The button, the menu and the Match sheet
+  say nothing, as they say nothing of a skip.
+  (d) **Declined.** More verify renders (the issue's option 3): in (i) the limiter holds the
+  sound and more renders would not reach T, and each one renders the whole clip.
+  (e) **Left as decided.** At ×32 the answer stays `max_gain`, with the ceiling's note, even when
+  an action's limiter is what held the last render under T and no volume would reach it: the
+  owner's option bounds the new value to the loop's own stop below the ceiling.
+  Proof: `audio_ap6_probe.py` E18 (the rule's arms on both sides of 0.1 LU and at ×32, the note
+  by case with the ceiling's sentence byte for byte, Enhance's reason by case) and mutants
+  M27–M31 (the threshold at 1 LU, the bound answering nil, the bound before the ceiling, the
+  note and the reason giving every limit the ceiling's words), all killed; `audio_ap6_proof.py`
+  V16 (g), (i), (k) (`match_audio` on (i)'s clip) and (l) (`enhance_voice` −24 on (g)'s clip),
+  and `limit_of`, the rule from a row's own figures, where V2, V13 (c), V16 (f) and V17 asserted
+  null. On a Debug build of the tree before this entry, five rows failed: (f) −20.11 against −20
+  after four renders, (g) −30.249, (i) and (k) −28.595 at volume 28.37 after five, (l) −29.551 at
+  20.84 after four, each with `limited_by` null and no note, and (l)'s reason ending at its
+  renders. With it, `AP6_ONLY=actions` 21 of 21 on Debug, each of them `verify_renders` with the
+  note. Enhance at −16 and −20 on (g)'s clip climbed to ×32 at −29.12 and answered `max_gain`
+  ((e)).

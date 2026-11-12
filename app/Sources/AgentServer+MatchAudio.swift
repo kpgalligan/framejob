@@ -69,7 +69,7 @@ extension AgentServer {
     }
 
     /// The answer to `plan`, on main: the reference, the rows, the skips,
-    /// the ceiling's note and the edit.
+    /// the limits' note (AU-167) and the edit.
     private func matchAnswer(
         _ plan: AudioMatch.Plan, input: AudioMatch.Input, referenceLUFS: Double,
         document: ProjectDocument
@@ -91,13 +91,11 @@ extension AgentServer {
         if !plan.skipped.isEmpty {
             fields["skipped"] = plan.skipped.map { $0.description }
         }
-        let limited = plan.matched.filter { $0.loudness?.limit != nil }
-        if !limited.isEmpty, let target = plan.targetLUFS {
-            let ids = limited.map { String($0.clip) }.joined(separator: ", ")
-            fields["note"] =
-                "Clip(s) \(ids) stopped short of \(target) LUFS: the volume that reaches it "
-                + "would pass the \(AudioNormalize.maxGainName) ceiling (limited_by max_gain). "
-                + "result_lufs says where each landed."
+        if let target = plan.targetLUFS,
+            let note = AudioNormalize.limitNote(
+                plan.matched.map { (clip: $0.clip, limit: $0.loudness?.limit) }, targetLUFS: target)
+        {
+            fields["note"] = note
         }
         return try editResult(document, AudioMatch.actionName, plan.ops, fields)
     }

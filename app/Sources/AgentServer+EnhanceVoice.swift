@@ -109,8 +109,8 @@ extension AgentServer {
         }
     }
 
-    /// The answer to `plan`, on main: the rows, the skips, the ceiling's note
-    /// and the edit.
+    /// The answer to `plan`, on main: the rows, the skips, the limits' note
+    /// (AU-167) and the edit.
     private func enhanceAnswer(_ plan: AudioEnhance.Plan, document: ProjectDocument)
         throws -> String
     {
@@ -122,13 +122,11 @@ extension AgentServer {
         if !plan.skipped.isEmpty {
             fields["skipped"] = plan.skipped.map { $0.description }
         }
-        let limited = plan.enhanced.filter { $0.loudness.limit != nil }
-        if !limited.isEmpty {
-            let ids = limited.map { String($0.clip) }.joined(separator: ", ")
-            fields["note"] =
-                "Clip(s) \(ids) stopped short of \(plan.targetLUFS) LUFS: the volume that reaches "
-                + "it would pass the \(AudioNormalize.maxGainName) ceiling (limited_by max_gain). "
-                + "result_lufs says where each landed."
+        if let note = AudioNormalize.limitNote(
+            plan.enhanced.map { (clip: $0.clip, limit: $0.loudness.limit) },
+            targetLUFS: plan.targetLUFS)
+        {
+            fields["note"] = note
         }
         return try editResult(document, AudioEnhance.actionName, plan.ops, fields)
     }
