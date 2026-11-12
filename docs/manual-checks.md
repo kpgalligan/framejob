@@ -1374,9 +1374,10 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 Needs your own Anthropic API key (Setup 3).
 
 **AS-1 — A real conversation**
+- **When:** with the Assistant section before a release, and again whenever the assistant helper or its pin of Slaude changes. Owed now: the Swift helper replaced the Bun helper on 2026-11-12 (road map "swift-helper", spec §11 SA-1), and this check has not yet been run on it.
 - **Do:** Open a project with a few clips; View ▸ Assistant (⌃⌘A); ask for a marker, a split at the playhead, a caption's text change and a move inside a nest.
 - **Expect:** the reply streams; each tool call shows one line; each edit is its own step in Edit ▸ Undo.
-- **Source:** #159.
+- **Source:** #159; road map "swift-helper" SA5 (spec §11 SA-1).
 
 **AS-2 — Allow, Deny and Stop**
 - **Do:** 1. Ask it to export; press Return; Deny. 2. Ask again; Allow. 3. Ask over an existing file. 4. Send something long and press Stop; ask for an export and press Stop while the question is up. 5. Ask for an export of a long project, Allow, and press Stop while it writes.
@@ -1389,19 +1390,22 @@ Needs your own Anthropic API key (Setup 3).
 - **Source:** #159.
 
 **AS-4 — What a turn cost**
+- **When:** with the Assistant section before a release, and again whenever the assistant helper or its pin of Slaude changes. Owed now: the Swift helper replaced the Bun helper on 2026-11-12 (road map "swift-helper", spec §11 SA-1), and this check has not yet been run on it.
 - **Do:** 1. Quit Frame Job and delete `~/Library/Application Support/Frame Job/anthropic-prices.json`. 2. Relaunch; send two messages. 3. Clear; send one more. 4. Open `~/Library/Application Support/Frame Job/spend.jsonl`.
 - **Expect:** each turn ends with `Cost: $… · Frame Job's estimate at LiteLLM prices (…)`, the three reading `(bundled table of …)`, then `(fetched <today>)`, then `(cached <today>)`; the ledger has one line per response, with no key and no message text; the month's total is near the Anthropic Console's for the same calls.
-- **Source:** road map 13 P2; spec §11 P-4, P-5.
+- **Source:** road map 13 P2; spec §11 P-4, P-5; road map "swift-helper" SA5 (spec §11 SA-1).
 
 **AS-5 — What a conversation and the month cost**
+- **When:** with the Assistant section before a release, and again whenever the assistant helper or its pin of Slaude changes. Owed now: the Swift helper replaced the Bun helper on 2026-11-12 (road map "swift-helper", spec §11 SA-1), and this check has not yet been run on it.
 - **Do:** With your real key, open Frame Job ▸ Settings… and keep it beside the window; View ▸ Assistant (⌃⌘A). 1. Read the tab's Spend row. 2. Send two messages. 3. Clear; send one more.
 - **Expect:** the Spend row starts at "Nothing yet"; after the messages it equals the sum of those turns' `Cost:` lines ("$… · Frame Job's estimate"); Clear puts it back to "Nothing yet" and the next turn starts a new sum. Settings' month line ("<Month> <year> (UTC): $… over N responses.") grows with each response while it is open, without flickering to "Reading the spend ledger…", and is near the Anthropic Console's total for the same UTC days.
-- **Source:** road map 13 P4; spec §11 P-4, P-7.
+- **Source:** road map 13 P4; spec §11 P-4, P-7; road map "swift-helper" SA5 (spec §11 SA-1).
 
 **AS-6 — A reply cut short**
+- **When:** with the Assistant section before a release, and again whenever the assistant helper or its pin of Slaude changes. Owed now: the Swift helper replaced the Bun helper on 2026-11-12 (road map "swift-helper", spec §11 SA-1), and this check has not yet been run on it.
 - **Do:** With your real key, ask for something long (a paragraph about each clip) and press Stop while the reply streams. Open `~/Library/Application Support/Frame Job/spend.jsonl`, then the Anthropic Console's usage for the same minutes. Then, with Compact off in Settings, keep a conversation going until the Context meter reads full.
 - **Expect:** the turn ends with `Cost: at least $… (a response was cut short) · Frame Job's estimate at LiteLLM prices (…)`; the ledger's last line carries `"partial": true`; the Console's charge for that request is at least that figure, and expect it above: the streamed output is not counted (spec §11 P-8). A reply that reaches the end of the window stops where it got to, and the red line "The reply was cut off because the conversation filled the model's context window." follows it.
-- **Source:** issue batch B15 (#162); spec §11 P-8; #484.
+- **Source:** issue batch B15 (#162); spec §11 P-8; #484; road map "swift-helper" SA5 (spec §11 SA-1).
 
 **AS-7 — Selecting the conversation, and a message of several lines**
 - **Do:** In light, then dark, after a turn with a tool call: 1. Drag from inside a reply down into the next person line and a tool line; ⌘C; paste into TextEdit. 2. In the composer type a line, ⇧Return, another, ⌥Return, a third, and keep adding lines past five. 3. Press Return. 4. With an input method that composes (Japanese, say), start a word so it is underlined and press Return. 5. Send something long and, while it is working, type in the composer and press Return.

@@ -1,16 +1,18 @@
 # Road map "swift-helper" — the assistant helper in Swift, on Slaude
 
-**Status: approved 2026-11-12, being built.** Opened 2026-11-11 by issue #599. The owner approved
-it on #599 on 2026-11-12 and answered the six questions of §12, which now holds the answers. SA0,
-the spike, has landed: its record is in §13, and it wrote SA-1..SA-3 in
-`designs/spec/11-decisions/swift-helper.md`. SA1, the package beside the Bun helper, has landed
-with SA-4..SA-7 and SA-12; its record is in §13. SA2, the drive that runs both helpers and
-compares them, has landed; its record is in §13. SA3, the switch, has landed with SA-8..SA-10:
-the app bundles the Swift helper and the notices and the publish runner have left Bun; its
-record is in §13. SA4, the deletion, has landed with SA-11 and SA-13: the Bun helper, its
+**Status: built and closed 2026-11-12.** Opened 2026-11-11 by issue #599 (`7dfa1122`). The owner
+approved it on #599 on 2026-11-12 and answered the six questions of §12, which now holds the
+answers. Every phase has landed, each with its record in §13: SA0, the spike, with SA-1..SA-3 in
+`designs/spec/11-decisions/swift-helper.md` (`943bb2e0`); SA1, the package beside the Bun helper,
+with SA-4..SA-7 and SA-12 (`6dffe76d`, `bc1760a0`, `7c668c3c`, `84dd2441`, `8bee8a56`); SA2, the
+drive that ran both helpers and compared them (`a012946f`); SA3, the switch, with SA-8..SA-10:
+the app bundles the Swift helper and the notices and the publish runner left Bun (`215229aa`,
+`2deef7fa`, `e392854b`, `3833b404`); SA4, the deletion, with SA-11 and SA-13: the Bun helper, its
 TypeScript and its build are gone, road map 12's A0 spike is retired, and the drive holds the
-Swift helper to its recordings; its record is in §13. Next: the paid acceptance, the three live
-proofs of §12 answer 3, run by the orchestrator; then SA5, the close.
+Swift helper to its recordings (`850be2eb`, `6c607cdd`, `ce869fc5`, `900799a0`); the paid
+acceptance, the three live proofs of §12 answer 3, run by the orchestrator on 2026-11-12 (UTC);
+and SA5, the close, whose commit moved this file to `archive/`. The condensed record is
+`designs/adr/swift-helper.md`.
 
 **Source.** The owner, on #599 (2026-11-12): "We're going to replace Bun with the Swift Anthropic
 API we wrote. See ~/devel/doctored for background info. That had the same Typescript Anthropic
@@ -1427,3 +1429,90 @@ after the deletion). The diff read follows this record's build.
   still counts the deleted TypeScript and not the Swift package; filed with the residue.
 
 ### SA5 — record
+
+**What landed** (2026-11-12, on `900799a0`, as two commits: the record, then the close). This
+record and the status at the head of this file; AS-1, AS-4, AS-5 and AS-6 of
+`docs/manual-checks.md` marked for the owner to run again, each with a `When` line and SA5 in its
+source; a run paragraph appended to AI-20 (`designs/spec/11-decisions/assistant.md`), changing
+none of its words; the section "Road map "swift-helper" SA5" in `tools/proof/README.md`; and the
+Lines cells those move. Then the close: `designs/adr/swift-helper.md`; this file moved unchanged
+to `archive/swift-helper.md`, with its row in `archive/INDEX.md`; and the four lines that cited
+its path: `docs/developing.md`'s `make agent-test` row repointed to the ADR,
+`tools/proof/agent_helper_drive.py`'s docstring to the archived sections, the preamble of
+`designs/spec/11-decisions/swift-helper.md` put in the past tense (no entry below it touched,
+its index row with it), and `agent/CLAUDE.md`'s pointer left to the integrator. No product code,
+no new spec §11 decision, and no proof's behaviour. **No Slaude change:** no branch or pull
+request was opened and no re-pin is owed.
+
+**The paid acceptance** (§12 answer 3, §9 SA5), run by the orchestrator, never by a lane, and
+reported on #599 on 2026-11-12. The figures below are that report's; nothing was run again for
+this record. The Release app built from main at `900799a0` (the Swift helper on Slaude
+`4c6c2ca4`, after SA4), on 2026-11-12 (UTC), one run after another:
+
+| Proof | Flags | Result | Settled |
+|---|---|---|---|
+| `assistant_clearing_proof.py` | `--live --cap 5` | 7/7, 0 skipped | $0.0758 |
+| `assistant_compaction_proof.py` | `--live --cap 11.50` | 9/9, 0 skipped | $0.2389 |
+| `assistant_prompt_proof.py` | `--live --cap 32` | 26/26, 0 skipped | $0.2309 |
+
+The month's Anthropic proof ledger read $0.0000 before and $0.5457 after, of the $40.00 budget
+(P-9). Every POST answered 200; the largest body was 410,950 bytes against the 480,000 bound
+(`BODY_BYTES_BOUND`, P-9). Nothing failed, so nothing is fixed or filed from the runs. Each figure
+is printed to four places from an unrounded sum (a run's `relay.spent()`, the ledger's
+`month_total()` in `tools/proof/budget.py`), so the three settled figures as printed add to
+$0.5456 against the ledger's $0.5457. The clearing run is the one AI-20 said was owed and §12
+answer 3 named, and it is the second live run of that proof, the first on the Swift helper: the
+first was on 2026-10-01 on the Bun helper (#208, `--live --cap 3`, 7/7, 0 skipped, $0.1252;
+`tools/proof/README.md`'s "Live run" in the clearing proof's section). AI-20 now carries both.
+
+**Each earlier "What is owed" item**, resolved:
+- **SA0's** SA1 items landed in SA1 (its record: the package at `.macOS("26.0")` with the
+  symlinked table, the suite's request failing before `message_start` and its H12, `.sortedKeys`
+  and KO). Its SA3 items landed in SA3: the table's content in the stamp's key and the path
+  record beside it (`agent_build_proof.py` K4–K6), the persistent mutant tree, and a tree copy's
+  whole app build with and without the clone (`makefile_env_proof.py`, SA3's item 3). Two of them
+  stay unmeasured, each decided: whether dropping only the module cache repairs a foreign scratch
+  path (SA-8: not needed, since SwiftPM schedules all of Slaude again on a moved one and the best
+  case is the cold build) and the direct `swiftc` builder's `embedded_resources.swift` (SA-8 chose
+  the persistent mutant tree). Its live-run item, "what API version 2026-10-21 refuses", is
+  answered for what the three proofs send: every POST of the three runs answered 200, and the
+  relay forwards the helper's own `anthropic-version` and `x-stainless-*` headers, dropping only
+  the credential, `host`, `content-length`, `connection` and `accept-encoding`
+  (`DROPPED_HEADERS` in `tools/proof/assistant_prompt_eval.py`). Its "Doctored's figures stand"
+  stays as it was: the network fetch of Slaude and the publish runner are what the next publish
+  shows (SA3's item below), and whole-module optimization is not used (release in batches, §10).
+- **SA1's** SA2 items landed in SA2, its SA3 items in SA3 (K10 holds that the script spells no
+  `agent-swift-test`; `tree_copy.py`'s T2 the table's bytes in a copy), and its integrator's edits
+  in `8bee8a56`.
+- **SA2's** SA3 and SA4 items landed in those phases (their records). Its "found, not this
+  phase's" item is #614, below.
+- **SA3's** SA4 item landed in SA4 and its integrator's edits in `3833b404`. "Only a real
+  publish shows" is not built and not filed: it is the owner's next push to `publish`.
+  `docs/developing.md`'s publishing section names what to look for, a failure there fails the
+  workflow by itself, and REL-2 (`docs/manual-checks.md`) checks the helper in the downloaded app.
+  Its live-run item is SA0's, above.
+- **SA4's** paid acceptance is above; its integrator's `CLAUDE.md` edits were applied in
+  `900799a0`, and `agent/node_modules` is gone from the integration worktree and the main
+  checkout. Its README item is #615.
+
+**#614** (`x-stainless-timeout: NOT_GIVEN`), which SA4's record left "blocked on SA5's live run",
+is answered. The three runs were made by the helper whose recordings hold that header by value on
+every request (SA-13), the relay forwarded it as it came, and every POST answered 200: no
+measurement shows the pin cannot serve, so §12 answer 4 asks for no Slaude change. A re-pin that
+changes the header re-records under SA-13 with no new decision. #614 closes as answered.
+
+**What its review found.** The challenge made two objections, both accepted:
+`spec_index_proof.py` is run at each of this phase's two commits, since each moves Lines cells;
+and the clearing run is called the second live one and the first on the Swift helper wherever
+it is called the one AI-20 said was owed. The diff read follows this record's build.
+
+**What is owed.**
+- **The owner:** AS-1, AS-4, AS-5 and AS-6 on the Swift helper (`docs/manual-checks.md`, each
+  row's `When` line).
+- **The next push to `publish`**, the owner's to ask for: SwiftPM fetching and building Slaude
+  inside the Archive, the helper signed with the Developer ID identity and a timestamp, within the
+  job's 60 minutes; P8 and P25 over the exported app; then REL-2 on the downloaded app.
+- **The integrator:** the root `CLAUDE.md`'s `designs/adr/` entry and `agent/CLAUDE.md`'s pointer
+  to this file, from the build notes.
+- Nothing else. #615 (the README's Languages table) and #616 (creator-jobs FC5's draft) are open
+  and are not this road map's.

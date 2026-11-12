@@ -33258,3 +33258,29 @@ printed them):
 | `make typecheck` with no bun on `PATH` | exit 0, 0 errors, the four baseline warnings |
 | `make gate` | PASS 722 s: names 2 s, typecheck 9 s, fmt 5 s, lint 22 s, test 465 s (the suite `Executed 77 tests, with 0 failures`, the drive 28/28), app 218 s (D25, D26 ok) |
 | `make dist` | 208.6 s: `dist_check: 47/47`, `published_check: 27/27` |
+
+## Road map "swift-helper" SA5 — the paid acceptance (three live proofs on the Swift helper; spec §11 P-9, AI-20)
+
+The owner's answer 3 in road map "swift-helper"'s §12: after SA4, the three paid proofs, serially
+in one month, each run's dollars reported, run by the orchestrator and never by a lane. None is in
+`make test` or `make gate`: each needs `--live --cap`, the owner's key and the month's budget
+(spec §11 P-3, P-6, P-9). Run on 2026-11-12 (UTC) on the Release app built from main at
+`900799a0`, the Swift helper on Slaude `4c6c2ca4`, one after another, and reported on #599:
+
+| Proof | Flags | Result | Settled |
+|---|---|---|---|
+| `assistant_clearing_proof.py` | `--live --cap 5` | 7/7, 0 skipped | $0.0758 |
+| `assistant_compaction_proof.py` | `--live --cap 11.50` | 9/9, 0 skipped | $0.2389 |
+| `assistant_prompt_proof.py` | `--live --cap 32` | 26/26, 0 skipped | $0.2309 |
+
+The month's Anthropic proof ledger read $0.0000 before and $0.5457 after, of the $40.00 budget.
+Every POST answered 200 on Slaude's API version `2026-10-21` with Bearer credentials (the relay
+forwards the helper's own headers but `DROPPED_HEADERS`); the largest body was 410,950 bytes
+against `BODY_BYTES_BOUND`'s 480,000. Nothing failed. Each figure is printed to four places from an
+unrounded sum, so the three settled figures add to $0.5456 against the ledger's $0.5457. The
+clearing run is the one AI-20 said was owed, and the second live run of that proof, the first on
+the Swift helper: the first, on the Bun helper, is the "Live run" of issue batch B54's section
+(2026-10-01, #208, `--cap 3`, 7/7, $0.1252). The compaction and prompt proofs' earlier live runs,
+on the Bun helper, are in issue batch B26's section and road map 12's A3 section. The road map's
+SA5 record holds the same figures, and spec §11 SA-13's recordings hold the
+`x-stainless-timeout: NOT_GIVEN` these runs sent (#614).

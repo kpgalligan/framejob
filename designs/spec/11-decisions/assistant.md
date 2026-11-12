@@ -252,6 +252,11 @@ in §6).
   `FrameJobAssistantClearToolResults`.
   **Amended by SA-4** (2026-11-12, road map "swift-helper"): from that road map's switch (SA3),
   `CLEAR_TRIGGER_TOKENS` is the Swift helper's `Request.clearTriggerTokens`, still 150 000.
+  **Run** (road map "swift-helper" SA5): the capped live clearing proof
+  (`tools/proof/assistant_clearing_proof.py --live`) has run twice, each 7/7 with none skipped: on
+  2026-10-01 on the Bun helper (#208, `--cap 3`, $0.1252 settled) and on 2026-11-12 on the Swift
+  helper (`--cap 5`, $0.0758), so `context_management` has reached the real API and no live
+  clearing proof is owed. The risk's other halves stand.
 - **AI-21 — The ask-first question names the file the tool will write, covers every path the
   model chose, and is not put for a call that can only be refused on its path** (docs bugs c1,
   #461, #462, #494; amends AI-7). (a) `new_project`, `render_frame` and `render_graphic` are
