@@ -58,6 +58,23 @@ Routes:
   `"context_management"` of the final `message_delta` (not on a `"cut"`
   reply); in a non-stream Message, a top-level key. A reply without it keeps
   its bytes.
+  Three more keys, added for road map "swift-helper" SA2's two-helper drive
+  (`agent_helper_drive.py`), are inert without their key, so a reply that
+  holds none of them keeps its bytes (no other proof's scenario held
+  `"http_error"`, `"cut": "error"` or a `"thinking"` block when they were
+  added):
+  - `"http_error": {"status", "type", "message", "retry_after",
+    "retry_after_ms"}` answers that status with the API's error JSON (with
+    `retry-after` and `retry-after-ms` headers when given) and consumes the
+    reply, so a retried request takes the next one.
+  - `"cut": "error"` with `"error": {"type", "message"}` sends
+    `message_start` and the content blocks, then an `event: error` carrying
+    `{"type":"error","error":{…}}`, and closes: an error mid-stream.
+  - A Block `{"type":"thinking","thinking","signature"}`: streamed, its
+    `content_block_start` carries `{"type":"thinking","thinking":"",
+    "signature":""}`, then ONE `thinking_delta` with the whole text and ONE
+    `signature_delta` with the whole signature; in a non-stream Message the
+    block as given.
 * `GET /__control/log` answers
   `{"requests":[{"method","path","headers","body","bytes"}],"failures":[str]}`.
 
@@ -168,6 +185,7 @@ def stream_events(reply, index, model):
                                          "usage": {"output_tokens":
                                                    reply.get("output_tokens", 10)}}))
     for at, block in enumerate(reply.get("content", [])):
+        deltas = None
         if block.get("type") == "tool_use":
             opening = {"type": "tool_use", "id": block["id"], "name": block["name"],
                        "input": {}}
@@ -177,15 +195,23 @@ def stream_events(reply, index, model):
             opening = {"type": "compaction", "content": None, "encrypted_content": None}
             delta = {"type": "compaction_delta", "content": block.get("content"),
                      "encrypted_content": None}
+        elif block.get("type") == "thinking":
+            opening = {"type": "thinking", "thinking": "", "signature": ""}
+            deltas = [{"type": "thinking_delta", "thinking": block.get("thinking", "")},
+                      {"type": "signature_delta", "signature": block.get("signature", "")}]
         else:
             opening = {"type": "text", "text": ""}
             delta = {"type": "text_delta", "text": block.get("text", "")}
         events.append(("content_block_start", {"type": "content_block_start", "index": at,
                                                "content_block": opening}))
-        events.append(("content_block_delta", {"type": "content_block_delta", "index": at,
-                                               "delta": delta}))
+        for one in deltas or [delta]:
+            events.append(("content_block_delta", {"type": "content_block_delta", "index": at,
+                                                   "delta": one}))
         events.append(("content_block_stop", {"type": "content_block_stop", "index": at}))
     if cut in ("drop", "stall"):
+        return events
+    if cut == "error":
+        events.append(("error", {"type": "error", "error": dict(reply.get("error") or {})}))
         return events
     final_usage = {"output_tokens": 10}
     if "iterations" in reply:
@@ -208,10 +234,12 @@ def make_handler(fake):
         def log_message(self, *arguments):
             pass
 
-        def _bytes(self, code, data, kind="application/json"):
+        def _bytes(self, code, data, kind="application/json", extra=()):
             try:
                 self.send_response(code)
                 self.send_header("content-type", kind)
+                for name, value in extra:
+                    self.send_header(name, value)
                 self.send_header("content-length", str(len(data)))
                 self.end_headers()
                 self.wfile.write(data)
@@ -221,8 +249,10 @@ def make_handler(fake):
         def _json(self, code, body):
             self._bytes(code, json.dumps(body).encode("utf-8"))
 
-        def _error(self, code, kind, message):
-            self._json(code, {"type": "error", "error": {"type": kind, "message": message}})
+        def _error(self, code, kind, message, headers=()):
+            self._bytes(code, json.dumps({"type": "error", "error": {"type": kind,
+                                                                     "message": message}})
+                        .encode("utf-8"), extra=headers)
 
         def _handle(self, method):
             path = self.path.split("?")[0]
@@ -277,6 +307,13 @@ def make_handler(fake):
                 fake.fail(f"POST /v1/messages #{index + 1}: past the end of the script")
                 return self._error(400, "invalid_request_error",
                                    "the stand-in's script has no reply left")
+            failure = reply.get("http_error")
+            if failure is not None:
+                headers = [(name, str(failure[key])) for name, key in
+                           (("retry-after", "retry_after"), ("retry-after-ms", "retry_after_ms"))
+                           if key in failure]
+                return self._error(int(failure["status"]), failure.get("type", "api_error"),
+                                   failure.get("message", ""), headers)
             model = body.get("model", "claude-opus-5-5")
             if not body.get("stream"):
                 return self._json(200, message_object(reply, index, model))

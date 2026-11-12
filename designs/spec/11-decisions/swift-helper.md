@@ -90,7 +90,14 @@ until SA3's switch lands, the shipped helper is the one AI-1, P-2 and P-8 descri
   lost for nothing. **Amends AI-9 and AI-20** where they point at `agent/src/main.ts` for the rule
   and `CLEAR_TRIGGER_TOKENS`: from SA3's switch these are the package's `Compaction.swift`,
   `Turn.swift` and `Request.clearTriggerTokens`. Risk accepted: SA2's two-helper drive allows these
-  three differences by name, and nothing else.
+  three differences by name, and nothing else. SA2 measured (`tools/proof/agent_helper_drive.py`,
+  road map §13): (b) is no difference, since the 0.128.0 runner already skips the summary after
+  such a reply and both helpers send nothing and say "no summary came back"; (c) differs in events
+  only, since that runner keeps the history when the block is empty and only `main.ts`'s report
+  says `compacted`; and "success needs both" makes a fourth difference, allowed by name under
+  this entry: a summary holding a non-empty `compaction` block that stopped with another reason
+  replaces the TypeScript runner's history with that block, though `main.ts` reports
+  `compaction_failed`, where the Swift helper keeps the conversation.
 - **SA-5 — The request: today's body in a pinned key order, the system block's own cache
   breakpoint, API version `2026-10-21`, Bearer credentials, and sorted keys from the app** (SA1,
   road map §5 "The request"; the owner's answer 6 (a)). The body is raw JSON with today's keys in

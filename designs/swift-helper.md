@@ -4,7 +4,8 @@
 it on #599 on 2026-11-12 and answered the six questions of §12, which now holds the answers. SA0,
 the spike, has landed: its record is in §13, and it wrote SA-1..SA-3 in
 `designs/spec/11-decisions/swift-helper.md`. SA1, the package beside the Bun helper, has landed
-with SA-4..SA-7 and SA-12; its record is in §13. SA2 is next.
+with SA-4..SA-7 and SA-12; its record is in §13. SA2, the drive that runs both helpers and
+compares them, has landed; its record is in §13. SA3 is next.
 
 **Source.** The owner, on #599 (2026-11-12): "We're going to replace Bun with the Swift Anthropic
 API we wrote. See ~/devel/doctored for background info. That had the same Typescript Anthropic
@@ -480,8 +481,10 @@ SA-4..SA-6.
 A stdio drive, `tools/proof/agent_helper_drive.py`, runs **both** helpers (the Bun one and the
 Swift one) as the app does, over the same scripted conversations on `anthropic_fake.py`, and
 compares the event streams and the request bodies. The differences it allows are an explicit
-list, each row naming its SA decision: the system block's breakpoint, the key order, the
-credential header, the API version, the three compaction behaviours.
+list, each row naming its SA decision: the system block's breakpoint, the credential header, the
+API version, the path's `?beta=true`, the client's own headers, SA-4's compaction behaviours and
+SA-6's protocol differences. The key order was listed here and did not differ, so it is compared
+strictly (§13, SA2's record).
 
 This is the red-then-green Doctored could not have: any other difference fails. It exists only
 while both helpers do, so it runs before any deletion. Its cases stay afterwards as the Swift
@@ -1065,6 +1068,115 @@ with 0 failures`), `app pass 235s` (D25, D26 ok), `gate: PASS 768s` (load 62.48 
 - **The integrator:** `agent/CLAUDE.md` and the root `CLAUDE.md`'s lines, from the build notes.
 
 ### SA2 — record
+
+**What landed** (2026-11-12, on `8bee8a56`). `tools/proof/agent_helper_drive.py`, a proof
+instrument in `make test` straight after `make agent-test`: B0 builds the Bun helper with
+`agent/build.sh helper` into a scratch target, B1 builds the Swift helper's product on the suite's
+scratch path behind SA-12's guard, and 27 cases run each helper as `AssistantSession` runs it
+(exactly HOME, TMPDIR and PATH, the app's sorted compact lines and `writeResult`'s spliced
+answers) over one stand-in, comparing the event streams line for line and every request (method,
+path, headers, body) as parsed JSON with its key order. A case also holds the Swift helper's own
+event types, POSTs, requests and the stand-in's failures, so two helpers failing alike fail. The
+allowed list, `ALLOWED`, has sixteen rows, each naming its decision and declaring its cases;
+`--drop`, `--rows-needed` and the switch `drive-same-helper` show each row needed and none
+vacuous, and `SWIFT_MUTANTS` holds eight mutants of `agent/Sources`, applied in place behind a
+clean-tree guard and restored by digest. `tools/proof/anthropic_fake.py` gained three keys, each
+inert without it: `http_error`, `"cut": "error"` and a `thinking` block. The section "Road map
+"swift-helper" SA2" in `tools/proof/README.md`; the `make test` row in `docs/developing.md`; one
+"SA2 measured" sentence appended to SA-4 (no decision moved) with the two index cells it changes.
+**No Slaude change:** the pin lacked nothing the drive needed, so no branch or pull request was
+opened and no re-pin is owed. Nothing in `app/Sources` changed.
+
+**What was measured.** On the same 12-core, 96 GB host, Xcode 26.2, Swift 6.2.3, with two other
+lanes building throughout: no figure is an idle one.
+
+1. **What differs** (the first run of every case, before the list was written; road map §9 named
+   the expected rows). Every request: `anthropic-version` 2023-06-01 against 2026-10-21,
+   `x-api-key` against `authorization: Bearer`, and the client's own headers (`Anthropic/JS
+   0.128.0` against `Anthropic/Swift 2.3.0`, the `x-stainless-*` set, `accept-encoding`, and
+   URLSession's `accept-language`); every POST: `?beta=true` and `system` as a string against one
+   block with `cache_control`. Then SA-4 (a) in `cut-reply-tool-call`'s next request, SA-4 (c) in
+   `compaction-empty`'s events (`compacted {before 5010, after 0}` against `compaction_failed`
+   "the summary came back empty"), a fourth in `compaction-wrong-stop-block` (`messages[0].role`
+   'assistant' against 'user'), and SA-6's: the parser's words, `[1]`'s error, `reset`'s
+   `context_usage` of 0 and Bun's `used` 0 after it against Swift's 110, `configure` without a key,
+   the three error spellings ("stream ended without producing a Message with role=assistant"
+   against "API error: The stream ended before its message_stop event.", `API error :
+   Overloaded` against `API error 529: Overloaded`, `API error : Connection error.` against `API
+   error: Connection error.`), and the price cache's 949 indented bytes against 660 compact ones
+   holding the same table. **Not different:** no body and no event differs in key order (SA-5's
+   pinned order and SA-6's event order hold), so key order is compared strictly and has no row;
+   SA-4 (b) is the same in both, because the 0.128.0 runner already skips that summary
+   (`BetaToolRunner.mjs`'s `compactAfterFinalTurn`); every `cost`'s `dollars` is the same double;
+   and the tool round trip, the refusals, the retries, the cancels, `pause_turn`, the round cap,
+   clearing, AI-20's mid-turn settings, the price refresh's events and each helper's reading of
+  the cache file the other wrote are the same.
+2. **The fourth difference.** A summary holding a non-empty `compaction` block that stopped with
+   another reason: the runner swaps its history for that block (`_compact` tests the block alone)
+   while `main.ts` reports `compaction_failed` "the summary stopped with end_turn" and says the
+   history is unchanged; the Swift helper keeps the conversation, as SA-4's "success needs both"
+   says. It is allowed by name under SA-4 (`summary-needs-compaction-stop`), and SA-4 now says so.
+3. **Green.** `python3 tools/proof/agent_helper_drive.py`, building both: `B0 ok — agent/build.sh
+   helper, 0.564 s`, `B1 ok — scratch path kept; Build of product 'framejob-agent' complete!
+   (1.51s), 2.277 s`, `43/43`, `real 22.65` (load 49.71 56.27 39.28 → 43.43 54.34 39.08). In the
+   gate's first `make test`: 27 cases in 17.2 s, of which `no-connection`'s retries 13.2 s.
+4. **Each row needed.** `--rows-needed` (load 96.33 36.80 27.28 → 113.44 44.54 30.28): without
+   each row exactly its declared cases FAIL — 23 for `system-breakpoint` and `beta-query` (every
+   case with a POST), 26 for `credential-header`, `api-version` and `client-headers` (every case
+   with a request), one each for the other eleven. `--drop summary-needs-compaction-stop` over
+   three cases: `caught — exactly compaction-wrong-stop-block failed`, exit 1.
+5. **Not vacuous.** `--mutant drive-same-helper` (the Swift helper on both sides): every one of the
+   sixteen rows `FAIL — allows nothing: remove it`, `27/43`, caught.
+6. **Mutants**, each applied in place, built, run over its cases, restored byte-identical and
+   rebuilt (load 118.27 59.11 36.79 → 92.55 63.31 40.70): `tool-results-reversed` (tools),
+   `cost-before-done` (text, tools), `two-retries` (retry: `swift sent 3 POSTs of 4 requests`),
+   `summary-keeps-clearing` (compaction: the summary body `only in swift
+   ['context_management']`), `system-loses-guide` (text, tools: `system-breakpoint` did not take
+   the shorter text), `not-run-reworded` (cut-reply-tool-call: `unrun-calls-answered` did not
+   take the other sentence) and `empty-summary-swapped` (compaction-empty: the swap's request,
+   `messages[0].role 'user' / 'assistant'`, which `empty-summary` does not let through), all
+   caught. `no-defer-loading`'s first form, the line deleted, did not build under the suite's
+   warnings-as-errors (`initialization of immutable value 'core' was never used`, exit 2); re-aimed
+   to `_ = core`, it was caught in text, tools, compaction and retry (`body.tools[3]: keys only in
+   bun ['defer_loading']`). `git status --porcelain -- agent/Sources` was empty afterwards, and
+   `mutant_anchors.py` reads the table's eight anchors once each.
+7. **The stand-in's keys seen red.** With `git show HEAD:tools/proof/anthropic_fake.py` in its
+   place for one run, `--cases thinking,stream-error,retry`: `15/19`, each case FAIL (no
+   `progress_delta`; no error mid-stream; one POST where four were expected); restored
+   byte-identical. No other proof's scenario holds any of the three keys (a grep of
+   `tools/proof`), so no other proof's bytes moved.
+8. **`make gate`.** `names pass 3s`, `typecheck pass 19s` (its four warnings), `fmt pass 8s`,
+   `lint pass 26s`, `test pass 517s` (the suite's `Executed 77 tests, with 0 failures` on the kept
+   scratch path, then the drive: `B0 ok … 0.601 s`, `B1 ok … 2.715 s`, `43/43`), `app pass 201s`
+   (D25, D26 ok), `gate: PASS 776s` (load 39.48 38.55 35.03 → 24.41 55.20 61.72). Two code edits
+   followed (`--drop` refusing a run with none of its row's cases, exit 2; a mutant whose file was
+   not put back exiting 2), each checked by a narrow run (`--drop empty-summary --cases text`:
+   exit 2; `--mutant two-retries`: caught, restored); the gate again: `test pass 132s` (the drive
+   `43/43`, 27 cases in 16.3 s), the rest skipped as unchanged, `gate: PASS 135s` (load 14.43
+   47.76 58.59 → 5.02 31.99 50.65).
+
+**What its review found.** The challenge made four objections, all accepted. (1) In the price
+case the refresh's `prices` and the Models lookup's `context_usage` race, so the drive's feed
+holds its answer until that helper's `context_usage` has been read. (2) A summary that holds a
+compaction block and stops with another reason is a fourth difference: `compaction-wrong-stop`
+became two cases, and the run confirmed it (item 2). (3) `retry-after: 0` is a default back-off
+in both clients, so `retry` uses `retry-after-ms: 10` (its case takes 0.2 s). (4) The mutants'
+files are tree-relative paths, which `mutant_anchors.py` finds, and the switch `drive-same-helper`
+is kept out of every name holding `MUTANT`. The diff read follows this record's build.
+
+**What is owed.**
+- **SA3:** the drive's Swift helper is the suite's debug build; SA3 points it at the bundled
+  release helper SA-8's script builds, and moves the mutants to SA-8's mutant builder or its
+  persistent mutant scratch path (today they edit `agent/Sources` in place on the suite's scratch
+  path). B0 keeps building the Bun helper until SA4.
+- **SA4:** the Bun side goes (B0, `--bun`, `ALLOWED`, `--drop`, `--rows-needed`,
+  `drive-same-helper` and the Bun half of each run), and the cases stay with their expectations,
+  which are the Swift helper's, as its drive.
+- **Found, not this phase's:** Slaude sends `x-stainless-timeout: NOT_GIVEN` on every request,
+  where the TypeScript SDK sends the timeout in seconds (600). `client-headers` lets it through
+  as one of the client's own headers and the pin serves the drive, so no Slaude change is made
+  now (the owner's answer 4: only when a measurement shows the pin cannot serve); a residue issue
+  records it.
 
 ### SA3 — record
 

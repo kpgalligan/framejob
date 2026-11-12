@@ -72,6 +72,10 @@ codecs:
 # over synthetic proofs in scratch trees. No app, no build.
 # `agent_test.py --selftest` (road map "swift-helper" SA1, spec §11 SA-12) is the suite's
 # scratch-path guard over scratch folders, no SwiftPM; then `make agent-test`, below.
+# `agent_helper_drive.py` (road map "swift-helper" SA2, spec §11 SA-4..SA-6) runs the Bun helper
+# and the Swift helper over the same scripted conversations on the stand-in API and fails any
+# difference outside its allowed list; it builds the Swift helper on the suite's warm scratch
+# path, so it follows `make agent-test`. Loopback only, dummy keys, nothing paid.
 test: rust codecs
 	cd core && cargo test --release
 	cd graphic && cargo test --release
@@ -81,6 +85,7 @@ test: rust codecs
 	python3 tools/proof/prices_proof.py
 	python3 tools/agent/agent_test.py --selftest
 	$(MAKE) agent-test
+	python3 tools/proof/agent_helper_drive.py
 	python3 tools/proof/budget_proof.py
 	python3 tools/proof/capture_spike/inventory.py --check
 	python3 tools/proof/spec_index_proof.py

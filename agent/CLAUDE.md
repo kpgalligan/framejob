@@ -8,7 +8,9 @@ TypeScript in `src/` (`build.sh`, `package.json`, `bun.lock`, `tsconfig.json`,
 the agent loop of `Contents/Helpers/framejob-agent`, started once per window's conversation by
 `AssistantSession`. The package was ported once from Doctored's helper at that repository's
 `b524babc` (the owner's answer 2 (a)) and has no identity rule with it. `make agent-test` runs its
-suite through `tools/agent/agent_test.py`; until SA3 nothing builds it into the app.
+suite through `tools/agent/agent_test.py`, and `tools/proof/agent_helper_drive.py` (SA2, in
+`make test`) runs it beside the Bun helper over the same conversations on the stand-in API and
+fails any difference outside its allowed list; until SA3 nothing builds it into the app.
 
 ## Module map
 
@@ -54,6 +56,10 @@ One line per file; each file's doc comments hold its detail.
   loosely, so a renamed type or field fails silently there; change one only with its app side and
   spec §11 (SA-6). The sentences the tab shows (the refusals, `API error <status>: …`,
   `API error: …`, the three end-of-turn sentences) are pinned by tests.
+- **A difference from the Bun helper is a decision first.** Until SA4 deletes the Bun side, a
+  change that makes the Swift helper's events, requests or wording differ from the Bun
+  helper's fails `tools/proof/agent_helper_drive.py`; it lands with its spec §11 SA- entry and
+  a row in the drive's `ALLOWED` naming it, never by widening an existing row.
 - **History is verbatim and append-only**: `[RawJSON]` exactly as received, replayed byte for
   byte. Never route it through typed models, `JSONValue` or sorted keys. The only rewrites are the
   compaction swap at turn end and the `pushUserText` merge into an unanswered user message.

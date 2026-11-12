@@ -32942,3 +32942,137 @@ server and scratch ledgers only, nothing live:
 The Debug rehearsals printed the same largest bodies (398,050, 399,360 and 397,888 bytes), and
 each is 2,222 to 3,694 bytes over the probe's 395,666: the probe's mirror of the helper's wire
 shape agrees with the bodies the relay measured. No paid run was made.
+
+## Road map "swift-helper" SA2 — the two helpers, driven (`agent_helper_drive.py`; sixteen allowed rows; eight mutants and `drive-same-helper`; spec §11 SA-4, SA-5, SA-6)
+
+The Bun helper the app still ships and the Swift helper of `agent/Package.swift` that replaces it
+at SA3, each run as the app runs it, over the same scripted conversations on the stand-in API
+(`anthropic_fake.py`); their events and their requests are compared, and any difference outside
+an explicit list fails. In `make test`, straight after `make agent-test`. Loopback only, the
+dummy keys `proof-key` and `wrong-key`, both keys popped from every child, nothing paid.
+
+```
+python3 tools/proof/agent_helper_drive.py                         # B0, B1, the 27 cases, the 16 rows (make test)
+python3 tools/proof/agent_helper_drive.py --cases text,tools      # a subset (and the case each needs)
+python3 tools/proof/agent_helper_drive.py --bun PATH --swift PATH # built helpers in place of B0 and B1
+python3 tools/proof/agent_helper_drive.py --list                  # the cases, the rows, the mutants
+python3 tools/proof/agent_helper_drive.py --drop ROW              # without one row: exactly its cases FAIL (exit 1)
+python3 tools/proof/agent_helper_drive.py --rows-needed           # --drop for every row, over one run (exit 0)
+python3 tools/proof/agent_helper_drive.py --mutant NAME           # a Swift mutant, in place, rebuilt (exit 1 caught)
+python3 tools/proof/agent_helper_drive.py --mutant drive-same-helper  # both sides Swift (exit 1 caught)
+```
+
+**The helpers.** B0 is `agent/build.sh helper` into `work/agent_helper_drive/bun-target/` (no bun
+is `build.sh`'s own error and a FAIL). B1 runs `agent_test.py`'s guard (spec §11 SA-12) on
+`build/agent-swift-test` and builds the `framejob-agent` product there with the suite's
+environment, so `make agent-test` has already built it and B1 takes seconds; the path is
+SwiftPM's `--show-bin-path`. Each helper gets exactly `HOME`, `TMPDIR` (scratch folders) and
+`PATH=/usr/bin:/bin`, as `AssistantSession` gives it, and the app's lines: sorted keys, compact,
+and `writeResult`'s spliced answers.
+
+**A case** is the stand-in's scenario, the app's steps and the Swift helper's expectation: its
+event types, its POSTs and all its requests, the stand-in's failures and, for the price cases, the
+feed's GETs, so two helpers failing alike still fail. Every wait is bounded; a hang, an exit other
+than 0 after stdin closes or a Swift stderr line without `framejob-agent: ` fails the case. The
+price feed is the drive's own loopback server, holding its answer until that helper's
+`context_usage` is read, so the two cannot race.
+
+| Case | What it holds |
+|---|---|
+| `handshake` | `prices` (bundled), `ready`, `context_usage`; the Models GET |
+| `text` | one round: the events, the body, the headers |
+| `thinking` | a thinking block with a signature: `progress_delta`, and the block replayed in the next request |
+| `tools` | five calls answered in reverse (text, an image and text, `isError`, `null`, no content) and an unknown tool: every request out before any answer, the results in the reply's order |
+| `two-turns` | `settings` turning clearing on between turns: `context_management`, the fourth beta, `tool_results_cleared` |
+| `settings-mid-turn` | `settings` during a tool wait (spec §11 AI-20): no clearing in that turn, its compaction at its end, clearing in the next |
+| `compaction` | with clearing on: the summary request without `context_management`, its `cost`, `compacted`, the swapped history |
+| `compaction-wrong-stop` | a text summary that stopped `end_turn` |
+| `compaction-wrong-stop-block` | a compaction block that stopped `end_turn` (row `summary-needs-compaction-stop`) |
+| `compaction-empty` | a `compaction` stop with a null block (row `empty-summary`) |
+| `cut-reply-tool-call` | `max_tokens` after two tool calls, past the limit: SA-4 (b) the same in both, (a) in the next request (row `unrun-calls-answered`) |
+| `stop-sentences` | `max_tokens`, `refusal` and #484's `model_context_window_exceeded` |
+| `pause-turn` | the resend |
+| `round-cap` | thirty tool rounds and a silent end |
+| `cancel-stream` | a cancel on a stalled reply's first `text_delta`: one partial `cost`, no error, the next send merged |
+| `cancel-tools` | a cancel during a tool wait and "Cancelled by the user." after it: no request after the cancel |
+| `stream-drop` | a reply cut short (row `error-stream-cut`) |
+| `stream-error` | an `overloaded_error` event mid-stream (row `error-event-status`) |
+| `retry` | four 529s with `retry-after-ms: 10`: four POSTs of one body |
+| `past-script`, `wrong-key` | 400 and 401: `API error <status>: <message>` in both |
+| `no-connection` | `api_base` at a closed port: three retries of each request (row `error-no-status`) |
+| `refusals` | `send` before `configure`, `send` during a turn |
+| `bad-lines` | a blank line, a line that is not JSON, `[1]`, an unknown type, `reset` after a turn, each answer marked off by a `configure` |
+| `configure-no-key` | `configure` with no `api_key` (row `configure-validated`) |
+| `prices-fetched` | a refresh from the held feed: `ready`, `context_usage`, then `prices` `fetched`; the cache file each wrote |
+| `prices-cached` | each helper started on the cache file the other wrote: `prices` `cached` before `ready`, a turn priced from it, no fetch |
+
+**What is compared.** The two event streams line for line, and every request (method, path,
+headers as a set with `anthropic-beta` as a list, body), as parsed JSON with each object's key
+order; numbers by value, so `1e-07` is `1e-7` (SA-6). A refreshed table's `as_of` and its cache
+file's `fetched_at` are clock readings: each must be an ISO 8601 instant inside the run and is
+then compared as `<clock>`.
+
+**The allowed rows** (`ALLOWED`). Each rewrites only the difference its decision names, and a full
+run fails a row that explained nothing in one of its declared cases ("allows nothing: remove it")
+or anything in another:
+
+| Row | Decision | Lets through | Cases |
+|---|---|---|---|
+| `system-breakpoint` | SA-5 | Bun's `system` string against Swift's one text block of that string with `cache_control` | every case with a POST |
+| `credential-header` | SA-5 | `x-api-key: <dummy>` against `authorization: Bearer <the same dummy>` | every case with a request |
+| `api-version` | SA-5 | `anthropic-version` 2023-06-01 against 2026-10-21 | every case with a request |
+| `beta-query` | SA-5 | `POST /v1/messages?beta=true` against `/v1/messages` | every case with a POST |
+| `client-headers` | SA-1 | eighteen named headers of the HTTP client and the SDK: `user-agent`, twelve `x-stainless-*`, `accept-encoding`, `accept-language`, `connection`, `content-length`, `host` | every case with a request |
+| `unrun-calls-answered` | SA-4 (a) | Swift's next user message starting with one "Not run: the reply stopped with <reason> before this call could run." per call | `cut-reply-tool-call` |
+| `summary-needs-compaction-stop` | SA-4 | Bun's later requests starting from a wrongly stopped summary block, Swift's from the conversation it kept | `compaction-wrong-stop-block` |
+| `empty-summary` | SA-4 (c) | Bun's `compacted` and its `context_usage` against Swift's `compaction_failed` "the summary came back empty" | `compaction-empty` |
+| `configure-validated` | SA-6 | Swift's "Bad message from the app: configure needs a string api_key" against Bun's `prices`, `ready` and a `context_usage` with no limit | `configure-no-key` |
+| `non-object-line` | SA-6 | Swift's "… expected a JSON object" against Bun's silence | `bad-lines` |
+| `reset-ignored` | SA-6 | Bun's `context_usage` of 0 after `reset` against Swift's silence, and Bun's `used` 0 against the context Swift kept until the next response | `bad-lines` |
+| `parser-text` | SA-6 | the JSON parsers' own words after "Bad message from the app: " | `bad-lines` |
+| `error-no-status` | SA-6 | `API error : <m>` against `API error: <m>` | `no-connection` |
+| `error-stream-cut` | SA-6 | the TypeScript SDK's "stream ended without producing a Message with role=assistant" against `API error: <m>` | `stream-drop` |
+| `error-event-status` | SA-6 | `API error : Overloaded` against `API error 529: Overloaded` | `stream-error` |
+| `cache-file-layout` | SA-6 | the same table indented by Bun, compact from Swift | `prices-fetched` |
+
+Two differences the road map expected need no row: the key order (no body and no event differs in
+it, so it is compared strictly) and SA-4 (b) (the 0.128.0 runner already skips that summary, so
+both helpers send nothing and say "no summary came back"). One that SA-4 did not list needs one:
+`summary-needs-compaction-stop`, from SA-4's "success needs both".
+
+**The stand-in's three keys** (`anthropic_fake.py`): `http_error` (a status and the API's error
+JSON, with `retry-after` and `retry-after-ms` when given), `"cut": "error"` (an `event: error`
+mid-stream) and a `thinking` block (one `thinking_delta`, one `signature_delta`). Each is inert
+without its key; no other proof's scenario held one when they were added.
+
+**Mutants** (`SWIFT_MUTANTS`, counted by `mutant_anchors.py`): applied in place to
+`agent/Sources`, refused while that folder has any change `git status --porcelain` shows, the
+file restored from the bytes kept in `work/agent_helper_drive/mutant-original/` and checked by
+digest, and the helper rebuilt on the suite's scratch path. A mutant is caught only when every
+case it names FAILs; one that does not build exits 2. `tool-results-reversed` (`tools`),
+`no-defer-loading` (`text`, `tools`, `compaction`, `retry`), `cost-before-done` (`text`, `tools`),
+`two-retries` (`retry`) and `summary-keeps-clearing` (`compaction`) make a difference outside the
+list; `system-loses-guide` (`text`, `tools`), `not-run-reworded` (`cut-reply-tool-call`) and
+`empty-summary-swapped` (`compaction-empty`) show the `system-breakpoint`, `unrun-calls-answered`
+and `empty-summary` rows no wider than their decisions. `--mutant drive-same-helper` runs the
+Swift helper on both sides: every row must allow nothing.
+
+**When SA3 and SA4 land.** SA3 points `--swift`'s default at the bundled release helper and
+builds the mutants with SA-8's builder; SA4 deletes the Bun side (`--bun`, `ALLOWED`, `--drop`,
+`--rows-needed`, `drive-same-helper`) and keeps the cases with their expectations as the Swift
+helper's drive.
+
+Run on 2026-11-12 in a worktree of 8bee8a56, other lanes building (load averages as `uptime`
+printed them):
+
+| Command | Result |
+|---|---|
+| The first run, before the list (every case, `--dump`) | 0/27: the headers and the system block in every request, then SA-4 (a) and (c), `compaction-wrong-stop-block`'s fourth difference, and SA-6's protocol and error wording; no key order differed anywhere and SA-4 (b) was equal |
+| `agent_helper_drive.py` (B0 and B1 built; load 49.71 → 43.43) | 43/43, exit 0, 22.65 s: `B0 ok — agent/build.sh helper, 0.564 s`, `B1 ok — scratch path kept; … complete! (1.51s), 2.277 s` |
+| `--rows-needed` (load 96.33 → 113.44) | exit 0: each row's declared cases FAIL without it and no other (23, 26, 26, 23, 26, then one each) |
+| `--drop summary-needs-compaction-stop --cases compaction-wrong-stop-block,compaction-empty,text` | exit 1: `caught — exactly compaction-wrong-stop-block failed` |
+| `--mutant drive-same-helper` | 27/43, exit 1: all sixteen rows `allows nothing: remove it` |
+| `--mutant` each of the eight (load 118.27 → 92.55) | exit 1 each, caught in its named cases; each file restored byte-identical and rebuilt. `no-defer-loading` first deleted its line and did not build under the suite's warnings-as-errors (exit 2), and was re-aimed to `_ = core` |
+| `--cases thinking,stream-error,retry` on the stand-in as it was at 8bee8a56 | 15/19, exit 1: all three FAIL; the file put back byte-identical |
+| `mutant_anchors.py` | PASS: `agent_helper_drive.py SWIFT_MUTANTS: 8 mutants, 8 anchors read` |
+| `make gate` (load 39.48 → 61.72), then again after two code edits (load 14.43 → 50.65) | PASS 776 s: names, typecheck, fmt, lint, test 517 s (`Executed 77 tests, with 0 failures`; the drive 43/43), app 201 s (D25, D26); then PASS 135 s: test 132 s (the drive 43/43, 27 cases in 16.3 s), the rest skipped as unchanged |
