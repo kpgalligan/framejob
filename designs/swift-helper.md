@@ -263,9 +263,11 @@ before `message_delta` is priced from `message_start`'s counts and nothing else.
 ### Compaction and clearing (#161, #484, AI-9, AI-18, AI-20)
 
 - **What stays:** compaction only at a turn's end, after a final reply, never after a cancel, once
-  `used` reaches `auto_compact_tokens`; `null` never compacts; a `settings` message applies from
-  the next turn; the events `compaction_started`, `compacted`, `compaction_failed`; the three
-  betas; clearing as `context_management` with the fourth beta, at 150,000 / 50,000 / keep 5.
+  `used` reaches `auto_compact_tokens`; `null` never compacts; a `settings` message's clearing
+  applies from the next turn and its threshold at the end of the turn in flight (AI-20, as
+  `compactionDue()` reads the live settings today); the events `compaction_started`, `compacted`,
+  `compaction_failed`; the three betas; clearing as `context_management` with the fourth beta, at
+  150,000 / 50,000 / keep 5.
   AI-18's dev knob is the app's and is untouched.
 - **What changes, because the runner's implicit compaction becomes AH-3's explicit rule.** Three
   behaviours, each a decision (SA-4) and each with a suite case:
@@ -941,7 +943,8 @@ Bun helper, ported once from Doctored's `agent/` at `b524babc` (the owner's answ
 `PriceTable.swift` and `PriceRefresh.swift` — the refresh in a third file, as the plan allowed,
 to keep the table's file readable at 250 lines — and `anthropic.json`, the committed relative
 symlink to `agent/prices/anthropic.json`), `Sources/framejob-agent/main.swift`, and `Tests/` (nine
-test files and three support files, 76 tests). What the port adds to Doctored's: `price_cache` and
+test files and three support files, 77 tests after the fix pass below, 76 before it). What the
+port adds to Doctored's: `price_cache` and
 `price_feed`; the events `message_done`, `prices` and `cost`; the price function, the table, its
 refresh and the cache file in `priceTable.ts`'s rules; the partial price from
 `currentMessageSnapshot` when a round throws after `message_start`; a turn's prices fixed at
@@ -1026,6 +1029,32 @@ scratch path of its own and SA-12's marker governs it alone, so SA-8's clone rul
 rather than inferred from SA0's release figures (2, item 3 above); KO's mutant runs T1 in a mutant
 launch A and then W's launch B of the same app and compares them (3); and the SA-3 mutant that had
 nothing to mutate became `cancel-not-priced`, with H12 kept as a plain case (4).
+
+The diff read found one should-fix and two nits, all taken in a fix pass. (1) The end-of-turn
+compaction check read the limit the turn started with, where AI-20 and `main.ts`'s
+`compactionDue()` read the settings in force when the turn ends: a limit turned off while a tool
+call waited still compacted, and a limit lowered mid-turn compacted only at the next turn's end.
+`compactIfDue` now reads the session's current settings, clearing and the betas staying the
+turn's; the suite's settings case became two (a limit set mid-turn compacting at that turn's end
+with clearing still off, the next turn clearing; a limit set to null mid-turn not compacting);
+SA-4 now says the threshold is read at the turn's end, as AI-20 has it, and §5 above says the
+same. Mutant
+`limit-at-turn-start` (the turn's settings read again), `swift test --filter SessionTests` under
+`FJ_AGENT_STRICT=1`: both cases red, `Executed 9 tests, with 4 failures`, reverted (its first run
+trapped on an index in the first case, which now stops at its failed count instead). (2) SA-6's
+allowed list now names the error wording: `API error: <message>` for an error with no status
+where the TypeScript writes `API error : <message>`, a mid-stream `error` event carrying its
+type's status (529 for `overloaded_error`) where the TypeScript gives it none, and a stream cut
+short, which the TypeScript reports with its SDK's message alone. (3) `FJ_AGENT_STRICT=1` seen
+red: an unused `let` in `Log.swift` under `make agent-test` stopped the build with `error:
+initialization of immutable value 'strictProbe' was never used` and `make: *** [agent-test] Error
+1`, reverted. After the fix, `make agent-test` in a fresh worktree whose copied scratch path the
+guard emptied (`emptied: made at` the build worktree's path): `Executed 77 tests, with 0
+failures`, `exit 0 wall 59 s` (load 4.17 26.66 102.53 → 21.44 28.37 98.05). `make gate` after the
+fix: `names pass`, `typecheck pass` (its four warnings), `fmt` and `lint` skipped as unchanged,
+`test pass 521s` (the suite `Build complete! (8.48s)` on the kept scratch path, `Executed 77 tests,
+with 0 failures`), `app pass 235s` (D25, D26 ok), `gate: PASS 768s` (load 62.48 39.71 90.36 →
+93.69 91.22 98.83).
 
 **What is owed.**
 - **SA2:** the two-helper drive, with SA-4's three behaviours, SA-5's request and SA-6's listed

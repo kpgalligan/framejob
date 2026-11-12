@@ -10,12 +10,16 @@ extension AgentSession {
     /// (`reportCompaction`). The summary is priced like any response, before its report, and
     /// has no `message_done` (spec §11 SA-4, SA-6).
     ///
+    /// The limit is the one in force now, when the turn ends, not the one it started with: a
+    /// `settings` message that arrived mid-turn applies its threshold at this turn's end, while
+    /// clearing and the betas stay the turn's until the next one (spec §11 AI-20).
+    ///
     /// `endsInToolCall` is a final reply that ends in tool calls that never ran (the loop
     /// has answered them with error results). The summary is then not asked for, as the
     /// SDK runner skipped it, and this returns true; the loop reports
     /// `compaction_failed` after it ends.
     func compactIfDue(_ turn: TurnState, endsInToolCall: Bool) async throws -> Bool {
-        guard let limit = turn.settings.autoCompactTokens, contextUsed >= limit, !isCancelled else { return false }
+        guard let limit = settings.autoCompactTokens, contextUsed >= limit, !isCancelled else { return false }
         emit(.compactionStarted(used: contextUsed))
         if endsInToolCall {
             Log.warn("The pending compaction was skipped because the last turn ended with tool calls that were not run.")

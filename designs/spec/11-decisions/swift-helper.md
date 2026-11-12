@@ -70,8 +70,9 @@ until SA3's switch lands, the shipped helper is the one AI-1, P-2 and P-8 descri
 - **SA-4 — Compaction is one explicit rule, and three of the runner's behaviours change with it**
   (SA1, road map §5 "Compaction and clearing"). What stays: compaction only at a turn's end, after
   its final reply, never between tool calls and never after a cancel, once the context reaches
-  `auto_compact_tokens` (`null` never compacts); one summary request, the round's body without
-  `context_management` and with `compaction {type: summarize, instructions}`; the events
+  `auto_compact_tokens` (`null` never compacts), the threshold read when the turn ends and
+  clearing and its beta fixed when it starts, as AI-20 has it; one summary request, the round's
+  body without `context_management` and with `compaction {type: summarize, instructions}`; the events
   `compaction_started`, `compacted` and `compaction_failed`; and the three end-of-turn sentences,
   #484's "The reply was cut off because the conversation filled the model's context window." among
   them, which Doctored's helper drops and Frame Job keeps. Success needs both the `compaction` stop
@@ -135,14 +136,19 @@ until SA3's switch lands, the shipped helper is the one AI-1, P-2 and P-8 descri
   laxer, and anything else means a refresh is due, as an unparseable date does today); the feed's
   URL is read by Foundation's `URLComponents` and must have a host, where the TypeScript reads it
   with WHATWG's `new URL`, so a URL only one of them accepts is refused by the other in the same
-  sentence; and the cache file holds the same table
-  written compact, where the TypeScript indents it, each helper reading the other's file. A
-  `cost`'s `dollars` is the same double written in Swift's shortest spelling (`1e-07` where
-  JavaScript writes `1e-7`), so SA2 and every reader compares parsed values. Why: `message_done`
-  costs one line per response and `spend_proof.py`'s H10 needs it to be able to fail; `ready` is
-  what `assistant_helper_proof.py` P3 waits for; `reset` has no sender. A later phase that drops
-  `message_done` names the four sites of road map §2 in the same change and gives H10 a clause that
-  can still fail. Risk accepted: a client that sends `reset` hears nothing back.
+  sentence; an API error reads `API error <status>: <message>` with Slaude's message and status,
+  so an `error` event mid-stream carries its type's status (529 for `overloaded_error`) where the
+  TypeScript gives every such event none, and one with no status (a failed connection, an `error`
+  event of a type Slaude does not map, a stream cut short) reads `API error: <message>`, where the
+  TypeScript writes `API error : <message>`, or for a stream cut short its SDK's message alone; and
+  the cache file holds the same table written compact, where the TypeScript indents it, each
+  helper reading the other's file. A `cost`'s `dollars` is the same double written in Swift's
+  shortest spelling (`1e-07` where JavaScript writes `1e-7`), so SA2 and every reader compares
+  parsed values. Why: `message_done` costs one line per response and `spend_proof.py`'s H10 needs
+  it to be able to fail; `ready` is what `assistant_helper_proof.py` P3 waits for; `reset` has no
+  sender. A later phase that drops `message_done` names the four sites of road map §2 in the same
+  change and gives H10 a clause that can still fail. Risk accepted: a client that sends `reset`
+  hears nothing back.
 - **SA-7 — `async`/`await` and actors are the concurrency model of `agent/` and of nothing else; W-8
   is bounded, not amended** (SA1). W-8 and its two files (`MediaImporter.swift`,
   `SpeechEngine.swift`) govern `app/Sources`, which gains no `async`, and `make typecheck` keeps its

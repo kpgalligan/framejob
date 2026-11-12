@@ -72,14 +72,21 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(h.sink.events, [.prices(Fixtures.unconfiguredSource), .ready, .contextUsage(used: 0, limit: nil)])
     }
 
-    func testSettingsApplyFromTheNextTurn() async throws {
-        // Settings that change while a tool call waits must not reach the same turn's next round, nor its
-        // end-of-turn compaction check: round 2's reply (200 tokens) is past the new limit of 100.
+    /// Spec §11 AI-20: settings that change while a tool call waits do not reach the same turn's next
+    /// round, whose clearing and betas are the turn's, but their compaction limit applies at this turn's
+    /// end: round 2's reply (200 tokens) is past the new limit of 100, so the summary is asked for, still
+    /// without clearing, and the next turn clears.
+    func testSettingsApplyFromTheNextTurnAndTheirLimitAtThisTurnsEnd() async throws {
         let base = "thinking-display-updates-2026-08-18,server-side-fallback-2026-07-01,compact-2026-09-04"
+        let summary = SSE.reply(
+            [SSE.start(0, #"{"type":"compaction","content":null}"#),
+             SSE.delta(0, #"{"type":"compaction_delta","content":"A frame was rendered."}"#), SSE.stop(0)],
+            stop: "compaction", usage: #"{"output_tokens":40,"iterations":[{"type":"compaction","input_tokens":200,"output_tokens":40}]}"#)
         let h = Harness(ScriptedAPI([
             .sse(SSE.reply(SSE.toolUse(0, id: "toolu_s", name: "render_frame", input: "{}"), stop: "tool_use")),
             .sse(SSE.reply(SSE.text(0, "rendered"), startUsage: #"{"input_tokens":190,"output_tokens":1}"#,
                            usage: #"{"output_tokens":10}"#)),
+            .sse(summary),
             .sse(SSE.reply(SSE.text(0, "ok"))),
         ]))
         await h.configure()
@@ -88,15 +95,39 @@ final class SessionTests: XCTestCase {
         await h.line(HostMessage.settings(ChatSettings(autoCompactTokens: 100, clearToolResults: true)).json)
         await h.answer(h.sink.toolRequests[0].callID, #"{"content":[{"type":"text","text":"ok"}]}"#)
         await h.sink.waitUntil { $0.contains(.turnFinished) }
-        XCTAssertEqual(h.api.requests.count, 2)
-        XCTAssertFalse(h.sink.events.contains { if case .compactionStarted = $0 { true } else { false } })
-        for round in 0..<2 {
-            XCTAssertNil(try h.api.body(round)["context_management"])
-            XCTAssertEqual(h.api.requests[round].headers["anthropic-beta"], base)
+        XCTAssertEqual(h.api.requests.count, 3)
+        XCTAssertEqual(Array(h.sink.lastTurnPlain.suffix(5)), [
+            .contextUsage(used: 200, limit: 1_000_000), .compactionStarted(used: 200), .compacted(before: 200, after: 40),
+            .contextUsage(used: 40, limit: 1_000_000), .turnFinished,
+        ])
+        // Without the summary request the indexes below would trap rather than fail.
+        guard h.api.requests.count == 3 else { return }
+        XCTAssertNotNil(try h.api.body(2)["compaction"])
+        for request in 0..<3 {
+            XCTAssertNil(try h.api.body(request)["context_management"])
+            XCTAssertEqual(h.api.requests[request].headers["anthropic-beta"], base)
         }
         await h.turn("two")
-        XCTAssertNotNil(try h.api.body(2)["context_management"])
-        XCTAssertEqual(h.api.requests[2].headers["anthropic-beta"], base + ",context-management-2025-06-27")
+        XCTAssertNotNil(try h.api.body(3)["context_management"])
+        XCTAssertEqual(h.api.requests[3].headers["anthropic-beta"], base + ",context-management-2025-06-27")
+    }
+
+    /// Spec §11 AI-20: compaction turned off while a tool call waits is off at that turn's end, though
+    /// the turn started with a limit its final reply passes.
+    func testALimitTurnedOffMidTurnDoesNotCompactAtItsEnd() async {
+        let h = Harness(ScriptedAPI([
+            .sse(SSE.reply(SSE.toolUse(0, id: "toolu_t", name: "render_frame", input: "{}"), stop: "tool_use")),
+            .sse(SSE.reply(SSE.text(0, "rendered"), startUsage: #"{"input_tokens":190,"output_tokens":1}"#,
+                           usage: #"{"output_tokens":10}"#)),
+        ]))
+        await h.configure(Fixtures.configure(ChatSettings(autoCompactTokens: 100, clearToolResults: false)))
+        await h.line(HostMessage.send(text: "one").json)
+        await h.sink.waitUntil { _ in h.sink.toolRequests.count == 1 }
+        await h.line(HostMessage.settings(ChatSettings(autoCompactTokens: nil, clearToolResults: false)).json)
+        await h.answer(h.sink.toolRequests[0].callID, #"{"content":[{"type":"text","text":"ok"}]}"#)
+        await h.sink.waitUntil { $0.contains(.turnFinished) }
+        XCTAssertEqual(h.api.requests.count, 2)
+        XCTAssertEqual(Array(h.sink.lastTurnPlain.suffix(2)), [.contextUsage(used: 200, limit: 1_000_000), .turnFinished])
     }
 
     func testErrorWording() {

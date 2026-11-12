@@ -16,9 +16,10 @@ public actor AgentSession {
         let generation: Int
     }
 
-    /// The turn in flight. It keeps what it started with: a `settings` or `configure` message
-    /// applies from the next turn, and a price refresh that settles during it from the next
-    /// turn too (spec §11 P-5).
+    /// The turn in flight. It keeps what it started with: a `settings` or `configure` message's
+    /// clearing and betas apply from the next turn, and a price refresh that settles during it
+    /// from the next turn too (spec §11 P-5). The one exception is the compaction limit, read
+    /// from `settings` when the turn ends (`compactIfDue`, spec §11 AI-20).
     struct TurnState {
         let id: Int
         let setup: Setup
