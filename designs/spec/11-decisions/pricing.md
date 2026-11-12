@@ -143,3 +143,6 @@ and §5.
   owner's decision, recorded here. No paid run was made for it. Risk accepted: the budget is a
   ceiling on the worst case, not an expectation (the last full evaluation settled $0.53), and B1's
   measure mirrors the helper's wire shape by hand until the helper is Swift (#599).
+  **Amended by SA-9** (2026-11-12, road map "swift-helper" SA3): (d)'s measure is the first POST
+  of the release helper `tools/agent/build_helper.sh` builds, configured as the app configures it,
+  read from the stand-in's log; the hand mirror is struck.

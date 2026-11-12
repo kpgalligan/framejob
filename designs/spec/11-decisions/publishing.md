@@ -54,6 +54,9 @@ where Frame Job's differs, and why.
   local Distribution build, so it is exercised between publishes. Risk accepted: in the
   workflow the absence of the dev tools has no positive control — that is `dist_check.py`'s D4,
   which needs a Release bundle the workflow does not build.
+  **Amended by SA-8** (2026-11-12, road map "swift-helper" SA3): the assistant helper is the Swift
+  helper, held to the hardened runtime and no entitlements; "without `allow-jit`" no longer
+  applies (P8, D10/D11).
 - **PUB-5 — The DMG is what is notarized and stapled, with an App Store Connect API key.**
   Notarizing the DMG covers the app inside it, and one submission is one wait. Risk accepted:
   the ticket is stapled to the DMG and not to the app, so an app copied out of it is verified
@@ -124,6 +127,11 @@ where Frame Job's differs, and why.
   with readers of their own (no code shared with the generator, so the check is not
   tautological). Risk accepted: Bun's notice names the libraries it embeds, JavaScriptCore
   (LGPL-2) among them, by link and not by full text, as Bun publishes it.
+  **Amended by SA-10** (2026-11-12, road map "swift-helper" SA3): no npm package and no Bun are
+  read or listed, and the risk of Bun's notice is struck; the Swift helper's one dependency,
+  Slaude, is `package slaude <revision>` with its own and its vendored SDK's licence texts, read
+  from the scratch path `--agent-scratch` names, and D42/D43 refuse a header of a kind the file no
+  longer holds.
 - **PUB-11 — `published_check.py` carries the encoders' rows P22–P24 and the
   acknowledgements' P25.** P22 looks for each encoder's own string literal (`SVT-AV1 Encoder
   Lib`, `WebM Project VP9 Encoder`) in the app binary's bytes, not D37's `nm -j`, because
@@ -140,3 +148,5 @@ where Frame Job's differs, and why.
   still decides reuse. `oven-sh/setup-bun` installs `BUN_LICENSE_VERSION`, the Bun whose licence
   is vendored. Risk accepted: the first run after a change to the script, the pins, cmake or the
   SDK builds the encoders from source again.
+  **Amended by SA-10** (2026-11-12, road map "swift-helper" SA3): the workflow installs no Bun;
+  `setup-bun` and the pins step's Bun output are gone.

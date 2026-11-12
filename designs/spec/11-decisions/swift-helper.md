@@ -180,3 +180,99 @@ until SA3's switch lands, the shipped helper is the one AI-1, P-2 and P-8 descri
   has no stamp to serve a clone from, so its marker is read on every run. Risk accepted: a worktree that copied `build/` builds Slaude cold once in debug
   (about two minutes, the cost the owner's answer 5 accepted), and the suite's scratch path is a
   second one per worktree beside SA3's (about 2.3 GB, road map §10).
+- **SA-8 — The app build makes the helper with `tools/agent/build_helper.sh`: SwiftPM in release,
+  in batches, on `build/agent-swift`, skipped by a content stamp that serves a clone at any path,
+  the tree taken from the caller, the product stripped and signed with the hardened runtime and
+  no entitlements; a helper mutant is built by the same script on one persistent mutant tree**
+  (SA3, road map §7, §9 SA3, §10). Project.yml's "Build Agent Helper" step is the one line
+  `/bin/bash "$PROJECT_DIR/tools/agent/build_helper.sh"` with the bundle's
+  `Contents/Helpers/framejob-agent` as its argument. The script takes its tree from
+  `$PROJECT_DIR`, refusing to run when it is unset, and never from its own path, because a tree
+  copy's `tools` is a link to the tree's. It runs `swift build --product framejob-agent` in the
+  release configuration, without whole-module optimization and in batches, on
+  `<tree>/build/agent-swift`, under `env -i` with only `HOME`, `TMPDIR`,
+  `PATH=/usr/bin:/bin:/usr/sbin:/sbin` and, when set, `DEVELOPER_DIR`, so no key, no
+  `FJ_AGENT_STRICT` and none of Xcode's build settings reach SwiftPM. It has no configuration
+  knob (the owner's answer 5 (a)) and never touches the suite's scratch path (SA-12). A stamp
+  inside the scratch path holds a key and the product's size and time, and SwiftPM is skipped
+  while all three match. The key digests the script, the toolchain, `agent/Package.swift`,
+  `agent/Package.resolved` and every file under `agent/Sources` read through links, so the price
+  table's content is in it (SA-3), and a tree and its copy agree where the copy holds the
+  table's bytes as a regular file. The scratch path's own absolute path is a second file beside
+  the stamp, `.framejob-helper-path`, never part of the key and read only on a miss: a miss on a
+  scratch path whose record is missing or names another path empties it and builds Slaude cold,
+  because SwiftPM cannot build on a scratch path made at another path (SA0 items 3 and 9). So a
+  clone is served at any path while its key matches, and a tree copy
+  (`tools/proof/tree_copy.py`) receives the tree's scratch path as a `cp -cRp` clone, never as a
+  link: a copy that builds a mutant changes the helper on purpose, and through a link it would
+  become the tree's product. Whether dropping only the module cache would repair a foreign
+  scratch path was not measured and is not needed: SA0 item 9 saw SwiftPM schedule all of Slaude
+  again on a moved one, so the best case is the cold build. A dependency edited in place
+  (`agent/Packages`) or local runs SwiftPM every time with no stamp, as Doctored's script has it.
+  The destination is removed before SwiftPM runs, so a failed build fails the step with no
+  helper at the destination and no stamp. The product is copied out, its linker signature
+  removed, `strip -x`ed and signed `--options runtime` with no entitlements, ad hoc or with
+  Xcode's identity and a secure timestamp. **A helper mutant**, a proof's scratch helper, is
+  built by this script on one persistent tree per worktree, `build/agent-swift-mutant/`, under a
+  lock: its own `agent/`, brought to the tree's file by file by content (only a file that
+  differs is written) before the mutant's edits are applied, and its own `build/agent-swift`,
+  cold once and incremental after (`tools/proof/agent_helper_build.py`). Never by SwiftPM on a
+  clone of the tree's scratch path, which cannot build a changed `agent/` (SA0 item 9), and not by
+  the direct `swiftc` builder SA0 recommended, which was never measured with the embedded table
+  and would compile a mutant differently from the product. **Amends PUB-4 and the contract of
+  `dist_check.py`'s D10/D11 and `published_check.py`'s P8** (spec §7.9b): the helper holds the
+  `runtime` flag and no entitlements, where `allow-jit` was JavaScriptCore's (Doctored's AH-6).
+  Why: Doctored's script, measured in this tree by SA0 (its 122.4 s cold build, its 1.21 s step on
+  a served clone, its PCH failure on a moved scratch path), with the three rules SA0 found it
+  lacks: the table's content in the key, the path record beside the key, the tree from the
+  caller. `tools/proof/agent_build_proof.py` holds the script's rules over toy packages in
+  `make test`, each rule with a mutant. Risk accepted: a worktree's first app build compiles
+  Slaude (SA0's 122–392 s) and needs the network; a cloned scratch path that misses builds cold;
+  a worktree that builds helper mutants holds a second release scratch path (about 1.8 GB) and
+  builds it cold once; `make test` builds the release helper (SA-9).
+- **SA-9 — `assistant_lane_proof.py`'s B1 measures the first POST of the release helper SA-8's
+  script builds, configured as the app configures it** (SA3, road map §5 "The request"). The probe
+  writes the `configure` the app writes — the assistant catalog through
+  `AssistantToolTable.assistantCatalog`, `AssistantPrompt`'s system prompt, search guide, core
+  tools and compaction instructions, the dummy `proof-key`, tool-result clearing on, sorted keys,
+  no spend fields — and B1 starts the helper on it against the stand-in, sends one short message,
+  and reads the first POST's bytes from the stand-in's log. That POST's `tools` must be the
+  catalog plus tool search and its system text the prompt, a blank line and the guide; then its
+  bytes plus `CONVERSATION_BYTES_BOUND` must fit `BODY_BYTES_BOUND`. The hand mirror of the wire
+  shape (`requestBytes` in `assistant_lane_probe.swift`) is deleted. **Amends P-9 (d)**: its "B1's
+  measure mirrors the helper's wire shape by hand until the helper is Swift (#599)" is struck; the
+  measure is the helper's own bytes, envelope and one short message included, and
+  `CONVERSATION_BYTES_BOUND` stays the room for the rest of a conversation. Why: SA-5 changed the
+  bytes (the system block's breakpoint, the key order), and a mirror can drift from the helper it
+  mirrors where the helper's own POST cannot. Risk accepted: `make test` builds the release helper,
+  seconds while its stamp matches and SA0's cold build in a worktree that has none; no spend
+  fields are sent, so the helper B1 starts makes no price request and writes nothing.
+- **SA-10 — The acknowledgements list Slaude and no longer read npm or Bun, and the publish runner
+  installs no Bun, in the commit that switches the build step** (SA3, road map §2, §9 SA3).
+  `tools/licenses/acknowledgements.py` reads neither `agent/bun.lock` nor `agent/node_modules`,
+  checks no `bun --version`, and has no `--strict-bun` or `--print-bun-version`; the `runtime bun`
+  entry, `BUN_LICENSE_VERSION` and `tools/licenses/bun/` are gone, and with them the LGPL notice,
+  since nothing left in the bundle embeds JavaScriptCore (#380's review is moot). Slaude is the
+  entry `== package slaude <revision> ==`, read as Sparkle's is: the revision from the
+  `workspace-state.json` of the scratch path the caller names (`--agent-scratch`, which
+  project.yml's "Write Acknowledgements" passes as `$PROJECT_DIR/build/agent-swift`, else the
+  tree's), and the texts from its resolved checkout. They are Slaude's `LICENSE` (Apache-2.0) and,
+  because Slaude's sources are transformed from Anthropic's Python SDK and its README says the
+  vendored SDK keeps its own licences, that SDK's `LICENSE` and `LICENSE-MIT`; the two files of the
+  SDK's vendored `httpx_aiohttp`, a Python transport of which nothing ships, are listed as excluded
+  in `NESTED`, and a licence file a later pin adds fails the build until it is listed. A missing
+  state or checkout fails the build naming the path. `dist_check.py`'s D42/D43 and
+  `published_check.py`'s P25 want `package slaude` at `agent/Package.resolved`'s revision, read
+  with their own reader, and refuse a header of any kind the file no longer holds (`npm`,
+  `runtime`). The publish workflow loses `oven-sh/setup-bun` and the pins step's Bun output: once
+  the step is switched nothing on the runner runs Bun. **Amends PUB-10** (its npm and Bun
+  sentences, and its accepted risk of Bun's LGPL notice by link, are struck) **and PUB-12**
+  (`setup-bun`). Bun stays a build tool until SA4 only for `make typecheck`'s tsc, `gate.py`'s
+  fingerprint and SA2's two-helper drive, none of which reads the notices. Why: the npm reader read
+  `agent/node_modules`, which only the Bun step's `bun install` made; a tree copy has none of its
+  own and the runner never ran it, so the old notices could not outlive the old step, and the
+  bundle would have listed Bun and not Slaude (road map §2). Risk accepted: the step reads
+  SwiftPM's checkout, so it runs after Build Agent Helper; a base copy of a commit before SA3
+  (`tree_copy.make_base_copy`), which passes no `--agent-scratch`, reads the tree's scratch path,
+  so the tree's helper must have been built; and a real publish is the first run of SwiftPM on the
+  runner (road map §10).
