@@ -25881,6 +25881,53 @@ changed `run_app_mutant`, still fails BK4 alone and prints as before.
 **Not measured here.** What the API does with any image (no paid call; `docs/manual-checks.md`
 AS-11 is a person's check with a real key); how a saved gradient looks (PRC-7).
 
+## Issue #610 — `render_frame`'s image block scaled down alone to fit the API's limit (`raster_dither_proof.py` BKk, BKp, BKj; BK1–BK3 its other side; seven mutants; spec §11 PR-23)
+
+**What it proves.** A default image block whose base64 would pass 5,242,880 bytes is drawn
+smaller until it fits, its type kept (a PNG's an 8-bit PNG, a JPEG's a JPEG), with the sentence
+"The image here is scaled down to <w>×<h> px to fit the API's 5 MB image limit; the file is not
+scaled." after the copy's and before "Written to <path>."; the file is untouched; a block that
+fits is the one it was (BK1, BK3); a `full_depth_image` block is never scaled (BK2).
+
+**Rows.** Each 3840×2160 frame asserts its premise first, so the row cannot pass on an easy
+picture: the file 3840×2160 and its base64 over the limit. BKk (printed since #604, scored now):
+`blk2160` under `flat`, the file a 16-bit PNG; the block `image/png`, 8-bit, within the limit,
+narrower than 3840 and shorter than 2160 with |w·2160 − h·3840| ≤ 3840; the copy sentence, then
+the scale sentence naming exactly the block's size, then "Written to <path>." last; and the block
+is the frame: block and file each reduced by ffmpeg to 64×36 `rgb24` (area scaling), mean |Δ| at
+most `THUMB_BOUND` (2.0 levels). BKp: `blk2160` alone, the file an 8-bit PNG, the block BKk's rule
+with the scale sentence and no copy sentence. BKj: a 3840×2160 uniform-noise still
+(`noise2160.png`, `NOISE_STILL`) alone as `format: "jpeg"`, the file's size read by `sips`; the
+block `image/jpeg`, BKp's rule otherwise. Each row prints the text, the sizes, the gap and the
+call's seconds.
+
+    python3 tools/proof/raster_dither_proof.py --only BK1,BK2,BK3,BKk,BKp,BKj,Z1
+    python3 tools/proof/raster_dither_proof.py --app-mutant NAME --base <any folder: the BK rows read none>
+
+**Recorded** (2026-11-12). Before the change (Debug at e0206243): BKk's block the 8-bit copy at
+3840×2160, base64 6,782,656, the file 16-bit, base64 14,241,128; BKp's block the 8-bit file,
+base64 7,031,532 (5,273,648 bytes); BKj's block the JPEG file, base64 12,441,372 (9,331,028
+bytes); none with a scale sentence, so all three FAILED, while BK1, BK2, BK3 and Z1 passed. With
+it (Release; Debug read the same bytes and sizes, 10/10 with BK1–BK6 and Z1): BKk's block
+3038×1709, base64 4,469,860, 64×36 gap 0.324, 1.99 s (Debug 6.73 s); BKp's 2984×1679, base64
+4,456,620, gap 0.027, 0.67 s; BKj's `image/jpeg` 2243×1262, base64 3,242,680, gap 0.213, 0.59 s;
+each the first attempt (⌊3840 · 0.9·√(3,932,160 / b)⌋ from the unscaled block's b); BK1–BK6 as
+they were (BK1's block base64 2,985,988, BK2's the file, 6,406,520). The whole run on Release with
+no `--base` and no `--control` 31/48: the seventeen failing are B1–B4b, F1 and F2 (PR-13's
+`--control`) and E1, D3, D4, G3, GEa–GEd, GMe and DGj (a base capture), as in #611's run.
+
+**Mutants** (2026-11-12, Debug tree copies, `--base` an empty folder, each caught):
+`block-not-bounded` (the size test always fits) fails BKk, BKp and BKj, each block over the limit
+at 3840×2160; `block-always-scaled` (the entry test dropped) fails BK1 (its copy 1728×972) and BK3
+(its block not the file); `full-depth-scaled` fails BK2 (an 8-bit PNG in place of the file);
+`limit-counts-raw-bytes` fails BKk alone, by design: its unscaled block is 5,086,992 raw bytes,
+under 5,242,880, and 6,782,656 as base64, so the mutant leaves it unscaled, while BKp's (5,273,648
+raw) and BKj's are past both and are scaled under it; `scale-sentence-dropped` fails BKk, BKp and
+BKj; `scaled-jpeg-as-png` fails BKj (`image/png`, 1319×742); `aspect-not-kept` fails BKk
+(2668×2160) and BKp (2600×2160). Run again because the change moved the function their anchors are
+in: `block-is-the-file` fails BK1 (the 16-bit file scaled to 1563×879, no copy sentence) and BK4
+(`image/heic`); `hlg-block-not-copied` fails BK6 with BK1–BK5 passing.
+
 ## Codec export C0 — the bundled encoders' link (`codecs_proof.py` L1–L3; `tools/codecs/build_codecs.py --selftest`; spec §11 CX-4, CX-5)
 
 `tools/codecs/build_codecs.py` (`make codecs`, and project.yml's "Build Codecs"

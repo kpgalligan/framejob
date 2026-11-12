@@ -68,12 +68,12 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.9i-agent-vertical.md`](07.9i-agent-vertical.md) | 182 | `make_vertical_version`: its arguments, the size, the step's classes and order, a canvas-size graphic re-sized, the caption step (6), the treatments and reasons, the copy and its old template copies updated (§11 VR-42, VR-44), the analysis on the source, the answer and the refusals in order; ask-first only with `path` (§11 VR-30…VR-37); `relay_captions`: the survey, the re-lay, its answer and refusal (§11 VR-40, VR-45). |
 | [`07.9j-agent-analysis-tools.md`](07.9j-agent-analysis-tools.md) | 117 | The media analysis tools, §7.9e's until #448: `get_media_analysis` (every kind: shots, masks, faces, sound_events, subjects, and its refusals), Split at Shot Changes (`split_at_shots`) and `analyze_cutout`. |
 | [`07.9k-agent-dev-tools-continued.md`](07.9k-agent-dev-tools-continued.md) | 134 | The dev tools continued, §7.9c's until #548: `land_recording`, `cache_ledger`, `analysis_job` and the analysis launch defaults, and `transcript_view`. |
-| [`07.9l-agent-render-audio-export.md`](07.9l-agent-render-audio-export.md) | 270 | The app-state tools continued, §7.9e's until #585: `render_frame`, Normalize (`normalize_clip`), Enhance (`enhance_voice`), Match (`match_audio`), Synchronize (`sync_audio`), and `export`, `export_status` and `cancel_export`. |
+| [`07.9l-agent-render-audio-export.md`](07.9l-agent-render-audio-export.md) | 275 | The app-state tools continued, §7.9e's until #585: `render_frame`, Normalize (`normalize_clip`), Enhance (`enhance_voice`), Match (`match_audio`), Synchronize (`sync_audio`), and `export`, `export_status` and `cancel_export`. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 163 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 335 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 27217 in 81 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 27290 in 81 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

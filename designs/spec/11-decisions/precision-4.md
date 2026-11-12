@@ -271,3 +271,75 @@ into a sibling file.
   - No op, recipe, FFI or format change; the catalog gains one argument of an app-state tool.
   - Amends PR-4 and PR-9 (no `depth` argument: still none for the file) and PR-20 (whether the
     image block should be bounded, held for the owner, is decided here).
+  - Amended by PR-23: a default block whose base64 would pass the limit is drawn smaller until it
+    fits, so "Not done: bounding an 8-bit block by size" and "Same size as the file" no longer
+    hold for such a block.
+
+- **PR-23 — `render_frame`'s image block is scaled down alone when its base64 would pass the
+  API's limit (owner, 2026-11-12, #610: option (b), "#610: b").**
+  - The rule: when a default image block's base64 (`Data.base64EncodedString()`, 4·⌈n/3⌉ bytes
+    for n raw) would be more than 5,242,880 bytes, the Anthropic API's limit on one image
+    (PR-22), the block alone is drawn smaller until it fits. Exactly at the limit fits. The file
+    `render_frame` writes, its size and depth, the path it answers, `max_width`'s meaning and
+    File ▸ Save Frame… are untouched.
+  - Every default block is bounded: the 8-bit PNG copy of a deep PNG and of a HEIC, an 8-bit PNG
+    that is the file, and a JPEG that is the file. An 8-bit 4K frame's block could pass the limit
+    before PR-20 too, and so can a JPEG's.
+  - `full_depth_image: true` is exempt: it is an explicit ask for the file's bytes, which stay in
+    the block whatever their size. Its description already said a full-depth frame can pass the
+    limit and that `max_width` keeps it under, and now says it is never scaled. BK2's block
+    (base64 6,406,520, over the limit) stays the file's bytes.
+  - The scaled block's type follows the unscaled one's: an 8-bit PNG where the block was a PNG
+    (the file or the copy), a JPEG where it was the JPEG file. A scaled block is never the file's
+    bytes.
+  - The draw (`FrameBlock.scaledDown`): the frame labelled as its file is (BT.709, PR-11; an HLG
+    project's BT.2100 HLG) drawn at the smaller size in that space with `interpolationQuality
+    .high`, since a downscale needs interpolation. A PNG goes into an 8-bit premultiplied RGBA
+    context and is encoded with no properties; a JPEG goes into an opaque 8-bit context filled
+    black first (the file's flatten) and is encoded at `FrameWriter.quality`. It is drawn from the
+    frame, not decoded from the unscaled block. PR-22's full-size copy keeps its draw with no
+    interpolation, so a block that fits is the bytes it was.
+  - The loop: each attempt takes the last encode's raw bytes b and width w; the next width is
+    ⌊w · min(0.9, 0.9·√(3,932,160 / b))⌋, 3,932,160 being the raw bytes whose base64 is the
+    limit, and the height comes from `Exporter.scaledSize` (`max_width`'s arithmetic: aspect
+    kept, rounded, at least 1). It stops at the first encode that fits. PNG size is not monotonic
+    in scale, so every attempt is measured, and there are at most 16 (each shrinks the area to at
+    most 0.81).
+  - A scale never fails the tool, PR-22's rule for the copy: an encode that cannot be made, or
+    16 attempts that do not fit, leave the unscaled block, with no scale sentence.
+  - The text: one sentence after the copy's sentence when there is one, before "Written to
+    <path>.": "The image here is scaled down to <w>×<h> px to fit the API's 5 MB image limit;
+    the file is not scaled." A block that fits answers the bytes and the text it did, and the
+    test costs it one comparison.
+  - `render_frame`'s description says an image block that would pass the limit is scaled down
+    alone, the file untouched, and that `full_depth_image` is never scaled; its schema is
+    unchanged. The assistant's prompt still asks for `max_width` (unchanged here: #599's road map
+    edits that file).
+  - Seen first (`raster_dither_proof.py`, Debug at e0206243, each 3840×2160 frame's premise held):
+    BKk (`blk2160` under `flat`) the 8-bit copy at 3840×2160, base64 6,782,656, beside the 16-bit
+    file's 14,241,128; BKp (`blk2160` alone) the 8-bit file, base64 7,031,532; BKj (a noise still
+    as JPEG) the JPEG file, base64 12,441,372; none with a scale sentence, so all three failed.
+  - With it (Release; Debug read the same figures): BKk's block an 8-bit PNG of 3038×1709, base64
+    4,469,860, after the copy's sentence; BKp's 2984×1679, base64 4,456,620; BKj's `image/jpeg`
+    2243×1262, base64 3,242,680; each the first attempt, the file untouched, the scale sentence
+    naming its size before "Written to <path>.", and the block the frame (block and file each
+    reduced to 64×36: mean |Δ| 0.324, 0.027 and 0.213 levels against a bound of 2).
+    `render_frame` took 1.99 s for BKk, 0.67 s for BKp and 0.59 s for BKj on Release (Debug 6.73
+    s for BKk, 5.84 s before the change). BK1 (its block base64 2,985,988, as before), BK2 (the
+    file, 6,406,520, over the limit and not scaled), BK3 and BK4–BK6 unchanged. The whole
+    `raster_dither_proof.py` on Release 31 of 48, the other seventeen needing PR-13's `--control`
+    or a base capture, neither made (as #611's run, 28 of 45).
+  - Mutants (Debug tree copies, each caught): `block-not-bounded` (the size test always fits:
+    BKk, BKp and BKj's blocks over the limit at 3840×2160); `block-always-scaled` (the scale
+    entered whatever the size: BK1's copy 1728×972, BK3's block not the file); `full-depth-scaled`
+    (the exemption dropped: BK2's block an 8-bit PNG, not the file); `limit-counts-raw-bytes`
+    (the raw bytes compared with 5,242,880: BKk's unscaled block, 5,086,992 raw bytes and
+    6,782,656 as base64, left over the limit; BKp's, 5,273,648 raw, and BKj's are past both, so
+    only BKk can catch it); `scale-sentence-dropped` (BKk, BKp, BKj); `scaled-jpeg-as-png` (BKj's
+    block `image/png`); `aspect-not-kept` (the scaled height left at the frame's: BKk 2668×2160,
+    BKp 2600×2160). PR-22's `block-is-the-file` (BK1's 16-bit file now scaled to 1563×879 with no
+    copy sentence; BK4 `image/heic`) and `hlg-block-not-copied` (BK6 the 16-bit file, BK1–BK5
+    passing) run again, since this change moved the function their anchors are in.
+  - No op, recipe, FFI, format or catalog schema change; `RC_FORMAT_VERSION` is unchanged.
+  - Amends PR-22 (its "Not done: bounding an 8-bit block by size", and "Same size as the file, so
+    `max_width` bounds both", which now holds only for a block that fits).

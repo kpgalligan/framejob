@@ -146,10 +146,12 @@ extension AgentServer {
                     + "and a half times an 8-bit PNG's size for camera footage; a JPEG is always "
                     + "8-bit. The image block of such a PNG, and of any HEIC, is an 8-bit PNG "
                     + "copy of the frame and a sentence before the last says so; the file keeps "
-                    + "its depth. full_depth_image puts the file itself in the image block "
-                    + "instead: a 16-bit PNG of a 1080p frame of camera footage can pass the "
-                    + "Anthropic API's 5 MB limit on an image, so pass max_width to keep it "
-                    + "under. In an "
+                    + "its depth. An image block that would pass the Anthropic API's 5 MB limit "
+                    + "on an image (a 4K frame's can) is scaled down alone until it fits, the "
+                    + "file untouched, and a sentence before the last gives its size. "
+                    + "full_depth_image puts the file itself in the image block instead and is "
+                    + "never scaled: a 16-bit PNG of a 1080p frame of camera footage can pass "
+                    + "the limit, so pass max_width with it. In an "
                     + "HLG project (set_canvas output) the frame is a 16-bit PNG or a 10-bit "
                     + "HEIC labeled BT.2100 HLG; a JPEG, and any frame asked with "
                     + "sdr_version, is the project's SDR version, labeled BT.709. Its scopes "
@@ -173,9 +175,10 @@ extension AgentServer {
                         "type": "boolean",
                         "description": "Put the file itself in the image block, the 16-bit PNG "
                             + "or the HEIC, instead of the 8-bit PNG copy a deep frame's PNG and "
-                            + "every HEIC get. The file written is the same either way. A "
-                            + "full-depth 1080p frame can pass the Anthropic API's 5 MB image "
-                            + "limit; max_width keeps it under. Default false.",
+                            + "every HEIC get. The file written is the same either way. It is "
+                            + "never scaled to fit: a full-depth 1080p frame can pass the "
+                            + "Anthropic API's 5 MB image limit; max_width keeps it under. "
+                            + "Default false.",
                     ],
                     "path": [
                         "type": "string",

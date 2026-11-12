@@ -248,12 +248,28 @@ only (`blk1080`: a 1 s 1920×1080 `testsrc2` with temporal noise, 8-bit H.264 at
   `image/png`, an 8-bit PNG of the file's width and height, every sample within
   1 level of the file's rounded to 8 bits; the copy sentence, and "Written to
   <path>." last. BK1's size premise is not asserted: a graphic's frame is small.
-- **BKk**, printed and NOT scored: a 3840×2160 `testsrc2` frame under `flat` on
-  a 3840×2160 canvas, the file's and the default block's base64 bytes beside the
-  limit (an 8-bit block is not bounded by size, PR-22's last bullet).
+- **BKk** (#610, spec §11 PR-23; printed and not scored until then): a 3840×2160
+  `testsrc2` frame (`blk2160`) under `flat` on a 3840×2160 canvas, default: the
+  file a 16-bit PNG of 3840×2160 whose base64 is over the limit (the premise);
+  the block `image/png`, 8-bit, base64 at most 5,242,880, narrower than 3840
+  and shorter than 2160 with the aspect kept (|w·2160 − h·3840| ≤ 3840); the copy
+  sentence, then the scale sentence naming exactly the block's w×h, then
+  "Written to <path>." last; and the block is the frame (`thumb_gap`: block and
+  file each reduced by ffmpeg to 64×36 `rgb24`, area scaling, mean |Δ| at most
+  `THUMB_BOUND` levels).
+- **BKp** (#610): `blk2160` alone on the 3840×2160 canvas (an 8-bit frame),
+  default: the file an 8-bit PNG of 3840×2160 over the limit (the premise); the
+  block BKk's rule, with the scale sentence and NO copy sentence.
+- **BKj** (#610): a 3840×2160 uniform-noise still (`noise2160.png`) alone,
+  `format: "jpeg"`, default: the JPEG file 3840×2160 (`sips`) over the limit (the
+  premise); the block `image/jpeg`, at most the limit, smaller, aspect kept;
+  the scale sentence and no copy sentence; `thumb_gap` as BKk.
+BK2 is PR-23's exemption: a `full_depth_image` block over the limit stays the
+file's bytes. BK1 and BK3 are its other side: a block that fits is untouched.
 On a `capture` by an app before PR-22, BK1, BK2, BK4, BK5 and BK6 FAIL (the
 block is the file, an `image/heic` one for a HEIC, and `full_depth_image` is a
-stranger).
+stranger); by an app before PR-23, BKk, BKp and BKj FAIL (the block over the
+limit, no scale sentence).
 
 `capture DIR` runs every row and keeps every file in DIR; its own files are
 the control it is scored against, so on the control tree B1, B3, B4a and B4b
@@ -295,7 +311,14 @@ PR-21's two (`gradient-not-a-source`, the arm gone: G0, GV, G5;
 (`block-is-the-file`: BK1, BK4; `full-depth-ignored`: BK2, BK4;
 `block-always-recoded`, an 8-bit PNG copied too: BK3; `heic-block-follows-file`:
 BK4; `hlg-block-not-copied`, #611, the copy refused in BT.2100 HLG only: BK6,
-with BK1–BK5 kept passing) run against any base.
+with BK1–BK5 kept passing) and PR-23's seven (`block-not-bounded`, the size test
+always fits: BKk, BKp, BKj; `block-always-scaled`, the scale entered whatever the
+size: BK1, BK3; `full-depth-scaled`, the exemption dropped: BK2;
+`limit-counts-raw-bytes`, the raw bytes compared with the limit: BKk, whose
+unscaled block is under 5,242,880 raw bytes and over it as base64;
+`scale-sentence-dropped`: BKk, BKp, BKj; `scaled-jpeg-as-png`: BKj;
+`aspect-not-kept`, the scaled height left at the frame's: BKk, BKp) run against
+any base.
 
 Exit 0 when every scored row passes (a mutant: caught); 1 when one failed (a
 mutant: survived); 2 when the control could not be performed.
@@ -339,7 +362,7 @@ SEC = 600_000
 ROWS = ["B1", "B2", "B3", "B4a", "B4b", "F1", "F2", "S1", "E1", "D1", "D3", "D4", "D5", "D6",
         "D7", "G0", "G1", "G3", "G5", "G6", "G7", "GV", "GEa", "GEb", "GEc", "GEd", "GM", "GMg",
         "GMc", "GMs", "GMe", "GMf", "GMr", "DG", "DGf", "DGv", "DGo", "DGj", "DGs", "BK1", "BK2",
-        "BK3", "BK4", "BK5", "BK6", "BKk", "Z1"]
+        "BK3", "BK4", "BK5", "BK6", "BKk", "BKp", "BKj", "Z1"]
 # Every file a run keeps, by the row that writes it (L1–L3 are printed only).
 FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B3a": "b3-apng.png",
          "B4a": "b4a-prores.mov",
@@ -371,7 +394,10 @@ FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B3a": "b3-apng.png",
          "BK4": "bk4-frame.heic", "BK4b": "bk4-block.png", "BK4f": "bk4f-frame.heic",
          "BK4fb": "bk4f-block.heic", "BKk": "bkk-frame.png", "BKkb": "bkk-block.png",
          # #611: an HLG project's deep frame and its block.
-         "BK6": "bk6-frame-hlg.png", "BK6b": "bk6-block-hlg.png"}
+         "BK6": "bk6-frame-hlg.png", "BK6b": "bk6-block-hlg.png",
+         # #610, spec §11 PR-23: 3840×2160 frames over the limit, each block scaled to fit.
+         "BKp": "bkp-frame.png", "BKpb": "bkp-block.png", "BKj": "bkj-frame.jpg",
+         "BKjb": "bkj-block.jpg"}
 # Spec §11 PR-16's fixture: the shape's gradient, and its exact G in levels.
 SHAPE_FROM, SHAPE_TO = (13, 21, 18), (42, 79, 61)    # #0D1512 at x 0, #2A4F3D at x 1920
 SHAPE_563 = {"kind": "rectangle", "stroke": None, "width": W, "height": H, "fill": [1, 1, 1, 1],
@@ -462,6 +488,17 @@ COPY_HEIC = "The image here is an 8-bit PNG copy of the HEIC file."
 COPY_SAID = "8-bit PNG copy"    # in either sentence
 BLOCK_NOISE = 12
 BLOCK_RATE = "100M"
+# #610, spec §11 PR-23: the sentence a block scaled to fit adds (after a copy's), the words every
+# such sentence holds, and the bound on `thumb_gap`, the mean |Δ| in levels between the block and
+# the file each reduced to 64×36.
+SCALE_SAID = ("The image here is scaled down to {w}×{h} px to fit the API's 5 MB image limit; "
+              "the file is not scaled.")
+SCALED_WORDS = "to fit the API's 5 MB image limit"
+THUMB = (64, 36)
+THUMB_BOUND = 2.0
+# BKj's still: uniform noise over grey at 3840×2160, which a JPEG at 0.9 cannot make small.
+NOISE_STILL = ["-f", "lavfi", "-i", "color=c=gray:s=3840x2160:d=1", "-vf",
+               "noise=alls=100:allf=u", "-frames:v", "1"]
 
 
 def block_footage(size):
@@ -641,6 +678,35 @@ APP_MUTANTS = {
                                "        guard labelled.width > 0, labelled.height > 0,",
                                "        guard !FrameWriter.isHLG(labelled), labelled.width > 0, "
                                "labelled.height > 0,")], ["BK6"]),
+    # #610, spec §11 PR-23: a default block whose base64 would pass the limit is drawn smaller
+    # until it fits (BKk, BKp, BKj), one that fits is untouched (BK1, BK3), `full_depth_image` is
+    # exempt (BK2), the test is on the base64 (BKk: its unscaled block is 5,086,992 raw bytes,
+    # under 5,242,880, and 6,782,656 as base64), the sentence says so, a JPEG's block stays a
+    # JPEG (BKj) and the aspect is kept (BKk, BKp).
+    "block-not-bounded": ([(f"{SOURCES}/FrameBlock.swift",
+                            "        4 * ((data.count + 2) / 3) <= limit\n", "        true\n")],
+                          ["BKk", "BKp", "BKj"]),
+    "block-always-scaled": ([(f"{SOURCES}/FrameBlock.swift",
+                              "        guard !fullDepth, !fits(whole.data),\n",
+                              "        guard !fullDepth,\n")], ["BK1", "BK3"]),
+    "full-depth-scaled": ([(f"{SOURCES}/FrameBlock.swift",
+                            "        guard !fullDepth, !fits(whole.data),\n",
+                            "        guard !fits(whole.data),\n")], ["BK2"]),
+    "limit-counts-raw-bytes": ([(f"{SOURCES}/FrameBlock.swift",
+                                 "        4 * ((data.count + 2) / 3) <= limit\n",
+                                 "        data.count <= limit\n")], ["BKk"]),
+    "scale-sentence-dropped": ([(f"{SOURCES}/FrameBlock.swift",
+                                 "            note: [whole.note, scaleNote(width: scaled.width, "
+                                 "height: scaled.height)]\n                .compactMap { $0 }"
+                                 ".joined(separator: \" \"))\n",
+                                 "            note: whole.note)\n")], ["BKk", "BKp", "BKj"]),
+    "scaled-jpeg-as-png": ([(f"{SOURCES}/FrameBlock.swift",
+                             "        format == .jpeg ? .jpeg : .png\n", "        .png\n")],
+                           ["BKj"]),
+    "aspect-not-kept": ([(f"{SOURCES}/FrameBlock.swift",
+                          "            let size = Exporter.scaledSize(full, to: next)\n",
+                          "            let size = CGSize(width: next, height: labelled.height)\n")],
+                        ["BKk", "BKp"]),
 }
 # The rows an app mutant must leave PASSING, beside the ones it must fail: what tells a mutant
 # that acts in one case from one that acts in all (#611: `block-is-the-file` fails BK6 too).
@@ -1052,6 +1118,7 @@ class Doc:
         out, kept = WORK / file, WORK / block_file
         out.unlink(missing_ok=True)
         kept.unlink(missing_ok=True)
+        started = time.monotonic()
         try:
             content = self.client.call_content(
                 "render_frame", dict(extra, t=t, path=str(out), project=str(self.path)))
@@ -1059,6 +1126,7 @@ class Doc:
             return {"ok": False, "error": str(error)}
         except Exception as error:  # a socket timeout is the expiry
             return {"ok": False, "error": f"{type(error).__name__}: {error}"}
+        FRAME_SECONDS[file] = time.monotonic() - started
         images = [part for part in content if part.get("type") == "image"]
         text = "".join(part.get("text", "") for part in content if part.get("type") == "text")
         if len(images) != 1 or not out.exists():
@@ -1294,11 +1362,14 @@ def run_sizes(client, files):
 
 def run_blocks(client, files):
     """Spec §11 PR-22's frames (#604), each through `Doc.frame_block`: `blk1080` under `flat`
-    (BK1, BK2, BK4), alone (BK3, BK5), a 3840×2160 one under `flat` (BKk, printed), and an HLG
-    project's `band374` clip, D6's recipe under its own name (BK6, #611)."""
+    (BK1, BK2, BK4), alone (BK3, BK5), and an HLG project's `band374` clip, D6's recipe under its
+    own name (BK6, #611); PR-23's 3840×2160 frames (#610), `blk2160` under `flat` (BKk) and alone
+    (BKp), and a noise still as a JPEG (BKj)."""
     closed = True
     clip = (fixture("blk1080.mov", block_footage("1920x1080"))
             if selected & {"BK1", "BK2", "BK3", "BK4", "BK5"} else None)
+    clip4k = (fixture("blk2160.mov", block_footage("3840x2160"))
+              if selected & {"BKk", "BKp"} else None)
     asks = []
     if selected & {"BK1", "BK2", "BK4"}:
         asks.append(("blockgraphic", clip, None, [
@@ -1309,10 +1380,14 @@ def run_blocks(client, files):
             ("BK3", "BK3", "BK3b", {}),
             ("BK5", "BK5", "BK5b", {"full_depth_image": "yes"})]))
     if "BKk" in selected:
-        asks.append(("block4k", fixture("blk2160.mov", block_footage("3840x2160")), (3840, 2160),
-                     [("BKk", "BKk", "BKkb", {})]))
+        asks.append(("block4k", clip4k, (3840, 2160), [("BKk", "BKk", "BKkb", {})]))
+    if "BKp" in selected:
+        asks.append(("block4kplain", clip4k, (3840, 2160), [("BKp", "BKp", "BKpb", {})]))
+    if "BKj" in selected:
+        asks.append(("block4kjpeg", fixture("noise2160.png", NOISE_STILL), (3840, 2160),
+                     [("BKj", "BKj", "BKjb", {"format": "jpeg"})]))
     for name, media, size, frames in asks:
-        graphic = name != "blockplain"
+        graphic = name in {"blockgraphic", "block4k"}
         doc = Doc(client, name, "flat", FLAT_JS) if graphic else Doc(client, name)
         made, why = (True, "") if doc.ok else (False, doc.why)
         if made and size:
@@ -2069,12 +2144,90 @@ def score_blocks(files):
                f"|block − file/257| {worst} over {count:,} samples; copy "
                f"sentence {COPY_PNG in got['text']}; written last {written_last(got)}"
                if file and block else f"canvas output {output}; {got.get('error', 'not read')}"))
-    if "BKk" in selected:
-        got = BLOCKS.get("BKk") or {"ok": False, "error": "not run"}
-        file = png_bytes(got["file"]) if got["ok"] else None
-        print(f"  --   BKk (NOT scored) a 3840×2160 frame of footage under a graphic, default: "
-              + (f"file {file[0]}-bit {file[1]}×{file[2]}, {file[3]:,} bytes, base64 "
-                 f"{file[4]:,}; " if file else "file not read; ") + block_shown(got), flush=True)
+    for row, title, depth, mime, copy in [
+            ("BKk", "a 3840×2160 frame of footage under a graphic", 16, "image/png", COPY_PNG),
+            ("BKp", "the 3840×2160 footage alone (an 8-bit frame)", 8, "image/png", None),
+            ("BKj", "a 3840×2160 noise still as a JPEG", None, "image/jpeg", None)]:
+        if row in selected:
+            scaled_row(row, title, BLOCKS.get(row) or {"ok": False, "error": "not run"}, depth,
+                       mime, copy)
+
+
+def image_size(path):
+    """(width, height) of an image by `sips`, or None."""
+    if path is None or not Path(path).exists():
+        return None
+    got = bounded.run(["sips", "-g", "pixelWidth", "-g", "pixelHeight", str(path)], TOOL_BOUND,
+                      env=bounded.child_env())
+    found = {line.split(":")[0].strip(): line.split(":")[-1].strip()
+             for line in got["stdout"].splitlines() if ":" in line}
+    try:
+        return int(found["pixelWidth"]), int(found["pixelHeight"])
+    except (KeyError, ValueError):
+        return None
+
+
+def thumb_gap(a, b):
+    """The mean |Δ| in 8-bit levels between images `a` and `b`, each reduced by ffmpeg to `THUMB`
+    as `rgb24` with area scaling, or None when either does not read."""
+    def thumb(path):
+        argv = ["ffmpeg", "-nostdin", "-v", "error", "-i", str(path), "-frames:v", "1", "-vf",
+                f"scale={THUMB[0]}:{THUMB[1]}:flags=area", "-f", "rawvideo", "-pix_fmt", "rgb24",
+                "-"]
+        try:
+            raw = subprocess.run(argv, capture_output=True, timeout=TOOL_BOUND,
+                                 env=bounded.child_env()).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        return raw if raw and len(raw) == THUMB[0] * THUMB[1] * 3 else None
+
+    one, other = thumb(a), thumb(b)
+    if one is None or other is None:
+        return None
+    return sum(abs(x - y) for x, y in zip(one, other)) / len(one)
+
+
+def scaled_row(row, title, got, depth, mime, copy):
+    """Spec §11 PR-23's rule (#610) over a 3840×2160 frame whose unscaled block would pass the
+    API's limit: the file untouched and over it (the premise, so the row cannot pass on an easy
+    picture), `depth` its PNG bit depth (None: a JPEG, read by `sips`); the block `mime`, within
+    the limit, smaller on both sides with the aspect kept; `copy`'s sentence (None: no copy
+    sentence), then the scale sentence naming the block's size, then "Written to <path>." last;
+    and the block the frame (`thumb_gap` ≤ `THUMB_BOUND`)."""
+    if not got["ok"]:
+        check(f"{row} {title}: the block scaled to fit", False, got.get("error", "not read"))
+        return
+    file_b64 = 4 * ((got["file"].stat().st_size + 2) // 3)
+    file_header = png_header(got["file"]) if depth else None
+    file_size = file_header[:2] if file_header else image_size(got["file"])
+    file_ok = (file_size == (3840, 2160) and file_b64 > API_IMAGE_LIMIT
+               and (depth is None or file_header[2] == depth))
+    block_header = png_header(got["block"]) if mime == "image/png" else None
+    size = block_header[:2] if block_header else image_size(got["block"])
+    smaller = (size is not None and 0 < size[0] < 3840 and 0 < size[1] < 2160
+               and abs(size[0] * 2160 - size[1] * 3840) <= 3840)
+    block_ok = (got["mime"] == mime and got["b64"] <= API_IMAGE_LIMIT and smaller
+                and (mime != "image/png" or (block_header is not None and block_header[2] == 8)))
+    said = SCALE_SAID.format(w=size[0], h=size[1]) if size else None
+    sentences = (said is not None and f"{copy + ' ' if copy else ''}{said} Written to " in got["text"]
+                 and got["text"].count(SCALED_WORDS) == 1 and written_last(got)
+                 and (copy is not None or COPY_SAID not in got["text"]))
+    gap = thumb_gap(got["block"], got["file"])
+    picture = gap is not None and gap <= THUMB_BOUND
+    check(f"{row} {title}, default: the file untouched (3840×2160"
+          f"{f', {depth}-bit' if depth else ''}) and its base64 over the API's {API_IMAGE_LIMIT:,} "
+          f"bytes; the block {mime} within it, smaller with the aspect kept; "
+          + ("the copy sentence, then " if copy else "no copy sentence; ")
+          + "the scale sentence naming its size, and the text still ends naming the file; the "
+          f"block is the frame (64×36 mean |Δ| ≤ {THUMB_BOUND})",
+          file_ok and block_ok and sentences and picture,
+          f"file {file_size} {f'{file_header[2]}-bit' if file_header else ''} "
+          f"{got['file'].stat().st_size:,} bytes, base64 {file_b64:,}; {block_shown(got)}, "
+          f"{size}; aspect |w·2160 − h·3840| "
+          f"{abs(size[0] * 2160 - size[1] * 3840) if size else None}; sentences {sentences}; "
+          f"written last {written_last(got)}; 64×36 mean |Δ| "
+          f"{f'{gap:.3f}' if gap is not None else 'not read'}; seconds "
+          f"{FRAME_SECONDS.get(got['file'].name, 0):.2f}\n       text: {got['text']}")
 
 
 def score(files, control):

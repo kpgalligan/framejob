@@ -1422,6 +1422,11 @@ Needs your own Anthropic API key (Setup 3).
 - **Expect:** its tool line shows `render_frame` done, and it describes the picture, with no error from the API about the image's size.
 - **Source:** #604 (spec §11 PR-22); `raster_dither_proof.py` BK1 measures the image's size against the API's limit, not what the API does with it.
 
+**AS-12 — The assistant looks at a 4K frame**
+- **Do:** With a real key, in a 3840 × 2160 project of camera footage (or 8-bit footage with a title over it), ask the assistant to look at the frame at the playhead without making it smaller (no `max_width`) and say what it shows.
+- **Expect:** its tool line shows `render_frame` done, and it describes the picture, with no error from the API about the image's size. The tool's text says the image was scaled down to fit and to what size, and the file it names is still 3840 × 2160.
+- **Source:** #610 (spec §11 PR-23); `raster_dither_proof.py` BKk, BKp and BKj measure the scaled image against the API's limit, not what the API does with it.
+
 ## Agent connections
 
 Whether an MCP client refetches its tool list when a stdio server says it

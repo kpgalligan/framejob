@@ -3332,7 +3332,11 @@ the key map behind it.
 - `FrameBlock.swift` — `render_frame`'s image block (spec §11 PR-22): the file's bytes for an
   8-bit PNG and a JPEG, an 8-bit PNG copy of a 16-bit PNG and of any HEIC (the labelled frame
   drawn at its size in its own colour space, PNG with no properties) unless
-  `full_depth_image`, and the sentence a copy adds; `mimeType` of a file's bytes. Pure: no
+  `full_depth_image`, and the sentence a copy adds; a default block whose base64 would pass
+  5,242,880 bytes drawn smaller from the labelled frame until it fits (`scaledDown`: high-quality
+  interpolation, the height `Exporter.scaledSize`'s, at most 16 attempts, the unscaled block when
+  none fits), its type kept (a JPEG's a JPEG, any other an 8-bit PNG), with the sentence saying to
+  what size (spec §11 PR-23); `full_depth_image` never scaled; `mimeType` of a file's bytes. Pure: no
   AppKit, no file read; `AgentServer+Render.swift` hands it the frame and the file's bytes.
 
 **Captions.** A caption is an ordinary text clip, which is what makes burn-in

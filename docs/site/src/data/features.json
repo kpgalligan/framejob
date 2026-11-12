@@ -18718,7 +18718,7 @@
     {
      "id": "mcp-render-frame-full-depth-image",
      "name": "render_frame: full_depth_image",
-     "summary": "The image the model sees is an 8-bit PNG copy of a 16-bit PNG or a HEIC by default; full_depth_image sends the file itself.",
+     "summary": "The image the model sees is an 8-bit PNG copy of a 16-bit PNG or a HEIC by default, scaled down when it would pass the API's 5 MB image limit; full_depth_image sends the file itself, never scaled.",
      "page": "mcp/render-frame",
      "anchor": "full_depth_image"
     },
