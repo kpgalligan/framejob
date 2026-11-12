@@ -18,7 +18,7 @@ DEBUG_APP_PATH := $(BUILD_DIR)/Build/Products/Debug/Frame Job Debug.app
 unexport RC_ASSEMBLYAI_KEY
 unexport ANTHROPIC_API_KEY
 
-.PHONY: all app app-debug dist rust codecs test lint fmt typecheck project run clean prices gate
+.PHONY: all app app-debug dist rust codecs test agent-test lint fmt typecheck project run clean prices gate
 
 all: app
 
@@ -70,6 +70,8 @@ codecs:
 # `mutant_anchors.py` (#554) reads every proof's mutant table without importing the proof
 # and counts each anchor in the file it names, exactly once; `--selftest` is the reader
 # over synthetic proofs in scratch trees. No app, no build.
+# `agent_test.py --selftest` (road map "swift-helper" SA1, spec §11 SA-12) is the suite's
+# scratch-path guard over scratch folders, no SwiftPM; then `make agent-test`, below.
 test: rust codecs
 	cd core && cargo test --release
 	cd graphic && cargo test --release
@@ -77,6 +79,8 @@ test: rust codecs
 	python3 tools/proof/assistant_lane_proof.py
 	python3 tools/proof/assistant_prompt_proof.py --probe
 	python3 tools/proof/prices_proof.py
+	python3 tools/agent/agent_test.py --selftest
+	$(MAKE) agent-test
 	python3 tools/proof/budget_proof.py
 	python3 tools/proof/capture_spike/inventory.py --check
 	python3 tools/proof/spec_index_proof.py
@@ -96,6 +100,15 @@ test: rust codecs
 	python3 tools/proof/ai_docs_r2c_proof.py --only T1,T2
 	python3 tools/proof/mutant_anchors.py --selftest
 	python3 tools/proof/mutant_anchors.py
+
+# The Swift assistant helper's suite (agent/Tests; no network, dummy keys, nothing paid), road
+# map "swift-helper" SA1: `swift test` on agent/ with FJ_AGENT_STRICT=1 (its own targets'
+# warnings are errors, agent/Package.swift) on its own scratch path, build/agent-swift-test,
+# emptied first when it was made at another path (a lane's copy of build/; spec §11 SA-12). The
+# first run in a worktree fetches Slaude (from SwiftPM's cache when it holds it) and builds it in
+# debug, about two minutes. Until SA3 the app still bundles the Bun helper.
+agent-test:
+	python3 tools/agent/agent_test.py
 
 lint:
 	cd core && cargo clippy --all-targets -- -D warnings

@@ -36,6 +36,11 @@ this page points to them rather than repeating them.
   likewise fetches the encoders' two pinned tarballs, about 17 MB, into
   `build/codecs-downloads/`, checks each by SHA-256, and builds them into
   `build/codecs/` in about a minute; later builds reuse them by their stamp.
+  The first `make test` (through `make agent-test`) likewise fetches
+  [Slaude](https://github.com/kpgalligan/Slaude), the Swift client for the
+  Claude API that the coming Swift assistant helper is built on, at the
+  revision `agent/Package.swift` pins, and builds it in debug into
+  `build/agent-swift-test/` in about two minutes; later runs reuse it.
 
 ## Make targets
 
@@ -46,7 +51,8 @@ this page points to them rather than repeating them.
 | `make app-debug` | The same (the Rust core and `make codecs` first) with the Debug configuration: `build/Build/Products/Debug/Frame Job Debug.app`, an app called "Frame Job Debug" with its own bundle id (`com.kgalligan.FrameJob.debug`) and settings. Unoptimised, so it rebuilds in seconds after a one-file edit. |
 | `make run` | `make app`, then opens it. |
 | `make typecheck` | `make codecs` first (the bridging header includes the encoders' headers, found with `-Xcc -Ibuild/codecs/include`), then typechecks every Swift file in `app/Sources` with `swiftc` (with the dev tools compiled in), then the helper's TypeScript with `tsc --noEmit`. Seconds. It is the only authoritative Swift check, but it stops before code generation, so only `make app` proves the app builds. |
-| `make test` | `make codecs` first, then the Rust tests of `core/`, `graphic/` and `mcp-proxy/`, then the scripted checks that need no app: the assistant's agent lane and prompt texts, the price function and the proofs' spend budgets (no network), the menu inventory and spec index against the tree, the self-tests of the encoder build, the acknowledgements' generator, the probe build, app-choice, gate and appcast scripts, the defaults clean-up, the old-name residue check, the spelling scan of the app's strings, the site and `README.md`, and the count of every proof's mutant anchors in the tree. |
+| `make test` | `make codecs` first, then the Rust tests of `core/`, `graphic/` and `mcp-proxy/`, then the scripted checks that need no app: the assistant's agent lane and prompt texts, the price function and the proofs' spend budgets (no network), the Swift assistant helper's suite (`make agent-test`), the menu inventory and spec index against the tree, the self-tests of the encoder build, the acknowledgements' generator, the probe build, app-choice, gate and appcast scripts, the defaults clean-up, the old-name residue check, the spelling scan of the app's strings, the site and `README.md`, and the count of every proof's mutant anchors in the tree. |
+| `make agent-test` | The suite of the Swift assistant helper in `agent/` (the SwiftPM package that replaces the Bun helper, road map `designs/swift-helper.md`; until its switch the app still bundles the Bun one): `swift test` with the package's own targets held to no warnings, on `build/agent-swift-test/`, which `tools/agent/agent_test.py` empties first when it was copied from another tree. No network after the first fetch, dummy keys only. Part of `make test`. |
 | `make lint` | `cargo clippy --all-targets -- -D warnings` in `core/`, `graphic/` and `mcp-proxy/`. |
 | `make fmt` | `cargo fmt` in the same three crates. |
 | `make gate` | The one full verification: the name residue check, typecheck (held to exactly its known warnings), `cargo fmt --check`, lint, test, then `make app` with the Release app's entitlements and signature checked. Serial, stops at the first failure, and skips a step whose inputs and tools are byte-identical to its last pass (its state is in `build/gate/`). `make gate GATE_ARGS=--force` runs every step. |
@@ -89,6 +95,8 @@ mcp-proxy/       Rust crate: framejob-mcp, the stdio MCP server bundled in
 agent/           The assistant helper: Bun and the Anthropic SDK's Tool Runner,
   src/             built into Contents/Helpers/framejob-agent by build.sh.
   prices/          The Anthropic price table and the fixtures its readers run.
+  Package.swift    The Swift helper that will replace it (road map swift-helper):
+  Sources/ Tests/  a SwiftPM package on Slaude, tested by `make agent-test`.
 app/
   Sources/         The AppKit app, programmatic UI (no storyboards).
   Resources/       Shaders/Compositor.metal, Models/ (the voice model),
@@ -101,6 +109,8 @@ designs/         spec/ (the normative spec, one file per section), adr/
 docs/            site/ (the public documentation site), graphics-api.md,
                  manual-checks.md, agents/ (what the engineering skills read),
                  this file.
+tools/agent/     agent_test.py (`make agent-test`: the Swift helper's suite and its
+                 scratch-path guard).
 tools/codecs/    build_codecs.py (`make codecs`: the bundled encoders' pins, their
                  fetch, digest check, build and stamp) and PROVENANCE.md.
 tools/licenses/  acknowledgements.py (every build's third-party notices,
