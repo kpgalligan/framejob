@@ -23,6 +23,9 @@ and §5.
   whose rate the row lacks). Risk accepted: a declined
   attempt in an unbilled refusal category is priced (an over-count); fast, priority/batch and
   US-only answer `unknown`.
+  **Amended by SA-3** (2026-11-12, road map "swift-helper"): from that road map's switch (SA3),
+  "in the helper" is the Swift helper on Slaude, and "the SDK's `BetaUsage.iterations` doc" stands
+  only as the source for what `iterations` means.
 - **P-3 — Budgets are dollars per calendar month per service** ($25 Anthropic, $5 AssemblyAI).
   They are enforced by the proofs before each request, at the worst case. Tokens are recorded for
   diagnosis and are never the budget. The budgets are the owner's numbers, committed; an agent
@@ -111,6 +114,11 @@ and §5.
   streamed output; how the API bills an aborted stream is manual check AS-6's; the month line does
   not say that a line was partial.
   **Amended by NM-5** (rename R0): "· Reelcut's estimate" is now "· Frame Job's estimate".
+  **Amended by SA-3** (2026-11-12, road map "swift-helper"): from that road map's switch (SA3),
+  "the SDK's accumulating snapshot … until `finalMessage` resolves" is Slaude's
+  `currentMessageSnapshot` until `getFinalMessage()` returns. The rest stands, the lower bound
+  included: SA0 measured the snapshot holding `message_start`'s counts alone before
+  `message_delta`.
 - **P-9 — The Anthropic proof budget is $40 a calendar month, and the assistant proofs price their
   worst POST from a request body of 480,000 bytes** (#594; amends P-3's Anthropic figure). The
   helper sends the assistant's tool definitions and its system prompt on every POST, and they had

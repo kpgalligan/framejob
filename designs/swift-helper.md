@@ -1,13 +1,16 @@
 # Road map "swift-helper" — the assistant helper in Swift, on Slaude
 
-**Status: designed, not built.** Opened 2026-11-11 by issue #599. No phase has started, no spec
-§11 decision is written and no file but this one exists. The owner's questions are at the end
-(§12); SA0 does not start until they are answered.
+**Status: approved 2026-11-12, being built.** Opened 2026-11-11 by issue #599. The owner approved
+it on #599 on 2026-11-12 and answered the six questions of §12, which now holds the answers. SA0,
+the spike, has landed: its record is in §13, and it wrote SA-1..SA-3 in
+`designs/spec/11-decisions/swift-helper.md`. SA1 is next.
 
 **Source.** The owner, on #599 (2026-11-12): "We're going to replace Bun with the Swift Anthropic
 API we wrote. See ~/devel/doctored for background info. That had the same Typescript Anthropic
 API, but now uses our new Swift API." And the decision comment (2026-11-13): "#599 Reference
-doctored for the design".
+doctored for the design". And the approval (2026-11-12): "For Bun replacement, Slaude changes. I
+would like you to push changes to Slaude, not just make them locally. They can be a PR.
+Everything else, as recommended".
 
 **Written from** Doctored's record of the same move, `~/devel/doctored/designs/assistant-helper.md`
 (decisions AH-1..AH-7, accepted 2026-11-03, shipped in its v0.4.4), read at Doctored's
@@ -24,12 +27,15 @@ PUB-10..PUB-12 (`designs/spec/11-decisions/publishing.md`), W-8
 (`designs/spec/11-decisions/word-captions.md`) and NM-10 (`designs/spec/11-decisions/rename.md`).
 
 Line numbers and counts in this file are `grep -n` and `wc -l` at `e2a918df` (main, 2026-11-11);
-a phase re-reads them at its start. A figure marked **(Doctored)** was measured in Doctored's tree
-on 2026-11-03 or 2026-11-04 and is not Frame Job's until SA0 measures it here.
+a phase re-reads them at its start. SA0 re-read them at `e0206243` (2026-11-12) and none had
+moved: of the files cited by line, only `app/Sources/AssistantPrompt.swift` had changed, below the
+line cited. A figure marked **(Doctored)** was measured in Doctored's tree on 2026-11-03 or
+2026-11-04; §10 sets the figures SA0 measured here beside them.
 
 Decisions this road map will need are numbered **SA-n**, and its phases **SA0..SA5**. `HS-` is
 taken by the host-state rows of `docs/manual-checks.md`, `SH-` by the sharp handoff and `SW-` by
-Switch by Speaker; `SA-` appears nowhere under `designs/spec/` or in the manual checks.
+Switch by Speaker; `SA-` appeared nowhere under `designs/spec/` or in the manual checks when it was
+chosen.
 
 ## 1. Goal
 
@@ -87,8 +93,9 @@ protocol, except what §5 lists; the app's `AssistantSession`, `AgentLane`, `Ass
   `[String: Any]`. A helper that keeps the protocol and the file name needs no change there.
 - `AssistantSession.write` serialises with `JSONSerialization` and no `.sortedKeys` (lines
   363-368). Doctored's app writes every message with sorted keys, so the same catalog is the same
-  bytes on every launch and the cached prefix survives a relaunch. Whether Frame Job's
-  `configure` is byte-stable across launches today is not known; SA0 measures it (§9).
+  bytes on every launch and the cached prefix survives a relaunch. Frame Job's `configure` is
+  not: SA0 caught two launches' lines, the same once parsed and different in key order at every
+  level, and so was the tools-and-system prefix the Bun helper sent from them (§13, SA0 item 8).
 
 ### Its build, its notices, its checks
 
@@ -231,14 +238,14 @@ Doctored's record cannot answer these.
 ### Pricing stays, ported (the price table and the spend ledger, P-1..P-9)
 
 Doctored removed pricing (AH-4) because its app never sent the price messages. Frame Job's is
-live and shown to the person, so this road map ports it. Dropping it is the owner's question 1,
-not a design choice.
+live and shown to the person, so this road map ports it: the owner's answer 1 (a) (§12), recorded
+as SA-3.
 
 | Piece | Today | After |
 |---|---|---|
 | The price function (P-2) | `agent/src/pricing.ts`, `bun test` on `agent/prices/cases.json` | `Pricing.swift` in the package, the same cases in `swift test` |
 | The table and its refresh (P-1, P-5) | `agent/src/priceTable.ts`, `fetch`, `bun test` on `agent/prices/reduce_cases.json` | `PriceTable.swift`, on `URLSession` with the same URL, user-agent, 30 s timeout, feed rule and atomic write; the same cases |
-| The bundled table | imported into the Bun binary | compiled into the helper (SwiftPM's `.embedInCode`), the file staying at `agent/prices/anthropic.json` if SA0 shows a resource outside the target can be embedded, else copied into the target by the build script |
+| The bundled table | imported into the Bun binary | compiled into the helper (SwiftPM's `.embedInCode`): the file stays at `agent/prices/anthropic.json`, the target holds a committed relative symlink to it and names that, and the build's stamp digests the table's content (§13, SA0 item 4) |
 | `prices`, `cost`, `price_cache`, `price_feed` | protocol | kept, the same shapes |
 | The partial price (P-8) | the SDK's snapshot of the response in flight | Slaude's `currentMessageSnapshot` on its raw-JSON stream (`Sources/Anthropic/Lib/Streaming/JSONMessageStream.swift` line 127 at the pinned revision), which Doctored does not use |
 | A turn's prices fixed at `turn_started` (P-5) | `turnPrices` | the same |
@@ -300,18 +307,22 @@ before `message_delta` is priced from `message_start`'s counts and nothing else.
 - **B1.** The breakpoint and the key order change the bytes `assistant_lane_proof.py`'s B1 and
   the paid proofs' `BODY_BYTES_BOUND` measure. SA3 re-measures B1 from the built helper's real
   first POST, which retires the hand mirror P-9 (d) accepts.
-- **Sorted keys from the app.** If SA0 finds `configure`'s catalog is not the same bytes on every
-  launch, the app's `write` gains `.sortedKeys`: one option in `AssistantSession.swift`, the only
-  app-side behaviour change in this road map, and a decision (SA-5).
-- **Platform.** `.macOS(.v26)`, the app's floor (`project.yml` line 5); Doctored's package says
-  15.
-- **API version `2026-10-21`.** AH-5's five checks, redone against Frame Job's requests in SA0:
-  no sampling parameters; assistant messages only the API's own replies; user messages the typed
-  text (behind the `<framejob_context>` block, AI-15) and `tool_result` blocks of text and base64
-  images (`render_frame`, `render_graphic`); no Admin or Analytics call; `GET /v1/models/{id}`
-  for the context meter.
+- **Sorted keys from the app.** `configure` is different bytes on every launch today, and so is
+  the tools-and-system prefix the Bun helper sends from it (§13, SA0 item 8), so the app's `write`
+  gains `.sortedKeys`: one option in `AssistantSession.swift`, the only app-side behaviour change
+  in this road map, and a decision (SA-5). Without it the system block's breakpoint cannot be read
+  back after a relaunch. The phase that writes SA-5 places the change and proves it with a row of
+  two launches and one digest.
+- **Platform.** swift-tools 6.0 with `platforms: [.macOS("26.0")]`, the app's floor (`project.yml`
+  line 5); Doctored's package says 15. The spelling `.v26` needs PackageDescription 6.2 and is
+  refused under 6.0, so the string form is deliberate (§13, SA0 item 1; SA-1).
+- **API version `2026-10-21`.** AH-5's five checks, redone against Frame Job's requests in SA0,
+  all of which hold (§13, SA0 item 7): no sampling parameters; assistant messages only the API's
+  own replies; user messages the typed text (behind the `<framejob_context>` block, AI-15) and
+  `tool_result` blocks of text and base64 images (`render_frame`, `render_graphic`); no Admin or
+  Analytics call; `GET /v1/models/{id}` for the context meter.
 - **Bearer credentials.** The stand-in names `authorization` among its credential headers, and
-  SA0 confirms a Bearer value passes it. The relay
+  SA0 confirmed a Bearer value passes it (§13, SA0 item 6). The relay
   (`assistant_prompt_eval.py` line 376) and `budget_proof.py`'s row learn `Authorization: Bearer`
   in SA3. AI-13's override and AI-8's key path are the app's and do not change.
 
@@ -326,14 +337,15 @@ message (AI-15). None of it moves.
 - Its S rows read the helper's POSTs at the stand-in: S1 "POST 1's system is `system`, a blank
   line, `search_guide`" must read the text inside the system block once it carries a breakpoint;
   S2's append-only check and S3's compaction instructions hold as they are. SA3 runs them.
-- The evaluation (`assistant_prompt_eval.py`, E1-E6 and H) is paid and is SA5's, behind
-  `--live --cap`.
+- The evaluation (`assistant_prompt_eval.py`, E1-E6 and H) is paid, behind `--live --cap`, and
+  is one of the three runs of the owner's answer 3, after SA4 has landed and before SA5's close
+  (§12, §9 SA5).
 
 ## 7. How it fits the tree
 
 ```
 agent/
-  Package.swift            swift-tools 6.0, Swift 6 mode, .macOS(.v26); Slaude by exact revision
+  Package.swift            swift-tools 6.0, Swift 6 mode, .macOS("26.0"); Slaude by exact revision
   Package.resolved         committed
   Sources/FrameJobAgentKit/  Doctored's eleven files (Protocol, LineSplitter, Session, Turn,
                            Compaction, Request, History, ContextUsage, ToolResults, ClientFactory,
@@ -358,8 +370,8 @@ build/agent-swift/         SwiftPM's scratch path (ignored, per worktree)
     already do (`make codecs`), and compiles Slaude (§10).
 - **Slaude's facts** (read from Doctored's checkout at revision
   `4c6c2ca435350741796c3d461720a61e7149b378`): public, Apache-2.0, Foundation only, one target
-  `Anthropic`. Whether it has moved past that revision since, and whether Frame Job pins the same
-  one, is SA0's.
+  `Anthropic`. SA0 found it has not moved past that revision (its `main` is that revision on
+  2026-11-12), and Frame Job pins the same one (§13, SA0 item 10; SA-1).
 - **`make`.** A new `make agent-test` (`swift test` on the scratch path, warnings as errors) is a
   line of `make test`. `make typecheck` loses its tsc line and gains nothing: the package is
   checked by its own build and suite, and W-8's four-warning baseline is about `app/Sources`.
@@ -369,39 +381,55 @@ build/agent-swift/         SwiftPM's scratch path (ignored, per worktree)
   stays in `app`'s; `tools/agent` joins `app`'s.
 - **Tree copies.** A proof's tree copy has a real `build/` with only `build/codecs` linked, so
   each proof that builds an app through `tree_copy.py` would compile Slaude from
-  nothing where Bun took well under a second. A copy gets the scratch path as a clone (`cp -c`),
-  with the stamp deciding reuse, and never as a link the way `build/codecs` is: a copy never
+  nothing where Bun took well under a second. A copy gets the scratch path as a clone
+  (`cp -cRp`, as `make_base_copy` already clones `core/target`), with the stamp deciding reuse,
+  and never as a link the way `build/codecs` is: a copy never
   changes the encoders' inputs, but a copy that builds a helper mutant changes the helper's on
   purpose, and through a link that mutant would become the tree's product (Doctored's script
   copies the one product path out to strip and sign it after `swift build` has returned and
   released SwiftPM's lock, so a tree build beside it could bundle the copy's helper). A link is
   safe only for a copy whose `agent/` is byte-identical to the tree's, and is not worth a second
-  rule. SA0 measures a clone's app build; SA3 changes `tree_copy.py`'s copy rule and its T rows
-  with it.
+  rule. SA3 changes `tree_copy.py`'s copy rule and its T rows with it.
+- **A clone serves only while the stamp matches** (§13, SA0 items 3 and 9). When SwiftPM runs on
+  a scratch path cloned from another path, every compile fails, because the cloned module cache's
+  precompiled headers name the path they were built at; it does not merely recompile. So the
+  stamp also records the scratch path's own absolute path, beside its key and not in it, and
+  reads it only on a miss: a clone at any path is served while the key matches (item 3's 1.21 s
+  step), and a miss on a scratch path whose recorded path is not its own empties it and builds
+  cold. The path in the key would make every clone miss and every tree copy build Slaude cold.
+  Whether dropping only its module cache would be enough was not measured. The build script takes
+  its tree from the caller (`$PROJECT_DIR`), never from its own physical path, because a tree
+  copy's `tools` is a symlink to the tree's and Doctored's `$(dirname "$0")/..` would build the
+  tree. A tree copy's whole app build, with and without the clone, was not run in SA0 and is
+  SA3's.
 
 ## 8. The spec §11 decisions each phase will need
 
-Named here, written by the phase that needs each, before its code. New decisions go in a new
-`designs/spec/11-decisions/swift-helper.md` with their index rows.
+Named here, written by the phase that needs each, before its code, in
+`designs/spec/11-decisions/swift-helper.md` with their index rows. SA0 wrote SA-1..SA-3 there;
+each later one is appended.
 
 | Decision | Phase | What it settles |
 |---|---|---|
 | SA-1 | SA0 | The helper is a Swift executable from a SwiftPM package in `agent/`, on Slaude by exact revision; the process boundary and the protocol stay. Amends AI-1 (Bun, the Tool Runner, "the one TypeScript in the product", the accepted risk of Bun in every `make app`). |
 | SA-2 | SA0 | Its own turn loop, verbatim history, raw-JSON bodies in a pinned order; every `tool_use` answered; a cancel never ends a tool wait. |
-| SA-3 | SA0 | Pricing in the Swift helper (or what question 1's answer makes of it). Amends P-2 and P-8 where they say "the SDK". |
+| SA-3 | SA0 | Pricing in the Swift helper (the owner's answer 1 (a)). Amends P-2 and P-8 where they say "the SDK". |
 | SA-4 | SA1 | The explicit compaction rule and its three changed behaviours (§5). Amends AI-9's and AI-20's pointers to `main.ts`. |
-| SA-5 | SA1 | The request: the system block's breakpoint, the key order, API version `2026-10-21`, Bearer credentials, and sorted keys from the app if SA0 calls for them. Amends AI-13's pointer to `protocol.ts`. |
+| SA-5 | SA1 | The request: the system block's breakpoint (the owner's answer 6 (a)), the key order, API version `2026-10-21`, Bearer credentials, and sorted keys from the app, which SA0 found are needed (§13, SA0 item 8). Amends AI-13's pointer to `protocol.ts`. |
 | SA-6 | SA1 | The protocol: `reset` dropped, `message_done` and `ready` kept. |
 | SA-7 | SA1 | **W-8's edge.** async/await and actors are the concurrency model of `agent/` and of nothing else; W-8 and its two files govern `app/Sources`, which gains no `async`. W-8 is not amended, only bounded. |
-| SA-8 | SA3 | The build: the script, the scratch path, release in batches, the stamp, the hardened runtime and no entitlements. Amends D10/D11 and P8's contract. |
+| SA-8 | SA3 | The build: the script, the scratch path, release in batches, the stamp, the hardened runtime and no entitlements. From SA0 (§13, items 3, 4 and 9): the stamp's key gains the price table's content; the stamp records the scratch path's own path beside the key, not in it, and reads it only on a miss, when a scratch path made elsewhere is emptied (§7: a clone is served at any path while the key matches); the script takes its tree from the caller; and how a helper mutant is built (§9 SA3). Amends D10/D11 and P8's contract. |
 | SA-9 | SA3 | B1 measures the built helper's first POST. Amends P-9 (d). |
 | SA-10 | SA3 | The Acknowledgements and the publish runner, in the commit that switches the build step (§2: the npm reader reads what that step installs): npm and Bun out, Slaude in, `setup-bun` gone. Amends PUB-10 (its npm and Bun sentences and the LGPL risk line) and PUB-12 (`setup-bun`). |
-| SA-11 | SA4 | What the tie to Doctored becomes (question 2). Amends AI-15's "`agent/` is one diff with Rasterize" and NM-10. |
+| SA-11 | SA4 | What the tie to Doctored becomes: the owner's answer 2 (a), Frame Job's package its own, ported once from Doctored at `b524babc`, with no identity rule. Amends AI-15's "`agent/` is one diff with Rasterize" and NM-10. |
 
 ## 9. Phases
 
 Each phase is its own commit, builds, and passes its own checks. Each has a mutant per decision
-it adds. No phase spends money except SA5, and only with the flags it names.
+it adds. No phase spends money: a phase's own proofs use the stand-in only, and the three paid
+proofs of the owner's answer 3 are run by the orchestrator after SA4 has landed and before SA5's
+close, whose record holds them (SA5, §12).
+A phase that finds Slaude lacking something the port needs follows the owner's answer 4 (§12).
 
 ### SA0 — the spike (no product code)
 
@@ -423,7 +451,7 @@ Measured in this tree, in a scratch folder, and recorded here before SA1:
    three scratch helpers.
 10. Whether Slaude has moved past the pin, and what the move holds.
 
-It writes SA-1..SA-3. **Proof:** the measurements, each with its command and output.
+It writes SA-1..SA-3. **Proof:** the measurements, each with its command and output (§13).
 
 ### SA1 — the package, beside the Bun helper
 
@@ -464,6 +492,16 @@ helper's drive.
   `HELPER_MUTANTS`, `assistant_helper_proof.py`'s rows rewritten for SwiftPM (P1's "never skips"
   becomes "a failed SwiftPM build fails the app build"), `prices_proof.py` row T and its mutant,
   `assistant_settings_proof.py`, `docs_bugs_c1_proof.py`, `mutant_anchors.py`.
+- **How a helper mutant is built** (SA-8). Not by SwiftPM on a clone of the tree's scratch path:
+  on a clone used from another path a changed `agent/` cannot be built at all (§13, SA0 item 9).
+  SA0's recommendation is one builder beside `tools/proof/swift_build.py` that compiles the
+  mutated helper sources against the tree's built Slaude module and links the tree's Slaude
+  objects, reading them only, so the tree's product cannot become a mutant's; it needs the tree's
+  helper built first. SA0 measured it on Doctored's package, which embeds no resource: with the
+  price table compiled in, the source file SwiftPM generates for it (`embedded_resources.swift`)
+  must be supplied to the builder, which was not measured. The other shape that works is one
+  persistent SwiftPM scratch path for mutants per worktree, built cold once and incremental at a
+  fixed path after, at a second scratch path's disk (§10). SA3 chooses between them.
 - B1 measures the built helper's first POST; the relay and `budget_proof.py` learn Bearer.
 - **The notices and the publish runner, with the switch** (SA-10; §2 says why they cannot wait
   for SA4, which would leave every tree copy's and the runner's build failing at Write
@@ -524,7 +562,10 @@ helper's drive.
 
 ### SA5 — the live run and the close
 
-- The paid proofs question 3 chooses, serially, each with its flags and its dollars reported.
+- The paid proofs of the owner's answer 3 (§12): all three, serially, in one month, each with its
+  flags and its dollars reported, run by the orchestrator, never by a lane, after SA4 has landed
+  and before the close below. This phase's record holds each run's flags, dollars and result; a
+  failure a run finds is fixed, or filed with the residue, before the close.
 - `docs/manual-checks.md`'s AS-1, AS-4, AS-5 and AS-6 are marked for the owner to run again: a
   real conversation, what a turn cost, what a conversation and the month cost, a reply cut short.
 - The close: `designs/adr/swift-helper.md`, this file moved to `archive/swift-helper.md` with its
@@ -532,35 +573,68 @@ helper's drive.
 
 ## 10. Build and publishing cost
 
-Every figure here is **(Doctored)** until SA0 measures it in this tree.
+SA0 measured these in this tree on 2026-11-12 (§13, SA0 items 2 and 3), beside Doctored's of
+2026-11-03 **(Doctored)**, on the same kind of host (12 cores, 96 GB). **None of this tree's figures
+is an idle one:** two other lanes built throughout, each figure carries the load averages its run
+printed, and the `-j 3` run overlapped an app build in the same worktree. They are costs to plan
+with, not thresholds. Memory is the sum of resident sizes over the build's process tree, sampled
+four times a second, as Doctored measured it.
 
-- A worktree's first app build compiles Slaude in release: 148 s cold, with a 2.1 GB tree peak at
-  three jobs and 3.2 GB at twelve. Bun took about 0.2 s. Later builds are skipped by the stamp
-  (the phase's no-op is under a second).
-- `make agent-test` compiles it once more in debug: 60 s cold, a 3.7 GB tree peak.
-- The helper is 35.5 MB stripped where Bun's is 57.7 MB.
-- On the publish runner (`macos-26`, the image `publish.yml` line 44 uses here) SwiftPM built
-  Slaude and the helper in 279.5 s with no memory failure, and the archive step took 20 min 2 s
-  against 19 min 11 s for the last Bun build.
-- Whole-module optimization of Slaude peaks at 10.6 GB in one compiler process, past the runner,
-  which is why release compiles in batches.
+| Figure | Doctored, 2026-11-03 (load 20–490) | This tree, 2026-11-12 | Load averages, start → end |
+|---|---|---|---|
+| Release in batches, cold, 12 jobs: wall | 148 s | 122.4 s | 58.61 31.27 23.88 → 47.86 41.68 29.40 |
+| the same: tree peak / largest process | 3.2 GB / 1.78 GB | 3.08 GiB / 1.67 GiB | the same run |
+| Release in batches, cold, `-j 3`: wall | 160 s | 391.9 s, beside an app build | 73.73 56.76 38.66 → 101.44 71.05 50.44 |
+| the same: tree peak / largest process | 2.1 GB / — | 1.95 GiB / 1.67 GiB | the same run |
+| Release, warm, nothing changed: wall (SwiftPM's own line) | (0.6–1.9 s) | 4.1 s (2.93 s) | 106.14 116.85 110.09 → 106.14 116.85 110.09 |
+| Release, warm, one helper file edited: wall | — | 4.1 s, 11 files compiled, none of Slaude's | 106.14 116.85 110.09 → 101.17 115.64 109.70 |
+| Debug, cold: wall | 60 s, the build | 124.4 s, `swift test` (its build 116.58 s, the 50 tests) | 48.42 42.16 30.24 → 76.34 54.41 36.71 |
+| the same: tree peak / largest process | 3.7 GB / 1.20 GB | 3.70 GiB / 1.06 GiB | the same run |
+| The helper step in a `make app-debug`, cold | — | 273.36 s of the build's 420.4 s | 63.34 54.66 42.19 → 94.83 79.08 56.81 |
+| The step with its stamp matching (digest, copy, strip, sign) | 0.72–0.75 s | 1.21 s and 1.89 s, in a tree copy | 109.74 116.61 83.19 → 110.89 116.73 83.43 |
+| The helper, stripped and signed | 35.5 MB | 35,546,496 bytes (78,112,240 before `strip -x`) | — |
+| The Bun helper | 57.7 MB | 57,735,840 bytes | — |
+| The scratch path on disk: release / debug with the suite | — | 1.8 GB / 2.3 GB | — |
+
+- **A worktree's first app build** compiles Slaude in release, as the table says; later builds
+  are skipped by the stamp. Bun took about 0.2 s **(Doctored)**. `make agent-test` compiles it
+  once more in debug.
+- **Disk.** A worktree that has built the helper and run the suite holds about 4 GB of SwiftPM
+  products, a release and a debug build on its scratch path. A tree copy's clone of it is free
+  until written to; a persistent scratch path for mutants (§9 SA3) would hold another.
+- **Not measured here, so Doctored's figures stand:** the network fetch of Slaude (this Mac's
+  SwiftPM cache already held it), and the two below.
+  - On the publish runner (`macos-26`, the image `publish.yml` line 44 uses here) SwiftPM built
+    Slaude and the helper in 279.5 s with no memory failure, and the archive step took 20 min 2 s
+    against 19 min 11 s for the last Bun build **(Doctored)**.
+  - Whole-module optimization of Slaude peaks at 10.6 GB in one compiler process, past the
+    runner, which is why release compiles in batches **(Doctored)**.
 - If a later Slaude outgrows the runner, the levers are the debug configuration and a larger
   runner.
 
-## 11. Accepted risks, carried from Doctored
+## 11. Accepted risks, carried from Doctored or found here
 
 - **Slaude is young and has one maintainer**, the owner. Its transformation and tests track the
   official Python SDK, and Doctored has shipped on it since 2026-11-04; nobody else uses it.
+  Agents change it only through a pull request the owner merges (§12, answer 4).
 - **The pin's cadence.** A new API feature or fix reaches the helper only through a commit that
   moves the pin and runs the suite and the gate.
+- **A pin on a pull request's branch** (§12, answer 4) is fetchable only while that branch holds
+  its commit. A squash merge leaves the commit off Slaude's default branch, so the branch must be
+  kept until Frame Job re-pins to the default branch, which the phase that pinned it records as
+  owed.
 - **The compile**, on every worktree's first build and on the publish runner (§10).
+- **Disk:** about 4 GB of SwiftPM products in every worktree that builds the helper and runs the
+  suite (§10), with lanes of worktrees on one volume.
 - **The first build needs the network**, to fetch Slaude.
 - **A second Swift toolchain mode in the tree.** The package is Swift 6 with actors; the app is
   Swift 5 with GCD. SA-7 keeps them apart by directory.
 
-## 12. Questions for the owner
+## 12. The owner's answers (2026-11-12)
 
-Each has a recommendation; the phases above are written for the recommended answers.
+The owner answered on #599 on 2026-11-12 (the approval quoted at the head of this file): 4 not as
+recommended, "Everything else, as recommended". Each question stays as it was asked, with its
+options; the answer follows it.
 
 1. **The spend figures.** Doctored dropped pricing when it made this move, because nothing there
    showed it. Frame Job shows two figures (P-7) and keeps a ledger.
@@ -571,6 +645,7 @@ Each has a recommendation; the phases above are written for the recommended answ
    - (c) Drop pricing as Doctored did. The tab's Spend row, Settings' month line and the ledger
      go, with P-1, P-2, P-4, P-5, P-7 and P-8; SA1-SA4 lose every pricing item above, and the
      proofs' own budget (P-3, P-6, P-9) is unaffected.
+   - **Answered: (a).** Both figures stay, with pricing ported into the Swift helper (SA-3).
 2. **What the tie to Doctored becomes.** The byte-identical rule has had no counterpart since
    Doctored deleted its TypeScript.
    - (a) Frame Job's package is its own, ported once from Doctored at a named commit, with no
@@ -583,6 +658,8 @@ Each has a recommendation; the phases above are written for the recommended answ
      rasterize#325 is road maps 12 and 13's hand-over of the helper change and of `pricing.ts` /
      `priceTable.ts` (`designs/adr/roadmap-12-assistant.md` line 67,
      `designs/adr/roadmap-13-pricing.md` line 50). #484's arm was never filed there.
+   - **Answered: (a).** Frame Job's package is its own, ported once from Doctored at `b524babc`,
+     with no identity rule (SA-11, in SA4). The two Rasterize issues are the owner's to close.
 3. **The paid acceptance after the switch.** Three live proofs exist: compaction
    (`assistant_compaction_proof.py --live --cap 11.50`), clearing
    (`assistant_clearing_proof.py --live --cap 5`, the run AI-20 says is owed) and the prompt
@@ -594,20 +671,44 @@ Each has a recommendation; the phases above are written for the recommended answ
      every byte the helper sends, which is what these runs test.
    - (b) Compaction and clearing only.
    - (c) None; the stand-in runs and the manual checks carry it.
+   - **Answered: (a).** All three, serially, in one month, each run's dollars reported. They are
+     the orchestrator's, never a lane's, run after SA4 has landed and before SA5's close, whose
+     record holds them (§9 SA5); a phase's own proofs use the stand-in only.
 4. **Who changes Slaude** when the port needs something it lacks.
    - (a) An agent files the need on `kpgalligan/Slaude`; the owner lands it; the pin moves in its
      own commit here. **Recommended:** it keeps this repository's agents out of another
      repository.
    - (b) Agents may commit to Slaude directly.
+   - **Answered: not (a), the recommendation, and not (b) as written.** Agents make the changes
+     Slaude needs themselves and push them for the owner to merge:
+     - a Slaude change is made only when a measurement shows the pin cannot serve and the fix
+       belongs in Slaude;
+     - it is a branch pushed to `kpgalligan/Slaude` and a pull request there against its default
+       branch: never a push to the default branch, never a merge of the pull request (the owner
+       merges), and never a force-push of its branch;
+     - Frame Job pins the branch's commit by exact `revision:` meanwhile. A squash merge leaves
+       that commit off the default branch, so the pull request asks for its branch to be kept
+       until Frame Job re-pins, and "re-pin to Slaude's default branch after the pull request
+       merges" is written as owed in the commit message and in the phase's record (§13);
+     - the pull request says what Frame Job needs and what was run, with no local path and no bare
+       at-sign name in it;
+     - the work is done in a fresh clone from GitHub in a scratch folder, never in an existing
+       local checkout.
+
+     SA0 needed none of it: the pin lacked nothing it measured (§13, SA0 items 1, 5, 6, 7 and 10).
 5. **The build cost** (§10).
    - (a) Accept it. **Recommended:** it is what compiling Slaude costs, once per worktree.
    - (b) Local app builds use SwiftPM's debug configuration (60 s cold against 148 s, for a
      larger and slower helper **(Doctored)**) and only Distribution builds release.
+   - **Answered: (a).** The cost is accepted. SA0's figures for this tree are in §10, with one
+     cost the question did not show: about 4 GB of SwiftPM products per worktree (§10, §11).
 6. **The system block's cache breakpoint** (§5). It lowers what a new conversation costs and
    changes the request.
    - (a) Adopt it with the switch. **Recommended:** Doctored measured the saving live.
    - (b) Switch first with today's request, and adopt it as its own change afterwards, so SA2's
      comparison allows one difference fewer.
+   - **Answered: (a).** The breakpoint is adopted with the switch (SA-5), with the app's sorted
+     keys that let a relaunch read it (§5).
 
 ## 13. Records
 
@@ -615,6 +716,213 @@ Each phase's record goes under its heading here when it lands: what landed, what
 what its review found, what is owed.
 
 ### SA0 — record
+
+**What landed** (2026-11-12, on `e0206243`). This record; the status, the owner's answers in §12,
+and what the spike changed in §2, §5, §7, §8, §9, §10 and §11; SA-1..SA-3 in
+`designs/spec/11-decisions/swift-helper.md`, with a pointer appended to AI-1, P-2 and P-8. No
+product code. The spike's package (Doctored's `agent/` at `b524babc`, with a probe target) and its
+second build step were a throwaway patch in a worktree, and neither they nor its scripts are in
+the tree. No Slaude branch or pull request: the pin lacked nothing measured, so nothing is owed
+to re-pin.
+
+**What was measured.** On 12 cores and 96 GB, Xcode 26.2 (17C52), Swift 6.2.3, on 2026-11-12 at
+`e0206243`. Two other lanes built throughout, so **no figure here is an idle one**: each carries
+the load averages its run printed (one, five and fifteen minutes). Memory is the sum of resident
+sizes over the build's process tree, sampled four times a second, with the largest single process
+beside it; Xcode's build service is not a child of `xcodebuild`, so no memory figure is given for
+a whole app build. "SwiftPM's command" is Doctored's build line, in its scrubbed environment:
+`env -i HOME=… PATH=/usr/bin:/bin:/usr/sbin:/sbin TMPDIR=… xcrun swift build --package-path agent
+--scratch-path <scratch> --configuration release --product doctored-agent -Xswiftc
+-no-whole-module-optimization -Xswiftc -enable-batch-mode`, on Doctored's `agent/` at `b524babc`
+with its platform line changed. Where the spike's own output went to its terminal only, the build
+pass ran the measurement again, marked "re-run", or left the figure out.
+
+1. **Doctored's package against the pin, at the macOS 26 floor.** SwiftPM's command with
+   `.macOS(.v26)` under swift-tools 6.0 failed: `error: 'v26' is unavailable`, `note: 'v26' was
+   introduced in PackageDescription 6.2`. `swift package dump-package` on four one-target
+   manifests (re-run; load 100.14 118.08 110.10): `tools 6.0, .macOS(.v26): REFUSED`;
+   `tools 6.0, .macOS("26.0"): accepted, platform 26.0`; tools 6.2 accepted either spelling. With
+   `.macOS("26.0")`: `Working copy of https://github.com/kpgalligan/Slaude resolved at
+   4c6c2ca435350741796c3d461720a61e7149b378`, `Build of product 'doctored-agent' complete!
+   (121.62s)`, the log's only warning the driver's `ignoring -num-threads argument`; and
+   `swift test` with Doctored's `DR_AGENT_STRICT=1`: `Executed 50 tests, with 0 failures`. Slaude
+   came from this Mac's SwiftPM cache (`Fetched https://github.com/kpgalligan/Slaude from cache
+   (0.62s)`), so the network fetch was not measured. **So:** swift-tools 6.0 with
+   `platforms: [.macOS("26.0")]` (§5, SA-1).
+2. **Build time and peak memory.** A sampler around SwiftPM's command, each cold on an empty
+   scratch path, then warm on the 12-job one at the path it was built at:
+
+   | Build | Wall | Tree peak | Largest process | Load averages, start → end |
+   |---|---|---|---|---|
+   | release, batches, 12 jobs (the default), cold | 122.4 s | 3.08 GiB | 1.67 GiB | 58.61 31.27 23.88 → 47.86 41.68 29.40 |
+   | release, batches, `-j 3`, cold, beside item 3's app build | 391.9 s | 1.95 GiB | 1.67 GiB | 73.73 56.76 38.66 → 101.44 71.05 50.44 |
+   | debug, `swift test`, cold (`Build complete! (116.58s)`, the 50 tests) | 124.4 s | 3.70 GiB | 1.06 GiB | 48.42 42.16 30.24 → 76.34 54.41 36.71 |
+   | release, warm, nothing changed (re-run; SwiftPM's line 2.93 s) | 4.1 s | 0.08 GiB | 0.08 GiB | 106.14 116.85 110.09 → 106.14 116.85 110.09 |
+   | release, warm, one helper file edited (re-run; 11 `Compiling` lines, none of Slaude's; SwiftPM 2.89 s) | 4.1 s | 1.49 GiB | 0.15 GiB | 106.14 116.85 110.09 → 101.17 115.64 109.70 |
+
+   The `-j 3` wall time does not compare with Doctored's; its memory does. The release product is
+   78,112,240 bytes, and 35,546,496 after `strip -x` and `codesign --force --options runtime
+   --sign -`: `flags=0x10002(adhoc,runtime)`, no entitlements (re-read). The Bun helper in this
+   tree's Debug and Release bundles is 57,735,840 bytes (re-read). On disk (`du -sh`, re-run):
+   1.8 GB for each release scratch path, 2.3 GB for the debug one with the suite. **So:**
+   Doctored's build line as it is, release in batches without whole-module optimization at the
+   default jobs (§10).
+3. **A tree copy's app build with the helper step in it.** The spike worktree's own
+   `make app-debug`, its helper step running Bun's build and then Doctored's
+   `build_agent_helper.sh` (with this tree's paths) on an empty `build/agent-swift`:
+   `exit 0  wall 420.4 s` (load 53.06 55.95 40.78 → 95.81 79.80 57.33), the step
+   `helper step total 273.36 s` (load 63.34 54.66 42.19 → 94.83 79.08 56.81). That build left
+   914 MB of intermediates, 620 MB of module cache and 195 MB of Debug products (`du -sh`, re-run).
+   Then `tools/proof/tree_copy.py`'s `make_copy`, the tree's `build/agent-swift` cloned into the
+   copy (`cp -cRp of build/agent-swift: exit 0, 4.41 s`) and the step run there as the copy's
+   phase would run it: `SwiftPM skipped`, `digest+check 0.31 s`, `helper step total 1.21 s` (load
+   109.74 116.61 83.19), and again 1.89 s (load 110.89 116.73 83.43). Then `touch` on the copy's
+   product, so the stamp missed: SwiftPM ran in the copy and failed, `error: PCH was compiled with
+   module cache path '…/build/agent-swift/arm64-apple-macosx/release/ModuleCache/2UHWOJU7ZQLJ2',
+   but the path is currently '…/copy/build/agent-swift/…'` and `missing required module
+   'SwiftShims'`. A clone made without `-p` would not move the product's time: on this volume
+   `cp -cR` and `cp -cRp` both kept a file's time (re-run: `1577858460` on the original and both
+   copies), and only the `cp -cR` copy's folder took the current time. **Not run:** the copy's
+   whole `make app-debug`, with or without the clone, for lack of disk while three lanes built.
+   **So:** a clone saves the cold step only while the stamp matches, and on a miss SwiftPM must
+   not run on a scratch path made at another path (§7, SA-8).
+4. **`.embedInCode` with the table at `agent/prices/anthropic.json`.** Three packages, each with
+   the tree's table (3866 bytes) and a target `Kit` that embeds it, and a tool printing the
+   embedded bytes against the file: the resource named outside the target
+   (`.embedInCode("../../prices/anthropic.json")`), a relative symlink in the target, and a copy
+   in it. All three built; the outside one printed `Found unhandled resource at
+   …/agent/prices/anthropic.json` on each build, the symlink nothing. One byte was added to the
+   table in the first two, which were rebuilt. Their tools, run again (re-run, no compile):
+   outside `embedded bytes 3867`, `file bytes 3867 equal true`; symlink the same; copied
+   `embedded bytes 3866`, `file bytes 3866 equal true`. The generated accessor is
+   `PackageResources.anthropic_json: [UInt8]`. On the symlink layout `find agent/Sources -type f`
+   lists `Kit.swift` and `main.swift`, and `find -L` adds `anthropic.json`. **So:** the symlink
+   layout, and a stamp that digests the table's content, which Doctored's `find agent/Sources
+   -type f` does not reach (§5, SA-3, SA-8). `tree_copy.make_copy` copies `agent/` with
+   `shutil.copytree`, which follows the link and writes the same bytes into a copy.
+5. **`currentMessageSnapshot` at a cancel.** A probe built as a product of the spike's package
+   sent one streamed request through Doctored's `ClientFactory` and `Request` and read it as
+   Doctored's turn loop does, against `tools/proof/anthropic_fake.py`, with the app's own captured
+   `configure` (122 tools). `"cut": "drop"` is `spend_proof.py` H10's scenario; `"cut": "stall"`,
+   closed on its first `content_block_delta`, is H11's; `after-delta` closes an uncut reply on its
+   `message_delta`:
+
+   | Mode | Events the probe saw | Thrown | The snapshot's usage |
+   |---|---|---|---|
+   | drop | `message_start`, `content_block_start`, `content_block_delta`, `content_block_stop` | `StreamEndedEarlyError` | input 100, output 0 |
+   | stall | `message_start`, `message_delta`, `content_block_start`, `content_block_delta` | `CancellationError` | input 100, output 10 |
+   | after-delta | the drop's four, then `message_delta` | `CancellationError` | input 100, output 10 |
+   | full | all six | nothing; `messageComplete` true | input 100, output 10 |
+
+   After a throw the snapshot stays readable with `messageComplete` false, and the two errors are
+   distinct types, which is what tells H10's cut (an `error` after the cost) from H11's Stop (no
+   `error`). A request failing before `message_start` was not run; Slaude's
+   `JSONMessageStream.swift` says the snapshot is `nil` there. The `full` row is a complete reply
+   (text, where H12's first reply is a `tool_use`) returned by `getFinalMessage()` with
+   `messageComplete` true, which is what prices H12's first reply complete, once. H12 itself, a cancel during the tool wait after that reply with no
+   stream in flight (one `cost`, no `partial`, one POST), reads no snapshot and was not run here;
+   it is SA1's suite case of a cancel with tools pending. **So:** P-8 ports as written on the
+   pin, and its lower bound does not move (SA-3).
+6. **The Bearer header.** The same runs, as the stand-in logged them:
+   `GET /v1/models/claude-opus-5-5 0 bytes; credential {'authorization': 'Bearer proof-key'};
+   anthropic-version 2026-10-21`, `user-agent Anthropic/Swift 2.3.0`, each POST the same at
+   398930 bytes, and `stand-in failures: []` in all five modes. **So:** the stand-in needs no
+   change, and `assistant_session_proof.credential()` already strips `Bearer `. The relay
+   (`tools/proof/assistant_prompt_eval.py` line 376) and `tools/proof/budget_proof.py` (line 438)
+   learn it in SA3 (§5).
+7. **AH-5's five checks against Frame Job's own request.** The worktree's Debug app, launched by
+   `assistant_session_proof.App` against the stand-in with a scratch secret folder, ran a turn
+   whose scripted reply calls `render_frame` on a project of one text clip and then answers in
+   text: the Bun helper's real traffic. `POST /v1/messages?beta=true 399098 bytes; credential
+   header ['x-api-key']; anthropic-version 2023-06-01`, keys `['model', 'max_tokens', 'system',
+   'tools', 'messages', 'cache_control', 'output_config', 'thinking', 'fallbacks', 'stream']`,
+   `sampling keys present []`, `system is str; tools 123`; the second POST (457461 bytes) carries
+   `('assistant', ['tool_use'])` and `tool_result[image:base64:image/png,text]`. Read again from
+   the stand-in's log (re-run, no launch): the three requests are the model lookup and the two
+   POSTs; no `citations` key in either's messages; the `tool_result` block's keys `['content',
+   'tool_use_id', 'type']`. Item 5's Swift body: the same ten keys in the same order,
+   `sampling keys []`, `system list of [['cache_control', 'text', 'type']]`, 123 tools. All five
+   of §5's checks hold. What differs on the wire, for SA2's allowed differences:
+   `anthropic-version` 2023-06-01 → 2026-10-21; `x-api-key` → `authorization: Bearer`; the path
+   loses `?beta=true`; `system` is a one-block list carrying `cache_control`; the user-agent is
+   `Anthropic/Swift 2.3.0`. **Limit:** the stand-in does not know what API version 2026-10-21
+   refuses (owed, below).
+8. **`configure`'s bytes across two launches.** A copy of the worktree's Debug bundle whose
+   `framejob-agent` is a shim that copies its stdin to a file and pipes it to the real helper; two
+   launches against one stand-in, one secret folder and no spend folder: `configure one: 396901
+   bytes sha256 2af3d846c5e52075`, `configure two: 396901 bytes sha256 54a156bd00e50130`,
+   `byte-identical: False`, `equal once parsed (so any difference is key order): True`, top-level
+   key orders `['core_tools', 'type', 'api_key', …]` and `['api_key', 'system', 'api_base', …]`,
+   `tool entries whose own key order differs between launches: 101 of 122`, `tool entries whose
+   inputSchema bytes differ between launches: 85`, and the tools-and-system prefix of each
+   launch's first POST `402397 and 402397 bytes, identical False`. An earlier pair of launches
+   printed the same shape (97 of 122, and 95). The two captured lines read again (re-run, no
+   launch): `byte-identical: False`, `equal once parsed: True`, `sorted-key serialisations
+   identical: True`. **So:** no. `JSONSerialization` writes a dictionary in its per-process hash
+   order and the Bun helper passes each schema's order through, so a relaunch cannot read the
+   prompt cache the last launch wrote. `AssistantSession.write` takes `.sortedKeys` (§5, SA-5);
+   `writeResult` builds its line by hand and is unaffected.
+9. **A helper mutant in a clone of the scratch path.** A scratch root shaped as `spend_proof.py`
+   makes one (`agent/` copied without `node_modules`, `tools` linked, `build/agent-swift` a
+   `cp -cRp` clone of the tree's), the step run in it, and the tree's product digested before and
+   after. `agent/` unchanged: `clone (cp -cRp) of the scratch path: exit 0, 6.12 s`, `SwiftPM
+   skipped`, `the step took 2.0 s, exit 0`, `tree product unchanged: True` (load 177.80 124.59
+   80.47 → 183.66 126.69 81.46). One line of `Turn.swift` changed: `clone: exit 0, 9.53 s`, then
+   SwiftPM scheduled Slaude again and every compile failed on the cloned module cache (the log
+   holds 298 `PCH was compiled with module cache path` errors): `STOPPED by this script after 9.2
+   s: 300 Anthropic files recompiled so far, SwiftPM's counter at [304/381]`, `tree product
+   unchanged: True` (load 182.49 127.39 81.98 → 178.26 129.24 83.44). Then the same mutated
+   sources by `swiftc` directly, the kit as one module, `main.swift`, one link, against the tree's
+   `release/Modules/Anthropic.swiftmodule` and its 2385 `Anthropic.build/*.o`, read only:
+   `kit: exit 0, 12.99 s`, `main: exit 0, 0.88 s`, `link: exit 0, 1.39 s`, `the whole mutant
+   build: 15.39 s`, a 77847152-byte helper answering `{"type":"ready"}` to the app's `configure`,
+   and the tree's product unchanged at 77904736 bytes and sha256 `dabd19c05a175f55` (load 107.51
+   116.73 81.59 → 116.10 118.19 82.73). **So:** no: on a clone used from another path SwiftPM
+   cannot build a changed `agent/` at all, and an unchanged one is skipped by the stamp, the step
+   taking 2.0 s. SA0 recommends the direct build for the proofs' scratch helpers, measured on a
+   package that embeds no resource (§9 SA3).
+10. **Slaude past the pin.** `gh api
+    repos/kpgalligan/Slaude/compare/4c6c2ca435350741796c3d461720a61e7149b378...main`, at the
+    spike's start and end and again by the build pass (re-run, 2026-11-12 15:15 UTC):
+    `{"ahead_by":0,"behind_by":0,"status":"identical"}`; `main` is
+    `4c6c2ca435350741796c3d461720a61e7149b378`, last pushed `2026-11-03T20:51:10Z`; no open pull
+    request; its branches `claude/api-implementation-8ix9bn` and `main`. Doctored's
+    `agent/Package.swift` at `b524babc` pins the same revision. **So:** it has not moved; Frame Job
+    pins `4c6c2ca435350741796c3d461720a61e7149b378` (SA-1), and SA0 opened no Slaude branch or pull
+    request.
+
+**What its review found.** The plan's challenge made five objections, all accepted. Four changed
+this file before it was written: every figure here is traced to a run's kept output, and where
+the spike's had gone to its terminal only the measurement was run again or left out; "a clone
+without `-p` misses the stamp", which nothing had measured, was measured and is false (item 3);
+the direct mutant build is written as a recommendation measured without an embedded resource,
+not as the design (§9 SA3); and two sentences of §7 that still deferred to SA0 were brought up to
+date. The fifth changed only the build pass's own checker. The diff read made one should-fix and
+three nits, all taken in its fix pass: SA-8's row and the owed list below called the scratch
+path's own path one of the stamp's inputs, which, built as written, puts the path in the key, so
+every clone at another path misses, is emptied and builds Slaude cold, against item 3's 1.21 s;
+both now say the key gains the table's content and the path is recorded beside the key and read
+only on a miss, and §7 says why. Item 5 now says what its `full` row shows of H12 and that H12
+itself is SA1's. The paid runs are placed after SA4 and before SA5's close, whose record holds
+them (§6, §9, §12).
+
+**What is owed.**
+- **SA1:** the package at `.macOS("26.0")` with the symlinked table; a suite case for a request
+  failing before `message_start`, the snapshot `nil` and no `cost` (P-8's "emits none"); H12 as
+  the suite's cancel with tools pending, after a complete `tool_use` reply: one `cost`, no
+  `partial`, no second request (item 5); and, with SA-5, `.sortedKeys` in
+  `AssistantSession.write` and a row of two launches and one digest.
+- **SA3** (SA-8): the table's content in the stamp's key; the scratch path's own path recorded
+  beside the key, not in it, and read only on a miss, when a foreign scratch path is emptied (§7);
+  whether dropping only its module cache would repair one (not measured, so cold is assumed); the
+  mutant builder or the persistent mutant scratch path, and for the builder the generated
+  `embedded_resources.swift` (not measured); a tree copy's whole app build, with and without the
+  clone, with `tree_copy.py`'s copy rule.
+- **The live run, after SA4 and before SA5's close** (§12, answer 3): what API version 2026-10-21
+  refuses, which the stand-in cannot say.
+- **Not measured, and Doctored's figures stand:** the network fetch of Slaude, whole-module
+  optimization and the publish runner (§10). Not owed: any figure here again on an idle host; they
+  are costs, not thresholds.
 
 ### SA1 — record
 

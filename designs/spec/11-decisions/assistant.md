@@ -15,6 +15,10 @@ in §6).
   every `make app`, and a nested executable of H1's size, signed separately.
   **Amended by NM-5** (rename R0): `Contents/Helpers/reelcut-agent` is now
   `Contents/Helpers/framejob-agent`.
+  **Amended by SA-1** (2026-11-12, road map "swift-helper"): the helper becomes a Swift
+  executable built from a SwiftPM package in `agent/` on Slaude, the owner's Swift client for the
+  Claude API. What this entry says of Bun, the Tool Runner and the one TypeScript in the product,
+  and its risk of Bun in every `make app`, holds until that road map's switch (SA3) lands.
 - **AI-2 — The helper owns no tools; every call goes through `AgentServer.execute` by way of
   one lane.** An `AgentLane` holds one lock around every tool call from either caller, the MCP
   trampoline and the assistant session; the trampoline's call to it is the only wiring change
