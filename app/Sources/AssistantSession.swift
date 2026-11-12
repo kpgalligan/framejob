@@ -360,8 +360,12 @@ final class AssistantSession {
         writeLine(#"{"type":"tool_result","call_id":\#(quotedID),"result":\#(result)}"#)
     }
 
+    /// Sorted keys, so the same catalog is the same `configure` bytes on every launch and the
+    /// helper's cached tools-and-system prefix with it (spec §11 SA-5).
     private func write(_ message: [String: Any]) {
-        guard let data = try? JSONSerialization.data(withJSONObject: message),
+        var options: JSONSerialization.WritingOptions = []
+        options.insert(.sortedKeys)
+        guard let data = try? JSONSerialization.data(withJSONObject: message, options: options),
             let line = String(data: data, encoding: .utf8)
         else { return }
         writeLine(line)

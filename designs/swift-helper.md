@@ -3,7 +3,8 @@
 **Status: approved 2026-11-12, being built.** Opened 2026-11-11 by issue #599. The owner approved
 it on #599 on 2026-11-12 and answered the six questions of §12, which now holds the answers. SA0,
 the spike, has landed: its record is in §13, and it wrote SA-1..SA-3 in
-`designs/spec/11-decisions/swift-helper.md`. SA1 is next.
+`designs/spec/11-decisions/swift-helper.md`. SA1, the package beside the Bun helper, has landed
+with SA-4..SA-7 and SA-12; its record is in §13. SA2 is next.
 
 **Source.** The owner, on #599 (2026-11-12): "We're going to replace Bun with the Swift Anthropic
 API we wrote. See ~/devel/doctored for background info. That had the same Typescript Anthropic
@@ -929,6 +930,110 @@ them (§6, §9, §12).
   are costs, not thresholds.
 
 ### SA1 — record
+
+**What landed** (2026-11-12, on `943bb2e0`). SA-4..SA-7 and SA-12 in
+`designs/spec/11-decisions/swift-helper.md` with their index rows, and pointers appended to AI-9,
+AI-13 and AI-20; SA-12's row in §8 and the suite's path in §7. The package in `agent/`, beside the
+Bun helper, ported once from Doctored's `agent/` at `b524babc` (the owner's answer 2 (a)):
+`Package.swift` (swift-tools 6.0, `.macOS("26.0")`, Slaude at
+`4c6c2ca435350741796c3d461720a61e7149b378`, `-warnings-as-errors` under `FJ_AGENT_STRICT=1`),
+`Package.resolved`, `Sources/FrameJobAgentKit/` (Doctored's eleven files, then `Pricing.swift`,
+`PriceTable.swift` and `PriceRefresh.swift` — the refresh in a third file, as the plan allowed,
+to keep the table's file readable at 250 lines — and `anthropic.json`, the committed relative
+symlink to `agent/prices/anthropic.json`), `Sources/framejob-agent/main.swift`, and `Tests/` (nine
+test files and three support files, 76 tests). What the port adds to Doctored's: `price_cache` and
+`price_feed`; the events `message_done`, `prices` and `cost`; the price function, the table, its
+refresh and the cache file in `priceTable.ts`'s rules; the partial price from
+`currentMessageSnapshot` when a round throws after `message_start`; a turn's prices fixed at
+`turn_started`; and #484's sentence. `tools/agent/agent_test.py` is `make agent-test` (the SA-12
+guard, then `swift test` with `FJ_AGENT_STRICT=1`), and `make test` runs its selftest and then the
+suite. `AssistantSession.write` takes `.sortedKeys` (SA-5), and
+`tools/proof/assistant_session_proof.py` gains row KO and the mutant `unsorted-configure`. Nothing
+is bundled: the app still ships the Bun helper. **No Slaude change:** the pin lacked nothing the
+port needed, so no Slaude branch or pull request was opened and no re-pin is owed.
+
+**What was measured.** On the same 12-core, 96 GB host, Xcode 26.2, Swift 6.2.3, with two other
+lanes building throughout: no figure is an idle one, and each carries its load averages (one, five
+and fifteen minutes).
+
+1. **Slaude's cold debug build** in this tree, `swift build --build-tests` on a stub package:
+   `exit 0 wall 135 s` (load 45.33 32.01 53.86 → 158.17 85.29 72.05), Slaude from this Mac's
+   SwiftPM cache. `make agent-test`'s first run in the build worktree, whose scratch path had been
+   made by hand: `emptied: no marker`, then the 76 tests, `exit 0 wall 107 s` (load 127.09 135.25
+   127.75 → 183.99 148.12 133.30).
+2. **The suite.** `Executed 76 tests, with 0 failures` under `FJ_AGENT_STRICT=1`: Doctored's cases
+   ported (the codec both ways and the line splitter, the tool-result conversion, the history
+   merge, the refusals and error wording, deltas, a multi-tool round with an image, a cancel
+   mid-stream, before the headers and with tools pending, `refusal` and `max_tokens`, a final
+   reply's unrun calls, 429 and 529 with `retry-after` and three retries, a mid-stream `error`
+   event, a stream cut short, `pause_turn`, an unknown tool and thirty rounds, compaction's
+   success, wrong stop, empty summary, tool-call ending and limit, settings mid-turn, the request
+   body, clearing's edit, the same prefix on every round and in two helpers, byte-identical
+   replay, and the process tests over the built executable) and Frame Job's: all 23 of
+   `cases.json` within 1e-12, the committed table and the embedded bytes equal to the file's,
+   `reduce_cases.json`'s rows and three refusals, priceTable.test.ts's ten refresh cases (a
+   dead feed is port 1 on 127.0.0.1), a failed status, and a cache file in the Bun helper's
+   indented layout,
+   `prices` before `ready` and after it when a refresh settles, `message_done` then `cost` per
+   response and none for a summary, H10 (a stream dropped after `message_start`: one partial
+   `cost` at input 100, output 0, then the error), H11 (a cancel after `message_delta`: one
+   partial `cost` at output 10, no error), a request failing before `message_start` (no `cost`),
+   H12 (a cancel during the tool wait after a complete `tool_use` reply: one complete `cost`, one
+   POST), a turn keeping its prices through a refresh that settles mid-turn, #484's sentence,
+   `reset` ignored with the history kept, and a tool wait held 1 s with no request and across a
+   cancel until its answer.
+3. **A cloned debug scratch path** (the challenge's objection 2): the warm suite scratch path
+   `cp -cRp`-cloned into a second tree in 8 s, with a marker naming the first. `swift test` on it
+   unguarded: `exit 1` in 23 s, 2,386 `PCH was compiled with module cache path` lines and
+   `missing required module 'SwiftShims'` (load 45.67 115.49 119.49 → 51.91 111.37 117.89). Through
+   `agent_test.py --tree`: emptied, built cold, 76 tests passed, `exit 0` in 175 s (load 51.91
+   111.37 117.89 → 168.64 141.94 129.31); again, kept, `exit 0` in 8 s. The scratch path was 2.5 GB.
+   So the debug suite fails on a clone as the release build did (SA0 item 3), and SA-12's guard
+   repairs it at a cold build's cost.
+4. **Mutants**, each applied in place, run with `swift test --filter` on the warm scratch path
+   without `FJ_AGENT_STRICT` (so a red is a test failure, never a warning), seen red, reverted:
+   SA-4 `empty-summary-swapped` (CompactionTests' empty summary), `unrun-calls-unanswered` (a final
+   reply's unrun calls), `summary-after-tool-call` (a reply ending in a tool call) and
+   `no-484-sentence` (TurnTests' stop-reason sentences); SA-5 `no-system-breakpoint` (the round's
+   body); SA-6 `no-message-done` (SpendTests' per-response order) and `reset-clears-history`
+   (SessionTests' reset); SA-3 `cancel-not-priced` (H11) and `prices-at-each-cost` (a turn keeps
+   its prices); SA-2 `cancel-ends-tool-wait` (the tool wait); and two reds for the price port,
+   `stub-price` (cases.json's 23, 14 failing) and `unrounded-per-million` (the reducer's rows).
+   All twelve caught. SA-12: `agent_test.py --mutant guard-noop` fails exactly S1 and S2. SA-5's
+   app half: `assistant_session_proof.py --mutant unsorted-configure` (item 6). SA-7:
+   `make typecheck` 0 errors and its four warnings, and the diff adds no `async`, `await` or
+   `actor` under `app/Sources`.
+5. **`make gate`.** The first run stopped in `test` at its 900 s bound (`ran past its 900 s
+   bound`, 902.5 s, load 344.72 311.40 239.61 at its end), still in `assistant_prompt_proof.py
+   --probe`'s 860-source build and before the suite; nothing failed. The second, unchanged:
+   `test pass 560s` (the suite's build `Build complete! (28.37s)` on the kept scratch path, 76
+   tests) and `app pass 609s`, `gate: PASS 1171s` (load 212.86 293.92 277.17 after `test`, 219.74
+   261.56 268.06 at the end). The first `make test` of a lane that copied `build/` adds Slaude's
+   cold debug build to that step (item 1), inside the same bound.
+6. **SA-5's sorted keys, from the app.** `RC_PROOF_APP=release python3
+   tools/proof/assistant_session_proof.py`: `14/14`, KO `launch A's prefix 4049b72362c3d816
+   (398849 bytes), launch B's 4049b72362c3d816 (398849 bytes): identical` (KO serialises the
+   parsed pair compactly, so its byte count is not SA0 item 8's measure of the raw prefix).
+   `--mutant unsorted-configure` (the `.sortedKeys` line deleted in a tree copy, `make app-debug`
+   there, `built … in 35 s`, T1's launch A and W's launch B of it): `KO FAIL — launch A's prefix
+   cc25d88108d0f8e4 (398849 bytes), launch B's 2f48bd6a24a4fffa (398849 bytes): DIFFERENT; equal
+   once parsed True`, `mutant unsorted-configure: caught — KO failed` (load 98.16 219.80 252.05 →
+   62.47 195.40 241.62).
+
+**What its review found.** The challenge made four objections, all accepted: the suite has a
+scratch path of its own and SA-12's marker governs it alone, so SA-8's clone rule for
+`build/agent-swift` stands (1); the clone's failure and the guard's repair were measured in debug
+rather than inferred from SA0's release figures (2, item 3 above); KO's mutant runs T1 in a mutant
+launch A and then W's launch B of the same app and compares them (3); and the SA-3 mutant that had
+nothing to mutate became `cancel-not-priced`, with H12 kept as a plain case (4).
+
+**What is owed.**
+- **SA2:** the two-helper drive, with SA-4's three behaviours, SA-5's request and SA-6's listed
+  differences as its allowed list; a `cost`'s `dollars` compared as parsed doubles.
+- **SA3:** the build script must never use `build/agent-swift-test`; the suite's marker is not the
+  stamp's path record (SA-8); `tree_copy.py` copies `agent/` following the symlink, so a copy holds
+  the table's bytes.
+- **The integrator:** `agent/CLAUDE.md` and the root `CLAUDE.md`'s lines, from the build notes.
 
 ### SA2 — record
 

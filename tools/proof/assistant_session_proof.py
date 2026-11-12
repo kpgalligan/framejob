@@ -52,6 +52,10 @@ dummy key, `RC_ASSISTANT_BASE_URL` at the stand-in):
 Launch B, W: the same kind of turn with NO MCP server — its scratch socket's
       folder is 0755, so it logs `not bound` — through the launch
       default; the model setting reaches the stand-in (AI-11)
+  KO  (road map "swift-helper" SA1, spec §11 SA-5) the app writes `configure`
+      with sorted keys, so two launches send one prefix: the SHA-256 of launch
+      A's first POST's `tools` and `system` (T1's), serialised in the order the
+      stand-in received them, equals launch B's (W's). No launch of its own
 Launch C, K2: AI-13 — the override set and no `-RCSecretFolder`: the session
       is refused for want of a key, the stand-in hears nothing, no helper runs
 
@@ -59,13 +63,16 @@ Launch C, K2: AI-13 — the override set and no `-RCSecretFolder`: the session
     python3 tools/proof/assistant_session_proof.py --mutant no-prepare          # W: FAILS
     python3 tools/proof/assistant_session_proof.py --mutant no-transcribe-stop  # ST: FAILS
     python3 tools/proof/assistant_session_proof.py --mutant key-echo            # K1: FAILS
+    python3 tools/proof/assistant_session_proof.py --mutant unsorted-configure  # KO: FAILS
 
 A mutant copies the tree with `tree_copy.make_copy` into
 `work/assistant_session/mutant/tree`, deletes its one line (`MUTANTS`: the
 `AgentLane.prepareAtLaunch()` line in main.swift; the transcribe's
-`onCancel` line), builds it there (`tree_copy.build_app`), and runs its
-row against that app — W's report must be `ok: false`, naming AI-3; ST
-runs in a launch A of the mutant app. `no-transcribe-stop` must fail ST
+`onCancel` line; `AssistantSession.write`'s `.sortedKeys` line), builds it
+there (`tree_copy.build_app`), and runs its row against that app — W's
+report must be `ok: false`, naming AI-3; ST runs in a launch A of the
+mutant app; KO runs T1 in a launch A of the mutant app and then W's launch
+B of it, both unscored, and compares their prefixes. `no-transcribe-stop` must fail ST
 with `waited_ms − stopped_ms … > 5000` (LATE) among its problems, or the run
 exits 2: the fixture ran out within the bound on this host. `key-echo` is a
 stand-in control with no build: launch A of the built app, where ST's
@@ -90,6 +97,7 @@ path before the app goes).
 """
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -133,6 +141,7 @@ MUTANTS: dict[str, tuple[str | None, str | None, str, str | None]] = {
     "no-transcribe-stop": ("AgentServer+Captions.swift",
                            "stop?.onCancel { token.cancel() }", "ST", LATE),
     "key-echo": (None, None, "K1", None),
+    "unsorted-configure": ("AssistantSession.swift", "options.insert(.sortedKeys)", "KO", None),
 }
 # The person's chat settings (spec §11 AI-20) at their defaults, as launch
 # arguments: `App` appends each one whose `-Key` its arguments do not set, so no
@@ -761,7 +770,8 @@ def row_st(app, fake, ctx):
 # Launch B (W) and launch C (K2).
 
 
-def row_w(app_path, fake, secrets):
+def row_w(app_path, fake, secrets, keep=None):
+    """W; its stand-in log is kept in `keep["w_log"]` for KO."""
     folder = os.path.join(WORK, "w")
     shutil.rmtree(folder, ignore_errors=True)
     os.makedirs(folder)
@@ -788,6 +798,8 @@ def row_w(app_path, fake, secrets):
     finally:
         app.stop()
     log = fake.log()
+    if keep is not None:
+        keep["w_log"] = log
     gets = [r["path"] for r in log.get("requests", []) if r.get("method") == "GET"]
     sent = posts(log)
     results = tool_results(report, "add_marker")
@@ -810,6 +822,30 @@ def row_w(app_path, fake, secrets):
                   f"GETs {gets}; {len(sent)} POSTs with {PROOF_MODEL} and the dummy {posts_ok}; "
                   f"failures {log.get('failures')}; `Frame Job: ` {complaints[:1]}; "
                   f"listening {listening}")
+
+
+def prefix(log):
+    """(sha256, bytes, the parsed pair) of the first POST's `tools` and `system`, serialised in
+    the order the stand-in received them, or None without a POST."""
+    sent = posts(log or {})
+    if not sent:
+        return None
+    body = sent[0].get("body") or {}
+    pair = [body.get("tools"), body.get("system")]
+    text = json.dumps(pair, ensure_ascii=False, separators=(",", ":")).encode()
+    return hashlib.sha256(text).hexdigest(), len(text), pair
+
+
+def row_ko(ctx):
+    a, b = prefix(ctx.get("t1_log")), prefix(ctx.get("w_log"))
+    if a is None or b is None:
+        return False, (f"no first POST to compare: launch A {'has' if a else 'has none'}, "
+                       f"launch B {'has' if b else 'has none'}")
+    same_values = a[2] == b[2]
+    good = a[0] == b[0] and a[1] > 0
+    return good, (f"launch A's prefix {a[0][:16]} ({a[1]} bytes), launch B's {b[0][:16]} "
+                  f"({b[1]} bytes): {'identical' if a[0] == b[0] else 'DIFFERENT'}; equal once "
+                  f"parsed {same_values} (so a difference is key order)")
 
 
 def row_k2(app_path, fake):
@@ -929,6 +965,22 @@ def main():
             if named == "W":
                 guarded("W", lambda: (lambda ok, d: (ok, "(no prepareAtLaunch) " + d))
                         (*row_w(app, fake, secrets)))
+            elif named == "KO":
+                # Both of KO's launches from the mutant app: T1's in a launch A, then W's
+                # launch B, neither scored here; only their first POSTs are read.
+                folder = os.path.join(WORK, "mutant-a")
+                shutil.rmtree(folder, ignore_errors=True)
+                os.makedirs(folder)
+                mutant_ctx = {"folder": folder}
+                mutant_app = App("A", app, ["-RCSecretFolder", secrets], fake.base)
+                try:
+                    mutant_app.connect()
+                    row_t1(mutant_app, fake, mutant_ctx)
+                finally:
+                    mutant_app.stop()
+                row_w(app, fake, secrets, mutant_ctx)
+                guarded("KO", lambda: (lambda ok, d: (ok, f"({args.mutant}) " + d))
+                        (*row_ko(mutant_ctx)))
             else:
                 folder = os.path.join(WORK, "mutant-a")
                 shutil.rmtree(folder, ignore_errors=True)
@@ -971,7 +1023,8 @@ def main():
             finally:
                 app.stop()
             if not args.mutant:
-                guarded("W", row_w, release, fake, secrets)
+                guarded("W", row_w, release, fake, secrets, ctx)
+                guarded("KO", row_ko, ctx)
                 guarded("K2", row_k2, release, fake)
     except Exception as error:  # noqa: BLE001
         score("setup", False, f"the instrument could not run: {type(error).__name__}: {error}",
