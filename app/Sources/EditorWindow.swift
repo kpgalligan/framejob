@@ -269,13 +269,21 @@ final class EditorWindow: NSWindow {
         }
     }
 
+    /// Read by `performKeyEquivalent(with:)` in place of `isKeyWindow` when
+    /// set (spec §11 TX-48). Internal: a probe's window is never key, so its
+    /// key-window rows set it; the app never does.
+    var keyWindowStandIn: Bool?
+
     /// ⌘Return in the find field (spec §11 TX-43) at the window's other
     /// door: `NSApplication` offers a ⌘ key-down to the key window's key
     /// equivalents, then to the menus, before it dispatches the key through
     /// `sendEvent`, so the key is taken here too. A key taken here is spent,
-    /// so `sendEvent` never sees it; every other key is `super`'s.
+    /// so `sendEvent` never sees it; every other key is `super`'s. Taken
+    /// only while this is the key window, asked before `keepReturn` acts, so
+    /// a ⌘ key offered to another window's key equivalents never selects in
+    /// its transcript (TX-48).
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if keepReturn(for: event, taking: [.select]) { return true }
+        if keyWindowStandIn ?? isKeyWindow, keepReturn(for: event, taking: [.select]) { return true }
         return super.performKeyEquivalent(with: event)
     }
 

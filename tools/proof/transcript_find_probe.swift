@@ -108,6 +108,11 @@
 //       clears the selection and the next closes the bar, and after another
 //       ⌘Return ⌫ makes one "Delete Words" (undone after). (c)–(g) press as
 //       `NSApplication` does: the key-equivalent door, then `sendEvent`.
+//       (a)–(g) run with the window's `keyWindowStandIn` true, as in the key
+//       window (TX-48); (h) clears it on this window, which is not key: ⌘Return
+//       offered at the key-equivalent door is `super`'s (false), and the
+//       selection, the range, the playhead, the field's keys and the current
+//       match do not move.
 //   F18 Edit ▸ Find… on the Media tab (#560, TX-45): (a) the validator false
 //       on Clip, Document and Assistant, true on Media and Transcript; (b) a
 //       name typed in Search by name and the keys handed back, the action gives
@@ -1243,7 +1248,10 @@ if let (document, editor, window, pane) = openEditor(), let inspector = editor.i
         "a press on Next: current \(String(describing: before12)) → \(String(describing: after12)), "
             + "the field still typing \(typing12); a press on Done closed the bar \(!pane.isFindOpen)")
 
-    // F17 ⌘Return selects the current match (TX-43).
+    // F17 ⌘Return selects the current match (TX-43), at the key-equivalent
+    // door only in the key window (TX-48): (a)–(g) stand in for one.
+    let keyed = window as? EditorWindow
+    keyed?.keyWindowStandIn = true
     let commandReturn = { (flags: NSEvent.ModifierFlags) in key(36, "\r", window: window, flags: flags) }
     /// As `NSApplication` presses a ⌘ key: the window's key equivalents
     /// first, then, unclaimed, `sendEvent`.
@@ -1289,9 +1297,9 @@ if let (document, editor, window, pane) = openEditor(), let inspector = editor.i
     let countA = pane.find.matches.count
     let tookA = commandReturn(.command).map { window.performKeyEquivalent(with: $0) } ?? false
     spin(0.3)
-    let a17 = tookA && matchA?.count == 1 && matchSelected(matchA) && current() == currentA
-        && pane.find.matches.count == countA && countA == 6
-    let saidA = "(a) key-equivalent door answered \(tookA): \(said(matchA)), current "
+    let a17 = keyed != nil && tookA && matchA?.count == 1 && matchSelected(matchA)
+        && current() == currentA && pane.find.matches.count == countA && countA == 6
+    let saidA = "(a) an EditorWindow \(keyed != nil), key-equivalent door answered \(tookA): \(said(matchA)), current "
         + "\(String(describing: current())) (was \(String(describing: currentA))), \(pane.find.matches.count) "
         + "matches → \(a17)"
 
@@ -1377,8 +1385,28 @@ if let (document, editor, window, pane) = openEditor(), let inspector = editor.i
     let saidG = "(g) selected \(heldG); Esc cleared, bar open \(clearedG); Esc closed it, the text "
         + "keeping the keys \(closedG); ⌘Return again \(heldG2), then ⌫: step “\(stepG)”, tokens "
         + "\(tokensG) → \(afterG) → \(g17)"
-    row("F17", a17 && b17 && c17 && d17 && e17 && f17 && g17,
-        [saidA, saidB, saidC, saidD, saidE, saidF, saidG].joined(separator: "; "))
+
+    // (h) a window that is not key leaves ⌘Return to `super` (TX-48).
+    fresh17("cafe")
+    send(returnKey([]))  // one on, as (a)
+    spin(0.1)
+    let currentH = current()
+    let heldH = document.playhead
+    let noRangeH = document.inOutRange == nil
+    keyed?.keyWindowStandIn = nil
+    let keyH = window.isKeyWindow
+    let tookH = commandReturn(.command).map { window.performKeyEquivalent(with: $0) } ?? true
+    spin(0.3)
+    let h17 = keyed != nil && !keyH && !tookH && currentH != nil && view.selection == nil
+        && noRangeH && document.inOutRange == nil && document.playhead == heldH && typing()
+        && pane.isFindOpen && current() == currentH
+    let saidH = "(h) not key: isKeyWindow \(keyH), stand-in \(String(describing: keyed?.keyWindowStandIn)), "
+        + "key-equivalent door answered \(tookH) (want false); selection "
+        + "\(String(describing: view.selection)), range \(!noRangeH) → \(document.inOutRange != nil), playhead "
+        + "\(document.playhead) (was \(heldH)), first responder \(who()), bar open \(pane.isFindOpen), "
+        + "current \(String(describing: currentH)) → \(String(describing: current())) → \(h17)"
+    row("F17", a17 && b17 && c17 && d17 && e17 && f17 && g17 && h17,
+        [saidA, saidB, saidC, saidD, saidE, saidF, saidG, saidH].joined(separator: "; "))
     if pane.isFindOpen { pane.closeFind() }
     view.select(nil)
     spin(0.2)

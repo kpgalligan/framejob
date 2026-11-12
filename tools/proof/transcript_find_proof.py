@@ -2,7 +2,8 @@
 """Find in the Transcript tab (#434, spec §11 TX-37…TX-39): Edit ▸ Find… ⌘F,
 its bar, its marks and the dev tool `transcript_view`'s `find` / `find_step`;
 since #559 and #560 (TX-43…TX-47) ⌘Return selecting the current match and
-Edit ▸ Find… on the Media tab.
+Edit ▸ Find… on the Media tab; since #603 (TX-48) ⌘Return taken at the
+key-equivalent door only in the key window.
 
     python3 tools/proof/transcript_find_proof.py [--only IDS]
     python3 tools/proof/transcript_find_proof.py --mutant NAME
@@ -17,7 +18,8 @@ builds; F1–F16 as its header says (F14 is #558's: the click-to-clip scroll and
 the follow in 27,000 words; F15 is #584's: the follow at the text's ends; F16
 is #583's: the whole text laid out in idle time after a rebuild, and #593's:
 the top word kept across a width change, (g) and (h); F17 is #559's: ⌘Return at
-both of the window's doors; F18 is #560's: Edit ▸ Find… on the Media tab).
+both of the window's doors, and #603's: the key-equivalent door only in the key
+window, (h); F18 is #560's: Edit ▸ Find… on the Media tab).
 
 App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
   Z0  no `Frame Job: ` line; `transcript_view` takes exactly its ten earlier
@@ -49,9 +51,9 @@ App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
       tab of the project with media it runs.
 
 Mutants (`--mutant NAME`, or all with `--mutants`): each anchor occurs once; a
-mutant is caught when every row it names fails. All forty-five are probe
-mutants (a copy of `app/Sources` with the edit); TX-39 and TX-47 say why there
-are forty-five. F15 and F16 print each letter's verdict, and the letter a mutant
+mutant is caught when every row it names fails. All forty-seven are probe
+mutants (a copy of `app/Sources` with the edit); TX-39, TX-47 and TX-48 say why
+there are forty-seven. F15, F16 and F17 print each letter's verdict, and the letter a mutant
 fails is named beside it here: the row failing is the script's verdict, and a
 record reads the named letter's own verdict too.
   return-leaves         K-4 takes Return from the find field (F4)
@@ -105,6 +107,10 @@ record reads the named letter's own verdict too.
   command-return-untaken  ⌘Return is not a kept Return (F17)
   key-equivalent-door-shut  the window's `performKeyEquivalent` takes nothing
                         (F17 a)
+  key-equivalent-any-window  the door takes ⌘Return in a window that is not
+                        key, #603's old behaviour (F17 h)
+  key-test-after-take   the door asks for the key window after `keepReturn`
+                        has acted (F17 h)
   send-event-door-shut  `sendEvent` takes Return and ⇧Return only (F17 b)
   shifted-command-taken ⌘ with ⇧ also selects (F17 f)
   select-keeps-keys     ⌘Return leaves the keys in the field (F17 a)
@@ -258,7 +264,17 @@ MUTANTS = {
     "command-return-untaken": (["F17"], [
         (EW, "        return flags == .command ? .select : nil\n", "        return nil\n")]),
     "key-equivalent-door-shut": (["F17"], [
-        (EW, "        if keepReturn(for: event, taking: [.select]) { return true }\n", "")]),
+        (EW, "        if keyWindowStandIn ?? isKeyWindow, keepReturn(for: event, taking: [.select]) "
+             "{ return true }\n", "")]),
+    "key-equivalent-any-window": (["F17"], [
+        (EW, "        if keyWindowStandIn ?? isKeyWindow, keepReturn(for: event, taking: [.select]) "
+             "{ return true }\n",
+         "        if keepReturn(for: event, taking: [.select]) { return true }\n")]),
+    "key-test-after-take": (["F17"], [
+        (EW, "        if keyWindowStandIn ?? isKeyWindow, keepReturn(for: event, taking: [.select]) "
+             "{ return true }\n",
+         "        if keepReturn(for: event, taking: [.select]), keyWindowStandIn ?? isKeyWindow "
+         "{ return true }\n")]),
     "send-event-door-shut": (["F17"], [
         (EW, "        for event: NSEvent, taking keys: Set<KeptReturn> = [.next, .previous, .select]\n",
          "        for event: NSEvent, taking keys: Set<KeptReturn> = [.next, .previous]\n")]),

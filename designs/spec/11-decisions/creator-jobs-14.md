@@ -110,3 +110,37 @@ recommendations"): #559's and #560's first options, and #442's third.
   issues' decisions share the instrument, which now carries forty-five with TX-39's thirty-four.
   JOB-67 adds a real ⌘Return and a real ⌘F on the Media tab. #442 has no row: its checks are
   `spec_index_proof.py` and `docs_site_proof.py`. Amends TX-39.
+
+## The key-equivalent door asks for the key window (#603, 2026-11-12)
+
+Recorded before the code. #603's first option, chosen by the issue loop's classifier as a defensive
+guard (no owner choice).
+
+- **TX-48 — The editor window's `performKeyEquivalent(with:)` takes ⌘Return only while it is the
+  key window.** If AppKit offered an unclaimed ⌘ key-down to the key equivalents of a window that
+  is not key, then with two documents open and B's find field left as B's first responder, a
+  ⌘Return pressed in A (a new line in A's canvas text editor, K-2) would select and seek in B's
+  transcript and never reach A. Whether AppKit does is not shown: no app is activated here and the
+  probe's window is never key, so the guard is defensive. The window's own key status is asked
+  BEFORE `keepReturn`, because `keepReturn` hands the field the key (`returnPressed`) before it
+  answers; a window that is not key passes the key to `super` untouched. `sendEvent` asks nothing
+  more: a key-down is dispatched only to the window it belongs to. In the key window nothing
+  changes and both doors still take ⌘Return; were the window being typed in ever to answer not
+  key at that moment, its `sendEvent` would still take the key (no menu item or view has
+  ⌘Return, TX-43). **The seam:** the door reads `keyWindowStandIn ?? isKeyWindow`.
+  `keyWindowStandIn` is an internal `Bool?` on `EditorWindow`
+  that the app never sets; a probe sets it, because its window is never key and `EditorWindow` is
+  final (`TranscriptView.laysOutWhenIdle` is the precedent, ungated by `FRAMEJOB_DEV_TOOLS`). A
+  stored stand-in rather than a function the probe calls, so F17 (a) still goes through the real
+  override and the new letter reads the real `isKeyWindow`. **The proof:** F17 (a)–(g) run with the
+  stand-in true, as `NSApplication` presses a key in the key window; new letter **(h)**, the
+  stand-in cleared on the probe's window, which is not key (asserted): ⌘Return offered at the
+  key-equivalent door is answered with `super`'s answer, false, and the selection, the in/out range,
+  the playhead, the field's keys and the bar's current match do not move. Two more mutants:
+  `key-equivalent-any-window` (the door without the guard, the tree before #603: F17 h) and
+  `key-test-after-take` (the guard asked after `keepReturn`: F17 h); `key-equivalent-door-shut`
+  moves to the new line and still fails F17 (a). With TX-47's eleven that is thirteen for #559,
+  #560 and #603 on one instrument, over the root rule's ten for TX-47's reason; the instrument now
+  carries forty-seven. JOB-67 adds the real keys' check: ⌘Return in one project's canvas text
+  editor while a second project's find field holds the keys.
+  Amends TX-43 (the key-equivalent door asks for the key window) and TX-47 (F17 (h), the count).

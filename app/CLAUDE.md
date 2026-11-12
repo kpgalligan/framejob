@@ -1635,7 +1635,9 @@ the key map behind it.
   (spec §11 TX-37 (e), TX-43): `sendEvent` asks `TextFocus.keptReturn` first
   and hands a `TextFocusKeepsReturn` field the key as a `KeptReturn` (Return
   next, ⇧Return previous, ⌘Return select), and the window's
-  `performKeyEquivalent(with:)` asks it too and takes ⌘Return alone, because
+  `performKeyEquivalent(with:)` asks it too and takes ⌘Return alone, and only
+  while the window is key (spec §11 TX-48; `keyWindowStandIn` is the probe's
+  stand-in for `isKeyWindow`, never set by the app), because
   `NSApplication` offers a ⌘ key to the key window's key equivalents before
   `sendEvent`; and `TextFocus.host(of:)` answers an enclosing `TextFocusHosting` view, so a
   press on the find bar's own buttons keeps the typing.
