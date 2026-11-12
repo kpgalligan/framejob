@@ -5,7 +5,9 @@ it on #599 on 2026-11-12 and answered the six questions of §12, which now holds
 the spike, has landed: its record is in §13, and it wrote SA-1..SA-3 in
 `designs/spec/11-decisions/swift-helper.md`. SA1, the package beside the Bun helper, has landed
 with SA-4..SA-7 and SA-12; its record is in §13. SA2, the drive that runs both helpers and
-compares them, has landed; its record is in §13. SA3 is next.
+compares them, has landed; its record is in §13. SA3, the switch, has landed with SA-8..SA-10:
+the app bundles the Swift helper and the notices and the publish runner have left Bun; its
+record is in §13. SA4 is next.
 
 **Source.** The owner, on #599 (2026-11-12): "We're going to replace Bun with the Swift Anthropic
 API we wrote. See ~/devel/doctored for background info. That had the same Typescript Anthropic
@@ -1179,6 +1181,132 @@ is kept out of every name holding `MUTANT`. The diff read follows this record's 
   records it.
 
 ### SA3 — record
+
+**What landed** (2026-11-12, on `a012946f`, as two commits: SA-8..SA-10 first, then the switch).
+SA-8, SA-9 and SA-10 in `designs/spec/11-decisions/swift-helper.md` with their index rows, and
+pointers appended to PUB-4, PUB-10, PUB-12 and P-9. **The build:** `tools/agent/build_helper.sh`
+(Doctored's script with SA0's three rules: the table's content in the key through `find -L`, the
+path record `.framejob-helper-path` beside the stamp and read only on a miss, the tree from
+`$PROJECT_DIR`; the destination removed before SwiftPM runs), and project.yml's "Build Agent
+Helper" step its one line, signed with the hardened runtime and no entitlements; D10/D11 and P8
+now read no entitlements (`dist_check.no_entitlements`, the proxy's reader), with
+`dist_check_mutants.py`'s `extra-entitlement` re-signing with `allow-jit` alone and
+`no-entitlements-dist` gone. **How a helper mutant is built** (SA-8's choice): the persistent
+mutant tree `build/agent-swift-mutant/`, its own `agent/` brought to the tree's by content
+(`Sources/` and `Tests/`, the challenge's objection 1) and its own scratch path, by the same
+script (`tools/proof/agent_helper_build.py`); not the direct `swiftc` builder, never measured
+with the embedded table. **The tree copy:** `tree_copy.make_copy` clones the tree's
+`build/agent-swift` (`cp -cRp`, never a link; `helper_clone=False` for a cold one) and copies
+`agent/` without `node_modules` or `.build`; T2 holds the kit's table as the table's bytes and
+T9 the clone; `proof_app.py` walks `tools/agent/build_helper.sh`; `gate.py`'s `app` step reads
+`tools/agent`, and its `test` bound is 1200 s. **The proofs repointed:** the new
+`tools/proof/agent_build_proof.py` (K1–K10 over toy packages, six mutants, in `make test`);
+`assistant_helper_proof.py` (P0 the one script line, P1 "a failed SwiftPM build fails the app
+build" through the build proof's K8, P2 no entitlements; P5 and `skip-without-bun` gone with the
+Bun step); `spend_proof.py`'s three helper mutants on the mutant builder, `priced-twice` in place
+of `keep-unpriced` (the Swift loop keeps nothing in flight after a reply returns);
+`prices_proof.py`'s T and A on `PricingTests` and `PriceTableTests` through
+`tools/agent/agent_test.py --filter`, and `swift-disagrees` through `FJ_AGENT_PRICES`, which
+`PriceFiles` in the suite now reads; `assistant_settings_proof.py` on `Request.clearTriggerTokens`;
+`docs_bugs_c1_proof.py`'s `no-context-arm` on `Turn.swift`; `mutant_anchors.py`'s pins; the
+drive's B1 on the release helper and its mutants on the mutant builder (its clean-tree guard and
+restore gone); `makefile_env_proof.py`'s fifth row and `--cold-helper`. **B1** (SA-9): the probe
+writes the app's `configure` (`writeConfigure`; `requestBytes` deleted) and B1 runs the release
+helper on it against the stand-in, with the switch `b1-empty-catalog`. **Bearer:** the relay takes
+the dummy as `x-api-key` or `Authorization: Bearer` and forwards the real credential in the
+header it came in; `budget_proof.py`'s R1 posts Bearer and R5 holds the other header and a
+stranger; three proofs' safety sentences reworded (the challenge's objection 2). **The notices and
+the runner** (SA-10): `acknowledgements.py` without npm, Bun, `--strict-bun` or
+`--print-bun-version`, with `package slaude <revision>` from `--agent-scratch` (four `NESTED`
+rows; `.git` skipped in the licence walk), its selftest's N1, N2 and B1 replaced by S1 and S2 and
+`bun-unchecked` by `slaude-missing-ok`; `tools/licenses/bun/` deleted with its PROVENANCE row and
+section; D42/D43 on `agent/Package.resolved`'s pin and refusing another kind of header, with two
+new dist mutants (39 cases); `publish.yml` without `setup-bun` or the pins step's Bun output. The
+texts: spec §7.9b's build paragraph, `docs/developing.md`, the site's open-source page, the
+Makefile's comments, `tools/proof/README.md`, REL-2's source line, and the two comments in
+`agent/` that said the app still shipped the Bun helper. `tools/proof/mc1_spike/mc1_spike.py`'s
+anchor on the old step line re-aimed. **No Slaude change:** the pin lacked nothing the switch
+needed, so no Slaude branch or pull request was opened and no re-pin is owed.
+
+**What was measured.** On the same 12-core, 96 GB host, Xcode 26.2, Swift 6.2.3, with other lanes
+building: no figure is an idle one, and each carries its load averages where its run printed them.
+`df -g /`: 67 GB available at the start, 53 GB at the end (other lanes build on the same volume).
+
+1. **The script on this tree.** Cold: `exit 0`, 82.53 s, SwiftPM's `Build of product
+   'framejob-agent' complete! (80.09s)`, 2,401 files compiled, Slaude from SwiftPM's cache (load
+   7.40 10.49 14.22 → 50.92 25.36 19.62). The helper is 35,610,496 bytes,
+   `flags=0x10002(adhoc,runtime)`, no entitlements, `compaction_instructions` once in its bytes
+   (`dist_check_mutants.py`'s `marker` anchor survives `strip -x`). Again: `skipped`, 1.29 s.
+   On disk: `build/agent-swift` 1.6 GB, `build/agent-swift-mutant` 1.7 GB,
+   `build/agent-swift-test` 2.1 GB.
+2. **SA-8's rules** (`agent_build_proof.py`): 10/10 in 14.4 s. The first mutant runs failed rows
+   past their own on three mutants because the instrument shared state (every toy tree ran tree
+   A's copy of the script, and K6 emptied the clone K5 had already emptied); each toy tree now
+   holds its own copy and K6 its own clone, as `tools/proof/README.md`'s section says. On the
+   final instrument each mutant fails exactly its rows: `path-in-key` K5, `no-table-in-key` K4
+   K5, `tree-from-script` K7, `miss-keeps-foreign` K6 (SwiftPM failed on the moved clone even for
+   the toy, as SA0 item 9 saw for Slaude), `failure-masked` K8, `env-not-scrubbed` K9.
+3. **The app build.** `make app` (Release): `exit 0`, 226.03 s, the helper step `build_helper:
+   skipped` (load 7.58 26.67 27.86 → 20.44 19.28 24.11); after two comment edits in `agent/`, 6.61
+   s with the helper `built` incrementally. **A tree copy's whole app build** (SA0's owed item),
+   by `makefile_env_proof.py`: with the clone, the copy's Release build 350 s, its helper step
+   `skipped`, 5/5 (load 38.27 22.18 24.36 → 25.64 34.54 31.27); without it (`--cold-helper`), 5/5,
+   the build 372 s with the step `built` from nothing (load 25.78 32.98 30.96 → 45.23 34.88 31.24;
+   the step's own seconds are not printed apart from the build's, and the two builds ran beside
+   each other's and `make dist`'s load). Both copies' notices pass the fifth row with no
+   `agent/node_modules`. **A copy whose clone misses:** `docs_bugs_c1_proof.py --mutant
+   no-context-arm` (the arm in the copy's `Turn.swift`): the copy's Release build 365 s inside its
+   1500 s bound, its helper step emptied the clone and built cold (the copy's
+   `.framejob-helper-path` names the copy), `CAUGHT: C1 failed` (load 20.83 30.65 30.23 → 34.88
+   34.37 31.29).
+4. **B1** (SA-9): `the helper's first POST 399,414 bytes + 30,000 for the conversation = 429,414,
+   within the body bound 480,000 (50,586 left)`, 123 tools; the hand mirror it replaces had
+   measured 395,666 bytes of tools and system alone on 2026-11-11 (`assistant_prompt_eval.py`'s
+   note). `b1-empty-catalog`: B1 FAIL, exit 1. The rehearsals' largest bodies through the relay,
+   now Bearer from the Swift helper: compaction 402,782, clearing 401,392, prompt 401,310 bytes.
+5. **SA-10.** The generator over this tree: 109 entries (95 crates, `package slaude
+   4c6c2ca435350741796c3d461720a61e7149b378` with its `LICENSE`, the SDK's `LICENSE` and
+   `LICENSE-MIT`, no `npm`, no `runtime`). The copy's notices (`makefile_env_proof.py`'s fifth
+   row) pass with no `agent/node_modules` in the copy; the same row over the pre-switch Release
+   notices fails on all three counts. `make dist` (266.59 s, load 18.74 → 69.46): `dist_check:
+   47/47` (D10/D11 no entitlements; D42/D43 `109 entries, 95 crates, slaude 4c6c2ca4, 9 fonts`),
+   `published_check: 27/27`, the Distribution build's helper step served by the same stamp;
+   `dist_check_mutants.py` 39/39 in 71.08 s, `acknowledgements-slaude-dropped-release` failing D42
+   and `acknowledgements-bun-listed-dist` D43 alone.
+6. **The stand-in assistant proofs, whole, on Release.** `assistant_helper_proof.py` 5/5 (P0
+   failed over the committed `project.yml`), `spend_proof.py` 21/21 and its three helper mutants
+   each caught, `spend_ui_proof.py` 10/10, `assistant_session_proof.py` 14/14,
+   `assistant_tab_proof.py` 26/26, `assistant_settings_proof.py` 3/3,
+   `assistant_prompt_proof.py`'s F, M and S 18/18 and its rehearsal 25/25,
+   `docs_bugs_c1_proof.py` 35/35, the compaction rehearsal 8/8 and the clearing rehearsal 6/6;
+   the drive 43/43 on the release helper and its eight mutants each caught on the mutant tree,
+   built cold once in 158.0 s and in 7.7–14.8 s after. No proof needed changing for SA-4..SA-6:
+   `spend_proof.py`'s H7 ends `compaction_failed`, since its stand-in summary is plain text, which
+   SA-4's "success needs both" decides and H7 accepts.
+7. **Red runs.** `prices_proof.py --mutant swift-disagrees` 25/27 naming `opus-mixed`;
+   `budget_proof.py` against the relay as committed 20/24 (R1–R4 answered 401); `tree_copy.py`
+   T9 with the clone made a link 8/9; `acknowledgements.py --mutant slaude-missing-ok` S2.
+8. **`make gate`.** `names pass 2s`, `typecheck pass 10s` (its four warnings), `fmt pass 4s`,
+   `lint pass 19s`, `test pass 350s` (B1 `399,414 bytes`, the build proof 10/10, the suite's
+   `Executed 77 tests, with 0 failures`, the drive 43/43 with B1 `skipped`, `budget_proof.py`
+   24/24), `app pass 8s` (the helper step `skipped`; D25, D26 ok), `gate: PASS 395s` (load 14.34
+   28.38 29.26 → 28.59 44.16 37.40).
+
+**What its review found.** The challenge made two objections, both accepted: the mutant tree
+syncs `Tests/` (SwiftPM loads every declared target) and the toy packages carry a test target;
+and the three proofs whose safety sentence said the key leaves only as `x-api-key` say "the
+relay's credential header". The diff read follows this record's build.
+
+**What is owed.**
+- **SA4:** the Bun side, as §9 SA4 lists; with it `agent_helper_drive.py`'s B0 and the Bun half,
+  `assistant_spike/`, `make typecheck`'s tsc, `gate.py`'s `bun --version`, and the root
+  `CLAUDE.md` lines §9 SA4 reserves.
+- **Only a real publish shows** (`docs/developing.md`): SwiftPM fetching and building Slaude
+  inside the Archive and the helper signed with the Developer ID identity and a timestamp, within
+  the job's 60 minutes (Doctored's 279.5 s on the same runner image); P8 and P25 over the exported
+  app.
+- **The live run, after SA4 and before SA5's close** (§12, answer 3): unchanged from SA0's list.
+- **The integrator:** the CLAUDE.md edits in the build notes.
 
 ### SA4 — record
 
