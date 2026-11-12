@@ -349,13 +349,16 @@ agent/
   Package.resolved         committed
   Sources/FrameJobAgentKit/  Doctored's eleven files (Protocol, LineSplitter, Session, Turn,
                            Compaction, Request, History, ContextUsage, ToolResults, ClientFactory,
-                           Log) plus Pricing.swift and PriceTable.swift; each under 400 lines
+                           Log) plus Pricing.swift, PriceTable.swift and PriceRefresh.swift, and
+                           anthropic.json, the symlink to prices/; each under 400 lines
   Sources/framejob-agent/main.swift   the stdin loop and the one stdout writer
   Tests/                   XCTest; no network, dummy keys
   prices/                  as today
   CLAUDE.md                the package's rules (owed at SA1, applied by the integrator)
 tools/agent/build_helper.sh   Doctored's script: scrubbed environment, batches, stamp, strip, sign
-build/agent-swift/         SwiftPM's scratch path (ignored, per worktree)
+tools/agent/agent_test.py     `make agent-test`: the scratch-path guard, then the suite (SA-12)
+build/agent-swift/         SwiftPM's scratch path for the release helper (ignored, per worktree)
+build/agent-swift-test/    the suite's own debug scratch path (ignored, per worktree; SA-12)
 ```
 
 - **Vendored, a package, or copied.** A SwiftPM dependency of `agent/` alone, pinned by exact
@@ -372,8 +375,8 @@ build/agent-swift/         SwiftPM's scratch path (ignored, per worktree)
   `4c6c2ca435350741796c3d461720a61e7149b378`): public, Apache-2.0, Foundation only, one target
   `Anthropic`. SA0 found it has not moved past that revision (its `main` is that revision on
   2026-11-12), and Frame Job pins the same one (§13, SA0 item 10; SA-1).
-- **`make`.** A new `make agent-test` (`swift test` on the scratch path, warnings as errors) is a
-  line of `make test`. `make typecheck` loses its tsc line and gains nothing: the package is
+- **`make`.** A new `make agent-test` (`swift test` on its own scratch path, warnings as errors,
+  SA-12) is a line of `make test`. `make typecheck` loses its tsc line and gains nothing: the package is
   checked by its own build and suite, and W-8's four-warning baseline is about `app/Sources`.
   `make app`, `app-debug` and `dist` build the helper in the same Xcode step, through the new
   script.
@@ -422,6 +425,7 @@ each later one is appended.
 | SA-9 | SA3 | B1 measures the built helper's first POST. Amends P-9 (d). |
 | SA-10 | SA3 | The Acknowledgements and the publish runner, in the commit that switches the build step (§2: the npm reader reads what that step installs): npm and Bun out, Slaude in, `setup-bun` gone. Amends PUB-10 (its npm and Bun sentences and the LGPL risk line) and PUB-12 (`setup-bun`). |
 | SA-11 | SA4 | What the tie to Doctored becomes: the owner's answer 2 (a), Frame Job's package its own, ported once from Doctored at `b524babc`, with no identity rule. Amends AI-15's "`agent/` is one diff with Rasterize" and NM-10. |
+| SA-12 | SA1 | `make agent-test`'s own scratch path, `build/agent-swift-test`, emptied before SwiftPM runs when its marker is missing or names another path, because every lane copies `build/` (§13, SA1's record); SA-8's `build/agent-swift` and its rule untouched. Written by SA1, numbered after the four reserved here. |
 
 ## 9. Phases
 

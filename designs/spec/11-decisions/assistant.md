@@ -101,6 +101,10 @@ in §6).
   changed in Settings, and with "Clear old tool results" on, the API's clearing is a second
   rewrite — of what the model sees in a request past 150 000 tokens, possibly mid-turn, not of
   the helper's history. Each clearing breaks the prompt cache once.
+  **Amended by SA-4** (2026-11-12, road map "swift-helper"): from that road map's switch (SA3),
+  compaction is the Swift helper's explicit rule (`Compaction.swift`, `Turn.swift`) in place of the
+  Tool Runner's in `agent/src/main.ts`: a final reply's unrun tool calls are answered at once, no
+  summary is requested after such a reply, and an empty summary is a failure, never a swap.
 - **AI-10 — Each tool call the assistant makes is its own undo step,** exactly as an MCP call
   is. A turn is not grouped, and the Edit menu names the step as it would for the same call
   from MCP (§6.4). Risk accepted: a ten-call turn is ten Undos.
@@ -127,6 +131,9 @@ in §6).
   variable cannot be persisted in the app's defaults, which is R6-9 (c)'s reason. Risk
   accepted: a person who exports it sends their environment's key, and only that, to the
   server it names.
+  **Amended by SA-5** (2026-11-12, road map "swift-helper"): from that road map's switch (SA3),
+  `api_base` is read by the Swift helper's `Protocol.swift` in place of the shared `protocol.ts`;
+  what it means, and where the app takes it from, do not change.
 - **AI-14 — A selection change that is not a click on a clip leaves the Assistant tab
   showing; a click on a clip still shows Clip.** The inspector's switch to Clip on a changed
   selection (`InspectorViewController.refresh(isLive:)`) runs only from the Media and Document
@@ -240,6 +247,8 @@ in §6).
   `FrameJobAssistantAutoCompact`; `ReelcutAssistantAutoCompactTokens` is now
   `FrameJobAssistantAutoCompactTokens`; `ReelcutAssistantClearToolResults` is now
   `FrameJobAssistantClearToolResults`.
+  **Amended by SA-4** (2026-11-12, road map "swift-helper"): from that road map's switch (SA3),
+  `CLEAR_TRIGGER_TOKENS` is the Swift helper's `Request.clearTriggerTokens`, still 150 000.
 - **AI-21 — The ask-first question names the file the tool will write, covers every path the
   model chose, and is not put for a call that can only be refused on its path** (docs bugs c1,
   #461, #462, #494; amends AI-7). (a) `new_project`, `render_frame` and `render_graphic` are
