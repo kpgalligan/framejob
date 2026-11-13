@@ -51,9 +51,9 @@ extension AgentServer {
     /// names, so a test can diff it or a human can open it. The block is a
     /// COPY (`FrameBlock`, spec §11 PR-22): an 8-bit PNG of a deep frame and of
     /// a HEIC, unless `full_depth_image` asks for the file's own bytes, with one
-    /// sentence before the last saying so, and drawn smaller when its base64
-    /// would pass the API's image limit, with one more (PR-23); the file is
-    /// what it always was.
+    /// sentence before the last saying so; it is the file's size and never
+    /// scaled, whatever its size in bytes (PR-25); the file is what it always
+    /// was.
     ///
     /// **The write is `FrameWriter`'s, and that is the point of it** (road map
     /// 2's phase 7a). This handler used to hold its own
@@ -240,8 +240,7 @@ extension AgentServer {
             text += " " + sentence
         }
         // What the model sees (spec §11 PR-22): the file's bytes, or an 8-bit PNG copy of a deep
-        // frame or a HEIC, drawn smaller when it would pass the API's image limit (PR-23); the
-        // copy and the scale each say so here.
+        // frame or a HEIC, which says so here; at the file's size and never scaled (PR-25).
         let block = FrameBlock.block(of: image, format: format, file: data, fullDepth: fullDepth)
         if let note = block.note {
             text += " " + note

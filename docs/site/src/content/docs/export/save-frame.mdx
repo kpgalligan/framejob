@@ -81,7 +81,7 @@ A graphic that fails draws its error card in the saved frame, and a clip whose c
 
 ## The same still for an agent
 
-`render_frame` writes the same bytes as Save Frame for the same frame and format. It returns the picture itself as well as a file, an 8-bit PNG copy of it when the file is a 16-bit PNG or a HEIC, scaled down when it would be larger than the 5 MB limit on one image, and with no path it writes a temporary file and names it. The format comes from `format` if you pass it, otherwise from the path's extension, otherwise PNG.
+`render_frame` writes the same bytes as Save Frame for the same frame and format. It returns the picture itself as well as a file, an 8-bit PNG copy of it when the file is a 16-bit PNG or a HEIC, at the file's size, and with no path it writes a temporary file and names it. The format comes from `format` if you pass it, otherwise from the path's extension, otherwise PNG.
 
 It also reports what Save Frame keeps quiet: when a graphic in the frame warned or failed it names the graphic, its frame and the message, and it names a cursor file it couldn't read. Like Save Frame, it waits 30 seconds for masks and says which clip it drew whole. An agent can ask for more than the menu offers, such as a timecode burn-in, an ungraded picture or scope measurements. See [Check the picture: render_frame](/mcp/render-frame/).
 

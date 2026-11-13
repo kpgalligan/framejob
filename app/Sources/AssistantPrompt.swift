@@ -7,7 +7,7 @@ import Foundation
 ///
 /// **Every fact here is interpolated from the code that decides it, or
 /// checked against it by `make test`** (`assistant_prompt_proof.py --probe`,
-/// rows F1–F8): a backticked token must be a tool, an argument or a key of
+/// rows F1–F9): a backticked token must be a tool, an argument or a key of
 /// `get_project`'s answer; the timescale is `ReelTime.perSecond`; the
 /// ask-first and conditional withheld tools are read from
 /// `AssistantToolTable.rows`; the id kinds are checked against a fixture;
@@ -124,12 +124,14 @@ enum AssistantPrompt {
             + "`ripple_delete_ranges` call.",
         "`render_frame` renders one frame of the finished timeline through the compositor an "
             + "export uses, at the playhead unless you pass `t`, and answers an 8-bit image of "
-            + "it and the PNG's path. Look before and after a visual edit, and pass `max_width` "
-            + "to keep the image small: past 2576 px on its long edge an image is scaled down "
-            + "before you see it, and once the conversation holds more than 20 images one over "
-            + "3000 px on a side can be refused. The height follows the width, so on a tall "
-            + "canvas pass a smaller `max_width`. Never pass `full_depth_image`: its image can "
-            + "be too large for you to be sent.",
+            + "it and the PNG's path. Look before and after a visual edit. The image is sent at "
+            + "the size you ask for and Frame Job never scales it, so pass `max_width` to keep "
+            + "it small: an image whose base64 passes 10 MB is refused, as a detailed 4K frame's "
+            + "can, past 2576 px on its long edge an image is scaled down before you see it, and "
+            + "once the conversation holds more than 20 images one over 3000 px on a side can be "
+            + "refused. The height follows the width, so on a tall canvas pass a smaller "
+            + "`max_width`. Never pass `full_depth_image`: its image can be too large for you to "
+            + "be sent.",
         askFirstParagraph,
         "Reply in a sentence or two. Never repeat tool output the person can already see.",
     ].joined(separator: "\n")

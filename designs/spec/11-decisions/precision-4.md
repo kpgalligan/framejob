@@ -274,7 +274,8 @@ into a sibling file.
   - Amended by PR-23: a default block whose base64 would pass the limit is drawn smaller until it
     fits, so "Not done: bounding an 8-bit block by size" and "Same size as the file" no longer
     hold for such a block. Amended by PR-24: 5,242,880 is Amazon Bedrock's limit, the smaller (the
-    Anthropic API's own is 10 MB of base64), not the Anthropic API's.
+    Anthropic API's own is 10 MB of base64), not the Anthropic API's. Amended by PR-25: PR-23's
+    scale is taken out, so both hold again for every block.
 
 - **PR-23 — `render_frame`'s image block is scaled down alone when its base64 would pass the
   API's limit (owner, 2026-11-12, #610: option (b), "#610: b").**
@@ -348,6 +349,8 @@ into a sibling file.
     caller sizes its own image (`max_width`) and that the description says what the API does with
     a large one; the 5 MB bound stays because it is Amazon Bedrock's, the smaller (10 MB on the
     Anthropic API), not the Anthropic API's as the rule above says.
+  - Superseded by PR-25 (owner, 2026-11-13, #618: "Take it out"): the scale is removed and no
+    block is scaled.
 
 - **PR-24 — `render_frame`'s image block is not bounded by its sides; the description says what
   the API does with a large image, and `max_width` is the caller's control (owner, 2026-11-13,
@@ -392,3 +395,79 @@ into a sibling file.
     missing, the attribution in none, the bounds (16, 8192), and BK5 and Z1 passing beside it.
   - No op, recipe, FFI, format, schema or behaviour change; `RC_FORMAT_VERSION` is unchanged.
   - Amends PR-22 and PR-23 (whose limit it is, and the sides deliberately not bounded).
+  - Amended by PR-25: PR-23's scale by size is taken out, so "PR-23's scale by size stands as it
+    is" and "the 5 MB bound stays" no longer hold; the sentences it wrote apart from the
+    scale-down sentence now stand alone.
+
+- **PR-25 — `render_frame`'s image block is never scaled: PR-23's scale to fit is taken out, and
+  the block is the frame at the caller's size (owner, 2026-11-13, #618: "Take it out").**
+  - The owner's words, on #612: "If the tool description describes the situation, leave it
+    alone. Scaling images automatically may not be what the caller actually wants. MCP callers
+    need to be smart enough to handle these situations." Asked whether #610's automatic downscale
+    (PR-23, their earlier choice (b)) should then stay or go: "Take it out".
+  - The rule: the image block is PR-22's again, at the file's size, which is `max_width`'s or the
+    canvas's: the file's bytes for an 8-bit PNG and a JPEG, the 8-bit PNG copy of a deeper PNG and
+    of any HEIC, and with `full_depth_image: true` the file's bytes and type. Frame Job bounds
+    neither the block's bytes nor its sides: no scale, no cap, no refusal and no new argument take
+    PR-23's place. A block whose base64 is past 5 MB, or past 10 MB, is sent as it is.
+  - Removed (`FrameBlock`): the size test, the scale and its loop, the scaled draw, the sentence
+    "The image here is scaled down to <w>×<h> px to fit the API's 5 MB image limit; the file is
+    not scaled." and the 5,242,880 constant. Kept: the copy and its sentence (PR-22),
+    `full_depth_image`, the file, its path, Save Frame…, and "Written to <path>." last, so a call
+    whose block PR-23 scaled answers PR-22's text again.
+  - One account in every text — `render_frame`'s description, `max_width`'s and
+    `full_depth_image`'s descriptions, the site's `render_frame` pages and Save Frame's paragraph
+    on the tool, and the assistant's prompt: the limits are the API's (PR-24's: 5 MB of base64 an
+    image on Amazon Bedrock and 10 MB on the Anthropic API; refused past 8000 px a side; a stricter
+    limit past 20 images in a request, which 3000 px a side stays under; downscaled past 2576 px on
+    the long edge by the newest models); Frame Job doesn't scale or cap the image to meet them, on
+    its bytes or its sides; `max_width` is the caller's control. The prompt says the image is sent
+    at the size asked for and Frame Job never scales it, so the assistant passes `max_width`.
+  - What shows the in-app assistant stays under the limits, and where it does not:
+    - Its helper posts to the Anthropic API (`ClientFactory`'s default base URL,
+      `https://api.anthropic.com`; `RC_ASSISTANT_BASE_URL` is the only override, and nothing in
+      the app or the helper names Bedrock) and forwards the block as given (`ToolResults.swift`),
+      so its limit on one image is 10 MB of base64, 10,485,760 bytes.
+    - The prompt asks it to pass `max_width` to keep the image small, says Frame Job never
+      scales it, and says never to pass `full_depth_image`. `assistant_prompt_probe.swift`'s F9
+      holds the prompt's `render_frame` paragraph to `max_width` and "never scales", and to
+      `max_width` being an argument `render_frame` publishes; M7 drops the clause and F9 fails.
+    - Unscaled default blocks measured, one image each, no `max_width`: generated 1080p footage
+      under a graphic 2,985,988 (BK1, PR-22); the owner's 1080p footage 2,326,800 to 3,210,716
+      (PR-22's DGs); generated 3840×2160 footage (`testsrc2` with noise, `blk2160`) under a
+      graphic and alone, BKk's and BKp's below. All are under 10,485,760.
+    - Not covered, and said so: no real 3840×2160 camera frame was measured (the iPhone clip's
+      1080p block is 3,210,716, and a 4K frame has four times the pixels, so its block could fall
+      either side of 10 MB); a noise-like 3840×2160 frame asked with no `max_width` (BKj, a
+      JPEG) is past 10 MB, and the API refuses it; and every figure is one image, while the
+      helper resends a conversation's earlier frames until it compacts (PR-24), so several large
+      frames add up in one request. In each case what keeps the assistant under is the prompt's
+      `max_width` alone, by the owner's choice that the caller sizes its own image.
+  - The check: `raster_dither_proof.py` BKk, BKp and BKj, PR-23's 3840×2160 rows, now hold the
+    block NOT scaled: the file 3840×2160 with its base64 over 5,242,880 (the premise); the block
+    exactly 3840×2160 with its base64 over 5,242,880 (BKj's over 10,485,760 too), BKp's and BKj's
+    the file's bytes, BKk's the 8-bit copy of the frame (64×36 gap ≤ 2 levels); no "scaled down"
+    in the text, the copy sentence (BKk) or none (BKp, BKj) directly before "Written to <path>.".
+    BKd adds that the description says "on its bytes or its sides", that `max_width`'s names
+    5 MB and 10 MB, and that none of the three descriptions says "scaled down" or "never scaled".
+  - Seen first (Debug at e7e525e8, the spec and the proof edited, the app untouched): BKk's
+    block 3038×1709 (base64 4,469,860), BKp's 2984×1679 (4,456,620), BKj's 2243×1262
+    (3,242,680), each with the scale sentence, so all three failed; BKd failed on the missing
+    phrases and the scale words; the prompt probe's F9 failed on HEAD's prompt ("never scales"
+    not in its `render_frame` paragraph); BK1, BK2, BK3 and Z1 passed.
+  - With it (Debug; the Release run in `tools/proof/README.md`): BKk's block an 8-bit PNG of
+    3840×2160, base64 6,782,656, the frame (64×36 gap 0.269), with the copy sentence; BKp's the
+    8-bit file's bytes, 7,031,532; BKj's the JPEG file's bytes, 12,441,372, past 10,485,760 too;
+    no scale sentence in any; BKd passing; BK1 (2,985,988), BK2 (the file, 6,406,520) and
+    BK3–BK6 as before; the prompt probe 16/16.
+  - Mutants (Debug tree copies, each caught): `block-scaled-to-fit` (a default block past
+    5,242,880 drawn at half its sides: BKk, BKp and BKj fail on the block alone, BK1–BK3 pass),
+    `scale-sentence-said` (the answer saying such a block is scaled down: BKk, BKp and BKj fail on
+    the sentence alone, BK1 and BK3 pass), `description-says-scaled` (BKd fails, BK5 passes), and
+    the prompt probe's M7. PR-22's `block-is-the-file`, `full-depth-ignored` and
+    `hlg-block-not-copied` run again, since the function their anchors are in was renamed, each
+    caught; PR-23's seven went with the code.
+  - No op, recipe, FFI, format, schema or catalog argument change; `RC_FORMAT_VERSION` is
+    unchanged.
+  - Supersedes PR-23. Amends PR-22 (its "Not done: bounding an 8-bit block by size" and "Same
+    size as the file, so `max_width` bounds both" hold again for every block) and PR-24 (above).

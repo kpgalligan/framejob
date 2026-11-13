@@ -2,7 +2,7 @@
 """The assistant's prompt texts, live context and evaluation — road map 12
 A3 (spec §11 AI-7, AI-9, AI-15).
 
-  F1–F8, M1–M6  the probe (`assistant_prompt_probe.swift`, compiled over
+  F1–F9, M1–M7  the probe (`assistant_prompt_probe.swift`, compiled over
           `app/Sources` minus `main.swift` through `swift_build.py`, reused
           when every input is byte-identical to a cached build's): the texts
           in `AssistantPrompt.swift` checked against the code that decides
@@ -85,8 +85,8 @@ SOURCES = os.path.join(ROOT, "app", "Sources")
 PROBE_SWIFT = os.path.join(HERE, "assistant_prompt_probe.swift")
 LIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
 WALL_BUILD, WALL_RUN, WALL_TURN = 900, 300, 60
-PROBE_ROWS = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "M1", "M2", "M3", "M4", "M5",
-              "M6"]
+PROBE_ROWS = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "M1", "M2", "M3", "M4",
+              "M5", "M6", "M7"]
 EVAL_ROWS = ["E1", "E2", "E3", "E4", "E5", "E6", "H", "K"]
 SEND = "AssistantPrompt.message(text, document: document)"
 # The mutants: a file from the repo root, the text that must occur there once, and its

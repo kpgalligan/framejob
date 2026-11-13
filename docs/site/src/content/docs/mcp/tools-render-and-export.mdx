@@ -28,16 +28,15 @@ With no arguments, it draws the frame under the playhead at the canvas's size an
 | --- | --- |
 | The moment | [`t`](/mcp/render-frame/#t), in ticks. Default: the playhead. |
 | The file | [`path`](/mcp/render-frame/#path), [`format`](/mcp/render-frame/#format) (`png`, `jpeg` or `heic`) and [`max_width`](/mcp/render-frame/#max_width) (16 to 8192 pixels). |
-| The image | [`full_depth_image`](/mcp/render-frame/#full_depth_image): the file itself, not the 8-bit PNG copy a 16-bit PNG or a HEIC gets, and never scaled down. |
+| The image | [`full_depth_image`](/mcp/render-frame/#full_depth_image): the file itself, not the 8-bit PNG copy a 16-bit PNG or a HEIC gets. |
 | What's drawn | [`burn_in_timecode`](/mcp/render-frame/#burn_in_timecode), [`ungraded`](/mcp/render-frame/#ungraded), [`sdr_version`](/mcp/render-frame/#sdr_version) and [`selection`](/mcp/render-frame/#selection). |
 | Scopes | [`waveform`, `parade` and `histogram`](/mcp/render-frame/#waveform-parade-and-histogram), [`vectorscope` and `vectorscope_zoom`](/mcp/render-frame/#vectorscope-and-vectorscope_zoom). Each scope also writes a JSON file beside the image. |
 
 The switches in the **View** menu never reach this tool, so an agent asks for those pictures here, whatever a person has switched on.
 
-It returns an image and a text block. The image is the file, or an 8-bit PNG copy of it when the file is a 16-bit PNG or a HEIC. An image that would be larger than the 5 MB limit on one image is scaled down until it fits, and the file isn't. An image's sides aren't capped: see [Image limits](/mcp/render-frame/#image-limits) for what the API takes and how `max_width` keeps an image inside it. The text gives the moment and the sizes, and its last sentence is "Written to `<path>`." Before that sentence it can add what each scope measured, or a note about:
+It returns an image and a text block. The image is the file, or an 8-bit PNG copy of it when the file is a 16-bit PNG or a HEIC, and it's always the file's size: Frame Job doesn't scale or cap it, by its size or by its sides. See [Image limits](/mcp/render-frame/#image-limits) for what the API takes and how `max_width` keeps an image inside it. The text gives the moment and the sizes, and its last sentence is "Written to `<path>`." Before that sentence it can add what each scope measured, or a note about:
 
 - An image that is an 8-bit copy of the file.
-- An image [scaled down to fit](/mcp/render-frame/#full_depth_image) the API's 5 MB limit, with its size.
 - A JPEG that flattened a transparent canvas onto black.
 - A [graphic](/mcp/render-frame/#graphic-problems-in-the-answer) that warned or failed.
 - A recorded cursor that couldn't be drawn.

@@ -25953,6 +25953,69 @@ With it, Debug and then Release (after the gate's `make app`): nothing missing, 
 in none of the three, the bounds (16, 8192); BK5, BKd and Z1 passed (3/3 each), and the texts
 read back are the ones in `AgentCatalog+Render.swift`.
 
+## Issue #618 — `render_frame`'s image block never scaled: PR-23's scale to fit taken out (`raster_dither_proof.py` BKk, BKp, BKj, BKd; `assistant_prompt_proof.py --probe` F9, M7; three mutants; spec §11 PR-25)
+
+**What it proves.** The owner took PR-23's automatic downscale back out ("Take it out"): the image
+block is PR-22's again, at the file's size (`max_width`'s or the canvas's), whatever its size in
+bytes, and the answer holds no scale sentence. The texts say one thing: the limits are the API's
+(5 MB of base64 on Amazon Bedrock, 10 MB on the Anthropic API, PR-24's side limits), Frame Job
+doesn't scale or cap the image to meet them, and `max_width` is the caller's control. The
+assistant's prompt, which is now what keeps its images under, asks for `max_width` and says Frame
+Job never scales the image.
+
+**Rows.** #610's three 3840×2160 frames keep their names, fixtures and premise (the file
+3840×2160, its base64 over 5,242,880) and now hold the block NOT scaled (`unscaled_row`): BKk
+(`blk2160` under `flat`) the block an 8-bit PNG of exactly 3840×2160, its base64 over 5,242,880,
+the frame (64×36 gap ≤ `THUMB_BOUND`), the copy sentence directly before "Written to <path>.";
+BKp (`blk2160` alone) the block the file's bytes, `image/png`, 3840×2160, over 5,242,880, no copy
+sentence; BKj (`noise2160.png` as `format: "jpeg"`) the block the file's bytes, `image/jpeg`,
+3840×2160, over `API_DIRECT_LIMIT` (10,485,760) too; none of the three answers holds "scaled
+down", and each still ends "Written to <path>.". BKd adds "on its bytes or its sides" to
+`SIDES_SAID`, 5 MB and 10 MB to `WIDTH_SAID`, and `SCALE_GONE` ("scaled down", "never scaled"),
+absent from the description, `max_width`'s and `full_depth_image`'s. The prompt probe's F9 holds
+the system prompt's `render_frame` paragraph to `max_width` and "never scales", and `render_frame`
+to publishing `max_width`; M7 replaces "never scales" and F9 must fail.
+
+    python3 tools/proof/raster_dither_proof.py --only BK1,BK2,BK3,BK4,BK5,BK6,BKk,BKp,BKj,BKd,Z1
+    python3 tools/proof/raster_dither_proof.py --app-mutant NAME --base <an empty folder: the BK rows read none>
+    python3 tools/proof/assistant_prompt_proof.py --probe
+
+**Recorded** (2026-11-12). Before the change (Debug at e7e525e8, the spec and the proof
+edited, `app/Sources` untouched; `--only BK1,BK2,BK3,BKk,BKp,BKj,BKd,Z1`, 4/8): BKk's block
+3038×1709, base64 4,469,860, BKp's 2984×1679, 4,456,620, BKj's `image/jpeg` 2243×1262,
+3,242,680, each with the scale sentence, so all three FAILED; BKd FAILED on "on its bytes or its
+sides" missing, 5 MB and 10 MB missing from `max_width`'s, "scaled down" in the description and
+"never scaled" in it and in `full_depth_image`'s; BK1, BK2, BK3 and Z1 passed. The prompt probe
+on HEAD's prompt (the edited one put back after): F9 FAILED ("never scales" not in the 593
+characters of the paragraph), 15/16, M7 caught. With it (Debug, 11/11 with BK1–BK6 and Z1):
+BKk's block an 8-bit PNG of 3840×2160, base64 6,782,656 beside the 16-bit file's 14,241,128,
+64×36 gap 0.269, the copy sentence then "Written to <path>.", 1.25 s; BKp's the file's bytes,
+base64 7,031,532, 0.32 s; BKj's the JPEG file's bytes, base64 12,441,372 (over 10,485,760 too),
+0.39 s; no "scaled down" in any; BKd nothing missing and no scale words; BK1's block 2,985,988 and
+BK2's the file, 6,406,520, as before. The prompt probe 16/16 (F9 on a 735-character paragraph,
+the system prompt 3856 of 6000). On Release (after the gate's `make app`), the whole run with
+no `--base` and no `--control` 32/49: BKk, BKp, BKj and BKd passed with the Debug figures (BKk
+1.26 s, BKp 0.32 s, BKj 0.43 s), BK1–BK6 and Z1 passed, and the seventeen failing are B1–B4b, F1
+and F2 (PR-13's `--control`) and E1, D3, D4, G3, GEa–GEd, GMe and DGj (a base capture), as in
+#610's run, which scored 31/48 before #612 added BKd.
+
+**Mutants** (2026-11-12, Debug tree copies, `--base` an empty folder). Each caught.
+`block-scaled-to-fit` (a `block` wrapping the real one draws a default block whose base64 would
+pass 5,242,880 at half its sides) fails
+BKk, BKp and BKj on the block alone (1920×1080: base64 1,863,992, 1,918,056 and an `image/jpeg`
+of 2,242,376; their sentences pass), with BK1, BK2 and BK3 passing beside them;
+`scale-sentence-said` (the answer saying "The image here is scaled down to fit." for a block
+over 5,242,880) fails BKk, BKp and BKj on the sentence alone (each block 3840×2160 and the bytes
+above), with BK1 and BK3 passing; `description-says-scaled` (the scale-down sentence back in
+the description) fails BKd ("scaled down" in `render_frame`'s), with BK5 passing. Run again,
+because the function their anchors are in was renamed: `block-is-the-file` fails BK1 (the
+16-bit file, base64 6,406,520, no copy sentence) and BK4 (`image/heic`); `full-depth-ignored`
+fails BK2 (an 8-bit PNG, base64 2,985,988) and BK4; `hlg-block-not-copied` fails BK6 (the
+16-bit file, base64 3,305,516) with BK1–BK5 passing. `block-always-recoded` and
+`heic-block-follows-file` (anchors in `copies`, untouched) were not rebuilt: `mutant_anchors.py`
+counts every `APP_MUTANTS` anchor exactly once (26 mutants, 27 anchors). PR-23's seven went
+with the code.
+
 ## Codec export C0 — the bundled encoders' link (`codecs_proof.py` L1–L3; `tools/codecs/build_codecs.py --selftest`; spec §11 CX-4, CX-5)
 
 `tools/codecs/build_codecs.py` (`make codecs`, and project.yml's "Build Codecs"

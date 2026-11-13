@@ -1434,8 +1434,8 @@ Needs your own Anthropic API key (Setup 3).
 
 **AS-12 — The assistant looks at a 4K frame**
 - **Do:** With a real key, in a 3840 × 2160 project of camera footage (or 8-bit footage with a title over it), ask the assistant to look at the frame at the playhead without making it smaller (no `max_width`) and say what it shows.
-- **Expect:** its tool line shows `render_frame` done, and it describes the picture, with no error from the API about the image's size. The tool's text says the image was scaled down to fit and to what size, and the file it names is still 3840 × 2160.
-- **Source:** #610 (spec §11 PR-23); `raster_dither_proof.py` BKk, BKp and BKj measure the scaled image against the API's limit, not what the API does with it.
+- **Expect:** its tool line shows `render_frame` done; the tool's text has no sentence about scaling the image, and the file it names is 3840 × 2160, as is the image sent. Then either it describes the picture, or the API refuses the image for its size (its base64 over 10 MB): that refusal is the API's limit, which Frame Job leaves to the caller, not a failure of this row. Note which, and the frame's footage, since no real 4K camera frame has been measured. After a refusal, press Clear before the next row: the conversation keeps the image and sends it again.
+- **Source:** #618 (spec §11 PR-25, superseding #610's PR-23); `raster_dither_proof.py` BKk, BKp and BKj measure the unscaled image against the API's limits, not what the API does with it.
 
 ## Agent connections
 

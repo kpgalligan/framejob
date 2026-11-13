@@ -23,7 +23,7 @@ With no arguments it draws the frame under the playhead at the canvas's size and
 { "t": 1200000, "path": "/tmp/shot.png", "max_width": 960 }
 ```
 
-The picture comes back two ways: as an image the model can see, and as a file on disk. The image is an 8-bit PNG copy when the file is a 16-bit PNG or a HEIC, so it stays small enough to send, and the file keeps the frame's full depth. An image that would still be larger than the 5 MB limit on one image is scaled down until it fits, and the file isn't. See [`full_depth_image`](#full_depth_image) and [Image limits](#image-limits). The text beside it says what was drawn and ends by naming the file:
+The picture comes back two ways: as an image the model can see, and as a file on disk. The image is an 8-bit PNG copy when the file is a 16-bit PNG or a HEIC, and the file keeps the frame's full depth. The image is always the file's size: Frame Job doesn't scale it down to fit the API's limits, so `max_width` is how you keep it small. See [`full_depth_image`](#full_depth_image) and [Image limits](#image-limits). The text beside it says what was drawn and ends by naming the file:
 
 ```
 Frame at 1200000 ticks of a 1920×1080 px canvas, rendered at 960×540 px. Written to /tmp/shot.png.
@@ -83,9 +83,9 @@ An explicit `format` wins, and the path's extension is replaced rather than adde
 
 ### `max_width`
 
-Caps the image's width in pixels, from 16 to 8192. The picture keeps its shape and is never made larger than the canvas, so the height follows the width. Leave it out for the canvas's own size. Without it, the file is the canvas's size, and the image the model sees is scaled down only when it would be larger than the API's 5 MB limit. See [`full_depth_image`](#full_depth_image).
+Caps the image's width in pixels, from 16 to 8192. The picture keeps its shape and is never made larger than the canvas, so the height follows the width. Leave it out for the canvas's own size. Without it, the file and the image the model sees are both the canvas's size.
 
-It's also how you keep an image inside the API's limits on its sides, which Frame Job doesn't enforce. See [Image limits](#image-limits).
+It's how you keep an image inside the API's limits, on its size and on its sides, which Frame Job doesn't enforce. See [Image limits](#image-limits).
 
 A smaller frame is quicker to send and to look at. The [scopes](#measure-the-frame) measure the frame as written, so their counts cover fewer pixels too.
 
@@ -95,9 +95,9 @@ Some frames are written deeper than 8 bits. A PNG of a frame that shows a graphi
 
 By default the image the model sees is an 8-bit PNG copy of the frame whenever the file is a 16-bit PNG or a HEIC of any depth, and the text says so just before its last sentence: "The image here is an 8-bit PNG copy of the 16-bit PNG file." or "… of the HEIC file." An 8-bit PNG, and a JPEG, come back as the file itself, and the text says nothing more.
 
-The image is the file's size unless it would be larger than the 5 MB limit on one image, as a 3840 × 2160 frame's can be. Then it's drawn smaller until it fits, keeping its shape: a PNG's image stays an 8-bit PNG, and a JPEG's stays a JPEG. The file isn't scaled. The text adds a sentence before its last, after the copy's sentence when there is one, for example: "The image here is scaled down to 3038×1709 px to fit the API's 5 MB image limit; the file is not scaled."
+The image is always the file's size. A 3840 × 2160 frame's image can be larger than the 5 MB limit on one image, and Frame Job sends it as it is. Pass `max_width` to make it smaller.
 
-Pass `full_depth_image: true` to get the file itself as the image instead: the 16-bit PNG, or the HEIC. The file written is the same either way, and this image is never scaled.
+Pass `full_depth_image: true` to get the file itself as the image instead: the 16-bit PNG, or the HEIC. The file written is the same either way.
 
 :::caution
 A 16-bit PNG of a 1080p frame of camera footage can be larger than the 5 MB limit on one image, and `full_depth_image` sends it as it is. Pass `max_width` with `full_depth_image` to keep it under.
@@ -114,7 +114,7 @@ The model's API has limits on the images it takes. They're the API's, not Frame 
 | More than 20 images in one request | Applies a stricter limit to each image, which 3000 pixels a side stays under everywhere. A long conversation can pass 20, because its earlier frames count. |
 | Detail | The newest Claude models scale an image down when its long edge is over 2576 pixels, so a larger one shows no more. |
 
-Frame Job doesn't cap or scale the image's sides for these. `max_width` is your control: it sets the width, and the height follows the picture's shape, so on a tall canvas pick a width that brings the height under as well.
+Frame Job doesn't cap or scale the image for these, by its size or by its sides. `max_width` is your control: it sets the width, and the height follows the picture's shape, so on a tall canvas pick a width that brings the height under as well.
 
 ## Change what's drawn
 

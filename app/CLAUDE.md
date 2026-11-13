@@ -3335,12 +3335,10 @@ the key map behind it.
 - `FrameBlock.swift` — `render_frame`'s image block (spec §11 PR-22): the file's bytes for an
   8-bit PNG and a JPEG, an 8-bit PNG copy of a 16-bit PNG and of any HEIC (the labelled frame
   drawn at its size in its own colour space, PNG with no properties) unless
-  `full_depth_image`, and the sentence a copy adds; a default block whose base64 would pass
-  5,242,880 bytes drawn smaller from the labelled frame until it fits (`scaledDown`: high-quality
-  interpolation, the height `Exporter.scaledSize`'s, at most 16 attempts, the unscaled block when
-  none fits), its type kept (a JPEG's a JPEG, any other an 8-bit PNG), with the sentence saying to
-  what size (spec §11 PR-23); `full_depth_image` never scaled; `mimeType` of a file's bytes. Pure: no
-  AppKit, no file read; `AgentServer+Render.swift` hands it the frame and the file's bytes.
+  `full_depth_image`, and the sentence a copy adds; at the file's size, never scaled or capped,
+  on its bytes or its sides (spec §11 PR-25, which took PR-23's scale out); `mimeType` of a
+  file's bytes. Pure: no AppKit, no file read; `AgentServer+Render.swift` hands it the frame and
+  the file's bytes.
 
 **Captions.** A caption is an ordinary text clip, which is what makes burn-in
 free.
@@ -4763,9 +4761,10 @@ free.
   bundled files, so they can interpolate `ReelTime.perSecond`,
   `AssistantToolTable.rows` (the ask-first and conditional withheld rows)
   and `AssistantLiveContext.tag`, and `assistant_prompt_proof.py --probe`
-  (rows F1–F8, in `make test`; F7 also holds `"none"`/`"null"` in double
+  (rows F1–F9, in `make test`; F7 also holds `"none"`/`"null"` in double
   quotes and the no-scope word to the block's, F8 each ask-first row's reason
-  to a write) fails the build's tests when a backticked
+  to a write, F9 the `render_frame` paragraph to `max_width` and "never
+  scales", spec §11 PR-25) fails the build's tests when a backticked
   token is not a tool, an argument or a `get_project` key, a withheld tool
   is named, an id kind or the timescale is wrong, `searchTopics` does not
   cover the assistant's catalog but the core tools exactly once, a text
