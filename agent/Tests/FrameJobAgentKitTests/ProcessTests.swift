@@ -32,9 +32,14 @@ final class ProcessTests: XCTestCase {
         let status: Int32
     }
 
-    /// Writes `lines`, then plays the app: each tool_request is answered with `answer`'s
-    /// result JSON. After `turn_finished` it closes stdin and waits for the exit.
-    private func run(_ lines: [String], answer: (String) -> String = { _ in "null" }) throws -> Run {
+    /// Writes `setup` (the lines up to `configure`), reads until the Models API lookup's
+    /// `context_usage` (before a `send`, nothing else emits one), then writes `send` and plays
+    /// the app: each tool_request is answered with `answer`'s result JSON. After
+    /// `turn_finished` it closes stdin and waits for the exit. The `send` waits because nothing
+    /// orders the lookup before a turn, so its event could land after the turn's or carry the
+    /// turn's context, and the helper does not wait for a lookup still in flight when stdin
+    /// closes (#617); `tools/proof/agent_helper_drive.py`'s configure step waits the same way.
+    private func run(_ setup: [String], send: String, answer: (String) -> String = { _ in "null" }) throws -> Run {
         let process = Process()
         process.executableURL = try helper
         process.environment = ["HOME": NSHomeDirectory(), "TMPDIR": NSTemporaryDirectory(), "PATH": "/usr/bin:/bin"]
@@ -48,20 +53,30 @@ final class ProcessTests: XCTestCase {
         try process.run()
         defer { if process.isRunning { process.terminate() } }
         func write(_ line: String) { input.fileHandleForWriting.write(Data((line + "\n").utf8)) }
-        lines.forEach(write)
+        setup.forEach(write)
         var events: [HelperEvent] = []
         let deadline = Date().addingTimeInterval(30)
-        while Date() < deadline, !events.contains(.turnFinished) {
-            let complete = stdout.data.split(separator: 0x0A, omittingEmptySubsequences: false).dropLast()
-            for line in complete.dropFirst(events.count) {
-                // stdout is the protocol only: every line one event.
-                let event = try XCTUnwrap(HelperEvent(json: try RawJSON.parse(Data(line))), String(decoding: line, as: UTF8.self))
-                events.append(event)
-                if case .toolRequest(let callID, let name, _) = event {
-                    write(#"{"type":"tool_result","call_id":"\#(callID)","result":\#(answer(name))}"#)
+        /// Reads events until `done` holds of them or the deadline passes; whether it held.
+        func read(until done: ([HelperEvent]) -> Bool) throws -> Bool {
+            while Date() < deadline, !done(events) {
+                let complete = stdout.data.split(separator: 0x0A, omittingEmptySubsequences: false).dropLast()
+                for line in complete.dropFirst(events.count) {
+                    // stdout is the protocol only: every line one event.
+                    let event = try XCTUnwrap(HelperEvent(json: try RawJSON.parse(Data(line))), String(decoding: line, as: UTF8.self))
+                    events.append(event)
+                    if case .toolRequest(let callID, let name, _) = event {
+                        write(#"{"type":"tool_result","call_id":"\#(callID)","result":\#(answer(name))}"#)
+                    }
                 }
+                usleep(2_000)
             }
-            usleep(2_000)
+            return done(events)
+        }
+        if try read(until: { $0.contains { if case .contextUsage = $0 { true } else { false } } }) {
+            write(send)
+            _ = try read(until: { $0.contains(.turnFinished) })
+        } else {
+            XCTFail("no context_usage before the send: \(events)")
         }
         try input.fileHandleForWriting.close()
         while Date() < deadline, process.isRunning { usleep(5_000) }
@@ -85,14 +100,14 @@ final class ProcessTests: XCTestCase {
         for _ in 0..<2 {
             let server = try LoopbackServer([sse])
             defer { server.stop() }
-            let run = try run(["{not json", configureLine(server), HostMessage.send(text: "Hi").json.serializedString])
+            let run = try run(["{not json", configureLine(server)], send: HostMessage.send(text: "Hi").json.serializedString)
             XCTAssertEqual(run.status, 0)
             guard case .error(let bad) = run.events.first else { return XCTFail("\(run.events)") }
             XCTAssertTrue(bad.hasPrefix("Bad message from the app: "), bad)
-            // The bundled table's prices, then the handshake.
-            XCTAssertEqual(Array(run.events.dropFirst().prefix(2)), [.prices(Fixtures.unconfiguredSource), .ready])
-            // The 404 from the Models API leaves the limit unknown.
-            XCTAssertTrue(run.events.contains(.contextUsage(used: 0, limit: nil)))
+            // Before the turn: the bundled table's prices, the handshake, then the 404 from the
+            // Models API, which leaves the limit unknown.
+            XCTAssertEqual(Array(run.events.dropFirst().prefix { $0 != .turnStarted }),
+                           [.prices(Fixtures.unconfiguredSource), .ready, .contextUsage(used: 0, limit: nil)])
             XCTAssertEqual(run.events.filter { event in
                 if case .contextUsage = event { return false }
                 return !RecordingSink.isSpend(event)
@@ -117,7 +132,7 @@ final class ProcessTests: XCTestCase {
         // About 6 MB of base64, as a large frame render is.
         let image = String(repeating: "iVBORw0KGgoAAAANSUhEUgAA", count: 250_000)
         let started = Date()
-        let run = try run([configureLine(server), HostMessage.send(text: "Look").json.serializedString]) { _ in
+        let run = try run([configureLine(server)], send: HostMessage.send(text: "Look").json.serializedString) { _ in
             #"{"content":[{"type":"image","data":"\#(image)","mimeType":"image/png"}]}"#
         }
         let elapsed = Date().timeIntervalSince(started)
