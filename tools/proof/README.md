@@ -33373,3 +33373,47 @@ the Swift helper: the first, on the Bun helper, is the "Live run" of issue batch
 on the Bun helper, are in issue batch B26's section and road map 12's A3 section. The road map's
 SA5 record holds the same figures, and spec §11 SA-13's recordings hold the
 `x-stainless-timeout: NOT_GIVEN` these runs sent (#614).
+
+## Issue #619 — an image past the API's 10 MB answered to the model as an error text (`agent_helper_drive.py` `image-too-large`; `ToolResultsTests`; six mutants; spec §11 SA-14)
+
+**What it proves.** Since #618 `render_frame` never scales its image, so one asked with no
+`max_width` can pass the Anthropic API's 10,485,760 bytes of base64, and the helper used to put it
+in the history, where every later request carried it and was refused until Clear. Now
+`ToolResults.convert` answers such an image with one text block in its place, "The image is too
+large to send: its base64 is <n> bytes and the API's limit for one image is 10,485,760. Ask again
+for a smaller one, with max_width where the tool takes it.", keeps the rest of the result, and
+marks it an error summarised by that sentence. Exactly at the limit the image is sent.
+
+**Rows.** The suite's `ToolResultsTests` (`make agent-test`): `testAnImagePastTheLimitBecomesAnErrorText`,
+`testAnImageExactlyAtTheLimitIsSent`, `testOnlyTheOversizedImageIsReplaced`; `ProcessTests`' 6 MB
+round trip is the under-limit control, unchanged. The drive's case `image-too-large`: the first
+`render_frame` answered with an image one byte past the limit (made in Python, never stored)
+beside "Written to /tmp/frame.jpg.", the retry at `width` 640 answered with the tiny `IMAGE`, then
+a second turn; its recording holds the event `is_error` with the sentence as its summary and
+requests 2–4 carrying the sentence and the text, never the image. Loopback only, nothing paid.
+
+    python3 tools/agent/agent_test.py --filter ToolResultsTests
+    python3 tools/proof/agent_helper_drive.py --cases image-too-large
+    python3 tools/proof/agent_helper_drive.py --mutant NAME   # each of the six below (exit 1 caught)
+
+**Mutants.** Five in `SWIFT_MUTANTS`, each failing `image-too-large`: `image-limit-off` (the size
+test never true), `image-limit-raised` (the limit 10,485,761), `image-limit-not-error` (the tool's
+own flag kept), `image-limit-drops-rest` (the whole result replaced by the sentence) and
+`image-limit-text-summary` (the summary the tool's first text). One in the drive's new
+`SUITE_MUTANTS`, `image-limit-at-boundary` (`>=`): a drive case at the limit would record the 10
+MB image it sends, so the edit is applied to the mutant tree's `agent/` under its lock and
+`agent_test.py --tree build/agent-swift-mutant --filter ToolResultsTests/testAnImageExactlyAtTheLimitIsSent`
+runs there; caught when that test's line says it failed. `mutant_anchors.py` reads both tables.
+
+**Recorded** (2026-11-12, on the release helper `build_helper.sh` builds). Before the change, with
+the sentence's helper written and no size test, `--filter ToolResultsTests`: 9 tests, the
+past-limit and mixed cases FAILED (`isError` false, the summary `(image)` and `Rendered.`, the
+image block sent), the at-limit case passed. With it: `make agent-test` 80 tests, 0 failures
+(the 6 MB round trip 6,001,179 bytes); `--record --cases image-too-large` printed `new` (23,146
+bytes); the whole drive 29/29, `recordings ok — 28 recordings, one per case`, every other
+recording unchanged. The mutants, each caught: `image-limit-off` and `image-limit-raised` on
+event 9's `is_error` (true / false) and request 2's tool result without `is_error`;
+`image-limit-not-error` the same, its summary still the sentence; `image-limit-drops-rest` on
+request 2's tool result, 2 blocks / 1; `image-limit-text-summary` on event 9's summary, "Written
+to /tmp/frame.jpg."; `image-limit-at-boundary` with `testAnImageExactlyAtTheLimitIsSent` failed
+(the mutant tree's suite, 52.5 s).

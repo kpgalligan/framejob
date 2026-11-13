@@ -12,7 +12,7 @@ original. SA-1..SA-3 are SA0's, decided 2026-11-12 after the owner approved the 
 answered its §12 on #599. SA-4 on were appended here by the phases §8 named, each before its
 code. Each entry bound the code from the phase that built it: until SA3's switch landed, the
 shipped helper was the one AI-1, P-2 and P-8 describe. SA-11 and SA-13 are SA4's, the deletion
-of the Bun helper.
+of the Bun helper. SA-14 is #619's, decided after the road map closed.
 
 - **SA-1 — The assistant helper is a Swift executable built from a SwiftPM package in `agent/`,
   on Slaude pinned by exact revision; the process boundary and the stdio protocol stay.** It is
@@ -348,3 +348,74 @@ of the Bun helper.
   held once the helper it compared with is gone. Risk accepted: a Slaude re-pin or a toolchain
   that changes a request legitimately fails `make test` until re-recorded; `x-stainless-timeout:
   NOT_GIVEN` (#614) is now held by value and no longer compared with the TypeScript SDK's header.
+- **SA-14 — An image a tool answers whose base64 passes the Anthropic API's limit on one image,
+  10,485,760 bytes, is answered to the model as an error text naming its size and `max_width`,
+  so it never enters the history** (#619; the owner, 2026-11-13). The owner's words on #619:
+  "Go with option 1 for now, but add an issue for later describing a situation. The internal
+  assistant is doing work that we can reasonably predict better than what an external MCP caller
+  might want, so we might want to add more assumptions about scaling directly into our assistant
+  or even its core system prompts. But I don't want to design that right now." The issue for
+  later is #620, parked; how the assistant sizes the images it asks for is its subject, not this
+  entry's.
+  - Why: since PR-25 `render_frame`'s image is never scaled, so asked with no `max_width` it can
+    pass 10 MB of base64 (`raster_dither_proof.py` BKj, a noise-like 3840×2160 JPEG, 12,441,372).
+    The helper appended a round's tool results to its history before the next request
+    (`Turn.swift`), a refused request left the history as it was, and `pushUserText` merged the
+    person's next message into that same user message, so every later request, compaction's
+    included, carried the image and was refused until the person pressed Clear.
+  - The rule: `ToolResults.convert` counts an MCP `image` item's `data`, which is already the
+    base64 the API measures, in UTF-8 bytes. Past `ToolResults.imageLimit`, 10,485,760 (PR-25's
+    limit for the Anthropic API, which the helper posts to), the item becomes one text block in
+    its own place: "The image is too large to send: its base64 is <n> bytes and the API's limit
+    for one image is 10,485,760. Ask again for a smaller one, with max_width where the tool takes
+    it." `<n>` is grouped by commas, and the sentence names `max_width` conditionally because the
+    helper knows no tool's arguments. Exactly at the limit the image is sent as before (PR-23's
+    "Exactly at the limit fits").
+  - The rest of the result is kept: its text items, any image at or under the limit, and their
+    order. Each image past the limit gets its own sentence.
+  - The result is an error: `is_error` on the `tool_result` block and on the `tool_result`
+    event, whatever the tool said, because the prompt already tells the model such an image "is
+    refused" and every other refusal reaches it that way. Its summary is the first replaced
+    image's sentence, even when a text item comes first, so the Assistant tab shows `failed: The
+    image is too large to send: …` before the model's retry, and never `failed: Written to
+    <path>.`; the sentence is under the summary's 200 UTF-16 units for any count a line can
+    carry. The site's `failed:` table names the line.
+  - Where: in `convert`, before the session emits the event or builds the block, so `History`
+    stays verbatim and append-only and the image never reaches it. `render_frame`, its
+    description, the assistant's prompt ("an image whose base64 passes 10 MB is refused", true
+    from the model's side) and PR-25's rule are unchanged: the tool scales nothing, and an MCP
+    caller sizes its own image. Only the in-app assistant's helper holds the image back.
+  - Not covered, and no rule is made for either: several images in one request, each within 10
+    MB, that together pass the API's limit on a whole request; and an image refused for its sides
+    (past 8000 px, or past 3000 px once a request holds more than 20 images, PR-24), which the
+    helper cannot see without decoding it. Either still fails every later request until Clear.
+    An assistant sizing rule that would prevent them is #620's.
+  - The check (`make agent-test`): `ToolResultsTests`' `testAnImagePastTheLimitBecomesAnErrorText`
+    (an image of 10,485,761 bytes, then the tool's text: the sentence and the text, `is_error`,
+    the summary the sentence and at most 200 units, as for a count of `Int.max`),
+    `testAnImageExactlyAtTheLimitIsSent` (10,485,760 bytes: one image block, not an error,
+    `(image)`) and `testOnlyTheOversizedImageIsReplaced` (a text, a small image, an oversized one
+    and a text, all in order, the summary the sentence). Seen first with the sentence written
+    and no size test: the first and third failed and the second passed. With the change the
+    suite's 80 tests passed, `ProcessTests`' 6,000,000-byte image unchanged among them.
+  - The drive's case `image-too-large`: an image one byte past the limit beside "Written to
+    /tmp/frame.jpg.", a retry at `width` 640 answered with a small image, then a second turn.
+    `--record --cases image-too-large` printed `new` (23,146 bytes): the event `is_error` with
+    the sentence as its summary, and requests 2–4 carrying the sentence and the text and no
+    image. The whole drive then passed 29/29, every other recording unchanged.
+  - Mutants, each caught: on the drive's case, `image-limit-off` (the size test never true) and
+    `image-limit-raised` (the limit 10,485,761), each with the event's `is_error` false and
+    request 2's result without it; `image-limit-not-error` (the tool's own flag kept), the same
+    with the sentence still the summary; `image-limit-drops-rest` (the whole result replaced by
+    the sentence), request 2's result one block, not two; `image-limit-text-summary` (the
+    summary the tool's first text), the event's summary "Written to /tmp/frame.jpg.". And
+    `image-limit-at-boundary` (`>=`), in the drive's `SUITE_MUTANTS`, run on the mutant tree's
+    suite: `testAnImageExactlyAtTheLimitIsSent` failed. A drive case at the limit would record
+    the 10 MB image it sends, so the boundary is the suite's.
+  - **Amends PR-25** (its "forwards the block as given (`ToolResults.swift`)": the helper
+    forwards an image at or under 10,485,760 bytes of base64 as given, and answers one past it
+    with the sentence; the rest of PR-25 stands) **and SA-13** (its drive gains the case
+    `image-too-large` and its recording, a change to what the helper sends, landed with this
+    entry; SA-13's "five of the drive's eight mutants" stays the count it made). Risk accepted: a
+    tool that did its work and wrote its file is reported to the model and on the tab as failed,
+    which is what lets the model retry smaller.

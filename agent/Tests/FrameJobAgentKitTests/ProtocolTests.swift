@@ -1,5 +1,5 @@
 import Anthropic
-import FrameJobAgentKit
+@testable import FrameJobAgentKit
 import XCTest
 
 final class ProtocolTests: XCTestCase {
@@ -187,6 +187,48 @@ final class ToolResultsTests: XCTestCase {
         XCTAssertEqual(summary, String(repeating: "x", count: 199))
         // The block keeps the whole text.
         XCTAssertEqual(try convert(#"{"content":[{"type":"text","text":"\#(long)"}]}"#).blocks[0]["text"]?.stringValue, long)
+    }
+
+    // Spec §11 SA-14: an image whose base64 passes the Anthropic API's 10,485,760 bytes never
+    // reaches the history; the model reads why and can ask again smaller.
+    private static let tooLarge = "The image is too large to send: its base64 is 10,485,761 bytes and the API's "
+        + "limit for one image is 10,485,760. Ask again for a smaller one, with max_width where the tool takes it."
+
+    private func image(_ bytes: Int, _ type: String = "image/jpeg") -> String {
+        #"{"type":"image","data":"\#(String(repeating: "A", count: bytes))","mimeType":"\#(type)"}"#
+    }
+
+    func testAnImagePastTheLimitBecomesAnErrorText() throws {
+        let result = try convert(#"{"content":[\#(image(10_485_761)),{"type":"text","text":"Written to /tmp/f.jpg."}]}"#)
+        XCTAssertTrue(result.isError)
+        XCTAssertEqual(result.summary, Self.tooLarge)
+        XCTAssertEqual(RawJSON.array(result.blocks).serializedString,
+                       #"[{"type":"text","text":"\#(Self.tooLarge)"},{"type":"text","text":"Written to /tmp/f.jpg."}]"#)
+        XCTAssertEqual(ToolResults.block(toolUseID: "toolu_9", result)["is_error"], true)
+        // The tab shows the whole sentence, for any count a line could carry.
+        XCTAssertLessThanOrEqual(Self.tooLarge.utf16.count, ToolResults.summaryLength)
+        XCTAssertLessThanOrEqual(ToolResults.tooLarge(Int.max).utf16.count, ToolResults.summaryLength)
+        XCTAssertTrue(ToolResults.tooLarge(Int.max).contains("9,223,372,036,854,775,807 bytes"))
+    }
+
+    func testAnImageExactlyAtTheLimitIsSent() throws {
+        let result = try convert(#"{"content":[\#(image(10_485_760))]}"#)
+        XCTAssertFalse(result.isError)
+        XCTAssertEqual(result.summary, "(image)")
+        XCTAssertEqual(result.blocks.count, 1)
+        XCTAssertEqual(result.blocks[0]["type"]?.stringValue, "image")
+        XCTAssertEqual(result.blocks[0]["source"]?["media_type"]?.stringValue, "image/jpeg")
+        XCTAssertEqual(result.blocks[0]["source"]?["data"]?.stringValue?.utf8.count, 10_485_760)
+    }
+
+    func testOnlyTheOversizedImageIsReplaced() throws {
+        // A text first and a small image kept in place; the summary is still the sentence, so
+        // the tab never shows "failed: Rendered." for it.
+        let result = try convert(#"{"content":[{"type":"text","text":"Rendered."},{"type":"image","data":"QUJD"},\#(image(10_485_761, "image/png")),{"type":"text","text":"Written to /tmp/f.png."}]}"#)
+        XCTAssertTrue(result.isError)
+        XCTAssertEqual(result.summary, Self.tooLarge)
+        XCTAssertEqual(RawJSON.array(result.blocks).serializedString,
+                       #"[{"type":"text","text":"Rendered."},{"type":"image","source":{"type":"base64","media_type":"image/png","data":"QUJD"}},{"type":"text","text":"\#(Self.tooLarge)"},{"type":"text","text":"Written to /tmp/f.png."}]"#)
     }
 }
 

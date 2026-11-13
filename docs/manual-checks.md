@@ -1433,9 +1433,9 @@ Needs your own Anthropic API key (Setup 3).
 - **Source:** #604 (spec §11 PR-22); `raster_dither_proof.py` BK1 measures the image's size against the API's limit, not what the API does with it.
 
 **AS-12 — The assistant looks at a 4K frame**
-- **Do:** With a real key, in a 3840 × 2160 project of camera footage (or 8-bit footage with a title over it), ask the assistant to look at the frame at the playhead without making it smaller (no `max_width`) and say what it shows.
-- **Expect:** its tool line shows `render_frame` done; the tool's text has no sentence about scaling the image, and the file it names is 3840 × 2160, as is the image sent. Then either it describes the picture, or the API refuses the image for its size (its base64 over 10 MB): that refusal is the API's limit, which Frame Job leaves to the caller, not a failure of this row. Note which, and the frame's footage, since no real 4K camera frame has been measured. After a refusal, press Clear before the next row: the conversation keeps the image and sends it again.
-- **Source:** #618 (spec §11 PR-25, superseding #610's PR-23); `raster_dither_proof.py` BKk, BKp and BKj measure the unscaled image against the API's limits, not what the API does with it.
+- **Do:** With a real key, in a 3840 × 2160 project of camera footage (or 8-bit footage with a title over it), ask the assistant to look at the frame at the playhead without making it smaller (no `max_width`) and say what it shows. Then send it one more message, without pressing Clear.
+- **Expect:** its tool line shows `render_frame`; the tool's text has no sentence about scaling the image, and the file it names is 3840 × 2160. Then either it describes the picture from that image, or the tab shows `failed: The image is too large to send: …` (the image's base64 over 10 MB, so the assistant was given that sentence in place of the image), and the assistant calls `render_frame` again with a smaller `max_width` and then describes the picture. Note which, and the frame's footage, since no real 4K camera frame has been measured. Either way the next message is answered, with no API error about the image's size and no Clear needed.
+- **Source:** #618 (spec §11 PR-25, superseding #610's PR-23); #619 (spec §11 SA-14); `raster_dither_proof.py` BKk, BKp and BKj measure the unscaled image against the API's limits, not what the API does with it; `agent_helper_drive.py`'s `image-too-large` case holds the helper's sentence in place of an image past the limit on the stand-in, not what a model does with it.
 
 ## Agent connections
 

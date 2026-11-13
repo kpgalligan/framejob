@@ -9,7 +9,9 @@ and SA4 and their records in §13, condensed in `designs/adr/swift-helper.md`).
     python3 tools/proof/agent_helper_drive.py --swift PATH          # a helper already built
     python3 tools/proof/agent_helper_drive.py --list                # the cases, mutants and controls
     python3 tools/proof/agent_helper_drive.py --mutant NAME         # a SWIFT_MUTANTS edit, built on
-                                                                    # the persistent mutant tree
+                                                                    # the persistent mutant tree, or
+                                                                    # a SUITE_MUTANTS edit, tested
+                                                                    # there
     python3 tools/proof/agent_helper_drive.py --control NAME        # a run or a recording altered in
                                                                     # memory (CONTROLS)
     python3 tools/proof/agent_helper_drive.py --record              # rewrite the recordings
@@ -58,8 +60,11 @@ Mutants (`SWIFT_MUTANTS`): an edit of the helper's sources, built by `agent_help
 on the persistent mutant tree `build/agent-swift-mutant/` (spec §11 SA-8), never in the tree's
 own `agent/`; then the cases it names run. A mutant is caught only when every case it names
 FAILs: `mutant <name>: caught — …`, exit 1; one that passed any SURVIVED, exit 0; one that did not
-build could not perform its control, exit 2. Five of the eight change only a request body, which
-only the recordings hold.
+build could not perform its control, exit 2. Six of the thirteen change only a request body, which
+only the recordings hold. `SUITE_MUTANTS` are edits no case can see without recording the 10 MB
+image they would send (spec §11 SA-14's boundary): applied to the same tree's `agent/` under its
+lock, then the one XCTest case each names run there by `tools/agent/agent_test.py --tree`, caught
+when its line says it failed, and exit 2 when no such line was printed.
 
 Controls (`CONTROLS`): one case run on the tree's helper with its run or its recording altered in
 memory, to show each comparison rule is as narrow as it says. `control <name>: held — …`, exit 0,
@@ -75,8 +80,10 @@ paid. Exit 0 PASS, 1 FAIL.
 import argparse
 import copy
 import datetime
+import fcntl
 import http.server
 import json
+import re
 import shutil
 import socket
 import subprocess
@@ -143,6 +150,11 @@ TEXT = '{"content":[{"type":"text","text":"{\\"name\\":\\"Demo\\",\\"clips\\":2}
 IMAGE = ('{"content":[{"type":"image","data":"iVBORw0KGgoAAAANSUhEUg==","mimeType":"image/png"},'
          '{"type":"text","text":"The frame at 1.5 s."}]}')
 REFUSED = '{"content":[{"type":"text","text":"set_playhead was refused: past the end."}],"isError":true}'
+# An image whose base64 is one byte past the Anthropic API's 10,485,760 (spec §11 SA-14), made
+# here and never stored: the helper answers it as text, so the recording stays small. One byte
+# past on purpose, so a limit moved up by one sends it.
+OVERSIZED = ('{"content":[{"type":"image","data":"' + "A" * 10_485_761 + '","mimeType":"image/jpeg"},'
+             '{"type":"text","text":"Written to /tmp/frame.jpg."}]}')
 NULL = "null"
 EMPTY = '{"content":[]}'
 CANCELLED = '{"content":[{"type":"text","text":"Cancelled by the user."}],"isError":true}'
@@ -243,6 +255,24 @@ CASES = {
         "expect": expect(HELLO + ["turn_started", "text_delta"] + ROUND
                          + ["tool_call", "tool_request"] * 5 + ["tool_result"] * 5
                          + ["text_delta"] + ROUND + ["turn_finished"], 2, 3),
+    },
+    # Spec §11 SA-14 (#619): an image past the API's limit reaches the model as an error text
+    # beside the tool's own text, the model asks again smaller, and the next turn's request still
+    # carries the text, never the image.
+    "image-too-large": {
+        "scenario": {"replies": [
+            reply([tool("toolu_1", "render_frame", {})], "tool_use"),
+            reply([text("Too large; asking smaller."),
+                   tool("toolu_2", "render_frame", {"width": 640})], "tool_use"),
+            reply([text("A test card.")], "end_turn"),
+            reply([text("You're welcome.")], "end_turn")]},
+        "steps": [("configure", {}), ("send", "What is at the playhead?"),
+                  ("answer", [(0, OVERSIZED)]), ("answer", [(0, IMAGE)]), ("turn",),
+                  ("send", "Thanks."), ("turn",), ("close",)],
+        "expect": expect(HELLO + ["turn_started"] + ROUND
+                         + ["tool_call", "tool_request", "tool_result", "text_delta"] + ROUND
+                         + ["tool_call", "tool_request", "tool_result", "text_delta"] + ROUND
+                         + ["turn_finished"] + TURN, 4, 5),
     },
     "two-turns": {
         "scenario": {"replies": [
@@ -1101,7 +1131,44 @@ SWIFT_MUTANTS = {
                               "        guard Self.holdsSummary(reply.message) else {\n",
                               "        guard Self.holdsSummary(reply.message) || true else {\n",
                               ["compaction-empty"]),
+    # Spec §11 SA-14 (#619). The size test never true: the image forwarded as given, as before.
+    "image-limit-off": (KIT + "ToolResults.swift", "                if bytes > imageLimit {\n",
+                        "                if bytes < 0 {\n", ["image-too-large"]),
+    # The limit one byte higher: the case's image, exactly that size, is sent. (One byte lower,
+    # `>=`, sends no image the drive could record; the suite's
+    # testAnImageExactlyAtTheLimitIsSent holds that edge, tools/proof/README.md.)
+    "image-limit-raised": (KIT + "ToolResults.swift", "    public static let imageLimit = 10_485_760\n",
+                           "    public static let imageLimit = 10_485_761\n", ["image-too-large"]),
+    # The replaced result keeps the tool's own error flag, so a success stays one.
+    "image-limit-not-error": (KIT + "ToolResults.swift",
+                              "            return ConvertedToolResult(blocks: blocks, isError: true, "
+                              "summary: prefix(replaced, summaryLength))\n",
+                              "            return ConvertedToolResult(blocks: blocks, isError: result[\"isError\"]?"
+                              ".boolValue == true, summary: prefix(replaced, summaryLength))\n",
+                              ["image-too-large"]),
+    # The whole result replaced by the sentence, the tool's other content dropped: a body
+    # difference.
+    "image-limit-drops-rest": (KIT + "ToolResults.swift",
+                               "            return ConvertedToolResult(blocks: blocks, isError: true, "
+                               "summary: prefix(replaced, summaryLength))\n",
+                               "            return failure(replaced)\n", ["image-too-large"]),
+    # The summary the tool's first text, as for any other result: an event difference.
+    "image-limit-text-summary": (KIT + "ToolResults.swift", "summary: prefix(replaced, summaryLength))",
+                                 "summary: summary)", ["image-too-large"]),
 }
+
+# Suite mutants: an edit no case can see without recording a 10 MB image, held instead by one of
+# the helper's own XCTest cases, run with `tools/agent/agent_test.py --tree` on the mutant tree's
+# own suite scratch path (cold once, about two minutes, spec §11 SA-12). Caught only when that
+# test's line says it failed.
+SUITE_MUTANTS = {
+    # Spec §11 SA-14's boundary one byte lower: an image exactly at the limit replaced.
+    "image-limit-at-boundary": (KIT + "ToolResults.swift", "                if bytes > imageLimit {\n",
+                                "                if bytes >= imageLimit {\n",
+                                "ToolResultsTests/testAnImageExactlyAtTheLimitIsSent"),
+}
+AGENT_TEST = ROOT / "tools" / "agent" / "agent_test.py"
+WALL_SUITE = 1500  # the mutant tree's first suite run builds Slaude in debug
 
 
 # ---------------------------------------------------------------------------
@@ -1215,6 +1282,8 @@ def listing():
     print("mutants:")
     for name, (file, _, _, cases) in SWIFT_MUTANTS.items():
         print(f"  {name}: {file}; must FAIL {', '.join(cases)}")
+    for name, (file, _, _, test) in SUITE_MUTANTS.items():
+        print(f"  {name}: {file}; the suite's {test} must FAIL")
     print("controls:")
     for name, (case, how, fails) in CONTROLS.items():
         print(f"  {name}: {case}, {what(how)}; must {'FAIL' if fails else 'pass'}")
@@ -1281,6 +1350,43 @@ def mutant(args, name):
     return verdict(name, named, {case: not results[case][0] for case in named})
 
 
+def suite_mutant(name):
+    """A SUITE_MUTANTS edit on the persistent mutant tree, under its lock, then the one XCTest
+    case it names, run there."""
+    file, anchor, replacement, test = SUITE_MUTANTS[name]
+    tree = agent_helper_build.MUTANT_TREE
+    agent_helper_build.LOCK.parent.mkdir(parents=True, exist_ok=True)
+    with open(agent_helper_build.LOCK, "w") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            written = agent_helper_build.sync()
+            path = tree / file
+            text = path.read_text()
+            if text.count(anchor) != 1:
+                print(f"mutant {name}: the control could not be performed — its anchor occurs "
+                      f"{text.count(anchor)} times in {file}", flush=True)
+                return 2
+            path.write_text(text.replace(anchor, replacement))
+            env = agent_helper_build.bounded.child_env()
+            for key in ("ANTHROPIC_API_KEY", "RC_ASSEMBLYAI_KEY"):
+                env.pop(key, None)
+            ran = agent_helper_build.bounded.run(
+                [sys.executable, str(AGENT_TEST), "--tree", str(tree), "--filter", test],
+                WALL_SUITE, cwd=str(ROOT), env=env)
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+    suite, case = test.split("/")
+    line = re.search(rf"Test Case '-\[\w+\.{suite} {case}\]' (passed|failed)", ran["stdout"])
+    print(f"S1 the suite on {tree.relative_to(ROOT)} ({written} files synced): exit {ran['rc']} "
+          f"(expired {ran['expired']}), {ran['seconds']} s, {case} "
+          f"{line.group(1) if line else 'not run'}", flush=True)
+    if line is None:
+        print(f"mutant {name}: the control could not be performed — no XCTest line for {case}",
+              flush=True)
+        return 2
+    return verdict(name, [case], {case: line.group(1) == "passed"})
+
+
 def control(args, name):
     """One case on the tree's helper, its run or its recording altered: it FAILs or passes as
     the control says."""
@@ -1314,7 +1420,7 @@ def main():
     parser.add_argument("--cases", help="a comma-separated subset of the cases")
     parser.add_argument("--swift", help="a built Swift helper, in place of B1")
     parser.add_argument("--list", action="store_true")
-    parser.add_argument("--mutant", choices=sorted(SWIFT_MUTANTS))
+    parser.add_argument("--mutant", choices=sorted(SWIFT_MUTANTS) + sorted(SUITE_MUTANTS))
     parser.add_argument("--control", choices=sorted(CONTROLS))
     parser.add_argument("--record", action="store_true",
                         help="rewrite the recordings from this run (spec §11 SA-13)")
@@ -1330,6 +1436,8 @@ def main():
         print("record: refused — a recording is written only from a plain run, never with "
               "--mutant or --control", flush=True)
         return 2
+    if args.mutant in SUITE_MUTANTS:
+        return suite_mutant(args.mutant)
     if args.mutant:
         return mutant(args, args.mutant)
     if args.control:

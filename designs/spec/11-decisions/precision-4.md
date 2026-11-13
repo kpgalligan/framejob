@@ -471,3 +471,7 @@ into a sibling file.
     unchanged.
   - Supersedes PR-23. Amends PR-22 (its "Not done: bounding an 8-bit block by size" and "Same
     size as the file, so `max_width` bounds both" hold again for every block) and PR-24 (above).
+  - Amended by SA-14 (#619): the assistant's helper forwards an image at or under 10,485,760
+    bytes of base64 as given, and answers one past it to the model as an error text naming its
+    size and `max_width`, so it never enters the conversation's history; the tool is unchanged
+    and still scales nothing.

@@ -1,7 +1,7 @@
 # agent/CLAUDE.md — the assistant helper's rules
 
 Applies to everything under `agent/`. The shipped helper is the SwiftPM package here
-(`Package.swift`, `Sources/`, `Tests/`; spec §11 SA-1..SA-13, in
+(`Package.swift`, `Sources/`, `Tests/`; spec §11 SA-1..SA-14, in
 `designs/spec/11-decisions/swift-helper.md`), the agent loop of
 `Contents/Helpers/framejob-agent`, started once per window's conversation by
 `AssistantSession`: every app build makes its release product with
@@ -36,7 +36,8 @@ One line per file; each file's doc comments hold its detail.
 - `Request.swift` — the request bodies and betas, built once per configure (SA-5).
 - `History.swift` — the verbatim, append-only history and the `pushUserText` merge.
 - `ContextUsage.swift` — the context-meter arithmetic and cleared tool results.
-- `ToolResults.swift` — MCP CallToolResult → tool_result blocks and the tab's summary.
+- `ToolResults.swift` — MCP CallToolResult → tool_result blocks and the tab's summary; an image
+  whose base64 passes the API's 10,485,760 bytes answered as an error text in its place (SA-14).
 - `ClientFactory.swift` — the Slaude client per configure, behind the `MessagesAPI` seam.
 - `Pricing.swift` — `PriceTable`, `Price` and `Pricing.price`, the same steps in the same order
   as `tools/proof/prices.py` (spec §11 P-2, SA-3).
