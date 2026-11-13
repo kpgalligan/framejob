@@ -273,7 +273,8 @@ into a sibling file.
     image block should be bounded, held for the owner, is decided here).
   - Amended by PR-23: a default block whose base64 would pass the limit is drawn smaller until it
     fits, so "Not done: bounding an 8-bit block by size" and "Same size as the file" no longer
-    hold for such a block.
+    hold for such a block. Amended by PR-24: 5,242,880 is Amazon Bedrock's limit, the smaller (the
+    Anthropic API's own is 10 MB of base64), not the Anthropic API's.
 
 - **PR-23 — `render_frame`'s image block is scaled down alone when its base64 would pass the
   API's limit (owner, 2026-11-12, #610: option (b), "#610: b").**
@@ -343,3 +344,51 @@ into a sibling file.
   - No op, recipe, FFI, format or catalog schema change; `RC_FORMAT_VERSION` is unchanged.
   - Amends PR-22 (its "Not done: bounding an 8-bit block by size", and "Same size as the file, so
     `max_width` bounds both", which now holds only for a block that fits).
+  - Amended by PR-24: the block's sides are deliberately not bounded, by the owner's choice that a
+    caller sizes its own image (`max_width`) and that the description says what the API does with
+    a large one; the 5 MB bound stays because it is Amazon Bedrock's, the smaller (10 MB on the
+    Anthropic API), not the Anthropic API's as the rule above says.
+
+- **PR-24 — `render_frame`'s image block is not bounded by its sides; the description says what
+  the API does with a large image, and `max_width` is the caller's control (owner, 2026-11-13,
+  #612: option (a)).**
+  - The owner's words: "If the tool description describes the situation, leave it alone. Scaling
+    images automatically may not be what the caller actually wants. MCP callers need to be smart
+    enough to handle these situations."
+  - The rule: no cap, no scaling and no refusal of a block by its sides, by default or with
+    `full_depth_image`; `max_width` keeps its range 16…8192 and its meaning, so a width of 8001…
+    8192 stays legal; no new argument. PR-23's scale by size stands as it is.
+  - The facts the texts state, from Anthropic's vision page as quoted on #612 (read 2026-11-12):
+    an image past 8000 px on a side is refused; once a request holds more than 20 images a
+    stricter per-image limit applies, which 3000 px a side stays under on every platform (the
+    page's own advice), and a long conversation reaches that count, since the assistant's helper
+    resends its history, frames included, until it compacts; the newest models (Claude 4.7 and
+    later) downscale an image past 2576 px on its long edge; an image's base64 may be at most 10
+    MB on the Anthropic API and 5 MB on Amazon Bedrock. PR-22's and PR-23's "the Anthropic
+    API's limit" is corrected to that: 5,242,880 stays the bound because it is the smaller. The
+    texts state these as the API's, not as anything Frame Job does, and they can move with the
+    API.
+  - `max_width` sets the width and the height follows the aspect (`Exporter.scaledSize`), so on a
+    tall canvas (`set_canvas` takes up to 16384 a side) an image can pass a side limit at a
+    width under it, and `max_width: 8192` on a wide canvas is itself past 8000; the texts say the
+    caller sizes by width and the height follows, never that `max_width` alone keeps an image
+    under 8000 px.
+  - Where it is said: `render_frame`'s description (its own sentences, apart from PR-23's
+    scale-down sentence, so a change to that sentence leaves them whole), `max_width`'s
+    description, the assistant's prompt (past 2576 px scaled down before it sees it, past 3000
+    px refusable once the conversation holds more than 20 images, the height following the
+    width), the site's `render_frame` page (an Image limits section, linked from `max_width`'s)
+    and its paragraph on the rendering tools page. The scale-down sentence, `full_depth_image`'s
+    description and the site's 5 MB sentences (the `render_frame` page's three, the rendering
+    tools page's one and Save Frame's) drop "the Anthropic API's" only; `FrameBlock.scaleNote`
+    is unchanged.
+  - The check: `raster_dither_proof.py` BKd reads `tools/list`: `render_frame`'s description
+    names 8000 px, 3000 px, more than 20 images, 2576 px, 10 MB and Amazon Bedrock and says
+    "max_width is the caller's control"; `max_width`'s names 8000 px, 3000 px and 2576 px and
+    says the height follows, its schema still 16…8192; none of the three says "Anthropic API's 5
+    MB". Seen first (Debug at d0df3607): the description missing all seven phrases, `max_width`'s
+    all four, "Anthropic API's 5 MB" in the description and `full_depth_image`'s, the bounds
+    (16, 8192), so BKd FAILED. With it (Debug; the Release run in `tools/proof/README.md`): none
+    missing, the attribution in none, the bounds (16, 8192), and BK5 and Z1 passing beside it.
+  - No op, recipe, FFI, format, schema or behaviour change; `RC_FORMAT_VERSION` is unchanged.
+  - Amends PR-22 and PR-23 (whose limit it is, and the sides deliberately not bounded).

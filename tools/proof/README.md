@@ -25927,6 +25927,32 @@ BKj; `scaled-jpeg-as-png` fails BKj (`image/png`, 1319×742); `aspect-not-kept` 
 in: `block-is-the-file` fails BK1 (the 16-bit file scaled to 1563×879, no copy sentence) and BK4
 (`image/heic`); `hlg-block-not-copied` fails BK6 with BK1–BK5 passing.
 
+## Issue #612 — `render_frame`'s description names the API's limits on an image's sides, and `max_width` as the caller's control (`raster_dither_proof.py` BKd; spec §11 PR-24)
+
+**What it proves.** The owner chose no cap on the image block's sides, on the condition that the
+description says what the API does with a large image. `tools/list` publishes that: the
+description names the API's limits (refused past 8000 px a side; a stricter limit past 20 images
+in a request, which 3000 px a side stays under; downscaled past 2576 px on the long edge by the
+newest models; 10 MB of base64 on the Anthropic API, 5 MB on Amazon Bedrock) in sentences of its
+own, apart from PR-23's scale-down sentence, and that max_width is the caller's control;
+`max_width`'s description names the three side limits and that the height follows, with its
+schema still 16…8192; and the 5 MB is no longer called the Anthropic API's.
+
+**Row.** BKd needs no media and renders nothing: it reads `render_frame` from the `tools/list`
+BK5 already reads, and holds the description to `SIDES_SAID`, `max_width`'s to `WIDTH_SAID` and
+its `minimum`/`maximum` to 16 and 8192, and all three descriptions (with `full_depth_image`'s)
+to not holding `OLD_ATTRIBUTION`. It prints the three texts. The base tree is its mutant: the
+descriptions before the change.
+
+    python3 tools/proof/raster_dither_proof.py --only BKd,BK5,Z1
+
+**Recorded** (2026-11-12). Before the change (Debug at d0df3607): the description missing all
+seven `SIDES_SAID` phrases, `max_width`'s all four `WIDTH_SAID` phrases, "Anthropic API's 5 MB" in
+the description and `full_depth_image`'s, the bounds (16, 8192): BKd FAILED, Z1 passed (1/2).
+With it, Debug and then Release (after the gate's `make app`): nothing missing, the attribution
+in none of the three, the bounds (16, 8192); BK5, BKd and Z1 passed (3/3 each), and the texts
+read back are the ones in `AgentCatalog+Render.swift`.
+
 ## Codec export C0 — the bundled encoders' link (`codecs_proof.py` L1–L3; `tools/codecs/build_codecs.py --selftest`; spec §11 CX-4, CX-5)
 
 `tools/codecs/build_codecs.py` (`make codecs`, and project.yml's "Build Codecs"

@@ -125,8 +125,11 @@ enum AssistantPrompt {
         "`render_frame` renders one frame of the finished timeline through the compositor an "
             + "export uses, at the playhead unless you pass `t`, and answers an 8-bit image of "
             + "it and the PNG's path. Look before and after a visual edit, and pass `max_width` "
-            + "to keep the image small. Never pass `full_depth_image`: its image can be too "
-            + "large for you to be sent.",
+            + "to keep the image small: past 2576 px on its long edge an image is scaled down "
+            + "before you see it, and once the conversation holds more than 20 images one over "
+            + "3000 px on a side can be refused. The height follows the width, so on a tall "
+            + "canvas pass a smaller `max_width`. Never pass `full_depth_image`: its image can "
+            + "be too large for you to be sent.",
         askFirstParagraph,
         "Reply in a sentence or two. Never repeat tool output the person can already see.",
     ].joined(separator: "\n")

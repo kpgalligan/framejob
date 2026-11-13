@@ -34,7 +34,7 @@ With no arguments, it draws the frame under the playhead at the canvas's size an
 
 The switches in the **View** menu never reach this tool, so an agent asks for those pictures here, whatever a person has switched on.
 
-It returns an image and a text block. The image is the file, or an 8-bit PNG copy of it when the file is a 16-bit PNG or a HEIC. An image that would be larger than the 5 MB the Anthropic API takes for one image is scaled down until it fits, and the file isn't. The text gives the moment and the sizes, and its last sentence is "Written to `<path>`." Before that sentence it can add what each scope measured, or a note about:
+It returns an image and a text block. The image is the file, or an 8-bit PNG copy of it when the file is a 16-bit PNG or a HEIC. An image that would be larger than the 5 MB limit on one image is scaled down until it fits, and the file isn't. An image's sides aren't capped: see [Image limits](/mcp/render-frame/#image-limits) for what the API takes and how `max_width` keeps an image inside it. The text gives the moment and the sizes, and its last sentence is "Written to `<path>`." Before that sentence it can add what each scope measured, or a note about:
 
 - An image that is an 8-bit copy of the file.
 - An image [scaled down to fit](/mcp/render-frame/#full_depth_image) the API's 5 MB limit, with its size.

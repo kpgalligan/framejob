@@ -146,12 +146,24 @@ extension AgentServer {
                     + "and a half times an 8-bit PNG's size for camera footage; a JPEG is always "
                     + "8-bit. The image block of such a PNG, and of any HEIC, is an 8-bit PNG "
                     + "copy of the frame and a sentence before the last says so; the file keeps "
-                    + "its depth. An image block that would pass the Anthropic API's 5 MB limit "
+                    + "its depth. An image block that would pass the 5 MB limit "
                     + "on an image (a 4K frame's can) is scaled down alone until it fits, the "
                     + "file untouched, and a sentence before the last gives its size. "
                     + "full_depth_image puts the file itself in the image block instead and is "
                     + "never scaled: a 16-bit PNG of a 1080p frame of camera footage can pass "
-                    + "the limit, so pass max_width with it. In an "
+                    + "the limit, so pass max_width with it. "
+                    // Spec §11 PR-24 (#612): the API's limits on an image, apart from the
+                    // scale-down sentence above; no side of the block is capped.
+                    + "What the API does with an image: its base64 may be at most 5 MB on "
+                    + "Amazon Bedrock and 10 MB on the Anthropic API itself; an image past "
+                    + "8000 px on a side is refused; once a request holds more than 20 images "
+                    + "(a long conversation's earlier frames count) a stricter limit applies, "
+                    + "which 3000 px a side stays under on every platform; and the newest "
+                    + "Claude models downscale an image past 2576 px on its long edge, so more "
+                    + "is not seen. Frame Job never caps or scales the image block for the "
+                    + "limits on its sides: max_width is the caller's control. It sets the "
+                    + "width and the height follows the aspect, so on a tall canvas choose a "
+                    + "max_width that brings the height under too. In an "
                     + "HLG project (set_canvas output) the frame is a 16-bit PNG or a 10-bit "
                     + "HEIC labeled BT.2100 HLG; a JPEG, and any frame asked with "
                     + "sdr_version, is the project's SDR version, labeled BT.709. Its scopes "
@@ -165,10 +177,17 @@ extension AgentServer {
                         "type": "integer",
                         "description": "The moment to render, \(ticks) Default: the playhead.",
                     ],
+                    // Spec §11 PR-24 (#612): the caller's control over the API's limits on an
+                    // image's sides; the range stays 16…8192.
                     "max_width": [
                         "type": "integer", "minimum": 16, "maximum": 8192,
                         "description": "Cap the image's width in px, aspect kept and never "
-                            + "upscaled. Default: the canvas's own size.",
+                            + "upscaled; the height follows the width. This is the caller's "
+                            + "control over the API's limits on an image's sides, which Frame "
+                            + "Job does not enforce: an image past 8000 px on a side is refused, "
+                            + "3000 px a side stays under the stricter limit once a request "
+                            + "holds more than 20 images, and the newest Claude models downscale "
+                            + "past 2576 px on the long edge. Default: the canvas's own size.",
                     ],
                     // Spec §11 PR-22: the image block, never the file's depth.
                     "full_depth_image": [
@@ -177,7 +196,7 @@ extension AgentServer {
                             + "or the HEIC, instead of the 8-bit PNG copy a deep frame's PNG and "
                             + "every HEIC get. The file written is the same either way. It is "
                             + "never scaled to fit: a full-depth 1080p frame can pass the "
-                            + "Anthropic API's 5 MB image limit; max_width keeps it under. "
+                            + "5 MB image limit; max_width keeps it under. "
                             + "Default false.",
                     ],
                     "path": [

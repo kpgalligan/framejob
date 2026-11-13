@@ -7,9 +7,9 @@ import UniformTypeIdentifiers
 /// writes (spec §11 PR-22, #604), drawn smaller when it would pass the API's limit (PR-23, #610).
 ///
 /// The file and the path it answers stay as deep as the frame (PR-9, PR-20, PR-21). The block
-/// goes to a model API, which takes at most 5 MB an image (Anthropic's: 5,242,880 bytes of
-/// base64) and no HEIC, and a 16-bit PNG of a 1080p frame of camera footage is past that. So,
-/// by the file written:
+/// goes to a model API, which takes at most 5 MB an image (5,242,880 bytes of base64: Amazon
+/// Bedrock's limit, the smaller; the Anthropic API's own is 10 MB, PR-24) and no HEIC, and a
+/// 16-bit PNG of a 1080p frame of camera footage is past that. So, by the file written:
 ///
 /// - a PNG of a frame of 8 bits a component: the file's bytes, as it always was;
 /// - a PNG of a deeper frame, and a HEIC of any depth: an 8-bit PNG copy;
@@ -18,6 +18,8 @@ import UniformTypeIdentifiers
 /// Any of those whose base64 would still pass the limit (a 4K frame's can) is drawn smaller
 /// until it fits, a PNG's as an 8-bit PNG and a JPEG's as a JPEG, and a sentence says to what
 /// size (PR-23). The file is never scaled, and a block that fits is the one it always was.
+/// No block is capped or scaled by its sides: `render_frame`'s description names the API's
+/// limits on them and `max_width` is the caller's control (PR-24, the owner's choice).
 ///
 /// `fullDepth` (`full_depth_image: true`) puts the file's own bytes in the block whatever it is
 /// and whatever its size: it is never scaled. It chooses the block only: the file's depth is
@@ -36,7 +38,7 @@ enum FrameBlock {
         let note: String?
     }
 
-    /// The Anthropic API's limit on one image, in bytes of base64 (PR-22).
+    /// Amazon Bedrock's limit on one image, the smaller, in bytes of base64 (PR-22, PR-24).
     static let limit = 5_242_880
 
     /// The most draws a scale makes before it answers the unscaled block (PR-23).

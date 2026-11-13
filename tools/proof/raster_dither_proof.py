@@ -264,6 +264,15 @@ only (`blk1080`: a 1 s 1920×1080 `testsrc2` with temporal noise, 8-bit H.264 at
   `format: "jpeg"`, default: the JPEG file 3840×2160 (`sips`) over the limit (the
   premise); the block `image/jpeg`, at most the limit, smaller, aspect kept;
   the scale sentence and no copy sentence; `thumb_gap` as BKk.
+- **BKd** (#612, spec §11 PR-24; no media, no render): `tools/list`'s
+  `render_frame` says what the API does with a large image, apart from the
+  scale-down sentence: its description holds each of `SIDES_SAID` (8000 px,
+  3000 px, more than 20 images, 2576 px, 10 MB, Amazon Bedrock, and "max_width
+  is the caller's control"); `max_width`'s description each of `WIDTH_SAID`
+  (8000 px, 3000 px, 2576 px, "the height follows") with its schema still
+  `minimum` 16 and `maximum` 8192 (no cap added); and none of the description,
+  `max_width`'s and `full_depth_image`'s says `OLD_ATTRIBUTION` ("Anthropic
+  API's 5 MB": the 5 MB is Amazon Bedrock's). The three texts are printed.
 BK2 is PR-23's exemption: a `full_depth_image` block over the limit stays the
 file's bytes. BK1 and BK3 are its other side: a block that fits is untouched.
 On a `capture` by an app before PR-22, BK1, BK2, BK4, BK5 and BK6 FAIL (the
@@ -362,7 +371,7 @@ SEC = 600_000
 ROWS = ["B1", "B2", "B3", "B4a", "B4b", "F1", "F2", "S1", "E1", "D1", "D3", "D4", "D5", "D6",
         "D7", "G0", "G1", "G3", "G5", "G6", "G7", "GV", "GEa", "GEb", "GEc", "GEd", "GM", "GMg",
         "GMc", "GMs", "GMe", "GMf", "GMr", "DG", "DGf", "DGv", "DGo", "DGj", "DGs", "BK1", "BK2",
-        "BK3", "BK4", "BK5", "BK6", "BKk", "BKp", "BKj", "Z1"]
+        "BK3", "BK4", "BK5", "BK6", "BKk", "BKp", "BKj", "BKd", "Z1"]
 # Every file a run keeps, by the row that writes it (L1–L3 are printed only).
 FILES = {"B1": "b1-sheet.png", "B3": "b3-frame.png", "B3a": "b3-apng.png",
          "B4a": "b4a-prores.mov",
@@ -712,6 +721,12 @@ APP_MUTANTS = {
 # that acts in one case from one that acts in all (#611: `block-is-the-file` fails BK6 too).
 # A mutant with no row here is scored on its failing rows alone.
 KEPT_ROWS = {"hlg-block-not-copied": ["BK1", "BK2", "BK3", "BK4", "BK5"]}
+# Spec §11 PR-24 (#612): what `render_frame`'s and `max_width`'s descriptions say of the API's
+# limits on an image, and the attribution PR-24 corrected.
+SIDES_SAID = ["8000 px", "3000 px", "more than 20 images", "2576 px", "10 MB", "Amazon Bedrock",
+              "max_width is the caller's control"]
+WIDTH_SAID = ["8000 px", "3000 px", "2576 px", "the height follows"]
+OLD_ATTRIBUTION = "Anthropic API's 5 MB"
 CORE_PATCH = "[patch.crates-io]\n"
 
 rows = {}
@@ -1426,13 +1441,15 @@ def run_blocks(client, files):
         else:
             print(f"       blockhlg project: {why}", flush=True)
         closed = doc.close() and closed
-    if "BK5" in selected:
+    if selected & {"BK5", "BKd"}:
         try:
             schema = client.schemas().get("render_frame") or {}
         except Exception as error:  # a socket timeout is the expiry
             schema = {"error": f"{type(error).__name__}: {error}"}
         BLOCKS["BK5schema"] = ((schema.get("inputSchema") or {}).get("properties")
                                or {}).get("full_depth_image") or {}
+        # Spec §11 PR-24 (#612): the whole tool, for its descriptions.
+        BLOCKS["BKdtool"] = schema
     return closed
 
 
@@ -2151,6 +2168,30 @@ def score_blocks(files):
         if row in selected:
             scaled_row(row, title, BLOCKS.get(row) or {"ok": False, "error": "not run"}, depth,
                        mime, copy)
+    if "BKd" in selected:
+        tool = BLOCKS.get("BKdtool") or {"error": "not run"}
+        properties = (tool.get("inputSchema") or {}).get("properties") or {}
+        said = tool.get("description") or ""
+        width = properties.get("max_width") or {}
+        width_said = width.get("description") or ""
+        deep_said = (properties.get("full_depth_image") or {}).get("description") or ""
+        missing = [phrase for phrase in SIDES_SAID if phrase not in said]
+        width_missing = [phrase for phrase in WIDTH_SAID if phrase not in width_said]
+        old = [name for name, text in [("render_frame", said), ("max_width", width_said),
+                                       ("full_depth_image", deep_said)]
+               if OLD_ATTRIBUTION in text]
+        bounds = (width.get("minimum"), width.get("maximum"))
+        check("BKd tools/list: render_frame's description names the API's limits on an image "
+              "(8000 px, 3000 px past more than 20 images, 2576 px, 10 MB, Amazon Bedrock) and "
+              "max_width as the caller's control; max_width's names 8000, 3000 and 2576 px and "
+              "that the height follows, its schema still 16…8192; none says \"Anthropic API's "
+              "5 MB\"", bool(said) and not missing and not width_missing and not old
+              and bounds == (16, 8192),
+              f"description missing {missing}; max_width missing {width_missing}, bounds "
+              f"{bounds}; \"{OLD_ATTRIBUTION}\" in {old}"
+              + (f"; {tool['error']}" if "error" in tool else "")
+              + f"\n       description: {said}\n       max_width: {width_said}"
+              f"\n       full_depth_image: {deep_said}")
 
 
 def image_size(path):
