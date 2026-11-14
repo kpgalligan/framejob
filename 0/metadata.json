@@ -1,0 +1,102 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M7E0FDMNDW50AJNRC5CDKJK9",
+  "session_id": "d372f4f5-88fe-469c-88f8-483ebb43658f",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-14T21:47:40.021973Z",
+  "branch": "tips2",
+  "checkpoints_count": 8,
+  "files_touched": [
+    "CLAUDE.md",
+    "app/CLAUDE.md",
+    "app/Sources/AgentServer+Export.swift",
+    "app/Sources/EditorViewController+Export.swift",
+    "app/Sources/Tips.swift",
+    "app/Sources/TipsWindowController.swift",
+    "designs/spec/07.4-swift-file-map.md",
+    "designs/spec/07.9l-agent-render-audio-export.md",
+    "designs/spec/11-decisions/README.md",
+    "designs/spec/11-decisions/tips.md",
+    "designs/spec/README.md",
+    "docs/manual-checks.md",
+    "docs/site/src/content/docs/mcp/export.mdx",
+    "docs/site/src/content/docs/mcp/helper-and-socket.mdx",
+    "docs/site/src/content/docs/reference/tips.mdx",
+    "docs/site/src/data/features.json",
+    "tools/proof/README.md",
+    "tools/proof/screens.py",
+    "tools/proof/tips_probe.swift",
+    "tools/proof/tips_proof.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-fable-5-2",
+  "turn_id": "22e0eab075fd",
+  "checkpoint_transcript_start": 618,
+  "transcript_lines_at_start": 618,
+  "compact_transcript_start": 75,
+  "token_usage": {
+    "input_tokens": 56,
+    "cache_creation_tokens": 191877,
+    "cache_read_tokens": 3716439,
+    "output_tokens": 11583,
+    "api_call_count": 20,
+    "subagent_tokens": {
+      "input_tokens": 532,
+      "cache_creation_tokens": 2438953,
+      "cache_read_tokens": 49850412,
+      "output_tokens": 326256,
+      "api_call_count": 262
+    }
+  },
+  "redaction": {
+    "replacements": 12,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 15,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01N2QZqXaLBMcoe9kpyxwpty",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "fablecode"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "63517e5ad4ab",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 386,
+        "end": 387,
+        "entry_ids": [
+          "e398a8a8-0ec4-4551-826a-3905cb92c316"
+        ],
+        "tool_use_id": "toolu_01N2QZqXaLBMcoe9kpyxwpty"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01N2QZqXaLBMcoe9kpyxwpty"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: fablecode",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 24
+  }
+}
