@@ -462,6 +462,17 @@ enum Harness {
             // mode. These are the defaults.
             "FrameJobBackgroundRender": true,
             "FrameJobBackgroundRenderDelay": 5,
+            // Settings ▸ Tips' toggle (`TipsSettings.enabledKey`, spec §11
+            // TIP-6), a literal for the recorder keys' reason. Pinned OFF, the
+            // one pin here that is not the first-run value, and deliberately
+            // (TIP-7): on, the editor's toolbar ends Export… then a Tips
+            // button, and older chrome proofs read Export… at fixed points of
+            // this harness's renders (`sharp_chrome.py`'s `EXPORT_RIGHT`,
+            // `phase7_chrome.py`'s accent patch). Off is a state a person
+            // reaches in Settings, so the renders are still the app's. The
+            // button's own proof is `tips_proof.py`, and the `settings` mode
+            // draws the Tips pane with its box unticked.
+            "FrameJobTips": false,
             // Normalize's chosen mode and loudness target (`NormalizeChoice`'s
             // two keys, spec §11 AU-15), literals for the same reason: written
             // by ordinary use whenever a person changes the Volume section's

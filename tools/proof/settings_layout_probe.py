@@ -8,7 +8,8 @@ click policy — measured through the app's own sources. Issue batch B74
 visible text, Copy MCP Command's press, and its missing-helper state. #127
 G6 phase 4 (spec §11 G-38) put the Playback pane last and added L12, and
 its fix pass 1 put the panes in a scroll view capped at the screen and
-added L13.
+added L13. Tips (spec §11 TIP-6) put the Tips pane last: L1 and L13 name
+five panes, and `tips_proof.py` C4 holds the pane itself.
 
     python3 tools/proof/settings_layout_probe.py [--sources DIR] [--mutant NAME] [--only IDS]
 
@@ -28,7 +29,7 @@ Prints `<ID> pass|fail — <detail>` per row, then `scores: N/M`.
 Rows:
   B0   the probe builds.
   L1   `content.arrangedSubviews` is exactly [mcpPane, assistantPane,
-       transcriptionPane, playbackPane], in that order, and
+       transcriptionPane, playbackPane, tipsPane], in that order, and
        `content.spacing` is 24.
   L2   the Assistant and Transcription panes' first arranged subview is a
        stack of [headingLabel, infoButton], the headings reading "Assistant"
@@ -81,7 +82,7 @@ Rows:
   L13  a fresh controller's `fitScreen` over a 3000 pt visible frame leaves
        `scroll` exactly the document's height; over 1440 × 875 (a
        1440 × 900 display less its menu bar) the window lies inside it
-       vertically, the document is taller than the clip, and the Playback
+       vertically, the document is taller than the clip, and the Tips
        pane is still `content`'s last, inside the document.
 
 Mutants (`--mutant`), each a literal found exactly once in the written code:
@@ -129,12 +130,12 @@ WALL = 120
 MUTANTS = {
     "order-swapped": (["L1"], [
         ("SettingsWindowController.swift",
-         "for pane in [mcpPane, assistantPane, transcriptionPane, playbackPane] {",
-         "for pane in [mcpPane, transcriptionPane, assistantPane, playbackPane] {")]),
+         "for pane in [mcpPane, assistantPane, transcriptionPane, playbackPane, tipsPane] {",
+         "for pane in [mcpPane, transcriptionPane, assistantPane, playbackPane, tipsPane] {")]),
     "mcp-last": (["L1"], [
         ("SettingsWindowController.swift",
-         "for pane in [mcpPane, assistantPane, transcriptionPane, playbackPane] {",
-         "for pane in [assistantPane, transcriptionPane, playbackPane, mcpPane] {")]),
+         "for pane in [mcpPane, assistantPane, transcriptionPane, playbackPane, tipsPane] {",
+         "for pane in [assistantPane, transcriptionPane, playbackPane, tipsPane, mcpPane] {")]),
     "bare-label": (["L3"], [
         ("SettingsWindowController.swift",
          'static let keyLabel = "AssemblyAI API key:"',

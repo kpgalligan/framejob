@@ -241,6 +241,7 @@ PINS = [(key, _plist(value)) for key, value in [
     ("FrameJobAssistantClearToolResults", False),
     ("FrameJobBackgroundRender", True),
     ("FrameJobBackgroundRenderDelay", 5),
+    ("FrameJobTips", True),
     ("FrameJobNormalizeMode", "loudness"),
     ("FrameJobNormalizeTargetLUFS", -16.0),
     ("FrameJobSwitchSpeakerMinShot", 2.0),
@@ -256,6 +257,14 @@ PINS = [(key, _plist(value)) for key, value in [
 # A `static let …Key = "(FrameJob|RC)…"` literal no captured screen draws,
 # and why. P2 requires every such literal in PINS or here.
 NOT_SHOWN = {
+    "FrameJobTipsExports": "how many exports a person confirmed in the export card have "
+                           "succeeded (spec §11 TIP-5); read and written only when one does, "
+                           "and no screen exports",
+    "FrameJobTipsFirstExport": "when the first of those exports succeeded (TIP-5); read only "
+                               "when one completes, and no screen exports",
+    "FrameJobTipsLastAsked": "when the Tips dialog was last shown by itself or Leave a Tip "
+                             "last pressed (TIP-5); read only when a person's export "
+                             "completes, and no screen exports",
     "FrameJobCompositorTiming": "a diagnostic switch for the compositor's timing log; nothing "
                                "on screen reads it",
     "RCFFmpegImport": "the opt-in ffmpeg rewrap policy, read at import; the fixtures import "

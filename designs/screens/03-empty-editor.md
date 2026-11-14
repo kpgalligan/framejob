@@ -3,7 +3,8 @@
   "title": "The empty editor",
   "project": "empty",
   "steps": [{"call": "set_selection", "args": {"clips": []}}],
-  "captures": [{"name": "window", "window": "editor"}]
+  "captures": [{"name": "window", "window": "editor"}],
+  "expect": [{"capture": "window", "visible_text": "Tips"}]
 }
 ```
 
@@ -15,7 +16,9 @@ Across the top is the toolbar: on the left, transport buttons (go to start,
 previous edit point, play, next edit point, go to end, and loop), then the
 timecode "00:00:00:00" in a box followed by "/ 00:00:00:00", the project's
 length. On the right are a "Fit" zoom pop-up for the preview, a "Safe" checkbox
-(safe-area guides, off) and a blue "Export…" button.
+(safe-area guides, off), a blue "Export…" button and, last, a green "Tips" button
+with a white label (spec §11 TIP-6): it opens the Tips window, and Settings ▸ Tips
+removes it.
 
 The upper left is the preview: the black canvas centred in a grey well, captioned
 "960 × 540 · 30 fps". The upper right is the inspector with four tabs, Clip

@@ -33417,3 +33417,86 @@ event 9's `is_error` (true / false) and request 2's tool result without `is_erro
 request 2's tool result, 2 blocks / 1; `image-limit-text-summary` on event 9's summary, "Written
 to /tmp/frame.jpg."; `image-limit-at-boundary` with `testAnImageExactlyAtTheLimitIsSent` failed
 (the mutant tree's suite, 52.5 s).
+
+## Tips — the dialog, the editor's button, the automatic ask and Settings' section (`tips_proof.py`, `tips_probe.swift`; twelve mutants; spec §11 TIP-1…TIP-7)
+
+The owner's Tips feature (2026-11-14): a small window that says who a tip pays for and opens one
+web page, a green Tips button right of Export…, an ask Frame Job makes by itself on a schedule,
+and a Settings section whose box turns the button and the ask off. Its instrument is a probe and
+not a launch default: the feature has no `-RCDev` switch and no dev tool (TIP-7), so all three
+builds run one code path and the probe hands that path its clock, calendar, defaults, dialog and
+queue.
+
+    python3 tools/proof/tips_proof.py               # the probe, the tree's text, then the app over MCP
+    python3 tools/proof/tips_proof.py --no-live     # without the L rows (no app)
+    python3 tools/proof/tips_proof.py --mutant NAME # one of the twelve; exit 1 when caught (rule R)
+
+**The probe** is `tips_probe.swift` compiled as `main.swift` over `app/Sources` through
+`swift_build.build`, with `default.metallib` (compiled from the tree's shaders) and `Blank.mp4`
+beside it, because W1–W3 run real exports of a document made in process holding one rectangle
+and no media, and a timeline with no media composes against that placeholder. Nothing reaches the
+screen, a browser or a real defaults domain: activation policy `.prohibited`, every editor in a
+window 20,000 pt off every display, the dialog's `open` and its two order calls as closures that
+record, and the state in `ProbeDefaults`, a `UserDefaults` in memory whose every other call
+traps. The one use of `UserDefaults.standard` is C3's toggle, set through the volatile argument
+domain and cleared.
+
+- **S1–S10, the schedule** (`TipsSchedule.isDue`, pure): each row a list of (state, moment,
+  calendar) against a literal verdict — the two thresholds, the toggle, the December edges to the
+  second, the 1 June boundary, one instant judged in two time zones, a clock set back.
+- **A1–A5, the state** (`TipsAsk` over `ProbeDefaults` and a clock a row moves): what
+  `countExport`, `takeAsk` and `noteTipPageOpened` write, and the four key names.
+- **F1–F3, which queue jobs count** (`TipsQueueFollower` over a table of states the row edits).
+- **C1, the dialog**: its texts, keys and window flags; its order calls made to really order the
+  window, moved off every display first, so "closes" is read off `isVisible`; a picture of each
+  look written beside the answer, each built with its look as the current drawing appearance
+  (a probe that has already drawn under the system's look resolves a layer's background against
+  that one otherwise, and paints a light dialog on a dark ground).
+- **C2, C3, the toolbar button** on `ProjectDocument()` and `EditorViewController(document:)` at
+  1440 pt and at the 900 pt minimum, found by a view walk; its geometry in the bar's coordinates.
+- **C4, Settings' pane** alone, over `ProbeDefaults` and a closure in place of the dialog.
+  `settings_layout_probe.py` L1 and L13 hold its place in the window (five panes, Tips last).
+- **W1–W3, the two export doors, run for real.** W1 and W2 call
+  `EditorViewController.beginExport(settings:to:options:tips:)`, the call the export card's commit
+  makes, with a `TipsDoors` of the row's own; the progress sheet is found among the editor's
+  presented view controllers, `viewDidAppear` is called as `docs_bugs_b4_probe.swift` calls it,
+  and Close is pressed with `performClick`. A sheet an earlier export dismissed stays in
+  `presentedViewControllers` in an off-screen window, with no presenter, so the row takes the
+  last one that has one. W3 runs Add to Queue's `TipsDoors.follow` on the probe's own
+  `ExportQueueController()`: `enqueueExport` itself is not called, because it shows the Export
+  Queue window; T1 holds its two lines.
+
+**T1** reads the same sources the probe was built from, so a mutant's copy is what it reads: the
+doors' calls counted by name. **L0–L3** drive two instances `mcp.launch` starts, one with
+`-FrameJobTips YES` and one with `-FrameJobTips NO`, so the owner's own toggle in the shared
+defaults domain never decides a row; L2's teeth are `mcp.py`'s own guard, since an agent export
+that counted would move `FrameJobTipsExports`.
+
+**The pins.** The offscreen harness pins `FrameJobTips` OFF (`pinDefaults`), the one pin that is
+not a first-run value: `sharp_chrome.py` (`EXPORT_RIGHT`) and `phase7_chrome.py` (its accent
+patch at x 1334) read Export… at fixed points of the harness's renders, and a button to its
+right would move it. `screens.py` pins it ON and lists the three state keys in `NOT_SHOWN`
+(row P2). `settings_layout_probe.py`'s L1 and L13 and `assistant_tab_probe.swift`'s P7 now want
+five panes with Tips last, and `order-swapped` and `mcp-last` follow the new pane list.
+
+**Mutants** (`MUTANTS`, `settings_layout_probe.py`'s shape, read by `mutant_anchors.py`), twelve
+because the feature adds twelve separable decisions (TIP-7): `days-ignored` (S2),
+`exports-ignored` (S3), `toggle-ignored` (S4, A3), `any-month` (S5), `skip-ignored` (S6, S7),
+`ask-unrecorded` (A2), `cancelled-counts` (F2), `agent-follows` (T1), `button-ignores-toggle`
+(C3), `toggle-unposted` (C4), `success-unwired` (W1) and `auto-takes-key` (C1, W1, W3).
+
+**Recorded** (2026-11-14). On the tree before the code, `--sources <HEAD's app/Sources> --only
+B0`: FAIL, "cannot find type 'TipsState' in scope". With it: 31/31 against Debug and, after
+`make gate`, 31/31 against Release (`RC_PROOF_APP=release`): C2 measured Tips at 46 × 26 pt,
+1382–1428 of a 1440 pt bar and 842–888 of a 900 pt one, the spacer still 109 pt wide at 900; W1
+counted 5 with the result sheet up and ordered the dialog front, never key, after Close; W3
+counted one export of two completed jobs; L2's agent export left the windows as they were and
+moved no key. The twelve mutants, each a probe rebuild, each caught on exactly its rows:
+`days-ignored` S2, `exports-ignored` S3, `toggle-ignored` S4 and A3, `any-month` S5,
+`skip-ignored` S6 and S7, `ask-unrecorded` A2, `cancelled-counts` F2 (`completed` called 3),
+`agent-follows` T1, `button-ignores-toggle` C3, `toggle-unposted` C4 (posts 0),
+`success-unwired` W1 (counted 4), `auto-takes-key` C1, W1 and W3 (orders `["key"]`).
+`settings_layout_probe.py` 14/14 with five panes, its `order-swapped` and `mcp-last` caught on
+L1; `screens.py --only 02-settings,03-empty-editor` 7 pass, P2 with the three state keys not
+shown. Not run: `assistant_tab_proof.py` (its probe typechecked with P7's five panes) and the
+older chrome proofs that read the harness's toolbar, which the harness's pin leaves as it was.

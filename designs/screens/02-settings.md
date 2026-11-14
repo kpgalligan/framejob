@@ -14,19 +14,22 @@
              {"capture": "window",
               "visible_text": "Frame Job's own estimate at LiteLLM prices, from its spend ledger. The Anthropic Console shows what your account was billed."},
              {"capture": "window", "visible_text": "Background render"},
+             {"capture": "window",
+              "visible_text": "Show the Tips button and the yearly reminder"},
              {"capture": "window", "no_visible_text": "API key:"}]
 }
 ```
 
-Settings (Frame Job ▸ Settings…) has four sections, one under the other: MCP,
-Assistant, Transcription and Playback. The first is where a person finds how to connect
+Settings (Frame Job ▸ Settings…) has five sections, one under the other: MCP,
+Assistant, Transcription, Playback and Tips. The first is where a person finds how to connect
 an MCP client such as Claude Code to Frame Job (spec §11 MC-7); the second is
 where they give Frame Job an Anthropic API key, choose the model for the
 Assistant tab, and set how a long conversation is kept in bounds; the third is
 where they give it an AssemblyAI API key, so that the Generate Captions sheet
 can transcribe in the cloud instead of on this Mac; the fourth is where they
 say whether Frame Job draws a window's graphics ahead while it is left alone
-(spec §11 G-38).
+(spec §11 G-38); the fifth is where they turn the editor's Tips button and the
+yearly reminder off, and can open the Tips window (spec §11 TIP-6).
 
 The "MCP" section opens with its bold heading alone, with no ⓘ. Under it, two
 short paragraphs in 13 pt black (white in dark), visible rather than in a
@@ -110,14 +113,24 @@ processor busy while it runs; and that the frames are held in memory, at most a
 quarter of this Mac's and less when memory is short, until the window closes or
 newer frames replace them.
 
+The "Tips" section, last, opens with its bold heading alone, with no ⓘ, like
+the MCP section. Under it, one sentence in 13 pt black (white in dark): "Frame
+Job is free and open source, made by one developer. Tips are voluntary." Then a
+ticked checkbox, "Show the Tips button and the yearly reminder", and under it a
+"Tips" button (a white square button with a thin outline). Unticking the box
+removes the green Tips button from every editor's toolbar at once and stops
+Frame Job from opening the Tips window by itself; the section's own button is
+always there and opens that window whatever the box says.
+
 No long grey paragraph is left in the window; the MCP section's blurb is its
 only paragraph, and it is black.
 
-The window is as tall as its four sections on a screen with room for them. On a
+The window is as tall as its five sections on a screen with room for them. On a
 shorter one, such as a 1440 × 900 display, it stops at the screen's visible
-height and the sections scroll inside it, so the Playback row is reached by
-scrolling. The expectation that "Background render" is visible assumes a
-capture on a screen tall enough that nothing scrolls.
+height and the sections scroll inside it, so the Playback row and the Tips
+section are reached by scrolling. The expectations that "Background render"
+and the Tips checkbox are visible assume a capture on a screen tall enough
+that nothing scrolls.
 
 In the light capture the ground is white and the headings, the MCP blurb and
 path, labels, status lines and the month's line black; the ⓘ icons, the spend note and the words

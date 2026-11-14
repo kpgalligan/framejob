@@ -662,6 +662,7 @@ export const sidebar = [
       'reference/troubleshooting',
       'reference/glossary',
       'reference/open-source',
+      'reference/tips',
     ],
   },
 ];

@@ -444,9 +444,25 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 
 **CH-6 — Settings' MCP section**
 - **Do:** 1. On a 13" display, open Frame Job ▸ Settings… in the light appearance and read the MCP section's blurb. 2. Press Copy MCP Command. 3. Scroll down to the Playback section's Background render row, if Settings scrolls. 4. Repeat in the dark appearance.
-- **Expect:** the window fits on screen, top and bottom (on a display shorter than its four panes, such as 1440 × 900, the panes scroll and the Background render row is reached by scrolling); the blurb is large and high-contrast; the button is below the blurb; nothing is selected or highlighted when Settings opens (the Assistant key field has focus); the status line appears after a press.
+- **Expect:** the window fits on screen, top and bottom (on a display shorter than its five panes, such as 1440 × 900, the panes scroll and the Background render row is reached by scrolling); the blurb is large and high-contrast; the button is below the blurb; nothing is selected or highlighted when Settings opens (the Assistant key field has focus); the status line appears after a press.
 - **Answer:** did the window fit, read clearly, open with nothing selected, and show the status line after the press, in both appearances?
 - **Source:** issue batch B74 (#222; `settings_layout_probe.py` L9, L10; spec §11 MC-7); the scrolling, #127 G6 phase 4's fix pass 1 (`settings_layout_probe.py` L13; spec §11 G-38 (a)).
+
+**CH-7 — The Tips button and its dialog**
+- **Do:** 1. Open a project and look at the right end of the toolbar, in the light appearance. 2. Hover the green Tips button, then press it. 3. Read the window; press Not Now. 4. Press Tips again, then press Leave a Tip. 5. Select a clip that has an action, so the mint action lane and bands are on screen beside the button. 6. Narrow the window to its minimum width. 7. Repeat in the dark appearance.
+- **Expect:** a green square "Tips" button after Export…, white label easy to read, lightening on hover, with the tooltip "Support Frame Job"; it reads as a different green from the action lane's mint in both appearances, and as a sibling of Export… in size. The Tips window is centred, titled Tips, reads as one of Frame Job's sheets (bold heading, a paragraph, a grey line naming Settings ▸ Tips, Not Now outlined and Leave a Tip blue), and nothing is clipped. Not Now closes it. Leave a Tip opens `https://boppallewyn.com/frame-job/tips/` in the browser and closes the window. At the minimum width nothing in the toolbar is squeezed or overlaps.
+- **Answer:** is this green right beside the action ink, in both appearances, or should the button take another colour?
+- **Source:** Tips (spec §11 TIP-1, TIP-2, TIP-6; `tips_proof.py` C1, C2).
+
+**CH-8 — Settings ▸ Tips**
+- **Do:** 1. With two projects open, open Frame Job ▸ Settings… and scroll to Tips, the last section. 2. Untick "Show the Tips button and the yearly reminder" and look at both editor windows. 3. Press the section's Tips button. 4. Tick the box again. 5. Close every project so Welcome shows, open Settings and press Tips. 6. Repeat in the dark appearance.
+- **Expect:** the section has a bold heading, one sentence, the box (ticked at first) and an outlined Tips button. Unticking removes the green button from both toolbars at once and Export… moves to the right end; ticking brings it back. The section's Tips button opens the Tips window in every state, with or without a project.
+- **Source:** Tips (spec §11 TIP-6; `tips_proof.py` C3, C4).
+
+**CH-9 — The automatic ask**
+- **Do:** 1. Quit Frame Job. In Terminal: `defaults write com.kgalligan.FrameJob FrameJobTipsExports -int 4`, `defaults write com.kgalligan.FrameJob FrameJobTipsFirstExport -date "2026-01-01T12:00:00Z"`, `defaults delete com.kgalligan.FrameJob FrameJobTipsLastAsked` (an error from the last one is fine). 2. Open the Release app from the Finder, open a short project, File ▸ Export…, export it, and while it writes click into the timeline. 3. When it has finished, press Close on the result. 4. Type Return and Space. 5. Close the Tips window, then export again and press Close. 6. `defaults read com.kgalligan.FrameJob FrameJobTipsLastAsked`. 7. Afterwards, `defaults delete` the three keys if you don't want this Mac's count to start at 6.
+- **Expect:** nothing appears while the result sheet is up. After Close the Tips window appears once, in front, WITHOUT taking the keyboard: Return and Space go to the editor (Space plays) and do not press Leave a Tip. The second export brings no window. Step 6 prints today's date.
+- **Source:** Tips (spec §11 TIP-3, TIP-4, TIP-5; `tips_proof.py` W1).
 
 ## Sound and export
 

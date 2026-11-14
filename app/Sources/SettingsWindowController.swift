@@ -16,17 +16,18 @@ import AppKit
 /// the Window menu opens it, so AppKit's own row is the only way back to a
 /// window the person has buried.
 ///
-/// **Four panes, "MCP", "Assistant", "Transcription" then "Playback"** (issue
-/// batch B74's `MCPSettingsPane`, spec §11 MC-7; road map 12 A2's
-/// `AssistantSettingsPane`; `transcriptionPane`; then G-38's
-/// `PlaybackSettingsPane`), each a vertical stack
+/// **Five panes, "MCP", "Assistant", "Transcription", "Playback" then "Tips"**
+/// (issue batch B74's `MCPSettingsPane`, spec §11 MC-7; road map 12 A2's
+/// `AssistantSettingsPane`; `transcriptionPane`; G-38's
+/// `PlaybackSettingsPane`; then TIP-6's `TipsSettingsPane`), each a vertical stack
 /// and each one of `content`'s arranged subviews, 24 pt apart through
 /// `content.spacing`. §5d's one pane was taken as a HEADING inside a window
 /// titled Settings rather than as a tab bar with one tab. The Assistant,
 /// Transcription and Playback panes open with `settingsSectionHeader` — a heading and a
 /// `SettingsInfoButton` whose popover holds its explanation (spec §11 SH-5);
 /// the MCP pane opens with its bare heading and shows its blurb, because
-/// MC-7 asked for the text above its button. There is still a Transcription
+/// MC-7 asked for the text above its button, and the Tips pane with its bare
+/// heading and one sentence (TIP-6). There is still a Transcription
 /// section, so the sentence the `transcribe` tool and its catalog entry both
 /// print — the one that sends a caller to Settings and then to Transcription
 /// — stays true without either of them being edited. The window's first
@@ -37,7 +38,7 @@ import AppKit
 ///
 /// **The panes scroll when the screen is short.** `content` sits in `scroll`,
 /// as tall as the panes but capped at the screen's visible height less the
-/// title bar (`fitScreen`): four panes are taller than a 1440 × 900 display
+/// title bar (`fitScreen`): the panes are taller than a 1440 × 900 display
 /// leaves, and the window must never outgrow its screen. On a taller screen
 /// nothing scrolls and the window is exactly the panes' height.
 ///
@@ -71,7 +72,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     /// Captions sheet can re-enable its button without being reopened.
     static let didChangeNotification = Notification.Name("FrameJobSettingsDidChange")
 
-    /// The Transcription pane's heading, the third of the window's four panes.
+    /// The Transcription pane's heading, the third of the window's five panes.
     static let paneTitle = "Transcription"
 
     /// What the field shows when a key IS stored. Fixed length on purpose:
@@ -118,8 +119,10 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     let assistantPane: AssistantSettingsPane
     /// The Transcription pane, after the Assistant pane.
     let transcriptionPane = NSStackView()
-    /// Settings' Playback pane, last (G-38).
+    /// Settings' Playback pane, after the Transcription pane (G-38).
     let playbackPane: PlaybackSettingsPane
+    /// Settings' Tips pane, last (TIP-6).
+    let tipsPane: TipsSettingsPane
 
     private(set) var saveButton: NSButton!
     private(set) var removeButton: NSButton!
@@ -133,7 +136,8 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         environment: [String: String] = ProcessInfo.processInfo.environment,
         spendFolder: @escaping () -> URL? = { AssistantSpend.folder() },
         mcpHelper: URL = AgentServer.mcpHelperURL,
-        pasteboard: NSPasteboard = .general
+        pasteboard: NSPasteboard = .general,
+        showTips: @escaping () -> Void = { TipsWindowController.shared.show() }
     ) {
         self.store = store
         self.defaults = defaults
@@ -143,6 +147,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
             store: assistantStore, defaults: defaults, environment: environment,
             spendFolder: spendFolder)
         playbackPane = PlaybackSettingsPane(defaults: defaults)
+        tipsPane = TipsSettingsPane(defaults: defaults, showTips: showTips)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: Self.windowWidth, height: 340),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
@@ -225,7 +230,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         content.orientation = .vertical
         content.alignment = .leading
         content.spacing = 24
-        for pane in [mcpPane, assistantPane, transcriptionPane, playbackPane] {
+        for pane in [mcpPane, assistantPane, transcriptionPane, playbackPane, tipsPane] {
             content.addArrangedSubview(pane)
         }
         content.translatesAutoresizingMaskIntoConstraints = false
@@ -305,6 +310,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         assistantPane.sync()
         assistantPane.refreshSpend()
         playbackPane.sync()
+        tipsPane.sync()
         fitScreen(window?.screen?.visibleFrame ?? NSScreen.main?.visibleFrame)
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)

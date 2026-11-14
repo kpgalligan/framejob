@@ -3982,7 +3982,9 @@ free.
   to Queue, the save panel and the job; `ExportSheetDynamicRange.swift`: the
   Dynamic Range row, only in an HLG project, HDR (HLG) · HDR10 (PQ) · SDR
   version on the rows that carry HDR and a disabled "SDR version" on every
-  other, never part of `ExportChoice`, spec §11 HD-14) · `ExportProgressSheetController.swift` ·
+  other, never part of `ExportChoice`, spec §11 HD-14) · `ExportProgressSheetController.swift`
+  (`onSuccess`, set by `beginExport` and called once on a success, is the
+  Tips door, spec §11 TIP-4) ·
   `ReverseProgressSheetController.swift` ·
   `SpeedSheetController.swift` · `SpeedRampSheetController.swift` (Clip ▸
   Speed Ramp…, SR-24: shape, rate, curve and hold over the range inside the
@@ -4113,16 +4115,26 @@ free.
 - `PlaybackSettingsPane.swift` — Settings' Playback pane (G-38): the
   Background render checkbox and "Start after N seconds". No tool reads or
   writes it (AI-11, R6-12, MC-7).
+- `Tips.swift` · `TipsWindowController.swift` · `TipsSettingsPane.swift` ·
+  `TipsToolbarButton.swift` — Tips (spec §11 TIP-1…TIP-7). `Tips.swift` is
+  Foundation only: the link, the pure schedule, the toggle, the state's
+  three writers and the queue follower. The dialog is a window, `show()`
+  key and `showAutomatic()` front only; `TipsDoors` is the two export
+  doors, called only from `EditorViewController+Export.swift`; `showTips`
+  is at the file's foot. The toolbar button hides itself and is the
+  experiment's one file. No tool reads or writes any of it, and nothing
+  off a person's door writes a key.
 - `SettingsWindowController.swift` — Frame Job ▸ Settings… ⌘,, the app's one
   window for something PERSISTED beyond view state, with
   `extension AppDelegate { showSettings }` at its foot
   (`CaptionImporter.swift`'s command-at-the-foot precedent, which is why
   `AppDelegate.swift` is untouched). `ExportQueueWindowController`'s mould.
   `+Verify` holds the Verify bookkeeping (pure move, #58).
-  Four panes as `content`'s arranged subviews, MCP (`mcpPane`,
+  Five panes as `content`'s arranged subviews, MCP (`mcpPane`,
   `MCPSettingsPane`, spec §11 MC-7), Assistant (`AssistantSettingsPane`),
-  Transcription (`transcriptionPane`) then Playback (`PlaybackSettingsPane`,
-  spec §11 G-38), 24 pt apart, inside a scroll view `fitScreen` caps at the
+  Transcription (`transcriptionPane`), Playback (`PlaybackSettingsPane`,
+  spec §11 G-38) then Tips (`tipsPane`, `TipsSettingsPane`, TIP-6; the
+  defaulted `showTips:` parameter is its button's door), 24 pt apart, inside a scroll view `fitScreen` caps at the
   screen's visible height less the title bar (called from `init` and
   `show()`; a tall screen shows it all, a 1440 × 900 one scrolls); the Assistant and
   Transcription panes open with `settingsSectionHeader` (a heading and a
@@ -5034,7 +5046,7 @@ free.
   `archive/roadmap-7.md` §2–§3).
 
 **Shared chrome.** `Theme.swift` (`DS` tokens, including the three track
-heights S/M/L per kind), `Controls.swift`, `OptionControls.swift`,
+heights S/M/L per kind and `DS.tips`, the Tips button's green, TIP-6), `Controls.swift`, `OptionControls.swift`,
 `Sheets.swift`, `EditorChrome.swift` (`BarView`), `FileDropView.swift`
 (Finder drops + the first responder the bare-key map needs) — copied from
 Rasterize; keep them in sync rather than forking. `Sheets.swift`'s section

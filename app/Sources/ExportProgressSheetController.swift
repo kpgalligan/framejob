@@ -63,6 +63,11 @@ final class ExportProgressSheetController: NSViewController {
     /// it is over.
     private var ledgerToken: UInt64?
 
+    /// Called once when the export succeeds, after the sheet has become its result panel, and
+    /// never on a failure or a cancel. Set by `EditorViewController.beginExport`, the person's
+    /// door (spec §11 TIP-4); nil for a sheet built any other way.
+    var onSuccess: (() -> Void)?
+
     /// The sheets whose export has begun and not finished: added in `viewDidAppear`, removed
     /// first thing in `finished`. Weak, so a sheet nothing holds any more is not counted. Read
     /// only by `revealWriting()`, which the quit asks (spec §11 #477).
@@ -206,6 +211,7 @@ final class ExportProgressSheetController: NSViewController {
             stopButton.title = "Close"
             revealButton.isHidden = false
             revealButton.isEnabled = true
+            onSuccess?()
         case .failure(let error):
             if case Exporter.ExportError.cancelled = error {
                 dismiss(self)

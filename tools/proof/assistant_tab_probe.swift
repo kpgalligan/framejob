@@ -488,10 +488,11 @@ func rowP7() {
         store: { MemoryStore() }, assistantStore: { MemoryStore() }, defaults: suite,
         environment: [:])
     let arranged = window.content.arrangedSubviews
-    let placed = arranged.count == 4 && arranged[1] === window.assistantPane
-        && arranged[2] === window.transcriptionPane && arranged.last === window.playbackPane
-    notes.append("Settings: four panes, Assistant pane second, Transcription pane third, "
-        + "Playback pane last \(placed)")
+    let placed = arranged.count == 5 && arranged[1] === window.assistantPane
+        && arranged[2] === window.transcriptionPane && arranged[3] === window.playbackPane
+        && arranged.last === window.tipsPane
+    notes.append("Settings: five panes, Assistant pane second, Transcription pane third, "
+        + "Playback pane fourth, Tips pane last \(placed)")
     row("P7", emptyState && saved && removed && defaultQuiet && changed && sameQuiet && placed,
         notes.joined(separator: "; "))
 }

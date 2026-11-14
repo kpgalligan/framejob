@@ -21,7 +21,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`02-six-ideas.md`](02-six-ideas.md) | 28 | The six ideas the model is built on, and why it stays simple. |
 | [`03-window-layout.md`](03-window-layout.md) | 73 | The window's regions, as the design handoff specifies them. |
 | **§4 — The regions in detail** | | |
-| [`04.1-toolbar.md`](04.1-toolbar.md) | 25 | The toolbar. |
+| [`04.1-toolbar.md`](04.1-toolbar.md) | 30 | The toolbar. |
 | [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 201 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping, Show Ungraded and the scopes panel (its two slots, their sizes and the four scopes drawn). |
 | [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 146 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear, the note on the section list, and the controls the sections use (Rasterize's `OptionControls`). |
 | [`04.3b-inspector-clip-sections.md`](04.3b-inspector-clip-sections.md) | 364 | The Clip tab's sections: every video section. |
@@ -49,7 +49,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 338 | The composition plan: A/B assignment, speed and freeze, audio envelopes, the tap's isolation and voice pass, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 468 | The per-frame recipe the compositor draws: layers, mattes, nests, the cursor, cutout and blur keys. |
 | [`07.3b-frame-recipe-options.md`](07.3b-frame-recipe-options.md) | 108 | §7.3 continued: the recipe options — burn-in, ungraded, selection and behind, the SDR version — and how an option reaches a frame. |
-| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 110 | The spec's Swift file map (app/CLAUDE.md is the live one). |
+| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 111 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5a-compositor-step-0-output.md`](07.5a-compositor-step-0-output.md) | 205 | The Metal compositor's pixel formats, step 0 (per composition) and camera log, the request and the scopes' tap (the shown set, the kernels, the counting rule), the HLG working space, the output pass and linear light. |
 | [`07.5b-compositor-passes-grades.md`](07.5b-compositor-passes-grades.md) | 439 | The compositor's per-layer passes and pipelines, the cursor and the cutout, the adjustment pass and its qualifier, the encoded-sRGB blend, transitions, mattes, tone, wheels, curves, looks and `.cube` LUTs, and the frame budget. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 70 | What playback does after every edit: rebuild or refresh. |
@@ -73,7 +73,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 335 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 28051 in 82 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 28165 in 83 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

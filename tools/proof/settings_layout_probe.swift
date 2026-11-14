@@ -5,6 +5,8 @@
 // batch B74 (spec §11 MC-7) put the MCP pane first and added L9–L11: its
 // order and text, Copy MCP Command's press, and its missing-helper state.
 // #127 G6 phase 4 (spec §11 G-38) put the Playback pane last and added L12.
+// Tips (spec §11 TIP-6) put the Tips pane after it: L1 and L13 name five
+// panes with Tips last, and `tips_proof.py` C4 holds the pane itself.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `FrameJob`, against `libframejob_core.a`. One process,
@@ -22,7 +24,7 @@
 // LITERAL, never the app's own constant, so a changed constant is a changed
 // answer. Rows:
 //   L1 `content`'s arranged subviews are exactly [mcpPane, assistantPane,
-//      transcriptionPane, playbackPane], and `content.spacing` is 24.
+//      transcriptionPane, playbackPane, tipsPane], and `content.spacing` is 24.
 //   L2 the Assistant and Transcription panes open with a stack of
 //      [headingLabel, infoButton], the headings reading "Assistant" and
 //      "Transcription"; the MCP pane opens with its bare headingLabel reading
@@ -65,7 +67,7 @@
 //      document's height (nothing scrolls); over a 1440 × 875 one (a
 //      1440 × 900 display less its menu bar) the window's frame lies inside
 //      it vertically, the document is taller than the clip (the panes
-//      scroll), and the Playback pane is still `content`'s last, inside the
+//      scroll), and the Tips pane is still `content`'s last, inside the
 //      document.
 import AppKit
 
@@ -133,16 +135,17 @@ let allFields = fields(in: root)
 
 do {
     let arranged = controller.content.arrangedSubviews
-    let ordered = arranged.count == 4 && arranged[0] === controller.mcpPane
+    let ordered = arranged.count == 5 && arranged[0] === controller.mcpPane
         && arranged[1] === assistant && arranged[2] === controller.transcriptionPane
-        && arranged[3] === controller.playbackPane
+        && arranged[3] === controller.playbackPane && arranged[4] === controller.tipsPane
     let spacing = controller.content.spacing
     row("L1", ordered && spacing == 24,
         "arranged \(arranged.map { String(describing: type(of: $0)) }), "
             + "mcp first \(arranged.first === controller.mcpPane), "
             + "assistant second \(arranged.count > 1 && arranged[1] === assistant), "
             + "transcription third \(arranged.count > 2 && arranged[2] === controller.transcriptionPane), "
-            + "playback last \(arranged.last === controller.playbackPane), spacing \(spacing)")
+            + "playback fourth \(arranged.count > 3 && arranged[3] === controller.playbackPane), "
+            + "tips last \(arranged.last === controller.tipsPane), spacing \(spacing)")
 }
 
 // MARK: - L2 the headers
@@ -477,14 +480,14 @@ do {
         let inside = frame.minY >= short.minY - 0.5 && frame.maxY <= short.maxY + 0.5
         let clipHeight = fitted.scroll.contentView.bounds.height
         let scrolls = document.frame.height > clipHeight + 0.5
-        let last = fitted.content.arrangedSubviews.last === fitted.playbackPane
-            && fitted.playbackPane.isDescendant(of: document)
+        let last = fitted.content.arrangedSubviews.last === fitted.tipsPane
+            && fitted.tipsPane.isDescendant(of: document)
         good = uncapped && inside && scrolls && last
         detail = "3000 pt screen: document \(full), scroll \(tallScroll) (equal \(uncapped)), "
             + "document width \(tallWidth) then \(document.frame.width), scroller style "
             + "\(fitted.scroll.scrollerStyle == .legacy ? "legacy" : "overlay"); "
             + "1440 × 875 screen: window \(frame) inside \(inside), document "
-            + "\(document.frame.height) over clip \(clipHeight) (scrolls \(scrolls)); playback "
+            + "\(document.frame.height) over clip \(clipHeight) (scrolls \(scrolls)); tips "
             + "last in the document \(last)"
     }
     row("L13", good, detail)

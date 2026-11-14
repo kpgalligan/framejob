@@ -47,17 +47,25 @@ extension EditorViewController {
     /// (`export_overrides.rs`) and the file reported as a success. The default
     /// is no options at all, so a caller that says nothing exports what it
     /// always did.
-    func beginExport(settings: ExportSettings, to url: URL, options: RecipeOptions = .none) {
+    ///
+    /// This is a person's export, so its success is told to `tips` (spec §11
+    /// TIP-4): counted then, and the Tips dialog shown, when it is due, once
+    /// this window's result sheet has ended.
+    func beginExport(
+        settings: ExportSettings, to url: URL, options: RecipeOptions = .none,
+        tips: TipsDoors = .shared
+    ) {
         guard let document = document else {
             NSSound.beep()
             return
         }
         playback.pause()
-        presentAsSheet(
-            ExportProgressSheetController(
-                project: document.project, urls: document.mediaURLs(), settings: settings,
-                to: url, options: options,
-                graphics: GraphicRegistry.shared.snapshot(for: document.recipeKey)))
+        let sheet = ExportProgressSheetController(
+            project: document.project, urls: document.mediaURLs(), settings: settings,
+            to: url, options: options,
+            graphics: GraphicRegistry.shared.snapshot(for: document.recipeKey))
+        sheet.onSuccess = { [weak self] in tips.exportSucceeded(sheetOn: self?.view.window) }
+        presentAsSheet(sheet)
     }
 
     /// Called by `ExportSheetController`'s **Add to Queue** once the save
@@ -80,15 +88,20 @@ extension EditorViewController {
     /// Playback is NOT paused, unlike `beginExport`: a queued job runs behind
     /// the editor by design, and the person who chose not to wait for it did
     /// not ask for their preview to stop.
+    ///
+    /// The job is a person's, so Tips follows it by its id (spec §11 TIP-4):
+    /// a completion counts, a cancel or a failure does not. The agent's
+    /// `export` enqueues without this.
     func enqueueExport(settings: ExportSettings, to url: URL, options: RecipeOptions = .none) {
         guard let document = document else {
             NSSound.beep()
             return
         }
-        ExportQueueController.shared.enqueue(
+        let id = ExportQueueController.shared.enqueue(
             project: document.project, urls: document.mediaURLs(), settings: settings,
             to: url, options: options,
             graphics: GraphicRegistry.shared.snapshot(for: document.recipeKey))
+        TipsDoors.shared.follow(queueJob: id)
         // Adding to a queue shows the queue: the job has no sheet of its own,
         // so this window is the only thing that says it exists.
         ExportQueueWindowController.shared.show()

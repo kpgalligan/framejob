@@ -26,9 +26,9 @@ DUMMY key in a `-RCSecretFolder` of its own,
       empties the field, masks the placeholder and posts `key`; Remove; a
       model commit writes the suite and posts `model`; a commit that leaves
       the model where it was (`""` → claude-opus-5-5, the same text again)
-      posts nothing; the window has four panes, the Assistant pane second
-      (after B74's MCP pane), the Transcription pane third (B71, B74) and
-      the Playback pane last (G-38)
+      posts nothing; the window has five panes, the Assistant pane second
+      (after B74's MCP pane), the Transcription pane third (B71, B74), the
+      Playback pane fourth (G-38) and the Tips pane last (TIP-6)
   P8  (#150) the probe run alone under `--close <path>`, against the
       stand-in scripted to ask for `export` to `work/assistant_tab/p8/P8.mp4`:
       the question `export writes <path>`; then `window.close()` with the
