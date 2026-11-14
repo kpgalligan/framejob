@@ -428,7 +428,10 @@ written and before it is swapped in, so a proof can publish a cache file during 
 a save out); and `cache_ledger`, which answers, for a document's cache folder, how many
 publishes of each cache writer met a save and waited it out, and arms a gate that holds a
 named writer's next publish until a save of that folder is inside its `-RCDevSaveHold`
-(spec §11 #552); and
+(spec §11 #552); and `-RCDevTipsSuite <name>`, which keeps Tips' counting
+state in a throwaway suite and counts the instance, so a proof can see an
+agent's export counted and the Tips window open without moving the bundle's
+domain (spec §11 TIP-7, TIP-8); and
 `-RCDevExportFault audio@N|video@N|audio-hold@N`, the same for an
 `ExportWriter` export's pumps, spec §11 #378), which
 Distribution does not. `rc_op_names`

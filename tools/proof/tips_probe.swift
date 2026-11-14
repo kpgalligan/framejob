@@ -1,4 +1,4 @@
-// Tips (spec §11 TIP-1…TIP-7) — the probe `tips_proof.py` builds and runs.
+// Tips (spec §11 TIP-1…TIP-8) — the probe `tips_proof.py` builds and runs.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `FrameJob`, against `libframejob_core.a`, through
@@ -18,8 +18,10 @@
 // closures that only record; the state lives in `ProbeDefaults`, in memory.
 // The one use of `UserDefaults.standard` is C3's toggle, set through the
 // volatile ARGUMENT domain and cleared again, which writes nothing. The
-// exports of W1–W3 are real ones, of a document made in process holding one
-// shape clip and no media, into the scratch folder.
+// exports of W1–W7 are real ones, of a document made in process holding one
+// shape clip and no media, into the scratch folder. This process is itself a
+// scratch instance (TIP-8): a bare executable, which `tips_proof.py` also
+// runs with `RC_AGENT_SOCKET` set so I3 can read the process's environment.
 import AppKit
 
 let app = NSApplication.shared
@@ -51,6 +53,19 @@ func spin(_ seconds: Double) { RunLoop.main.run(until: Date().addingTimeInterval
 
 /// A line on stderr, which `tips_proof.py` keeps beside the answer.
 func trace(_ text: String) { FileHandle.standardError.write(Data((text + "\n").utf8)) }
+
+/// The modal watchdog: counts a modal session and aborts it, from a timer in
+/// the common modes (which a modal loop runs). Nothing here starts one, so
+/// the count stays 0; a build whose ask ran one would otherwise hang the run
+/// where a row should fail (W4).
+var modalSessions = 0
+let modalWatchdog = Timer(timeInterval: 0.05, repeats: true) { _ in
+    guard let window = NSApp.modalWindow else { return }
+    modalSessions += 1
+    NSApp.abortModal()
+    window.orderOut(nil)
+}
+RunLoop.main.add(modalWatchdog, forMode: .common)
 
 /// The state's defaults, in memory. Only the calls `Tips.swift` and
 /// `TipsSettingsPane.swift` make are answered; anything else traps, which is a
@@ -333,6 +348,69 @@ do {
     third.settle()
     row("F3", thirdCalls == 1,
         "job 7 completed and never followed, job 8 followed: completed called \(thirdCalls)")
+}
+
+// MARK: - I: whose instance counts (TIP-8)
+
+do {
+    let app = "com.kgalligan.FrameJob"
+    func counts(_ environment: [String: String], _ bundle: String?) -> Bool {
+        TipsInstance.counts(environment: environment, bundleIdentifier: bundle)
+    }
+    let socket = verdicts([
+        ("no variable, the app's bundle", counts([:], app), true),
+        ("RC_AGENT_SOCKET a path",
+         counts(["RC_AGENT_SOCKET": "/tmp/rc-x/agent.sock"], app), false),
+        ("RC_AGENT_SOCKET empty", counts(["RC_AGENT_SOCKET": ""], app), true),
+        ("CFFIXED_USER_HOME alone, which is not a condition",
+         counts(["CFFIXED_USER_HOME": "/tmp/home"], app), true),
+        ("another variable alone", counts(["RC_PROOF_APP": "release"], app), true),
+    ])
+    row("I1", socket.0, socket.1)
+
+    let bundle = verdicts([
+        ("no bundle identifier, no variable", counts([:], nil), false),
+        ("the Debug bundle's identifier", counts([:], "com.kgalligan.FrameJob.debug"), true),
+        ("no bundle identifier, the socket set",
+         counts(["RC_AGENT_SOCKET": "/tmp/rc-x/agent.sock"], nil), false),
+    ])
+    row("I2", bundle.0, bundle.1)
+
+    // I3: `ofProcess` reads THIS process's environment, in which the proof
+    // set RC_AGENT_SOCKET. This executable has no bundle identifier, so a
+    // bundle with one is made in the scratch folder and handed in: with it,
+    // only the environment can make the answer false.
+    let folder = scratch.appendingPathComponent("Fake.bundle/Contents", isDirectory: true)
+    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let plist: [String: Any] = [
+        "CFBundleIdentifier": "com.example.tips-probe", "CFBundlePackageType": "BNDL",
+    ]
+    try? PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+        .write(to: folder.appendingPathComponent("Info.plist"))
+    let fake = Bundle(url: folder.deletingLastPathComponent())
+    let own = ProcessInfo.processInfo.environment["RC_AGENT_SOCKET"] ?? ""
+    var notes: [String] = []
+    var good = true
+    func check(_ pass: Bool, _ note: String) {
+        if !pass { good = false }
+        notes.append("\(note) \(pass)")
+    }
+    check(!own.isEmpty, "CONTROL: this process was run with RC_AGENT_SOCKET set")
+    check(
+        fake?.bundleIdentifier == "com.example.tips-probe",
+        "CONTROL: the scratch bundle has an identifier (\(fake?.bundleIdentifier ?? "none"))")
+    check(Bundle.main.bundleIdentifier == nil, "CONTROL: this executable has none")
+    if let fake {
+        check(
+            TipsInstance.ofProcess(environment: [:], bundle: fake),
+            "CONTROL: with that bundle and an empty environment it counts")
+        check(
+            !TipsInstance.ofProcess(bundle: fake),
+            "with that bundle and this process's own environment it does not")
+    }
+    check(!TipsInstance.ofProcess(), "this process, as it is, does not count")
+    check(!TipsInstance.isPersons, "TipsInstance.isPersons is false here")
+    row("I3", good, notes.joined(separator: "; "))
 }
 
 // MARK: - C1: the dialog
@@ -702,23 +780,38 @@ do {
 // MARK: - W: the two export doors, with real exports
 
 /// One door's fixture: a state one export short of due, and a dialog that
-/// only records how it was ordered.
+/// records how it was ordered. Each order call moves the window off every
+/// display and orders it back, as C1's does, so a build whose ask ran a modal
+/// session on it would run that session on a window already off screen.
 final class Door {
     let store = ProbeDefaults()
     let clock = Clock()
     var orders: [String] = []
     lazy var ask = TipsAsk(defaults: store, now: { self.clock.now }, calendar: { la })
     lazy var dialog = TipsWindowController(
-        ask: ask, open: { _ in }, orderKey: { [unowned self] _ in self.orders.append("key") },
-        orderFront: { [unowned self] _ in self.orders.append("front") })
+        ask: ask, open: { _ in },
+        orderKey: { [unowned self] in self.order($0, "key") },
+        orderFront: { [unowned self] in self.order($0, "front") })
 
     init() {
         store.values["FrameJobTipsExports"] = 4
         store.values["FrameJobTipsFirstExport"] = clock.now - 40 * day
     }
 
+    private func order(_ window: NSWindow, _ how: String) {
+        window.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+        window.orderBack(nil)
+        orders.append(how)
+    }
+
     var exports: Int { store.integer(forKey: "FrameJobTipsExports") }
     var lastAsked: Date? { store.values["FrameJobTipsLastAsked"] as? Date }
+    /// True while the state is exactly what `init` seeded: nothing counted,
+    /// nothing asked, no key added.
+    var untouched: Bool {
+        exports == 4 && lastAsked == nil && store.values.count == 2
+            && store.values["FrameJobTipsFirstExport"] as? Date == clock.now - 40 * day
+    }
 }
 
 /// The progress sheet the editor is presenting now. One an earlier export
@@ -785,7 +878,8 @@ do {
     // W2 first: a failed and a cancelled Export… on a state the next counted
     // export would make due.
     let door = Door()
-    let doors = TipsDoors(ask: door.ask, dialog: { door.dialog }, queue: ExportQueueController())
+    let doors = TipsDoors(
+        ask: door.ask, dialog: { door.dialog }, queue: ExportQueueController(), counts: { true })
     var notes: [String] = []
     var good = true
     func check(_ pass: Bool, _ note: String) {
@@ -843,12 +937,13 @@ do {
 }
 
 do {
-    // W3: Add to Queue's door on the probe's own queue. Job A is enqueued
-    // as the agent's `export` enqueues, unfollowed; B is followed; C is
-    // followed and cancelled while it waits.
+    // W3: Add to Queue's door on the probe's own queue. Job A is a job
+    // nobody followed; B is followed; C is followed and cancelled while it
+    // waits.
     let door = Door()
     let queue = ExportQueueController()
-    let doors = TipsDoors(ask: door.ask, dialog: { door.dialog }, queue: queue)
+    let doors = TipsDoors(
+        ask: door.ask, dialog: { door.dialog }, queue: queue, counts: { true })
     var notes: [String] = []
     var good = true
     func check(_ pass: Bool, _ note: String) {
@@ -866,7 +961,7 @@ do {
                 project: editor.document.project, urls: editor.document.mediaURLs(),
                 settings: settings, to: destination)
         }
-        let a = enqueue("w3-agent.mp4")
+        let a = enqueue("w3-unfollowed.mp4")
         let b = enqueue("w3-person.mp4")
         doors.follow(queueJob: b)
         let c = enqueue("w3-cancelled.mp4")
@@ -892,6 +987,205 @@ do {
         check(false, "no editor or no settings")
     }
     row("W3", good, notes.joined(separator: "; "))
+}
+
+// MARK: - W4–W7: the agent's door, and the doors in a scratch instance
+
+/// A tool handler's answer: whether it is an error, its text, and the text
+/// read as a JSON object.
+func toolAnswer(_ raw: String) -> (error: Bool, text: String, object: [String: Any]) {
+    let outer = (try? JSONSerialization.jsonObject(with: Data(raw.utf8))) as? [String: Any] ?? [:]
+    let text = (outer["content"] as? [[String: Any]])?.first?["text"] as? String ?? ""
+    let object = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any] ?? [:]
+    return (outer["isError"] as? Bool ?? true, text, object)
+}
+
+/// Gives the editor's document a path and registers it, so the handler's
+/// `project` argument finds it and no other; answers the path.
+func register(_ editor: Editor, as name: String) -> String {
+    let url = scratch.appendingPathComponent(name)
+    editor.document.fileURL = url
+    NSDocumentController.shared.addDocument(editor.document)
+    return url.path
+}
+
+func unregister(_ editor: Editor) {
+    NSDocumentController.shared.removeDocument(editor.document)
+    editor.window.close()
+}
+
+/// The agent's `export`, through its handler
+/// (`AgentServer.exportProject(_:tips:)`): the job's id, or why there is none.
+/// It is called HERE on main. The lane calls it on its own thread, and the
+/// handler hops to main for the block that enqueues, tracks and follows,
+/// which is the block these rows are about.
+func agentExport(project: String, to name: String, doors: TipsDoors) -> (id: UInt64?, note: String) {
+    let destination = scratch.appendingPathComponent(name)
+    try? FileManager.default.removeItem(at: destination)
+    let arguments: [String: Any] = [
+        "project": project, "preset": "h264", "path": destination.path,
+    ]
+    let raw: String
+    do {
+        raw = try AgentServer.shared.exportProject(arguments, tips: doors)
+    } catch {
+        return (nil, "refused: \((error as? AgentServer.ToolError)?.message ?? "\(error)")")
+    }
+    let answer = toolAnswer(raw)
+    guard !answer.error, let id = (answer.object["export_id"] as? NSNumber)?.uint64Value else {
+        return (nil, "answered \(answer.text)")
+    }
+    return (id, answer.object["status"] as? String ?? "no status")
+}
+
+/// `export_status`, through its handler: the status word, or why none.
+func agentStatus(_ id: UInt64) -> String {
+    guard let raw = try? AgentServer.shared.exportStatus(["export_id": Int(id)]) else {
+        return "refused"
+    }
+    return toolAnswer(raw).object["status"] as? String ?? "no status"
+}
+
+/// Follows a job through `export_status` to its end, at most 120 s.
+func agentWait(_ id: UInt64?) -> String {
+    guard let id else { return "no job" }
+    let start = Date()
+    var word = agentStatus(id)
+    while !["done", "failed", "cancelled"].contains(word), Date().timeIntervalSince(start) < 120 {
+        spin(0.05)
+        word = agentStatus(id)
+    }
+    spin(0.3)
+    return word
+}
+
+do {
+    // W4: the agent's door in a person's instance, on a state one export
+    // short of due.
+    let door = Door()
+    let doors = TipsDoors(
+        ask: door.ask, dialog: { door.dialog }, queue: .shared, counts: { true })
+    var notes: [String] = []
+    var good = true
+    func check(_ pass: Bool, _ note: String) {
+        if !pass { good = false }
+        notes.append("\(note) \(pass)")
+    }
+    if let editor = makeEditor(seconds: 1) {
+        let project = register(editor, as: "w4.framejob")
+        let modalBefore = modalSessions
+        let first = agentExport(project: project, to: "w4-first.mp4", doors: doors)
+        let ended = agentWait(first.id)
+        check(
+            first.id != nil && ended == "done",
+            "export answered an id (\(first.note)) and export_status reached \(ended)")
+        check(door.exports == 5, "counted (\(door.exports) from 4)")
+        check(
+            door.orders == ["front"] && door.lastAsked == door.clock.now,
+            "asked when it completed: ordered front, never key (\(door.orders)), last asked "
+                + "recorded (\(door.lastAsked == door.clock.now))")
+        check(
+            modalSessions == modalBefore && NSApp.modalWindow == nil,
+            "no modal session was run (\(modalSessions - modalBefore) seen, modal window "
+                + "\(NSApp.modalWindow == nil ? "none" : "one"))")
+        let after = first.id.map(agentStatus) ?? "no job"
+        let second = agentExport(project: project, to: "w4-second.mp4", doors: doors)
+        let secondEnded = agentWait(second.id)
+        check(
+            after == "done" && second.id != nil && secondEnded == "done",
+            "with the dialog shown, export_status answers \(after) and a second export "
+                + "(\(second.note)) reaches \(secondEnded)")
+        check(
+            door.exports == 6 && door.orders == ["front"],
+            "the second: counted (\(door.exports)), not asked again (\(door.orders))")
+        unregister(editor)
+    } else {
+        check(false, "no editor")
+    }
+    row("W4", good, notes.joined(separator: "; "))
+}
+
+do {
+    // W5: the queue door in a scratch instance, through the same handler.
+    let door = Door()
+    let doors = TipsDoors(
+        ask: door.ask, dialog: { door.dialog }, queue: .shared, counts: { false })
+    var notes: [String] = []
+    var good = true
+    func check(_ pass: Bool, _ note: String) {
+        if !pass { good = false }
+        notes.append("\(note) \(pass)")
+    }
+    if let editor = makeEditor(seconds: 1) {
+        let project = register(editor, as: "w5.framejob")
+        let made = agentExport(project: project, to: "w5.mp4", doors: doors)
+        let ended = agentWait(made.id)
+        check(made.id != nil && ended == "done", "the agent's export reaches \(ended) (\(made.note))")
+        check(
+            door.untouched && door.orders.isEmpty,
+            "nothing counted, asked or ordered: exports \(door.exports), keys "
+                + "\(door.store.values.keys.sorted()), orders \(door.orders)")
+        unregister(editor)
+    } else {
+        check(false, "no editor")
+    }
+    row("W5", good, notes.joined(separator: "; "))
+}
+
+do {
+    // W6: the Export… door in a scratch instance.
+    let door = Door()
+    let doors = TipsDoors(
+        ask: door.ask, dialog: { door.dialog }, queue: ExportQueueController(), counts: { false })
+    var notes: [String] = []
+    var good = true
+    func check(_ pass: Bool, _ note: String) {
+        if !pass { good = false }
+        notes.append("\(note) \(pass)")
+    }
+    if let editor = makeEditor(seconds: 1) {
+        let exported = runExport(
+            editor, to: scratch.appendingPathComponent("w6.mp4"), doors: doors)
+        spin(0.3)
+        closeSheet(editor)
+        check(exported == "exported", "Export… succeeds (\(exported))")
+        check(
+            door.untouched && door.orders.isEmpty,
+            "nothing counted, asked or ordered after Close: exports \(door.exports), keys "
+                + "\(door.store.values.keys.sorted()), orders \(door.orders)")
+        editor.window.close()
+    } else {
+        check(false, "no editor")
+    }
+    row("W6", good, notes.joined(separator: "; "))
+}
+
+do {
+    // W7: doors built with the DEFAULT rule, in this process, which is a
+    // scratch instance: the rule the app's own doors are built with.
+    let door = Door()
+    let doors = TipsDoors(ask: door.ask, dialog: { door.dialog }, queue: .shared)
+    var notes: [String] = []
+    var good = true
+    func check(_ pass: Bool, _ note: String) {
+        if !pass { good = false }
+        notes.append("\(note) \(pass)")
+    }
+    if let editor = makeEditor(seconds: 1) {
+        let project = register(editor, as: "w7.framejob")
+        check(!TipsInstance.isPersons, "CONTROL: this process is a scratch instance")
+        let made = agentExport(project: project, to: "w7.mp4", doors: doors)
+        let ended = agentWait(made.id)
+        check(made.id != nil && ended == "done", "the agent's export reaches \(ended) (\(made.note))")
+        check(
+            door.untouched && door.orders.isEmpty,
+            "with the default rule nothing is counted, asked or ordered: exports "
+                + "\(door.exports), keys \(door.store.values.keys.sorted()), orders \(door.orders)")
+        unregister(editor)
+    } else {
+        check(false, "no editor")
+    }
+    row("W7", good, notes.joined(separator: "; "))
 }
 
 finish()

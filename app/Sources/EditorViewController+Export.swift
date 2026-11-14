@@ -89,9 +89,9 @@ extension EditorViewController {
     /// the editor by design, and the person who chose not to wait for it did
     /// not ask for their preview to stop.
     ///
-    /// The job is a person's, so Tips follows it by its id (spec §11 TIP-4):
-    /// a completion counts, a cancel or a failure does not. The agent's
-    /// `export` enqueues without this.
+    /// Tips follows the job by its id (spec §11 TIP-4): a completion counts,
+    /// a cancel or a failure does not. The agent's `export` follows its own
+    /// job the same way (`AgentServer.exportProject`).
     func enqueueExport(settings: ExportSettings, to url: URL, options: RecipeOptions = .none) {
         guard let document = document else {
             NSSound.beep()

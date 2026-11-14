@@ -135,17 +135,19 @@ final class TipsWindowController: NSWindowController {
 
 // MARK: - The export doors
 
-/// The two places a person's export reaches Tips (TIP-4): the Export… sheet's
-/// success and an Add to Queue job. `EditorViewController+Export.swift` is
-/// the only caller; the agent's `export` never comes here. The ask, the
-/// dialog and the queue are parameters so a probe runs both doors on its own.
-/// Main thread.
+/// The two places an export reaches Tips (TIP-4): the Export… sheet's success
+/// and a queued job, which is a person's Add to Queue
+/// (`EditorViewController+Export.swift`) or the agent's `export`
+/// (`AgentServer+Export.swift`, the Assistant's too). Both doors do nothing in
+/// a scratch instance (`counts`, TIP-8). The ask, the dialog, the queue and
+/// that rule are parameters so a probe runs the doors on its own. Main thread.
 final class TipsDoors {
     static let shared = TipsDoors()
 
     private let ask: TipsAsk
     private let dialog: () -> TipsWindowController
     private let queue: ExportQueueController
+    private let counts: () -> Bool
     private var follower: TipsQueueFollower?
     private var queueObserver: NSObjectProtocol?
     /// The result sheets still up after a counted success, each waiting for
@@ -155,11 +157,13 @@ final class TipsDoors {
     init(
         ask: TipsAsk = .shared,
         dialog: @escaping () -> TipsWindowController = { TipsWindowController.shared },
-        queue: ExportQueueController = .shared
+        queue: ExportQueueController = .shared,
+        counts: @escaping () -> Bool = { TipsInstance.isPersons }
     ) {
         self.ask = ask
         self.dialog = dialog
         self.queue = queue
+        self.counts = counts
     }
 
     deinit {
@@ -169,8 +173,9 @@ final class TipsDoors {
     /// An Export… the person confirmed has succeeded: counted now. The ask
     /// waits until `window`'s sheet — the export's own result panel — ends,
     /// and one main-queue turn more so the sheet has left; with no sheet
-    /// attached it is asked at once.
+    /// attached it is asked at once. Nothing in a scratch instance.
     func exportSucceeded(sheetOn window: NSWindow?) {
+        guard counts() else { return }  // the Export… door
         ask.countExport()
         guard let window, window.attachedSheet != nil else {
             askIfDue()
@@ -184,9 +189,11 @@ final class TipsDoors {
             })
     }
 
-    /// An Add to Queue job the person confirmed: followed to its end by id.
-    /// A completion counts and asks; a cancel or a failure does neither.
+    /// A queued job, a person's Add to Queue or the agent's `export`:
+    /// followed to its end by id. A completion counts and asks; a cancel or a
+    /// failure does neither. Not followed at all in a scratch instance.
     func follow(queueJob id: UInt64) {
+        guard counts() else { return }  // the queue door
         if follower == nil {
             follower = TipsQueueFollower(
                 state: { [queue] in queue.job($0)?.state },

@@ -1,9 +1,9 @@
 import Foundation
 
-/// Tips (spec §11 TIP-1…TIP-7): what the dialog links to, when Frame Job asks
-/// by itself, and what it remembers. Foundation only, so a probe can run the
-/// rule against a clock of its own and the AppKit-free export queue can be
-/// followed from here. The dialog is `TipsWindowController.swift`, the
+/// Tips (spec §11 TIP-1…TIP-8): what the dialog links to, when Frame Job asks
+/// by itself, what it remembers, and whose instance counts. Foundation only,
+/// so a probe can run the rule against a clock of its own and the AppKit-free
+/// export queue can be followed from here. The dialog is `TipsWindowController.swift`, the
 /// editor's button `TipsToolbarButton.swift`, Settings' pane
 /// `TipsSettingsPane.swift`.
 
@@ -16,7 +16,8 @@ enum TipsLink {
 struct TipsState: Equatable {
     /// When the first counted export succeeded; nil before one has.
     var firstExport: Date?
-    /// How many exports a person confirmed in the export card have succeeded.
+    /// How many exports have succeeded in a person's instance (TIP-4, TIP-8),
+    /// whoever started them: the export card, an MCP client or the Assistant.
     var exports = 0
     /// When the automatic ask was last shown, or "Leave a Tip" last pressed.
     var lastAsked: Date?
@@ -80,9 +81,70 @@ enum TipsSettings {
     }
 }
 
-/// The stored state and its three writers (TIP-5). Every writer is reached
-/// only from a person's door: an export confirmed in the export card, or the
-/// dialog's "Leave a Tip". Main thread.
+/// Whose instance this is (TIP-8). A scratch instance counts nothing and asks
+/// nothing: one a proof or a test copy runs on a socket of its own, and the
+/// app's code run in a bare executable (a probe, the offscreen harness).
+/// Both export doors (`TipsWindowController.swift`) ask before they do
+/// anything, so the rule is about the instance and not about who started the
+/// export.
+enum TipsInstance {
+    /// Pure. A person's instance runs from an app bundle, with
+    /// `RC_AGENT_SOCKET` unset or empty (`AgentServer.socketPlan`'s reading).
+    /// MC-6 keeps every proof off the person's socket, so an instance a proof
+    /// can reach is one it gave that variable. A relocated home is
+    /// deliberately not asked about: macOS sets one in a sandboxed process.
+    static func counts(environment: [String: String], bundleIdentifier: String?) -> Bool {
+        guard bundleIdentifier != nil else { return false }
+        guard (environment[AgentServer.socketEnvironmentKey] ?? "").isEmpty else { return false }
+        return true
+    }
+
+    /// `counts` for a process: its environment and its bundle. The two are
+    /// parameters so a probe, which has no bundle, can hand it one.
+    static func ofProcess(
+        environment: [String: String] = ProcessInfo.processInfo.environment, bundle: Bundle = .main
+    ) -> Bool {
+        counts(environment: environment, bundleIdentifier: bundle.bundleIdentifier)
+    }
+
+    /// This process's own answer, read once.
+    static let isPersons: Bool = {
+        #if FRAMEJOB_DEV_TOOLS
+        if devStore != nil { return true }
+        #endif
+        return ofProcess()
+    }()
+
+    #if FRAMEJOB_DEV_TOOLS
+    /// `-RCDevTipsSuite <name>`, a dev-only launch default (TIP-7): the
+    /// counting keys are read and written in the named suite and not in the
+    /// bundle's domain, AND the instance counts whatever its socket. One
+    /// switch does both, so a proof's instance can never count into the real
+    /// domain. The name must start with `devSuitePrefix`, the prefix
+    /// `tools/proof/proof_defaults.py` owns and removes; any other value, or
+    /// a suite that cannot be made, is named on stderr and ignored whole.
+    static let devSuiteKey = "RCDevTipsSuite"
+    static let devSuitePrefix = "framejob."
+
+    /// The suite the switch names, or nil without it.
+    static let devStore: UserDefaults? = {
+        guard let name = UserDefaults.standard.string(forKey: devSuiteKey) else { return nil }
+        guard name.hasPrefix(devSuitePrefix), let store = UserDefaults(suiteName: name) else {
+            let line = "\(devSuiteKey) must name a suite starting \"\(devSuitePrefix)\" (got "
+                + "\"\(name)\"); Tips keeps the bundle's defaults and this instance's own rule.\n"
+            FileHandle.standardError.write(Data(line.utf8))
+            return nil
+        }
+        return store
+    }()
+    #endif
+}
+
+/// The stored state and its three writers (TIP-5): an export that succeeded,
+/// whoever started it, the automatic ask being shown, and the dialog's "Leave
+/// a Tip". No export in a scratch instance writes a key (`TipsInstance`,
+/// TIP-8); a press of "Leave a Tip" is a person's and writes in any instance.
+/// Main thread.
 final class TipsAsk {
     /// Int; absent = 0.
     static let exportsKey = "FrameJobTipsExports"
@@ -91,8 +153,14 @@ final class TipsAsk {
     /// A date: the last automatic ask, or the last press of "Leave a Tip".
     static let lastAskedKey = "FrameJobTipsLastAsked"
 
-    /// The app's own, over the bundle's defaults and the real clock.
-    static let shared = TipsAsk()
+    /// The app's own, over the bundle's defaults and the real clock; under
+    /// the dev-only `-RCDevTipsSuite`, over that suite.
+    static let shared: TipsAsk = {
+        #if FRAMEJOB_DEV_TOOLS
+        if let store = TipsInstance.devStore { return TipsAsk(defaults: store) }
+        #endif
+        return TipsAsk()
+    }()
 
     private let defaults: UserDefaults
     private let now: () -> Date
@@ -115,8 +183,8 @@ final class TipsAsk {
             enabled: TipsSettings.isEnabled(in: defaults))
     }
 
-    /// One more export a person confirmed has succeeded. Counts whatever the
-    /// toggle says.
+    /// One more export has succeeded in a person's instance. Counts whatever
+    /// the toggle says.
     func countExport() {
         let state = self.state
         defaults.set(state.exports + 1, forKey: Self.exportsKey)
@@ -138,9 +206,10 @@ final class TipsAsk {
     }
 }
 
-/// Which export queue jobs a person started (Add to Queue), followed by id as
-/// `AgentExports` follows the agent's, so the queue's jobs carry no origin
-/// (TIP-4). `settle()` runs on every change of the queue.
+/// Which export queue jobs count (TIP-4): a person's Add to Queue and the
+/// agent's `export`, followed by id as `AgentExports` follows the agent's, so
+/// the queue's jobs carry no origin. `settle()` runs on every change of the
+/// queue.
 final class TipsQueueFollower {
     private let state: (UInt64) -> ExportQueueController.State?
     private let completed: () -> Void

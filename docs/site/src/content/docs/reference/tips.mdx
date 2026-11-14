@@ -26,14 +26,14 @@ The same window opens from **Frame Job ▸ Settings… ▸ Tips**, with or witho
 
 ## When Frame Job asks
 
-Frame Job opens the Tips window by itself rarely, and only just after an export you made has finished.
+Frame Job opens the Tips window by itself rarely, and only just after an export has finished.
 
 - **The first time** comes once you've finished at least 5 exports and 30 days have passed since the first of them. If you press **Leave a Tip** before then, that counts as having been asked, and the next time is a December.
 - **After that**, once a year, in December. If Frame Job asked, or you pressed **Leave a Tip**, after the start of June, it skips that year's December.
 
-It appears when you close the result of an **Export…**, or when an export you added to the queue finishes. It never takes the keyboard, so a key you were typing can't press one of its buttons. Close it and it won't come back until the next time it's due.
+It appears when you close the result of an **Export…**, or when an export on the queue finishes: one you added, or one an agent or the Assistant started. It never takes the keyboard, so a key you were typing can't press one of its buttons, and it never holds up an agent's next call. If Frame Job is behind another app at that moment, the window waits there and doesn't bring Frame Job forward. Close it and it won't come back until the next time it's due.
 
-Only exports you start from the export sheet count: **Export…** and **Add to Queue**. An export that fails or that you cancel doesn't count. Exports an agent or the Assistant starts don't count either, and they never open the window.
+Every export that finishes counts, whoever started it: **Export…** and **Add to Queue** in the export sheet, an agent's [`export`](/mcp/export/) and the Assistant's. An export that fails or is cancelled doesn't count.
 
 Opening the window yourself and choosing **Not Now** changes nothing about when Frame Job next asks.
 
@@ -53,11 +53,13 @@ The box saves the moment you click it, and the button leaves or returns in every
 - Frame Job keeps the count of your exports, the date of the first one and the date it last asked in macOS's preferences for Frame Job, on your Mac only.
 - December is judged by your Mac's time zone.
 - If you export nothing in December, Frame Job doesn't ask that year.
-- No agent tool opens the Tips window or changes this setting.
+- No agent tool opens the Tips window on request or changes this setting. An agent's export finishing can bring the reminder, as yours can.
+- A [test copy on its own socket](/mcp/connect-a-client/#testing-a-second-copy) counts no exports and never opens the Tips window by itself.
 
 ## Related
 
 - [Settings](/reference/settings/#tips)
 - [The editor window](/getting-started/editor-window/#toolbar)
 - [The export sheet](/export/export-sheet/)
+- [Export: start, then poll](/mcp/export/)
 - [Open source and notices](/reference/open-source/)

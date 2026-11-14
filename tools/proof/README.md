@@ -33418,22 +33418,25 @@ request 2's tool result, 2 blocks / 1; `image-limit-text-summary` on event 9's s
 to /tmp/frame.jpg."; `image-limit-at-boundary` with `testAnImageExactlyAtTheLimitIsSent` failed
 (the mutant tree's suite, 52.5 s).
 
-## Tips — the dialog, the editor's button, the automatic ask and Settings' section (`tips_proof.py`, `tips_probe.swift`; twelve mutants; spec §11 TIP-1…TIP-7)
+## Tips — the dialog, the editor's button, the automatic ask, Settings' section and whose exports count (`tips_proof.py`, `tips_probe.swift`; nineteen mutants; spec §11 TIP-1…TIP-8)
 
 The owner's Tips feature (2026-11-14): a small window that says who a tip pays for and opens one
 web page, a green Tips button right of Export…, an ask Frame Job makes by itself on a schedule,
-and a Settings section whose box turns the button and the ask off. Its instrument is a probe and
-not a launch default: the feature has no `-RCDev` switch and no dev tool (TIP-7), so all three
-builds run one code path and the probe hands that path its clock, calendar, defaults, dialog and
-queue.
+and a Settings section whose box turns the button and the ask off. The same day the owner
+overruled one part: an export an agent or the Assistant starts counts, and the window opens after
+it (TIP-4 as amended), with a proof's instance told from a person's by TIP-8. Its instrument is a
+probe, which hands the code its clock, calendar, defaults, dialog, queue and instance rule, and
+four instances over MCP. The feature has one `-RCDev` switch, `-RCDevTipsSuite <name>` (TIP-7),
+and no dev tool: it exists so L4 and L5 can see a counted agent export on the running app without
+writing the bundle's defaults domain.
 
     python3 tools/proof/tips_proof.py               # the probe, the tree's text, then the app over MCP
     python3 tools/proof/tips_proof.py --no-live     # without the L rows (no app)
-    python3 tools/proof/tips_proof.py --mutant NAME # one of the twelve; exit 1 when caught (rule R)
+    python3 tools/proof/tips_proof.py --mutant NAME # one of the nineteen; exit 1 when caught (rule R)
 
 **The probe** is `tips_probe.swift` compiled as `main.swift` over `app/Sources` through
 `swift_build.build`, with `default.metallib` (compiled from the tree's shaders) and `Blank.mp4`
-beside it, because W1–W3 run real exports of a document made in process holding one rectangle
+beside it, because W1–W7 run real exports of a document made in process holding one rectangle
 and no media, and a timeline with no media composes against that placeholder. Nothing reaches the
 screen, a browser or a real defaults domain: activation policy `.prohibited`, every editor in a
 window 20,000 pt off every display, the dialog's `open` and its two order calls as closures that
@@ -33447,6 +33450,15 @@ domain and cleared.
 - **A1–A5, the state** (`TipsAsk` over `ProbeDefaults` and a clock a row moves): what
   `countExport`, `takeAsk` and `noteTipPageOpened` write, and the four key names.
 - **F1–F3, which queue jobs count** (`TipsQueueFollower` over a table of states the row edits).
+- **I1–I3, whose instance counts** (`TipsInstance`, TIP-8). I1 and I2 are the pure
+  `counts(environment:bundleIdentifier:)` over literal environments: the socket variable set,
+  empty and absent, no bundle identifier, and `CFFIXED_USER_HOME` alone, which counts because a
+  relocated home is deliberately no condition. I3 is `ofProcess`, which reads the process's own
+  environment: `tips_proof.py` runs the probe with `RC_AGENT_SOCKET` naming a path nothing binds,
+  and the row hands `ofProcess` a bundle that HAS an identifier (a `Fake.bundle` it writes in the
+  scratch folder), so only the environment can make the answer false. Without that bundle the
+  probe's own answer is false twice over (no bundle identifier, and the socket), and could not
+  show the environment is read.
 - **C1, the dialog**: its texts, keys and window flags; its order calls made to really order the
   window, moved off every display first, so "closes" is read off `isVisible`; a picture of each
   look written beside the answer, each built with its look as the current drawing appearance
@@ -33465,27 +33477,67 @@ domain and cleared.
   last one that has one. W3 runs Add to Queue's `TipsDoors.follow` on the probe's own
   `ExportQueueController()`: `enqueueExport` itself is not called, because it shows the Export
   Queue window; T1 holds its two lines.
+- **W4–W7, the agent's door and the doors in a scratch instance.** W4, W5 and W7 call
+  `AgentServer.shared.exportProject(_:tips:)`, the `export` handler with its Tips doors as a
+  parameter, called on main here where the lane calls it on its own thread (the handler hops to
+  main for the block that enqueues and follows; L4 and L5 run the lane's path, with the app's own
+  doors resolved inside that block), on `ExportQueueController.shared` (the handler's own
+  queue) and a document given a `fileURL` in the scratch folder and added to
+  `NSDocumentController`, so the call's `project` finds it and no other; the job is followed
+  through the `export_status` handler. W4's doors count (`counts: { true }`): the export is
+  counted, the dialog ordered front and never key, and with it shown `export_status` still
+  answers and a second export completes. W5 (`counts: { false }`) and W6 (the Export… door, the
+  same) leave the store exactly as seeded. W7 builds its doors with NO `counts` argument, so the
+  rule is the default the app's own doors get, `TipsInstance.isPersons`, which is false in the
+  probe. **The modal watchdog** is a repeating timer in the common run-loop modes, installed at
+  the probe's start, that counts a modal session and aborts it: nothing in the tree starts one,
+  and a build whose ask did would otherwise hang the run where W4 should fail. Every `Door`
+  orders its dialog off every display, as C1 does, so such a session would run on a window
+  already off screen.
 
 **T1** reads the same sources the probe was built from, so a mutant's copy is what it reads: the
-doors' calls counted by name. **L0–L3** drive two instances `mcp.launch` starts, one with
-`-FrameJobTips YES` and one with `-FrameJobTips NO`, so the owner's own toggle in the shared
-defaults domain never decides a row; L2's teeth are `mcp.py`'s own guard, since an agent export
-that counted would move `FrameJobTipsExports`.
+doors' calls counted by name (`.follow(queueJob:` twice now, in the export card's file and the
+agent's), and `RCDevTipsSuite` spelled in `Tips.swift` alone. **L0–L3** drive two instances
+`mcp.launch` starts, one with `-FrameJobTips YES` and one with `-FrameJobTips NO`, so the owner's
+own toggle in the shared defaults domain never decides a row. L2 is the proof-instance row: its
+instance is on a scratch socket, so the agent's export counts nothing, and its teeth are
+`mcp.py`'s own guard, since an export that counted would move `FrameJobTipsExports`.
+
+**L4 and L5** each run on an instance of its own launched with `-RCDevTipsSuite <suite>`, the
+suite a throwaway `framejob.tips-proof.<pid>.<tag>` domain the row seeds first with `defaults
+write` (4 exports, a first export 40 days back; `proof_defaults.read_env()`, so never under the
+scratch home) and removes with `proof_defaults.remove_domain` once the instance has stopped; a
+suite left behind fails the row by name, and the sweep in `make test` owns the prefix. L4 has an
+editor window: after the agent's export the suite reads 5 and a last-asked date inside the run,
+`snapshot_ui {}` lists one visible window titled "Tips" that is not key, `get_project` answers
+within 15 s, Frame Job ▸ Settings… is performed (`perform_menu_item` refuses while anything is
+app-modal), and a second export reaches `done` with 6 counted and last-asked unchanged. L5 adds
+`-RCDevDerivedHidden YES`: `new_project_from_range` makes a document with no window, the source
+is closed, and the export of the windowless document brings the same count and the same window.
+Both print whether the app was active, which is the host's, and L5 prints whether the Tips
+window was key without holding it: with no other window an active app may hand it key. Both hold
+`mcp.defaults_moved` empty, which is the claim that the switch moved the state out of the
+bundle's domain.
 
 **The pins.** The offscreen harness pins `FrameJobTips` OFF (`pinDefaults`), the one pin that is
 not a first-run value: `sharp_chrome.py` (`EXPORT_RIGHT`) and `phase7_chrome.py` (its accent
 patch at x 1334) read Export… at fixed points of the harness's renders, and a button to its
-right would move it. `screens.py` pins it ON and lists the three state keys in `NOT_SHOWN`
-(row P2). `settings_layout_probe.py`'s L1 and L13 and `assistant_tab_probe.swift`'s P7 now want
+right would move it. `screens.py` pins it ON and lists the three state keys and
+`RCDevTipsSuite` in `NOT_SHOWN` (row P2). `settings_layout_probe.py`'s L1 and L13 and `assistant_tab_probe.swift`'s P7 now want
 five panes with Tips last, and `order-swapped` and `mcp-last` follow the new pane list.
 
-**Mutants** (`MUTANTS`, `settings_layout_probe.py`'s shape, read by `mutant_anchors.py`), twelve
-because the feature adds twelve separable decisions (TIP-7): `days-ignored` (S2),
+**Mutants** (`MUTANTS`, `settings_layout_probe.py`'s shape, read by `mutant_anchors.py`),
+nineteen because the feature holds nineteen separable decisions (TIP-7): `days-ignored` (S2),
 `exports-ignored` (S3), `toggle-ignored` (S4, A3), `any-month` (S5), `skip-ignored` (S6, S7),
-`ask-unrecorded` (A2), `cancelled-counts` (F2), `agent-follows` (T1), `button-ignores-toggle`
-(C3), `toggle-unposted` (C4), `success-unwired` (W1) and `auto-takes-key` (C1, W1, W3).
+`ask-unrecorded` (A2), `cancelled-counts` (F2), `button-ignores-toggle` (C3), `toggle-unposted`
+(C4), `success-unwired` (W1) and `auto-takes-key` (C1, W1, W3, W4) from the first build, whose
+twelfth, `agent-follows` (T1), guarded the decision TIP-4 reversed and is gone; and for the
+amendment `agent-unfollowed` (W4, T1), `socket-ignored` (I1), `bundle-ignored` (I2),
+`environment-unread` (I3), `default-counts` (W7), `queue-ignores-instance` (W5),
+`card-ignores-instance` (W6) and `ask-runs-modal` (W4). Each is a probe rebuild and none runs an
+L row, so no mutant can write a real defaults domain.
 
-**Recorded** (2026-11-14). On the tree before the code, `--sources <HEAD's app/Sources> --only
+**Recorded** (2026-11-14, the first build, before the amendment; 31 rows and twelve mutants then). On the tree before the code, `--sources <HEAD's app/Sources> --only
 B0`: FAIL, "cannot find type 'TipsState' in scope". With it: 31/31 against Debug and, after
 `make gate`, 31/31 against Release (`RC_PROOF_APP=release`): C2 measured Tips at 46 × 26 pt,
 1382–1428 of a 1440 pt bar and 842–888 of a 900 pt one, the spacer still 109 pt wide at 900; W1
@@ -33500,3 +33552,37 @@ moved no key. The twelve mutants, each a probe rebuild, each caught on exactly i
 L1; `screens.py --only 02-settings,03-empty-editor` 7 pass, P2 with the three state keys not
 shown. Not run: `assistant_tab_proof.py` (its probe typechecked with P7's five panes) and the
 older chrome proofs that read the harness's toolbar, which the harness's pin leaves as it was.
+
+**Recorded for the amendment** (2026-11-14, agents' exports counting, TIP-4 and TIP-8). 40/40
+against Debug and, after `make gate` (PASS, 657 s on a cold worktree), 40/40 against Release
+(`RC_PROOF_APP=release`), with the owner's own Release instance running beside it and no
+`DEFAULTS MOVED` line. W4 counted 5 from 4 through the `export` handler, ordered the dialog front
+and never key, saw no modal session, and with the dialog shown answered `export_status` and
+completed a second export (6, not asked again); W5, W6 and W7 left the store at its seed. L2's
+proof instance moved no key and listed no Tips window. L4, on both builds: the suite read 5
+exports and a last-asked date one to three seconds into the run, the listing had one visible
+window titled "Tips", not key, the app inactive, `get_project` answered in 0.001 s or less, Settings…
+was performed, and the second export left the suite at 6 with last-asked unchanged. L5: no
+editor window before the export, then the same count and the same window, not key. Both suites
+were removed, and no `framejob.tips-proof.*` plist was left in `~/Library/Preferences`. The
+suite is read and written by an instance running under a scratch `CFFIXED_USER_HOME`, and
+`defaults` without that variable sees the same domain: a named suite is no more moved by the
+home than the bundle's domain is. The nineteen mutants, each a probe rebuild, each caught on
+exactly its rows: the eleven kept as before, `auto-takes-key` now on W4 too (orders `["key"]`);
+`agent-unfollowed` W4 (counted 4 from 4, orders `[]`) and T1; `socket-ignored` I1 (a socket
+path counted); `bundle-ignored` I2 (no bundle identifier counted); `environment-unread` I3 (the
+scratch bundle counted in a process run with the socket set); `default-counts` W7,
+`queue-ignores-instance` W5 and `card-ignores-instance` W6 (each: exports 5, last-asked
+written, orders `["front"]`); `ask-runs-modal` W4 (1 modal session seen and aborted by the
+watchdog, every other fact of the row true). One red run on the way: the probe's first run
+scored 33/34, T1 failing because a comment in `Tips.swift` named `TipsDoors`; the comment was
+reworded. `screens.py --only 03-empty-editor` on Release: 6 pass, P2 with 99 key literals, 48
+not shown. L4 and L5 have no red run of their own (the switch does not exist on the tree before
+the code); the decisions they show on the running app are held red by W4, W5, W7 and I1–I3.
+A fix pass the same day moved the app's own doors' resolution inside the handler's main-thread
+block (`let doors = tips ?? .shared`; the handler itself runs on the lane's thread) and worded
+TIP-5's claim as "no export in a scratch instance writes a key". Re-run after it, on Debug: the
+whole proof 40/40, and `agent-unfollowed`, the one mutant whose anchor moved, caught on W4 and
+T1; then `make gate`. The Release run above is the build before that fix; the other eighteen
+mutants were not re-run, their anchors and the rows' code being unchanged.
+Owed: the owner's manual check CH-10.

@@ -31,7 +31,19 @@ extension AgentServer {
     /// for every format that has any, whether `loudness_lufs` was asked for
     /// or not, and, with `stems` (the sheet's Stems popup, spec §11 AU-108),
     /// each stem file beside the mix.
+    ///
+    /// The job counts toward Tips when it completes, as a person's Add to
+    /// Queue job does (spec §11 TIP-4), in a person's instance only (TIP-8).
     func exportProject(_ a: [String: Any]) throws -> String {
+        try exportProject(a, tips: nil)
+    }
+
+    /// `export` with the Tips doors as a parameter, so a probe runs the
+    /// agent's door on its own (`tools/proof/tips_probe.swift`). nil is the
+    /// app's own doors, resolved inside the main-thread block below: this
+    /// handler runs on the lane's thread (`productOffMainTools`), and the
+    /// doors and the queue they hold are main-thread objects.
+    func exportProject(_ a: [String: Any], tips: TipsDoors?) throws -> String {
         // The clock `export_status`'s `elapsed` runs on, read before any check.
         let started = ProcessInfo.processInfo.systemUptime
         let presetID = try requiredString(a, "preset")
@@ -92,6 +104,8 @@ extension AgentServer {
                 graphics: graphics)
             AgentExports.shared.track(
                 id, settings: settings, burnInTimecode: options.burnInTimecode, started: started)
+            let doors = tips ?? .shared
+            doors.follow(queueJob: id)
             let word = ExportQueueController.shared.job(id).map {
                 Self.exportStatusWord($0.state)
             }

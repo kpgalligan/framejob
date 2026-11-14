@@ -20957,7 +20957,7 @@
     {
      "id": "ref-tips-reminder",
      "name": "When Frame Job asks for a tip",
-     "summary": "Frame Job opens the Tips window by itself after 5 finished exports and 30 days unless you pressed Leave a Tip first, then once a year in December, and only just after an export you made.",
+     "summary": "Frame Job opens the Tips window by itself after 5 finished exports and 30 days unless you pressed Leave a Tip first, then once a year in December, and only just after an export finishes, whether you, an agent or the Assistant started it.",
      "page": "reference/tips",
      "anchor": "when-frame-job-asks"
     },

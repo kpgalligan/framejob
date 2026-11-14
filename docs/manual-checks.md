@@ -464,6 +464,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Expect:** nothing appears while the result sheet is up. After Close the Tips window appears once, in front, WITHOUT taking the keyboard: Return and Space go to the editor (Space plays) and do not press Leave a Tip. The second export brings no window. Step 6 prints today's date.
 - **Source:** Tips (spec §11 TIP-3, TIP-4, TIP-5; `tips_proof.py` W1).
 
+**CH-10 — The ask after an agent's export**
+- **Do:** 1. Quit Frame Job and set the three keys as CH-9's step 1 does (4 exports, an old first export, no last asked). 2. Open the Release app from the Finder and open a short project. 3. From an MCP client connected with Settings' Copy MCP Command (or from the Assistant tab), ask for an export of the project to a file, then switch to another app and keep typing there while it writes. 4. When the client reports the export done, look at the screen without clicking anything. 5. Ask the client for the project again (`get_project`). 6. Switch back to Frame Job. 7. `defaults read com.kgalligan.FrameJob FrameJobTipsExports`. 8. Afterwards, `defaults delete` the three keys if you don't want this Mac's count to start at 5.
+- **Expect:** while you type in the other app nothing takes the keyboard and Frame Job does not come forward; the Tips window is among Frame Job's windows, in front of its editor. The client's next call answers at once. Back in Frame Job the Tips window is there, once. Step 7 prints 5.
+- **Answer:** did the Tips window wait behind the app you were using without interrupting it, and was it clear on return why it was there?
+- **Source:** Tips (spec §11 TIP-4, TIP-8; `tips_proof.py` W4, L4, L5).
+
 ## Sound and export
 
 **SE-1 — M3's inspector sections and sheets**

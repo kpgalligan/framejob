@@ -257,14 +257,17 @@ PINS = [(key, _plist(value)) for key, value in [
 # A `static let …Key = "(FrameJob|RC)…"` literal no captured screen draws,
 # and why. P2 requires every such literal in PINS or here.
 NOT_SHOWN = {
-    "FrameJobTipsExports": "how many exports a person confirmed in the export card have "
-                           "succeeded (spec §11 TIP-5); read and written only when one does, "
-                           "and no screen exports",
+    "FrameJobTipsExports": "how many exports have succeeded in a person's instance (spec "
+                           "§11 TIP-5, TIP-8); read and written only when one does there, and "
+                           "a screen's instance is a proof's, which counts nothing",
     "FrameJobTipsFirstExport": "when the first of those exports succeeded (TIP-5); read only "
-                               "when one completes, and no screen exports",
+                               "when one completes in a person's instance",
     "FrameJobTipsLastAsked": "when the Tips dialog was last shown by itself or Leave a Tip "
-                             "last pressed (TIP-5); read only when a person's export "
-                             "completes, and no screen exports",
+                             "last pressed (TIP-5); read only when an export completes in a "
+                             "person's instance",
+    "RCDevTipsSuite": "a dev launch default that moves Tips' counting keys into a named "
+                      "`framejob.` suite and counts the instance, for `tips_proof.py` L4 and "
+                      "L5 (TIP-7); no screen launches with it",
     "FrameJobCompositorTiming": "a diagnostic switch for the compositor's timing log; nothing "
                                "on screen reads it",
     "RCFFmpegImport": "the opt-in ffmpeg rewrap policy, read at import; the fixtures import "

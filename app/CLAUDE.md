@@ -4116,14 +4116,17 @@ free.
   Background render checkbox and "Start after N seconds". No tool reads or
   writes it (AI-11, R6-12, MC-7).
 - `Tips.swift` · `TipsWindowController.swift` · `TipsSettingsPane.swift` ·
-  `TipsToolbarButton.swift` — Tips (spec §11 TIP-1…TIP-7). `Tips.swift` is
+  `TipsToolbarButton.swift` — Tips (spec §11 TIP-1…TIP-8). `Tips.swift` is
   Foundation only: the link, the pure schedule, the toggle, the state's
-  three writers and the queue follower. The dialog is a window, `show()`
-  key and `showAutomatic()` front only; `TipsDoors` is the two export
-  doors, called only from `EditorViewController+Export.swift`; `showTips`
-  is at the file's foot. The toolbar button hides itself and is the
-  experiment's one file. No tool reads or writes any of it, and nothing
-  off a person's door writes a key.
+  three writers, the queue follower, `TipsInstance` (which instance
+  counts, TIP-8) and the dev-only `-RCDevTipsSuite`. The dialog is a
+  window, `show()` key and `showAutomatic()` front only; `TipsDoors` is
+  the two export doors, called from `EditorViewController+Export.swift`
+  and, for the agent's `export`, from `AgentServer+Export.swift`
+  (`exportProject(_:tips:)`, nil meaning the app's own doors, resolved on
+  main); `showTips` is at the file's foot. The toolbar button hides
+  itself and is the experiment's one file. No tool reads or writes its
+  state, and no export in a scratch instance writes a key (TIP-8).
 - `SettingsWindowController.swift` — Frame Job ▸ Settings… ⌘,, the app's one
   window for something PERSISTED beyond view state, with
   `extension AppDelegate { showSettings }` at its foot
