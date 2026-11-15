@@ -46,7 +46,7 @@ extension EditorViewController {
 
     // MARK: - Construction
 
-    /// Transport · timecode ——— view · Export · Tips. Called once, from `loadView`.
+    /// Transport · timecode ——— view · Export · Contribute. Called once, from `loadView`.
     func buildToolbar() -> NSView {
         let bar = BarView(border: .bottom)
 
@@ -88,7 +88,8 @@ extension EditorViewController {
             AccentButton(
                 title: "Export…", symbol: "square.and.arrow.up", fallback: "⤴",
                 tooltip: "Export… (⌘E)", action: #selector(exportProject(_:))),
-            // The Tips experiment (spec §11 TIP-6); it hides itself while its toggle is off.
+            // The Contribute button, an experiment (spec §11 TIP-6); it hides itself while its
+            // toggle is off.
             TipsToolbarButton(),
         ])
         row.translatesAutoresizingMaskIntoConstraints = false

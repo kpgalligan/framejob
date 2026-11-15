@@ -41,7 +41,7 @@ enum DS {
     static let butter = NSColor(srgbRed: 0xF2 / 255, green: 0xC1 / 255, blue: 0x4E / 255, alpha: 1)
     static let coral = NSColor(srgbRed: 0xF4 / 255, green: 0x65 / 255, blue: 0x3F / 255, alpha: 1)
 
-    /// The editor toolbar's Tips button (spec §11 TIP-6): a leaf green, the
+    /// The editor toolbar's Contribute button (spec §11 TIP-6): a leaf green, the
     /// same in both appearances, under a white label at 5.1:1. Not `forest`,
     /// which is within 10/255 of the action ink's light value, and not
     /// `action` itself (CI-4): this one sits about 40° of hue from both.

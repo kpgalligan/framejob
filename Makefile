@@ -65,9 +65,10 @@ codecs:
 # first, because swift_build.py's selftest links the archives.
 # `acknowledgements.py --selftest` (spec §11 PUB-10) is the third-party notices'
 # generator over synthetic metadata, locks and package folders: no cargo, no network.
-# `ai_docs_r2c_proof.py --only T1,T2` (#556) is the spelling scan, spec §11 #526: the
+# `ai_docs_r2c_proof.py --only T1,T2,T3` (#556) is the spelling scan, spec §11 #526: the
 # string literals of app/Sources, core/src and graphic/src, and the site's pages,
 # sidebar.mjs, features.json and README.md; its tree rows launch no app and write nothing.
+# T3 is the same texts for the word a person no longer reads, "tip" (spec §11 TIP-9).
 # `mutant_anchors.py` (#554) reads every proof's mutant table without importing the proof
 # and counts each anchor in the file it names, exactly once; `--selftest` is the reader
 # over synthetic proofs in scratch trees. No app, no build.
@@ -107,7 +108,7 @@ test: rust codecs
 	python3 tools/proof/name_residue.py
 	python3 tools/proof/docs_site_proof.py --selftest
 	python3 tools/proof/docs_site_proof.py
-	python3 tools/proof/ai_docs_r2c_proof.py --only T1,T2
+	python3 tools/proof/ai_docs_r2c_proof.py --only T1,T2,T3
 	python3 tools/proof/mutant_anchors.py --selftest
 	python3 tools/proof/mutant_anchors.py
 

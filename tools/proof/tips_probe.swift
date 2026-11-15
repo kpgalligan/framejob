@@ -1,4 +1,4 @@
-// Tips (spec §11 TIP-1…TIP-8) — the probe `tips_proof.py` builds and runs.
+// Tips (spec §11 TIP-1…TIP-9) — the probe `tips_proof.py` builds and runs.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `FrameJob`, against `libframejob_core.a`, through
@@ -298,7 +298,7 @@ do {
         absentOn
             && keys == ["FrameJobTips", "FrameJobTipsExports", "FrameJobTipsFirstExport",
                         "FrameJobTipsLastAsked"]
-            && dates && TipsLink.url == "https://boppallewyn.com/frame-job/tips/",
+            && dates && TipsLink.url == "https://boppallewyn.com/frame-job/contribute/",
         "absent toggle reads on \(absentOn); keys \(keys); both dates are Date \(dates); link "
             + "\(TipsLink.url)")
 }
@@ -461,23 +461,24 @@ do {
     }
     let texts = allViews(dialog.window?.contentView ?? NSView())
         .compactMap { ($0 as? NSTextField)?.stringValue }
-    check(dialog.window?.title == "Tips", "window titled Tips")
+    check(dialog.window?.title == "Contribute", "window titled Contribute")
     check(texts.contains("Frame Job is free and open source"), "heading")
     check(
         texts.contains(
-            "Frame Job is made by one developer. It is free to use and its source is open. If "
-                + "it is useful to you, a tip helps pay for the time to keep working on it. Tips "
-                + "are voluntary, and nothing in Frame Job is locked without one."),
+            "Frame Job is made by one developer and shared as open source. If it is useful "
+                + "to you, a contribution helps keep the work going. Contributions are "
+                + "voluntary, and nothing in Frame Job is locked without one."),
         "body")
     check(
-        texts.contains("You can turn this reminder off in Frame Job ▸ Settings… ▸ Tips."),
+        texts.contains(
+            "You can turn this reminder off in Frame Job ▸ Settings… ▸ Contributions."),
         "hint")
     check(
         dialog.notNowButton.title == "Not Now" && dialog.notNowButton.keyEquivalent == "\u{1b}",
         "Not Now on Escape")
     check(
-        dialog.tipButton.title == "Leave a Tip" && dialog.tipButton.keyEquivalent == "\r",
-        "Leave a Tip on Return")
+        dialog.tipButton.title == "Contribute" && dialog.tipButton.keyEquivalent == "\r",
+        "Contribute on Return")
     check(dialog.window?.isExcludedFromWindowsMenu == true, "out of the Window menu")
     check(dialog.window?.frameAutosaveName.isEmpty == true, "no frame autosave name")
 
@@ -496,12 +497,12 @@ do {
         "showAutomatic() orders front, never key, and writes nothing (orders \(orders))")
     dialog.tipButton.performClick(nil)
     check(
-        opened.map { $0.absoluteString } == ["https://boppallewyn.com/frame-job/tips/"],
-        "Leave a Tip opens exactly the page (\(opened.map { $0.absoluteString }))")
+        opened.map { $0.absoluteString } == ["https://boppallewyn.com/frame-job/contribute/"],
+        "Contribute opens exactly the page (\(opened.map { $0.absoluteString }))")
     check(
         store.values["FrameJobTipsLastAsked"] as? Date == clock.now && store.values.count == 1,
-        "Leave a Tip writes last asked alone")
-    check(!visible(), "Leave a Tip closes")
+        "Contribute writes last asked alone")
+    check(!visible(), "Contribute closes")
 
     // A picture of each look for a reader: a dialog built under that look,
     // as the app builds its one under the look it launched in.
@@ -632,7 +633,7 @@ do {
     for width in [CGFloat(1440), 900] {
         guard let editor = makeEditor(seconds: 1, width: width), let toolbar = Toolbar(editor)
         else {
-            check(false, "no editor or no Tips button at \(Int(width)) pt")
+            check(false, "no editor or no Contribute button at \(Int(width)) pt")
             continue
         }
         let arranged = toolbar.row.arrangedSubviews
@@ -640,14 +641,14 @@ do {
         check(
             count >= 2 && arranged[count - 1] === toolbar.tips
                 && arranged[count - 2] === toolbar.export && toolbar.export.title == "Export…",
-            "\(Int(width)) pt: the row ends Export… then Tips")
+            "\(Int(width)) pt: the row ends Export… then Contribute")
         let tipsRect = toolbar.inBar(toolbar.tips)
         let exportRect = toolbar.inBar(toolbar.export)
         check(
             abs(tipsRect.minX - exportRect.maxX - 12) < 0.01
                 && abs(toolbar.bar.bounds.maxX - tipsRect.maxX - 12) < 0.01,
-            "\(Int(width)) pt: Tips 12 pt after Export… and 12 pt from the edge (Export… ends "
-                + "\(exportRect.maxX), Tips \(tipsRect.minX)–\(tipsRect.maxX), bar "
+            "\(Int(width)) pt: Contribute 12 pt after Export… and 12 pt from the edge (Export… "
+                + "ends \(exportRect.maxX), Contribute \(tipsRect.minX)–\(tipsRect.maxX), bar "
                 + "\(toolbar.bar.bounds.maxX))")
         check(
             abs(tipsRect.height - 26) < 0.01
@@ -657,7 +658,7 @@ do {
         if width == 1440 {
             wide = widths.fixed
             let button = toolbar.tips.button
-            check(button.title == "Tips", "titled Tips")
+            check(button.title == "Contribute", "titled Contribute")
             check(
                 components(button.fill) == [0x2E, 0x7D, 0x32],
                 "fill #2E7D32 (\(components(button.fill)))")
@@ -665,7 +666,7 @@ do {
                 button.action.map { NSStringFromSelector($0) } == "showTips:"
                     && button.target == nil,
                 "nil-target showTips:")
-            check(button.toolTip == "Support Frame Job", "tooltip")
+            check(button.toolTip == "Contribute to Frame Job", "tooltip")
             let colors = png(
                 toolbar.bar, to: scratch.appendingPathComponent("tips-toolbar.png"))
             check(colors > 1, "toolbar PNG has \(colors) colours")
@@ -712,11 +713,11 @@ do {
         check(!toolbar.tips.isHidden, "on again: shown")
         check(
             abs(edge - toolbar.inBar(toolbar.tips).maxX - 12) < 0.01,
-            "on again: Tips 12 pt from the edge")
+            "on again: Contribute 12 pt from the edge")
         setToggle(nil)
         editor.window.close()
     } else {
-        check(false, "no editor or no Tips button")
+        check(false, "no editor or no Contribute button")
     }
     row("C3", good, notes.joined(separator: "; "))
 }
@@ -738,14 +739,15 @@ do {
         arranged.count == 4 && arranged[0] === pane.headingLabel && arranged[1] === pane.blurbLabel
             && arranged[2] === pane.toggleBox && arranged[3] === pane.tipsButton,
         "heading, blurb, toggle, button")
-    check(pane.headingLabel.stringValue == "Tips", "heading Tips")
+    check(pane.headingLabel.stringValue == "Contributions", "heading Contributions")
     check(
         pane.blurbLabel.stringValue
-            == "Frame Job is free and open source, made by one developer. Tips are voluntary."
+            == "Frame Job is free and open source, made by one developer. Contributions are "
+            + "voluntary and help keep the work going."
             && pane.blurbLabel.stringValue.count < 200,
         "the blurb, under 200 characters")
     check(
-        pane.toggleBox.title == "Show the Tips button and the yearly reminder"
+        pane.toggleBox.title == "Show the Contribute button and the yearly reminder"
             && pane.toggleBox.state == .on,
         "the toggle's title, on by default")
     check(
@@ -760,8 +762,9 @@ do {
             && pane.toggleBox.state == .off,
         "unticking writes FrameJobTips false and posts once (posts \(posts))")
     check(
-        pane.tipsButton.title == "Tips" && !pane.tipsButton.isHidden && pane.tipsButton.isEnabled,
-        "off: the Tips button is there and enabled")
+        pane.tipsButton.title == "Contribute…" && !pane.tipsButton.isHidden
+            && pane.tipsButton.isEnabled,
+        "off: the Contribute… button is there and enabled")
     pane.tipsButton.performClick(nil)
     check(shown == 1, "off: a press shows the dialog (\(shown))")
     pane.toggleBox.performClick(nil)

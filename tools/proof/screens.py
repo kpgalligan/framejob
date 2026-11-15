@@ -262,12 +262,12 @@ NOT_SHOWN = {
                            "a screen's instance is a proof's, which counts nothing",
     "FrameJobTipsFirstExport": "when the first of those exports succeeded (TIP-5); read only "
                                "when one completes in a person's instance",
-    "FrameJobTipsLastAsked": "when the Tips dialog was last shown by itself or Leave a Tip "
-                             "last pressed (TIP-5); read only when an export completes in a "
-                             "person's instance",
-    "RCDevTipsSuite": "a dev launch default that moves Tips' counting keys into a named "
-                      "`framejob.` suite and counts the instance, for `tips_proof.py` L4 and "
-                      "L5 (TIP-7); no screen launches with it",
+    "FrameJobTipsLastAsked": "when the Contribute dialog was last shown by itself or its "
+                             "Contribute last pressed (TIP-5); read only when an export "
+                             "completes in a person's instance",
+    "RCDevTipsSuite": "a dev launch default that moves the contribution reminder's counting "
+                      "keys into a named `framejob.` suite and counts the instance, for "
+                      "`tips_proof.py` L4 and L5 (TIP-7); no screen launches with it",
     "FrameJobCompositorTiming": "a diagnostic switch for the compositor's timing log; nothing "
                                "on screen reads it",
     "RCFFmpegImport": "the opt-in ffmpeg rewrap policy, read at import; the fixtures import "

@@ -49,7 +49,7 @@ extension EditorViewController {
     /// always did.
     ///
     /// This is a person's export, so its success is told to `tips` (spec §11
-    /// TIP-4): counted then, and the Tips dialog shown, when it is due, once
+    /// TIP-4): counted then, and the Contribute dialog shown, when it is due, once
     /// this window's result sheet has ended.
     func beginExport(
         settings: ExportSettings, to url: URL, options: RecipeOptions = .none,

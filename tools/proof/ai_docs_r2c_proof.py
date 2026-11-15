@@ -6,7 +6,7 @@ British spellings in what the app says, and `snapshot_ui` at a forced capture sc
     python3 tools/proof/ai_docs_r2c_proof.py [--only S1,C1,…] [--app PATH] [--expect-red]
     RC_PROOF_APP=release python3 tools/proof/ai_docs_r2c_proof.py
     RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_r2c_proof.py --expect-red
-    python3 tools/proof/ai_docs_r2c_proof.py --only T1,T2      # make test (#556): no app, no write
+    python3 tools/proof/ai_docs_r2c_proof.py --only T1,T2,T3   # make test (#556): no app, no write
 
 The built app (`proof_app`'s choice) under a scratch home, driven over MCP, on projects built from
 media made into `tools/proof/work/ai-docs-r2c/media/`: a `say`-voiced WAV (speech.wav, about 14 s)
@@ -71,6 +71,12 @@ Tree:
 - T2 (t) the documentation site's pages, `sidebar.mjs` and `src/data/features.json`, and
   `README.md`, hold `levell…` only in a code span or a fenced block (a page) or an `"id"` value
   (`features.json`), and no page's path holds it (#541).
+- T3 (t) the word a person reads is "contribution" (spec §11 TIP-9): T1's literals and T2's
+  texts (a page less its code spans, a page's path, `sidebar.mjs`, every string of
+  `features.json` with its ids, `README.md`) hold no "tip", "tips", "tipped" or "tipping" as a
+  whole word, any case, outside `WORD_KEPT`: an accessibility identifier by its file and exact
+  literal, a page's sentence by its file and words, and a page line opening Starlight's `:::tip`
+  aside. Every hit is printed, and a `WORD_KEPT` entry that matches nothing fails by name.
 - I1 (t) `sips`: the four inspector webps `05h-clip-qualifier` and `11-document-inspector` are
   608 × 1078, `12-export-sheet.sheet.*` 960 × 1614 and `15-generate-captions-sheet.sheet.*`
   840 × 1076.
@@ -104,9 +110,9 @@ CALL_BOUND = 600
 SEC = 600_000
 
 ROWS = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S12", "C4", "C1",
-        "C2", "C3", "T1", "T2", "I1", "Z1"]
+        "C2", "C3", "T1", "T2", "T3", "I1", "Z1"]
 CONTROLS = {"S3", "S11", "C4", "Z1"}
-TREE = {"T1", "T2", "I1"}
+TREE = {"T1", "T2", "T3", "I1"}
 LAUNCH_ONE = {"S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "S11", "S12", "C4"}
 LAUNCH_TWO = {"C1", "C2"}
 LAUNCH_THREE = {"C3"}
@@ -120,6 +126,23 @@ C2_FORMS = re.compile(r"\b(colour\w*|centre[sd]?)\b", re.I)
 LEVEL = re.compile(r"levell\w*", re.I)
 LEVEL_KEY_PATH = re.compile(r"(?:[a-z0-9_./]*[./])?leveller(?:[./][a-z0-9_./]*)?")
 LEVEL_KEY_CONTEXTS = re.compile(r"\{leveller:|leveller \(null or \{|gate, leveller, de_esser")
+# The word a person no longer reads (spec §11 TIP-9), and what keeps it: (file, exact literal)
+# for a string literal that is an identifier, (page, its words) for a page's sentence.
+WORD = re.compile(r"\b(?:tips?|tipped|tipping)\b", re.I)
+WORD_KEPT = (
+    ("app/Sources/TipsWindowController.swift", "tips.body"),
+    ("app/Sources/TipsWindowController.swift", "tips.hint"),
+    ("app/Sources/TipsWindowController.swift", "tips.notnow"),
+    ("app/Sources/TipsWindowController.swift", "tips.tip"),
+    ("app/Sources/TipsSettingsPane.swift", "settings.tips.heading"),
+    ("app/Sources/TipsSettingsPane.swift", "settings.tips.blurb"),
+    ("app/Sources/TipsSettingsPane.swift", "settings.tips.toggle"),
+    ("app/Sources/TipsSettingsPane.swift", "settings.tips.button"),
+    ("app/Sources/TipsToolbarButton.swift", "toolbar.tips"),
+    ("docs/site/src/content/docs/text-and-shapes/lines-and-arrows.mdx",
+     "A head's tip sits exactly on the end"),
+)
+ASIDE = re.compile(r"^\s*:::tip\b")
 BAD_COLOUR_JS = """export const meta = {};
 export function render(frame, props, ctx) {
   const fill = interpolateColors(0, [0, 1], ["bluish", "#000"]);
@@ -619,6 +642,80 @@ def site_scan():
           f"forms outside a code span or an id ({len(ids)} ids keep theirs) {hits[:16] or ''}")
 
 
+def word_scan():
+    """T3: no whole-word "tip" where a person reads it (spec §11 TIP-9)."""
+    site = ROOT / "docs/site"
+    used = set()
+    hits = []
+
+    def kept(rel, value):
+        """`value` with every kept phrase of `rel` taken out; a literal must BE its entry."""
+        for entry in WORD_KEPT:
+            if entry[0] != rel:
+                continue
+            if rel.startswith("docs/site/"):
+                if entry[1] in value:
+                    used.add(entry)
+                    value = value.replace(entry[1], " ")
+            elif value == entry[1]:
+                used.add(entry)
+                value = ""
+        return value
+
+    def scan(rel, number, value):
+        for m in WORD.finditer(kept(rel, value)):
+            hits.append(f"{rel}:{number} {m.group(0)!r} in {value.strip()[:100]!r}")
+
+    files = ([(p, "swift") for p in sorted((ROOT / "app/Sources").glob("*.swift"))]
+             + [(p, "rust") for p in sorted((ROOT / "core/src").rglob("*.rs"))]
+             + [(p, "rust") for p in sorted((ROOT / "graphic/src").rglob("*.rs"))]
+             + [(p, "js") for p in sorted((ROOT / "graphic/src").rglob("*.js"))])
+    scanned = 0
+    for path, lang in files:
+        rel = str(path.relative_to(ROOT))
+        for number, value in literals(path.read_text(encoding="utf-8"), lang):
+            scanned += 1
+            scan(rel, number, value)
+
+    pages = sorted(p for p in (site / "src/content/docs").rglob("*") if p.suffix in (".md", ".mdx"))
+    asides = 0
+    for path in pages + [ROOT / "README.md"]:
+        rel = str(path.relative_to(ROOT))
+        if WORD.search(str(path.relative_to(ROOT if path.name == "README.md" else site))):
+            hits.append(f"{rel} (its path)")
+        # A code span is taken out with its line breaks kept, so a hit's line is the file's.
+        text = CODE_SPANS.sub(lambda m: "\n" * m.group(0).count("\n") or " ",
+                              path.read_text(encoding="utf-8"))
+        for number, row in enumerate(text.split("\n"), 1):
+            row, opened = ASIDE.subn("", row)
+            asides += opened
+            scan(rel, number, row)
+    rel = str((site / "sidebar.mjs").relative_to(ROOT))
+    for number, row in enumerate((site / "sidebar.mjs").read_text(encoding="utf-8").split("\n"), 1):
+        scan(rel, number, row)
+
+    def walk(node, key=None):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                walk(v, k)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v, key)
+        elif isinstance(node, str):
+            for m in WORD.finditer(node):
+                hits.append(f"docs/site/src/data/features.json {key}: {m.group(0)!r} in "
+                            f"{node[:100]!r}")
+
+    walk(json.loads((site / "src/data/features.json").read_text(encoding="utf-8")))
+    stale = [f"{f}: {words!r}" for f, words in WORD_KEPT if (f, words) not in used]
+    lines = "".join(f"\n      {hit}" for hit in hits)
+    check("T3", not hits and len(pages) > 100 and scanned > 1000,
+          f"{len(files)} files, {scanned} literals, {len(pages)} pages, sidebar.mjs, features.json "
+          f"and README.md; {len(hits)} whole-word tip forms outside WORD_KEPT ({len(used)} kept "
+          f"entries used, {asides} `:::tip` asides){lines}")
+    check("T3", not stale, f"{len(stale)} WORD_KEPT entries that match nothing {stale or ''}")
+
+
 def webp_sizes():
     folder = ROOT / "docs/site/src/assets/screens"
     wants = {}
@@ -707,12 +804,14 @@ def main():
         tree_scan()
     if "T2" in selected:
         site_scan()
+    if "T3" in selected:
+        word_scan()
     if "I1" in selected:
         webp_sizes()
 
     app_rows = selected & (LAUNCH_ONE | LAUNCH_TWO | LAUNCH_THREE)
     if app_rows:
-        # Only an app row uses the work folder: `make test`'s `--only T1,T2` (#556) writes
+        # Only an app row uses the work folder: `make test`'s `--only T1,T2,T3` (#556) writes
         # nothing, so it cannot take a by-hand run's media and homes away.
         if WORK.exists():
             shutil.rmtree(WORK)

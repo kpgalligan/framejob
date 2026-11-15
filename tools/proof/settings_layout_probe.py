@@ -8,8 +8,8 @@ click policy — measured through the app's own sources. Issue batch B74
 visible text, Copy MCP Command's press, and its missing-helper state. #127
 G6 phase 4 (spec §11 G-38) put the Playback pane last and added L12, and
 its fix pass 1 put the panes in a scroll view capped at the screen and
-added L13. Tips (spec §11 TIP-6) put the Tips pane last: L1 and L13 name
-five panes, and `tips_proof.py` C4 holds the pane itself.
+added L13. Tips (spec §11 TIP-6) put its pane, Contributions, last: L1 and
+L13 name five panes, and `tips_proof.py` C4 holds the pane itself.
 
     python3 tools/proof/settings_layout_probe.py [--sources DIR] [--mutant NAME] [--only IDS]
 
@@ -82,8 +82,8 @@ Rows:
   L13  a fresh controller's `fitScreen` over a 3000 pt visible frame leaves
        `scroll` exactly the document's height; over 1440 × 875 (a
        1440 × 900 display less its menu bar) the window lies inside it
-       vertically, the document is taller than the clip, and the Tips
-       pane is still `content`'s last, inside the document.
+       vertically, the document is taller than the clip, and the
+       Contributions pane is still `content`'s last, inside the document.
 
 Mutants (`--mutant`), each a literal found exactly once in the written code:
   order-swapped       the panes added Transcription before Assistant: must

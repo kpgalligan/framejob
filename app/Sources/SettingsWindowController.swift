@@ -16,7 +16,7 @@ import AppKit
 /// the Window menu opens it, so AppKit's own row is the only way back to a
 /// window the person has buried.
 ///
-/// **Five panes, "MCP", "Assistant", "Transcription", "Playback" then "Tips"**
+/// **Five panes, "MCP", "Assistant", "Transcription", "Playback" then "Contributions"**
 /// (issue batch B74's `MCPSettingsPane`, spec §11 MC-7; road map 12 A2's
 /// `AssistantSettingsPane`; `transcriptionPane`; G-38's
 /// `PlaybackSettingsPane`; then TIP-6's `TipsSettingsPane`), each a vertical stack
@@ -26,7 +26,7 @@ import AppKit
 /// Transcription and Playback panes open with `settingsSectionHeader` — a heading and a
 /// `SettingsInfoButton` whose popover holds its explanation (spec §11 SH-5);
 /// the MCP pane opens with its bare heading and shows its blurb, because
-/// MC-7 asked for the text above its button, and the Tips pane with its bare
+/// MC-7 asked for the text above its button, and the Contributions pane with its bare
 /// heading and one sentence (TIP-6). There is still a Transcription
 /// section, so the sentence the `transcribe` tool and its catalog entry both
 /// print — the one that sends a caller to Settings and then to Transcription
@@ -121,7 +121,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     let transcriptionPane = NSStackView()
     /// Settings' Playback pane, after the Transcription pane (G-38).
     let playbackPane: PlaybackSettingsPane
-    /// Settings' Tips pane, last (TIP-6).
+    /// Settings' Contributions pane, last (TIP-6, TIP-9).
     let tipsPane: TipsSettingsPane
 
     private(set) var saveButton: NSButton!

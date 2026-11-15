@@ -28,7 +28,7 @@ DUMMY key in a `-RCSecretFolder` of its own,
       the model where it was (`""` → claude-opus-5-5, the same text again)
       posts nothing; the window has five panes, the Assistant pane second
       (after B74's MCP pane), the Transcription pane third (B71, B74), the
-      Playback pane fourth (G-38) and the Tips pane last (TIP-6)
+      Playback pane fourth (G-38) and the Contributions pane last (TIP-6)
   P8  (#150) the probe run alone under `--close <path>`, against the
       stand-in scripted to ask for `export` to `work/assistant_tab/p8/P8.mp4`:
       the question `export writes <path>`; then `window.close()` with the

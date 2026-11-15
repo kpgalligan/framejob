@@ -4116,7 +4116,9 @@ free.
   Background render checkbox and "Start after N seconds". No tool reads or
   writes it (AI-11, R6-12, MC-7).
 - `Tips.swift` · `TipsWindowController.swift` · `TipsSettingsPane.swift` ·
-  `TipsToolbarButton.swift` — Tips (spec §11 TIP-1…TIP-8). `Tips.swift` is
+  `TipsToolbarButton.swift` — the contribution reminder (spec §11
+  TIP-1…TIP-9: a person reads "Contribute" and "Contributions"; the code
+  keeps "Tips"). `Tips.swift` is
   Foundation only: the link, the pure schedule, the toggle, the state's
   three writers, the queue follower, `TipsInstance` (which instance
   counts, TIP-8) and the dev-only `-RCDevTipsSuite`. The dialog is a
@@ -4136,7 +4138,7 @@ free.
   Five panes as `content`'s arranged subviews, MCP (`mcpPane`,
   `MCPSettingsPane`, spec §11 MC-7), Assistant (`AssistantSettingsPane`),
   Transcription (`transcriptionPane`), Playback (`PlaybackSettingsPane`,
-  spec §11 G-38) then Tips (`tipsPane`, `TipsSettingsPane`, TIP-6; the
+  spec §11 G-38) then Contributions (`tipsPane`, `TipsSettingsPane`, TIP-6; the
   defaulted `showTips:` parameter is its button's door), 24 pt apart, inside a scroll view `fitScreen` caps at the
   screen's visible height less the title bar (called from `init` and
   `show()`; a tall screen shows it all, a 1440 × 900 one scrolls); the Assistant and
@@ -5049,7 +5051,7 @@ free.
   `archive/roadmap-7.md` §2–§3).
 
 **Shared chrome.** `Theme.swift` (`DS` tokens, including the three track
-heights S/M/L per kind and `DS.tips`, the Tips button's green, TIP-6), `Controls.swift`, `OptionControls.swift`,
+heights S/M/L per kind and `DS.tips`, the Contribute button's green, TIP-6), `Controls.swift`, `OptionControls.swift`,
 `Sheets.swift`, `EditorChrome.swift` (`BarView`), `FileDropView.swift`
 (Finder drops + the first responder the bare-key map needs) — copied from
 Rasterize; keep them in sync rather than forking. `Sheets.swift`'s section

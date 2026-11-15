@@ -31903,14 +31903,23 @@ T1), M4 "after the leveller" back in `AgentCatalog+Properties.swift` (S12 and T1
 `level_forms` without its key contexts (T1 and S12 red on the kept keys).
 
 ```sh
-make app-debug && python3 tools/proof/ai_docs_r2c_proof.py [--only S1,S12,C1,T1,T2]
+make app-debug && python3 tools/proof/ai_docs_r2c_proof.py [--only S1,S12,C1,T1,T2,T3]
 make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_r2c_proof.py
 RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_r2c_proof.py --expect-red
-python3 tools/proof/ai_docs_r2c_proof.py --only T1,T2      # make test
+python3 tools/proof/ai_docs_r2c_proof.py --only T1,T2,T3   # make test
 ```
 
 T1 and T2 run in `make test` (#556), so a British form or a `levell…` form that comes back in
-a string literal, on a site page or in `README.md` fails the gate's `test` step. With only tree
+a string literal, on a site page or in `README.md` fails the gate's `test` step. **T3** (spec
+§11 TIP-9) runs beside them over the same texts, T1's literals and T2's pages (a page less its
+code spans, its path, `sidebar.mjs`, every string of `features.json` with its ids, `README.md`):
+no "tip", "tips", "tipped" or "tipping" as a whole word, any case, outside `WORD_KEPT`, whose
+entries are a string literal that is an identifier (its file and exact text: the nine
+accessibility identifiers of the Tips files) or a page's own sentence (its file and words: the
+arrowhead's tip on the lines-and-arrows page); a page line opening Starlight's `:::tip` aside
+is kept by its form. Every hit is printed with its file and line, and a `WORD_KEPT` entry that
+matches nothing fails by name, so the list cannot outlive what it excuses. A later string that
+needs the word adds its entry there. With only tree
 rows selected the proof chooses no app and writes nothing: `tools/proof/work/ai-docs-r2c` is
 wiped and made only when an app row runs.
 
@@ -33418,11 +33427,14 @@ request 2's tool result, 2 blocks / 1; `image-limit-text-summary` on event 9's s
 to /tmp/frame.jpg."; `image-limit-at-boundary` with `testAnImageExactlyAtTheLimitIsSent` failed
 (the mutant tree's suite, 52.5 s).
 
-## Tips — the dialog, the editor's button, the automatic ask, Settings' section and whose exports count (`tips_proof.py`, `tips_probe.swift`; nineteen mutants; spec §11 TIP-1…TIP-8)
+## Tips, which a person reads as "Contribute" — the dialog, the editor's button, the automatic ask, Settings' section and whose exports count (`tips_proof.py`, `tips_probe.swift`; nineteen mutants; spec §11 TIP-1…TIP-9)
 
-The owner's Tips feature (2026-11-14): a small window that says who a tip pays for and opens one
-web page, a green Tips button right of Export…, an ask Frame Job makes by itself on a schedule,
-and a Settings section whose box turns the button and the ask off. The same day the owner
+The owner's feature of 2026-11-14, named Tips in the code and worded "Contribute" for a person
+since TIP-9 the same day: a small window that says what a contribution does and opens one web
+page, a green Contribute button right of Export…, an ask Frame Job makes by itself on a
+schedule, and a Settings section, Contributions, whose box turns the button and the ask off.
+The rows below compare the labels as they read now; the two "Recorded" paragraphs further down
+are runs from before TIP-9 and keep the labels those runs saw ("Tips", "Leave a Tip"). The same day the owner
 overruled one part: an export an agent or the Assistant starts counts, and the window opens after
 it (TIP-4 as amended), with a proof's instance told from a person's by TIP-8. Its instrument is a
 probe, which hands the code its clock, calendar, defaults, dialog, queue and instance rule, and
@@ -33467,7 +33479,8 @@ domain and cleared.
 - **C2, C3, the toolbar button** on `ProjectDocument()` and `EditorViewController(document:)` at
   1440 pt and at the 900 pt minimum, found by a view walk; its geometry in the bar's coordinates.
 - **C4, Settings' pane** alone, over `ProbeDefaults` and a closure in place of the dialog.
-  `settings_layout_probe.py` L1 and L13 hold its place in the window (five panes, Tips last).
+  `settings_layout_probe.py` L1 and L13 hold its place in the window (five panes, Contributions
+  last).
 - **W1–W3, the two export doors, run for real.** W1 and W2 call
   `EditorViewController.beginExport(settings:to:options:tips:)`, the call the export card's commit
   makes, with a `TipsDoors` of the row's own; the progress sheet is found among the editor's
@@ -33509,13 +33522,13 @@ write` (4 exports, a first export 40 days back; `proof_defaults.read_env()`, so 
 scratch home) and removes with `proof_defaults.remove_domain` once the instance has stopped; a
 suite left behind fails the row by name, and the sweep in `make test` owns the prefix. L4 has an
 editor window: after the agent's export the suite reads 5 and a last-asked date inside the run,
-`snapshot_ui {}` lists one visible window titled "Tips" that is not key, `get_project` answers
-within 15 s, Frame Job ▸ Settings… is performed (`perform_menu_item` refuses while anything is
+`snapshot_ui {}` lists one visible window titled "Contribute" that is not key, `get_project`
+answers within 15 s, Frame Job ▸ Settings… is performed (`perform_menu_item` refuses while anything is
 app-modal), and a second export reaches `done` with 6 counted and last-asked unchanged. L5 adds
 `-RCDevDerivedHidden YES`: `new_project_from_range` makes a document with no window, the source
 is closed, and the export of the windowless document brings the same count and the same window.
-Both print whether the app was active, which is the host's, and L5 prints whether the Tips
-window was key without holding it: with no other window an active app may hand it key. Both hold
+Both print whether the app was active, which is the host's, and L5 prints whether the
+Contribute window was key without holding it: with no other window an active app may hand it key. Both hold
 `mcp.defaults_moved` empty, which is the claim that the switch moved the state out of the
 bundle's domain.
 
@@ -33524,7 +33537,7 @@ not a first-run value: `sharp_chrome.py` (`EXPORT_RIGHT`) and `phase7_chrome.py`
 patch at x 1334) read Export… at fixed points of the harness's renders, and a button to its
 right would move it. `screens.py` pins it ON and lists the three state keys and
 `RCDevTipsSuite` in `NOT_SHOWN` (row P2). `settings_layout_probe.py`'s L1 and L13 and `assistant_tab_probe.swift`'s P7 now want
-five panes with Tips last, and `order-swapped` and `mcp-last` follow the new pane list.
+five panes with Contributions (`tipsPane`) last, and `order-swapped` and `mcp-last` follow the new pane list.
 
 **Mutants** (`MUTANTS`, `settings_layout_probe.py`'s shape, read by `mutant_anchors.py`),
 nineteen because the feature holds nineteen separable decisions (TIP-7): `days-ignored` (S2),
@@ -33586,3 +33599,29 @@ whole proof 40/40, and `agent-unfollowed`, the one mutant whose anchor moved, ca
 T1; then `make gate`. The Release run above is the build before that fix; the other eighteen
 mutants were not re-run, their anchors and the rows' code being unchanged.
 Owed: the owner's manual check CH-10.
+
+**Recorded for the wording** (2026-11-14, TIP-9: "tip" becomes "contribution" in what a person
+reads; no behaviour, key or identifier changed). Red first, on the tree before the app's
+strings: with only the probe's literals changed, `tips_proof.py --no-live --only B0,A5,C1,C2,C4`
+scored 1/5, A5 on the address, C1 on the title, body, hint, button and opened page, C2 on the
+title and tooltip, C4 on the heading, sentence, checkbox and button; and with only T3 added,
+`ai_docs_r2c_proof.py --only T3` failed on 98 whole-word forms, twelve of them in eleven string
+literals of the four Tips files and the rest on the site (its page, its path, five other pages,
+`sidebar.mjs` and `features.json`), with all ten `WORD_KEPT` entries used and none of the nine
+identifiers reported. With the change: T3 passes (0 forms, 8 `:::tip` asides kept by form), the
+five probe rows pass, and the whole proof is 40/40 against Debug and, after `make gate` (PASS,
+796 s on a cold worktree), 40/40 against Release (`RC_PROOF_APP=release`), with no
+`DEFAULTS MOVED` line and both suites removed. C2 measured Contribute at
+80 × 26 pt (Tips was 46), 1348–1428 of a 1440 pt bar and 808–888 of a 900 pt one, every other
+control at its 1440 pt width and the spacer 75 pt wide at 900 (109 before), so the longer word
+needed no change to the toolbar. L1 read the button at 80 pt right of Export… on the running
+app, L3 found "Contribute…" and the new checkbox title in Settings, and L4 and L5 each listed
+one visible window titled "Contribute", not key, with `get_project` answered in 0.001 s or
+less, on both builds.
+`settings_layout_probe.py` 14/14 (L5: no field over 200 characters, the new sentence being
+115); `screens.py --only 02-settings,03-empty-editor` 7 pass with the two new `expect` strings;
+`assistant_tab_probe.swift` typechecked with its P7 note reworded, the proof not run, no row's
+code having changed. The site: `check-pages.mjs` 367 pages and 0 problems, `docs_site_proof.py`
+0 problems, and `pnpm build` 368 pages with every internal link valid. No mutant was added or
+re-run: the change adds no decision to the app and moves no anchor, and `mutant_anchors.py`
+counts all nineteen as before.

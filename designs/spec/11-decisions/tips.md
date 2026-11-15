@@ -10,26 +10,33 @@ button an experiment that may be removed. The same day, having seen it built, th
 one part: "Exports over the MCP count. That user is getting value from the app, and getting
 something that other video apps don't really offer. Assuming the dialog doesn't prevent further
 MCP calls, the dialog should open." TIP-3, TIP-4, TIP-5 and TIP-7 are amended in place for it,
-each saying what changed, and TIP-8 is new.
+each saying what changed, and TIP-8 is new. Later the same day the owner changed the word a
+person reads from "tip" to "contribution" (TIP-9); TIP-1, TIP-2, TIP-4, TIP-5 and TIP-6 are
+amended in place for it, each saying what it read. "Tips" in a code span below is a name in the
+code, which keeps it.
 
-- **TIP-1 — A tip is voluntary, nothing in Frame Job is gated on one, and the app holds no payment
-  code: the dialog says who a tip funds and opens one web page.** The statement is plain: Frame
-  Job is made by one developer, it is free to use and its source is open, a tip helps pay for the
-  time to keep working on it, and nothing is locked without one. "Leave a Tip" opens
-  `https://boppallewyn.com/frame-job/tips/` in the person's browser, and that address is ONE
-  constant (`TipsLink.url`, `Tips.swift`), so moving the page is a one-line change. The page is
-  the owner's to make. Frame Job never learns whether anyone tipped, so there is no "thank you"
-  state and nothing to restore. Risk accepted: until the page exists the button opens a missing
-  page.
-- **TIP-2 — The dialog is its own small window titled "Tips", not a sheet and not an app-modal
-  alert, and it has three doors: the editor's Tips button, Settings' Tips button and the automatic
-  ask.** A sheet needs a host window and two of the doors have no document (Settings, and Settings
+- **TIP-1 — A contribution is voluntary, nothing in Frame Job is gated on one, and the app holds
+  no payment code: the dialog says what a contribution does and opens one web page (amended
+  2026-11-14 with TIP-9: this read "A tip is voluntary" and "says who a tip funds").** The
+  statement is plain: Frame Job is made by one developer and shared as open source, a
+  contribution helps keep the work going, and nothing is locked without one (it read "it is free
+  to use and its source is open, a tip helps pay for the time to keep working on it").
+  "Contribute" (it read "Leave a Tip") opens `https://boppallewyn.com/frame-job/contribute/` in
+  the person's browser (it read `https://boppallewyn.com/frame-job/tips/`), and that address is
+  ONE constant (`TipsLink.url`, `Tips.swift`), so moving the page is a one-line change. The page
+  is the owner's to make. Frame Job never learns whether anyone contributed, so there is no
+  "thank you" state and nothing to restore. Risk accepted: until the page exists the button opens
+  a missing page.
+- **TIP-2 — The dialog is its own small window titled "Contribute", not a sheet and not an
+  app-modal alert, and it has three doors: the editor's Contribute button, Settings' Contribute…
+  button and the automatic ask (amended 2026-11-14 with TIP-9: the window and both buttons read
+  "Tips", and Return was on "Leave a Tip").** A sheet needs a host window and two of the doors have no document (Settings, and Settings
   opened from the Welcome window); an app-modal alert would stop every window and would sit in
   front of an MCP client's calls. A window that is modal to nothing cannot make anything wait. It
   is the Settings window's mould (`TipsWindowController`): one instance, not released when closed,
   no frame autosave name (so it writes no `NSWindow Frame` key), built from the sheets' own pieces
   (`makeSheetView`, `makeButtonRow`) so it reads as one of them, Escape on "Not Now" and Return on
-  "Leave a Tip". It is left out of the Window menu: a two-button dialog is not a place to come
+  "Contribute". It is left out of the Window menu: a two-button dialog is not a place to come
   back to, and both buttons reopen it. There is no menu item for it, and no MCP mirror, because
   showing it is not an edit (spec §7.9).
 - **TIP-3 — The automatic ask is due by usage first and the calendar after: never while the
@@ -52,7 +59,8 @@ each saying what changed, and TIP-8 is new.
 - **TIP-4 — Every export that completes in a person's instance (TIP-8) counts, whoever started
   it, and its completion evaluates the ask: the export card's two commits, an MCP client's
   `export` and the Assistant's `export` (amended 2026-11-14, the owner: "Exports over the MCP
-  count").** Before the amendment only an export a person confirmed in the export card counted,
+  count"; and with TIP-9 the same day: the dialog's button, "Contribute" below, read "Leave a
+  Tip").** Before the amendment only an export a person confirmed in the export card counted,
   the agent's `export` was never followed, and an instance driven only by an agent was never
   shown the dialog; the owner overruled that because a person whose agent exports for them is
   using Frame Job, and in a way other editors do not offer. The card's two commits are Export…
@@ -66,7 +74,7 @@ each saying what changed, and TIP-8 is new.
   refused count nothing. The ask is evaluated, and recorded, at the moment it is shown: for
   Export…, when the result sheet ends (Close or Show in Finder), one main-queue turn later; for a
   queued job, a person's or an agent's, when it completes. The automatic ask is ordered front
-  WITHOUT becoming key, so a Return typed into the editor can never press "Leave a Tip"; the two
+  WITHOUT becoming key, so a Return typed into the editor can never press "Contribute"; the two
   buttons' doors make it key. **It never makes a tool call wait:** the window is modal to nothing
   (TIP-2) and a queued job's ask runs from the queue's own notification, outside every call and
   outside the agent lane's lock, so `export_status`, the next `export` and every other tool
@@ -76,24 +84,29 @@ each saying what changed, and TIP-8 is new.
   sheet, so that export is counted and the ask waits for the next one; Frame Job is usually in
   the background when an agent's export ends, so the dialog waits there without bringing Frame
   Job forward, and when the person comes back it may be the window that becomes key, where
-  Return is "Leave a Tip"; a client that exports in a loop is asked once, at the export that
+  Return is "Contribute"; a client that exports in a loop is asked once, at the export that
   made it due.
 - **TIP-5 — The state is four keys of the bundle's defaults domain, and no export in a scratch
   instance writes one (TIP-8): an export writes only when it succeeds in a person's instance,
   whoever started it, and the dialog's and Settings' own controls write wherever a person
   presses them (amended 2026-11-14 with TIP-4: this read "written only at a person's
-  doors").** Only the two export doors ask TIP-8's rule; "Leave a Tip" and Settings' checkbox
+  doors"; and with TIP-9: the dialog's button, "Contribute" below, read "Leave a Tip").** Only
+  the two export doors ask TIP-8's rule; "Contribute" and Settings' checkbox
   do not, being presses no tool can make. `FrameJobTips` (Bool, absent means on) is the toggle, written by Settings' checkbox.
   `FrameJobTipsExports` (Int) and `FrameJobTipsFirstExport` (a date, stamped once) are written
   when a counted export succeeds, and counting goes on while the toggle is off, so turning it back
   on behaves sensibly. `FrameJobTipsLastAsked` (a date) is written when the automatic ask is shown
-  and when "Leave a Tip" is pressed from any door: someone who has just visited the page is not
+  and when "Contribute" is pressed from any door: someone who has just visited the page is not
   asked again that December. Opening the dialog by hand and choosing "Not Now", or closing it,
   writes nothing. Dates are stored as dates, so `defaults write … -date` sets one. No project
   format changes. Risk accepted: the state is per Mac and per build identity, so a Debug build
   and a reinstall on another Mac each start again.
-- **TIP-6 — The editor's Tips button is an `AccentButton` filled with `DS.tips` (`#2E7D32`), right
-  of Export…, and Settings ▸ Tips holds the toggle that removes it.** The owner asked for green.
+- **TIP-6 — The editor's Contribute button is an `AccentButton` filled with `DS.tips`
+  (`#2E7D32`), right of Export…, and Settings ▸ Contributions holds the toggle that removes it
+  (amended 2026-11-14 with TIP-9: the button and the pane's button read "Tips", the pane was
+  "Tips", its checkbox "Show the Tips button and the yearly reminder" and its sentence "Frame Job
+  is free and open source, made by one developer. Tips are voluntary.").** The owner asked for
+  green.
   The fill is a fixed leaf green, the same in both appearances as the recorder's coral Record
   button is, with the white `DS.onAccent` label at 5.1:1. It is deliberately not `DS.action` and
   not `DS.forest`: CI-4 keeps mint for the action ink and nothing else, and forest (`#1F8564`) is
@@ -103,9 +116,11 @@ each saying what changed, and TIP-8 is new.
   after Export… with no rule between them, has no symbol, and is `TipsToolbarButton`, a view that
   hides itself while the toggle is off and follows `TipsSettings.didChangeNotification`, so the
   frozen editor file holds nothing for it: removing the experiment is deleting that file and one
-  line of `buildToolbar`. Settings' fifth and last pane, "Tips", is a bare heading, one visible
-  sentence (under SH-5's and `settings_layout_probe` L5's 200 characters, so it needs no ⓘ), the
-  checkbox "Show the Tips button and the yearly reminder" (on by default) and a "Tips" button.
+  line of `buildToolbar`. At 80 pt wide (it was 46) it still leaves the toolbar's spacer 75 pt
+  at the 900 pt minimum window (`tips_proof.py` C2). Settings' fifth and last pane, "Contributions", is a bare
+  heading, one visible sentence (115 characters, under SH-5's and `settings_layout_probe` L5's
+  200, so it needs no ⓘ), the checkbox "Show the Contribute button and the yearly reminder" (on
+  by default) and a "Contribute…" button.
   Unticking stops the automatic ask and removes the button from every open editor at once; the
   pane's own button is never hidden or disabled and shows the dialog whatever the toggle says. It
   is a person's setting: no tool reads or writes it (R6-12, MC-7).
@@ -147,8 +162,8 @@ each saying what changed, and TIP-8 is new.
   person's only when it runs from an app bundle and `RC_AGENT_SOCKET` is unset or empty.** The
   reason TIP-4 first excluded the agent's door still stands for the proofs: they export over MCP
   constantly and share the bundle's defaults domain, the owner's real one for a Release proof
-  (#238), so they must not count, must not move the owner's Tips state, must not trip `mcp.py`'s
-  `DEFAULTS MOVED` guard and must not put a Tips window into a capture. The rule is one pure
+  (#238), so they must not count, must not move the owner's own state, must not trip `mcp.py`'s
+  `DEFAULTS MOVED` guard and must not put a Contribute window into a capture. The rule is one pure
   function, `TipsInstance.counts(environment:bundleIdentifier:)`, read once for the process
   (`TipsInstance.isPersons`) and asked by both of `TipsDoors`' doors before anything is followed,
   counted or asked, so it is a rule about the instance and not about who started the export.
@@ -172,3 +187,44 @@ each saying what changed, and TIP-8 is new.
   accepted: a person who runs their everyday copy with `RC_AGENT_SOCKET` set is never counted or
   asked, not even for an Export… of their own in that copy; a probe built as a bundle with an
   identifier of its own would count into its own domain, never the app's, if it ever ran a door.
+- **TIP-9 — What a person reads says "Contribute" and "contribution", never "tip", and the page is
+  `https://boppallewyn.com/frame-job/contribute/`; the code keeps the name Tips (the owner,
+  2026-11-14).** The owner: "I want to change the term 'tip' to 'contribution'. Tip sounds too
+  close to begging. I want to foster a sense of working together. I'm changing the url from
+  '/frame-job/tips' to '/frame-job/contribute'. The language in the app should reflect that."
+  **The strings**, each a constant: the toolbar button "Contribute" with the tooltip "Contribute
+  to Frame Job" (they read "Tips" and "Support Frame Job"), the same green in the same place
+  (TIP-6); the window titled "Contribute" (it read "Tips"), its heading unchanged, "Frame Job is
+  free and open source", its body "Frame Job is made by one developer and shared as open source.
+  If it is useful to you, a contribution helps keep the work going. Contributions are voluntary,
+  and nothing in Frame Job is locked without one.", its hint "You can turn this reminder off in
+  Frame Job ▸ Settings… ▸ Contributions.", and its buttons "Contribute" (it read "Leave a Tip")
+  and "Not Now"; Settings' pane "Contributions" with the sentence "Frame Job is free and open
+  source, made by one developer. Contributions are voluntary and help keep the work going.", the
+  checkbox "Show the Contribute button and the yearly reminder" and the button "Contribute…",
+  with an ellipsis because it opens the window and not the page. The dev-only line
+  `-RCDevTipsSuite` writes to stderr names "the contribution reminder". No behaviour changes: the
+  schedule, the doors, the keys and whose instance counts are TIP-3…TIP-8's. **The code keeps
+  "Tips"**, because none of it is read by a person and renaming it buys nothing: the types and
+  their files (`Tips.swift`, `TipsWindowController`, `TipsSettingsPane`, `TipsToolbarButton`,
+  `TipsDoors`, `TipsAsk`, `TipsLink`…), the four `FrameJobTips…` defaults keys (so a person's
+  count, dates and toggle carry over with no migration), the notification's name, `showTips:`,
+  `DS.tips`, the accessibility identifiers (`toolbar.tips`, `tips.body`, `tips.hint`,
+  `tips.notnow`, `tips.tip`, `settings.tips.heading`, `.blurb`, `.toggle`, `.button`),
+  `-RCDevTipsSuite`, the proof's files (`tips_proof.py`, `tips_probe.swift`), this file's name
+  and the IDs TIP-1…TIP-9, a §11 ID never being renumbered. **The documentation site** follows:
+  the page is `reference/contribute` ("Contribute"), Settings' section is "Contributions", and
+  no page says "tip". The site says one thing the app does not: that a contribution here is
+  money given to support the work. In an open-source project "contribute" also means code, and
+  a reader who clicks expecting a pull-request guide should know before the browser opens; the
+  site names no amount and says nothing of how the owner's page takes it, only that Frame Job
+  takes no payment itself and never learns whether anyone contributed. The app's own strings
+  stay as the owner gave them. **What holds it** is `ai_docs_r2c_proof.py` T3, in `make test`:
+  no string literal of `app/Sources`, `core/src` or `graphic/src`, and no page (code spans
+  apart), page path, `sidebar.mjs` entry, `features.json` string or `README.md` line, holds
+  "tip", "tips", "tipped" or "tipping" as a whole word in any case, outside `WORD_KEPT`, an
+  explicit list: the nine accessibility identifiers, a page line opening Starlight's `:::tip`
+  aside, and the arrowhead's tip on the lines-and-arrows page. A kept entry that matches nothing
+  fails too, so the list cannot outlive what it excuses. A later feature that needs the word in
+  a string adds its entry there. Risk accepted: the old page address is gone with no redirect,
+  the page having been added the same day and the site having no public address yet.

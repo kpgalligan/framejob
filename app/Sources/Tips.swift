@@ -1,15 +1,17 @@
 import Foundation
 
-/// Tips (spec §11 TIP-1…TIP-8): what the dialog links to, when Frame Job asks
-/// by itself, what it remembers, and whose instance counts. Foundation only,
+/// Tips, which a person reads as "Contribute" (spec §11 TIP-1…TIP-9): what the
+/// dialog links to, when Frame Job asks by itself, what it remembers, and
+/// whose instance counts. Foundation only,
 /// so a probe can run the rule against a clock of its own and the AppKit-free
 /// export queue can be followed from here. The dialog is `TipsWindowController.swift`, the
 /// editor's button `TipsToolbarButton.swift`, Settings' pane
 /// `TipsSettingsPane.swift`.
 
-/// The one address "Leave a Tip" opens (TIP-1). The page is the owner's.
+/// The one address the dialog's "Contribute" opens (TIP-1, TIP-9). The page is
+/// the owner's.
 enum TipsLink {
-    static let url = "https://boppallewyn.com/frame-job/tips/"
+    static let url = "https://boppallewyn.com/frame-job/contribute/"
 }
 
 /// What the schedule is decided from: the stored state, read at one moment.
@@ -19,9 +21,9 @@ struct TipsState: Equatable {
     /// How many exports have succeeded in a person's instance (TIP-4, TIP-8),
     /// whoever started them: the export card, an MCP client or the Assistant.
     var exports = 0
-    /// When the automatic ask was last shown, or "Leave a Tip" last pressed.
+    /// When the automatic ask was last shown, or the dialog's "Contribute" last pressed.
     var lastAsked: Date?
-    /// Settings ▸ Tips' toggle.
+    /// Settings ▸ Contributions' toggle.
     var enabled = true
 }
 
@@ -60,13 +62,13 @@ enum TipsSchedule {
     }
 }
 
-/// Settings ▸ Tips' toggle (TIP-5, TIP-6): on shows the editor's Tips button
-/// and lets the automatic ask happen.
+/// Settings ▸ Contributions' toggle (TIP-5, TIP-6): on shows the editor's
+/// Contribute button and lets the automatic ask happen.
 enum TipsSettings {
     /// Bool; absent = true.
     static let enabledKey = "FrameJobTips"
 
-    /// Posted after the toggle is written, so every editor's Tips button
+    /// Posted after the toggle is written, so every editor's Contribute button
     /// follows it at once.
     static let didChangeNotification = Notification.Name("FrameJobTipsSettingsDidChange")
 
@@ -131,7 +133,8 @@ enum TipsInstance {
         guard let name = UserDefaults.standard.string(forKey: devSuiteKey) else { return nil }
         guard name.hasPrefix(devSuitePrefix), let store = UserDefaults(suiteName: name) else {
             let line = "\(devSuiteKey) must name a suite starting \"\(devSuitePrefix)\" (got "
-                + "\"\(name)\"); Tips keeps the bundle's defaults and this instance's own rule.\n"
+                + "\"\(name)\"); the contribution reminder keeps the bundle's defaults and this "
+                + "instance's own rule.\n"
             FileHandle.standardError.write(Data(line.utf8))
             return nil
         }
@@ -141,16 +144,16 @@ enum TipsInstance {
 }
 
 /// The stored state and its three writers (TIP-5): an export that succeeded,
-/// whoever started it, the automatic ask being shown, and the dialog's "Leave
-/// a Tip". No export in a scratch instance writes a key (`TipsInstance`,
-/// TIP-8); a press of "Leave a Tip" is a person's and writes in any instance.
+/// whoever started it, the automatic ask being shown, and the dialog's
+/// "Contribute". No export in a scratch instance writes a key (`TipsInstance`,
+/// TIP-8); a press of "Contribute" is a person's and writes in any instance.
 /// Main thread.
 final class TipsAsk {
     /// Int; absent = 0.
     static let exportsKey = "FrameJobTipsExports"
     /// A date, stamped by the first counted export and never again.
     static let firstExportKey = "FrameJobTipsFirstExport"
-    /// A date: the last automatic ask, or the last press of "Leave a Tip".
+    /// A date: the last automatic ask, or the last press of the dialog's "Contribute".
     static let lastAskedKey = "FrameJobTipsLastAsked"
 
     /// The app's own, over the bundle's defaults and the real clock; under
@@ -200,7 +203,7 @@ final class TipsAsk {
         return true
     }
 
-    /// "Leave a Tip" was pressed, from any door: that is an ask too.
+    /// The dialog's "Contribute" was pressed, from any door: that is an ask too.
     func noteTipPageOpened() {
         defaults.set(now(), forKey: Self.lastAskedKey)
     }

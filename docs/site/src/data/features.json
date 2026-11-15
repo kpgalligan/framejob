@@ -20347,7 +20347,7 @@
     {
      "id": "ref-settings-window",
      "name": "The Settings window",
-     "summary": "One window holds what belongs to you and not to a project, in five sections: MCP, Assistant, Transcription, Playback and Tips.",
+     "summary": "One window holds what belongs to you and not to a project, in five sections: MCP, Assistant, Transcription, Playback and Contributions.",
      "page": "reference/settings",
      "anchor": "opening-settings",
      "where": "Frame Job ▸ Settings…",
@@ -20402,12 +20402,12 @@
      "where": "Frame Job ▸ Settings… ▸ Playback ▸ Background render"
     },
     {
-     "id": "ref-settings-tips",
-     "name": "Settings: Tips",
-     "summary": "One box shows or removes the toolbar's Tips button and the yearly reminder, and a Tips button that is always there opens the Tips window.",
+     "id": "ref-settings-contributions",
+     "name": "Settings: Contributions",
+     "summary": "One box shows or removes the toolbar's Contribute button and the yearly reminder, and a Contribute… button that is always there opens the Contribute window.",
      "page": "reference/settings",
-     "anchor": "tips",
-     "where": "Frame Job ▸ Settings… ▸ Tips"
+     "anchor": "contributions",
+     "where": "Frame Job ▸ Settings… ▸ Contributions"
     },
     {
      "id": "ref-settings-no-agent",
@@ -20947,27 +20947,27 @@
      "anchor": "what-carries-its-own-licence"
     },
     {
-     "id": "ref-tips",
-     "name": "Tips",
-     "summary": "A green Tips button at the right end of the toolbar opens a small window that says who a tip pays for, with Leave a Tip and Not Now.",
-     "page": "reference/tips",
-     "anchor": "leave-a-tip",
-     "where": "Toolbar ▸ Tips"
+     "id": "ref-contribute",
+     "name": "Contribute",
+     "summary": "A green Contribute button at the right end of the toolbar opens a small window that says what a contribution does, with Contribute and Not Now.",
+     "page": "reference/contribute",
+     "anchor": "make-a-contribution",
+     "where": "Toolbar ▸ Contribute"
     },
     {
-     "id": "ref-tips-reminder",
-     "name": "When Frame Job asks for a tip",
-     "summary": "Frame Job opens the Tips window by itself after 5 finished exports and 30 days unless you pressed Leave a Tip first, then once a year in December, and only just after an export finishes, whether you, an agent or the Assistant started it.",
-     "page": "reference/tips",
+     "id": "ref-contribute-reminder",
+     "name": "When Frame Job asks for a contribution",
+     "summary": "Frame Job opens the Contribute window by itself after 5 finished exports and 30 days unless you pressed Contribute in it first, then once a year in December, and only just after an export finishes, whether you, an agent or the Assistant started it.",
+     "page": "reference/contribute",
      "anchor": "when-frame-job-asks"
     },
     {
-     "id": "ref-tips-setting",
-     "name": "Turn tips off",
-     "summary": "Unticking one box in Settings removes the Tips button and stops the reminder; Settings' own Tips button still opens the window.",
-     "page": "reference/tips",
-     "anchor": "turn-tips-off",
-     "where": "Frame Job ▸ Settings… ▸ Tips"
+     "id": "ref-contribute-setting",
+     "name": "Turn the Contribute button and the reminder off",
+     "summary": "Unticking one box in Settings removes the Contribute button and stops the reminder; Settings' own Contribute… button still opens the window.",
+     "page": "reference/contribute",
+     "anchor": "turn-the-button-and-the-reminder-off",
+     "where": "Frame Job ▸ Settings… ▸ Contributions"
     }
    ]
   }

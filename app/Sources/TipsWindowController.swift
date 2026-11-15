@@ -1,11 +1,11 @@
 import AppKit
 
-/// The Tips dialog (spec §11 TIP-1, TIP-2): who a tip funds, "Leave a Tip"
-/// and "Not Now".
+/// The Contribute dialog (spec §11 TIP-1, TIP-2, TIP-9): what a contribution
+/// does, "Contribute" and "Not Now". The code's name for it is Tips.
 ///
 /// **A window and not a sheet, deliberately.** It has three doors — the
-/// editor's Tips button, Settings' Tips button and the automatic ask — and
-/// two of them have no document to hold a sheet. It is modal to nothing, so
+/// editor's Contribute button, Settings' Contribute… button and the automatic
+/// ask — and two of them have no document to hold a sheet. It is modal to nothing, so
 /// no window and no tool call ever waits on it. `SettingsWindowController`'s
 /// mould: one instance, not released when closed, no frame autosave name.
 /// It is built from the sheets' own pieces so it reads as one of them, and
@@ -14,25 +14,26 @@ import AppKit
 /// **Two ways to show it.** `show()` is a person's press: key and front, and
 /// it writes nothing. `showAutomatic()` is the ask Frame Job makes by itself
 /// (TIP-4): front WITHOUT key, so a Return typed into the editor can never
-/// press "Leave a Tip". The two order calls are closures because a probe's
+/// press "Contribute". The two order calls are closures because a probe's
 /// window is never key and could not tell the two apart otherwise.
 ///
-/// **What "Leave a Tip" does.** Opens `TipsLink.url` in the browser, records
+/// **What "Contribute" does.** Opens `TipsLink.url` in the browser, records
 /// the press as an ask (TIP-5) and closes. Nothing here knows whether anyone
-/// tipped.
+/// contributed.
 final class TipsWindowController: NSWindowController {
-    /// The app's one Tips dialog. A probe builds its own.
+    /// The app's one Contribute dialog. A probe builds its own.
     static let shared = TipsWindowController()
 
-    static let windowTitle = "Tips"
+    static let windowTitle = "Contribute"
     static let heading = "Frame Job is free and open source"
     static let body =
-        "Frame Job is made by one developer. It is free to use and its source is open. If it "
-        + "is useful to you, a tip helps pay for the time to keep working on it. Tips are "
-        + "voluntary, and nothing in Frame Job is locked without one."
-    static let hint = "You can turn this reminder off in Frame Job ▸ Settings… ▸ Tips."
+        "Frame Job is made by one developer and shared as open source. If it is useful to "
+        + "you, a contribution helps keep the work going. Contributions are voluntary, and "
+        + "nothing in Frame Job is locked without one."
+    static let hint =
+        "You can turn this reminder off in Frame Job ▸ Settings… ▸ Contributions."
     static let notNowTitle = "Not Now"
-    static let tipTitle = "Leave a Tip"
+    static let tipTitle = "Contribute"
 
     private let ask: TipsAsk
     private let open: (URL) -> Void
@@ -106,7 +107,7 @@ final class TipsWindowController: NSWindowController {
 
     // MARK: - Showing
 
-    /// A person's press of a Tips button: key and front. Writes nothing.
+    /// A person's press of a Contribute button: key and front. Writes nothing.
     func show() {
         guard let window else { return }
         applyBackground()
@@ -135,7 +136,7 @@ final class TipsWindowController: NSWindowController {
 
 // MARK: - The export doors
 
-/// The two places an export reaches Tips (TIP-4): the Export… sheet's success
+/// The two places an export reaches the Contribute dialog (TIP-4): the Export… sheet's success
 /// and a queued job, which is a person's Add to Queue
 /// (`EditorViewController+Export.swift`) or the agent's `export`
 /// (`AgentServer+Export.swift`, the Assistant's too). Both doors do nothing in
@@ -238,7 +239,7 @@ private final class TipsSheetEnd: NSObject {
 
 /// The command half, at the foot of the file that owns the feature
 /// (`SettingsWindowController.swift`'s precedent): a nil-target selector, so
-/// the editor's Tips button resolves it through the responder chain.
+/// the editor's Contribute button resolves it through the responder chain.
 extension AppDelegate {
     @objc func showTips(_ sender: Any?) {
         TipsWindowController.shared.show()

@@ -107,7 +107,7 @@ The environment variable `RC_AGENT_SOCKET` moves the socket, for both the app an
 - An empty value means the default path.
 - The path's folder follows the same [rules](#the-sockets-folder-and-permissions) as the default one. A folder that already exists with mode `0755` won't do. A missing folder is made with the right mode.
 - Only the socket moves. The test copy still shares your everyday copy's preferences.
-- A copy started with the variable set counts no exports toward [Tips](/reference/tips/#when-frame-job-asks) and never opens the Tips window by itself.
+- A copy started with the variable set counts no exports toward [the contribution reminder](/reference/contribute/#when-frame-job-asks) and never opens the Contribute window by itself.
 
 When the helper launches Frame Job for a custom socket, it passes the path on, tells macOS not to restore the app's windows from last time, and writes the app's error output to `framejob-launch.log` beside the socket. A launch for your own socket does none of this, so your Frame Job opens as yours.
 

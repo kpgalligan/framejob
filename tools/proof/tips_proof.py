@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Tips (spec §11 TIP-1…TIP-8) — the dialog, the editor's button, the automatic
-ask, Settings' section, and whose exports count.
+"""Tips (spec §11 TIP-1…TIP-9) — the dialog, the editor's button, the automatic
+ask, Settings' section, and whose exports count. A person reads "Contribute"
+and "Contributions" (TIP-9); the code, its keys and this proof's names keep
+"Tips".
 
     python3 tools/proof/tips_proof.py [--only ROW,…] [--no-live] [--mutant NAME]
 
@@ -38,7 +40,7 @@ The probe (no app, nothing on screen, no browser, no real defaults domain):
        `takeAsk` false and nothing written; a sixth export still counts.
   A4   `noteTipPageOpened` writes last-asked alone.
   A5   the four key names; an absent toggle reads on; both dates are stored as
-       dates; the link is `https://boppallewyn.com/frame-job/tips/`.
+       dates; the link is `https://boppallewyn.com/frame-job/contribute/`.
   F1   a followed job waiting, running, then completed: `completed` once over
        three settles.
   F2   a followed job cancelled, failed or removed: never, and dropped.
@@ -52,23 +54,24 @@ The probe (no app, nothing on screen, no browser, no real defaults domain):
        a bundle with an identifier, made in the scratch folder, it is false
        (the proof set `RC_AGENT_SOCKET`) and true with an empty environment;
        the process as it is, and `TipsInstance.isPersons`, are false.
-  C1   the dialog: its title, heading, body and hint; Not Now on Escape, Leave
-       a Tip on Return; out of the Window menu, no frame autosave name;
+  C1   the dialog: its title ("Contribute"), heading, body and hint; Not Now on
+       Escape, Contribute on Return; out of the Window menu, no frame autosave name;
        `show()` orders key and writes nothing; `showAutomatic()` orders front,
-       never key; Not Now closes and writes nothing; Leave a Tip opens exactly
+       never key; Not Now closes and writes nothing; Contribute opens exactly
        the page, writes last-asked alone and closes. Its PNGs in both looks are
        written to `work/tips/…/scratch/` for a reader and checked for more
        than one colour only.
   C2   an in-process document's editor at 1440 pt and at the 900 pt minimum:
-       the toolbar's row ends Export… then Tips; Tips is 12 pt after Export…
-       and 12 pt from the edge, 26 pt tall at its own width; titled "Tips",
-       fill #2E7D32, a nil-target `showTips:`, its tooltip; at 900 pt every
+       the toolbar's row ends Export… then Contribute, which is 12 pt after
+       Export… and 12 pt from the edge, 26 pt tall at its own width (80 pt);
+       titled "Contribute", fill #2E7D32, a nil-target `showTips:`, its
+       tooltip "Contribute to Frame Job"; at 900 pt every
        control keeps its 1440 pt width and the spacer is wider than 0.
   C3   the toggle off (the argument domain, then the notification): the button
        is hidden and Export… is 12 pt from the edge; on again: back.
   C4   Settings' pane: heading, blurb, toggle, button; the literals; on by
        default; no info button; unticking writes `FrameJobTips` false and
-       posts once; the Tips button is there, enabled, and shows the dialog in
+       posts once; the Contribute… button is there, enabled, and shows the dialog in
        both states; the pane writes one key.
   W2   Export… through `EditorViewController.beginExport` on a state one
        export short of due: an export to a folder that is not there fails, and
@@ -109,19 +112,20 @@ The app over MCP (`mcp.launch`, each instance stopped by its own pid):
 
   L0   `grep "Frame Job: "` of each instance's log prints nothing.
   L1   launched with `-FrameJobTips YES`: the toolbar capture's layout dump has
-       a visible view reading "Tips" (`toolbar.tips`) right of the one reading
+       a visible view reading "Contribute" (`toolbar.tips`) right of the one reading
        "Export…"; the PNG is not one colour.
   L2   the same instance, which is a proof's (a scratch socket, TIP-8): an
        agent `export` of a one-clip project reaches `done`; `snapshot_ui`'s
-       listing has no window titled "Tips" and `mcp.defaults_moved` is empty.
+       listing has no window titled "Contribute" and `mcp.defaults_moved` is
+       empty.
   L3   launched with `-FrameJobTips NO`: no visible view of the toolbar reads
-       "Tips"; Settings' dump has the visible "Tips" button
+       "Contribute"; Settings' dump has the visible "Contribute…" button
        (`settings.tips.button`) and the toggle's title.
   L4   launched with `-RCDevTipsSuite <suite>` (TIP-7), the suite a throwaway
        `framejob.tips-proof.…` domain seeded with 4 exports and a first export
        40 days back: an agent `export` reaches `done`; the suite then reads 5
        exports and a last-asked date inside the run; the listing has one
-       visible window titled "Tips" that is not key; `get_project` answers
+       visible window titled "Contribute" that is not key; `get_project` answers
        within 15 s, Frame Job ▸ Settings… is performed (nothing is app-modal)
        and a second `export` reaches `done`, the suite reading 6 with
        last-asked unchanged; `mcp.defaults_moved` is empty. Whether the app
@@ -131,7 +135,7 @@ The app over MCP (`mcp.launch`, each instance stopped by its own pid):
        `new_project_from_range` makes a document with no window, its source
        is closed and the listing has no editor window; the windowless
        document's `export` reaches `done`, the suite reads 5 and a last-asked
-       date, the listing has the visible "Tips" window, and `get_project`
+       date, the listing has the visible "Contribute" window, and `get_project`
        answers within 15 s. Whether the window is key is printed, not held:
        an active app with no other window may hand it key. The suite is
        removed afterwards.
@@ -204,7 +208,7 @@ LIVE_ROWS = ["L0", "L1", "L2", "L3", "L4", "L5"]
 ROWS = ["B0"] + PROBE_ROWS + ["T1"] + LIVE_ROWS
 WALL = 480
 CALL_BOUND = 180
-NEXT_CALL_BOUND = 15    # how long a call may take with the Tips window up (L4, L5)
+NEXT_CALL_BOUND = 15    # how long a call may take with the Contribute window up (L4, L5)
 SUITE_BOUND = 10        # how long the suite may take to show a write (L4, L5)
 DOOR = "EditorViewController+Export.swift"
 AGENT_DOOR = "AgentServer+Export.swift"
@@ -492,11 +496,12 @@ def utc(value):
 
 
 def tips_windows(client):
-    """(the visible windows titled "Tips", every visible window, the app's
+    """(the visible windows titled "Contribute", every visible window, the app's
     `active` fact) from `snapshot_ui`'s listing."""
     listing = client.call_with("snapshot_ui", {})
     windows = listing.get("windows", [])
-    return [w for w in windows if w.get("title") == "Tips"], windows, listing.get("active")
+    return ([w for w in windows if w.get("title") == "Contribute"], windows,
+            listing.get("active"))
 
 
 def timed(call):
@@ -562,16 +567,16 @@ def live(wanted):
         client.call_with("new_project", {"path": project})
         answer = toolbar(client, project, "toolbar-on.png")
         views = views_of(answer)
-        tips = shown(views, text="Tips", ident="toolbar.tips")
+        tips = shown(views, text="Contribute", ident="toolbar.tips")
         export = shown(views, text="Export…")
         colours = png_colours(out / "toolbar-on.png")
         right = bool(tips and export
                      and tips[0]["frame"][0] >= export[0]["frame"][0] + export[0]["frame"][2])
         answers["L1"] = (
             len(tips) == 1 and len(export) == 1 and right and colours > 8,
-            f"visible Tips views {[v['frame'] for v in tips]}, Export… "
-            f"{[v['frame'] for v in export]}, Tips right of Export… {right}; the PNG's data "
-            f"holds {colours} byte values")
+            f"visible Contribute views {[v['frame'] for v in tips]}, Export… "
+            f"{[v['frame'] for v in export]}, Contribute right of Export… {right}; the PNG's "
+            f"data holds {colours} byte values")
 
         got = client.call_with("get_project", {"project": project})["project"]
         client.call_with("add_shape_clip", {
@@ -583,7 +588,7 @@ def live(wanted):
         titles = [w.get("title") for w in listing.get("windows", [])]
         moved = mcp.defaults_moved(launched.socket_path)
         answers["L2"] = (
-            isinstance(done, dict) and (out / "agent.mp4").exists() and "Tips" not in titles
+            isinstance(done, dict) and (out / "agent.mp4").exists() and "Contribute" not in titles
             and moved == [],
             f"export answered {done.get('status') if isinstance(done, dict) else done!r}, the "
             f"file exists {(out / 'agent.mp4').exists()}; visible windows {titles}; defaults "
@@ -595,18 +600,18 @@ def live(wanted):
         project = str(session / "off.framejob")
         client.call_with("new_project", {"path": project})
         views = views_of(toolbar(client, project, "toolbar-off.png"))
-        tips = shown(views, text="Tips")
+        tips = shown(views, text="Contribute")
         export = shown(views, text="Export…")
         client.call_with("perform_menu_item", {"path": ["Frame Job", "Settings…"]})
         settings = views_of(client.call_with("snapshot_ui", {
             "window": "settings", "path": str(out / "settings-off.png")}))
-        button = shown(settings, text="Tips", ident="settings.tips.button")
-        toggle = shown(settings, text="Show the Tips button and the yearly reminder",
+        button = shown(settings, text="Contribute…", ident="settings.tips.button")
+        toggle = shown(settings, text="Show the Contribute button and the yearly reminder",
                        ident="settings.tips.toggle")
         answers["L3"] = (
             not tips and len(export) == 1 and len(button) == 1 and len(toggle) == 1,
-            f"toolbar views reading Tips {len(tips)}, Export… {len(export)}; Settings' Tips "
-            f"button {len(button)}, toggle {len(toggle)}")
+            f"toolbar views reading Contribute {len(tips)}, Export… {len(export)}; Settings' "
+            f"Contribute… button {len(button)}, toggle {len(toggle)}")
         client.call_with("close_project", {"project": project, "discard": True})
 
     def one_clip(client, project):
@@ -651,13 +656,13 @@ def live(wanted):
             client.call_with("close_project", {"project": project, "discard": True})
             return ok, (
                 f"the suite after the first export: {state.get(EXPORTS_KEY)} exports, last "
-                f"asked {asked} (the run began {started}); windows titled Tips "
+                f"asked {asked} (the run began {started}); windows titled Contribute "
                 f"{[(w.get('visible'), w.get('key')) for w in tips]} (visible, key) of "
                 f"{len(windows)} visible, the app active {active}; get_project answered in "
                 f"{took} s; Settings… performed; the second export "
                 f"{second.get('status') if isinstance(second, dict) else second!r}, the suite "
                 f"then {later.get(EXPORTS_KEY)} exports and last asked unchanged "
-                f"{utc(later.get(ASKED_KEY)) == asked}, Tips windows {len(again)}; defaults "
+                f"{utc(later.get(ASKED_KEY)) == asked}, Contribute windows {len(again)}; defaults "
                 f"moved {moved}")
         return body
 
@@ -688,10 +693,10 @@ def live(wanted):
                   and isinstance(got, dict) and took <= NEXT_CALL_BOUND and moved == [])
             client.call_with("close_project", {"project": derived, "discard": True})
             return ok, (
-                f"before the export: Tips windows {len(before)}, editor windows {len(editors)} "
-                f"of {len(windows)} visible; the windowless document's export "
+                f"before the export: Contribute windows {len(before)}, editor windows "
+                f"{len(editors)} of {len(windows)} visible; the windowless document's export "
                 f"{done.get('status') if isinstance(done, dict) else done!r}; the suite "
-                f"{state.get(EXPORTS_KEY)} exports, last asked {asked}; windows titled Tips "
+                f"{state.get(EXPORTS_KEY)} exports, last asked {asked}; windows titled Contribute "
                 f"{[(w.get('visible'), w.get('key')) for w in tips]} (visible, key) of "
                 f"{len(after)} visible, the app active {active}; get_project answered in "
                 f"{took} s; defaults moved {moved}")

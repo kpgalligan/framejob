@@ -1,12 +1,12 @@
 ---
 title: "Settings"
-description: "Every control in the Settings window: connecting an MCP client, your Anthropic and AssemblyAI keys, the Assistant's model, background rendering and tips."
+description: "Every control in the Settings window: connecting an MCP client, your Anthropic and AssemblyAI keys, the Assistant's model, background rendering and the Contribute button."
 ---
 
 import AtAGlance from '@components/AtAGlance.astro';
 import Shot from '@components/Shot.astro';
 
-Settings holds what belongs to you and not to a project: how an MCP client reaches Frame Job, your Anthropic key and the Assistant's model, your AssemblyAI key and region, whether graphics render while you're idle, and whether Frame Job shows its Tips button.
+Settings holds what belongs to you and not to a project: how an MCP client reaches Frame Job, your Anthropic key and the Assistant's model, your AssemblyAI key and region, whether graphics render while you're idle, and whether Frame Job shows its Contribute button.
 
 <AtAGlance
   menu="Frame Job ▸ Settings…"
@@ -23,7 +23,7 @@ Settings holds what belongs to you and not to a project: how an MCP client reach
 
 Choose **Frame Job ▸ Settings…** (<kbd>⌘,</kbd>). It works with or without a project open, so you can set your keys from the Welcome window before you make anything. It's a window, not a sheet, and it shows the same settings whichever project is open.
 
-The window has five sections, one under the other: **MCP**, **Assistant**, **Transcription**, **Playback** and **Tips**. There are no tabs. On a short screen the window stops at the screen's height and scrolls.
+The window has five sections, one under the other: **MCP**, **Assistant**, **Transcription**, **Playback** and **Contributions**. There are no tabs. On a short screen the window stops at the screen's height and scrolls.
 
 There's no OK or Cancel. Every control saves as you use it, and a key saves when you press its **Save** button. While it's open it's listed in the **Window** menu, so you can bring it back from behind other windows.
 
@@ -37,7 +37,7 @@ Other places send you here:
 
 ## The info buttons
 
-The **Assistant**, **Transcription** and **Playback** headings each carry an ⓘ button that explains the section. The MCP and Tips sections have none, because their text is shown in full.
+The **Assistant**, **Transcription** and **Playback** headings each carry an ⓘ button that explains the section. The MCP and Contributions sections have none, because their text is shown in full.
 
 - Rest the pointer on it for about a third of a second to see the explanation. Moving away closes it.
 - Click it to keep the explanation open. Click it again, click anywhere else, press <kbd>⎋</kbd> or close the window to end it.
@@ -130,16 +130,16 @@ Anything you do in Frame Job stops the drawing at once and starts the wait again
 
 Background render never runs while a window is playing, and it keeps the processor busy while it runs. Its frames are held in memory, at most a quarter of your Mac's and less when memory is short, until the window closes or newer frames replace them. It draws pictures only and changes nothing about the sound. See [Graphics playback and memory](/graphics/playback-and-memory/).
 
-## Tips
+## Contributions
 
-This section holds one box and one button. See [Tips](/reference/tips/).
+This section holds one sentence, one box and one button. See [Contribute](/reference/contribute/).
 
 | Control | What it does | Default |
 | --- | --- | --- |
-| **Show the Tips button and the yearly reminder** | Shows the green **Tips** button at the right end of the editor's toolbar, and lets Frame Job open the Tips window by itself when it's due. Untick it to stop both. | On |
-| **Tips** | Opens the Tips window. It's always there and always works, whatever the box says. | |
+| **Show the Contribute button and the yearly reminder** | Shows the green **Contribute** button at the right end of the editor's toolbar, and lets Frame Job open the Contribute window by itself when it's due. Untick it to stop both. | On |
+| **Contribute…** | Opens the Contribute window. It's always there and always works, whatever the box says. | |
 
-The box saves the moment you click it, and the toolbar button leaves or returns in every open editor window at once. With the box unticked, this section's **Tips** button is the only way to the window.
+The box saves the moment you click it, and the toolbar button leaves or returns in every open editor window at once. With the box unticked, this section's **Contribute…** button is the only way to the window.
 
 ## How the key fields behave
 
@@ -160,7 +160,7 @@ The line under the controls reports what happened:
 
 ## Agents and Settings
 
-No agent tool reads or writes anything in Settings. Your keys, the model, the region, **Background render** and the **Tips** box are set only by you, in this window.
+No agent tool reads or writes anything in Settings. Your keys, the model, the region, **Background render** and the **Contributions** box are set only by you, in this window.
 
 An agent's cloud tools, `transcribe` with the AssemblyAI engine and `transcribe_for_fillers`, do use the key and region saved here, so you have to set the key first. Without one they stop at the point they would send, with "No AssemblyAI API key is set. Set one in Frame Job ▸ Settings… ▸ Transcription." A file that already has a transcript they can use needs no key. See [How an agent reaches Frame Job](/mcp/overview/).
 

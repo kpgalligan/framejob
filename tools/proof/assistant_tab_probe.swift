@@ -492,7 +492,7 @@ func rowP7() {
         && arranged[2] === window.transcriptionPane && arranged[3] === window.playbackPane
         && arranged.last === window.tipsPane
     notes.append("Settings: five panes, Assistant pane second, Transcription pane third, "
-        + "Playback pane fourth, Tips pane last \(placed)")
+        + "Playback pane fourth, Contributions pane last \(placed)")
     row("P7", emptyState && saved && removed && defaultQuiet && changed && sameQuiet && placed,
         notes.joined(separator: "; "))
 }

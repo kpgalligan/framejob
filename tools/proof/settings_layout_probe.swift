@@ -5,8 +5,8 @@
 // batch B74 (spec §11 MC-7) put the MCP pane first and added L9–L11: its
 // order and text, Copy MCP Command's press, and its missing-helper state.
 // #127 G6 phase 4 (spec §11 G-38) put the Playback pane last and added L12.
-// Tips (spec §11 TIP-6) put the Tips pane after it: L1 and L13 name five
-// panes with Tips last, and `tips_proof.py` C4 holds the pane itself.
+// Tips (spec §11 TIP-6) put its pane, Contributions, after it: L1 and L13
+// name five panes with it last, and `tips_proof.py` C4 holds the pane itself.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `FrameJob`, against `libframejob_core.a`. One process,
@@ -67,7 +67,7 @@
 //      document's height (nothing scrolls); over a 1440 × 875 one (a
 //      1440 × 900 display less its menu bar) the window's frame lies inside
 //      it vertically, the document is taller than the clip (the panes
-//      scroll), and the Tips pane is still `content`'s last, inside the
+//      scroll), and the Contributions pane is still `content`'s last, inside the
 //      document.
 import AppKit
 
@@ -145,7 +145,7 @@ do {
             + "assistant second \(arranged.count > 1 && arranged[1] === assistant), "
             + "transcription third \(arranged.count > 2 && arranged[2] === controller.transcriptionPane), "
             + "playback fourth \(arranged.count > 3 && arranged[3] === controller.playbackPane), "
-            + "tips last \(arranged.last === controller.tipsPane), spacing \(spacing)")
+            + "contributions last \(arranged.last === controller.tipsPane), spacing \(spacing)")
 }
 
 // MARK: - L2 the headers
@@ -487,8 +487,8 @@ do {
             + "document width \(tallWidth) then \(document.frame.width), scroller style "
             + "\(fitted.scroll.scrollerStyle == .legacy ? "legacy" : "overlay"); "
             + "1440 × 875 screen: window \(frame) inside \(inside), document "
-            + "\(document.frame.height) over clip \(clipHeight) (scrolls \(scrolls)); tips "
-            + "last in the document \(last)"
+            + "\(document.frame.height) over clip \(clipHeight) (scrolls \(scrolls)); "
+            + "contributions last in the document \(last)"
     }
     row("L13", good, detail)
 }

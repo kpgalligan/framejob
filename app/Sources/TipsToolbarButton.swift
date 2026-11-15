@@ -1,11 +1,11 @@
 import AppKit
 
-/// The editor toolbar's Tips button (spec §11 TIP-6): green, right of
-/// Export…, showing the Tips dialog. **An experiment the owner may remove**:
+/// The editor toolbar's Contribute button (spec §11 TIP-6, TIP-9): green, right
+/// of Export…, showing the Contribute dialog. **An experiment the owner may remove**:
 /// deleting this file and its one line in `buildToolbar` removes it.
 ///
 /// A view around one `AccentButton` (which is final) so that it can hide
-/// ITSELF while Settings ▸ Tips' toggle is off and follow
+/// ITSELF while Settings ▸ Contributions' toggle is off and follow
 /// `TipsSettings.didChangeNotification`: the frozen editor file holds no
 /// property for it, and a hidden arranged subview leaves no gap in the
 /// toolbar's stack. The fill is `DS.tips`, a fixed green apart from the
@@ -13,8 +13,8 @@ import AppKit
 /// `showTips(_:)` on `AppDelegate`; it is not an edit, so it has no MCP
 /// mirror.
 final class TipsToolbarButton: NSView {
-    static let title = "Tips"
-    static let tooltip = "Support Frame Job"
+    static let title = "Contribute"
+    static let tooltip = "Contribute to Frame Job"
 
     private let defaults: UserDefaults
     let button = AccentButton(

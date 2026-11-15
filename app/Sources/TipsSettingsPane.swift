@@ -1,10 +1,10 @@
 import AppKit
 
-/// Settings' Tips pane (spec §11 TIP-6): the window's last. A bare heading,
-/// one visible sentence, the toggle and a Tips button.
+/// Settings' Contributions pane (spec §11 TIP-6, TIP-9): the window's last. A
+/// bare heading, one visible sentence, the toggle and a Contribute… button.
 ///
 /// **The toggle** (`TipsSettings`, on by default) decides two things at once:
-/// whether the editor shows its Tips button, and whether Frame Job ever shows
+/// whether the editor shows its Contribute button, and whether Frame Job ever shows
 /// the dialog by itself. It saves when it is pressed, with no Save button, and
 /// every open editor follows `TipsSettings.didChangeNotification`.
 ///
@@ -17,10 +17,12 @@ import AppKit
 /// characters), and the dialog one press away says the rest. It is a
 /// person's setting: no tool reads or writes it (R6-12, MC-7).
 final class TipsSettingsPane: NSStackView {
-    static let paneTitle = "Tips"
-    static let blurb = "Frame Job is free and open source, made by one developer. Tips are voluntary."
-    static let toggleTitle = "Show the Tips button and the yearly reminder"
-    static let buttonTitle = "Tips"
+    static let paneTitle = "Contributions"
+    static let blurb =
+        "Frame Job is free and open source, made by one developer. Contributions are voluntary "
+        + "and help keep the work going."
+    static let toggleTitle = "Show the Contribute button and the yearly reminder"
+    static let buttonTitle = "Contribute…"
     /// The Settings window's width less its two insets.
     private static let textWidth: CGFloat = 420
 
