@@ -1,0 +1,86 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M7ENTB44ZJ61T8ZYDV0NG8JF",
+  "strategy": "manual-commit",
+  "branch": "contribute",
+  "checkpoints_count": 5,
+  "files_touched": [
+    "CLAUDE.md",
+    "Makefile",
+    "app/CLAUDE.md",
+    "app/Sources/EditorViewController+Export.swift",
+    "app/Sources/EditorViewController+Toolbar.swift",
+    "app/Sources/SettingsWindowController.swift",
+    "app/Sources/Theme.swift",
+    "app/Sources/Tips.swift",
+    "app/Sources/TipsSettingsPane.swift",
+    "app/Sources/TipsToolbarButton.swift",
+    "app/Sources/TipsWindowController.swift",
+    "designs/screens/02-settings.md",
+    "designs/screens/03-empty-editor.md",
+    "designs/spec/04.1-toolbar.md",
+    "designs/spec/07.4-swift-file-map.md",
+    "designs/spec/07.9l-agent-render-audio-export.md",
+    "designs/spec/09-keys-and-menus.md",
+    "designs/spec/11-decisions/README.md",
+    "designs/spec/11-decisions/tips.md",
+    "designs/spec/README.md",
+    "docs/manual-checks.md",
+    "docs/site/sidebar.mjs",
+    "docs/site/src/content/docs/getting-started/editor-window.mdx",
+    "docs/site/src/content/docs/mcp/export.mdx",
+    "docs/site/src/content/docs/mcp/helper-and-socket.mdx",
+    "docs/site/src/content/docs/reference/contribute.mdx",
+    "docs/site/src/content/docs/reference/remembered-choices.mdx",
+    "docs/site/src/content/docs/reference/settings.mdx",
+    "docs/site/src/content/docs/reference/tips.mdx",
+    "docs/site/src/data/features.json",
+    "tools/proof/README.md",
+    "tools/proof/ai_docs_r2c_proof.py",
+    "tools/proof/assistant_tab_probe.swift",
+    "tools/proof/assistant_tab_proof.py",
+    "tools/proof/harness/main.swift",
+    "tools/proof/screens.py",
+    "tools/proof/settings_layout_probe.py",
+    "tools/proof/settings_layout_probe.swift",
+    "tools/proof/tips_probe.swift",
+    "tools/proof/tips_proof.py"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 40,
+    "cache_creation_tokens": 399383,
+    "cache_read_tokens": 2905639,
+    "output_tokens": 10716,
+    "api_call_count": 15,
+    "subagent_tokens": {
+      "input_tokens": 82,
+      "cache_creation_tokens": 610198,
+      "cache_read_tokens": 5779468,
+      "output_tokens": 41733,
+      "api_call_count": 40
+    }
+  },
+  "redaction": {
+    "replacements": 12,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 15,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}

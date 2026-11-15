@@ -1,0 +1,122 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M7ENTB44ZJ61T8ZYDV0NG8JF",
+  "session_id": "d372f4f5-88fe-469c-88f8-483ebb43658f",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-15T04:00:36.766472Z",
+  "branch": "contribute",
+  "checkpoints_count": 5,
+  "files_touched": [
+    "CLAUDE.md",
+    "Makefile",
+    "app/CLAUDE.md",
+    "app/Sources/EditorViewController+Export.swift",
+    "app/Sources/EditorViewController+Toolbar.swift",
+    "app/Sources/SettingsWindowController.swift",
+    "app/Sources/Theme.swift",
+    "app/Sources/Tips.swift",
+    "app/Sources/TipsSettingsPane.swift",
+    "app/Sources/TipsToolbarButton.swift",
+    "app/Sources/TipsWindowController.swift",
+    "designs/screens/02-settings.md",
+    "designs/screens/03-empty-editor.md",
+    "designs/spec/04.1-toolbar.md",
+    "designs/spec/07.4-swift-file-map.md",
+    "designs/spec/07.9l-agent-render-audio-export.md",
+    "designs/spec/09-keys-and-menus.md",
+    "designs/spec/11-decisions/README.md",
+    "designs/spec/11-decisions/tips.md",
+    "designs/spec/README.md",
+    "docs/manual-checks.md",
+    "docs/site/sidebar.mjs",
+    "docs/site/src/content/docs/getting-started/editor-window.mdx",
+    "docs/site/src/content/docs/mcp/export.mdx",
+    "docs/site/src/content/docs/mcp/helper-and-socket.mdx",
+    "docs/site/src/content/docs/reference/contribute.mdx",
+    "docs/site/src/content/docs/reference/remembered-choices.mdx",
+    "docs/site/src/content/docs/reference/settings.mdx",
+    "docs/site/src/content/docs/reference/tips.mdx",
+    "docs/site/src/data/features.json",
+    "tools/proof/README.md",
+    "tools/proof/ai_docs_r2c_proof.py",
+    "tools/proof/assistant_tab_probe.swift",
+    "tools/proof/assistant_tab_proof.py",
+    "tools/proof/harness/main.swift",
+    "tools/proof/screens.py",
+    "tools/proof/settings_layout_probe.py",
+    "tools/proof/settings_layout_probe.swift",
+    "tools/proof/tips_probe.swift",
+    "tools/proof/tips_proof.py"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-fable-5-2",
+  "turn_id": "2ead90dbfa36",
+  "checkpoint_transcript_start": 799,
+  "transcript_lines_at_start": 799,
+  "compact_transcript_start": 101,
+  "token_usage": {
+    "input_tokens": 40,
+    "cache_creation_tokens": 399383,
+    "cache_read_tokens": 2905639,
+    "output_tokens": 10716,
+    "api_call_count": 15,
+    "subagent_tokens": {
+      "input_tokens": 82,
+      "cache_creation_tokens": 610198,
+      "cache_read_tokens": 5779468,
+      "output_tokens": 41733,
+      "api_call_count": 40
+    }
+  },
+  "redaction": {
+    "replacements": 12,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 15,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01N2QZqXaLBMcoe9kpyxwpty",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "fablecode"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "63517e5ad4ab",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 386,
+        "end": 387,
+        "entry_ids": [
+          "e398a8a8-0ec4-4551-826a-3905cb92c316"
+        ],
+        "tool_use_id": "toolu_01N2QZqXaLBMcoe9kpyxwpty"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01N2QZqXaLBMcoe9kpyxwpty"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: fablecode",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 29
+  }
+}
