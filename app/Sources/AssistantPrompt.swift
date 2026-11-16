@@ -1,12 +1,13 @@
 import Foundation
 
 /// The texts the assistant's session hands the helper in `configure`
-/// (`agent/src/protocol.ts`), the tools it loads up front, and the live
+/// (`agent/Sources/FrameJobAgentKit/Protocol.swift`), the tools it loads up
+/// front, and the live
 /// context each person message carries (spec §11 AI-15). Road map 12 A3.
 ///
 /// **Every fact here is interpolated from the code that decides it, or
 /// checked against it by `make test`** (`assistant_prompt_proof.py --probe`,
-/// rows F1–F8): a backticked token must be a tool, an argument or a key of
+/// rows F1–F9): a backticked token must be a tool, an argument or a key of
 /// `get_project`'s answer; the timescale is `ReelTime.perSecond`; the
 /// ask-first and conditional withheld tools are read from
 /// `AssistantToolTable.rows`; the id kinds are checked against a fixture;
@@ -50,7 +51,7 @@ enum AssistantPrompt {
           "detach_audio", "attach_audio", "split_at_shots", "retime_range",
           "speed_up_typing", "copy_pieces", "switch_angle",
           "switch_by_speaker"]),
-        ("how a clip looks and sounds: position, scale, crop, colour, filters, volume, fades, "
+        ("how a clip looks and sounds: position, scale, crop, color, filters, volume, fades, "
             + "text and its style, shapes, the clip's name, hide and mute, copying attributes",
          ["set_video", "set_audio", "set_text", "set_shape", "set_clip", "set_enabled",
           "paste_attributes", "analyze_cutout"]),
@@ -122,9 +123,15 @@ enum AssistantPrompt {
             + "the person asks: say which words you will cut, then cut them in one "
             + "`ripple_delete_ranges` call.",
         "`render_frame` renders one frame of the finished timeline through the compositor an "
-            + "export uses, at the playhead unless you pass `t`, and answers the image and the "
-            + "PNG's path. Look before and after a visual edit, and pass `max_width` to keep "
-            + "the image small.",
+            + "export uses, at the playhead unless you pass `t`, and answers an 8-bit image of "
+            + "it and the PNG's path. Look before and after a visual edit. The image is sent at "
+            + "the size you ask for and Frame Job never scales it, so pass `max_width` to keep "
+            + "it small: an image whose base64 passes 10 MB is refused, as a detailed 4K frame's "
+            + "can, past 2576 px on its long edge an image is scaled down before you see it, and "
+            + "once the conversation holds more than 20 images one over 3000 px on a side can be "
+            + "refused. The height follows the width, so on a tall canvas pass a smaller "
+            + "`max_width`. Never pass `full_depth_image`: its image can be too large for you to "
+            + "be sent.",
         askFirstParagraph,
         "Reply in a sentence or two. Never repeat tool output the person can already see.",
     ].joined(separator: "\n")
@@ -161,7 +168,7 @@ enum AssistantPrompt {
     /// What the end-of-turn compaction summary must carry (AI-9), in
     /// Rasterize's shape.
     static let compactionInstructions =
-        "Summarise this video-editing conversation so the work can continue without it. Keep: "
+        "Summarize this video-editing conversation so the work can continue without it. Keep: "
         + "what the person asked for and every preference they stated; the project's name and "
         + "path, and any nest open; every clip, track, marker and media involved, by id, and "
         + "what each is; each edit made, in order, how it turned out, and which were undone; "

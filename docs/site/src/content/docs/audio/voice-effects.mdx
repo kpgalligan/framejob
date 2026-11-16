@@ -9,6 +9,7 @@ import AtAGlance from '@components/AtAGlance.astro';
 Voice Effect changes the character of a clip's sound: pitch a voice up or down, squeeze it into a phone line, or put it in a hall. A clip has one effect at a time.
 
 <AtAGlance
+  menu="Clip ▸ Voice"
   where="Clip tab ▸ Sound ▸ Voice Effect"
   tools="set_audio"
   needs="Nothing. Apple's audio units render the effect on your Mac, with no key and no upload."
@@ -30,9 +31,17 @@ Voice Effect changes the character of a clip's sound: pitch a voice up or down, 
 
 Frame Job renders the effect in the background, and you hear it [when that's done](#when-you-hear-the-effect). Each effect keeps the clip at about the loudness it had, so switching between them doesn't jump in level.
 
-To take the effect off, choose **None**, or choose **Reset** in the section's header. The header shows the effect and its amount, such as "Space: Hall 100%", or "off".
+To take the effect off, choose **None**, or choose **Reset** in the section's header, or choose **Clip ▸ Voice ▸ None**. The header shows the effect and its amount, such as "Space: Hall 100%", or "off".
 
-With several clips selected, a change applies to all of them. **Amount** and **Pitch** give every selected clip the first clip's whole effect, not only the value you changed. See [Edit several clips at once](/audio/sound-tab/#edit-several-clips-at-once).
+With several clips selected, a change applies to all of them. **Effect**, **Amount** and **Pitch** give every selected clip the first clip's whole effect, not only the value you changed. See [Edit several clips at once](/audio/sound-tab/#edit-several-clips-at-once).
+
+## Choose from the Clip menu
+
+**Clip ▸ Voice** lists the same sixteen effects under their four group headings, then **None**. Choose one to put it on every selected clip that has sound. The selection can also hold clips with no sound, such as a title, and those are left alone.
+
+A checkmark marks the effect every one of those clips has, and a dash marks one that only some of them have. **None** is checked when none of them has an effect. No item has a keyboard shortcut.
+
+The menu changes only the effect. Each clip keeps its own Amount, where the **Effect** list gives every selected clip the first clip's, and a clip with no effect starts at 100 %. Pitch goes back to the chosen effect's own. The change is one undo step, **Voice Effect**.
 
 ## The effects
 
@@ -97,13 +106,13 @@ Choosing one of the three sets Pitch back to that effect's own: 0, +5 or −5. A
 | Off | The clip has no effect, or one that changes nothing, such as an Amount of 0 or **Voice: Pitch** at 0 semitones. |
 | Rendering… | The effect is being worked out. Until it's done the clip plays without it. |
 | Ready | The clip plays with the effect. |
-| Plays without it at this speed | The clip has a speed change, a speed ramp or a freeze frame. An effect plays only at normal speed. |
+| Plays no sound | The clip is silent, so there's nothing to add an effect to: it's faster than ×12. |
 | Waits for the reversed copy | The clip is reversed and its [reversed copy](/speed/reverse/) isn't ready yet. |
 | Not rendered: and a reason | The render failed. The reason might be "its media cannot be found" or "its isolated voice was not rendered". |
 
 ## When you hear the effect
 
-The effect is worked out once for each clip, in the background. Until it's ready the clip plays without it, and the editor switches over by itself when it is. A clip that isn't at normal speed plays without the effect, and [Status](#read-the-status) says so.
+The effect is worked out once for each clip, in the background. Until it's ready the clip plays without it, and the editor switches over by itself when it is. An effect works at any speed: on a clip with a [speed change](/speed/change-speed/) or a [speed ramp](/speed/speed-ramps/) the effect is added first and then sped up or slowed down with the clip.
 
 Changing the effect, Amount, Pitch or the clip's [Voice Isolation](/audio/voice-isolation/) amount works it out again. So does trimming or slipping the clip, because the clip then plays a different part of its file. Moving the clip along the timeline doesn't.
 
@@ -116,6 +125,7 @@ The effect comes right after Voice Isolation and before everything else in the [
 ## Good to know
 
 - A reverb or an echo stops at the end of the clip. It doesn't ring on into the next one.
+- On a clip with a speed change or a ramp, the effect changes speed with the clip. At ×2 an echo's repeats come twice as close together and a reverb's tail is half as long.
 - A clip split from a take starts its effect fresh at the cut, so a reverb or echo doesn't carry across the join.
 - On a stereo file a reverb or an echo mixes the two channels together, so the [channel choice](/audio/channels/) picks from the effected pair, not from the original left and right.
 - The effect can't be animated. Voice Effect is marked ⊘ inside an [action](/audio/animate-sound/), and a change there still applies to the whole clip. It's also made from the clip's own Voice Isolation amount, not an animated one.

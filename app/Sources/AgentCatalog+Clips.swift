@@ -96,7 +96,7 @@ extension AgentServer {
                     + "trim it afterwards with trim_start / trim_end. It is given "
                     + "Fit scale when the project's fit_new_clips is on and the source is bigger "
                     + "than the canvas. Refused when it would break the overlap rule: a clip may "
-                    + "overlap at most one neighbour on each side, and each overlap must be at "
+                    + "overlap at most one neighbor on each side, and each overlap must be at "
                     + "most half of the shorter of the two clips (an overlap IS a transition).",
                 [
                     "track": trackDescription,
@@ -106,7 +106,7 @@ extension AgentServer {
             opTool(
                 "add_text_clip",
                 "Adds a text clip — a title. It has no source, so it can be any length; the "
-                    + "default is 5 s of white, centred text in Source Sans 3 Bold at 72 px. "
+                    + "default is 5 s of white, centered text in Source Sans 3 Bold at 72 px. "
                     + "Style it afterwards with "
                     + "set_text and place it with set_video (x, y, scale).",
                 [
@@ -148,7 +148,7 @@ extension AgentServer {
                 "Adds an adjustment clip — Insert ▸ Adjustment Clip. It has no picture of its "
                     + "own: while it lasts it grades everything drawn BEHIND it (every lower "
                     + "track and the canvas background, never a track in front) with the "
-                    + "colour and the point filters (sepia, noir, vignette, invert) that "
+                    + "color and the point filters (sepia, noir, vignette, invert) that "
                     + "set_video gives it, and its opacity is the grade's strength. On a track "
                     + "cut by a matte it grades only inside the matte; on a matte track it does "
                     + "nothing. Refused inside a nest and in any transition or overlap — fade "
@@ -166,7 +166,7 @@ extension AgentServer {
                     + "is a canvas-sized WHITE rectangle, which is what the menu's Solid Color "
                     + "row sends: white rather than black because the canvas is already black, "
                     + "so a black plate would be a command that appears to do nothing. Give it "
-                    + "a color to paint the plate another colour, or a media to put that "
+                    + "a color to paint the plate another color, or a media to put that "
                     + "picture there instead, at FILL scale — where add_clip would Fit it, "
                     + "because a plate that leaves the canvas showing down one side has "
                     + "failed at that. A video or audio plate stops where its file does, an "
@@ -175,10 +175,10 @@ extension AgentServer {
                     + "is an error, as is a sub-frame duration or media, or one with no pictures.",
                 [
                     "media": "Media id to show as the background — get_project lists "
-                        + "them and import_media adds a file. Omit for a colour plate. A "
+                        + "them and import_media adds a file. Omit for a color plate. A "
                         + "timed media is clamped to its own file's length, so a short movie "
                         + "stops where its file does; only an image runs the whole timeline.",
-                    "color": colorDescription("The plate's colour; white when omitted"),
+                    "color": colorDescription("The plate's color; white when omitted"),
                     "duration": "Length \(ticks) Default: the whole timeline's length, "
                         + "and never less than one frame.",
                 ]),
@@ -187,7 +187,7 @@ extension AgentServer {
                 "The screencast backdrop — Clip ▸ Add Blurred Background. `clip` is copied "
                     + "onto a NEW back-most track at the same start, duration, speed and "
                     + "source window, so the two play exactly the same frames, and the copy is "
-                    + "scaled to FILL the canvas, centred, uncropped, blended normal and "
+                    + "scaled to FILL the canvas, centered, uncropped, blended normal and "
                     + "blurred at full strength. It is MUTED — its enabled becomes {video: "
                     + "true, audio: false}, or the mix would play one recording twice — and it "
                     + "drops the original's audio.duck along with its transition, actions and "
@@ -234,7 +234,7 @@ extension AgentServer {
                 "Shifts clips along the timeline by delta ticks (negative moves left; starts "
                     + "clamp at 0) and optionally onto another track — the timeline's clip drag. "
                     + "Several clips keep their relative track offsets. Refused when the "
-                    + "destination would break the overlap rule (at most one neighbour "
+                    + "destination would break the overlap rule (at most one neighbor "
                     + "overlapped on each side, each overlap at most half the shorter clip); a "
                     + "clip that gains an overlap with the clip before it also gains a "
                     + "cross_dissolve transition if it had none. A detach_audio pair moves "
@@ -304,11 +304,11 @@ extension AgentServer {
             opTool(
                 "split",
                 "Cuts clips in two at `at` — Clip ▸ Split (⌘T). The second piece keeps playing the source from "
-                    + "where the first stopped, and each keeps the animation actions that fall "
-                    + "on its side (an action straddling the cut becomes two). With no clips "
-                    + "every unlocked clip under the time is split, which is what the menu "
-                    + "command does with nothing selected. Refused when `at` is not strictly "
-                    + "inside a clip.",
+                    + "where the first stopped, and each keeps the animation actions that fall on its side (an "
+                    + "action straddling the cut becomes two). With no clips every unlocked clip under the time is "
+                    + "split, as the menu command does with nothing selected. Refused when `at` is not strictly "
+                    + "inside a clip, and when a piece would be too short for the transition it carries (the "
+                    + "overlap rule), naming the clips it was cut from.",
                 [
                     "clips": "Clip ids; omit to split every unlocked clip at `at`.",
                     "at": "Where to cut, \(ticks) Default: the playhead.",
@@ -323,25 +323,29 @@ extension AgentServer {
                 "ripple_delete",
                 "Removes clips and closes the gaps: everything starting after each removed span "
                     + "on an UNLOCKED track slides left by that span's length — ⌘⌫. Clips on "
-                    + "locked tracks and clips that straddle a span stay where they are.",
+                    + "locked tracks and clips that straddle a span stay where they are. A removed "
+                    + "clip with a transition into the next clip closes only up to where that clip "
+                    + "starts (the first such start when several are removed together), so it moves "
+                    + "and nothing slides under it. Refused, nothing removed, when a track it moves "
+                    + "would break the overlap rule.",
                 ["clips": clipsDescription]),
             opTool(
                 "ripple_delete_range",
-                "Cuts a time range out of the whole timeline: every unlocked clip is split at "
-                    + "both bounds, the middles are removed, and the rest slides left by the "
-                    + "range's length. The in/out-range form of ⌘⌫.",
+                "Cuts a time range out of the whole timeline: every unlocked clip is split at both bounds, "
+                    + "the middles are removed, and the rest slides left by the range's length. The in/out-range "
+                    + "form of ⌘⌫. Refused, nothing cut, when a piece left is too short for its transition.",
                 ["from": "Range start, \(ticks)", "to": "Range end, \(ticks)"]),
             opTool(
                 "ripple_delete_ranges",
                 "Cuts SEVERAL time ranges out of the whole timeline as ONE edit — what Clip ▸ "
                     + "Remove Silences… sends. Each pair is put in order (a reversed pair is "
                     + "the same range), the pairs are then MERGED — overlapping and touching "
-                    + "alike — and the survivors are cut right to left exactly as "
-                    + "ripple_delete_range cuts one. So this is NOT the same as calling that "
-                    + "once per pair: two ranges that meet make one shift, not two. It is one "
-                    + "undo step however many ranges there are, which is the point. Markers do "
-                    + "not move, as under every ripple. An empty list, and a list that merges "
-                    + "to nothing, change nothing. detect_silence returns ranges in this shape.",
+                    + "alike — and the survivors are cut right to left exactly as ripple_delete_range cuts "
+                    + "one. So this is NOT the same as calling that once per pair: two ranges that meet make "
+                    + "one shift, not two. It is one undo step however many ranges there are, which is the "
+                    + "point, and one range leaving a piece too short for its transition refuses them all. "
+                    + "Markers do not move, as under every ripple. An empty list, and a list that merges to "
+                    + "nothing, change nothing. detect_silence returns ranges in this shape.",
                 ["ranges": "The spans to cut, each a [from, to] pair \(ticks)"]),
         ]
         // detect_silence and normalize_clip are `AgentCatalog+Audio.swift`'s,
@@ -349,39 +353,10 @@ extension AgentServer {
         // unchanged — road map 4's toll 2. `ticks` and `clipsProperty` are
         // the two hoisted locals they read.
         rows += audioTools(ticks: ticks, clipsProperty: clipsProperty)
+        // lift_range, insert_time and close_gap are `AgentCatalog+Range.swift`'s,
+        // spliced in HERE for the same reason (spec §11 #602's toll).
+        rows += rangeTools(ticks: ticks, trackDescription: trackDescription)
         rows += [
-            opTool(
-                "lift_range",
-                "Cuts a time range out and LEAVES the hole — ⌫ with an in/out range and nothing "
-                    + "selected. Every unlocked clip is split at both bounds and the middles "
-                    + "removed, and nothing moves: every clip after the range keeps the moment "
-                    + "it had, which is what makes this the safe cut when a mix or a caption "
-                    + "track is already timed. Use ripple_delete_range to close the hole "
-                    + "instead.",
-                ["from": "Range start, \(ticks)", "to": "Range end, \(ticks)"]),
-            opTool(
-                "insert_time",
-                "Opens a gap: every unlocked clip starting at or after `at` moves right by "
-                    + "`length`. Straddling clips are left in place, so this makes room without "
-                    + "cutting anything — split first if you want the gap inside a clip. Every "
-                    + "marker at or after `at` moves right by `length` too.",
-                [
-                    "at": "Where the gap opens, \(ticks)",
-                    "length": "How much room, \(ticks)",
-                ]),
-            opTool(
-                "close_gap",
-                "Closes the empty span on `track` that contains `at` — double-clicking a gap in "
-                    + "a lane, or Clip ▸ Close Gap. The gap is bounded by the nearest clip "
-                    + "edges on that track, and everything from its far side slides left by its "
-                    + "length across every unlocked track. Nothing changes when `at` is on a "
-                    + "clip, when the track is locked, when there is no clip after the gap, or "
-                    + "when the shift would break the overlap rule — a gap closes fully or not "
-                    + "at all.",
-                [
-                    "track": trackDescription,
-                    "at": "A time inside the gap, \(ticks)",
-                ]),
             opTool(
                 "set_speed",
                 String(
@@ -509,8 +484,8 @@ extension AgentServer {
                     + "a target takes them. Speed, enabled, actions, the transition and the clip's "
                     + "own name and label stay. A video qualifier follows the clip kind: dropped "
                     + "onto a picture clip, an adjustment clip's own kept when the payload clip is "
-                    + "not an adjustment clip, copied between two. Refused (no change) when "
-                    + "nothing changes.",
+                    + "not an adjustment clip, copied between two. A text, shape, graphic or adjustment clip keeps its own crop, "
+                    + "corner radius and chroma key, and a nest clip its own corner radius and chroma key. Refused when nothing changes.",
                 [
                     "clips": clipsDescription,
                     "payload": "What Copy wrote, {\"clips\": [...], \"media\": [...], "

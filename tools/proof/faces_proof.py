@@ -18,7 +18,14 @@ one interval giving −1; P4 the stamp (kind version, `vision`, the per-request
 `device` exactly CJ-32's, no path); P5 `facesAnswer`: at most 4 decimals in
 its bytes, NaN null, a one-face row's bytes with and without `clip` (printed
 for CJ-34), the cap's refusal naming the `source` of the first row that does
-not fit and the same samples to that `to` answering.
+not fit and the same samples to that `to` answering; P6 `AnalysisFaces.run`
+over samples 0…99 of `faces_moving.mov` cancelled at half keeps the samples
+decided (spec §11 CJ-21 as amended by #435): one range [0, k], k < 99, every
+covered sample's bytes an uncancelled run's; P7 on `faces_portrait_rot.mov`
+(#437): a `read` whose callback never asks turns no picture upright
+(`AnalysisFrames.uprightsMade()`), and `AnalysisSampleJob.run` over samples
+0…49 turns exactly one picture per analysed sample — fewer than the frames
+delivered — each the upright portrait size at 720.
 
 **App rows** over MCP (`proof_app.binary()`, `RC_PROOF_APP`), on a scratch
 `CFFIXED_USER_HOME`; Z1 is the launch's parity grep:
@@ -36,7 +43,9 @@ not fit and the same samples to that `to` answering.
 - F3 the portrait pair: |roll| < π/8 wherever a face is found; the rotated
   file finds a face in at least 90 % of the samples the upright one does, and
   there its face centre is within 2 % of the frame width (RMS) of the upright
-  run's (F1's measure; the two files are separate lossy encodes).
+  run's (F1's measure; the two files are separate lossy encodes). Its detail
+  prints the rotated media's last job's seconds, its calls' seconds and both
+  `samples.bin` files' SHA-256 (#437's before and after).
 - F4 `faces_two.mov`: every sample whose two truth boxes are whole in the frame
   holds two faces, left to right, each overlapping its truth; the first sample
   after the back face's truth box has left holds one.
@@ -59,6 +68,7 @@ app's — and only its row run; CAUGHT (exit 0) when that row fails, SURVIVED
 """
 
 import argparse
+import hashlib
 import json
 import math
 import shutil
@@ -90,7 +100,7 @@ INTERVAL = 60_000            # one sample at 10 a second (CJ-30)
 DEVICE = "rectangles:neural_engine;landmarks:neural_engine"   # CJ-32
 SPIKE = ROOT / "tools/proof/work/creator_spike/CJ-S2/results.json"
 SPIKE_SMALL_RECALL = 1.0     # CJ-30: CJ-S2's rule 3 at 720 (600 samples)
-P_ROWS = ["P1", "P2", "P3", "P4", "P5"]
+P_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7"]
 APP = ["F1", "F2", "F3", "F4", "F5", "F6", "F7"]
 ROWS = P_ROWS + APP + ["Z1"]
 
@@ -101,6 +111,19 @@ MUTANTS = {
     "orientation-ignored": (["F3"], [(
         "app/Sources/AnalysisFrames.swift", "var upright = Upright(transform: transform)",
         "var upright = Upright(transform: .identity)")]),
+    "cancel-unpublished-sample-job": (["P6"], [(
+        "app/Sources/AnalysisSampleJob.swift",
+        "                if job.decided >= job.from {\n                    AnalysisStore.publishCancelled",
+        "                if false, job.decided >= job.from {\n                    AnalysisStore.publishCancelled")]),
+    "eager-upright": (["P7"], [(
+        "app/Sources/AnalysisFrames.swift",
+        "        return try pump(reader, output, cancelled: cancelled) { pts, buffer in\n"
+        "            try each(\n                pts,\n                LazyAnalysisPicture { body in\n"
+        "                    _ = try upright.picture(of: buffer) {\n",
+        "        return try pump(reader, output, cancelled: cancelled) { pts, buffer in\n"
+        "            _ = try upright.picture(of: buffer) { _ in true }\n"
+        "            return try each(\n                pts,\n                LazyAnalysisPicture { body in\n"
+        "                    _ = try upright.picture(of: buffer) {\n")]),
     "y-not-flipped": (["P2"], [(
         "app/Sources/AnalysisFaces.swift",
         "CGRect(x: box.minX, y: 1 - box.maxY, width: box.width, height: box.height)",
@@ -162,6 +185,7 @@ def probe_rows(sources):
         return
     request = out / "request.json"
     request.write_text(json.dumps({"fixture": str(face_fixtures.path("faces_moving")),
+                                   "rotated": str(face_fixtures.OUT / "faces_portrait_rot.mov"),
                                    "work": str(out / "run")}))
     try:
         run = subprocess.run([str(binary), str(request)], capture_output=True, text=True,
@@ -387,7 +411,15 @@ def plain_rows(client, record):
     def f3():
         up, _ = doc.media(face_fixtures.path("faces_portrait"), "portrait")
         rot, _ = doc.media(face_fixtures.OUT / "faces_portrait_rot.mov", "portrait_rot")
-        a, b = doc.faces(media=up), doc.faces(media=rot)
+        a = doc.faces(media=up)
+        begun = time.monotonic()
+        b = doc.faces(media=rot)
+        waited = time.monotonic() - begun
+        run = b.get("run") or {}
+        started, ended = run.get("started_at"), run.get("ended_at")
+        job = ended - started if started is not None and ended is not None else None
+        digests = [hashlib.sha256(doc.samples_file(m).read_bytes()).hexdigest()[:16]
+                   for m in (up, rot)]
         rolls = [f["roll"] for r in a["samples"] + b["samples"] for f in r["faces"]]
         tilted = [x for x in rolls if x is None or abs(x) >= math.pi / 8]
         found_up = [r for r in a["samples"] if len(r["faces"]) == 1]
@@ -408,7 +440,10 @@ def plain_rows(client, record):
               f"|roll| ≥ π/8 {tilted[:3]}; upright one face in {len(found_up)} of "
               f"{a['count']}, the rotated too in {len(squares)} ({share:.3f}, want ≥ 0.9); "
               f"the centres {rms and round(rms, 2)} px apart (RMS; want ≤ {0.02 * 1080:.1f}, "
-              f"2 % of the width), the largest box value difference {worst:.4f}")
+              f"2 % of the width), the largest box value difference {worst:.4f}; the rotated "
+              f"media's last job {job and round(job, 2)} s, its calls {waited:.2f} s "
+              f"({proof_app.config()}); samples.bin SHA-256 upright {digests[0]}, rotated "
+              f"{digests[1]}")
     if "F3" in selected:
         attempt(f3, "F3")
 

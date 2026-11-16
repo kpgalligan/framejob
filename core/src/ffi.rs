@@ -210,8 +210,9 @@ pub unsafe extern "C" fn rc_time_snap_to_frame(t: i64, fps_num: u32, fps_den: u3
     .unwrap_or(t)
 }
 
-/// Non-drop timecode: "HH:MM:SS:FF" when `frames`, else "HH:MM:SS.mmm".
-/// Negative times get a leading '-'.
+/// Timecode: "HH:MM:SS:FF" when `frames` (non-drop at an NTSC rate, real
+/// seconds at any other fractional rate, spec §11 #532), else
+/// "HH:MM:SS.mmm". Negative times get a leading '-'.
 ///
 /// # Safety
 /// Takes no pointers. The returned string is freed with

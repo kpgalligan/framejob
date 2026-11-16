@@ -467,18 +467,31 @@ fail every check that names either tool and then ABORTS at 4b's first
 batch B44 close nothing they open, so every project such a proof makes stays
 open. `close_project` (B44, spec §11 #40) closes one; `close_project_proof.py`
 closed sixty in a row on one instance, its thread count 13 before and 18
-after. Each open document costs about five threads and fifteen megabytes (measured:
-fifteen more documents took one instance from 174 threads and 509 MB to 254
-and 734 MB). All three proofs run in sequence against one fresh instance with
-room to spare — 26 documents, 197 threads — but somewhere past forty, which
-is four or five proof runs on one process, the instance DEADLOCKS:
-libdispatch's 64-thread soft limit is reached with every worker blocked in a
-synchronous operation, and the main thread then waits for ever on
-`-[NSDocument _performFileAccess:]`'s serialization semaphore (seen with
-`sample <pid>`; the wedged instance had 459 threads and 2 GB resident). The
-port keeps listening and the process sits at 0 % CPU, so it looks alive and
-every call simply hangs — `mcp.py` waits 600 s before it gives up. Kill YOUR
-instance and start a new one rather than reading a hang as a proof failure.
+after. Each open document with a clip costs about five threads and nineteen
+megabytes (`open_documents_proof.py`, "Issue #555" below: 150 open at once
+took a Release instance from 60 threads and 278 MB to 807 and 3,150 MB, every
+call answered, the slowest in 1.6 s). **Closing a document gives back its
+path, its player and its threads at the close** (since #568, "Issue #568"
+below: 773 threads with 150 open, 23 five seconds after the last close),
+**and its editor and most of its memory** (since #592, "Issue #592" below:
+3,125 MB with 150 open on Release, 1,476 MB five seconds after the last
+close, where #568's run read 2,953 MB). What stays is the bare window AppKit
+keeps until another window opens, which is small, and pages the allocator
+has freed and not yet given back. So a proof closes what it opens, to keep
+the threads, the paths and the memory free, and a long session of proofs
+still starts a new instance between them. #592's runs at 150 open also met
+calls of 40–150 s past 110 open under other lanes' load, once read as
+"hung" (that section has what the sample showed). An instance once
+DEADLOCKED somewhere past forty open documents, before `close_project`
+existed: every libdispatch worker blocked in a synchronous operation and the
+main thread waiting for ever on `-[NSDocument _performFileAccess:]`'s
+serialization semaphore (seen with `sample <pid>`, at 459 threads and 2 GB
+resident). That was not reproduced at 150 open on 2026-11-11, at more threads
+and more memory than the wedged instance had. A hang still looks like this:
+the socket keeps listening and the process sits at 0 % CPU, so it looks alive
+and every call simply waits — `mcp.py` for 600 s before it gives up. Kill
+YOUR instance and start a new one rather than reading a hang as a proof
+failure, and `sample` it first if the stack is not already on record.
 
 `phase2_proof.py` covers the catalog floor (65), phase 2's own schema keys —
 `name`, `label` and `solo`, which arrived at version 3 — through a saved
@@ -687,7 +700,8 @@ fixture loud in its first half and quiet in its second, trimmed to its first
 1.4 s forwards and backwards, which must read 20 dB apart and reads the same
 number twice on a build with the mirror taken out. One thing worth knowing
 before adding a check: `cache/peaks/<id>.bin` is written by a fire-and-forget
-task, so `Session.media` WAITS for it — a normalise issued in the same breath
+task, so `Session.media` WAITS for it (up to 600 s since #591: the cache lane
+on a loaded machine) — a normalise issued in the same breath
 as the import legitimately answers "still being analysed", which is how that
 refusal is reached on purpose (by deleting the file) rather than by accident.
 
@@ -938,9 +952,13 @@ historical compile is a scored failure, even if the error names
 harness. Host-state skips in recording's granted tier remain separate.
 
 `cloud_captions_probe.py` is the third caller (issue batch B93, #246): row
-W's reference entry against tree `515e6a80` and SP3/SP4's probe against tree
-`ef54f48e`, each with its own `-D` define and its own `before/`
-(`work/cloudprobe/baseline-ref-w`, `…-speakers`). The id may name a commit or
+W's reference entry against commit `9337a7c8` (C1's tolls, recorded) and
+SP3/SP4's probe against commit `a0f39e04` (B46's parent), each with its own
+`-D` define and its own `before/` (`work/cloudprobe/baseline-ref-w`,
+`…-speakers`); row 18's `project.yml` reads commit `0773a5a0` (C1's run).
+Until #528 the three were pipelines' working trees (`515e6a80`, `ef54f48e`,
+`c9b80435`), tree objects no commit held, and garbage collection took them;
+a baseline is a commit now. The id may name a commit or
 a tree object, and a tree that has `graphic/` gets it archived beside its
 core, which names it as a path dependency.
 
@@ -1578,12 +1596,12 @@ mean nothing on a shape), `A.mov` is sections 6 and 9's media in nobody's use,
 and `B.mov` is only ever a PATH inside a paste payload. Its version packages are
 `work/phase9-v<n>.framejob` at FIXED names, which is safe for phase 2's reason
 inverted — they are never saved through the document machinery, only read — and
-it opens SIXTEEN documents in the instance (ten `new_project` — one per
-section that needs a clean fixture, and section 7 needs two — and six
-`open_project`), so the relaunch
-rule below is not optional for it: two runs on one process is thirty-two, and
-the deadlock is somewhere past forty. No `ffmpeg`, no `swiftc`, no window server
-grant.
+it opens ten `new_project` documents in the instance (one per section that
+needs a clean fixture, and section 7 needs two) and one `open_project` per
+readable format version, each of those closed, so the relaunch
+rule ("Relaunch the instance between proof sessions") is not optional for it:
+it closes none of the ten, and every run on one process leaves ten more open.
+No `ffmpeg`, no `swiftc`, no window server grant.
 
 `media/` and `work/` are ignored: the movies are regenerable from the lines
 above and the projects are rebuilt on every run. Phase 2's packages are
@@ -1699,10 +1717,11 @@ bridging header or staticlib, now gets both (one line for every build).
 caches) and the closed spikes (`*_spike/`, `recording_spike.py`). A swiftc
 line that compiles no app source also stays: `phase8_proof.py`'s extracted
 `PreviewQuality.swift` and `v2_snapshot.py`'s `v2_cover`. Since codec-export C0
-the four closed spikes that compile `app/Sources` on their own line
-(`assistant_spike.py`, `capture_spike.py`, `words_spike/text_rows.py`,
-`speed_spike.py`) append `swift_build.codec_args()`, and `speed_spike.py`'s
-mtime check counts the two archives.
+the three closed spikes that compile `app/Sources` on their own line
+(`capture_spike.py`, `words_spike/text_rows.py`, `speed_spike.py`) append
+`swift_build.codec_args()`, and `speed_spike.py`'s mtime check counts the two
+archives (a fourth, road map 12's `assistant_spike.py`, was retired by road map
+"swift-helper" SA4, spec §11 SA-11).
 
 **The selftest** (`--selftest`, a line of `make test`), over a scratch cache
 in `work/swift-build-selftest/`: K0 (CONTROL) the same inputs give the same
@@ -1751,9 +1770,17 @@ it); only its `launch` command imports `mcp`.
 ```
 python3 tools/proof/proof_app.py launch [--app debug|release|PATH] [-- ARG…]   # prints folder, socket, log, pid
 python3 tools/proof/proof_app.py check [--app debug|release|PATH]
-python3 tools/proof/proof_app.py --selftest                                     # F1–F6, R1–R3, T1, E1, E2, D1, D2, C1 (make test)
-python3 tools/proof/proof_app.py --mutant exe-marker|md-counted|exe-mtime-running
+python3 tools/proof/proof_app.py --selftest                                     # F1–F6, R1–R3, T1, E1, E2, D1, D2, A1, A2, C1 (make test)
+python3 tools/proof/proof_app.py --mutant exe-marker|md-counted|exe-mtime-running|bare-number
 ```
+
+**Launch arguments.** `launch_arguments` refuses a bare negative number (`-16`, `-.5`) with a
+`ValueError` naming it and its plist-fragment spelling: the argument domain reads `-Key -16` as
+two flags, so `Key` stays unset and a proof would measure the default (#404). A number is passed
+as `'<real>-16</real>'`. `mcp.launch` calls it before anything starts, so a proof's `mcp.launch`
+and `proof_app.py launch -- ARG…` are guarded; a proof that starts the app with its own `Popen`
+is not. A1 holds the refusal, A2 that fragments, positive numbers and flags pass, and
+`--mutant bare-number` must fail exactly A1.
 
 **The choice.** `RC_PROOF_APP` is `debug` (the default since build
 velocity's phase 3, spec §11 V-4), `release` or a `.app` or executable path. Debug is `make app-debug`'s
@@ -1781,7 +1808,9 @@ on Debug its render_frame took 2.04 s of the 3 s bound, so it was pinned), and
 the app's memory", and `--measure ab`'s MA beside it; its rows, `capture` and
 `compare` run on either), and `reader_wedge_proof.py`'s app group ("W1 and W2
 bound decode work in wall seconds, and a Debug decode runs about 17x slower";
-its probe group runs on either, spec §11 #367); the
+its probe group runs on either, spec §11 #367), and `transcript_tab_proof.py`'s
+T6 alone (`T6_RELEASE_ONLY`: "its 100 ms median rebuild is a Release number";
+on a Debug app it is a named SKIP and every other row runs, #522); the
 18 app-driving proofs changed since issue batch B80 each scored their full
 score on Debug, the two with a recorded Release time (agent_socket_proof
 135 s, export_cancel_proof 256 s) faster on Debug (`archive/build-velocity.md`'s
@@ -1890,18 +1919,20 @@ seal) and the rest of dist_check still run only there.
 **Skip and stamp.** A step's hash is sha256 over the content of its own
 files among `git ls-files -co --exclude-standard` and a tool fingerprint
 (the output of `xcrun swiftc --version`, `xcodebuild -version`, `xcrun
---show-sdk-path`, `rustc -Vv`, `cargo clippy -V`, `bun --version`,
-`xcodegen --version`, `cargo fmt --version` and `cmake --version`).
+--show-sdk-path`, `rustc -Vv`, `cargo clippy -V`, `xcodegen --version`,
+`cargo fmt --version` and `cmake --version`; road map "swift-helper" SA4 took
+the helper's old build tool out, spec §11 SA-11).
 `gate.py` and the `Makefile` are in every step's files. `typecheck`:
-`app/Sources`, `app/Bridging`, `core/include`, `agent`, `tools/codecs`. `fmt`,
+`app/Sources`, `app/Bridging`, `core/include`, `tools/codecs` (`make
+typecheck` reads nothing in `agent` since SA4). `fmt`,
 `lint`: `core`, `graphic`, `mcp-proxy`. `test`: everything but `archive/`. `app`:
-`app`, `agent`, `core`, `graphic`, `mcp-proxy`, `tools/codecs`,
+`app`, `agent`, `core`, `graphic`, `mcp-proxy`, `tools/agent`, `tools/codecs`,
 `tools/licenses` (the acknowledgements' generator and its vendored texts, spec
-§11 PUB-10; Bun's licence is vendored as `LICENSE.txt` because a `*.md` there
-would not count), `project.yml`, `VERSION`,
+§11 PUB-10; a `*.md` there does not count), `project.yml`, `VERSION`,
 `docs/graphics-api.md`, `docs/graphics-api.d.ts` and
 `tools/proof/dist_check.py`. A `*.md` counts only under `designs/spec/` and
-`docs/` (for `test`) and as `docs/graphics-api.md` (for `app`); `.secrets/`
+`docs/`, and as the root `README.md`, which the spelling scan reads (#556)
+(for `test`), and as `docs/graphics-api.md` (for `app`); `.secrets/`
 is never read. A step is skipped when its hash equals its last pass. The
 hash is taken before the step and again after it (the tree re-read and the
 fingerprint re-run), and the pass is stamped only when the two are equal;
@@ -1924,8 +1955,9 @@ give identical hashes and every step is stamped; M1–M8 one file of each
 input class moves exactly its steps' hashes (an app source, the bridging
 header folder, the C header, the helper; a crate's source and `Cargo.toml`;
 `project.yml`, `VERSION`, a shader, the graphics reference, dist_check, a
-proof, a spec file, `docs/manual-checks.md`; `archive/`, `README.md`, a
-`CLAUDE.md` and an ADR move none; `gate.py` and the `Makefile` move all;
+proof, a spec file, `docs/manual-checks.md`, and the root `README.md`, which
+moves names and test (#556); `archive/` moves none, and `tools/proof/README.md`,
+a `CLAUDE.md` and an ADR move names alone; `gate.py` and the `Makefile` move all;
 M8 `tools/codecs/build_codecs.py` moves names, typecheck, test and app, and
 `tools/licenses/acknowledgements.py` names, test and app); H2
 a substituted tool string moves every step; H3 unequal before and after
@@ -1944,6 +1976,205 @@ a `core/src` edit runs fmt, lint, test and app (203 s); an injected type
 error, a fifth warning, a clippy warning and a failing spec-index row each
 FAIL their step, named; a held lock BLOCKED in 2 s under `--wait 2`; a file
 added while `test` ran left `test` unstamped and stamped `app`.
+
+## Mutant anchors (mutant_anchors.py)
+
+`mutant_anchors.py` (#554) counts every proof's mutant anchors in the tree, in `make test`. A
+mutant is an anchor (a piece of source text) and its replacement, and its applier demands the
+anchor exactly once in a file; when the source moves the anchor rots, and before this nothing
+said so until someone ran the mutant. Standard library only; no app, no build, a few seconds.
+
+```
+python3 tools/proof/mutant_anchors.py              # the check (make test)
+python3 tools/proof/mutant_anchors.py --list       # every table: mutants, anchors read, copies
+python3 tools/proof/mutant_anchors.py --selftest   # K0, U2, C1, A1–A3, F1, F2, U1, U3, E1–E3, H1, P2–P11, C2 (make test)
+python3 tools/proof/mutant_anchors.py --mutant count-any|skip-unreadable|pins-one-way|missing-file-zero|no-entry-check|loose-file-passes|copies-counted|pin-per-anchor
+```
+
+**What it reads.** Every `tools/proof/**/*.py` outside `work/`, itself left out. A proof is
+parsed, never imported: some call `proof_app.binary()` at top level, which refuses a stale
+app, and `make test` runs before `make app`. A table's expression is evaluated in a
+namespace that runs only the top-level statements that bind or add to a name the table needs,
+each at most once and in source order: a constant, a helper `def` (`tone_proof.py`'s
+`grade_inline`), a later `T[k] = …`, `T += …`, `T.update(…)` or a top-level `for` holding one
+(`cloud_captions_proof.py`). A statement first has the names it reads brought up to its own
+line, so a table holds what a constant was where the table is written, whatever rebinds the
+name further down (`docs_bugs_a3_proof.py`'s `REGION`). An import of a sibling proof is a proxy
+read the same way (`playback_prefetch_proof.py`'s `gp.WORKER_SVG`); a statement that merely sits
+at top level never runs. **A table's expression must therefore be pure**: whatever it calls
+runs in `make test`.
+
+**What a table is.** A top-level name ending `MUTANTS`; `MUTANT_EDITS`; the pair `MUTANT_FILE`
+with `MUTANT_ANCHOR` or `MUTANT_EDITS`; and `MUTANT` bound to a tuple. A table name bound by an
+import is the other proof's table and is checked there. `MUTANT = None` is an instrument's own
+switch and needs no row.
+
+**How an entry's edits are read.** R1: a file followed by an anchor and a replacement (a string
+or `None`), anywhere in the entry, flat or nested. R2: a file followed by a list of (anchor,
+replacement) pairs. A dict entry with `file` and `anchor` keys is read by those. R3: a table
+whose file is implicit in its applier has a row in `HINTS`, read off that applier: `pair`
+(anchor, replacement, …), `anchor` (anchor, …) or `pairs` ([(anchor, replacement) or (anchor,
+replacement, file), …], …). A file is a path from the repo root, a `Path`, or a bare name found
+under exactly one of `app/Sources`, the shaders, the bridging folder, a crate's `src` or root,
+`agent` or `tools/proof`. The same mutant name with the same anchor in the same file in a
+second table is a copy, counted once under the first table in path and source order.
+
+**The count.** Each anchor occurs exactly once in its file. A table in `EVERY` has an applier
+that replaces every occurrence, so its anchors need one or more.
+
+**Nothing is passed over silently.** Each failure is one `FAIL` line naming the proof, the
+table and the mutant, and each has one answer:
+
+| The line says | The answer |
+|---|---|
+| `anchor occurs 0 times` / `N times` | The source moved. Re-aim the anchor and its replacement at the same defect (lengthen an anchor that now repeats), run the mutant, and see it caught. Only when it cannot be run now: a `ROTTED` row saying where it is filed. The row is the MUTANT's: its anchors that still count are counted and only its dead ones are held, so a mutant with one dead edit of several is pinned the same way. A copy's rot is pinned under the first table, the one the line names. |
+| `no file X` / `X is ambiguous` | Spell the path from the repo root in the table. |
+| `UNREADABLE, <exception>` | The table needs something the reader could not evaluate. Keep its expression to constants, pure helpers and sibling constants. |
+| `no anchor read from any of its N mutants` | A new shape: a `HINTS` row when the file is implicit in the applier; `SWITCHES` with the count when the mutants are switches inside the instrument or have no tree text. |
+| `<mutant>: no anchor read` | Give the entry its file and anchor, or name it in `UNANCHORED`. |
+| `names X and no rule read an anchor for it` | A half-read entry: a source file is named and no rule took it as an edit's file. Write the edit as R1 or R2. |
+| `not the shape HINTS says` | The entry or the `HINTS` row is wrong. |
+| `a top-level name containing MUTANT that is no table` | Make it a table the reader knows, or name it in `NOT_TABLES`. |
+| `takes --mutant and has no mutant table` | Give the proof a table, or name it in `NO_TABLE`. |
+| `<PIN> names it and …` | The pin no longer applies: drop or correct the row. Every pin is exact in both directions, as `gate.py`'s `TYPECHECK_BASELINE` is: a `SWITCHES` count that is off, a `ROTTED` mutant with no dead anchor counted under that table (every anchor is back, or it is a copy counted under an earlier table), an `UNANCHORED` mutant that has an anchor, a name that is gone. |
+
+**The pins as landed** (#554): seven `HINTS` rows; `SWITCHES` for fifteen tables in twelve
+instruments (71 mutants); two `UNANCHORED` mutants (`assistant_session_proof.py` `key-echo`,
+which builds nothing, and `raster_dither_proof.py` `core-unpatched`, a file swap); `EVERY` for
+`clip_inspector2_proof.py`; eleven `NOT_TABLES` names; nineteen `NO_TABLE` proofs, whose edits
+sat inline in functions where no table can be read, none since 2026-11-11 (#581, below: with
+their tables, `SWITCHES` holds twenty-six tables and 98 mutants, and `UNANCHORED` five
+mutants); and twelve `ROTTED` anchors, none since 2026-11-11 (below).
+
+**The selftest** runs the reader over synthetic proofs and sources in scratch trees under
+`tools/proof/work/mutant-anchors-selftest/`, removed after. K0 (CONTROL) every shape at once:
+R1 flat, nested, by `Path` and with `None`; R2; a dict's own keys; a constant rebound further
+down; a helper `def`; a sibling's constants by `import … as` and `from … import`; `T[k] =`,
+`T.update` and a top-level `for`; the three hinted shapes; `MUTANT_FILE` with `MUTANT_ANCHOR`
+and with `MUTANT_EDITS` under `EVERY`; a `MUTANT` tuple; and one row of every pin. U2 (CONTROL)
+K0's proof holds `BINARY = open(…)`, a bare `open(…)` and `sys.exit(…)` at top level and its
+sibling a `raise SystemExit`, and no marker file exists after. C1 (CONTROL) an imported table
+name is no table of the importer, and the importer, which takes `--mutant`, is not a proof
+without a table. A1 an anchor that is nowhere; A2 a table that passes, then fails once its
+SOURCE line gains a comment; A3 an anchor twice; F1 a file that is nowhere; F2 a bare name
+under two folders; U1 a name nothing binds (UNREADABLE, `NameError`); U3 a table that is a
+string; E1 a mutant with no anchor and no pin; E3 a table with none and no pin; E2 a half-read
+entry; H1 an entry that is not its hinted shape; P2 a `SWITCHES` count off by one; P3 a `ROTTED`
+row whose anchor is back; P4 an `UNANCHORED` row for a mutant that has an anchor; P5 a new
+`MUTANT` name; P6 a `NO_TABLE` row for a proof that has a table; P7 `--mutant` with no table
+and no row; P8 a `SWITCHES` row for a table that has anchors; P9 a mutant with two edits, one
+dead, which fails unpinned for the dead one alone and passes with its `ROTTED` row, the good
+anchor counted and the dead one held; P10 a `ROTTED` row for a mutant whose two anchors are both
+back, failing once; C2 a dead anchor copied into a second table, reported once; P11 that tree
+with a `ROTTED` row for each table, where the first table's row holds the rot and the copy's
+row holds nothing and fails. Each mutant is a switch inside the reader and fails exactly its
+rows: `count-any` (one or more accepted) A3; `skip-unreadable` U1, U3; `pins-one-way` (a stale
+pin passes) P2, P3, P4, P6, P8, P10, P11; `missing-file-zero` F1; `no-entry-check` E1, E3;
+`loose-file-passes` E2; `copies-counted` (a copy reported again) C2, P11; `pin-per-anchor`
+(`ROTTED` tested on each anchor, so a pinned mutant's good edit fails "drop the row") P9, P10,
+P11.
+
+**What it does not see.** An anchor inside a function (none known since #581; a proof that
+takes `--mutant` and has no table at all fails by name), or behind a callable in an entry. A mutant's REPLACEMENT: that it still compiles and is still
+caught is shown only by running the mutant. `qualifier_proof.py`'s and `co2a_proof.py`'s own
+row MA stay; this check agrees with them (21 mutants and 28 anchors; 10 and 10).
+
+| Run (#554) | Result |
+|---|---|
+| The first run, before any re-aim | 195 proofs, 210 tables, 2,057 mutants; 2,048 anchors once; 24 anchors failed in 16 proofs: 20 occur 0 times, 4 twice |
+| After twelve re-aims and twelve `ROTTED` rows | exit 0: 2,060 anchors occur exactly once, 30 copies, 12 pinned as rotted |
+| `--selftest` | 25/25 |
+| Each of the eight `--mutant`s | `MUTANT PASS`, exactly its rows |
+| On the tree: one character of `qualifier_proof.py`'s first anchor changed; a comment appended to an anchored source line; an entry calling an undefined name | exit 1 each: `occurs 0 times`, `occurs 0 times`, `UNREADABLE, NameError` |
+| 2026-11-11 (#573, #575–#579), the six app-copy anchors re-aimed and their `ROTTED` rows still there | exit 1, 6 failures, each `ROTTED names it … and its anchor occurs once in <file>: drop the row` |
+| The same day, the six rows deleted | exit 0: 196 proofs, 211 tables, 2,095 mutants; 2,114 anchors occur exactly once, 30 copies, 6 pinned as rotted |
+| 2026-11-11 (#572, #574, #580), the last four re-aimed, two dropped, `save_hold_proof.py`'s `transcript-no-model` added (#571), and the six `ROTTED` rows still there | exit 1, 6 failures: four `ROTTED names it … and its anchor occurs once in <file>: drop the row` (M7, M25, M26, `no-swap`) and two `ROTTED names it and it is not there: drop the row` (`no-clear`, `padded-in-place`) |
+| The same day, `ROTTED` emptied | exit 0: 196 proofs, 211 tables, 2,094 mutants; 2,119 anchors occur exactly once, 30 copies, 0 pinned as rotted |
+| 2026-11-11 (#581), four of the nineteen given a table, their `NO_TABLE` rows still there and no `SWITCHES` row yet | exit 1, 8 failures: four `no anchor read from any of its N mutants` and four `NO_TABLE names it and it is not there: drop the row` |
+| The same day, `op_contract_proof.py`'s edits moved into a table verbatim | exit 1, 2 failures: `nearest-transition: anchor occurs 0 times` in `core/src/edit_transition.rs` and in `core/src/edit_transition_shift.rs` |
+| The same day, one character of `makefile_env_proof.py`'s first anchor changed in its table | exit 1: `anchor occurs 0 times in Makefile` |
+| The same day, all nineteen moved and `NO_TABLE` emptied | exit 0: 214 proofs, 229 tables, 2,134 mutants; 2,132 anchors occur exactly once; 26 switch tables (98 mutants), 5 mutants without an anchor, 30 copies, 0 pinned as rotted, 0 proofs with `--mutant` and no table; `--selftest` 25/25. Landed beside #568's and #583's proofs, the same line reads 215 proofs, 230 tables, 2,147 mutants and 2,145 anchors |
+
+**The twelve re-aimed, each mutant run once and caught:** `camera_recording_probe.py`
+`camera-format-elsewhere-admitted` (T7), `camera-format-alone-admitted` (T9) and
+`remainder-camera-dropped` (L8), whose lines CO8 rewrote; `cloud_captions_probe.py`
+`no-fifth-rule` (row 19 and SP4·on; the cue builder moved to `CaptionCues.swift`) and the fake's
+`speaker-labels-ignored` (SP4·off); `container_rewrap_probe.py` `no-recopy` (O40);
+`limiter_probe.py` `M5 gain-not-told` (L2); `speed_sheet_probe.py` `no-gain-lines` (P1, P3–P6);
+`transcript_proof.py` `device-past-clip-end` (P2); and `recording_probe.py` `ask-every-press`,
+`open-first-press` and `shell-opens`, whose three lines `inputMonitoringStep` (CU-62) repeats,
+so each anchor now starts at `screenStep`'s signature (`SCREEN_STEP`).
+
+**Twelve were pinned in `ROTTED`,** not re-aimed because a re-aim counts only once its mutant
+has run. **None is pinned now:** `ROTTED` is empty, and a row goes there again only for a rot
+found and not yet run, with its issue and its reason.
+
+**Six were re-aimed and run on 2026-11-11,** each in a Debug copy of the tree, each planting the
+defect it always planted, and their rows deleted:
+
+| Mutant | The anchor now | Run | Result |
+|---|---|---|---|
+| `curves_proof.py` `identity-kept` (#573) | `core/src/edit_props.rs`, `settle_video`'s `props.curves.drop_identities();` at 8 spaces | `--mutant identity-kept`, twice | First `MUTANT FAILURE`: N1 and CT failed (`--test curves`, `--test hue_curves`) and so did H7, whose identity hue patch was "accepted": the same decision, a row grading-4 added. The table now names N1 H7 CT; run again, `MUTANT PASS`, 56/59, no other row failed |
+| `export_readers_proof.py` `no-own-cancel` (#575) | the plain pump's `stop` closure, moved to `app/Sources/ExporterWriter+Pump.swift` (`PUMP`); the text unchanged | `--mutant no-own-cancel` | `MUTANT CAUGHT`, exit 1: failing exactly F1–F4, readers `video 1, audio 1` on F1–F3 and `video 4, audio 1` on F4 |
+| `export_status_proof.py` `no-graphics-gate` (#576) | four lines from `Exporter.graphicsRefusal(` to its throw in `AgentServer+Export.swift`, which the settings refusal (#470) does not repeat | `--mutant no-graphics-gate` | `caught — A7 failed`, exit 1: the broken graphic's export answered `export_id` 4, `running`, and the next id was 5 |
+| `log_proof.py` `vp9-jpeg-deep` (#577) | `AgentServer+Render.swift`'s `graphics: graphics, keepsDepth: format.carriesDepth,` (the call gained `cutoutWait:`) | `capture` then `--mutant vp9-jpeg-deep --control … --only L18,Z1`, twice | **Survived**, as B103 and spec §11 PR-12 record: the JPEG byte-identical (5,099 bytes), 2/2. A sixth L18 case tried for it, `slog3_fr_vp9e.mp4` as JPEG at `max_width` 512, was byte-identical too (4,328 bytes) and was taken out again. Kept as the recorded equivalent, as `precision_proof.py`'s `jpeg-deep` is; a pin cannot sit on a live anchor |
+| `matte_proof.py` `handler-drops-matte` (#578) | `AgentServer+Tracks.swift`'s `solo: solo, matte: matte,` (the call gained arguments) | `--mutant handler-drops-matte`, then with `--only C0,A1,G0,U0,P6,MM,V5,H0,B0,A2,N0,R0,Z1` | The whole run answered 2 (12/46): every project past P sets its fixture's matte through the handler, so those fixtures cannot hold under this mutant. Over project P's rows: `MUTANT PASS`, 5/13, failed A1 G0 U0 P6 MM B0 A2 N0 |
+| `mixed_audio_proof.py` `old-onset` (#579) | `CompositionBuilder+AudioTracks.swift`'s `let onset = family.sounding.map(\.lowerBound).min()`, the local both its readers take | `--mutant old-onset` | `caught`, exit 0, 20/22: both first-25 ms rows FAIL at −28.8 dBFS, every CONTROL passes |
+
+**The last six on 2026-11-11** (#572, #574, #580): four re-aimed and run on Debug, each planting
+the defect it always planted, and two dropped with the decision they mutated. The same day's run
+of `save_hold_proof.py`'s new `transcript-no-model` (#571) is under that proof's own section.
+
+| Mutant | The anchor now | Run | Result |
+|---|---|---|---|
+| `co2b_proof.py` `M7-export-previous-empty` (#572) | `Exporter+Masks.swift`, `waitForMasks`' `while true {` and its `CutoutWants.wants(` call, replaced by `CutoutWants.requests(… keeping: [], kind:)` per kind. The read of the open requests moved into `CutoutWants.wants`, which the document and the frame wait share; emptying it there would be a wider defect, on `M6-kept-empty`'s ground | `--only W9` on the unmutated app, then `--mutant M7-export-previous-empty` | Control 2/2: the export's rows `[[[0, 2249]]]` include the document's running request, one run. Mutant `CAUGHT: W9 failed`, exit 0: the export's rows `[[[406, 2249]]]` do not include `[[0, 2249]]`, two runs analysing the need; the export completed; the tree's file SHA-256 unchanged |
+| `export_offset_proof.py` `M25-no-limiter-lead` (#574) | `CompositionBuilder+AudioPlacement.swift`'s `(usesLimiter ? limiterLead : 0) +`, the clip limiter's term alone; the track limiter's (AU-153) kept | by hand: a tree copy built Debug, launched on its own socket, `export_offset_proof.py <sock> --only E44` | Control 1/1 (median +0.000 ms). Mutant 0/1: E44 median +3.292 ms, "pin missed" |
+| `export_offset_proof.py` `M26-no-lookup-lead` (#574) | `AudioTapSchedule.swift`'s `(usesLimiter ? CompositionBuilder.AudioShift.limiterLead : 0) + trackLead`, the same term of the tap's lookup lead | by hand, as M25, `limiter_proof.py <sock>` | Control 19/19. Mutant 18/19: P4's second leg FAIL, true peak -0.0000 (Kaiser) / -0.0067 (Annex 2) dBTP against -1 + 0.001; its first leg ok. A first run of the copy ended that leg on "limiter-cut-lead: 4.bin was never written" (the import's waveform not there in 15 s, load average 95 with three lanes building): not a catch, so the copy was launched and run again |
+| `raster_bench.py` `no-swap` (#580) | `graphic/src/raster.rs`, the row copy's three lines `to[0] = from[2];` … `to[2] = from[0];` (G-7), the route that exists | `--mutant no-swap` | "the mutant is CAUGHT: a_rect_draws_in_bgra_and_nothing_else_is_touched FAILED", exit 0 |
+| `raster_bench.py` `no-clear`, `padded-in-place` (#580) | none: the in-place route's clear of a caller's buffer and its `stride == row` branch, which the spike's STOP left unbuilt | not run | Dropped from the table. `rasterize` draws into a fresh pixmap and copies rows, and the tests the two named were never written; `bytes_past_the_row_are_untouched` holds a padded stride on the copy route |
+
+**The nineteen `NO_TABLE` proofs on 2026-11-11** (#581). Each held its mutants inline in a
+function; each now holds a top-level `MUTANTS` its own `--mutant` choices and applier read, so
+the table cannot drift from what runs. Eleven are switches with no tree text (a tuple of names,
+pinned in `SWITCHES` with its count); eight edit tree text (a file from the repo root, the
+anchor, the replacement). Each mutant was run once, on Debug where it drives an app, with both
+keys taken out of the environment and nothing live:
+
+| Proof | Its table | Run | Result |
+|---|---|---|---|
+| `gate.py` | switches: `tuple(sorted(EXPECTED))`, 4 | `--selftest`, then each `--mutant` | 37/37; `MUTANT PASS` each: `no-tools` H2, `stamp-always` H3, `md-counted` M4 M5 M6, `warning-count` W2 |
+| `proof_app.py` | switches: `tuple(sorted(EXPECTED))`, 4 | `--selftest`, then each `--mutant` | 17/17; `MUTANT PASS` each: `exe-marker` F3 F4, `md-counted` F5, `exe-mtime-running` R1 R2, `bare-number` A1 |
+| `name_residue.py` | switches, 3 | `--selftest`, then each `--mutant` | 8/8; `MUTANT PASS` each: `ge-count` S4, `no-untracked` S2, `text-history-paths` S7 |
+| `filler_spike/filler_spike.py` | switches, 3 | `--selftest`, then each `--selftest --mutant` | 13/13; exit 1 each: `keep-punctuation` K, O, f1, f2, o2 (8/13); `replaced-as-kept` R, O (11/13); `o2-ignored` V1, V2 (11/13) |
+| `budget_proof.py` | switches, 2 (`budget`'s names rebound in memory) | the proof, then each `--mutant` | 23/23; exit 1 each: `no-budget` P G1 R2 A2 A4 (18/23), `unknown-as-zero` W S2 S3 (20/23) |
+| `prices_proof.py` | `ts-disagrees` carries `"name": "opus-mixed"` in `agent/prices/cases.json`, the line `scratch_agent` must find once (its edit is a number in the parsed copy, so the replacement is `None`); `py-disagrees` and `reduce-disagrees` are in memory, in `UNANCHORED` | the proof, then each `--mutant` | 27/27; exit 1 each: `py-disagrees` four C rows and A (22/27), `ts-disagrees` T and A (25/27), `reduce-disagrees` R (26/27) |
+| `prices_crosscheck.py` | switches, 2 (the loaded table or the fetched page changed in memory) | each `--mutant` (the proof's one public GET each, no key) | exit 1 each: `table` X1 FAIL (`claude-opus-5-5 cache_read: table 0.21, page 0.2`), 2/3; `page` X2 FAIL (the page has no 'Claude Fable 5.1' row), 2/3 |
+| `op_contract_proof.py` | per mutant, its `edits`, the `tests` that must fail and the `signature` their failure carries; five anchors in `core/src` | each `--mutant` | exit 1 each, `NEGATIVE CONTROL PASS` for each named test (two for `nearest-transition`). Two rots found first, below |
+| `graphics_spike/rows_local.py` | `q5`: the edit the spike's Rust binary makes to `graphics/counter.js`, and the Rust line that makes it (`src/rows_stress.rs`), pinned so the two cannot drift apart. `q5` refuses, by name, a mutant whose anchor is not there once, since Rust's `replace` takes every occurrence and none silently | `graphics_spike.py --only q5 --mutant` | `q5 MUTANT: CAUGHT (137 raster mismatches)`, 864 renders, exit 0 |
+| `graphics_spike/graphics_spike.py` | none of its own: `from rows_local import MUTANTS` | the row above | |
+| `codec_import_proof.py` | switches, 2 (a fixture swapped) | each `--mutant` | exit 1 each: `p1-as-p0` R1 and the six rows that need its clip (3/10), `p0-as-p1` R4 (9/10) |
+| `container_import_proof.py` | switches, 1 (a fixture swapped) | `--mutant ffmpeg-copy` | `MUTANT PASS`: failed M2 (15/16) |
+| `assistant_clearing_proof.py` | switches, 1 (a launch argument) | `--mutant clearing-off`, then with `--cap 4` | First exit 2, "the control could not be performed": every POST refused on the $3 cap (worst $3.04). The unmutated `--rehearse` is refused the same way: the helper's body is about 396 KB now, over `assistant_prompt_eval.py`'s 256,000-byte bound, and H says so. At `--cap 4` (the stand-in, a scratch ledger): `X1 FAIL — the mutant was caught`, exit 1, `context_management null, beta False` on each POST; X4 and H fail beside it. Since #594 it runs at the default cap ("Issue #594" below) |
+| `assistant_helper_proof.py` | `skip-without-bun`: `agent/build.sh`, the guard's `  exit 1`; `no-fields` a switch in P4, in `UNANCHORED` | each `--mutant` (`no-fields` on Release) | `skip-without-bun`: P1 FAIL, 0/1, exit 1. `no-fields`: P4 FAIL, 0/1, exit 1 (the first POST's system ends `undefined`) |
+| `assistant_compaction_proof.py` | `extra-instruction`: `app/Sources/AssistantSession.swift`, the `compaction_instructions` line | `--mutant extra-instruction` (a Debug copy), `--rehearse` | `C3 FAIL — the mutant was caught`, exit 1: verbatim False, instructions 509 chars, wanted 499; H fails beside it (the stale body bound), 6/8. The first run also failed C4, as the unmutated rehearsal did (below); with C4 fixed the rehearsal is 7/8, H alone |
+| `assistant_prompt_proof.py` | `bare-send`: `app/Sources/AssistantSession.swift`, `AssistantPrompt.message(text, document: document)` | `--mutant bare-send` (a Debug copy) | S2 FAIL, 0/1, exit 1: the last user text of both turns is the bare text |
+| `makefile_env_proof.py` | each mutant's `unexport` line in `Makefile`; `KEYS` takes its directives from the table | each `--mutant` (the copy's own `make app`) | `no-unexport`: 3/4, exit 1, the AssemblyAI row FAILS and the Anthropic row passes; `no-unexport-anthropic`: 3/4, exit 1, the Anthropic row FAILS and the AssemblyAI row passes |
+| `defaults_proof.py` | switches: `tuple(sorted(EXPECTED))`, 4 (a function rebound in the child) | each `--mutant` | `MUTANT PASS` each: `no-compare` G1 G3 G4 G5 G6, `no-exit` G1 G3 G4 G6, `home-followed` H1 H2, `no-rehome` G6 |
+| `open_documents_proof.py` | switches, 2 (`verdict`; `memory_fell`, since #592) | `--mutant timeout-only --bound 20`; since #592 each `--mutant` at `--bound 4` (Debug) | V0 fail (1/6 verdicts), exit 1, 5/6. Run on this change merged with #568's ("Issue #568" below), where O4 passes (50 threads before the first document, 21 five seconds after the last close); on the tree before #568 the same run was 4/6, O4 failing beside V0 as it did unmutated. #592: `timeout-only` V0 fail (1/6 verdicts), `any-fall` V1 fail (6/8 rulings), each exit 1, 7/8 |
+
+**Three rots the pins had hidden, each fixed in the same change.** `op_contract_proof.py`'s
+`nearest-transition` named `let requested = duration / frame;` and `let asked = duration /
+frame;`, which are `frames_in(duration, fps)` calls now: moved into the table verbatim, the
+check failed on both (0 times each). It is re-aimed at the same defect, round to nearest instead
+of counting down: `frames_in(duration + crate::time::one_frame(fps) / 2, fps)` in both files, and
+both floor tests fail their `assert_eq` (handles 460000 against 440000, ripple 480000 against
+500000). The same proof's control copied `core/` alone and could not compile any mutant, since
+`core/Cargo.toml` names `../graphic` and its vendored tiny-skia by path; it copies both crates
+now. And `assistant_compaction_proof.py`'s C4 looked for `hello framejob` in a summary that
+reads "Hello Frame Job", so it failed unmutated; it looks for the title as the fixture spells
+it. What is left is filed as #594: the assistant proofs' 256,000-byte body bound is stale, so H
+fails in every rehearsal and the clearing rehearsal is refused at its own suggested cap. #594 is
+fixed: "Issue #594" below.
 
 ## The offscreen harness (no running app)
 
@@ -3341,13 +3572,15 @@ asserted WHOLE and never by keyword:
 | 1 — the overlap rule | the rule's whole sentence, ids and tick counts included, out of `move_clip`, out of `duplicate` (which names the copy it never made) and out of a SCOPED call; an overlap one frame under the limit still applying, so the number in the sentence is the rule's own boundary; the project unchanged either side of every refusal; and ONE undo putting back the marker edit, so not one of them registered a step |
 | 2 — an identity | four doors (`set_video`, `set_clip`, `set_canvas`, `split`) asked for the value the project already holds, each answering that whole sentence and NOTHING else — an equality, which is the only way to measure "says only that" — and naming no rule |
 | 3 — several ops | `normalize_clip` sends one `set_audio` per clip, so it is where the fold over a list is observable: a list of identities answers the identity, one undo puts both clips back, and a later op still runs after an earlier identity |
-| 4 — a locked track | `close_gap` over a gap that is really there and `insert_clip` with room to spare, both naming the track to unlock (`core/src/edit_time.rs`'s `locked_track`, written once for its three callers); the lock undone and both landing; and the same `close_gap` on a time that is ON a clip refused in a different sentence naming that clip (spec §11 #88) — two sentences at one op, not an identity |
+| 4 — a locked track | `close_gap` over a gap that is really there and `insert_clip` with room to spare, both naming the track to unlock (`core/src/edit_time.rs`'s `locked_track`, written once for its callers), and a `lift_range` held to that track by `tracks` naming it too (spec §11 #602 (c)); the lock undone and both landing; and the same `close_gap` on a time that is ON a clip refused in a different sentence naming that clip (spec §11 #88) — two sentences at one op, not an identity |
 | 5 — the track stack | the only track in a project, refused with and without `with_clips: true` — the flag is the way past the OTHER refusal and not past this one — a second track making the same call land, a track that still holds clips naming the CLIP rather than a count, and that flag then taking the track and its clip |
 | 6 — a media row | a media one clip still shows, refused naming that clip and `with_clips: true`, and an unused row still going with no argument at all |
 | 7 — the transition cut | a cut with no unused material, refused naming the request in whole FRAMES (15, hand-computed) and `ripple: true`; the same cut taking a RIPPLED transition, which slides the incoming clip by exactly the overlap asked for; and that rippled form on a LOCKED track, which is `locked_track`'s third caller |
 | 8 — the action rules | an action inside another and an action past the clip's end, each out of `add_action` AND `set_action` in the same words; and two boundaries that land — abutting is not overlapping, and an action ending exactly at the clip's end fits |
 | 9 — off the track stack | a two-track selection moved one track too far, naming the clip that would go off the top and the index it would land on, in `move_track`'s own words for the same mistake |
 | 10 — the non-edits that speak | spec §11 #88's sentences over MCP: a `roll` across a gap naming the track and where the clip begins; `set_transition_duration` on a track's first clip, and past tick 0 naming the pair's limit — that limit then sent and LANDING; `close_gap` past the track's last clip; `detach_audio` on a text clip, on `A.mov` (no audio track) and on `AV.mov` after one detach that applied (audio switched off), one undo then putting the audio back; and one undo for the batch |
+| 11 — a cut too close to a transition | spec §11 #427 over MCP, on a [0, 10 s) and b [8 s, 18 s) dissolving: `split` at 7 s, `lift_range` and `ripple_delete_range` over {0, 7 s}, and `ripple_delete_ranges` with a harmless {12 s, 13 s} beside it, each refused in `edit_cut_rule.rs`'s whole sentence naming a and b (never the piece's minted id); Edit ▸ Ripple Delete (`perform_menu_item`) with that range set, the project unchanged and the inspector's foot reading "Refused: " and the sentence in `snapshot_ui`'s layout dump; a split at 6 s (the bound) and a lift of {7 s, 10 s} (the short piece removed) LANDING; §11f (#602) a second track holding c [7 s, 17 s), and the lift of {7 s, 10 s} held to a and b's track by `tracks` LANDING with c uncut, then `tracks: []` and an unknown id each an error naming the argument, nothing changed; and one undo for the batch |
+| 12 — a clip ripple closes up to its neighbour | spec §11 #601 over MCP, on a [0, 10 s), b [8 s, 18 s), c [16 s, 26 s), d [26 s, 36 s), b and c dissolving in (made by two `move_clip`s): `ripple_delete [b]` LANDING with c at 8 s still dissolving from a and d at 18 s (the issue left c at 16 s and d under it, both [16 s, 26 s)); `ripple_delete_range {22 s, 23 s}` then applying on that track (the issue's second half: refused naming c and d unfixed); Edit ▸ Ripple Delete (`perform_menu_item`) with b selected LANDING the same; a second track's x [10 s, 20 s) and y [20 s, 30 s), where `ripple_delete [b]` slides y 8 s under x, refused in THE overlap rule's whole sentence, the project unchanged, and the same through the menu with the inspector's foot reading "Refused: " and the sentence; and one undo for the batch. 12b–12e were driven red on Debug built from the unfixed tree first (179/187, the 8 failures all in section 12); the whole script then 187/187 on Debug and on Release |
 
 Every refusal and every identity also asserts the ABSENCE of two fragments
 of the paragraph D2·2 deleted ("Either the project is already in that
@@ -5013,6 +5246,14 @@ every row on port base 4960 (2026-09-20, against 115):
 | `auth-carries-on` | the 401 arm not ending the run | 114/115 |
 | `no-hold` | R6-11's hold removed | 111/115 |
 
+`no-fifth-rule` was run again on 2026-11-11 (#582), after its anchor moved to
+`CaptionCues.swift` with the cue builder: a Debug copy (`make app-debug`, built
+in 55 s), every row against the stand-in with the dummy key. **222/225, exit
+1**, in 485 s, failing row 7's "a served speaker change BREAKS the cue where
+the fifth rule says", SC1 (two speakers place two caption clips, white then
+yellow) and SC2 (their rendered glyphs). In 2026-09 it failed one row of 115;
+SC1 and SC2 are rows added since.
+
 `no-delete` is the one whose TOTAL moves: with no transcript ever deleted,
 R6-11 holds every media a later row touches, so rows 7, 11 and H throw where
 the tree's build answers — scored as three row failures each named for its
@@ -5150,8 +5391,9 @@ Anthropic key, and B42 the sweep row). It builds a tree COPY at
 `project.yml` and `Makefile` are copied; every other build input
 `project.yml` names is a SYMLINK to the tree's (`core` already built, so the
 copy links the tree's staticlib); and `agent/` is COPIED without
-`node_modules`, because the helper's build step runs `bun install` and
-`bun build`, which write into it, and a copy keeps bun out of the tree. It
+`node_modules` (at B42 the helper's build step ran `bun install` there; since
+road map "swift-helper" SA3 it builds with SwiftPM on a clone of the tree's
+`build/agent-swift`, and SA4 deleted the Bun helper, spec §11 SA-8, SA-11). It
 runs `make app` inside the copy with both keys POPPED and a dummy in each
 place, `RCDUMMY-makefile-env-proof-5d1c` for `RC_ASSEMBLYAI_KEY` and
 `RCDUMMY-makefile-env-proof-anthropic-9b3e` for `ANTHROPIC_API_KEY`. Then it
@@ -5795,8 +6037,9 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --mutant sp
   has no `color` key; every expectation is computed in Python. SP2: each of
   the five word styles places the same ops with speakers as with them
   stripped. SP3: the same `PROBE_SOURCE` built against
-  `BASELINE_TREE_SPEAKERS` (`ef54f48e`, B46's starting working tree, a tree
-  object written with a temporary index) with
+  `BASELINE_TREE_SPEAKERS` (commit `a0f39e04`, B46's parent, since #528;
+  until then `ef54f48e`, B46's starting working tree, a tree object written
+  with a temporary index, which garbage collection took) with
   `-D CLOUD_PROBE_BEFORE_SPEAKERS`: nil-speaker cues, Subtitles and
   Highlight, place byte-identical ops; CONTROL, SP1's speaker cues do not.
   A baseline that will not build is a scored FAIL. SP4: the Generate
@@ -5932,7 +6175,8 @@ available directly with `cd core && cargo test --release --test NAME`.
 
 Three negative controls use `--mutant null-as-absent`,
 `--mutant unsnapped-marker`, or `--mutant nearest-transition`. Each copies
-the current core and tests into its own temporary tree, uses a private Cargo
+the current core and tests (and `graphic/`, which `core/Cargo.toml` names by
+path) into its own temporary tree, uses a private Cargo
 target and mutates only that copy. A successful negative control **exits 1**
 after compiling and observing its named behavioral assertion fail; anchor,
 compile or attribution failures exit 2. The nearest-transition control runs
@@ -6162,9 +6406,17 @@ the build.
 anchor asserted to occur exactly once) and exits 0 only if P5 FAILED.
 
 ```sh
-python3 tools/proof/graphics_ffi_probe.py                              # → 9/9
+python3 tools/proof/graphics_ffi_probe.py                              # → 13/13
 python3 tools/proof/graphics_ffi_probe.py --mutant frame-off-by-one   # exit 0 = P5 FAILED
 ```
+
+Since spec §11 PR-15 (#374) it also scores P10 (a deep raster through
+`GraphicLibrary.rasterize(…, deep: true)`: its size, its `byteCount`, its
+distance from the 8-bit raster), P11 (`Exporter.graphicsDeep` for every row
+of the export table, in an SDR and an HLG project), P12 (the texture key at
+both depths) and P13 (a scan: the two prefetch files count
+`GraphicRaster.byteCount`), with a mutant each for P10, P11 and P13
+(`bytes-uncounted`, `frame-form-unread`, `a-site-uncounted`).
 
 ## Road map 10's G3a — the package's `graphics/` store (`graphics_store_probe.py`, `graphics_store_probe.swift`, `graphics_store_proof.py`)
 
@@ -7124,8 +7376,8 @@ and prints the needle and both paths before its rows:
   which an absence check passes against a build that never had the tools;
 - **D5** — the Distribution binary does not hold the needle;
 - **D6–D13** — each bundle's assistant helper: present, signed with the
-  hardened runtime, entitlements exactly `allow-jit`, no needle (road map
-  12's A4, the last section of this file);
+  hardened runtime, no entitlements (`allow-jit` until road map
+  "swift-helper" SA3, spec §11 SA-8), no needle (road map 12's A4);
 - **D14** (#145) — the Distribution app's entitlements, read through its
   `realpath`ed executable with `codesign -d --entitlements - --xml`, are
   exactly `{com.apple.security.device.audio-input: true,
@@ -7188,26 +7440,31 @@ spec §11 PUB-10 added `vector.c-LICENSE`, libvpx's three), byte-identical to
 - **D42 / D43** (the acknowledgements, #376, spec §11 PUB-10) — the Release /
   Distribution bundle's `Contents/Resources/Acknowledgements.txt` (written each
   build by `tools/licenses/acknowledgements.py`) has an `== <kind> <name>
-  <version> ==` header for every shipped crate and npm package, name and
-  version, each pin (`library <name> <version>`), `framework sparkle` at
-  `project.yml`'s `exactVersion`, and `runtime bun`, `model silero-vad` and
-  `font <stem>` for each `*.ttf` in the bundle's `Contents/Resources/Fonts/`
-  at any version. The shipped sets come from readers of dist_check's own,
-  never the generator's code: `shipped_crates()` runs `cargo metadata
-  --format-version 1 --locked --offline --filter-platform aarch64-apple-darwin`
-  in `core/` and `mcp-proxy/` and walks every non-dev edge from the root
-  (Frame Job's three crates left out); `shipped_npm()` reads `agent/bun.lock`
-  from the workspace's `dependencies` through each package's own, each
-  resolved as Node does (bun's nested key under the dependent's chain, else a
-  shorter one, else the hoisted name), so a nested version is expected at its
-  own version. A missing file, `cargo`, metadata or lock FAILs the row with
-  the reason.
+  <version> ==` header for every shipped crate, name and version, each pin
+  (`library <name> <version>`), `framework sparkle` at `project.yml`'s
+  `exactVersion`, `package slaude` at `agent/Package.resolved`'s revision, and
+  `model silero-vad` and `font <stem>` for each `*.ttf` in the bundle's
+  `Contents/Resources/Fonts/` at any version, and no header of another kind
+  (`npm` and `runtime bun` were the Bun helper's, gone since road map
+  "swift-helper" SA3, spec §11 SA-10). The shipped sets come from readers of
+  dist_check's own, never the generator's code: `shipped_crates()` runs `cargo
+  metadata --format-version 1 --locked --offline --filter-platform
+  aarch64-apple-darwin` in `core/` and `mcp-proxy/` and walks every non-dev edge
+  from the root (Frame Job's three crates left out); `slaude_revision()` reads
+  the pin from `agent/Package.resolved`, where the generator reads the helper's
+  SwiftPM `workspace-state.json`. A missing file, `cargo`, metadata or pin file
+  FAILs the row with the reason.
+- **D44 / D45** (a `framejob://` link's dev switch, #385, spec §11 G-49 (l)) —
+  the Release binary holds `RCDevGraphicLinkLoopbackHTTP` (the positive
+  control) and the Distribution binary does not.
+- **D46 / D47** (G-49 (i)) — the Release / Distribution Info.plist has exactly
+  one `CFBundleURLTypes` row, whose schemes are exactly `["framejob"]`.
 
 No row is ever skipped: if D1 fails, D4, D5, D12 and D13 FAIL too, and so
 does each when its binary, helper, proxy or snapshot is missing. The last
-line is `dist_check: <passed>/43`; the exit is 0 only at 43/43.
-`dist_check_mutants.py` makes each helper row, D14, D15–D32, D35, D36, D38
-and D40–D43 fail on purpose; the A4 and MC3 sections of this file have its
+line is `dist_check: <passed>/47`; the exit is 0 only at 47/47.
+`dist_check_mutants.py` makes each helper row, D14, D15–D32, D35, D36, D38,
+D40–D43, D46 and D47 fail on purpose; the A4 and MC3 sections of this file have its
 cases. `codec_strings()` (each encoder's own string literal in the binary's
 bytes) is no row here: it is `published_check.py`'s P22.
 
@@ -7222,7 +7479,7 @@ optimised binary by the log line the flag-on `devTools()` writes, so a dev
 tool added to the seam needs no edit here.
 
 ```sh
-make dist                                                  # → dist_check: 42/43 (D31) until the owner's key lands, then 43/43
+make dist                                                  # → dist_check: 47/47
 python3 tools/proof/dist_check.py [--release APP] [--dist APP]
 ```
 
@@ -7520,6 +7777,13 @@ as a launch argument changes nothing, so no Apple argument gives a dark app on
 a light system. A real Light host was not available (the machine's setting was
 not changed).
 
+**One scale on any display.** Every launch also pins `-RCDevCaptureScale 2`
+(`screens.CAPTURE_SCALE`, `DevCaptureScale.swift`, spec §11 #539), which P2
+counts as pinned: `snapshot_ui` draws each capture at 2× whatever screen the
+window opened on, so a run on a 1× external display gives the same pixel sizes
+as one on a Retina screen, with no window moved. A capture whose answered
+`scale` is not 2 fails its screen, as one that answers the wrong look does.
+
 **The pins.** `PINS` is the offscreen harness's `pinDefaults`
 (`harness/main.swift:289-395`), as launch arguments
 (booleans and numbers as plist fragments, `<false/>`, `<real>304</real>`), plus
@@ -7685,38 +7949,17 @@ shows Picture's rows); `UISnapshot.openWindow(.recorder)` answering
 `RecorderPanelController.shared.window` fails R1 alone (the capture is taken
 instead of refused).
 
-## Road map 12's A0 — the assistant spike (`assistant_spike/`, `anthropic_fake.py`)
-
-The spike behind A1's plumbing: Rasterize's Bun helper (`agent/`, renamed
-`framejob-agent`) built, placed in `Contents/Helpers` and signed by Rasterize's
-own build step, in a COPY of the tree under `work/assistant_spike/tree/`
-(`tree_copy.make_copy` with `agent=False`, the copy's own agent step removed
-from its `project.yml` before Rasterize's is spliced in) with a hook (`AssistantSpikeHook.swift`) that exists only there. It answers
-whether the helper launches from a Release and a Distribution bundle under
-the hardened runtime and needs its one entitlement (B, H), how big the
-catalog is and whether it wants tool search (C), whether a stand-in Messages
-server scripts a whole turn — a `tool_use`, the tool's result, then text —
-against the built app (F, T), whether `export` replaces an existing file
-(E), and what an agent edit does to a timeline drag in progress (D, a probe
-built from `app/Sources`). 32 scored rows, a digest. Its README has the rows,
-the copy, the run order and the output; the answers are in
-`archive/roadmap-12.md` §7 (condensed in
-`designs/adr/roadmap-12-assistant.md`). `anthropic_fake.py` is the stand-in, at
-the top level because A1 reuses it: `port <n>` first, a scripted reply per
-`POST /v1/messages` (SSE when the body asks to stream), and R6-9(e)'s
-credential rule — only `proof-key` and `wrong-key` are ever logged.
-`ANTHROPIC_API_KEY` is popped from every child's environment; with it
-present, C3 counts the catalog through `count_tokens` and L1 searches every
-file the spike and the builds wrote for it, and without it C3 estimates and
-L1 skips as `host: no key`.
-
-```sh
-python3 tools/proof/assistant_spike/assistant_spike.py [--only B,H,C,F,T,E,D,L] [--rasterize ~/devel/rasterize]
-```
-
 ## Road map 12's A1 — the agent lane (`assistant_lane_proof.py`, `assistant_lane_probe.swift`)
 
-A line of `make test` (spec §11 AI-3's "`make test`-reachable
+**The stand-in, `anthropic_fake.py`.** It came with road map 12's A0 spike, which
+road map "swift-helper" SA4 retired with its folder (spec §11 SA-11; the spike's
+answers are in `designs/adr/roadmap-12-assistant.md`), and it stays at the top
+level because every assistant proof since A1, and `agent_helper_drive.py`, reuses
+it: `port <n>` first, a scripted reply per `POST /v1/messages` (SSE when the body
+asks to stream), and R6-9(e)'s credential rule — only `proof-key` and `wrong-key`
+are ever logged.
+
+`assistant_lane_proof.py` is a line of `make test` (spec §11 AI-3's "`make test`-reachable
 probe"). It launches no app instance, reads no key and uses no media: every
 child gets the environment without `RC_ASSEMBLYAI_KEY` and
 `ANTHROPIC_API_KEY`. The probe is compiled AS `main.swift` over every file in
@@ -7762,44 +8005,63 @@ in it calls `start()`, and every row makes its own documents.
   with the prepare line deleted, and the probe's L1 under `--no-prepare`
   (the gate is empty, so `add_marker` is refused for `at` and `name`), must
   BOTH fail.
+- **B1** (#594, spec §11 P-9 as SA-9 amends it, road map "swift-helper"
+  SA3): L6 writes the `configure` the app writes (`writeConfigure`: the
+  assistant catalog, `AssistantPrompt`'s four pieces, AI-11's default model,
+  `proof-key`, clearing on, no spend fields, sorted keys) to the run folder,
+  and B1 runs the release helper `tools/agent/build_helper.sh` builds
+  (`agent_helper_build.release`, seconds while its stamp matches) on it
+  against `anthropic_fake.py`, sends one short message and reads the first
+  POST's `bytes` from the stand-in's log. That POST must carry the catalog
+  plus tool search and the prompt, a blank line and the guide as its system
+  text; then its bytes plus `assistant_prompt_eval.CONVERSATION_BYTES_BOUND`
+  (30,000, the room for the conversation) must be within `BODY_BYTES_BOUND`;
+  failing, it says to raise the bound and recompute the floors and caps. A
+  probe that did not build, a helper that did not build or a POST that never
+  came FAILs it. **M3** (made to fail on purpose): B1's comparison with the
+  bound one byte under the measured POST plus that room must FAIL.
+  `--mutant b1-empty-catalog` runs B1 alone with the helper configured with
+  no tools, and B1 must FAIL (exit 1).
 
 A probe that does not build is a scored FAIL. Exit 0 only when every row
 passes.
 
 ```sh
-python3 tools/proof/assistant_lane_proof.py               # L0–L9, C1, M1
+python3 tools/proof/assistant_lane_proof.py               # L0–L13, C1, M1, S1, M2, B1, M3 (20 rows)
 python3 tools/proof/assistant_lane_proof.py --no-prepare  # the mutant alone: L0 and L1 FAIL, exit 1
 ```
 
 ## Road map 12's A1 part 2 — the helper and its build (assistant_helper_proof.py)
 
-The helper (`agent/`, spec §11 AI-1), its build and road map 12 §2's three
-`configure` fields. It launches no app and reads no key: every child's
+The helper (`agent/`, spec §11 AI-1, and since road map "swift-helper" SA3
+the Swift helper `tools/agent/build_helper.sh` builds, SA-8), its build and
+road map 12 §2's three `configure` fields. It launches no app and reads no key: every child's
 environment has `RC_ASSEMBLYAI_KEY` and `ANTHROPIC_API_KEY` popped. The
 helper only ever gets `proof-key`, and every `configure` it is sent points
 `api_base` at a running `anthropic_fake.py`, so no row reaches
 api.anthropic.com. Each child runs under a wall in its own process group
-(rule H): P1 30 s; the helper 20 s to `ready`, 60 s for a turn and 5 s to
-exit; P5 180 s. It works in `work/assistant_helper/`, prints
+(rule H): the helper 20 s to `ready`, 60 s for a turn and 5 s to exit; P1's
+toy builds 600 s each. It works in `work/assistant_helper/`, prints
 `<ID> ok|FAIL|skip — <reason>` per row and then `n/m`, and exits 0 only when
 no row fails. An instrument that cannot run is a scored FAIL.
 
 - **P0**, the wiring, read from the source:
   - `project.yml` has exactly one "Build Agent Helper" item, after "Copy
-    Graphic Templates" and before `schemes:`, with
-    `basedOnDependencyAnalysis: false` and `agent/build.sh" helper`.
-  - The Makefile's `typecheck` runs `/bin/sh agent/build.sh typecheck`.
-  - `unexport ANTHROPIC_API_KEY` occurs once.
-- **P1**, never skips. `build.sh helper` and `build.sh typecheck` run with a
-  fresh empty `HOME`, `PATH=/usr/bin:/bin` and a scratch
-  `TARGET_BUILD_DIR`. Each exits non-zero with a first stderr line
-  `error: bun is not installed …` and places no helper. It skips only as
-  `host: bun at a fixed path`, when bun is at `/opt/homebrew/bin` or
-  `/usr/local/bin`.
+    Graphic Templates" and before `schemes:`, whose own keys are exactly
+    `basedOnDependencyAnalysis: false` and the one line `script: /bin/bash
+    "$PROJECT_DIR/tools/agent/build_helper.sh"
+    "$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/framejob-agent"`, so the
+    step's exit is the script's.
+  - `unexport ANTHROPIC_API_KEY` occurs once in the Makefile.
+- **P1**, a failed SwiftPM build fails the app build: P0's one-line step
+  (Xcode fails the build on a run-script phase's non-zero exit) and
+  `agent_build_proof.failing_package()`, its K8, run here by import: a toy
+  package built by the tree's script, then one that does not compile, exits
+  non-zero with no helper at the destination and no stamp.
 - **P2r / P2d**, the Release helper and, with `--dist`, the Distribution
-  one. Each is present, shows `flags=0x10002(adhoc,runtime)`, has
-  entitlements that parse as exactly `{com.apple.security.cs.allow-jit:
-  true}`, and passes `codesign --verify --strict`.
+  one. Each is present, shows `flags=0x10002(adhoc,runtime)`, holds no
+  entitlements (none printed, or an empty dict), and passes `codesign
+  --verify --strict`.
 - **P3**. The Release helper is launched with exactly `HOME`, `TMPDIR` and
   `PATH=/usr/bin:/bin`. It answers a `configure` with `ready` and exits 0
   once stdin closes. The stand-in sees only the Models API `GET`, no POST,
@@ -7814,21 +8076,15 @@ no row fails. An instrument that cannot run is a scored FAIL.
   - The POST after `compaction_started` carries `P4-COMPACTION`. The SDK
     sends that POST inside the same turn, so the second `send`, kept for
     the other case, was not needed.
-- **P5**, the control. A scratch copy of `agent/` without `node_modules`,
-  with `const p5: number = "p5";` appended to `main.ts`, fails `build.sh
-  typecheck` with a tsc error naming `src/main.ts`.
-- **Mutants**, each running only its row, which must FAIL (exit 1). A mutant
-  whose row skipped on this host exits 2 and says the control could not be
-  performed; it is never read as caught:
-  - `skip-without-bun` runs P1 against a scratch `build.sh` whose guard
-    `exit 1` (asserted once) became `exit 0`.
-  - `no-fields` runs P4 with the three fields omitted. The system then ends
-    in "undefined", `get_project` is deferred, and the summary POST lacks
-    the instructions.
+- **The mutant** runs only its row, which must FAIL (exit 1): `no-fields`
+  runs P4 with the three fields omitted, so `get_project` is deferred and
+  the summary POST lacks the instructions. (P1's "never skips" over Bun,
+  its `skip-without-bun` mutant and P5, the TypeScript's type check, left
+  with the Bun build step in road map "swift-helper" SA3; P1's own rule is
+  `agent_build_proof.py`'s, with its mutants.)
 
 ```sh
-python3 tools/proof/assistant_helper_proof.py --dist "build/Build/Products/Distribution/Frame Job.app"  # 7/7
-python3 tools/proof/assistant_helper_proof.py --mutant skip-without-bun  # P1 FAIL, exit 1
+python3 tools/proof/assistant_helper_proof.py --dist "build/Build/Products/Distribution/Frame Job.app"  # 6/6
 python3 tools/proof/assistant_helper_proof.py --mutant no-fields         # P4 FAIL, exit 1
 ```
 
@@ -8224,7 +8480,7 @@ text clip "Welcome", two shapes, an action on the text clip, a marker, a
   (F1), the timescale's digits → 60000 (F2), the first topic's last tool
   dropped (F4), `system + " record_screen"` (F1).
 
-`--probe` runs these alone (no app, no bun): it is a line of
+`--probe` runs these alone (no app): it is a line of
 `make test`.
 
 **Launch S** (Release, a scratch socket, `proof-key` in a
@@ -8270,9 +8526,10 @@ duration, kind and content:
   exactly one export question, the project unchanged. A turn past 600 s is
   stopped and FAILs. A row whose session met a cap refusal FAILs `cap:
   refused at $<spent> of $<cap>`.
-- **H** every POST the relay saw was within `BODY_BYTES_BOUND` (256,000
-  bytes less image data) and `MAX_TOKENS_BOUND` (32,000); a breach FAILs
-  and says the arithmetic is stale. It prints the worst POST priced.
+- **H** every POST the relay saw was within `BODY_BYTES_BOUND` (480,000
+  bytes less image data since #594, spec §11 P-9) and `MAX_TOKENS_BOUND`
+  (32,000); a breach FAILs and says the arithmetic is stale. It prints the
+  worst POST priced and the largest body.
 - **K** (live only) the key's bytes in no file under `work/assistant_prompt/`
   nor the app log.
 Per row it prints the tools called, the tokens and the dollars at `RATES`,
@@ -8286,7 +8543,7 @@ answers 400 `invalid_request_error` naming the cap and writes nothing to the
 proofs' ledger. Otherwise it reserves that worst case in the proofs' ledger
 (`budget.SpendLedger`, road map 13 P3, spec §11 P-6) and answers 400 naming
 the BUDGET instead when this UTC month's recorded Anthropic spend plus it
-would pass $25; only once that reservation is made does the cap count it,
+would pass $40 (spec §11 P-9); only once that reservation is made does the cap count it,
 so a POST the budget refuses holds no cap reservation. A forwarded reply's
 whole usage is read and priced by the table (`budget.settle_anthropic`: the
 table's price, `table`; usage it cannot price at each class's dearest rate,
@@ -8299,14 +8556,15 @@ rate over every row and `above_200k` tier of `agent/prices/anthropic.json`
 (`budget.anthropic_worst_row`), the two cache writes folded into the dearer
 — today $10.00 input, $20.00 cache write, $1.00 cache read and $50.00
 output per MTok. The headroom arithmetic, printed before the first request:
-the helper sends `max_tokens` 32,000 on every POST and all 85 definitions,
-deferred ones included; the A2 session proof's largest logged body was
-230,340 bytes, bounded at 256,000 ≈ 85,333 tokens. The worst POST is
-85,333 × $20.00 + 32,000 × $50.00 per MTok ≈ $1.71 + $1.60 = $3.31. A row is
-bounded at one cache write of that body ($1.71) + 4 cache reads ($0.34) + 5
-rounds × 2,000 output ($0.50) ≈ $2.55, an estimate that bills every
-definition byte. The floor is the worst POST + 6 rows ≈ $18.59;
-`SUGGESTED_CAP` is $20.00, under the month's $25. Below the floor it prints
+the helper sends `max_tokens` 32,000 on every POST and all 122 of the
+assistant's definitions, deferred ones included; since #594 (spec §11 P-9)
+the body is bounded at 480,000 bytes ≈ 160,000 tokens, about 20 % over the
+largest body the rehearsals sent on 2026-11-11 (399,360 bytes). The worst
+POST is 160,000 × $20.00 + 32,000 × $50.00 per MTok = $3.20 + $1.60 = $4.80.
+A row is bounded at one cache write of that body ($3.20) + 4 cache reads
+($0.64) + 5 rounds × 2,000 output ($0.50) = $4.34, an estimate that bills
+every definition byte. The floor is the worst POST + 6 rows = $30.84;
+`SUGGESTED_CAP` is $32.00, under the month's $40. Below the floor it prints
 `WARNING: below the floor; rows past $<cap − worst> of settled spend will
 fail naming the cap` and still runs. A row whose session met the budget
 FAILs `budget: …` before the cap is considered, and the summary counts
@@ -8330,7 +8588,7 @@ scripted right calls (`add_marker`; `undo`; `split` with `clips`;
 `work/assistant_prompt/rehearsal/ledger.jsonl` and a scratch proofs' ledger,
 `work/assistant_prompt/rehearsal/spend.jsonl`, deleted first; `--month-spent
 D` (rehearsal only, D ≥ 0) seeds it with D dollars already spent this month,
-so `--month-spent 24.99` fails every E row `budget:` with nothing sent to
+so `--month-spent 39.99` fails every E row `budget:` with nothing sent to
 the stand-in. Each run prints the ledger's month line after building the
 relay and again with the report;
 `--wrong` scripts the mistakes (3000000; no undo; `split` without `clips`;
@@ -8361,15 +8619,17 @@ python3 tools/proof/assistant_prompt_proof.py --rehearse                # + E1�
 python3 tools/proof/assistant_prompt_proof.py --rehearse --wrong        # every E row FAILs, exit 1
 python3 tools/proof/assistant_prompt_proof.py --rehearse --cap 0.0001   # WARNING; E rows fail `cap:`
 python3 tools/proof/assistant_prompt_proof.py --mutant bare-send        # S2 FAIL, exit 1
-python3 tools/proof/assistant_prompt_proof.py --live --cap 15           # spends: the key from .secrets/ or the env
+python3 tools/proof/assistant_prompt_proof.py --live --cap 32           # spends: the key from .secrets/ or the env
 ```
 
 ## Road map 12's A4 — the helper in both bundles (`dist_check.py` D6–D13, `dist_check_mutants.py`)
 
 Both bundles carry the assistant helper, `Contents/Helpers/framejob-agent`,
-which `agent/build.sh helper` copies in and signs `--options runtime` with
-`agent/entitlements.plist` before Xcode signs the app. `dist_check.py` holds
-each bundle's helper to that contract, after D1–D5 and with none skipped:
+which `tools/agent/build_helper.sh` strips in and signs `--options runtime`
+with no entitlements before Xcode signs the app (road map "swift-helper"
+SA3, spec §11 SA-8; until then `agent/build.sh helper` signed the Bun helper
+with `allow-jit`). `dist_check.py` holds each bundle's helper to that
+contract, after D1–D5 and with none skipped:
 
 - **D6 / D7** — the Release / Distribution helper exists;
 - **D8 / D9** — it is signed with the hardened runtime: the first
@@ -8377,8 +8637,8 @@ each bundle's helper to that contract, after D1–D5 and with none skipped:
   STDERR; the CodeDirectory line) lists `runtime`, and
   `codesign --verify --strict` exits 0. `runtime`, not `adhoc`, so a
   Developer ID signature passes too;
-- **D10 / D11** — `codesign -d --entitlements - --xml`'s stdout, parsed as a
-  plist, is exactly `{com.apple.security.cs.allow-jit: true}`;
+- **D10 / D11** — `codesign -d --entitlements - --xml`'s stdout is empty or
+  parses as an empty dict (`no_entitlements`, the MCP proxy's D19/D20 reader);
 - **D12 / D13** — it does not hold the `devToolsMarker` needle.
 
 A missing helper FAILs its three rows ("no Release helper (D6)"); no needle
@@ -8405,10 +8665,9 @@ PUB-10) a copy of the real `Contents/Resources/Acknowledgements.txt`.
 | `control` | both sides the real apps | none |
 | `skeleton` | both sides skeletons, helpers copied untouched | none |
 | `no-helper-release` / `-dist` | no helper in the skeleton | D6 D8 D10 D12 / D7 D9 D11 D13 |
-| `no-runtime-release` / `-dist` | re-signed with `agent/entitlements.plist`, no `--options runtime` | D8 / D9 |
-| `extra-entitlement-release` / `-dist` | re-signed `--options runtime` with allow-jit plus `disable-library-validation` | D10 / D11 |
-| `no-entitlements-dist` | re-signed `--options runtime`, no entitlements | D11 |
-| `marker-release` / `-dist` | the needle written over the copy at the first `compaction_instructions`, re-signed as `build.sh` signs | D12 / D13 |
+| `no-runtime-release` / `-dist` | re-signed ad hoc with nothing, no `--options runtime` | D8 / D9 |
+| `extra-entitlement-release` / `-dist` | re-signed `--options runtime` with `allow-jit`, the Bun helper's one entitlement (SA-8) | D10 / D11 |
+| `marker-release` / `-dist` | the needle written over the copy at the first `compaction_instructions`, re-signed as `build_helper.sh` signs | D12 / D13 |
 | `app-entitlements-dist` (#145) | the whole Distribution app `ditto`ed to `<case>/dist/Frame Job.app` and re-signed ad hoc `--options runtime` with the pair it carried before B20, `audio-input` and `get-task-allow` | D14 |
 | `app-entitlements-mic-only-release` (B88) | the whole Release app `ditto`ed and re-signed ad hoc `--options runtime` with `audio-input` alone | D25 |
 | `noop-sign-release` (B88) | the whole Release app `ditto`ed, its executable re-signed alone (`codesign -s - -f`, as Write Agent Catalog does), then a byte appended to `agent-catalog.json` — what a no-op build shipped before B88's fix | D25 D26 |
@@ -8426,6 +8685,8 @@ PUB-10) a copy of the real `Contents/Resources/Acknowledgements.txt`.
 | `licence-changed-release` (CX-5) | the Release skeleton's `Licenses/` copy with a byte appended to `svt-av1/PATENTS.md` | D40 |
 | `acknowledgements-missing-release` (PUB-10) | no `Acknowledgements.txt` in the Release skeleton | D42 |
 | `acknowledgements-crate-dropped-dist` (PUB-10) | the Distribution skeleton's `Acknowledgements.txt` copy with its first `== crate ` header line deleted (`crate adler2 2.0.1` today) | D43 |
+| `acknowledgements-slaude-dropped-release` (SA-10) | the Release skeleton's copy with its `== package slaude ` header line deleted | D42 |
+| `acknowledgements-bun-listed-dist` (SA-10) | the Distribution skeleton's copy with `== runtime bun 1.3.6 ==` added, a kind the file no longer holds | D43 |
 
 ```sh
 make dist                                                  # → dist_check: 42/43 (D31) until the owner's key lands
@@ -8478,7 +8739,8 @@ file beside the table and `os.replace`s it. It prints `commit <sha> <date>`,
 failure is `error: …` on stderr, exit 1, and the file's bytes untouched.
 
 `tools/proof/prices.py` is the proofs' reader (importable: `load`,
-`match_model`, `price`); `agent/src/pricing.ts` is the helper's. Both answer
+`match_model`, `price`); the helper's is its `Pricing.swift` (the TypeScript
+`pricing.ts` until road map "swift-helper" SA3, spec §11 SA-3). Both answer
 `agent/prices/cases.json`, the hand-checked cases over a pinned fixture
 table, and never re-derive a rate. A model matches by exact id, or by the id
 less a trailing `-YYYYMMDD` when that is a key; nothing else is stripped.
@@ -8493,16 +8755,22 @@ entry prices at its own model (spec §11 P-2).
 - **K** — the committed table: format 1, the unit, the provider, a 40-hex
   commit; `claude-opus-5-5` and `claude-fable-5-1` hold all five base rates
   as finite numbers ≥ 0; 1000 input tokens on opus price as dollars > 0.
-- **T** — `/bin/sh agent/build.sh test` exits 0 (`bun test`, its JUnit report
-  in `build/agent/bun-test.xml`, deleted first; 300 s wall).
-- **A** — every case name has a passing `case: <name>` testcase in the JUnit
-  report AND a passing C row; prints the case count and `cases.json`'s sha256.
+- **T** — the Swift helper's price suites (road map "swift-helper" SA3):
+  `python3 tools/agent/agent_test.py --filter 'PricingTests|PriceTableTests'`
+  (`make agent-test`'s guard, scratch path and warnings as errors, so it
+  shares that build; 900 s wall) exits 0, and its XCTest lines name each test
+  passed.
+- **A** — `PricingTests.testEveryCaseInCasesJSON` (every case within 1e-12,
+  each assertion labelled `case <name>`) passed with no `case <name>` failure,
+  AND every case has a passing C row; prints the case count and
+  `cases.json`'s sha256.
 
 Made to fail on purpose: `--mutant py-disagrees` prices C with every
 `cache_read` rate doubled in memory (the cache-read C rows and A FAIL by
-name); `--mutant ts-disagrees` runs T and A on a scratch copy of `agent/`
-under `work/prices/ts-disagrees/` (`node_modules` ignored) whose `opus-mixed`
-expects its dollars + 0.01 (T and A FAIL naming `opus-mixed`).
+name); `--mutant swift-disagrees` runs T and A with `FJ_AGENT_PRICES` naming a
+scratch copy of `agent/prices` under `work/prices/swift-disagrees/` whose
+`opus-mixed` expects its dollars + 0.01 (`PriceFiles` in the suite reads that
+folder, so nothing is rebuilt; T and A FAIL naming `opus-mixed`).
 
 **`prices_crosscheck.py`** — network, not in `make test`. **X0** fetches
 `https://platform.claude.com/docs/en/about-claude/pricing.md` and parses the
@@ -8518,7 +8786,7 @@ line (X2 FAILs naming `claude-fable-5-1`).
 make prices                                               # network; the table's only writer
 python3 tools/proof/prices_proof.py                       # C × 23, K, T, A: 26/26
 python3 tools/proof/prices_proof.py --mutant py-disagrees # exit 1
-python3 tools/proof/prices_proof.py --mutant ts-disagrees # exit 1
+python3 tools/proof/prices_proof.py --mutant swift-disagrees # exit 1
 python3 tools/proof/prices_crosscheck.py                  # X0–X2 (network)
 python3 tools/proof/prices_crosscheck.py --mutant table   # exit 1
 python3 tools/proof/prices_crosscheck.py --mutant page    # exit 1
@@ -8542,7 +8810,8 @@ Fable 5.1' row", each 2/3, exit 1.
 
 ## Road map 13's P2 — the helper prices every response (`spend_proof.py`, `spend_probe.swift`; `prices_proof.py` R)
 
-The helper keeps the price table in force (`agent/src/priceTable.ts`): the
+The helper keeps the price table in force (its `PriceTable.swift` and
+`PriceRefresh.swift` since road map "swift-helper" SA3, spec §11 SA-3): the
 bundled `anthropic.json`, or the cache `configure`'s `price_cache` names,
 refreshed at most once a day from LiteLLM's raw `main` file (or
 `price_feed`). It emits `prices` once per `configure` and a `cost` for every
@@ -8555,8 +8824,9 @@ folder and ends each turn's transcript with the cost line
 `agent/prices/reduce_cases.json`'s `litellm` block answers exactly its
 `models` — the opus and fable rows, an `_above_200k_tokens` row, a row with
 no `…_above_1hr`, a bedrock row dropped and batch fields dropped. The
-helper's `reduceLiteLLM` answers the same fixture in `bun test`
-(`reduce:` tests). `--mutant reduce-disagrees` raises the expected opus
+helper's `reduceLiteLLM` answers the same fixture in `PriceTableTests`
+(`make agent-test`; the TypeScript helper's `reduce:` tests until road map
+"swift-helper" SA3). `--mutant reduce-disagrees` raises the expected opus
 input by 1: R FAILs, exit 1.
 
 **`spend_proof.py`** — no network: the API is `anthropic_fake.py`, the feed
@@ -8597,12 +8867,15 @@ dollar is `prices.py`'s, every expected date the local date of the instant.
   folder created, a file as the folder refused); P-5's table over a
   `UserDefaults` answering the argument domain.
 
-Made to fail: `--mutant stale-refresh` builds a scratch `agent/` with
-`REFRESH_AFTER_MS = 0` through its own `build.sh helper` and runs H2 and
-H3 on it (H3 FAILs: a GET and a fetched `prices`); `--mutant
-unknown-as-zero` runs the probe over a copy of `app/Sources` whose cost line
-renders unknown as `$0.0000` (S1 FAILs). Either exits 2 when its instrument
-did not build.
+Made to fail: `--mutant stale-refresh` builds a helper mutant whose
+`PriceTables.refreshAfter` is 0 (`agent_helper_build.mutant` on the
+persistent mutant tree, road map "swift-helper" SA3, spec §11 SA-8) and runs
+H2 and H3 on it (H3 FAILs: a GET and a fetched `prices`); `--mutant
+no-partial` (the catch's partial `emitCost` gone, H10 and H11) and `--mutant
+priced-twice` (a returned response priced a second time as partial, H12)
+build theirs the same way and run H10–H12; `--mutant unknown-as-zero` runs
+the probe over a copy of `app/Sources` whose cost line renders unknown as
+`$0.0000` (S1 FAILs). Each exits 2 when its instrument did not build.
 
 ```sh
 python3 tools/proof/prices_proof.py --mutant reduce-disagrees  # R FAIL, exit 1
@@ -8619,8 +8892,8 @@ no `prices` before `ready`, 1 GET, a later fetched `prices`), exit 1;
 ## Road map 13's P3 — the proofs' ledger and the budgets (`budget.py`, `budget_proof.py`)
 
 Every paid proof request is held to the month's budget (spec §11 P-3, P-6):
-$25 for Anthropic, $5 for AssemblyAI, the owner's numbers, constants in
-`budget.py` that nothing takes from a flag or the environment.
+$40 for Anthropic (P-9, #594) and $5 for AssemblyAI, the owner's numbers,
+constants in `budget.py` that nothing takes from a flag or the environment.
 
 **`budget.py`** (stdlib and `prices.py`) is the only writer of the proofs'
 ledger, `LEDGER` = `~/Library/Application Support/Frame Job Proofs/spend.jsonl`
@@ -8670,16 +8943,20 @@ key. It works in `work/budget/` (made fresh), prints `<ID> ok|FAIL — detail`
 and then `n/m`, exits 0 or 1, and scores an instrument that cannot run as a
 FAIL.
 
-- **P** the budgets are `{anthropic 25, assemblyai 5}`; `LEDGER` is absolute
-  and outside the repo; worst POST ≤ the floor ≤ `SUGGESTED_CAP` ≤ $25.
+- **P** the budgets are `{anthropic 40, assemblyai 5}`; `LEDGER` is absolute
+  and outside the repo; worst POST ≤ the floor ≤ `SUGGESTED_CAP` ≤ $40 for the
+  prompt evaluation and (since #594) the clearing and compaction proofs, whose
+  chains one child process reads (importing the clearing proof rebinds
+  `assistant_session_proof.WORK`, whose `Fake` R1–R4 use); a child that
+  fails or prints no JSON FAILs P as an instrument.
 - **F1** the fold over a hand-written file: last month's $30 counts nothing;
   this month's reserve 2 settled 0.5, open reserve 1, refused 9 and orphan
   settle 0.25 → $1.75; AssemblyAI's 4 settled 4 → $4.00. **F2** an absent
   file is $0; a non-JSON line refuses naming `line 2`, and `reserve`
   appends nothing.
-- **G1** at $24.00 a $1.00 reservation passes (the edge) and $0.01 is refused
+- **G1** at $39.00 a $1.00 reservation passes (the edge) and $0.01 is refused
   `budget:` with exactly one `refused` line; `gate=False` still records.
-  **G2** with an injected clock, $25 recorded in August counts nothing in
+  **G2** with an injected clock, $40 recorded in August counts nothing in
   September. **G3** a nested folder is created 0700 and the file is 0600.
 - **W** `anthropic_worst_row` over a two-row fixture (one tiered) is the
   per-class maximum; no committed rate exceeds it, and it equals the
@@ -8694,7 +8971,7 @@ FAIL.
   usage holding a string, an object and a bool totals only the integers.
 - **R1–R4** `ev.Relay` over `anthropic_fake.py` with a scratch proofs'
   ledger: a streamed `claude-opus-5-5` POST forwarded, reserved at
-  `measure`'s worst and settled $0.0006, `table`; at $24.999 recorded and a
+  `measure`'s worst and settled $0.0006, `table`; at $39.999 recorded and a
   cap of 1.5 × the POST's worst, TWO POSTs each answered 400 naming the
   budget, nothing sent to the stand-in, two `refused` lines, no cap refusal
   and `_reserved` 0 (a leaked cap reservation would make the second a cap
@@ -8730,7 +9007,7 @@ FAIL). Either exits 1.
 python3 tools/proof/budget_proof.py                          # 23/23 (make test)
 python3 tools/proof/budget_proof.py --mutant no-budget       # P G1 R2 A2 A4 FAIL, exit 1
 python3 tools/proof/budget_proof.py --mutant unknown-as-zero # W S2 S3 FAIL, exit 1
-(unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/assistant_prompt_proof.py --rehearse --month-spent 24.99 --cap 10)  # E1–E6 FAIL budget:, exit 1
+(unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/assistant_prompt_proof.py --rehearse --month-spent 39.99 --cap 10)  # E1–E6 FAIL budget:, exit 1
 ```
 
 Measured 2026-09-28, every command with `ANTHROPIC_API_KEY` and
@@ -8981,6 +9258,7 @@ mutants (`work/cloudproof/mutants/<name>`) and graphics' `frame-plus-one`
 (`work/graphics/mutant`), the last two now built by the copy's own
 `make app` (whose `unexport` keeps both keys out of the copy's build
 database) instead of xcodegen and xcodebuild; and the assistant spike's
+(retired by road map "swift-helper" SA4, spec §11 SA-11)
 `make_tree` (`agent=False`), which removes the copy's own `Build Agent
 Helper` item from its `project.yml` before splicing Rasterize's in (B3's
 anchors "project.yml's own Build Agent Helper item" and "one Build Agent
@@ -10221,7 +10499,8 @@ Headroom, as the runner prints it: worst POST $3.31; a conversation bound of
 12 POSTs (one cache write, 11 cache reads, 12 × 2,000 output) $3.85; floor
 $7.15; suggested cap $8.00. Its estimate at `claude-opus-5-5`'s table row
 (8 POSTs × 3,000 input + 5,000 5-minute write + 20,000 read + 500 output) is
-$0.41.
+$0.41. Since #594 (spec §11 P-9) it prints worst POST $4.80, a conversation
+bound of $6.16, floor $10.96 and suggested cap $11.50 ("Issue #594" below).
 
 Run on 2026-09-30 against HEAD0 `abda44b`, every instance my own:
 
@@ -11223,12 +11502,19 @@ own render, and whether drawing in place into the caller's buffer would pay
   else SWIFT if `swift ≥ 0.03` and `> spread`; else STOP. Exit 0 iff the
   dump, the build, the bench and the probe all succeeded; the verdict does
   not set it.
-- `--mutant no-clear|no-swap|padded-in-place`: a copy of `graphic/` under
+- `--mutant no-swap`: a copy of `graphic/` under
   `work/raster-bench/mutant/` (a sibling `app` symlink, the target dir
   `work/raster-bench-target/`), each anchor in `src/raster.rs` exactly once,
-  `cargo test --release --test pixels`. The anchors are the in-place
-  route's, which was not built, so each answers 2 (the control was not
-  performed).
+  `cargo test --release --test pixels`. The one mutant is the live row copy
+  (G-7) without its swizzle, RGBA out where BGRA is owed, which
+  `a_rect_draws_in_bgra_and_nothing_else_is_touched` must fail. Until
+  2026-11-11 (#580) there were three, anchored in the in-place route, which
+  was not built, so each answered 2 (the control was not performed):
+  `no-swap` was re-aimed at the copy that exists, and `no-clear` and
+  `padded-in-place` were dropped, because `rasterize` has no clear of a
+  caller's buffer and no `stride == row` branch, and the tests they named
+  (`a_dirty_row_buffer_draws_as_a_clean_one`,
+  `the_row_and_padded_strides_draw_the_same_rows`) were never written.
 
 Run on 2026-10-22 over `312c44d` plus the instrument, on the owner's parive
 promo (a copy), every instance my own, on a 12-CPU host with 96 GiB,
@@ -11240,6 +11526,7 @@ promo (a copy), every instance my own, on a 12-CPU host with 96 GiB,
 | the same, `--module bg` (for the record) | clip 4 (`bg`), frames 0…3775, 1920 × 1080; load 20.66 24.82 17.17 before, 15.35 23.23 16.82 after; ROW 1 407.5 ms, PADDED 1 401.7 ms, ALLOC 2.1, SWIZZLE 6.7, CLEARSWAP 28.7; spreads 0.0714 and 0.0695; probe Z 0.043, U 0.796, M 0.020. Per frame: row 35.188, net 0, copy 0.776, F 36.027, outside 0.819; share 0.0227, rust 0, swift 0.0227; inplace saving −0.0041. verdict: STOP; exit 0 |
 | `image_cache_bench.py parive-promo.framejob --frames 4 --rounds 1` (after `dump_scene` and `--exact`) | runs only `section_scene_orig_against_cached` (1 passed, 1 filtered out); every frame identical across the arms; exit 0 |
 | `raster_bench.py --mutant no-clear` | exit 2: the anchor occurs 0 times (the route is unbuilt) |
+| 2026-11-11 (#580), `raster_bench.py --mutant no-swap`, re-aimed at the row copy | exit 0: "the mutant is CAUGHT: a_rect_draws_in_bgra_and_nothing_else_is_touched FAILED" (`[255, 128, 0, 255]` against `[0, 128, 255, 255]` at `tests/pixels.rs:26`); the other five `pixels` tests ok |
 | `grep "Frame Job: "` over the dump instances' logs | nothing |
 
 ## Issue batch B38 — the assistant Stop residue: ST's hour fixture, K1 last with its `key-echo` control, `transcribe`'s first-statement read (`assistant_session_proof.py` ST, K1, `--mutant key-echo`; #179 items 1, 2 and 4)
@@ -12454,9 +12741,11 @@ python3 tools/proof/clip_inspector7_proof.py --mutant tag-frozen                
   - **The relay lowers the forwarded `max_tokens` to 8,000.** The helper always
     asks for 32,000 (`agent/src/main.ts`). Spec §11 P-6 reserves each POST at
     the body's bytes / 3 at $20/MTok plus `max_tokens` at $50/MTok. A helper
-    body of about 227 KB therefore reserves about $3.17, and under `--cap 3`
-    the relay would refuse every POST unchanged. At 8,000 the worst case is
-    about $1.91 (the rehearsal's H printed a worst POST of $1.9270).
+    body of about 227 KB therefore reserved about $3.17, and under `--cap 3`
+    the relay would have refused every POST unchanged. At 8,000 the worst case
+    was about $1.91 (the rehearsal's H printed a worst POST of $1.9270). Since
+    #594 (spec §11 P-9) a body at the 480,000-byte bound prices $3.60 at 8,000,
+    the floor is $4.64 and the suggested cap $5.00.
   - **X3 proves that the rewrite is the only change to turn A's bodies.** It
     compares each body as the app sent it (`relay.sent`) with the body
     forwarded (`relay.exchanges`). The rehearsal printed, for both turn-A
@@ -12495,7 +12784,7 @@ python3 tools/proof/assistant_tab_proof.py --mutant no-plex                 # P1
 python3 tools/proof/assistant_clearing_proof.py --rehearse                  # 6/6, K skipped
 python3 tools/proof/assistant_clearing_proof.py --rehearse --refused        # X4 SKIP, exit 0
 python3 tools/proof/assistant_clearing_proof.py --mutant clearing-off       # X1 FAIL, exit 1
-python3 tools/proof/assistant_clearing_proof.py --live --cap 3              # needs the key; spends
+python3 tools/proof/assistant_clearing_proof.py --live --cap 5              # needs the key; spends (#594)
 ```
 
 ### Live run
@@ -13340,6 +13629,16 @@ default; the batch's spec left a new row out of scope, so it is owed.
   `04.3a` 358 → 361, `06b` 348 → 354, `07.6` 42 → 46, `deepening.md`
   556 → 584. The folder cell went from 3065 to 3066 in 13 files, because the
   sentence this batch added to the decisions README is one line.
+- **#548 — the decision rows (2026-11-11).** The same script also reads the
+  "Every decision" table of `designs/spec/11-decisions/README.md`. For a row
+  with an ID, the entry is the line `- **<ID> — ` in the folder's files: where
+  one exists, exactly one file holds it and the row must name that file; where
+  none exists (a decision recorded as an amendment paragraph), the row's file
+  must contain the ID. An "Amends" bullet (`- **<ID>**: …`) is not an entry.
+  A problem names the ID, the file the row names and the file that holds the
+  entry. The selftest has a fifth mutant, M5: the `W-8` row re-pointed at
+  `silence.md` must show exactly one problem naming `decision W-8`, so it
+  reads 6/6. With the new check skipped, M5 is not caught and it reads 5/6.
 - **#218 — `mixed_audio_proof.py` `pending-first`.** It sits between
   `missing-first` and `CONTROL same`, on its own session. `aac.m4a` itself
   (not a copy, and never altered) goes at 0 and `pcm.wav` at the AAC clip's
@@ -17015,8 +17314,8 @@ at, read with `dist_check.py`'s own readers (imported, not copied):
   --strict` accepts it, which also fails when anything nested was changed
   after the app was sealed; **P5** its entitlements are exactly `audio-input`
   and `camera`;
-- **P6–P9** the assistant helper: present, hardened runtime, entitlements
-  exactly `allow-jit`, no needle;
+- **P6–P9** the assistant helper: present, hardened runtime, no entitlements
+  (`allow-jit` until road map "swift-helper" SA3, spec §11 SA-8), no needle;
 - **P10–P12** the MCP proxy: present, hardened runtime, no entitlements;
 - **P13** the catalog snapshot is at the bundle's version; **P14** it names no
   dev tool;
@@ -17042,14 +17341,17 @@ at, read with `dist_check.py`'s own readers (imported, not copied):
   **P24** the bundle holds every pin's licence texts, byte-identical to the
   checkout's `build/codecs/licenses/` (D41's); **P25**
   `Acknowledgements.txt` names every shipped component (D43's; its `cargo
-  metadata --offline` relies on the Archive having fetched the crates).
+  metadata --offline` relies on the Archive having fetched the crates);
+  **P26** the binary does not hold `RCDevGraphicLinkLoopbackHTTP` (D45's,
+  spec §11 G-49 (l)); **P27** the Info.plist's one `CFBundleURLTypes` row
+  claims exactly `framejob` (D47's).
 
-No row is skipped; the last line is `published_check: <passed>/25` and the
-exit is 0 only at 25/25. `make dist` runs it even when `dist_check.py`
+No row is skipped; the last line is `published_check: <passed>/27` and the
+exit is 0 only at 27/27. `make dist` runs it even when `dist_check.py`
 failed, and fails if either did.
 
 ```sh
-make dist                                                   # → dist_check: 42/43, published_check: 24/25 (D31, P20) until the owner's key lands
+make dist                                                   # → dist_check: 47/47, published_check: 27/27
 python3 tools/proof/published_check.py --app APP [--version V --build N]
 ```
 
@@ -17904,7 +18206,7 @@ that failed.
 | `core-matte-behind-matte` | `matte_target` ignores that the track behind is a matte | MM |
 | `core-untargeted-into-null` | an unlisted group's `into` is written `null` | B0 MM CT |
 | `core-no-override` | `layer` is told no layer is drawn into a matte | P6 |
-| `handler-drops-matte` | `set_track`'s handler sends `matte: nil` | A1 G0 |
+| `handler-drops-matte` | `set_track`'s handler sends `matte: nil` | A1 G0 (run with `--only` project P's rows and Z1 since MT3, #578) |
 
 **Its record** (2026-10-08): on Debug 16/16; recorded on the third gate's
 Release build (`RC_PROOF_APP=release`) 16/16, beside `phase6_proof.py` 168/168
@@ -18121,7 +18423,7 @@ scored by `matte_proof.py`'s N5, under its two new mutants.
 
 ```
 python3 tools/proof/matte_pool_probe.py                  # no app; builds through swift_build.py
-python3 tools/proof/matte_pool_probe.py --mutant NAME    # no-release, give-ignored, trim-never, trim-early
+python3 tools/proof/matte_pool_probe.py --mutant NAME    # no-release, give-ignored, trim-never, trim-early, depth-kept
 python3 tools/proof/matte_proof.py --mutant free-ignores-liveness --only N5,Z1
 python3 tools/proof/matte_proof.py --mutant early-resolve --only N5,Z1
 ```
@@ -18137,6 +18439,7 @@ mutant builds a tree copy as MT2's section says.
 | `give-ignored` (`Compositor+Matte.swift`) | `giveComposite` frees nothing | P2 |
 | `trim-never` (`Compositor+Matte.swift`) | `endFrame` releases nothing | P2 |
 | `trim-early` (`Compositor+Matte.swift`) | the window is `keepFrames − 1` frames | P2 |
+| `depth-kept` (`Compositor+Matte.swift`, #597) | a depth change keeps the coverages | P4 (#597's section) |
 | `free-ignores-liveness` (`matte_proof.py`) | each step gives back only its own composite | N5 |
 | `early-resolve` (`matte_proof.py`) | a cut set resolves at its first matte's step | N5 |
 
@@ -19839,7 +20142,7 @@ MUTANT PASS only when every named row failed and no other scored row did.
 | `curves-before-wheels` | step 4c.2's block moved before 4c.1 in the layer stage | O1 |
 | `ungraded-misses-curves` | `ungraded` keeps the curves | V1 CT |
 | `adjust-without-curves` | the adjustment pass has no step 4c.2 | J1 |
-| `identity-kept` | `set_video` stores an identity curve | N1 CT |
+| `identity-kept` | `set_video` stores an identity curve | N1 H7 CT (H7's identity hue patch, since grading-4; #573) |
 | `identity-not-aligned` | no identity alignment before an action's lerp | A2 A3 CT |
 
 Also moved by G2-3: `wheels_proof.py` N2 (the header's format version, not
@@ -19981,7 +20284,7 @@ RC_PROOF_APP=release python3 tools/proof/curves_proof.py compare tools/proof/wor
 aligned action, whose oracles are the per-point lerp, so they fail by
 construction. **Its record**: `archive/grading-4.md`'s T4-3 section.
 
-## Road map grading-2 — G2-4, the qualifier (`qualifier_proof.py` N0–N2, H1, W1, G1, S1, S1b, S2, L1, I1, M1, D1, E1, V1, B1, F1, A1, A2, R1, P0, U1, V2, Q1–Q6, K1–K10, Z1 and twenty-one mutants; `qualifier_probe.swift`; `core/tests/qualifier.rs`, `core/tests/selection.rs`, `core/tests/schema_v18.rs`, `core/tests/qualifier_blur.rs`; spec §11 GR-13, GR-35)
+## Road map grading-2 — G2-4, the qualifier (`qualifier_proof.py` N0–N2, H1, W1, G1, S1, S1b, S2, L1, I1, M1, D1, E1, V1, B1, F1, A1, A2, R1, P0, U1, V2, Q1–Q6, K1–K10, Z1, MA and twenty-one mutants; `qualifier_probe.swift`; `core/tests/qualifier.rs`, `core/tests/selection.rs`, `core/tests/schema_v18.rs`, `core/tests/qualifier_blur.rs`; spec §11 GR-13, GR-35)
 
 **What it answers.** That `video.qualifier` changes nothing until set (N0:
 six unqualified frames — the card, an adjustment clip at exposure +1 over it,
@@ -20037,7 +20340,10 @@ project it opens, and removes its work folder at the start and at exit.
 `--mutant` builds a tree copy as `curves_proof` does; a core mutant also runs
 `cargo test --release --no-fail-fast --test qualifier --test selection` in the
 copy's core (row CT). MUTANT PASS only when every named row failed and no
-other scored row did; each names every row it was measured to fail.
+other scored row did; each names every row it was measured to fail. Row MA
+(#433), first in a plain run and text only, holds every mutant's every anchor
+to exactly one occurrence in the tree, so an anchor a later change moves fails
+the next run by the mutant's name (`--only MA` launches no app).
 
 | Mutant | Edit | Must fail |
 |---|---|---|
@@ -20948,7 +21254,9 @@ and L17 FAILED; L9 and L18 captured 5 and 4 references; Z1 ok.
 - `vp9-jpeg-deep` (`AgentServer+Render.swift` passes `keepsDepth: true`; `--only L18,Z1`):
   survived, the JPEG byte-identical (5,099 bytes). Recorded as equivalent, as
   `precision_proof.py`'s `jpeg-deep` was: the JPEG's bytes do not move when it is read through
-  the reader (why was not measured), and L18 stays the guard.
+  the reader (why was not measured), and L18 stays the guard. Run again on 2026-11-11 with its
+  anchor re-aimed (#577; the call gained `cutoutWait:`): survived again, 5,099 bytes, and so did
+  a JPEG of the same fixture at `max_width` 512 (4,328 bytes), a case tried and not kept.
 
 `isDeep`'s VP9 subtype guard has no mutant: no fixture but VP9 carries a `vpcC` atom (L16 prints
 `absent` for the others), so removing it changes no answer. `composition_gap_probe.swift` and
@@ -23165,7 +23473,16 @@ Since spec §11 SR-28, CX2 (×2, Keep pitch off) carries a constant `ramp` and
 plays its offline render, so its plan and audio differ from the baseline by
 design: **U1** scores CX1 and CK05 only and reports CX2's comparison.
 
-`work/` is untracked, so a fresh worktree has no `ramp-baseline/`. For #334's
+`work/` is untracked, so a fresh worktree has no `ramp-baseline/`. **Since
+#388 U1 makes its own**: the base (`--base REV`, else
+`tree_copy.default_base()`) is built whole in `work/ramp-base/`
+(`tree_copy.make_base_copy`), driven as `--baseline` drives it before the
+tree's instance is launched, its plans read by the base's own probe
+(`base_probe`), and `baseline.json` records `base`, `config` and
+`plan_probe: base`, so a later run on the same base and build keeps it; the
+hygiene batch b1
+section at the end of this file has the rule. What follows is how it was made
+by hand before that. For #334's
 batch it was recorded on the batch's base commit (2026-10-26): a detached
 worktree at a34bea5 with `tools/proof/media` and `agent/node_modules` CoW-copied
 in, its `make app`, then from the lane `RC_PROOF_APP=release python3
@@ -23178,7 +23495,9 @@ equal; its `wav_audio` and `prores_audio` PCM differ from the base app's
 varispeed export, as SR-28 means; its video md5 is equal. U1 on the lane's
 Release build then passed: CX1 and CK05 plan, md5 and PCM all equal.
 
-- **`--baseline`** (before any SR2b app edit, on Release): CX1 (×1), CX2 (×2,
+- **`--baseline`** (by hand; alone it builds the base's app as U1 does, with
+  `--app EXECUTABLE` it drives that app, and it records `base` only when
+  `--base` names it, the plans then read by that commit's own probe): CX1 (×1), CX2 (×2,
   keep pitch off) and CK05 (×0.5, keep pitch on), each 4 s of the clicks
   fixture from in 1 s on a 320 × 180 30 fps canvas, saved and exported
   `audio_wav` and `prores_422`; `tools/proof/work/ramp-baseline/baseline.json`
@@ -23587,9 +23906,14 @@ is toneA and toneB on tracks 1 and 2. Each document's canvas is 640×360.
 - **R1–R4** — M1–M4 with "pending" in place of "gone".
 - **V0** — a gone `AV.mov` alone at 0, `prores_422`: done, a video stream, all-zero audio, frames ≥
   its own timeline's frames − 1024 (240 000 − 1024).
-- **K1 / K2** — C's and T's `audio_wav` PCM, `prores_422` PCM and video md5 identical to
-  `work/missing-audio-baseline/` (written by `--baseline` at bb73b35).
-- **P1** — `play_preview {seconds: 2}` on M1's document moves ≥ 900 000 ticks.
+- **K1 / K2** — C's and T's `audio_wav` PCM, `prores_422` PCM and video md5 identical to the
+  digests in the tracked `tools/proof/missing_audio_baseline.json`, which `--baseline` rewrites
+  (#550, "Issue #550" below; until then the baseline was raw PCM under
+  `work/missing-audio-baseline/`, written at bb73b35 and never tracked). **K0** scores the
+  digest comparison itself, with no app.
+- **P1** — `play_preview {seconds: 2, await_start: true}` on M1's document: `to − playing_from`
+  ≥ 900 000 ticks, timed from the playhead's first move (#368, in "Hygiene a1" below; until then
+  the row scored `to − from`, which includes the player's start-up).
 
 **The length is scored against control C, not the timeline** (owner, 2026-10-24). C's exports
 end exactly at its 10 180 000-tick timeline (814 400 frames): there is no shortfall, as the #337
@@ -23597,8 +23921,8 @@ section below measured. Each row reports its excess against its own document's t
 from `get_project` as the end of its last clip (#366), not scored.
 
 ```sh
-make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/missing_audio_proof.py --baseline   # at bb73b35 only
-make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/missing_audio_proof.py --only X0,M1,M2,M3,M4,R1,R2,R3,R4,V0,K1,K2,P1
+make app && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/missing_audio_proof.py --baseline   # rewrites the tracked missing_audio_baseline.json: only when the controls are meant to change
+make app-debug && env -u RC_ASSEMBLYAI_KEY python3 tools/proof/missing_audio_proof.py --only X0,M1,M2,M3,M4,R1,R2,R3,R4,V0,K0,K1,K2,P1
 make gate && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/missing_audio_proof.py
 ```
 
@@ -23793,8 +24117,9 @@ uses. A pure refactor: no pixel, sentence, undo name or result key moves.
   them (so no `viewDidAppear` starts a job) — Export (`prores_4444` over a one-clip project),
   Reverse (one job), Consolidate (an empty plan), Transcribe after `showProgress()`,
   AudioSync (an empty input), Rewrap (its own panel's content view) — puts each in an
-  offscreen borderless window sized to fit, and captures it with `UISnapshot.pass` (PNG)
-  and `UISnapshotLayout.report(root:skipping: nil)` (JSON).
+  offscreen borderless window sized to fit, and captures it through `cacheDisplay`, as
+  `UISnapshot.pass` does at the window's scale (PNG), and
+  `UISnapshotLayout.report(root:skipping: nil)` (JSON).
   - **B0** both builds succeed (a build failure is a scored FAIL, never an exit).
   - **C0** (CONTROL) each run produced all six captures, and the Export sheet's light and
     dark PNGs differ, in both builds.
@@ -24442,7 +24767,7 @@ that waits for it, and disk in `cache/ramp-audio/`. Before (a) ships, the cache-
 should be fixed or understood (fixed by #367). It blocked this very render queue, so under (a) every constant
 ×N clip would also go silent behind it.
 
-## Issue #367 — many cache passes in flight (`reader_wedge_proof.py` B0, L1–L4, C1, F0, P1, W1, W2, S0, D0; `cache_lane_probe.swift`; mutants `wide`, `lifo`, `slot-leak`, `inline`, `no-lane`; expected survivors `unbounded`, `app-inline`)
+## Issue #367 — many cache passes in flight (`reader_wedge_proof.py` B0, L1–L5, R0–R2, C1, F0, P1, W1, W2, S0, D0; `cache_lane_probe.swift`; mutants `wide`, `lifo`, `slot-leak`, `inline`, `probe-inline`, `thumbs-inline`, `pool-blind`, `no-lane`; expected survivors `unbounded`, `app-inline`)
 
 Twenty imports of long files that nobody waited for wedged every `AVAssetReader` in the process
 (#334's spike found it: "The cache-pass wedge" above). The cache lane (`MediaImporter.CacheLane`,
@@ -24452,9 +24777,19 @@ cooperative pool. The proof has one owned instance on its own socket, stopped by
 menu item and no `UserDefaults` write. The work folder is `tools/proof/work/reader-wedge/`, and
 the long fixtures are #334's (`constant_render_spike.make_long`).
 
+Issue #369 audited every other `AVAssetReader` user against the same rule (spec §11 #367's
+"Audited app-wide (#369)"): three reads a task reached now run on `MediaImporter.readQueue`
+through `MediaImporter.offPool`, and `ReaderPool.swift` is the witness the R rows read. Their
+two fixtures are built once into `tools/proof/work/reader-wedge/fixtures/` by
+`hevc_videotoolbox` Main 10 (`hdr_proof.hevc10`'s recipe, 320×180 2 s `testsrc2`): `pq.mov`
+(bt2020/smpte2084/bt2020nc, no audio, no HDR10 metadata) and `hlg441.mov`
+(bt2020/arib-std-b67/bt2020nc, a 440 Hz 44.1 kHz AAC sine). They go to the probe as `--pq` and
+`--hlg` on every probe run, plain and mutant; one that cannot be made leaves its row not
+performed (exit 2).
+
 ```sh
-python3 tools/proof/reader_wedge_proof.py --groups probe                     # B0, L1–L4, C1; exit 0
-for m in wide lifo slot-leak inline; do python3 tools/proof/reader_wedge_proof.py --groups probe --mutant $m; done   # each exit 1
+python3 tools/proof/reader_wedge_proof.py --groups probe                     # B0, L1–L5, R0–R2, C1; exit 0
+for m in wide lifo slot-leak inline probe-inline thumbs-inline pool-blind; do python3 tools/proof/reader_wedge_proof.py --groups probe --mutant $m; done   # each exit 1
 make gate
 env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/reader_wedge_proof.py                            # exit 0
 env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/reader_wedge_proof.py --groups app --mutant no-lane     # exit 1
@@ -24472,6 +24807,16 @@ env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/constant_rende
   - **L3**: L1's 40 bodies all finish within 10 s.
   - **L4**: a body through `MediaImporter.onCacheLane` from a `Task.detached` runs on the queue
     labelled `CacheLane.label`.
+  - **L5** (#369): a body through `MediaImporter.offPool` from a `Task.detached` runs on the
+    queue labelled `MediaImporter.readQueueLabel`.
+  - **R0** (#369, the control): `ReaderPool.note` from a `Task.detached` reads as on the
+    cooperative pool, and from a private serial GCD queue as off it.
+  - **R1** (#369): `MediaImporter.waitForProbe` of `pq.mov` answers `color.pq`, and
+    `DecoderSupport.decodesFirstFrame` and `MediaImporter.firstSample` were both noted, neither
+    on the pool.
+  - **R2** (#369): `MediaImporter.thumbnails` of a fresh UUID-named copy of `hlg441.mov`
+    (`AudioRateCopy`'s key is path, size and modification second), awaited in a
+    `Task.detached` with no stamp, noted `AudioRateCopy.write`, and no note was on the pool.
   - **C1** (reported, plain runs only): 30 s of `long-sine` read on a GCD queue alone, then again
     while one blocking `Task.detached` per core holds the cooperative pool (bound 15 s), then
     after the tasks are released. It answers whether a GCD-queue reader stalls while the pool is
@@ -24501,7 +24846,9 @@ found 34 of 60 markers in its 180 s. App mutants are built as Release copies.
 **Mutants.** The lane has two guards, each enough alone on this host (spec §11 #367): guard 1 runs
 the decodes off the cooperative pool, and guard 2 runs at most two at once. The scored set is
 the probe's `wide` (width 64; L1, guard 2), `lifo` (L2), `slot-leak` (L3) and `inline` (the body
-run on the submitting thread; L4, guard 1), and the app's `no-lane` (the three `onCacheLane` call
+run on the submitting thread; L4, guard 1), #369's `probe-inline` (`probeAsset`'s hop back to
+the two direct calls; R1), `thumbs-inline` (`thumbnails`' hop back to a direct `thumbnailReader`;
+R2) and `pool-blind` (`ReaderPool.isCooperative` answers false; R0), and the app's `no-lane` (the three `onCacheLane` call
 sites back to direct calls, which takes away both guards; W1). Two app mutants take away one
 guard each. They survive by design, and are recorded here, not scored
 (`EXPECTED_SURVIVORS`): `unbounded` (width 64, still off the pool) and `app-inline` (width 2, the
@@ -24521,6 +24868,9 @@ the cause is the cooperative pool, not the number of readers.
 | Release, `--groups app --mutant app-inline` | survived as expected, exit 0: W1 1.37 s. A sample of the same build after P1, with all 20 passes in flight: 4 cooperative threads, 2 of them in `copyNextSampleBuffer` (the lane's width), and W1 1.28 s |
 | **Release, plain (recorded)** | exit 0 in 55 s: B0, L1 (peak 2), L2 (offset 0), L3 (3.327 s), L4 ok; C1 alone 0.11 s, with 12 of 12 cooperative threads held STALLED (no finish in 15 s), finished 15.03 s from its start after the release; F0, P1 (3.3 s), W1 (1.37 s), W2 (60 of 60, 4.7 s), D0 ok |
 | **Release, `constant_render_spike.py --runs 1 --groups app --no-settle` (recorded)** | exit 0 in 24 s: all 8 A rows landed, 0.53–4.07 s |
+| #369 (2026-11-09), `--groups probe` | exit 0 in 69 s: L5 on `com.kgalligan.framejob.import-reads`; R0 task `com.apple.root.default-qos.cooperative` (pool true), serial queue (pool false); R1 `color.pq` present, `firstSample` and `decodesFirstFrame` on `import-reads`; R2 `AudioRateCopy.write` on `import-reads` |
+| #369, `--groups probe --mutant probe-inline` / `thumbs-inline` / `pool-blind` | each caught, exit 1: R1 both sites on `com.apple.root.user-initiated-qos.cooperative`; R2 `AudioRateCopy.write` on `com.apple.root.default-qos.cooperative`; R0 the task's note read pool false |
+| **#369, Release, plain (recorded)** | exit 0 in 82 s: B0, L1 (peak 2), L2 (offset 0), L3 (3.117 s), L4, L5, R0, R1, R2 ok; C1 alone 0.01 s, STALLED while held, 15.02 s after the release; F0, P1 (3.7 s), W1 (1.25 s), W2 (60 of 60, 9.9 s), D0 ok |
 
 **The host.** A Mac14,6 (12 cores) with macOS 26.5.1 (25F80), on AC power; the cooperative pool
 there is 12 threads. The Release runs' app came from this change's passing `make gate`.
@@ -25116,6 +25466,555 @@ Exit 0 means caught, 1 survived, and 2 the control could not be performed.
 - The variant tables that chose B4a and B4b (round 1: h264, hevc and ProRes, static and moving,
   at 8 and 16 Mbit/s; round 2: `hevc_10bit`, and spans of ±1 and ±1.5) come from the throwaway
   `work/raster-dither/b4_variants.py`. PR-13 quotes them.
+
+## Issue #374 — graphics drawn deeper than 8 bits (`raster_dither_proof.py` E1, D1–D7; `graphic/tests/deep.rs`; `graphics_ffi_probe.py` P10–P13; fifteen mutants; spec §11 PR-15)
+
+**What it proves.** A frame that leaves Frame Job deeper than 8 bits draws its graphics from a
+16-bit raster with no dither, so a gradient keeps its levels; every 8-bit frame keeps PR-13's
+dithered bytes.
+
+**The base.** E1, D3 and D4 are scored against `--base DIR`: a `capture` made by the app as it
+was before PR-15. Any build of an earlier commit does, named by `RC_PROOF_APP` (a `.app` outside a
+`build/Build/Products` folder is not checked for staleness):
+
+    RC_PROOF_APP=/path/to/the/earlier/Frame\ Job\ Debug.app python3 tools/proof/raster_dither_proof.py capture tools/proof/work/raster-dither-base
+    RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py --base tools/proof/work/raster-dither-base --only E1,D1,D3,D4,D5,D6,D7,Z1
+    python3 tools/proof/raster_dither_proof.py --mutant NAME                 # a crate mutant, cargo only
+    python3 tools/proof/raster_dither_proof.py --app-mutant NAME --base DIR  # the tree copied, Debug built, the named rows run
+
+B1–B4b still need `--control`, a capture of the tree before PR-13; none was made for PR-15, whose
+8-bit claim is E1's equality with the base instead.
+
+**Rows.** The script's module doc has each rule. E1: the 8-bit sheets and frames decode equal to
+the base's. D1, D5, D7: `render_frame` beside a 16-bit still, beside a 10-bit HEVC clip, and
+beside one over an H.264 clip (PR-14's re-read) is a 16-bit PNG with at least 400 distinct greens
+along #374's row, each within 1/8 level of the exact value. D6: the same in an HLG project,
+without the exact-value rule. D3: a `prores_422` export keeps at most half the base's per-pixel
+noise and error, with banding RMS at most 0.15. D4: a `hevc_10bit` export keeps at most 0.85 of
+the base's noise, with banding at most 0.15.
+
+**Recorded** (Release, 2026-11-10, 8/8): D1, D5 and D7 781 distinct values of 801, worst 0.0606 of
+a level (the base 44 values); D6 737 (the base 56); D3 noise 0.0165 against 0.3306, error 0.1115
+against 0.3460, banding 0.0974 against 0.0943, 2,123,379 bytes against 9,195,715; D4 noise 0.0741
+against 0.1059, banding 0.1213 against 0.1185. `graphics_prefetch_proof.py` 7/7 on the same
+build (its `prores_422` exports, now deep, masked-equal with the prefetch on and off),
+`graphic_memory_proof.py` 13/13, `graphics_proof.py` 51/51.
+
+**Mutants** (each caught). Crate, against `graphic/tests/deep.rs`: `dither-in-deep`, `root-only`,
+`lowp-on-deep`, `no-load-mask`, `plain-collapse`, `door-leaks`, `zero-run-drops`. App:
+`never-deep` (D1, D3, D5, D6), `always-deep` (E1), `hevc10-not-deep` (D4),
+`generator-frame-not-deep` (D5), `reread-not-deep` (D7). Probe: `bytes-uncounted` (P10),
+`frame-form-unread` (P11), `a-site-uncounted` (P13). PR-13's `core-unpatched` is now caught by
+the build failing to name `with_deep_pixmaps`.
+
+**Not measured here.** How a gradient looks on a display (`docs/manual-checks.md` GR-17); the
+AV1 and WebM rows' pixels (P11 holds their depth answer, and they pin their key through the same
+line as ProRes); raster time, which `graphic/tests/deep_bench.rs` prints unscored.
+
+## Issue #563 — a shape's gradient drawn at 16-bit float where its frame is deep (`raster_dither_proof.py` G0–G7, GEa–GEc; seven mutants; spec §11 PR-16)
+
+**What it proves.** First the measurement #563 asked for: what Core Graphics puts in a gradient
+shape's 8-bit texture, and what a deep frame and a `prores_422` file then hold. Then the cure: a
+shape that draws a gradient is drawn at 16-bit float in a frame delivered deeper than 8 bits, and
+every flat shape and every 8-bit delivery keeps its bytes.
+
+**The base.** G3 and GEa–GEc are scored against `--base DIR`, a `capture` made by the app as it
+was before PR-16 (any build of 692e3f5a or of a commit between PR-15 and PR-16). A capture also
+prints #563's verdict from its own ProRes file:
+
+    RC_PROOF_APP=/path/to/the/earlier/Frame\ Job\ Debug.app python3 tools/proof/raster_dither_proof.py capture tools/proof/work/raster-dither-base563
+    RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py --base tools/proof/work/raster-dither-base563 --only E1,D1,D5,D6,D7,G0,G1,G3,G5,G6,G7,GEa,GEb,GEc,Z1
+    python3 tools/proof/raster_dither_proof.py --app-mutant NAME --base tools/proof/work/raster-dither-base563
+
+Against this base D3 and D4 fail by design (the base already holds PR-15's deep graphics, so
+nothing halves), and B1–B4b need PR-13's control as before; E1 is the graphics' 8-bit claim.
+
+**Rows.** Fixture `shape563`: a project with no graphic module, one full-canvas rectangle with a
+linear 0° gradient `#0D1512` → `#2A4F3D`, 24 green levels over row 540's x 0–800. G0 prints the
+8-bit frame's figures (scored only on being an 8-bit PNG). G1, G5, G7: `render_frame` beside a
+16-bit still, beside a 10-bit HEVC clip, and beside one over an H.264 clip is a 16-bit PNG with at
+least 400 distinct greens, each within 1/8 level of the exact ramp. G6: the same in an HLG
+project, without the exact-value rule. G3: a `prores_422` export keeps at most half the base's
+noise and error, banding RMS at most 0.15; G4 prints a `hevc_10bit` export unscored. GEa: the
+8-bit frame equals the base's. GEb: the HLG project's JPEG equals the base's. GEc: a deep frame of
+flat shapes equals the base's.
+
+**Recorded.** The base (Debug at 692e3f5a, 2026-11-11): G0 26 levels, median run 2 px, widest 17,
+not monotonic, 76 of 81 rows differing from row 540, RMS of G − e 0.4066, worst 0.9922, worst
+block bias 0.0273; G1, G5 and G7 FAIL with 26 distinct values, G6 with 35; the ProRes file noise
+0.3786 and error 0.3887, so the verdict printed CURE (PR-15's base graphic: 0.3306 and 0.3460).
+With the cure (Release, 2026-11-11, 15/15 of the rows above): G1, G5 and G7 785 distinct values of
+801, worst 0.0296 of a level; G6 776; G3 noise 0.0000, error 0.1025, banding 0.0897 against
+0.0812, 1,578,575 bytes against 8,603,875; G4 banding 0.1054 against 0.1081, noise 0.0358 against
+0.0437; GEa, GEb, GEc and E1 equal. `precision_proof.py --only P1` 0.902 against 0.914 before.
+
+**Mutants** (each caught): `shape-never-deep` (G1, G3, G5, G6), `shape-always-deep` (GEa),
+`flat-shape-deep` (GEc), `export-not-marked` (G3), `shape-generator-frame-not-deep` (G5),
+`shape-reread-not-marked` (G7), `sdr-version-marked` (GEb). PR-15's `generator-frame-not-deep`
+was re-aimed at its moved line and run again (D5).
+
+**Not measured here.** How the ramp looks on a display (`docs/manual-checks.md` PRC-7); the deep
+pool's size, which nothing over MCP observes; the AV1 and WebM rows' pixels, which mark their key
+through the same line as ProRes. The draw time, an 8-bit movie row and a matte track are the next
+section's.
+
+## Issue #588 — a gradient shape as a matte, in an 8-bit movie, and its draw time (`raster_dither_proof.py` GEd, GM, GMg; `shape_draw_probe.py` T1, T2; three mutants; spec §11 PR-17)
+
+**What it proves.** The three things #563 left unmeasured. GEd: `shape563` exported `h264`, the
+frame at 0.5 s as `rgb24`, decodes equal to the base's, so an 8-bit movie row keeps Core Graphics'
+dithered draw. GM: a white full-canvas card under `shape563` on a `luma` matte track, exported
+`prores_422`; the picture's green is the matte's coverage, and its banding RMS is at most 0.15
+with the row-540 block means strictly increasing. The coverage is 8-bit and not dithered, so a
+float ramp rounded there bands; PR-17 keeps a matte member's 8-bit dithered draw. GMg, printed
+with GM and not scored, is the same project with the `band374` graphic as the matte, which PR-17
+does not cure. GEd fails without `--base`; GM's rule is absolute and prints the base's figures.
+
+    RC_PROOF_APP=/path/to/the/earlier/Frame\ Job\ Debug.app python3 tools/proof/raster_dither_proof.py capture tools/proof/work/raster-dither-base588
+    RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py --base tools/proof/work/raster-dither-base588 --only E1,D1,D5,D6,D7,G0,G1,G3,G5,G6,G7,GEa,GEb,GEc,GEd,GM,Z1
+    python3 tools/proof/raster_dither_proof.py --app-mutant matte-shape-deep --base tools/proof/work/raster-dither-base588
+    python3 tools/proof/shape_draw_probe.py [--mutant deep-call-eight]
+
+The base is a `capture` by the app before PR-16, made with THIS script so it holds the new rows'
+files (`tree_copy.make_base_copy(dest, "e929b761^")`, then `make app-debug` there).
+
+**The probe.** `shape_draw_probe.py` builds `shape_draw_probe.swift` over `app/Sources` and times
+`LayerRenderers.shape(_:hash:deep:)` as a cache miss (the Core Graphics draw plus the upload;
+`renderShape` is private) at 1920×1080 and 3840×2160: two warm-up pairs, then fifteen pairs of one
+8-bit and one float call, alternating order, the pools purged after each pair. T1: it builds and
+answers. T2: every call answered a texture of the asked size, `bgra8Unorm` at 8 bits and
+`rgba16Float` deep. The medians, their ratio and the load average are printed and never scored,
+and the probe is not in `make test`.
+
+**Recorded** (2026-11-11). The tree as PR-16 left it (Debug): GM FAILS at banding RMS 0.2770, 22
+levels at median run 38 px, noise 0.0000. With PR-17 (Release, 17/17 of the rows above; Debug gave the same figures): GM 0.0921, 23 levels at median
+run 1 px, noise 0.4411, 8,918,275 bytes, the base's figures exactly; GEd equal to the base's;
+GMg 0.3398 at median run 21 px on both. The probe, three runs under load average 23 to 24: ratio
+float/8-bit 1.21, 1.16, 1.21 at 1080p (8-bit median 6.49 to 6.58 ms) and 1.20, 1.19, 1.21 at 4K
+(25.89 to 26.51 ms).
+
+**Mutants** (each caught): `matte-shape-deep` (GM, 0.2770), `export-always-marked` (GEd: worst
+|Δ| 4 levels, mean 0.69), and the probe's `deep-call-eight` (T2). PR-16's `shape-never-deep` and
+`shape-always-deep`, anchored on the line after PR-17's condition, were run again (G1, G3, G5, G6;
+GEa).
+
+**Not measured here.** The draw alone, apart from the upload; a graphic or a 10-bit clip as a
+matte beyond GMg's printed figures; `hevc`, `hevc_alpha` and the 8-bit WebM rows, which mark
+through the line GEd holds.
+
+**Since PR-19** (#597): `matte-shape-deep` went with PR-17's condition, which PR-19 withdrew. GM's
+rule stands, and PR-19's `coverage-never-deep` fails it.
+
+## Issue #596 — a graphic as a matte in a deep export (`raster_dither_proof.py` GMg; `matte_proof.py` F1; three mutants; spec §11 PR-18)
+
+**What it proves.** GMg, printed since #588 and scored since #596: a white full-canvas card under
+the `band374` graphic on a `luma` matte track, exported `prores_422`, the frame at 0.5 s as
+`rgb48le`; the picture's green is the coverage, whose exact value is the radial gradient's
+Rec. 709 luma. GM's rule: banding RMS at most 0.15 and the row-540 block means strictly
+increasing. PR-18 draws a matte member's graphic as PR-13's dithered 8-bit raster in every frame,
+so the 8-bit coverage does not band. `matte_proof.py` F1 (a graphic window on a matte track over
+a card, `prores_422`) is the row that sees the prefetch's worker ask for the slot the compositor
+asks for: hits > 0, mismatched 0.
+
+    tools/proof/work/raster-dither-base596-tree: tree_copy.make_base_copy(dest, "d530de3a^"), then make app-debug there
+    RC_PROOF_APP=<that tree's Frame Job Debug.app> python3 tools/proof/raster_dither_proof.py capture tools/proof/work/raster-dither-base596
+    RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py --base tools/proof/work/raster-dither-base596 --only E1,D1,D3,D4,D5,D6,D7,G0,G1,G3,G5,G6,G7,GEa,GEb,GEc,GEd,GM,GMg,Z1
+    RC_PROOF_APP=release python3 tools/proof/matte_proof.py --only F1,Z1
+    python3 tools/proof/raster_dither_proof.py --app-mutant matte-graphic-deep|matte-graphic-call-deep --base tools/proof/work/raster-dither-base596
+    python3 tools/proof/matte_proof.py --only F1,Z1 --mutant matte-graphic-prefetch-deep
+
+The base is the app before PR-15's app change, which draws every graphic as PR-13's dithered
+raster, so its GMg is the cure's figure, measured before any code; it predates PR-16 too, so it
+serves E1, D3, D4, G3 and GEa–GEd.
+
+**Recorded** (2026-11-11). The base (Debug at d530de3a^): GMg banding RMS 0.1043, 38 levels at
+median run 2 px, noise kept 0.3964, 8,836,195 bytes, under the bound, measured before any code.
+The tree as PR-17 left it (Release, GMg scored, the app unchanged): GMg FAILS at 0.3398, 37
+levels at median run 21 px, noise 0.0437, 3,045,927 bytes. With PR-18 (Release, 20/20 of the
+rows above; Debug gave the same GM and GMg figures): GMg 0.1043, 38 levels at median run 2 px,
+noise 0.3964, the same 8,836,195 bytes, the base's figures exactly; GM 0.0921 as before; E1 and
+GEa–GEd equal to the base's; D1, D5, D7 781 distinct greens, worst 0.0606 of a level from `e`.
+`matte_proof.py` F1 (Release): 1 hit, 0 mismatched, 0 missed. `graphics_proof.py` 51/51,
+`graphics_prefetch_proof.py` 7/7 and `graphic_memory_proof.py` 13/13 (Release), `graphics_ffi_probe.py`
+13/13 (P12, P13). `graphics_pin_probe.swift` (`graphics_proof.py` Q1–Q5) now passes
+`matteMember: false` to `LayerRenderers.graphic`, whose parameter has no default.
+
+**Mutants** (each caught, Debug tree copies): `matte-graphic-deep` (the rule answers the key's
+depth) and `matte-graphic-call-deep` (the compositor reads no member) fail GMg at 0.3398;
+`matte_proof.py`'s `matte-graphic-prefetch-deep` (the worker reads no member, so its slot is deep
+and the compositor's 8-bit) fails F1 at 0 hits, 1 missed. PR-15's `never-deep` (D1, D3, D5, D6) and
+`always-deep` (E1), anchored beside the new method, were run again and caught.
+
+**Not measured here.** A graphic on a matte track and on the canvas in one frame (two slots,
+which the slot's `deep` member keeps apart; nothing over MCP reads the slots); a deep frame
+(`render_frame`) of a graphic matte, which takes the same call; a graphic CUT by a matte, which
+D1–D7's rule covers only without a matte.
+
+**Since PR-19** (#597): the three mutants went with PR-18's rule, which PR-19 withdrew. GMg's rule
+and F1 stand, and PR-19's `coverage-never-deep` fails GMg.
+
+## Issue #597 — a matte's coverage in a deep frame (`raster_dither_proof.py` GMc, GMs, GMe, GMf; `matte_pool_probe.py` P4; four mutants; spec §11 PR-19)
+
+**What it proves.** A matte's coverage is 16 bits where its frame is delivered deep, and 8 bits
+everywhere else. GMc: a white full-canvas card under `precision_proof.py`'s 10-bit ProRes 422 HQ
+ramp (`ramp_clip()`, grey, every 10-bit code across 1920 px) on a `luma` matte track, canvas
+background black, exported `prores_422`, the frame at 0.5 s as `rgb48le`; GMs: the same with
+`ramp16.png` (`still16_png()`). Each is scored against its control, the same source placed plainly
+and exported the same way (GMc0, GMs0): banding RMS at most `MATTE_BOUND` (0.15), the row-540
+block means strictly increasing, and row 540 holding at least half the control's distinct 16-bit
+greens. GMe: a 60 % grey card under the ramp clip, exported `h264`, decodes equal to the base's (an
+8-bit row keeps the 8-bit coverage; a white card would hide the difference). GMf: a `render_frame`
+PNG of GMc's project, which the generator answers deep with its key unmarked, against the clip's
+own frame (GMf0), by GMc's banding and distinct-green rules. `matte_pool_probe.py` P4: a depth
+change empties the pool's coverages and keeps its composites, and the next coverage is of the new
+depth's format; it prints one 3840×2160 coverage's `allocatedSize` at each depth. The fixtures
+come from `precision_proof.py` (imported), under `tools/proof/work/precision/media/`.
+
+    RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py capture tools/proof/work/raster-dither-pr19-before --only GM,GMg,GMc,GMs,GMe,GMf,Z1   # the measurement, on the app before PR-19
+    RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py --base tools/proof/work/raster-dither-base596
+    python3 tools/proof/raster_dither_proof.py --app-mutant coverage-never-deep|coverage-always-deep|frame-matte-not-reread --base tools/proof/work/raster-dither-base596
+    python3 tools/proof/matte_pool_probe.py [--mutant depth-kept]
+
+The base is #596's (the app at d530de3a^), captured with this script so it holds the new rows'
+files; GMe's file there decodes equal to the app's at b86b605e, the tree before PR-19.
+
+**Measured first** (Release at b86b605e, the app before PR-19; row 540, x 0–800): GMc banding RMS
+0.3431 against GMc0's 0.1126, 206 distinct 16-bit greens against 360; GMs 0.3369 against GMs0's
+0.0939, 215 against 366; GMf 0.2930 against GMf0's 0.0765, 107 against 689. The coverage rounds
+the ramp to 8-bit levels: it bands, which decided PR-19. The app at d530de3a^ (Debug) read the
+same figures.
+
+**Recorded** (Release after the gate's `make app`, `--base` as above; Debug gave the same
+figures): GMc 0.1126 with 360 distinct greens, GMs 0.0939 with 366 and GMf 0.0765 with 689, each
+its control's exactly; GMe equal to the base's; GM 0.0839, noise kept 0.0000, 1,350,095 bytes
+(0.0921, 0.4411 and 8,918,275 bytes with PR-17's dithered member), and GMg 0.0836, noise 0.0249,
+1,712,975 bytes (0.1043, 0.3964 and 8,836,195 bytes with PR-18's); E1, S1, D1–D7, G0–G7 and
+GEa–GEd pass as before, 25 rows; B1–B4b, F1 and F2 need PR-13's `--control`, which was not made.
+`matte_proof.py` 46/46, `hdr_proof.py --only HM,LM,Z1` 3/3, `graphics_proof.py` 51/51,
+`graphics_prefetch_proof.py` 7/7 (Release); `matte_pool_probe.py` 5/5, one 3840×2160 coverage
+allocated at 8,880,128 bytes `r8Unorm` and 17,235,968 bytes `r16Unorm` (Apple M2 Max).
+
+**Mutants** (each caught, Debug tree copies against the base; the probe's over a copy of one
+file): `coverage-never-deep` (the frame's depth not passed to the pool) fails GMc at 0.3431, GMs
+at 0.3369, GM at 0.2770 and GMg at 0.3398; `coverage-always-deep` fails GMe (worst |Δ| 2 levels,
+mean 0.1703 over rows 500–580); `frame-matte-not-reread` fails GMf at 0.2930 with 107 distinct
+greens; `depth-kept` fails P4 (the deep frame's coverage the old `r8Unorm` one). PR-16's
+`shape-never-deep` (G1, G3, G5, G6) and PR-15's `never-deep` (D1, D3, D5, D6), anchored beside
+lines PR-19 changed, were run again and caught. PR-19 withdrew PR-17's and PR-18's exceptions on
+the measurement of their own mutants on the new coverage, which survived: GM 0.0839 and GMg 0.0836,
+under the bound, with no dither noise.
+
+**Since #600**: `MattePool.beginFrame(width:height:deep:)` has no default, so a call that leaves
+the frame's depth out does not compile; the probe's six shallow frames and
+`cursor_spike/blur_spike.swift` pass `deep: false`, the value the default gave. With the default
+gone and those calls unchanged, `matte_pool_probe.py` scored B0 FAIL, "missing argument for
+parameter 'deep' in call" at the probe's lines 60, 76, 95, 109, 114 and 134, and `swift_build.py
+typecheck --define FRAMEJOB_DEV_TOOLS` of the spike failed with it at line 182. With them passing
+`deep: false`: 5/5, the coverages 8,880,128 and 17,235,968 bytes as above, `depth-kept` still
+fails P4, and the spike typechecks.
+
+## Issue #566 — a graphic is a deep source of a saved frame (`raster_dither_proof.py` DG, DGf, DGv, DGo, DGj, DGs; `png_read.py` R1–R5; four mutants; spec §11 PR-20)
+
+**What it proves.** A `render_frame` or Save Frame… as PNG or HEIC of a frame whose recipe draws
+a graphic is read through export's reader and is deep, beside anything, its graphics from the
+16-bit raster; a JPEG, the APNG and GIF frames and every 8-bit path keep their bytes. DG:
+`band374` alone (B3's project, `b3-frame.png`), D1's rule. DGf: `flat` alone, a 16-bit PNG whose
+one-colour gradient rect holds one value within 1/8 level of (51, 102, 153). DGv: `band374` over a
+256×144 8-bit H.264 clip, D1's rule. DGo: a `band374` clip then a flat shape, 16-bit at 0.5 s and
+8-bit at 1.5 s (the recipe at the frame time). DGj: the JPEG of DG's frame equal to the base's.
+DGs, printed: the PNG's bytes and base64 bytes against the Anthropic API's 5 MB image limit, for
+a 1920×1080 cut of the owner's iPhone clip (`media/owner-sync/IMG_0018.MOV`, "no fixture" without
+it) under a title, beside a 16-bit still, and the clip itself, unscaled and at `max_width` 1280.
+Since PR-20 B3, F2 and E1 read their 8-bit frame through an `apng` export of the in/out range
+0.48–0.56 s at 1920×1080 (`APNG_RANGE`), which `renderFrameReported` draws with `keepsDepth`
+false; E1 compares it with the base's `render_frame` PNG of the same frame.
+
+    tools/proof/work/raster-dither-base566-tree: tree_copy.make_base_copy(dest, "d530de3a^"), then make app-debug there
+    RC_PROOF_APP=<that tree's Frame Job Debug.app> python3 tools/proof/raster_dither_proof.py capture tools/proof/work/raster-dither-base566
+    RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py --base tools/proof/work/raster-dither-base566
+    python3 tools/proof/raster_dither_proof.py --app-mutant graphic-not-a-source|graphic-anywhere|graphic-frame-pin-not-marked --base tools/proof/work/raster-dither-base566
+    python3 tools/proof/png_read.py --selftest [--mutant bpp-channels]
+
+The base is the app before PR-15 (as #596's and #597's), captured with this script so it holds the
+APNG frames and DGj's JPEG; it serves E1, D3, D4, G3, GEa–GEd, GMe and DGj. Its own capture
+scored E1 (its APNG frames against its own 8-bit `render_frame` PNGs) and F2 green.
+
+**`png_read.py`** is the proofs' one 8- and 16-bit PNG reader (pure Python; `rgba8` reads a whole
+frame through ffmpeg with the same round-to-nearest, since ffmpeg's own `rgba` conversion of a
+16-bit PNG is not). Its selftest: R1 every sample of 8- and 16-bit PNGs of colour types 0, 2, 4 and
+6 under each filter decoded as encoded; R2 16-bit samples rounded to the nearest level; R3 `upto`;
+R4 interlaced, palette and 4-bit PNGs refused by name; R5 `rgba8` equal to `rows8`. Its mutant
+`bpp-channels` (the 8-bit reader's filter distance) fails R1, R2 and R5. `graphics_proof.py`'s
+pixels and `decode_rgba` and `cu8_proof.py`'s O5 read through it (`graphic_prop_action_proof.py`
+imports `graphics_proof`'s); the other hand PNG decoders in this folder read harness and
+`snapshot_ui` captures or frames with no graphic, and were left as they are.
+
+**Recorded** (2026-11-11). Before the change (Debug at 3cacf181): DG, DGf, DGv and DGo FAIL as
+8-bit PNGs (DG 1,765,486 bytes, its HEIC 8 bits a sample), DGj and E1 pass. With it (Release;
+Debug read the same figures): DG and DGv 781 distinct greens of 801, worst 0.0606 of a level; DG
+2,372,532 bytes, its HEIC 10 bits; DGf (13104, 26208, 39295), worst 0.1012 of a level; DGo 16-bit
+then 8-bit; DGj and E1 equal to the base's; the whole run 30/37, the other seven (B1–B4b, F1, F2)
+needing PR-13's `--control`, which was not made. DGs: the title over the 8-bit cut 1,743,875 bytes
+at 8 bits before, 4,170,643 bytes at 16 bits after (base64 5,560,860, past 5,242,880), 2,918,745
+at `max_width` 1280; the cut beside a 16-bit still base64 6,744,504 and the iPhone clip 9,328,440
+before and after (4,728,408 and 4,994,044 at 1280). `graphics_proof.py` 51/51,
+`graphic_prop_action_proof.py` 20/20, `matte_proof.py` 46/46, `image_cache_proof.py` 6/6,
+`graphics_files_proof.py` 10/10, `paste_graphic_proof.py` 8/8, `cu8_proof.py` 12/12 (O5 failed
+on every row with ffmpeg's `rgba` reading of the 16-bit frame, and reads 44 differing rows, all in
+the bottom half, through `png_read.rgba8`), `derived_proof.py` 13/13, `docs_bugs_c1_proof.py`
+35/35, `debug_release_proof.py` 10/10, `precision_proof.py --only D1,S8,S10,S14,S15,S16,Z1` 7/7,
+`log_proof.py --only L17,L18,Z1` 2/2, `docs_bugs_b3_proof.py --only D1,…,D8,Z1` 9/9.
+
+**Mutants** (each caught, Debug tree copies against the base): `graphic-not-a-source` fails DG,
+DGf, DGv (8-bit PNGs), D5 and D7 (44 distinct greens, worst 0.8918); `graphic-anywhere` (the arm
+asks `Playback.drawsGraphics` of the project) fails DGo, both frames 16-bit;
+`graphic-frame-pin-not-marked` fails DG, D1 and DGv (the 8-bit dithered raster in a 16-bit
+frame). PR-15's `generator-frame-not-deep` and `reread-not-deep` went with the code PR-20 removed;
+`shape-reread-not-marked`'s anchor lost that code's line. Run again and caught: it (G7),
+`sdr-version-marked` (GEb), `frame-matte-not-reread` (GMf) and `always-deep` (E1, through B3's
+APNG frame).
+
+**Not measured here.** How a deep frame looks (`docs/manual-checks.md` GR-17); what the API does
+with an image past its limit (no paid call is made); a graphic inside a nest or as a matte member
+on a saved frame, which take the same recipe test.
+
+## Issues #605 and #604 — a gradient shape a deep source of a saved frame, and `render_frame`'s image block a copy (`raster_dither_proof.py` G0, GV, GEa, GMr, BK1–BK6, BKk; `phase6_proof.py` 9–13; `matte_proof.py` L1–L3; `precision_proof.py` P1; seven mutants; spec §11 PR-21, PR-22)
+
+**What it proves.** PR-21: a `render_frame` or Save Frame… as PNG or HEIC of a frame whose recipe
+draws a shape with a gradient is read through export's reader and is deep, beside anything, its
+gradient PR-16's 16-bit float ramp; a frame of flat shapes stays 8-bit; every 8-bit door keeps
+Core Graphics' dithered bytes. PR-22: the image block `render_frame` answers is an 8-bit PNG copy
+of a 16-bit PNG and of any HEIC, `full_depth_image: true` puts the file in it, and the file and
+the path are what they were.
+
+**Rows.** G0: `shape563` alone, D1's rule against the shape's `e` (PR-16's measurement until
+PR-21); prints its bytes and G0h, its HEIC's `bitsPerSample`. GV: the same over a 256×144 8-bit
+H.264 clip, D1's rule. GEa: an `apng` export of G0's project (B3's door), its first frame decoded
+equal to the base's same file `gea-apng.png` (G0's own PNG until PR-21), with PR-16's figures of
+it printed. GMr: GMc's project over an 8-bit H.264 clip on a back-most track, GMf's rule: the
+generator answers that frame 8-bit, so PR-14's re-read and its mark are what make the coverage 16
+bits, the one frame left to reach them (G7 is read by the gradient arm first). DGo's flat shape
+at 1.5 s must stay 8-bit. The BK rows read `render_frame`'s whole answer through
+`mcp.MCP.call_content` (`call_with` drops image blocks) and keep each block beside its file
+(`Doc.frame_block`). Their footage is generated, `blk1080`: 1 s of `testsrc2` at 1920×1080 with
+temporal noise 12, 8-bit H.264 at 100 Mbit/s, tuned once on the app before PR-22 so that a 16-bit
+PNG of it is past the API's 5,242,880 base64 bytes and an 8-bit one under (the six settings
+tried are in the script beside `BLOCK_NOISE`). BK1 under `flat`: the file 16-bit and past the
+limit (asserted, so the row cannot pass on an easy picture), the block `image/png`, 8-bit, the
+file's size, within the limit, every sample within 1 level of the file's rounded, the copy
+sentence present and "Written to <path>." still last. BK2: with `full_depth_image: true` the
+block is the file's bytes and no sentence. BK3: the footage alone (8-bit), the block is the file's
+bytes and no sentence. BK4: BK1's frame as HEIC, the file 10 bits a sample, its default block an
+8-bit PNG with the HEIC sentence, and with `full_depth_image: true` `image/heic` and the file's
+bytes. BK5: `full_depth_image: "yes"` refused by name, and `tools/list` publishes it as a
+boolean. BK6 (#611): an HLG project, D6's recipe under its own name (a `band374` clip,
+`set_canvas {output: "hlg"}`, the output read back), BK1's rule without its size premise (a
+graphic's frame is small): the file 16-bit, the block `image/png`, 8-bit, the file's size, every
+sample within 1 level of the file's rounded, the copy sentence and "Written to <path>." last. It
+is the one row whose copy is drawn in BT.2100 HLG. BKk, printed: a 3840×2160 frame of the same
+footage under `flat`, its file's and default block's base64. DGs now prints each frame's default
+block beside its file. An app mutant may name rows it must leave passing (`KEPT_ROWS`): they run
+beside the rows it must fail, and MUTANT PASS needs both.
+
+    tools/proof/work/raster-dither-oldbase/tree: tree_copy.make_base_copy(dest, "d530de3a^"), then make app-debug there
+    RC_PROOF_APP=<that tree's Frame Job Debug.app> python3 tools/proof/raster_dither_proof.py capture tools/proof/work/rd-base-d530de3a-parent
+    RC_PROOF_APP=release python3 tools/proof/raster_dither_proof.py --base tools/proof/work/rd-base-d530de3a-parent
+    python3 tools/proof/raster_dither_proof.py --app-mutant NAME --base tools/proof/work/rd-base-d530de3a-parent
+    python3 tools/proof/raster_dither_proof.py --app-mutant hlg-block-not-copied --base <any folder: the BK rows read none>
+
+**The other proofs whose frames changed.** A frame of a gradient shape is a 16-bit PNG since
+PR-21. `phase6_proof.py`'s `Frame` reads a 16-bit PNG through `png_read.rows8` (to the nearest
+level, `depth` 16), and section 9 compares a one-colour gradient's decoded levels with the flat
+fill's where it compared the files' digests (one is 16-bit, the other 8-bit); before, section 9
+failed its four digest checks and its decoder raised on the 16-bit frame. `matte_proof.py`'s
+`rgba` reads through `png_read.rgba8`: with ffmpeg's own `rgba` conversion of the 16-bit frames
+L2 missed by 1.63 of a level at (223, 180). `precision_proof.py` P1 refused its 16-bit render
+(`png_depth == 8`) and now reads `g` at 16 bits (`green_row`).
+
+**Recorded** (2026-11-11). Before the change (Debug at aa5a1512, and the app at d530de3a^): G0
+and GV 8-bit PNGs, G0 1,830,922 bytes and its HEIC 8 bits; BK1's file 4,804,889 bytes, base64
+6,406,520, and the block that file; BK4's block `image/heic`; BK2, BK4's second half and BK5 the
+gate's "render_frame does not take full_depth_image"; BK3 and GMr passed (BK3's block base64
+3,595,204); BKk the file itself, base64 14,241,128. With it (Release, `--base` the app at
+d530de3a^; Debug read the same figures for the rows it ran): G0 and GV 785 distinct greens of
+801, worst 0.0296 of a level; G0 78,836 bytes (the dithered 8-bit PNG did not compress), its HEIC
+10 bits; GEa equal to the base's (26 levels, median run 2 px, RMS of G − e 0.4066); GMr 689
+distinct greens, banding 0.0765, as GMf; BK1's block 8-bit, base64 2,985,988, worst
+|block − file/257| 1 over 8,294,400 samples; BK2 and BK4's second half the files' bytes (BK4's
+HEIC base64 1,212,088); BK5 "full_depth_image must be true or false."; BKk's block 8-bit, base64
+6,782,656, past the limit. DGs's default blocks against their files, base64: 2,326,800 against
+5,560,860 (the title over the 8-bit cut), 2,806,964 against 6,744,504 (beside a 16-bit still),
+3,210,716 against 9,328,440 (the iPhone clip). The whole run 37/44, the other seven (B1–B4b, F1,
+F2) needing PR-13's `--control`, which was not made; D3, D4, G3 and E1 pass against this base.
+`phase6_proof.py` 168/168, `matte_proof.py` 46/46, `precision_proof.py --only C0,D1,P1` 4/4 (P1
+RMS 0.357 10-bit steps), all on Release.
+
+**Recorded, #611** (2026-11-12, Release; Debug read the same figures). BK6: the canvas read back
+`hlg`; the file a 16-bit PNG of 2,479,136 bytes (base64 3,305,516); the block `image/png`, an
+8-bit PNG of 1920×1080, base64 458,472, worst |block − file/257| 1 over 8,294,400 samples (the
+copy in BT.2100 HLG rounds only, as BK1's in BT.709 does), the copy sentence present and
+"Written to <path>." last. No app code changed, so BK6 is green on the tree before the row too:
+the mutant below is its red. The whole run with no `--base` and no `--control` 28/45: the
+seventeen failing are B1–B4b, F1 and F2 (PR-13's `--control`) and E1, D3, D4, G3, GEa–GEd, GMe
+and DGj (a base capture), neither made; BK1–BK6, D6, G6 and Z1 pass.
+
+**Mutants** (each caught, Debug tree copies against the d530de3a^ base): `gradient-not-a-source`
+(the arm gone) fails G0 and GV (8-bit PNGs) and G5 (26 distinct greens, worst 0.9602: its
+generator path no longer re-reads a gradient); `flat-shape-a-source` (every shape a source) fails
+DGo (both frames 16-bit); `block-is-the-file` fails BK1 (the 16-bit file in the block, base64
+6,406,520) and BK4 (`image/heic`); `full-depth-ignored` fails BK2 and BK4 (the 8-bit copy where
+the file was asked for); `block-always-recoded` (an 8-bit PNG copied too) fails BK3 on the copy
+sentence alone, the re-encoded 8-bit frame being byte-identical to its file; `heic-block-follows-file`
+fails BK4. `shape-generator-frame-not-deep` went with the code PR-21 removed;
+`shape-reread-not-marked` is `reread-not-marked`, on GMr (banding 0.2930 and 107 distinct greens
+under it: the 8-bit coverage); `shape-always-deep` is scored on GEa's door and GEd (both fail).
+Run again where this change moved their anchors or rows, each caught: `graphic-not-a-source` (DG,
+DGf, DGv, D5, D7), `graphic-anywhere` (DGo), `frame-matte-not-reread` (GMf),
+`sdr-version-marked` (GEb). #611 (2026-11-12, Debug tree copies, `--base` an empty folder):
+`hlg-block-not-copied` (`eightBitPNG` refusing a frame labelled BT.2100 HLG) fails BK6, its block
+the 16-bit file (base64 3,305,516) with no copy sentence, while BK1–BK5, its `KEPT_ROWS`, pass
+under it. `block-is-the-file` scored the same way (BK6 to fail, BK1–BK5 kept; in memory, the
+table not edited) is MUTANT FAILURE, BK1 and BK4 broken: the kept rows are what tell a copy
+refused in one space from one refused in all. `heic-block-follows-file`, run again under the
+changed `run_app_mutant`, still fails BK4 alone and prints as before.
+
+**Not measured here.** What the API does with any image (no paid call; `docs/manual-checks.md`
+AS-11 is a person's check with a real key); how a saved gradient looks (PRC-7).
+
+## Issue #610 — `render_frame`'s image block scaled down alone to fit the API's limit (`raster_dither_proof.py` BKk, BKp, BKj; BK1–BK3 its other side; seven mutants; spec §11 PR-23)
+
+**What it proves.** A default image block whose base64 would pass 5,242,880 bytes is drawn
+smaller until it fits, its type kept (a PNG's an 8-bit PNG, a JPEG's a JPEG), with the sentence
+"The image here is scaled down to <w>×<h> px to fit the API's 5 MB image limit; the file is not
+scaled." after the copy's and before "Written to <path>."; the file is untouched; a block that
+fits is the one it was (BK1, BK3); a `full_depth_image` block is never scaled (BK2).
+
+**Rows.** Each 3840×2160 frame asserts its premise first, so the row cannot pass on an easy
+picture: the file 3840×2160 and its base64 over the limit. BKk (printed since #604, scored now):
+`blk2160` under `flat`, the file a 16-bit PNG; the block `image/png`, 8-bit, within the limit,
+narrower than 3840 and shorter than 2160 with |w·2160 − h·3840| ≤ 3840; the copy sentence, then
+the scale sentence naming exactly the block's size, then "Written to <path>." last; and the block
+is the frame: block and file each reduced by ffmpeg to 64×36 `rgb24` (area scaling), mean |Δ| at
+most `THUMB_BOUND` (2.0 levels). BKp: `blk2160` alone, the file an 8-bit PNG, the block BKk's rule
+with the scale sentence and no copy sentence. BKj: a 3840×2160 uniform-noise still
+(`noise2160.png`, `NOISE_STILL`) alone as `format: "jpeg"`, the file's size read by `sips`; the
+block `image/jpeg`, BKp's rule otherwise. Each row prints the text, the sizes, the gap and the
+call's seconds.
+
+    python3 tools/proof/raster_dither_proof.py --only BK1,BK2,BK3,BKk,BKp,BKj,Z1
+    python3 tools/proof/raster_dither_proof.py --app-mutant NAME --base <any folder: the BK rows read none>
+
+**Recorded** (2026-11-12). Before the change (Debug at e0206243): BKk's block the 8-bit copy at
+3840×2160, base64 6,782,656, the file 16-bit, base64 14,241,128; BKp's block the 8-bit file,
+base64 7,031,532 (5,273,648 bytes); BKj's block the JPEG file, base64 12,441,372 (9,331,028
+bytes); none with a scale sentence, so all three FAILED, while BK1, BK2, BK3 and Z1 passed. With
+it (Release; Debug read the same bytes and sizes, 10/10 with BK1–BK6 and Z1): BKk's block
+3038×1709, base64 4,469,860, 64×36 gap 0.324, 1.99 s (Debug 6.73 s); BKp's 2984×1679, base64
+4,456,620, gap 0.027, 0.67 s; BKj's `image/jpeg` 2243×1262, base64 3,242,680, gap 0.213, 0.59 s;
+each the first attempt (⌊3840 · 0.9·√(3,932,160 / b)⌋ from the unscaled block's b); BK1–BK6 as
+they were (BK1's block base64 2,985,988, BK2's the file, 6,406,520). The whole run on Release with
+no `--base` and no `--control` 31/48: the seventeen failing are B1–B4b, F1 and F2 (PR-13's
+`--control`) and E1, D3, D4, G3, GEa–GEd, GMe and DGj (a base capture), as in #611's run.
+
+**Mutants** (2026-11-12, Debug tree copies, `--base` an empty folder, each caught):
+`block-not-bounded` (the size test always fits) fails BKk, BKp and BKj, each block over the limit
+at 3840×2160; `block-always-scaled` (the entry test dropped) fails BK1 (its copy 1728×972) and BK3
+(its block not the file); `full-depth-scaled` fails BK2 (an 8-bit PNG in place of the file);
+`limit-counts-raw-bytes` fails BKk alone, by design: its unscaled block is 5,086,992 raw bytes,
+under 5,242,880, and 6,782,656 as base64, so the mutant leaves it unscaled, while BKp's (5,273,648
+raw) and BKj's are past both and are scaled under it; `scale-sentence-dropped` fails BKk, BKp and
+BKj; `scaled-jpeg-as-png` fails BKj (`image/png`, 1319×742); `aspect-not-kept` fails BKk
+(2668×2160) and BKp (2600×2160). Run again because the change moved the function their anchors are
+in: `block-is-the-file` fails BK1 (the 16-bit file scaled to 1563×879, no copy sentence) and BK4
+(`image/heic`); `hlg-block-not-copied` fails BK6 with BK1–BK5 passing.
+
+## Issue #612 — `render_frame`'s description names the API's limits on an image's sides, and `max_width` as the caller's control (`raster_dither_proof.py` BKd; spec §11 PR-24)
+
+**What it proves.** The owner chose no cap on the image block's sides, on the condition that the
+description says what the API does with a large image. `tools/list` publishes that: the
+description names the API's limits (refused past 8000 px a side; a stricter limit past 20 images
+in a request, which 3000 px a side stays under; downscaled past 2576 px on the long edge by the
+newest models; 10 MB of base64 on the Anthropic API, 5 MB on Amazon Bedrock) in sentences of its
+own, apart from PR-23's scale-down sentence, and that max_width is the caller's control;
+`max_width`'s description names the three side limits and that the height follows, with its
+schema still 16…8192; and the 5 MB is no longer called the Anthropic API's.
+
+**Row.** BKd needs no media and renders nothing: it reads `render_frame` from the `tools/list`
+BK5 already reads, and holds the description to `SIDES_SAID`, `max_width`'s to `WIDTH_SAID` and
+its `minimum`/`maximum` to 16 and 8192, and all three descriptions (with `full_depth_image`'s)
+to not holding `OLD_ATTRIBUTION`. It prints the three texts. The base tree is its mutant: the
+descriptions before the change.
+
+    python3 tools/proof/raster_dither_proof.py --only BKd,BK5,Z1
+
+**Recorded** (2026-11-12). Before the change (Debug at d0df3607): the description missing all
+seven `SIDES_SAID` phrases, `max_width`'s all four `WIDTH_SAID` phrases, "Anthropic API's 5 MB" in
+the description and `full_depth_image`'s, the bounds (16, 8192): BKd FAILED, Z1 passed (1/2).
+With it, Debug and then Release (after the gate's `make app`): nothing missing, the attribution
+in none of the three, the bounds (16, 8192); BK5, BKd and Z1 passed (3/3 each), and the texts
+read back are the ones in `AgentCatalog+Render.swift`.
+
+## Issue #618 — `render_frame`'s image block never scaled: PR-23's scale to fit taken out (`raster_dither_proof.py` BKk, BKp, BKj, BKd; `assistant_prompt_proof.py --probe` F9, M7; three mutants; spec §11 PR-25)
+
+**What it proves.** The owner took PR-23's automatic downscale back out ("Take it out"): the image
+block is PR-22's again, at the file's size (`max_width`'s or the canvas's), whatever its size in
+bytes, and the answer holds no scale sentence. The texts say one thing: the limits are the API's
+(5 MB of base64 on Amazon Bedrock, 10 MB on the Anthropic API, PR-24's side limits), Frame Job
+doesn't scale or cap the image to meet them, and `max_width` is the caller's control. The
+assistant's prompt, which is now what keeps its images under, asks for `max_width` and says Frame
+Job never scales the image.
+
+**Rows.** #610's three 3840×2160 frames keep their names, fixtures and premise (the file
+3840×2160, its base64 over 5,242,880) and now hold the block NOT scaled (`unscaled_row`): BKk
+(`blk2160` under `flat`) the block an 8-bit PNG of exactly 3840×2160, its base64 over 5,242,880,
+the frame (64×36 gap ≤ `THUMB_BOUND`), the copy sentence directly before "Written to <path>.";
+BKp (`blk2160` alone) the block the file's bytes, `image/png`, 3840×2160, over 5,242,880, no copy
+sentence; BKj (`noise2160.png` as `format: "jpeg"`) the block the file's bytes, `image/jpeg`,
+3840×2160, over `API_DIRECT_LIMIT` (10,485,760) too; none of the three answers holds "scaled
+down", and each still ends "Written to <path>.". BKd adds "on its bytes or its sides" to
+`SIDES_SAID`, 5 MB and 10 MB to `WIDTH_SAID`, and `SCALE_GONE` ("scaled down", "never scaled"),
+absent from the description, `max_width`'s and `full_depth_image`'s. The prompt probe's F9 holds
+the system prompt's `render_frame` paragraph to `max_width` and "never scales", and `render_frame`
+to publishing `max_width`; M7 replaces "never scales" and F9 must fail.
+
+    python3 tools/proof/raster_dither_proof.py --only BK1,BK2,BK3,BK4,BK5,BK6,BKk,BKp,BKj,BKd,Z1
+    python3 tools/proof/raster_dither_proof.py --app-mutant NAME --base <an empty folder: the BK rows read none>
+    python3 tools/proof/assistant_prompt_proof.py --probe
+
+**Recorded** (2026-11-12). Before the change (Debug at e7e525e8, the spec and the proof
+edited, `app/Sources` untouched; `--only BK1,BK2,BK3,BKk,BKp,BKj,BKd,Z1`, 4/8): BKk's block
+3038×1709, base64 4,469,860, BKp's 2984×1679, 4,456,620, BKj's `image/jpeg` 2243×1262,
+3,242,680, each with the scale sentence, so all three FAILED; BKd FAILED on "on its bytes or its
+sides" missing, 5 MB and 10 MB missing from `max_width`'s, "scaled down" in the description and
+"never scaled" in it and in `full_depth_image`'s; BK1, BK2, BK3 and Z1 passed. The prompt probe
+on HEAD's prompt (the edited one put back after): F9 FAILED ("never scales" not in the 593
+characters of the paragraph), 15/16, M7 caught. With it (Debug, 11/11 with BK1–BK6 and Z1):
+BKk's block an 8-bit PNG of 3840×2160, base64 6,782,656 beside the 16-bit file's 14,241,128,
+64×36 gap 0.269, the copy sentence then "Written to <path>.", 1.25 s; BKp's the file's bytes,
+base64 7,031,532, 0.32 s; BKj's the JPEG file's bytes, base64 12,441,372 (over 10,485,760 too),
+0.39 s; no "scaled down" in any; BKd nothing missing and no scale words; BK1's block 2,985,988 and
+BK2's the file, 6,406,520, as before. The prompt probe 16/16 (F9 on a 735-character paragraph,
+the system prompt 3856 of 6000). On Release (after the gate's `make app`), the whole run with
+no `--base` and no `--control` 32/49: BKk, BKp, BKj and BKd passed with the Debug figures (BKk
+1.26 s, BKp 0.32 s, BKj 0.43 s), BK1–BK6 and Z1 passed, and the seventeen failing are B1–B4b, F1
+and F2 (PR-13's `--control`) and E1, D3, D4, G3, GEa–GEd, GMe and DGj (a base capture), as in
+#610's run, which scored 31/48 before #612 added BKd.
+
+**Mutants** (2026-11-12, Debug tree copies, `--base` an empty folder). Each caught.
+`block-scaled-to-fit` (a `block` wrapping the real one draws a default block whose base64 would
+pass 5,242,880 at half its sides) fails
+BKk, BKp and BKj on the block alone (1920×1080: base64 1,863,992, 1,918,056 and an `image/jpeg`
+of 2,242,376; their sentences pass), with BK1, BK2 and BK3 passing beside them;
+`scale-sentence-said` (the answer saying "The image here is scaled down to fit." for a block
+over 5,242,880) fails BKk, BKp and BKj on the sentence alone (each block 3840×2160 and the bytes
+above), with BK1 and BK3 passing; `description-says-scaled` (the scale-down sentence back in
+the description) fails BKd ("scaled down" in `render_frame`'s), with BK5 passing. Run again,
+because the function their anchors are in was renamed: `block-is-the-file` fails BK1 (the
+16-bit file, base64 6,406,520, no copy sentence) and BK4 (`image/heic`); `full-depth-ignored`
+fails BK2 (an 8-bit PNG, base64 2,985,988) and BK4; `hlg-block-not-copied` fails BK6 (the
+16-bit file, base64 3,305,516) with BK1–BK5 passing. `block-always-recoded` and
+`heic-block-follows-file` (anchors in `copies`, untouched) were not rebuilt: `mutant_anchors.py`
+counts every `APP_MUTANTS` anchor exactly once (26 mutants, 27 anchors). PR-23's seven went
+with the code.
 
 ## Codec export C0 — the bundled encoders' link (`codecs_proof.py` L1–L3; `tools/codecs/build_codecs.py --selftest`; spec §11 CX-4, CX-5)
 
@@ -25843,8 +26742,10 @@ tone at 44.1 kHz with ffmpeg's 48 kHz copies, and a −85 dBFS tone.
 | C10 | `ClipLoudness.Memo` on a probe document: pending, still pending after the cache lands (held), the reading after `invalidate()` |
 | C11 | through `beginLiveEdit` / `updateLiveEdit` (volume, pan) the held reading with no file read and no recompute; after `endLiveEdit` one recompute, still no file read |
 | C12 | (AP6, AU-63) the high band: an 8 kHz tone's `h` within 0.05 dB of its mean square times the 6 kHz high-pass's \|H(8 kHz)\|²; a 1 kHz tone's `h` at least 60 dB under its `z` |
+| C13 | (#406, AU-15) Normalize's mode changed through one window's Mode popup re-titles another window's Normalize button to the new tip, with no rebuild |
+| C14 | (#595, AU-164) 3 s of seeded noise — stereo at 48 kHz, its left channel, mono at 44.1 kHz — fed to `LoudnessBlocks` whole, a block at a time, in 4,096 and 1,024 frames and unevenly (`1, 479, 481, 1000, 37, 4096, 263`): each feeding's `data` the whole feeding's bytes; a block at a time, `blockSums` the whole's bits; and the product's stereo cache from C1 (the reader's own buffers) the bytes of the same PCM fed in one buffer. Per feeding the detail prints how many Float values and how many Double sums differ, with the first of each at `%.17g`; the Double counts are printed, not scored |
 
-`--mutants` runs eight (seven, and AP6's `M7-high-unfiltered`), each one replacement in a copied `app/Sources` (its
+`--mutants` runs ten (seven, AP6's `M7-high-unfiltered`, #406's `normalize-tip-unobserved` and #595's `weighting-state-per-buffer`), each one replacement in a copied `app/Sources` (its
 anchor asserted once), and scores each killed when its named row fails:
 
 | Mutant | Edit | Must fail |
@@ -25857,6 +26758,8 @@ anchor asserted once), and scores each killed when its named row fails:
 | `tables-at-44k` | Tables 1 and 2 used at every rate | C6 |
 | `version-unchecked` | the marker's version not checked | C9 |
 | `M7-high-unfiltered` | (AP6) the high band read unfiltered | C12 |
+| `normalize-tip-unobserved` | (#406) no pane observes `NormalizeChoice` | C13 |
+| `weighting-state-per-buffer` | (#595) the K-weighting state started afresh at each buffer | C14 |
 
 **`loudness_normalize_proof.py <dir>/agent.sock`** drives an instance over
 MCP and measures every export with `phase5_proof.py`'s own BS.1770-4
@@ -25865,8 +26768,13 @@ MCP and measures every export with `phase5_proof.py`'s own BS.1770-4
 recording) and waits for each media's loudness marker after placing it. N10
 launches two more instances of the chosen app, one with `-FrameJobNormalizeMode
 peak` and one with `-FrameJobNormalizeMode loudness`, each with
-`-FrameJobNormalizeTargetLUFS -16` (the argument domain: nothing persists, and
-the mode the shared defaults domain holds is never read), and stops each.
+`-FrameJobNormalizeTargetLUFS '<real>-20</real>'` (the argument domain: nothing
+persists, and the mode the shared defaults domain holds is never read), and
+stops each. The target is a plist fragment because a bare `-20` is read as a
+flag and never reaches the app, and it is −20 because −16 is the default, which
+an argument that did not arrive would also give (#404; `mcp.launch` refuses a
+bare negative number, `proof_app.py --selftest` A1). `LOUDNESS_ONLY=menu_rows`
+runs only the named parts while iterating.
 
 | Row | What it holds |
 |---|---|
@@ -25879,7 +26787,7 @@ the mode the shared defaults domain holds is never read), and stops each.
 | N7 | a reversed clip and a ×2 Keep pitch clip of a steady fixture land at −16 ±0.5 |
 | N8 | `measured_lufs` / `true_peak_dbtp` against the volume-1 export of the same window, ±0.5 LU / ±0.5 dB |
 | N9 | a second call "made no change" |
-| N10 | Clip ▸ Normalize on the Peak instance lands at −1 dBFS peak; on the Loudness instance at −16 ±0.5 LUFS |
+| N10 | Clip ▸ Normalize on the Peak instance lands at −1 dBFS peak; on the Loudness instance, launched with a −20 target, at −20 ±0.5 LUFS (#404) |
 | N11 | (AP2) no `mode` is Loudness at −16; `peak_db` alone is Peak |
 | N12 | (AP2) a clip's own limiter at −3 dBTP is kept, one at 0 is lowered to −1, each with its release, in the row and on the clip |
 | N13 | (AP2) one undo takes back the volume and the limiter together |
@@ -25889,8 +26797,8 @@ The eighth mutant, `target_lufs`'s range check dropped in
 must fail N2's −51 and −4 rows.
 
 ```sh
-python3 tools/proof/loudness_cache_probe.py            # C1–C12
-python3 tools/proof/loudness_cache_probe.py --mutants   # 8 mutants
+python3 tools/proof/loudness_cache_probe.py            # C1–C14
+python3 tools/proof/loudness_cache_probe.py --mutants   # 10 mutants
 make app-debug && python3 tools/proof/proof_app.py launch
 python3 tools/proof/loudness_normalize_proof.py <dir>/agent.sock
 ```
@@ -25902,6 +26810,16 @@ by its named row. `loudness_normalize_proof.py` 30/30 on Debug and on Release
 after `make gate` (PASS), the owner's recording measured −41.67 LUFS and landing
 at −24.15, held by its true peak; the N2 mutant on Debug failed N2's −51 and −4
 rows. `phase5_proof.py` 92/92 on both.
+
+**#595's run (2026-11-11):** `loudness_cache_probe.py` 14/14 rows on the tree
+before any change to the summing, which C14 left unchanged (AU-164): every
+feeding 0 Float values different from the whole's; the Double sums different in
+their last bits — stereo 135, 522 and 428 of 1,800 (4,096, 1,024, uneven), mono
+at 48 kHz 44, 169 and 138 of 600, mono at 44.1 kHz 34, 161 and 126 of 600, a
+block at a time 0 —; the product's stereo cache from 178 reader buffers (7,168
+and 8,192 frames, 166 ending inside a block), 0 of 24,288 Float values
+different from the one-buffer feeding and 575 of 18,216 Double sums. `--mutants`
+10/10 killed, `weighting-state-per-buffer` by C14.
 
 ## Road map "audio" AP2, part 1 — the clip limiter, and Normalize to a loudness through it (`limiter_probe.py`, `limiter_proof.py`; `loudness_normalize_proof.py` N4, N6, N11–N13; `export_offset_proof.py` E44, E45; `core/tests/schema_v30.rs`; spec §11 AU-20..AU-26)
 
@@ -25960,7 +26878,8 @@ and E45 (the same with noise reduction 0.5) hold every click on its frame
 through the limiter's 158-sample delay, as E22 does the reducer's; each
 prints its difference from E4. Two mutants run by hand on a Debug build
 (`HAND_MUTANTS` there): M25 drops the placement lead and must fail E44; M26
-drops the tap's lookup lead and must fail P4's second leg. `loudness_cache_probe.py`'s C8
+drops the tap's lookup lead and must fail P4's second leg (since #574 each drops the
+clip limiter's term alone and keeps the track limiter's, AU-153, beside it). `loudness_cache_probe.py`'s C8
 is rewritten for the new `plan`, and its two plan mutants re-anchored
 (`no-limiter`, `limited-by-nil`). `phase5_proof.py`, `peaks_proof.py` and
 `refusal_proof.py` name `mode="peak"` on every `normalize_clip` they mean as
@@ -25986,6 +26905,12 @@ both, the owner's recording exporting at −15.91 LUFS and −0.9998 / −0.9999
 92/92 on both; `peaks_proof.py` 21/21 and `refusal_proof.py` 145/145 on Debug;
 `loudness_cache_probe.py` 11/11 and `--mutants` 7/7. By hand on Debug: M25 failed
 E44 (+3.292 ms); M26 failed P4's second leg (+3.5363 dBTP) and passed its first.
+Again on 2026-11-11 (#574), re-aimed at today's lines, each in a Debug copy of the tree
+driven on its own socket; on the unmutated Debug app first, `--only E44` 1/1 (median
++0.000 ms) and `limiter_proof.py` 19/19. M25 failed E44 (median +3.292 ms, "pin missed").
+M26 failed P4's second leg (true peak -0.0000 (Kaiser) / -0.0067 (Annex 2) dBTP against
+-1 + 0.001: the export master, AU-27, now holds what the clip limiter let through at
+0 dBTP) and passed its first, 18/19.
 Again at integration, where the format became 30 (on the merged tree, Release, after
 `make gate` PASS): `limiter_proof.py` 19/19, P6 "the file is version 30, the header's 30";
 `loudness_normalize_proof.py` 37/37, N6 −15.91 LUFS and −0.9998 / −0.9999 dBTP;
@@ -26388,7 +27313,7 @@ reported); `--mutants` 8/9 killed, each by its named row, `read-by-arrival` surv
 equivalent. Once `read-by-arrival` was marked equivalent in the script, `--mutants` printed
 "8/8 mutants killed (1 equivalent, not scored)", exit 0, with `read-by-arrival` failing no row.
 
-## Road map "audio" AP5 — voice isolation (`audio_ap5_proof.py` P1–P9, P2b, I0–I10, I1b; ten mutants; `core/tests/isolation.rs`, `schema_v31.rs`; spec §11 AU-50…AU-57)
+## Road map "audio" AP5 — voice isolation (`audio_ap5_proof.py` P1–P12, P2b, I0–I10, I1b; fourteen mutants; `core/tests/isolation.rs`, `schema_v31.rs`; spec §11 AU-50…AU-57)
 
 A clip's `audio.isolation` crossfades its dry sound with one cached offline `AUSoundIsolation`
 render of its window, before the tap's chain (`IsolationRenderer.swift`, `IsolationCache.swift`,
@@ -26430,7 +27355,7 @@ row:
   measured max |Δ| 0.095), I8 Paste Attributes, I9 the refusal, I10 0 writes no key and plays
   I2's dry. `--instance` runs the I rows alone.
 
-`--mutants` runs ten, each a replacement in a copied `app/Sources` (every anchor asserted once),
+`--mutants` runs fourteen (the last four are #409's and "Hygiene a1"'s, below), each a replacement in a copied `app/Sources` (every anchor asserted once),
 scored killed when its named row fails:
 
 | Mutant | Edit | Must fail |
@@ -26445,10 +27370,14 @@ scored killed when its named row fails:
 | `window-not-keyed` | the window left out of the name | P7 |
 | `split-rounding` | `r(source_in) − r(at)` instead of `r(source_in − at)` | P2b |
 | `failure-silent` | a failed render calls no owner | P9 |
+| `lanes-cut-to-shorter` | lanes that disagree cut to the shorter count (#409) | P10 |
+| `memo-not-dropped` | a settled render no longer drops Voice Isolation's Status memo (#408) | P11 |
+| `voice-memo-not-dropped` | nor Voice Effect's (#408) | P12 |
+| `isolation-failure-retimed` | an unreadable forward source fails in the ramp renderer's words | P11 |
 
 ```sh
-python3 tools/proof/audio_ap5_proof.py --probe     # P1–P9, P2b
-python3 tools/proof/audio_ap5_proof.py --mutants   # 10 mutants
+python3 tools/proof/audio_ap5_proof.py --probe     # P1–P12, P2b
+python3 tools/proof/audio_ap5_proof.py --mutants   # 14 mutants
 python3 tools/proof/audio_ap5_proof.py             # the probe, then I0–I10, I1b on an own instance
 ```
 
@@ -26462,7 +27391,7 @@ I5 lag 0.000 with the old render pruned; I6 lag +0.007, floor 10.9 dB lower; I7 
 floor moved 0.00 dB and Keep pitch off sample for sample. `--mutants` 10/10 killed, each by its
 named row alone.
 
-## Road map "audio" AP7 — live loudness and true-peak metering (`audio_ap7_proof.py` T1–T16, L1–L4; eleven mutants; spec §11 AU-70…AU-78)
+## Road map "audio" AP7 — live loudness and true-peak metering (`audio_ap7_proof.py` T1–T18, L1–L4; twenty-one mutants; spec §11 AU-70…AU-78, AU-161)
 
 The live loudness meter (`LiveLoudness.swift`, `LiveLoudness+Sum.swift`) rebuilds the true mix on
 the main thread from each tap's `MixRing` (`LevelMeter.swift`) and measures it with the
@@ -26490,8 +27419,10 @@ signal is split over three tracks at 0.5, 0.3 and 0.2 under unity envelopes.
 | T14 | at ×2 nothing is measured (M, S nil; I, TP and `to_frame` held; `measuring` false); `stop()` holds M, S, I and TP, fires `onReading` once and empties the rings; a resume at ×1 from the reached frame continues with no reset |
 | T15 | the bars: two correlated 0.5 sines read peak 1.0; a sine and its inverse read 0.0 where the per-track sum reads 1.0 |
 | T16 | a 0.3 s and a 1 s gap between two clips on one track, and on one of two tracks: no reset, frames fed = to − from, I within 0.01 LU of the reference with silence in the gap |
+| T17 | the tap (AU-161, #405): a 4,096-frame buffer of non-silent samples through `AudioTapContext.process` with `sourced: false` (the player's filler: no duration) drains as one mark — its frame, its length, no samples, not an overrun; a sourced buffer drains as audio with its samples; a buffer with no time, filler or not, drains nothing; 63 fillers at one frame and then audio drain as 63 marks and the audio with no overrun |
+| T18 | marks in the sum (AU-161), as the player was measured to deliver them: (a) a seek — each track's fillers of the old position, track 1's at the seek's frame, and in a later tick track 2's stale filler, its own at the seek's frame and track 1's first audio, the audio 3,072 and 4,096 frames past the seek — resets once (`jump`), `from_frame` the first audio, frames fed = to − from, I within 0.01 LU of the reference with track 2 silent until its own first frame; (b) pause and continue — a stop with a buffer per track never summed, three fillers at each stream's end, audio 3,072 and 7,167 frames on — and (c) a long pause, 63 fillers a track drained by a second stop, audio 3,072 and 2,560 frames on: no reset, `from_frame` kept, frames fed = to − from, I within 0.01 LU of the reference with silence from the reached frame to the audio; (d) a stop, then audio 5,375 frames past the stream with no filler: a `jump`; (f) a seek 20 s on while paused, its two marks a track drained by a second stop, the same seek just before the first stop, and a seek 2 s back while paused, each with audio 3,072 and 4,096 frames past the marks: no reset at the stop, then one `jump`, `from_frame` the first audio, frames fed = to − from, I within 0.01 LU of the reference with track 2 silent until its own first frame; (g) a tick at rate 0 that takes 8,192 frames a track rendered ahead, then three fillers where the stream stands and audio 3,072 and 2,560 frames on: no reset, as (b); (e) ×2 for a second and two stops, and a stop and then ×2, each then ×1 where the stream stands: a `jump` |
 
-`--mutants` runs eleven, each a replacement in a copied `app/Sources` (its anchor asserted once),
+`--mutants` runs twenty-one, each a replacement in a copied `app/Sources` (its anchor asserted once),
 scored killed when its named row fails:
 
 | Mutant | Edit | Must fail |
@@ -26507,6 +27438,16 @@ scored killed when its named row fails:
 | `short-term-over-4` | short-term over 4 sub-blocks | T6 |
 | `tables-at-every-rate` | Tables 1–2 used at every rate | T9 |
 | `bars-from-per-track-sum` | the bars are `LevelMeterTrack.mix` | T15 |
+| `filler-captured` | the tap captures a filler as audio (the code before #405) | T17 |
+| `filler-unmarked` | the tap drops a filler, no mark | T17 |
+| `mark-reads-as-overrun` | the drain refuses a header with no frames | T18 |
+| `mark-without-length` | what follows a mark must continue its frame, not its length | T18 |
+| `awaiting-after-a-mark` | a track that moved by a mark is put back to awaiting by another track's move | T18 |
+| `resume-asked-of-the-sum` | after a stop, audio is asked against the reached frame as before | T18 |
+| `resume-after-another-rate` | every stop leaves its tracks resuming, one after another rate too | T18 |
+| `stop-adopts-a-seek` | a stop takes whatever it drains as the track's stream, a seek's mark too (the diff read's finding) | T18 |
+| `tick-at-rest-drops-its-drain` | a tick at rate 0 stops without what it drained, so the stream does not move past it | T18 |
+| `resume-through-another-rate` | playing at another rate does not end a track's resuming | T18 |
 
 **With a socket** (`python3 tools/proof/audio_ap7_proof.py <dir>/agent.sock`, an instance
 `proof_app.py launch` started), L1–L4 drive the real player through `play_preview` and the dev
@@ -26516,13 +27457,14 @@ mono pink noise on track 2 as two clips with a 0.4 s gap at 3.0–3.4 s (ffmpeg 
 export over `[from_frame, to_frame)` with `phase5_proof.py`'s BS.1770-4 (K-weighting from rest at
 `from_frame`, sub-blocks counted from there): \|ΔI\|, \|ΔM\|, \|ΔS\| ≤ 0.1 LU, \|ΔTP\| ≤ 0.2 dB,
 `resets` unchanged by the gap, `last_reset` `manual`, `measuring` false after the play. L2
-resets, plays 4 s from 4 s with `seek_to` 1 s: `resets` +1, `jump`. L3 resets and plays 2 s twice
-from 1 s: no reset, `from_frame` kept. L4: the tool listed with `reset` described, and the
+resets, plays 4 s from 4 s with `seek_to` 1 s: `resets` +1, `jump`, and I within 0.01 LU of L1's
+export over `[from_frame, to_frame)`, 1.5 s or more (AU-161). L3 resets and plays 2 s twice
+from 1 s, and a third time after 6 s paused (AU-161): no reset, `from_frame` kept; then `set_playhead` to 6 s while paused and a fourth play: `resets` +1, `jump`, `from_frame` within 0.5 s past 6 s (a guard: the player did not reach T18 (f)'s defect by this sequence, so `stop-adopts-a-seek` built into a Debug app passed it too, 2026-11-11; T18 (f) is the row that fails). L4: the tool listed with `reset` described, and the
 instance's log holds no `Frame Job: ` line. Needs ffmpeg.
 
 ```sh
-python3 tools/proof/audio_ap7_proof.py --probe             # T1–T16
-python3 tools/proof/audio_ap7_proof.py --probe --mutants   # 11 mutants
+python3 tools/proof/audio_ap7_proof.py --probe             # T1–T18
+python3 tools/proof/audio_ap7_proof.py --probe --mutants   # 21 mutants, about 50 minutes (`--only a,b` for some)
 python3 tools/proof/audio_ap7_proof.py <dir>/agent.sock    # L1–L4
 ```
 
@@ -26533,6 +27475,20 @@ or two buffers of the OLD position (sometimes the same buffer twice), not in ste
 the second track's stale buffer arrived after the first had moved. AU-72's admission now asks
 the reset rule only of a chunk that moves its track, and a track that has not moved after a jump
 drops its old stream until it does; T11's third case is that shape.
+
+**What the player hands a tap (#405, Debug, 2026-11-11, every callback logged: 1,044 buffers).**
+Audio has a time range with a duration. A FILLER is silent with a duration of zero or not
+numeric, and no audio buffer had either: one with no time before a stream's first audio (the
+first play, and a play after about 5 s paused); about twelve a second at the frame the track's
+stream stands at while paused, for about 5.3 s (62 or 63 a track), then none; one or two at a
+seek's frame, after the track's stale fillers of the old position (the "old position's buffers"
+above were these). After a seek to 48000 the audio began at 51072 on one track and 51584 or
+52096 on the other; after a pause, 3,072 frames past the stream's end on one and 2,560, 3,071
+and 7,167 on the other. On the tree before the fix L2's new comparison read 0.0654 LU low (the
+meter's [48000, 134016) against the export), and pause and continue reset (`jump`) after a 6 s
+pause and not after none, the audio coming back 6,144 frames past the frame the sum had reached
+(a stop had drained the pause's fillers before they could bridge it). With AU-161: L2 |ΔI|
+0.0000 from 51072, and pauses of 0, 6 and 12 s do not reset.
 
 **The recorded run (2026-10-30):** `--probe` 16/16 (case 1 −22.9933, cases 3–5 −23.0139,
 −23.0139, −22.9787, case 9 worst 0.0137 LU, case 12 worst 0.0396 LU, true peaks −6.0206,
@@ -26885,8 +27841,9 @@ AU-108). No format bump, no new op or FFI export: `export` takes `stems`.
   sample); S6 a tone at ×4 whose stem's true peak is over −1 dBTP by `limiter_probe.py`'s two
   meters while the mix's is under −1 + 0.001; S7 the three refusals by name; S8 a stem path that
   is the project's media failing the job with nothing written and the media byte-identical; C1
-  a cancel inside the last of three 600 s stems, seen past 0.5 + 0.5 × 3/4 of the bar with stems
-  1–2 on disk first, leaving no file.
+  a cancel inside the last of three 600 s stems, seen past 0.5 + 0.5 × 3/4 of the bar with the
+  mix and stems 1–2 whole on disk first (since #531 as three hidden `.framejob-export-*.wav`
+  siblings of one size, nothing at a final name; "Hygiene a1" below), leaving no file.
 - **`audio_ap10b_proof.py --probe`** runs B1–B2 alone (the whole run runs them first): the
   probe `audio_ap10b_probe.swift`, compiled AS `main.swift` over `app/Sources` through
   `swift_build.py`. B1 `ExportAudioMaster(limits: false)` at 24 bits over two buffers past the
@@ -26894,9 +27851,9 @@ AU-108). No format bump, no new op or FFI export: `export` takes `stems`.
   the default master changes them; B2 `url(for:mix:)`, `summary`, `collision` (exact, case-only,
   a symlink, none) and `SourceCollision`'s sentence.
 
-The queue row's success line is not read over MCP — `export_status`'s `done` carries no line and
-`snapshot_ui` cannot capture the Export Queue window — so its wording rests on `summary` (B2),
-which both success lines append, and on SE-36.
+The queue row's success line is `export_status`'s `message` on `done` since #395 (in "Hygiene
+a1" below): S1 holds "Exported “Mix.wav” and 2 stems." and S6 "… and 1 stem." against the
+result's `stems`. Until then it was not readable over MCP and rested on `summary` (B2) and SE-36.
 
 | Mutant | Edit | Killed by |
 |---|---|---|
@@ -26926,7 +27883,7 @@ exports over 1,454,400 frames; S6 the stem −0.4587 / −0.4460 dBTP (Kaiser / 
 C1 cancelled at progress 0.8973 with stems 1–2 on disk, nothing left; B1, B2. The mutants 7/7
 killed (the table). `export_master_proof.py` 11/11 on the same instance.
 
-## Road map "audio" AP8b — every other audio parameter animates (`audio_ap8b_proof.py` A1–A8, E1–E6, V1, U1; thirteen mutants; `core/tests/audio_automation.rs`, `action_off.rs`; spec §11 AU-85…AU-89)
+## Road map "audio" AP8b — every other audio parameter animates (`audio_ap8b_proof.py` A1–A9, E1–E6, V1, U1; fifteen mutants; `core/tests/audio_automation.rs`, `action_off.rs`; spec §11 AU-85…AU-89)
 
 The plan carries each audio segment's `automation` (`core/src/audio_automation.rs`, AU-85): the
 clip's evaluated tap keys at the voice's ends, each tap-key action's ends and the 1/30 s grid
@@ -26934,7 +27891,7 @@ inside an eased one. The tap reads a run's settings at its anchor on an absolute
 moves the pan per sample and isolation's Amount per frame (`AudioAutomation.swift`, AU-87); the
 inspector sends the tap keys to an action's end and `off` takes `audio.eq.<slot>` (AU-88).
 
-- **`audio_ap8b_proof.py <dir>/agent.sock`** (the docstring has each row and bound) runs A1–A8,
+- **`audio_ap8b_proof.py <dir>/agent.sock`** (the docstring has each row and bound) runs A1–A9,
   then makes its fixtures into `tools/proof/media/` (five 6 s stereo 24-bit sines: `ap8b_440`,
   `ap8b_1k`, `ap8b_4k`, `ap8b_200`, `ap8b_hot`) and drives the caller's instance: E1–E6 against
   24-bit `audio_wav` exports, each a new project with one clip and one action over [1 s, 3 s),
@@ -26949,8 +27906,15 @@ inspector sends the tap keys to an action's end and `off` takes `audio.eq.<slot>
   byte-identical; A3 the per-sample pan against `AudioPanLaw.gains(pan(t_n))`; A4
   `usesLimiter` / `usesNoiseReduction` from a point, and a track's lead from an end alone; A5 the
   Amount per frame from a base of 0 over a written wet render; A6 `routedInsideAction`; A7
-  `wanting` and `isolates` from an end; A8 `ReelOp.setActionEnd`'s EQ slot lift.
-- **`audio_ap8b_proof.py --mutants`**: M4–M12 each over its own copy of `app/Sources`, killed
+  `wanting` and `isolates` from an end; A8 `ReelOp.setActionEnd`'s EQ slot lift; A9 (#396) a
+  segment whose automation is inert at every point over a base with a compressor keeps no span
+  (`spans` empty, not active, no limiter, no reducer), beside two controls: the same segment
+  with no automation keeps its one span, and an inert base under one point carrying a
+  compressor keeps one automated span. A9's segments are the plan's own with `automation`
+  rewritten through the plan's JSON, because the core gives a segment's first point the clip's
+  state at its start, so no top-level project reaches "inert at every point over a base that
+  is not".
+- **`audio_ap8b_proof.py --mutants`**: M4–M12, M14 and M15 each over its own copy of `app/Sources`, killed
   when its named row fails; M1–M3 and M13 in one copy of `core/` under
   `work/audio_ap8b/core-mutants/` (`graphic/` beside it as a symlink, the target folder
   `work/audio_ap8b-core-target/`, seeded from `core/target` by `cp -c` and kept), each file
@@ -26971,11 +27935,13 @@ inspector sends the tap keys to an action's end and `off` takes `audio.eq.<slot>
 | M11 | the held slope glided in Swift | A1 |
 | M12 | the lift ignoring a null EQ slot | A8 |
 | M13 | `key_off` ignoring the slot | `action_off.rs` `off_keys_one_eq_slot_off_at_the_end` |
+| M14 | a voiced clip's end alone wanting an isolation render (#397) | A7 |
+| M15 | the base standing in for a segment inert at every point (#396) | A9 |
 
 ```sh
-python3 tools/proof/audio_ap8b_proof.py --probe                # A1–A8
-python3 tools/proof/audio_ap8b_proof.py --mutants              # M1–M13
-python3 tools/proof/audio_ap8b_proof.py <dir>/agent.sock       # A1–A8, then E1–E6, V1, U1
+python3 tools/proof/audio_ap8b_proof.py --probe                # A1–A9
+python3 tools/proof/audio_ap8b_proof.py --mutants              # M1–M15
+python3 tools/proof/audio_ap8b_proof.py <dir>/agent.sock       # A1–A9, then E1–E6, V1, U1
 ```
 
 **The recorded run (2026-10-31, after `make gate` PASS 394 s, against Release):** 16/16. A2 63
@@ -27027,35 +27993,198 @@ renders: the processed solve's figures are the proof's.
 with `phase5_proof.py`'s BS.1770 and `limiter_probe.true_peaks` (ceiling + 0.001 dB); the pause
 floor is `eq_proof.report`'s 10th percentile of 50 ms RMS. Its fixtures are the owner's
 recording and `say` speech (V6 low-passed at 3.5 kHz, V7 high-shelved +15 dB above 5 kHz). V8
-launches a second instance with `-FrameJobNormalizeTargetLUFS -16`, V14 one with
-`-RCDevRampRenderHold 3`; each is stopped. `AP6_ONLY=owner,sibilance,selection,speed,normalize,menu,hold`
+launches a second instance with `-FrameJobNormalizeTargetLUFS '<real>-18</real>'` (a plist
+fragment: a bare `-18` is read as a flag and never arrives, and −18 is not the default, #404),
+V14 one with `-RCDevRampRenderHold 3`; each is stopped. `AP6_ONLY=owner,sibilance,selection,speed,normalize,menu,hold,actions,limiter`
 runs only those parts while iterating; a recorded run sets nothing.
 
 | Row | What it holds |
 |---|---|
 | V1 | the owner's row (measurements, `set`, reasons, `processed_lufs`, `renders`) printed; `set` exactly the nine keys (the leveller since AP6b), held by `get_project` |
-| V2 | its export at −16 ±0.5 LUFS, ≤ −1 dBTP by both meters, `limited_by` null, `result_lufs` within 0.2 LU of the export, renders ≥ 2; the press timed three times (two more on fresh projects, each rendering its isolation window cold) |
+| V2 | its export at −16 ±0.5 LUFS, ≤ −1 dBTP by both meters, `limited_by` what its figures say (null within 0.1 LU of −16; AU-167, below), `result_lufs` within 0.2 LU of the export, renders ≥ 2; the press timed three times (two more on fresh projects, each rendering its isolation window cold) |
 | V3 | the pause floor at least 10 dB under a Normalize-only export's |
 | V4 | a second `enhance_voice` and `normalize_clip` after it: "made no change" |
 | V5 | one undo, "Enhance Voice", then the import's audio group |
 | V6, V7 | the de-esser off and on |
-| V8 | Clip ▸ Enhance Voice (`perform_menu_item`, waiting for the sheet to go) holds the tool's set, the volume within 0.05 dB |
+| V8 | on the instance launched with a −18 target: `enhance_voice {target_lufs: −18}` answers −18 and one undo restores the clip; then Clip ▸ Enhance Voice (`perform_menu_item`, waiting for the sheet to go) holds that tool call's set, the volume within 0.05 dB (#404) |
 | V9 | two clips each their own, one undo |
 | V10 | skips and refused arguments, changing nothing |
 | V11 | the parity log clean |
-| V12 | ×1.5 (not isolatable): noise reduction 0.5, a gate, the floor ≥ 10 dB under, the export at −16 ±0.5 |
+| V12 | ×1.5 with Keep pitch on (isolated at any speed since #387): isolation 0.8, noise reduction 0, a gate, the floor ≥ 10 dB under, the export at −16 ±0.5; its verify render against its limiter's ceiling printed, not scored (AU-162) |
 | V13 | `normalize_clip` alone at volume 2: (a) isolation 0.8 and (b) an EQ, `processed_lufs` ≠ `measured_lufs`, the export at −16 ±0.5 and a second call "made no change"; (c) a plain clip, `processed_lufs` null, `renders` 0, the cache plan's −16 |
 | V14 | the hold instance, each leg on a fresh project whose `cache/isolated/` is empty: (a) the Measuring Sound sheet seen in `snapshot_ui` (else FAIL), `cancel_sheet`, the clip unchanged after the hold; (b) the sheet seen, `set_audio {pan: 0.2}` during the hold, and once the sheet goes only the pan changed |
 | V15 | At volume (the `option.display` part after the "At volume" label in `snapshot_ui`'s layout, the Sound sub-tab) after Enhance within ±0.2 of −16 with no "≈"; after an EQ change "≈ " and the tooltip |
 
 ```sh
-python3 tools/proof/audio_ap6_probe.py             # E1–E3, E6–E11
-python3 tools/proof/audio_ap6_probe.py --mutants   # M1–M6, M8–M12
+python3 tools/proof/audio_ap6_probe.py             # E1–E3, E6–E18
+python3 tools/proof/audio_ap6_probe.py --mutants   # M1–M6, M8–M37
 make app-debug && python3 tools/proof/proof_app.py launch
 python3 tools/proof/audio_ap6_proof.py <dir>/agent.sock
 ```
 
 The recorded runs are in `archive/audio.md`'s AP6 record.
+
+**A stage only at an action's end (#402, spec §11 AU-159, 2026-11-11).** The probe gains rows and
+six mutants, the proof a part (`AP6_ONLY=actions`):
+
+| Row | What it holds |
+|---|---|
+| E10 | also, on a clip decoded from JSON with no base stage: each of the eight stages an action can switch on, only at an action's end, renders; pan, mono, channels, a limiter (until AU-165, below), a volume, a null EQ or gate and a 0 isolation or noise reduction at an end do not; a gate at the end of an action of no duration does not |
+| E12 | (unchanged) the memo's key names its document |
+| E13 | the memo's key survives the solve: on a clip with a base gate and an action whose end is a pan, R0's trial and the clip after `set_audio {volume: 2, limiter}` have one key, though their measurement plans differ (the core writes the base limiter into every automation point) |
+| E14 | the key follows an action's audio: another gate threshold or limiter ceiling at an end is another key; another end volume is not; a limiter keyed off at a later action's end is another key than the limiter left on |
+| V16 | the owner's recording with an EQ only at an action's end (1 s for 2 s): (a) At volume "≈" before any press; (b) `normalize_clip` −16: `processed_lufs` ≠ `measured_lufs`, renders ≥ 1, the export at −16 ±0.5, a second call "made no change"; (c) At volume after it −16 ±0.2, no "≈"; (d) the end also naming volume 0.5: one text with the playhead at 0 and inside the action; (e) another shelf gain at the end: "≈" again; (f) an end gate and limiter at −6 dBTP under the clip's own limiter, target −20: renders ≥ 2, `result_lufs` within 0.2 LU of the export, the export at −20 ±0.5, `limited_by` what its figures say (AU-167, below); (g)–(j) AU-165's, below (until it, (g) printed the one-render arm's miss, NOT scored) |
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M14 | (anchor moved) the memo's key without its document | E12 |
+| M15 | `needsRender` on a clip never reads its actions | E10 |
+| M16 | an action of no duration counts | E10 |
+| M17 | the key keeps the automation points' limiter | E13 |
+| M18 | the key's chain without the action ends' limiters | E14 |
+| M19 | the key's plan with every automation point emptied | E14 |
+| M20 | the key's chain without the limiter key-offs | E14 |
+
+V16 was seen red on three Debug builds with one edit each: M15's edit failed (a), (b), (e), (f)
+and (g); M17's failed (c) and (d); At volume reading the selected action's volume and limiter
+on a clip that renders failed (d) alone.
+
+**An action's end that sets a limiter (#402, spec §11 AU-165, 2026-11-12).** The probe gains three
+rows and six mutants, V16 four legs (`AP6_ONLY=actions`):
+
+| Row | What it holds |
+|---|---|
+| E10 | a limiter and a null limiter (keyed off) only at an action's end render; a limiter at the end of an action of no duration does not |
+| E15 | `endSetsLimiter` true for a limiter at an end, a null one and one beside a gate; false for an action of no duration, an end with no `limiter` key, the clip's own limiter alone and no clip; `verifiesByRender` over its four cases |
+| E16 | `Verified.holds` at its own volume and 0.04 dB away, not 0.06 dB away, under another limiter or at volume 0; a limited render not with none; the memo answers a verify render beside its R0 and the next R0 for the key drops it |
+| E17 | `limiterGoesOn`: R0's peak 0.01 dB under −1 dBTP at the volume stays off, 0.01 dB over goes on, a limiter already on is not asked; `AudioNormalize.ceilingLimiter`: the default at −1, a clip's own lowered to −1 or kept under it |
+| V16 | (g) an end gate and limiter at −24 dBTP, no limiter on the clip, target −30: renders ≥ 2, `limited_by` `verify_renders` since AU-167 (below), `result_lufs` within 0.2 LU of the export, the export at −30 ±0.5; At volume "≈" before the press, within 0.2 of the export with no "≈" after it, and "≈" with the action's-limiter tooltip at the volume ×1.2; (h) an end limiter at −12 dBTP alone, target −32: At volume "≈" before any press, `processed_lufs` not null, renders ≥ 2, `result_lufs` within 0.2 of the export, the export at −32 ±0.5, a second call "made no change"; (i) (g)'s clip with the target that puts R0's true peak at −1.3 dBTP at the plan's volume: the limiter on at −1 dBTP, the verify render's true peak ≤ −1 + 0.001, renders ≥ 2, `result_lufs` within 0.2 of the export, a second call "made no change"; (j) the clip's own limiter keyed off at an action's end (`off: ["audio.limiter"]`), target −20: renders ≥ 2, `result_lufs` within 0.2 of the export |
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M21 | `needsRender` without `endSetsLimiter` | E10 |
+| M22 | `verifiesByRender` only under a limiter | E15 |
+| M23 | `endSetsLimiter` counting only a limiter, not a null | E15 |
+| M24 | `Verified.holds` at any volume | E16 |
+| M25 | an R0 store keeping the verify render beside the old one | E16 |
+| M26 | `limiterGoesOn` never true | E17 |
+
+V16 (g)–(j) were red on a Debug build of the tree before AU-165 (seven of eight rows; (i)'s aim
+row is not a claim, and its second call, added after, is the hand mutant's row below): (g) renders 1 and the export 2.57 LU under `result_lufs`, At volume −30.0
+with no "≈" after the press and none at ×1.2; (h) "≈" missing before the press and `renders` 0;
+(i) renders 1, no limiter, the export 4.05 LU under; (j) renders 0. With AU-165 all sixteen
+rows passed on Debug, and the whole proof 81 of 81 on Release ((g) −30.25 after three
+verifies, within its ±0.5; (i) five renders, the limiter on, −28.60 at −3.48 dBTP). The restart under the limiter (`LoudnessMeasureRun.verify`: the loop
+started again from AU-24's plan, its count reset) was mutated by hand on a Debug build, the
+loop carrying on at the stepped volume under the limiter instead: (i)'s second call changed
+the volume (it answered "", not "made no change").
+
+**The verify bound named (#607, spec §11 AU-167, 2026-11-13).** The probe gains a row and five
+mutants, V16 two legs and four claims (`AP6_ONLY=actions`); `limit_of(row, target)` restates the
+rule from a row's own figures, and the rows that asserted `limited_by` null (V2, V13 (c), V16
+(f), V17's legs) assert it instead.
+
+| Row | What it holds |
+|---|---|
+| E18 | `verifiedLimit`: at ×2 0.11 LU short or over `verify_renders`, 0.09 nil; at ×32 0.11 short `max_gain`, 0.09 nil, 0.11 over `verify_renders`; at ×31.9 5 LU short `verify_renders`. `limitNote`: none nil; the ceiling's clips alone today's sentence byte for byte; a verify clip named with `verify_renders` and a limiter, no `max_gain`; both, the tail once. `AudioEnhance.loudnessReason`: landed "."; the ceiling's clause kept; the verify bound "short of" or "over" with a limiter, no "would pass" |
+| V16 | (g) also `limited_by` `verify_renders` more than 0.1 LU from −30 below ×32, and the note naming the clip, `verify_renders` and a limiter, no `max_gain`; (i) the same against its target; (k) `match_audio` on (i)'s clip, `eq: false`, the reference a plain clip of the recording placed after it at the volume that plays it at (i)'s target: `verify_renders` more than 0.1 LU from `target_lufs` below ×32 and the note; (l) `enhance_voice` −24 on (g)'s clip: `verify_renders` below ×32, the note, and the last reason "short of −24.0 LUFS" with a limiter and no "would pass" |
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M27 | the verify bound's threshold 1 LU | E18 |
+| M28 | the verify bound answers nil (the old behaviour) | E18 |
+| M29 | the verify bound tested before the ceiling | E18 |
+| M30 | the note puts every limited clip in the ceiling's sentence | E18 |
+| M31 | the reason gives the verify bound the ceiling's clause | E18 |
+
+Recorded 2026-11-11. Red on the tree before AU-167: the probe did not build (E18, `Limit` has no
+`verifyRenders`), and `AP6_ONLY=actions` on Debug passed 15 of 21: (f) −20.11 after four renders,
+(g) −30.249, (i) and (k) −28.595 at volume 28.37 after five, (l) −29.551 at 20.84 after four,
+each `limited_by` null with no note, and (l)'s reason ending at its renders. With it: the probe
+16/16, M27–M31 5/5 killed (every one of the 30 mutants' anchors found once), `AP6_ONLY=actions`
+21/21 on Debug; after `make gate`, the whole proof 86/86 on Release ((f) −20.11, (g) −30.249,
+(i) and (k) −28.595 and (l) −29.551 at 20.84, each `verify_renders` with the note; V2's export at
+−15.97 and every V17 leg null) and `loudness_normalize_proof.py` 37/37 on Release (N4 and N6 null).
+
+**An action's limiter named at the ×32 stop (#608, spec §11 AU-168, 2026-11-12).** E15 and E18
+gain arms and six mutants, V16 one leg of four tools' answers (`AP6_ONLY=ceiling` runs it alone).
+
+| Row | What it holds |
+|---|---|
+| E15 | also `endLimiterOn` over the same clips: true for a limiter at an end and one beside a gate; false for a null (keyed off), an action of no duration, an end with no `limiter` key, the clip's own limiter alone and no clip |
+| E18 | also `limitNote` with the clips an action's end turns a limiter on for: of two ceiling clips the one in the set named with that limiter in the ceiling's place, the other in the ceiling's sentence, the tail once; both in it, no "would pass"; R0 at −50 (×32 of it short of −16 anyway) the ceiling's sentence byte for byte; ×32 of R0 0.05 LU short of the target the limiter, 0.15 LU short the ceiling; a row with no R0 the ceiling; a landed and a verify bound's clip in the set change nothing; Match's measured target −15.999999999117435 written as −16.0. `loudnessReason` at ×32 with an action's limiter naming it and no "would pass"; the verify bound's clause the same with or without one |
+| V16 | (m) (g)'s clip, a fresh project per leg: `enhance_voice` −16 and −20, `normalize_clip` −16 and `match_audio` (`eq: false`, the reference a plain clip of the recording at the volume that plays it at −16): `limited_by` `max_gain` at ×32 more than 0.1 LU short, as its figures say, R0 + 20·log10 32 at or over the target less 0.1, and the note naming the clip, `max_gain`, an action's end and a limiter, no "would pass"; Enhance's last reason the same; Match's note writing its target as −16.0 |
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M32 | the note ignores the clips set (the old behaviour) | E18 |
+| M33 | `endLimiterOn` counting a null | E15 |
+| M34 | the limiter named for any limit, not `max_gain` alone | E18 |
+| M35 | the reason ignores the clip's action limiter (the old behaviour) | E18 |
+| M36 | the limiter named whatever ×32 of R0 reaches | E18 |
+| M37 | the reach test without the 0.1 LU tolerance | E18 |
+
+Recorded 2026-11-12. Red: the probe did not build on the tree before AU-168 (no `endLimiterOn`,
+no `endLimiters`), and on a Debug build whose three tools passed no clips to the note and whose
+Enhance setup passed none, `AP6_ONLY=ceiling` passed 2 of 8: every leg answered the ceiling's
+sentence and Enhance's reason "the volume would pass 32×" (Enhance −29.118 at ×32 from R0
+−39.437; Normalize and Match −28.343 from R0 −41.643), Match's note printing its target
+−15.999999999117435. The E18 arm for that target was red (15/16) before the note wrote it to
+0.001 LU. With AU-168: the probe 16/16, M32–M37 6/6 killed (every one of the 36 mutants' anchors
+found once), `AP6_ONLY=ceiling` 9/9 on Debug; after `make gate`, the whole proof 94/94 on Release:
+(m) Enhance −16 and −20 at ×32 −29.117 from R0 −39.468 (×32 of it −9.365), Normalize and Match
+−28.343 from R0 −41.643 (−11.540), each note naming the action's limiter, Match's target written
+−16.0; (g) −30.249, (i) and (k) −28.595 and (l) −29.551 as before; V2's export at −15.97.
+
+**The app's own sentence at the inspector's foot (#609, spec §11 AU-169, 2026-11-12).** E19 and
+six mutants here, `audio_ap12_probe.py` P13 and four mutants (P12 also holds that `measure` posts
+no notice), and V18 in this proof (`AP6_ONLY=foot`), on its own instance launched with
+`-FrameJobNormalizeTargetLUFS <real>-16</real> -FrameJobNormalizeMode loudness
+-RCDevMatchAudioAccept YES`, each leg a fresh project and each distance checked against the
+tool's own row for the same clip.
+
+| Row | What it holds |
+|---|---|
+| E19 | `AudioMeasureNotice.make`: no limit and no skip nil; the ceiling, an action's limiter (R0 reaching) and the verify bound short and over, each its cause; R0 too quiet to reach keeps the ceiling; a cache row 0.03 LU short "less than 0.1 LU"; three clips counted, the furthest named, the tooltip a line per clip; two cuts of one recording at one distance, the first by its start; Match's "the reference's"; one skip, a clip and two skips (an unnamed id "clip N"), every clip skipped and an identity in the "changed nothing" form; over the probe document the clip's name and m:ss start; the clock |
+| P13 | `AudioMeasureDoor.land` on a `ProjectDocument()`: the notice once, after the commit, no beep and no refusal, in the event and after the sheet and on a landing's follow; an identity "changed nothing"; a core refusal its refusal and no notice; the empty press one beep and the notice, the empty follow its refusal and none; `.refused` and a facts-less answer none |
+| V18 | (a) Clip ▸ Enhance Voice through the Measuring Sound sheet on V16 (g)'s clip; pressed again, "changed nothing"; undo, no sentence. (b) Clip ▸ Normalize in the event on `ap6-quiet.wav` (the recording 15 dB down); (c) the same inside a nest (`set_scope`); (d) a silent clip skipped; (e) Clip ▸ Match Audio… through its sheet, the reference first and normalized to −16, `match_audio {eq: true}` on the pair first answering `max_gain` |
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| M38 | the action's limiter named for any ceiling clip | E19 |
+| M39 | the first clip in place of the furthest | E19 |
+| M40 | the skips left out | E19 |
+| M41 | "short" for a clip over the target | E19 |
+| M42 | no "changed nothing" | E19 |
+| M43 | a clip named without its start | E19 |
+| M17 (`audio_ap12_probe.py`) | the notice posted before the commit as well | P13 |
+| M18 | an identity posted as applied | P13 |
+| M19 | a notice after a core refusal | P13 |
+| M20 | the empty press silent | P13 |
+
+Recorded 2026-11-12 in a worktree of 943bb2e0. Red: neither probe builds on the tree before
+AU-169 (no `AudioMeasureNotice`, no `Answer.ops(_:notice:)`), and on a Debug build whose `land`
+never posted (`guard false` in `note`) `AP6_ONLY=foot` passed 3 of 9, every leg's foot empty. With
+AU-169: `audio_ap6_probe.py` 17/17 and `audio_ap12_probe.py` 13/13; M38 and M40–M43 killed, M39
+(its first edit did not compile; written as `… && false`) killed on its own run, M14–M20 7/7
+killed (M14–M16 re-run beside the new landing); `AP6_ONLY=foot` 9/9 on Debug; after `make gate`
+(PASS; its first run's `test` step ran past the 900 s bound under a load average over 200 and
+passed in 264 s on the second), the whole proof 102/102 on Release with no `Frame Job: ` line. V18
+on Release: (a) "Enhance Voice left “ap6-rode.wav” (0:00) 13.1 LU short of −16.0 LUFS at the 32×
+ceiling, likely because a limiter an action's end turns on holds the sound down." and again
+"Enhance Voice changed nothing. “ap6-rode.wav” (0:00) is 13.1 LU short …"; (b) and (c)
+"Normalize left “ap6-quiet.wav” (0:00) 10.0 LU short of −16.0 LUFS, with its volume at the 32×
+ceiling." against the tool's −26.015 (renders 0, no sheet); (d) "Normalize changed nothing. It
+skipped “ap6-silence.wav” (0:00): is under −70 LUFS …"; (e) "Match Audio left “ap6-quiet.wav”
+(0:31) 10.6 LU short of the reference's −15.9 LUFS, with its volume at the 32× ceiling." against
+the tool's −26.511 and −15.904. V16 (m)'s Enhance at −16 −29.117 as AU-168's record.
+
+```sh
+python3 tools/proof/audio_ap6_probe.py                       # E1–E3, E6–E19
+python3 tools/proof/audio_ap6_probe.py --mutants M38,M39     # or --mutants for M1–M6, M8–M43
+python3 tools/proof/audio_ap12_probe.py --mutants M17,M18    # or --mutants for M1–M20
+AP6_ONLY=foot python3 tools/proof/audio_ap6_proof.py <dir>/agent.sock
+```
 
 ## Road map "audio" AP12 — Match Audio (`audio_ap12_probe.py` P1–P9, `audio_ap12_proof.py` A1–A8; twelve mutants; spec §11 AU-120…AU-129)
 
@@ -27169,7 +28298,7 @@ those parts while iterating; a recorded run sets nothing.
 | V1 | the tool door into a new project: the enhance row's clip `segments[0].clip`; `set` the nine keys (the leveller since AP6b) with isolation 0.8 and a gate, held by `get_project`; `result_lufs` −16 ±0.5; `set` equal to a control `enhance_voice` on an imported copy (the volume within 0.2 dB); one undo "Enhance Voice" back to the landing's audio, then nothing to undo; the landing-to-answer time over 3 runs |
 | V2 | the tool door into a document: undo "Enhance Voice", then "Add Recording" |
 | V3 | `enhance` false on both doors: no `enhance` keys, `enhance_pending` false, no sheet, the audio the landing's after 5 s, undo's top "Add Recording" |
-| V4 | the held instance, the panel door: (a) a new project — the Measuring Sound sheet seen in `snapshot_ui` (else FAIL), the audio-only export −18 ±0.5 LUFS, one undo "Enhance Voice"; (b) into a document — undo "Enhance Voice" then "Add Recording"; (c) `cancel_sheet` during the hold — unchanged, undo's top "Add Recording", `enhance_pending` false, no sheet 2 s and 5 s after |
+| V4 | the held instance, the panel door with no `follow_wait` (it waits the measurement out, #546), the sheet polled for: (a) a new project — the Measuring Sound sheet seen in `snapshot_ui` (else FAIL), the audio-only export −18 ±0.5 LUFS, one undo "Enhance Voice"; (b) into a document — undo "Enhance Voice" then "Add Recording"; (c) `cancel_sheet` during the hold — unchanged, undo's top "Add Recording", no sheet 2 s and 5 s after, and a second panel landing with no enhance answering `enhance_pending` false |
 | V5 | a movie and its microphone: only `mic_clip` enhanced, the movie clip's sound untouched |
 | V6 | `record_screen`'s refusals, exact, the project byte-identical: `enhance` "yes"; true on a screen with no microphone; `voice_over` with `place: false`; `seconds` 0 and `rate` 24 first; `source` camera |
 | V7 | a silent file: `enhance_error` "Nothing could be enhanced. …−70 LUFS…", undo's top "Add Recording"; the panel door with `follow_wait` 30: `enhance_pending` false, the clip untouched |
@@ -27184,7 +28313,7 @@ python3 tools/proof/audio_ap6c_proof.py <dir>/agent.sock
 
 The recorded runs are in `archive/audio.md`'s AP6c record.
 
-## Road map "audio" AP10 part 2b — track and bus dynamics (`audio_ap10c_proof.py` T1–T6, P1, U1, B1–B5; ten mutants; `core/tests/track_dynamics.rs`, `schema_v36.rs`; spec §11 AU-150…AU-156)
+## Road map "audio" AP10 part 2b — track and bus dynamics (`audio_ap10c_proof.py` T1–T6, P1, U1, B1–B5; eleven mutants; `core/tests/track_dynamics.rs`, `schema_v36.rs`; spec §11 AU-150…AU-156)
 
 A timeline track takes a compressor and a limiter (`tracks[].compressor`, `tracks[].limiter`,
 format 36, `set_track`), run post-fader on its sub-mix. Every export reads its mix through
@@ -27215,14 +28344,16 @@ the master. The preview runs the stage in each composition track's tap with the 
   compiled AS `main.swift` over `app/Sources` through `swift_build.py`. B1 the stage byte-identical
   at 512, 4,096 and irregular buffers, latency 158/0; B2 `ExportMixRead` single and
   byte-identical with no dynamics, sub-mixed and within −140 dB with an identity compressor, and
-  `Exporter.measureLoudness` reading the sub-mixes (> 3 LU from the undynamic project); B3 a nest
+  `Exporter.measureLoudness` reading the sub-mixes (> 3 LU from the undynamic project), and a
+  limited track of 65,600 frames, whose last drain is 4,160, handed back whole in buffers of at
+  most 4,096 (#414); B3 a nest
   bus equal to a fresh stage over its plain read plus the rest; B4 the tap's ×E/÷E — identity
   within 1e-6 (0 under 2⁻²⁰), a released limiter under a 1 → 0.1 step a pure 158-frame delay at
   48 and 44.1 kHz, and a 0.9 sine under E 0.5 passing a −6 dBTP limiter post-fader; B5 the leads
   (1,975 ticks, summed with a clip limiter's), a non-metering build's `trackDynamics`,
   `mixIsSet`, the footer and the meter's flag.
-- **`audio_ap10c_proof.py --mutants`** runs the seven probe mutants over copies of
-  `app/Sources` and prints the three run by hand.
+- **`audio_ap10c_proof.py --mutants`** runs the eight probe mutants over copies of
+  `app/Sources` (`--only M11` runs the ones named) and prints the three run by hand.
 
 | Mutant | Edit | Killed by |
 |---|---|---|
@@ -27236,10 +28367,11 @@ the master. The preview runs the stage in each composition track's tap with the 
 | M8 | the scope refusal removed | `track_dynamics.rs` (by hand) |
 | M9 | `nest` copies the dynamics | `track_dynamics.rs` (by hand) |
 | M10 | the ×E read `trackLead` ahead in ticks, not L frames | B4 (44.1 kHz) |
+| M11 | the last drain handed back as one buffer of whatever is left | B2 |
 
 ```sh
 python3 tools/proof/audio_ap10c_proof.py --probe                    # B1–B5, no app
-python3 tools/proof/audio_ap10c_proof.py --mutants                  # M1–M4, M6, M7, M10
+python3 tools/proof/audio_ap10c_proof.py --mutants                  # M1–M4, M6, M7, M10, M11
 make app-debug && python3 tools/proof/proof_app.py launch
 python3 tools/proof/audio_ap10c_proof.py <dir>/agent.sock           # B1–B5, T1–T6, P1, U1
 python3 tools/proof/audio_ap10c_proof.py <dir>/agent.sock --only T6 # one row
@@ -27273,6 +28405,9 @@ no state (`AudioLevellerRun`).
 | R3 | `needsRender` for a leveller alone; the memo key differs by its chain |
 | R4 | `choose` over one input twice is equal, the leveller on above 6 LU |
 | R5 | (not with `--quick`) the steady fixture's Enhance trial rendered three times through `ProcessedLoudness.render`, its isolated render wiped before the third: byte-identical step energies (AP6b step 3) |
+| R5's detail (#567) | on a failure, per pair of renders and for the steps and the peaks: how many differ of how many, the first one's index and time, both values at 17 digits and the largest difference in dB; and whether the isolated render made again before the third is the same bytes (SHA-256 of `cache/isolated/` before the wipe and after) |
+| R6 | the comparison R5 reports with, over synthetic arrays: equal, one step differing at a known index, another length |
+| R7 | `StepLoudnessMeter` gives byte-identical step energies and peaks for one programme fed whole, a step at a time, in 4,096-frame buffers and in uneven ones (spec §11 AU-160: a step's energy is summed once, in sample order; mutant M19, a sum per feed chunk as it was) |
 
 Then the step-2 figures (AU-67 (d)): the speech range Enhance measures on the owner's recording
 and both fixtures, each through a probe document's own loudness and speech caches, printed, and
@@ -27315,23 +28450,24 @@ stops it. The names after the socket run only those parts (P2 runs P3, P4 runs P
 |---|---|
 | P1 | `set_audio`'s leveller: `{}` the four defaults, a field merges, null clears; each bound and `threshold_db` refused by name, changing nothing; `paste_attributes` carries it; one undo |
 | P2 | the off-mic fixture, the leveller alone, 24-bit WAV: (a) the speech's range over whole segments out ≤ in − 5 LU; (b) each segment's first 0.5 s mean gain within ±3 dB of its settled gain (the median over [3 s, end − 0.5 s); AU-67 (e): the window holds the glide's end on the bed before each sentence's first word, 0.06–0.29 s in, and the sentences open 0.2–3.1 dB louder than their middles, which the curve follows; v1's carry-over, ~12 dB, still fails); (c) each pause from 0.4 s in to 0.5 s before its end moves ≤ 0.1 dB; (d) over each whole pause the gain within the gains of the 0.5 s before and after it, ±0.5 dB; every figure printed |
-| P3 | `loudness_meter` after `play_preview` 12 s from 0 within 0.01 LU of the export over the same frames; then 8 s from 20 s (a seek), its signed ΔI less a CONTROL's within 0.01 LU — the levelled export itself placed as a clip with nothing on it in a project of its own, the same two plays after its own build, against its own export — because after a seek the player hands every tap a silent zero-duration buffer carrying the seek's time, which the live meter places at the seek's frame (filed), so a seek's ΔI depends on the material's level there; the control hears the same material through the same meter, so that part cancels and a leveller-made difference still fails |
+| P3 | `loudness_meter` after `play_preview` 12 s from 0, then 8 s from 20 s (a seek), each within 0.01 LU of the export over the same frames. The seek's row was held against a control (the levelled export played as a clip of its own) until #405, while the live meter placed the player's silent filler at the seek's frame; since AU-161 it is absolute |
 | P4 | `enhance_voice` on the off-mic fixture: the leveller on at its defaults and its reason; the export at −16 ±0.5 LUFS and ≤ −1 dBTP; the last verify within 0.1 LU of −16; presses 2 and 3 "made no change" |
 | P5 | the steady fixture: the leveller null and its reason; presses 2 and 3 "made no change"; three rounds of `set_audio {volume: 1}` then `normalize_clip {mode: loudness}` give `processed_lufs` equal within 0.0005 LU and equal to Enhance's |
 | P6 | the owner's recording: `speech_range_lu`, the decision and its reason printed; the decision matches the rule; a second call "made no change" |
 | P7 | the steady fixture levelled, an action over [21, 23) s taking the target 0 → −6: against the same export with no action, 0 ±0.05 dB over [12, 21) s and −6 ±0.05 dB over [23, 32) s |
-| P8 | `snapshot_ui` on `audio.leveller`: its rows' labels (Target, Max Boost, Max Cut, Response, Status, Loudness), no Holds Under, and the Status part "Aims at …" |
+| P8 | `snapshot_ui` on `audio.leveller`: its rows' labels (Target, Max Boost, Max Cut, Response, Status, Loudness), no Holds Under, and the Status part "Aims at …"; then the clip split at 0.2 s and its first piece selected, Status "Not leveling: it plays for under 0.4 s" (#541) |
 
 ```sh
 python3 tools/proof/audio_ap6b_probe.py             # L1–L9, R1–R5, the step-2 ranges
-python3 tools/proof/audio_ap6b_probe.py --mutants   # M1–M10, M12–M15, M17
+python3 tools/proof/audio_ap6b_probe.py --soak-r5 9  # R5 alone (`--r5-only`) in fresh processes for 9 minutes or until one fails (#567; run it under other builds)
+python3 tools/proof/audio_ap6b_probe.py --mutants   # M1–M10, M12–M15, M17–M19
 make app-debug && python3 tools/proof/proof_app.py launch
 python3 tools/proof/audio_ap6b_proof.py <dir>/agent.sock
 ```
 
 The recorded runs are in `archive/audio.md`'s AP6b record.
 
-## Road map "creator-jobs" CJ2a — the analysis lane, its store and reader, and `shots` (`analysis_proof.py` P1–P9, A1–A12, Z1; ten mutants; `creator_spike/` CJ-S3, CJ-S4; spec §11 CJ-20…CJ-27)
+## Road map "creator-jobs" CJ2a — the analysis lane, its store and reader, and `shots` (`analysis_proof.py` P1–P11, A1–A14, Z1; fifteen mutants; `creator_spike/` CJ-S3, CJ-S4; spec §11 CJ-20…CJ-27, CJ-21 as amended by #435)
 
 **`analysis_fixtures.py`** makes every fixture with ffmpeg into `tools/proof/media/analysis/`
 (gitignored), reused while present (`--force` remakes them, `--flattened <socket>` also makes
@@ -27354,10 +28490,12 @@ frames composed over 20 s of a 1080p30 timeline idle and while another document'
 job runs (wanted through `analysis_job`).
 
 **`analysis_proof.py`** builds `analysis_probe.swift` from `app/Sources` with
-`FRAMEJOB_DEV_TOOLS` for P1–P9 (no app), then drives the app (`proof_app.binary()`) on a
-scratch `CFFIXED_USER_HOME` in three launches: plain (A1–A4, A8 without the flag, A9, A10,
-A12), `-RCDevAnalysisCanned YES` (A8 with it) and `-RCDevAnalysisHold 3` (A5–A7, A11, acting
-during a held job through the dev tool `analysis_job`). Z1 is each launch's parity grep.
+`FRAMEJOB_DEV_TOOLS` for P1–P11 (no app), then drives the app (`proof_app.binary()`) on a
+scratch `CFFIXED_USER_HOME` in four launches: plain (A1–A4, A8 without the flag, A9, A10,
+A12), `-RCDevAnalysisCanned YES` (A8 with it), `-RCDevAnalysisHold 3` (A5–A7, A11, acting
+during a held job through the dev tool `analysis_job`) and `-RCDevAnalysisHold 50` (A13, a
+call that gives up at its 60 s wait about 10 s into its job). Z1 is each launch's parity grep.
+A14 and its two launches came with hygiene c2 (#429): its record is at the end of this file.
 
 | Row | What it holds |
 |---|---|
@@ -27370,6 +28508,8 @@ during a held job through the dev tool `analysis_job`). Z1 is each launch's pari
 | P7 | the VFR twin: the 21 records after each gap equal from a whole-file job and from one starting just after the gap; the cut at 4 s found by both |
 | P8 | two disjoint publishes from one on-disk state, in either order and at once, both kept |
 | P9 | a publish started during a save (`CacheLedger.saveBegan`) writes no marker or payload until `saveEnded`, then both |
+| P10 | a shots job cancelled at half answers false and keeps what it stored: one range [0, k], records 0…k byte-equal to a whole run's (#435) |
+| P11 | a cancelled job's publish only merges: under another stamp it leaves the cache byte-identical, under its own it merges, on an empty cache it writes; an ordinary publish still replaces |
 | A1 | exactly the fixture's cuts (60, 120, 180, 240): none at the flash or in the dissolve; a job ran |
 | A2 | a second call `cached: true`, no `run`, marker and payload bytes unchanged |
 | A3 | a window inside the coverage is a hit; one past it runs only the missing range, the coverage the union |
@@ -27382,19 +28522,21 @@ during a held job through the dev tool `analysis_job`). Z1 is each launch's pari
 | A10 | `set_media_color` S-Log3: a miss whose stamp names the converted reader; cleared, another miss, raw |
 | A11 | `relink_media` to the same bytes during a held job: the job lands after it |
 | A12 | a trimmed, a ×2 and a reversed clip: every cut in its window once, at its `clip_time` and `timeline` |
+| A13 | `get_media_analysis {kind: masks}` on `hlg_4k.mov` past its 60 s wait refuses "call again to continue", and within 15 s the masks marker covers one range [0, k], k < 599, with `masks.pack` there (#435) |
 
 Mutants (each must fail its row): `stamp-no-os-build` P1, `stamp-no-reader` A10,
 `write-outside-publish` P9, `partial-taken-covered` A3, `margin-unread` A9, `width-wrong` A7,
 `flash-rule-removed` A1, `canned-without-flag` A8, `hold-no-cancel-poll` A6,
-`preroll-by-index` P7. A probe row's mutant edits a copy of `app/Sources`; an app row's builds
-a tree copy (`tree_copy.py`).
+`preroll-by-index` P7, `cancel-unpublished-shots` P10, `cancel-replaces-stamp` P11,
+`cancel-unpublished-masks` A13. A probe row's mutant edits a copy of `app/Sources`; an app
+row's builds a tree copy (`tree_copy.py`).
 
 ```sh
 python3 tools/proof/analysis_fixtures.py
 python3 tools/proof/creator_spike/shots_spike.py [--socket <sock>]
 python3 tools/proof/creator_spike/lane_spike.py
 python3 tools/proof/creator_spike/lane_spike.py --playback --socket <dir>/agent.sock
-python3 tools/proof/analysis_proof.py --only P1,P2,P3,P4,P5,P6,P7,P8,P9
+python3 tools/proof/analysis_proof.py --only P1,P2,P3,P4,P5,P6,P7,P8,P9,P10,P11
 make app-debug && python3 tools/proof/analysis_proof.py
 python3 tools/proof/analysis_proof.py --mutant <name>
 ```
@@ -27433,11 +28575,11 @@ python3 tools/proof/creator_spike/ceiling_spike.py --n 4096 --headroom 1024 --pr
 
 The recorded run is in `designs/creator-jobs.md`'s CJ6 record.
 
-## Road map "creator-jobs" CJ2b — the Analyzing sheet and Clip ▸ Split at Shot Changes (`shot_split_proof.py` S1–S8, S4n, Z1; eight mutants; spec §11 CJ-28, CJ-29)
+## Road map "creator-jobs" CJ2b — the Analyzing sheet and Clip ▸ Split at Shot Changes (`shot_split_proof.py` S1–S9, S4n, Z1; nine mutants; spec §11 CJ-28, CJ-29, #427)
 
 **`shot_split_proof.py`** drives the app (`proof_app.binary()`) on a scratch
 `CFFIXED_USER_HOME` in two launches, its packages saved under
-`tools/proof/work/shot-split-proof/`: plain (S1–S4, S4n, S8, through `split_at_shots`) and
+`tools/proof/work/shot-split-proof/`: plain (S1–S4, S4n, S8, S9, through `split_at_shots`) and
 `-RCDevAnalysisHold 3` (S5–S7, through `perform_menu_item` Clip ▸ Split at Shot Changes and the
 Analyzing sheet, each row on its own fresh package so every press misses the cache). Its
 fixtures are `analysis_fixtures.py`'s `shots.mov` and `shots_sound.mov` (`shots.mov`'s video
@@ -27452,6 +28594,7 @@ each launch's parity grep.
 | S4 | a picture with its detached sound and fillers to 4,091 clips: refused naming 8 and 5, the clip count and the undo top unchanged; three fillers deleted, `added: 8` and the sound cut at the same four times |
 | S4n | a nest holding `shots.mov` and top-level fillers to 4,093 clips (nests counted): inside the nest refused naming 4 and 3 in the composite's sentence; one filler deleted, `added: 4` |
 | S8 | two placements playing 0…2 s and 8…10 s: the shots marker's coverage holds no range over index 150 (the union of the windows, never their hull) |
+| S9 | spec §11 #427 (e): `shots.mov` at 0 with a 6 s text clip moved 80 frames onto its tail (a dissolve): the cut at 240 would leave a 140-frame piece under it by 80, so the call is refused whole in "Split at Shot Changes was refused at split: " and the core's sentence naming the two clips, the project and the undo top unchanged; the text clip moved 10 frames later (70, half of 140) it splits at all four |
 | S5 | the menu puts the Analyzing sheet up; `cancel_sheet` (Stop): for 10 s no clip added and no marker |
 | S6 | the sheet up; within 30 s S1's split lands, and `undo` answers "Split at Shot Changes" |
 | S7 | the sheet up; `add_marker` while it is held: after it goes nothing is split and the marker is kept |
@@ -27461,7 +28604,8 @@ Mutants (each must fail its row; every one builds a tree copy, `tree_copy.py`):
 checked before the splits, so the core's cap refuses only the splits past it after the first
 ones land), `partners-uncounted` S4, `ceiling-counts-scope` S4n (`clipCount` of the scoped
 view), `windows-hulled` S8, `stop-keeps-want` S5 (the sheet's one release of its owner removed),
-`stale-test-removed` S7.
+`stale-test-removed` S7, `split-trial-removed` S9 (the splits not tried one at a time first, so
+the other three land around the refused one).
 
 The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 108, and `split_at_shots` in
 `APP_STATE_TOOLS` of `phase9_proof.py`, `recording_proof.py` and `recording_probe.py`. Every
@@ -27525,12 +28669,12 @@ python3 tools/proof/cutout_spike/cutout_spike.py --only s1            # then --o
 python3 tools/proof/cutout_spike/cutout_spike.py --only s2 --pack     # the mask pack measured whatever the track answers
 ```
 
-## Road map "creator-jobs" CO1 — person masks on the Mac (`co1_proof.py` P1–P10, M1–M9, Z1; eight mutants; `cutout_spike/` `--only device`; `creator_spike/lane_spike.py --playback --kind masks`; spec §11 CO-10…CO-15)
+## Road map "creator-jobs" CO1 — person masks on the Mac (`co1_proof.py` P1–P11, M1–M9, Z1; nine mutants; `cutout_spike/` `--only device`; `creator_spike/lane_spike.py --playback --kind masks`; spec §11 CO-10…CO-15)
 
 **`co1_proof.py`** builds `co1_probe.swift` from `app/Sources` with `FRAMEJOB_DEV_TOOLS` through `swift_build.py`.
-- **P1–P10** are probe rows: the pack's bytes, the append-merge publish (`AnalysisStore.publishFile`), `shown(at:)`, the found flag, the stamp's `vision` field, a throwing write, a publish during a save, `runs` with the capped rate's nearest slot and `covered`, a marker whose pack is deleted, garbage or another size, and a publish of a range that made no mask (0 × 0, no frames), which keeps the pack and widens its coverage.
+- **P1–P11** are probe rows: the pack's bytes, the append-merge publish (`AnalysisStore.publishFile`), `shown(at:)`, the found flag, the stamp's `vision` field, a throwing write, a publish during a save, `runs` with the capped rate's nearest slot and `covered`, a marker whose pack is deleted, garbage or another size, a publish of a range that made no mask (0 × 0, no frames), which keeps the pack and widens its coverage, and (P11, #456) `AnalysisMasks.run` over a request whose one range lies wholly past the grid, with a missing file: true, no trap, no progress, nothing published. Its mutant `masks-crossed-range` (the guard on the clamped bounds removed) traps, so the probe gives no answer and P11 fails.
 - The probe's `compare` mode is the app rows' mask reader. It answers, for a pair of packs, their sizes, frame counts, the pts both hold, and at those pts the largest byte difference and the IoU above 127. The proof never decompresses LZFSE itself; it parses the tables in Python.
-- **M1–M9** are app rows over `get_media_analysis {kind: "masks"}` and `analysis_job`, each launch on a scratch `CFFIXED_USER_HOME`, with Z1 each launch's parity grep. M9 is Release only (Debug's per-pixel loops are unoptimised; on Debug it prints SKIP). On Debug the third arm reads about half a frame a second, so M4 takes about 20 minutes there.
+- **M1–M9** are app rows over `get_media_analysis {kind: "masks"}` and `analysis_job`, each launch on a scratch `CFFIXED_USER_HOME`, with Z1 each launch's parity grep. M8 closes the document during a running job: the outcome `cancelled`, the marker and pack read after the run ended unchanged 3 s later, and a marker the cancelled job wrote covering one range from 0 (spec §11 CJ-21 as amended by #435). M9 is Release only (Debug's per-pixel loops are unoptimised; on Debug it prints SKIP). On Debug the third arm reads about half a frame a second, so M4 takes about 20 minutes there.
 
 The fixtures are `cutout_spike.fixtures()`'s and the proof's own, all in `tools/proof/media/cutout/`:
 - `push_60.mov`: `push_1080.mov` looped three times, `-c copy`.
@@ -27542,14 +28686,14 @@ The fixtures are `cutout_spike.fixtures()`'s and the proof's own, all in `tools/
 - `push_640_relinked.mov`: M6's relink target, `push_640.mov` with a title.
 
 ```sh
-python3 tools/proof/co1_proof.py --only P1,P2,P3,P4,P5,P6,P7,P8,P9,P10   # no app
+python3 tools/proof/co1_proof.py --only P1,P2,P3,P4,P5,P6,P7,P8,P9,P10,P11   # no app
 make app-debug && python3 tools/proof/co1_proof.py
 RC_PROOF_APP=release python3 tools/proof/co1_proof.py                 # the recorded run, M9 included
 python3 tools/proof/co1_proof.py --mutant <name>
 python3 tools/proof/creator_spike/lane_spike.py --playback --kind masks --socket <dir>/agent.sock   # CO-12, Release
 ```
 
-## Road map "creator-jobs" CJ3 — face samples on the Mac (`faces_proof.py` P1–P5, F1–F7, Z1; five mutants; `creator_spike/faces_spike.py`; `creator_spike/lane_spike.py --playback --kind faces`; spec §11 CJ-30…CJ-35)
+## Road map "creator-jobs" CJ3 — face samples on the Mac (`faces_proof.py` P1–P7, F1–F7, Z1; seven mutants; `creator_spike/faces_spike.py`; `creator_spike/lane_spike.py --playback --kind faces`; spec §11 CJ-30…CJ-35)
 
 **`face_fixtures.py`** makes the face fixtures in `tools/proof/media/analysis/` (gitignored) and
 `faces.json` beside them. The pictures are read in place from Photos' FlexAudio covers
@@ -27580,7 +28724,14 @@ through `swift_build.py`.
 - **P1–P5** are probe rows: `samples.bin`'s round trip, the merge in either order, a damaged
   file written fresh; CJ-31's order and `topLeft`; the sample a frame serves (25 fps at 10 a
   second, a gap); the stamp; `facesAnswer`'s 4 decimals, nulls, row bytes (printed for CJ-34)
-  and cap.
+  and cap; P6 a faces job over samples 0…99 cancelled at half keeps the samples decided, byte-equal
+  to a whole run's (#435); P7 on the rotation-tagged portrait, a `read` that never asks turns no
+  picture upright and the sample job turns exactly one per analysed sample (#437).
+- F3's detail prints the rotated media's last job's seconds, its calls' seconds and both
+  `samples.bin` files' SHA-256, #437's before and after on one build class.
+- Mutants: `device-unpinned` (P4), `orientation-ignored` (F3), `y-not-flipped` (P2),
+  `source-in-clip-ticks` (F1), `nearest-frame` (P3), `cancel-unpublished-sample-job` (P6),
+  `eager-upright` (P7).
 - **F1–F7** are app rows over `get_media_analysis {kind: "faces"}` on one launch with a scratch
   `CFFIXED_USER_HOME`, and Z1 its parity grep. F5 (S-TH1's mouth gap) is skipped by name and owed.
 
@@ -27588,14 +28739,14 @@ through `swift_build.py`.
 python3 tools/proof/face_fixtures.py
 python3 tools/proof/creator_spike/faces_spike.py --selftest
 python3 tools/proof/creator_spike/faces_spike.py                      # CJ-S2, on AC
-python3 tools/proof/faces_proof.py --only P1,P2,P3,P4,P5             # no app
+python3 tools/proof/faces_proof.py --only P1,P2,P3,P4,P5,P6,P7       # no app
 make app-debug && python3 tools/proof/faces_proof.py
 RC_PROOF_APP=release python3 tools/proof/faces_proof.py              # the recorded run
 python3 tools/proof/faces_proof.py --mutant <name>
 python3 tools/proof/creator_spike/lane_spike.py --playback --kind faces --socket <dir>/agent.sock   # CJ-35, Release
 ```
 
-## Road map "creator-jobs" FC3 — sound events heard on the Mac (`sound_events_proof.py` P1–P9, E1–E11, Z1; six mutants; `creator_spike/sound_spike.py`; spec §11 FC-30…FC-34)
+## Road map "creator-jobs" FC3 — sound events heard on the Mac (`sound_events_proof.py` P1–P10, E1–E11, Z1; seven mutants; `creator_spike/sound_spike.py`; spec §11 FC-30…FC-34)
 
 **`creator_spike/sound_spike.py`** is spike FC-S1: `sound_spike.swift` (built over
 `swift_build.app_sources()`, optimised; modes `labels` and `run <file> <window> file|stream`)
@@ -27617,25 +28768,27 @@ Results in `tools/proof/work/creator_spike/FC-S1/results.json` (`agreement_metri
 MP3, a test-picture movie with that sound, a picture with none, and 9.0, 9.1 and 9.4 s cuts), and
 builds `sound_events_probe.swift` from `app/Sources` with `FRAMEJOB_DEV_TOOLS` through
 `swift_build.py`.
-- **P1–P9** are probe rows: `windows.bin`'s round trip with NaN, the merge in either order, a
+- **P1–P10** are probe rows: `windows.bin`'s round trip with NaN, the merge in either order, a
   damaged file written fresh; the hop grid; the stamp (reader `raw` with `color.log` set); the
   MP3's windowed read past its encoder delay against the WAV; ×2 and ramped placement against
   `MediaPeaks.sourceTick`, a reversed clip none; a run cancelled once four windows are covered;
   halves against a whole run within 0.01 (FC-30: the values move in the third decimal under
   load); `soundEventsAnswer`'s decimals, nulls and cap; the NaN tail against the decoded sound's
-  end on the three cuts, and a whole lookup's hit.
+  end on the three cuts, and a whole lookup's hit; a run at the default publish interval
+  cancelled at half keeping its answered prefix (#435).
 - **E1–E11** are app rows over `get_media_analysis {kind: "sound_events"}` and `analysis_job`
   on a plain launch (E1–E4, E6–E8) and one with `-RCDevAnalysisHold 3` (E5, E11), each with a
   scratch `CFFIXED_USER_HOME` and Z1 its parity grep. E9 (S-EV recall) and E10 (S-MU
   confusion) are skipped by name and owed.
 - Mutants: `window-start` (P2, E6), `mp3-trim-skipped` (P4), `early-publish` (P6),
-  `cover-whole-range` (P9, P7), `table-version` (P3), `sound-holds-picture` (E11); one with an
+  `cover-whole-range` (P9, P7), `table-version` (P3), `sound-holds-picture` (E11),
+  `cancel-unpublished-sound` (P10); one with an
   app row builds a copy of the tree with `make app-debug` (`tree_copy.py`).
 
 ```sh
 python3 tools/proof/creator_spike/sound_spike.py --selftest
 python3 tools/proof/creator_spike/sound_spike.py                         # FC-S1, on AC
-python3 tools/proof/sound_events_proof.py --only P1,P2,P3,P4,P5,P6,P7,P8,P9   # no app
+python3 tools/proof/sound_events_proof.py --only P1,P2,P3,P4,P5,P6,P7,P8,P9,P10   # no app
 make app-debug && python3 tools/proof/sound_events_proof.py
 RC_PROOF_APP=release python3 tools/proof/sound_events_proof.py           # the recorded run
 python3 tools/proof/sound_events_proof.py --mutant <name>
@@ -27848,12 +29001,13 @@ python3 tools/proof/vr2b_proof.py --only 6,6b,7,7b,9,10     # Debug, in the loop
 python3 tools/proof/screens.py --only 15i-follow-subject-sheet
 ```
 
-## Road map "creator-jobs" VR3a — Make Vertical's step, its copy and `make_vertical_version` (`vr3_proof.py` rows 1–11, Z1 per launch; seven mutants; spec §11 VR-30…VR-37)
+## Road map "creator-jobs" VR3a — Make Vertical's step, its copy and `make_vertical_version` (`vr3_proof.py` rows 1–11 and 14, Z1 per launch; eight mutants; spec §11 VR-30…VR-37, #460)
 
 **`vr3_proof.py`** drives the app (`proof_app.binary()`) on a scratch `CFFIXED_USER_HOME` in two
 launches, its packages under `tools/proof/work/vr3-proof/`. The media is one ffmpeg `testsrc`
 movie (1920 × 1080, 30 fps, 50 s, H.264) copied per media and a `testsrc` PNG (480 × 270); the
-analyses are `canned_framing.py`'s. Launch 1 is `-RCDevAnalysisCanned YES` (rows 1–10) over the
+analyses are `canned_framing.py`'s. Launch 1 is `-RCDevAnalysisCanned YES
+-RCDevVerticalSaveFault fault.framejob` (rows 1–10 and 14) over the
 fixture `src.framejob` (1920 × 1080, 30 fps, magenta background): a white plate [0, 2) s, still
 faces A, C (a zoom-and-volume action), D (a During Drift), E (scale 1.25), I (with an
 `add_blurred_background` copy) and J (on its own track under an alpha matte track holding the
@@ -27877,6 +29031,7 @@ y′ − k·y).
 | 9 | the copy's `cache/analysis/` holds every source file byte for byte; a second run from the source answers `cached` true, `analysis_job`'s `lane_queued` unchanged |
 | 10 | a 64-track source: "Make Vertical was refused at add_track: " and "too many tracks", no window |
 | 11 | (launch 2) `zoom: 5` answers the core's "zoom must be between 1 and 4 times fill, not 5" within 5 s, `lane_queued` unchanged; then the plain call answers `analyzing` past the 60 s bound, no window |
+| 14 | (#460) `{shape: "9:16", path: …/fault.framejob}`, whose save `-RCDevVerticalSaveFault fault.framejob` fails: the call answers the save's error ("… could not be saved …"); nothing is at the path; `get_project {project: path}` refused (the copy closed); the window count, the source's `get_project` project and its undo top unchanged |
 | Z1 | each launch's log has no `Frame Job: ` line |
 
 The mutants, each edited into the tree, a Debug app built with it (`make app-debug`), its row
@@ -27893,6 +29048,8 @@ run and the file restored, every one CAUGHT (its row FAIL, exit 1):
 - **blurred-after-picture** (3): the backdrop class tested after the picture class.
 - **continue-after-add-track** (10): `opening`'s add_track refusal answered with
   `.opened(trial, backgrounds: <the back-most track>)`.
+- **save-cleanup-removed** (14, #460): `makeVerticalVersion`'s catch around the save only
+  rethrows (no `close()`, no `removeItem`), so the package stays at the path and the copy open.
 
 The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 124, and `make_vertical_version` in
 `APP_STATE_TOOLS` of `phase9_proof.py`, `recording_proof.py` and `recording_probe.py`.
@@ -27900,7 +29057,7 @@ The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 124, and `make_verti
 "`make_vertical_version` with `path`".
 
 ```sh
-make app-debug && python3 tools/proof/vr3_proof.py [--only 1,3,8]
+make app-debug && python3 tools/proof/vr3_proof.py [--only 1,3,8,14]
 make app && RC_PROOF_APP=release python3 tools/proof/vr3_proof.py
 ```
 
@@ -28320,7 +29477,7 @@ C1 there; `played-span` builds the app in a tree copy
 and P11b (its anchor moved with TX2a's factored read: the tool's
 `items.append(item)` now appends the item with the played length).
 
-## Road map "creator-jobs" TX2a — the Transcript tab (`transcript_tab_proof.py` T0–T10, T3p, T4p, Z0, M1, T2–T4, T6, T11, T12; seven mutants; `transcript_spike/` TX-S2; spec §11 TX-20…TX-23)
+## Road map "creator-jobs" TX2a — the Transcript tab (`transcript_tab_proof.py` T0–T10, T3p, T4p, T16, T17, Z0, M1, T2–T4, T6, T11, T12; seven mutants and #444's three; `transcript_spike/` TX-S2; spec §11 TX-20…TX-23)
 
 ```sh
 python3 tools/proof/transcript_spike/view_spike.py [--measure]
@@ -28356,7 +29513,15 @@ above the text included, where the line answers `NSNotFound`): every answer
 inside the text, never a trap (the owner's CP1 crash, 2026-11-06); T15p eighteen
 drags along a line (middle, top or bottom; straight, wobbling or past the edge;
 paused, then looping while playing), none moving the scroll more than 0.5 pt
-(TX-22 at CP1).
+(TX-22 at CP1); T16 (#444, TX-34 as amended) a voice cache replaced under
+preloaded `.assemblyai` words (alpha [10.0, 10.4) s, beta [12.9, 13.3) s, an
+all-voiced cache before) — written with its `SpeechStamp` marker and announced
+by `MediaImporter.postCacheChange`, as `word_onset_probe.swift`'s U9 — puts one
+pause token after clip 3's alpha and a paragraph break before beta within 5 s;
+T17 (#444) the same landing while the tab's cloud load of a planted transcript
+(`MediaTranscript.write` and `writeStamp`) is held by
+`TranscriptTabSource.loadHold`, as U10: after the release the cloud words show
+with the new cache's pause and paragraph break.
 
 **The app rows** (one `assistant_session_proof.App` with dummy keys,
 `assemblyai_fake.py` and `anthropic_fake.py`, as TX1's): Z0 the schema and
@@ -28364,7 +29529,10 @@ the parity log; M1 View ▸ Transcript and the hidden-tab refusal; T2 the tab's
 tokens against `get_timeline_transcript` on TX1's `say` fixtures (two tracks,
 a nest, a locked track, a clip with its audio off); T3 the highlight after
 `play_preview`; T4 a click; T6 27,000 words served by the fake for a 3,600 s
-silent AAC (`ffmpeg anullsrc`), five `split`s and the median rebuild; T12 the
+silent AAC (`ffmpeg anullsrc`), five `split`s and the median rebuild under
+100 ms, the one Release-only row (#522: a named SKIP on an app whose
+`CFBundleIdentifier` is Debug's, where the same rebuild takes about 250 ms;
+`RC_PROOF_APP=release` runs it); T12 the
 playhead's media read first and shown while the long WAV (`long_fixture`)
 still reads, then the tab hidden and shown again with the long run started
 over. T11 runs `view_spike.py --measure`.
@@ -28373,7 +29541,11 @@ Mutants: `highlight-containment`, `follow-pause-ignored`, `space-consumed`,
 `paragraph-1.0s`, `live-rebuild`, `clip-picked-switches` and
 `line-index-unchecked` (T14p) and `drag-follows` (T15p) rebuild the probe over a
 copy of `app/Sources`; `one-wait` builds the app in a tree copy
-(`work/transcript_tab/mutant-app-one-wait/`) and runs T12.
+(`work/transcript_tab/mutant-app-one-wait/`) and runs T12. #444's three rebuild
+the probe too: `speech-kept` (the pane's `reloadSpeech` call removed; T16),
+`paragraphs-kept` (`reloadSpeech` returns after its drop, so the pause set is not
+read again; T16's paragraph half) and `cloud-epoch-unchecked` (the cloud arm's
+epoch check removed; T17).
 
 ### TX2b — the tab's bar (`transcript_tab_proof.py` B1–B4; two mutants; spec §11 TX-24…TX-27)
 
@@ -28443,7 +29615,7 @@ make app-debug && python3 tools/proof/co2a_proof.py [--only IDS] [--app PATH]
 
 The recorded runs are in `designs/creator-jobs.md`'s CO2a1 record.
 
-## Road map "creator-jobs" CO2a2 — Remove Background drawn (`co2a_proof.py` D1p, D1, D2, D3, D4, D6, D7, D11, D12, D15, D16 beside CO2a1's rows; nine mutants; spec §11 CO-24…CO-29)
+## Road map "creator-jobs" CO2a2 — Remove Background drawn (`co2a_proof.py` D1p, D1, D2, D3, D4, D6, D7, D11, D12, D15, D16 and MA beside CO2a1's rows; ten mutants; spec §11 CO-24…CO-29)
 
 The same script, its probe built with `cutout_spike/mask_track_writer.swift` (CO-S2's bar code)
 beside `app/Sources`. Since CO2b it runs two launches: the canned rows' with
@@ -28468,19 +29640,22 @@ first use; `push_1080.mov` and `screen_4k.mov`, `cutout_spike.fixtures()`'s.
 | D6 | a blur-0 shadow's alpha is the cut layer's, shifted 20 px, ±1 |
 | D7 | the HLG project's alpha within 1/255 of the SDR project's |
 | D12 | a 90°-tagged bar-code clip: picture and alpha codes both k |
-| D15 | a cutout-less project's three PNGs and a 2 s `prores_4444` export's frame md5s equal the base's app (`BASE`, built in a tree copy) |
+| D15 | a cutout-less project's three PNGs and a 2 s `prores_4444` export's frame md5s equal the base's app: `--base REV`, else `tree_copy.default_base()`, built WHOLE from its own Swift, core and header in `work/co2a-base/` (`tree_copy.make_base_copy`; #440), the fixture written at the base's format version |
+| MA | every mutant's every anchor occurs exactly once in the tree (text only, first in a plain run) |
 
 Mutants (`--mutant NAME`, each in a tree copy built as the run's configuration): `partner-box`
 (the `partnerBox` cutout clause, D1), `oriented-uv` (the mask sampled through `orientedUV`, D12),
 `one-frame-late` (D1), `nearest-frame` (the source tick rounded to a frame, D1), `miss-transparent`
 (a miss draws the layer at opacity 0, D3), `shadow-placeholder` (D6), `co5-per-range` (a window
 with any analysed run counts as found, D4), `mask-lifted` (the mask's value changed in an HLG
-project, a stand-in for a lift through step 0, D7) and `pivot` (the reversed query at `T − s`,
-D16).
+project, a stand-in for a lift through step 0, D7), `pivot` (the reversed query at `T − s`,
+D16) and `unmasked-dimmed` (CO-27's gate given an off arm that multiplies an unmasked layer's alpha
+by 0.98, D15; removing the gate alone draws the same bytes, because the placeholder mask is white
+and `cutoutCover(1)` is 1).
 
 ```sh
 make app-debug && python3 tools/proof/co2a_proof.py --only B0,D13p,D1p
-make app-debug && python3 tools/proof/co2a_proof.py [--only IDS] [--app PATH]
+make app-debug && python3 tools/proof/co2a_proof.py [--only IDS] [--app PATH] [--base REV]
 RC_PROOF_APP=release python3 tools/proof/co2a_proof.py --mutant NAME
 ```
 
@@ -28516,7 +29691,10 @@ Mutants (`--mutant NAME`, each in a tree copy built as the run's configuration, 
 the copy's `app/Sources`; the tree's mutated files' SHA-256 read before and after):
 `M1-no-export-wait` (W4), `M2-wait-after-guard` (W4b), `M3-open-only` (`ensureMasks()` only at
 the open, W2), `M4-unbounded-frame` (W3), `M5-no-release` (W7), `M6-kept-empty` (P2, W8),
-`M7-export-previous-empty` (W9), `M8-queued-as-running` (P2).
+`M7-export-previous-empty` (W9; since #572 the export's wait building its requests through
+`CutoutWants.requests` with nothing kept, in `Exporter+Masks.swift`, because the read of the
+open requests moved into `CutoutWants.wants`, which the document and the frame wait share),
+`M8-queued-as-running` (P2).
 
 ```sh
 python3 tools/proof/co2b_proof.py --only P1,P2
@@ -28595,7 +29773,7 @@ Mutants: nine are probe mutants on a copy of `app/Sources`
 (U6). `no-replan` builds the app in a tree copy
 (`work/transcript_cut/mutant-app-no-replan/`) and runs C9.
 
-## Road map "creator-jobs" CJ5b — File ▸ New Project from Range… and the derived document (`derived_proof.py` D1–D11, Z1; six mutants; spec §11 CJ-51, CJ-52)
+## Road map "creator-jobs" CJ5b — File ▸ New Project from Range… and the derived document (`derived_proof.py` D1–D12, Z1 with `derived_carry_probe.swift`; eight mutants; spec §11 CJ-51, CJ-52, #459)
 
 **`derived_proof.py`** drives the app (`proof_app.binary()`) on a scratch
 `CFFIXED_USER_HOME` in three launches, its packages saved under
@@ -28623,13 +29801,17 @@ launch's parity grep.
 | D9 | `carried` files, bytes and seconds of two calls over two movies and two sound files, recorded; S-PC1 from `tools/proof/media/creator/` when present, else skipped by name and owed |
 | D10 | the source's `get_project` project and undo top unchanged by the call; File ▸ New Project from Range… (`perform_menu_item`) opens "d1-source (range)" untitled and dirty, the source unchanged again |
 | D11 | an assistant turn calling `new_project_from_range` with `path` waits on "new_project_from_range writes <path>"; `assistant_answer deny` sends the model "The person declined: …" and nothing is at the path |
+| D12 | (#459; a probe row, `derived_carry_probe.swift` built from `app/Sources` through `swift_build.py`, no app) a scratch source cache with `thumbs/3/0.jpg`…`41.jpg`, peaks and a shots marker and payload, listed by `DerivedCarry.listing`; `40.jpg` removed before `copy(_ listing:…)`: no throw, one file fewer carried, every other file byte-identical, no `40.jpg`; then a read-only destination `thumbs/3/`: the throw "cache/thumbs/3/0.jpg could not be carried: Permission denied" |
 
 Mutants (each must fail its row; every one builds a tree copy, `tree_copy.py`; CAUGHT exits 1,
 SURVIVED 0, a control not performed 2): `deleted-transcript-carried` D4 (every cloud transcript
 carried), `reverse-not-carried` D5, `windows-before-caches` D3 (`makeWindowControllers()` before
 the caches land, so a pass starts), `every-module-carried` D6, `caches-in-temp-then-saved` D8
 (the path package opened untitled, its caches in a temporary folder, and saved after),
-`source-edited` D10 (the tool applies `keep_range` to the source first).
+`source-edited` D10 (the tool applies `keep_range` to the source first). D12's two
+(`vanished-throws`, the skip removed; `skip-every-failure`, every failed clone skipped) copy
+only `app/Sources` and rebuild the probe: no tree copy, no app, no Z1. A selection with no app
+row (`--only D12`, either of them) launches nothing.
 
 The pinned counts: `op_argument_proof.py`'s `PRODUCT_TOOLS` 110, and `new_project_from_range`
 in `APP_STATE_TOOLS` of `phase9_proof.py`, `recording_proof.py` and `recording_probe.py`.
@@ -28637,6 +29819,7 @@ in `APP_STATE_TOOLS` of `phase9_proof.py`, `recording_proof.py` and `recording_p
 with `path`".
 
 ```sh
+python3 tools/proof/derived_proof.py --only D12   # no app
 make app-debug && python3 tools/proof/derived_proof.py [--only D1,D3,D4]
 RC_PROOF_APP=release python3 tools/proof/derived_proof.py [--mutant <name>]
 ```
@@ -28688,7 +29871,7 @@ python3 tools/proof/retime_proof.py --mutant <name>
 
 The recorded runs are in `designs/creator-jobs.md`'s CU9a record.
 
-## Road map "creator-jobs" CO3 — Remove Background in the inspector and the menus (`co3_proof.py` I1–I8 with I6p, Z1; eight mutants; spec §11 CO-30…CO-32)
+## Road map "creator-jobs" CO3 — Remove Background in the inspector and the menus (`co3_proof.py` I1–I11 with I6p, Z1; twelve mutants; spec §11 CO-30…CO-32)
 
 **`co3_proof.py`** builds `co3_probe.swift` from `app/Sources` with `swift_build.py`'s line (its
 `centroid <request.json>` mode is the probe's OWN centroid of a pack, `MaskPack` and its own
@@ -28707,6 +29890,9 @@ Status is read from `snapshot_ui`'s layout dump: the first `option.display` part
 | I5 | (probe) Clip ▸ Remove Background after Look, no key; two clips: off, mixed, then on after the toggle, which cuts out only the bare clip (the other's edge 0.3 kept) as one undo step one undo takes back |
 | I6p | (probe) the probe's own centroid over a hand-made 4 × 2 pack is (3.0, 5.0) over 2 frames, and `CutoutStatus.centroid` agrees |
 | I8 | (probe) `CutoutStatus.progress`: running 0…999 at 0.4, running 200…999 at 0.25 and no running request, each 0.400 over need 0…999 with 0…399 covered |
+| I9 | (probe, its `header <request.json>` mode, a process of its own with `-RCDevAnalysisHold 3600` registered first; #438) a cut-out clip's Background section, shut, in an offscreen window: Status and the header's summary both "Analyzing 0 %"; the running request's fraction set to 0.5 (`AnalysisLane.devSetProgress`), both "Analyzing 50 %" within 1.5 s |
+| I10 | (probe; #438) `CutoutStatus.stamp` of a media at `work/stamp.mov`: nil while the file is absent, a stamp once it is written |
+| I11 | (probe; #438) `AgentServer.cutoutDetails` with a counting `read`: nothing kept reads 3; [ready, analysing, failed] kept under the same handles reads only the analysing clip and keeps the other two; the same kept under another `project` handle reads 3 |
 | I2 | launch H (`-RCDevAnalysisHold 3600`): Status "Analyzing 0 %"; launch N: "Ready" on the push-in, `no_person` and "No person found" on the screen recording |
 | I4 | launch H: `analyze_cutout {wait: 0}` analysing, not ready, `covered < frames`, centroid null; launch N: `{wait: 60}` ready with `covered == frames ==` `get_media_analysis {media, kind: masks}`'s frames over the clip's need (one frame more than `{clip}`'s window: the frame at its end the last tick can ask for) |
 | I6 | launch N: `analyze_cutout`'s centroid against the probe's over the need and the marker's coverage, within 1e-6 px |
@@ -28718,10 +29904,13 @@ the copy's `app/Sources`; the tree's mutated files' SHA-256 read before and afte
 `M1-unregistered` (I1), `M2-no-structural` (I3), `M3-early-answer` (I4), `M4-no-mixed` (I5),
 `M5-unscaled` (I6), `M6-no-retry` (I7), `M7-failure-first` (I7: any failed run of the media
 fails a clip, checked before `covered == frames` — objection 4's two guards together, since
-either alone keeps clip A ready), `M8-progress-over` (I8).
+either alone keeps clip A ready), `M8-progress-over` (I8); #438's: `M9-header-stale` (I9: the
+progress-only tick refreshes the read-out alone again), `M10-nil-memoised` (I10: the nil stamp
+stored), `M11-reread-settled` (I11: the kept details ignored), `M12-held-across-edit` (I11: the
+handle comparison removed).
 
 ```sh
-python3 tools/proof/co3_proof.py --only I1,I3,I5,I6p,I8
+python3 tools/proof/co3_proof.py --only I1,I3,I5,I6p,I8,I9,I10,I11
 make app-debug && python3 tools/proof/co3_proof.py [--only IDS] [--app PATH]
 RC_PROOF_APP=release python3 tools/proof/co3_proof.py --mutant NAME
 ```
@@ -29497,7 +30686,7 @@ crosstalk passage never one turn), after SW-22 (a)'s crosstalk bridge its second
 b24_f45's one late cut), and after SW-S4's named limit (the owner's second answer) its third
 (59/75, `CHOSEN bleed_db 15, dominance_db 8, floor_margin_db 6`, the draft). No person check.
 
-## Road map "creator-jobs" SW2b — Switch by Speaker's sheet, tool and Program track (`switch_speaker_proof.py` S1–S13, Z0; ten mutants; spec §11 SW-23, SW-26)
+## Road map "creator-jobs" SW2b — Switch by Speaker's sheet, tool and Program track (`switch_speaker_proof.py` S1–S15, Z0; thirteen mutants; spec §11 SW-23, SW-26, #457, #602)
 
 **`switch_speaker_proof.py [SOCKET]`** drives the app over F-TURNS (`creator_spike/f_turns.py`,
 run first and reused while its generator hash holds; without `say -v Samantha` or `Daniel` it
@@ -29538,12 +30727,25 @@ analysed". Packages land under `tools/proof/work/sw2b/`.
 - **S13** Cam B with sound, detached: both `apply` values refused in SW-23 (h)'s sentence, the
   sheet's summary (`snapshot_ui`, `switchspeaker.summary`) the same; in the dev-accept instance
   the refused sheet stays up and changes nothing (the layout dump carries no enabled state).
+- **S14** (#457) one camera clip selected, whose plan is refused ("needs at least two angles"):
+  `{mute_cameras: "yes"}` answers exactly "mute_cameras must be true or false." and `{apply:
+  "maybe"}` "apply must be true or false.", the project and its undo top unchanged.
+- **S15** (#602) Replace the shots on near a transition: a front track "Earlier" with the wide's
+  piece [40 s, 44 s) and Cam B's [43 s, 48 s) dissolving into it for 1 s (a `split` of the
+  wide's piece at 42.2 s alone refused in #427's sentence); the switch over {42.2 s, 48 s} onto
+  it applies — the wide's piece kept as [40 s, 42.2 s) under its id, then exactly the plan's
+  pieces, Cam B's piece gone, the microphones' clips unchanged — one undo gives it back, and the
+  fixture's six edits undone give the base. Seen red on a build before #602, refused at `split`
+  in that sentence.
 - **Z0** `grep "Frame Job: "` of every instance's log is empty.
 
 Mutants (`--mutant NAME`, each on a `tree_copy.py` copy's built app; CAUGHT exits 1):
 min-turn-ignored, crosstalk-never-wide, lead-twice, snap-removed (S1); ceiling-removed (S7);
-whole-track-hidden (S8); sheet-min-shot-not-passed (S10); replace-clear-removed (S11);
-mute-default-inverted (S12); linked-refusal-removed (S13).
+whole-track-hidden (S8); sheet-min-shot-not-passed (S10); replace-clear-removed (S11, `if false`
+on Replace's `lift_range` since #602); mute-default-inverted (S12); linked-refusal-removed (S13);
+arguments-after-plan (S14, `mute_cameras` and `apply` read with `try?`, so a malformed value
+reaches the plan's refusal); replace-lifts-every-track (S15, `tracks: nil`) and
+replace-by-split-and-delete (S15, the clear before #602).
 
 ```sh
 python3 tools/proof/switch_speaker_proof.py <dir>/agent.sock [--only S1,S8]
@@ -29614,10 +30816,10 @@ make app && RC_PROOF_APP=release python3 tools/proof/cursor_proof.py
 The recorded runs are in `designs/creator-jobs.md`'s CU3c record. JOB-21, JOB-27 and JOB-28 are
 the person checks.
 
-## Road map "creator-jobs" SW8 — Switch by Speaker with one shared microphone, from faces (`switch_faces_probe.py` P1–P6 with `switch_faces_probe.swift`; `switch_faces_proof.py` M0–M6; five mutants; `creator_spike/mouth_spike.py` SW-S3's head; spec §11 SW-80…SW-88)
+## Road map "creator-jobs" SW8 — Switch by Speaker with one shared microphone, from faces (`switch_faces_probe.py` P1–P8 with `switch_faces_probe.swift`; `switch_faces_proof.py` M0–M6; seven mutants; `creator_spike/mouth_spike.py` SW-S3's head; spec §11 SW-80…SW-88)
 
 **`switch_faces_probe.py [--only P1,P3]`** builds `switch_faces_probe.swift` with `app/Sources`
-through `swift_build` and scores pure rows — no document, file or app:
+through `swift_build` and scores pure rows — no document or app; only P8 writes a scratch file:
 
 - **P1** the largest face (second in CJ-31's order) is the person, equal areas the first; its
   gap/width the opening; a NaN gap, width 0, pts −1 and no face nil.
@@ -29633,9 +30835,15 @@ through `swift_build` and scores pure rows — no document, file or app:
 - **P6** `source(atClip:)` trimmed, at speed 2 and reversed, round-tripping through
   `clipTime(ofSource:)`; `faceSeries`' later-starting clip, nil past the media's end and off
   every clip.
+- **P7** (#456) an empty range (from == to) in the faces mode: the microphone's no-speech
+  refusal alone, no no-face refusal.
+- **P8** (#456) `storedActivity` over a scratch faces marker whose second range lies wholly past
+  the grid: no trap, the grid's count of values, indices 0–2 read.
 
 Mutants (`--mutant NAME`, each on a copy of `app/Sources`; CAUGHT exits 1): ratio-removed (P3),
-voice-gate-removed (P3), first-face (P1), wide-in-contest (P4).
+voice-gate-removed (P3), first-face (P1), wide-in-contest (P4), empty-range-no-face (P7, SW-84's
+loop without `count > 0`), crossed-range-read (P8, the guard on the clamped bounds removed: the
+probe traps).
 
 **`switch_faces_proof.py`** drives the app over F-TURNS' cameras (`creator_spike/f_turns.py`,
 skipped by name without `say`'s voices) and ONE microphone, `mic_a_b12_f55.wav`, with canned
@@ -29672,7 +30880,7 @@ python3 tools/proof/creator_spike/mouth_spike.py
 
 The recorded runs are in `designs/creator-jobs.md`'s SW8 record. Person check: JOB-55.
 
-## Road map "creator-jobs" CU10 — the recorder polishes on landing (`cu10_probe.py` B0, Q1–Q6 with `cu10_probe.swift`; `cu10_proof.py` Z0, P1, P1b, P2, P3, P4; eight mutants; spec §11 CU-100…CU-103)
+## Road map "creator-jobs" CU10 — the recorder polishes on landing (`cu10_probe.py` B0, Q1–Q7 with `cu10_probe.swift`; `cu10_proof.py` Z0, P1, P1b, P2, P3, P4, P5; nine mutants; spec §11 CU-100…CU-103, #458)
 
 **Ungranted, no app.** `cu10_probe.py` builds `cu10_probe.swift` from `app/Sources` on
 `cu3c_probe.py`'s shape and exit rule R (`--sources`, `--mutant`, `--only`). The panel is
@@ -29687,6 +30895,7 @@ The recorded runs are in `designs/creator-jobs.md`'s SW8 record. Person check: J
 | Q4 | `RecordingPolish.commands(of:)` in `allCases` order; the titles; `RecordingChoice()` asks none |
 | Q5 | `decide`: drop with no clips, wait while enhancing (past the limit too), run when ready and not busy, wait at 299 s, give up at 300 s |
 | Q6 | `recordingPolish`'s refusals in CU-102 (b)'s sentences and order, exact; `recordingSourceKind` refusing the three with voice_over (in `voiceOverScreenOnlyArguments` order) and camera |
+| Q7 | (#458) a `ProjectDocument` with a top-level clip of a screen media with a cursor file and a nest, the nest open: `screenClips` and `RecordingEnhance.present` with the landing's scope (nil) still find the landed clip, `isBusy` is true, and both `decide`s answer wait, not drop |
 
 `recording_probe.py`'s 5d and D3 count sixteen keys and 7c's arguments gain the three;
 `camera_recording_probe.swift`'s P3 and its box row count sixteen.
@@ -29700,16 +30909,30 @@ P1b (its own instance, the nine Auto Zoom and Speed Up Typing sheet keys pinned 
 by launch arguments): the panel door with `follow_wait` gives the same names and the same project.
 P2: `speed_up_typing.speech_saved` names the voice. P3: `auto_zoom` refused by name with `source:
 voice_over` and without `movie`. P4: `place: false` and `speed_up_typing` without `keys` refused
-through both tools, the project unchanged.
+through both tools, the project unchanged. P5 (#458; its own instance with P1b's pins): a
+package holding a nest before the landing; the panel door with `enhance` and `auto_zoom`, the
+voice spoken (`say -v Samantha`, padded to 20 s), no `follow_wait`; at once `set_scope` into the
+nest, 3 s, out; within 300 s the screen clip holds Auto Zoom's actions and the undo names read
+Auto Zoom, Enhance Voice, Add Recording, exactly, on every build: both follow-ups waited out the
+nest, and the polish waited for Enhance's measurement to land its step (#546). P6 and P7 (#546;
+their own instance with P1b's pins and `-RCDevMeasureHandBackHold 2`, the Measuring Sound sheet's
+hand-back held 2 s past the sheet), the spoken voice, no nest, the panel door with `follow_wait`:
+P6 `enhance` alone answers `enhance_pending` false and undo reads Enhance Voice, Add Recording
+straight after the answer; P7 `enhance` and `auto_zoom` answers both pendings false and undo
+reads Auto Zoom, Enhance Voice, Add Recording.
 
 Mutants (each must fail its row): `cu10_probe.py --mutant place-admitted` and `keys-admitted`
 (Q6), `enhance-ignored` and `ready-ignored` (Q5), `absent-zoom-off` (Q2),
-`shortcuts-without-keys` (Q3); `cu10_proof.py --mutant wrong-order` and `one-step` (P1), each on
-a `tree_copy.py` copy whose app it builds.
+`shortcuts-without-keys` (Q3), `open-container` (Q7: `RecordingEnhance.container(of:scope:)`
+answers the open container); `cu10_proof.py --mutant wrong-order` and `one-step` (P1),
+`polish-ignores-measuring` (P7: the polish's follow reads only Enhance's timer) and
+`wait-ignores-measuring` (P6: `follow_wait` reads only Enhance's timer), each on
+a `tree_copy.py` copy whose app it builds; and by hand `open-container` again for P5 (edited into
+the tree, `make app-debug`, `--only P5` fails, the file restored).
 
 ```sh
 make rust
-python3 tools/proof/cu10_probe.py [--only Q2,Q6]
+python3 tools/proof/cu10_probe.py [--only Q2,Q6,Q7]
 python3 tools/proof/cu10_probe.py --mutant <name>
 make app-debug && python3 tools/proof/cu10_proof.py <dir>/agent.sock
 make app && RC_PROOF_APP=release python3 tools/proof/cu10_proof.py
@@ -30138,9 +31361,9 @@ RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a2_proof.py --tree <a b
 python3 tools/proof/docs_bugs_a2_proof.py --mutant <name>
 ```
 
-## Docs-bugs batch a3 — canvas selection and the inspector around it (`docs_bugs_a3_proof.py`, `docs_bugs_a3_probe.swift`; twenty-one mutants by `--mutant`; spec §11 CI-17, CI-18, CI-19)
+## Docs-bugs batch a3 — canvas selection and the inspector around it (`docs_bugs_a3_proof.py`, `docs_bugs_a3_probe.swift`; thirty-one mutants by `--mutant`; spec §11 CI-17, CI-18, CI-19, #529, #530, #540)
 
-#469, #476, #471, #481 and #485, and batch a5's CI-19 rows. **`docs_bugs_a3_proof.py`** has the app under test make seventeen
+#469, #476, #471, #481 and #485, batch a5's CI-19 rows, ai-docs a2's F rows and ai-docs r2b's G rows. **`docs_bugs_a3_proof.py`** has the app under test make twenty
 projects over MCP (a recording with a camera through `land_recording`), then runs every row but Z1
 through **`docs_bugs_a3_probe.swift`**, the app's own sources on those packages: a drag, a click and
 a key press can't be sent over MCP. The app is `.prohibited` and its windows alpha 0, so nothing
@@ -30163,6 +31386,37 @@ width only), D27 (a ⇧-press that takes the dragged clip out of a pair) and V1 
 MCP, in the fixtures' launch). A grip off the overlay's bounds, such as a zoomed box's corner, is
 pressed through the overlay's own `mouseDown(with:)`, and the row prints which door it used. The
 nine `held-*` mutants each break one CI-19 decision.
+
+ai-docs a2 (#529 and #530, the owner's "Both follow the drag", spec §11 #529, #530) rescored D12,
+which had pinned a multi-selection's base write past the camera's first-frame cut as a CONTROL, and
+added F1–F14. On the `cam` fixture the camera C and the screen S both land with a cut (CO-80); each
+row reads the stored base and cut end and the state at frame 0, frame 1 and 4 s without moving the
+playhead. #529's rows select {C, S} with no action: F1 a drag of C (S moves on every frame, its base
+x its cut end x, one Undo puts both back), F2 a corner scale, F3 a ← nudge. #530's rows type into the
+Picture sub-tab's Transform fields and commit through the field's own click-away path
+(`controlTextDidEndEditing`): F6 X with no action selected, F7 X and F8 Y with the cut selected by a
+click at frame 0, F9 Scale, F11 Motion Blur with the cut selected, F13 X on {C, S}, F14 Motion Blur
+where the base and the cut already hold 0.3. F1, F6, F7 and F8's saved packages are rendered by the
+app under test against the untouched fixture where the camera went, at all three times. The
+CONTROLs are F4 (a rotate: the cut holds no rotation), F5 (`pairzoom` {a, b}: a finished zoom that is
+not a cut keeps its end, no refusal), F10 (Rotation typed: the base alone) and F12 (the `late`
+fixture: a one-frame layout action past clip time 0 is not a cut). Its seven mutants are
+`multi-no-held`, `multi-front-only`, `typed-no-cut`, `typed-no-base`, `typed-any-key`,
+`typed-cut-placement-only` and `typed-held-placement-only`, and `cut-any-start` now fails F12 too.
+
+ai-docs r2b (#540, spec §11 #540) added G1–G7: with no action selected, an inspector write on a clip
+with a first-frame cut sends the cut only those of a whole cutout's background, edge and feather that
+differ from the base cutout, and nothing for a null one. Three fixtures: `bg` (the landed camera with
+a base cutout, filter and region, its cut's end naming cutout {background: keep}, a filter and a
+region), `bgoff` (`bg` with the base cutout null) and `img` (an image clip from a 64 × 64 PNG the
+proof writes, a base cutout and a first-frame cut whose end names cutout {background: keep}). Each
+row presses the control through its own handler (`mouseDown(with:)`, a popup's `itemPicked:`) with
+`inspector.onEdit` wrapped, and prints the ops, each one's answer alone and the list's, the undo
+step, the window's sheet, the base and the cut's end as the core stores them, and `clip_state` at
+frame 0, frame 1 and the playhead. G1 unticks Remove background, G2 presses the Background header's
+Reset, G3 ticks it on `bgoff`, G7 sets an image's Subject to Foreground; G4 (Add Filter), G5 (Add
+Region) and G6 (the Background popup) are CONTROLs. Its three mutants are `held-whole-cutout`,
+`held-part-dropped` and `held-cutout-undiffed`, and `typed-any-key`'s anchor is the new call line.
 
 ```sh
 make app-debug && python3 tools/proof/docs_bugs_a3_proof.py [--only D1,N3]
@@ -30297,14 +31551,16 @@ python3 tools/proof/docs_bugs_b2_proof.py --mutant <name>
 RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_b2_proof.py --base-sources <its app/Sources> --expect-red
 ```
 
-## Docs bugs b3 — what an export does and answers (`docs_bugs_b3_proof.py`, `docs_bugs_b3_probe.swift`; eight mutants by `--mutant`, with `log_proof.py`'s `hevc-read-always` and `vp9_alpha_export_proof.py`'s `no-shape-guard`; spec §11 #470, #486, #504, PR-14)
+## Docs bugs b3 — what an export does and answers (`docs_bugs_b3_proof.py`, `docs_bugs_b3_probe.swift`; six mutants by `--mutant`, with `log_proof.py`'s `hevc-read-always` and `vp9_alpha_export_proof.py`'s `no-shape-guard`; spec §11 #470, #486, #504, PR-14)
 
 #470, #486, #488, #493 and #504. **`docs_bugs_b3_proof.py`** makes its own fixtures under
 `work/docs-bugs-b3/` (ffmpeg with libx264, libx265 and prores_ks, and `sips`) on a scratch
 `CFFIXED_USER_HOME`. The R, S, C, D and W rows run in one instance. A cancel row polls
 `export_status` every 20 ms and cancels on the phase it wants, so the phase is measured, not timed.
 The G rows launch an instance a card, with the choice in the argument domain, so nothing persists
-and nothing presses Export….
+and nothing presses Export…. C2 (a cancel while writing leaving nothing at the path) and the
+`no-put-back` and `cancel-removes` mutants were retired by spec §11 #531, which keeps the file:
+`ai_docs_b2_proof.py`'s K1 and mutants hold it now, and R4 also finds no `.framejob-export-*`.
 
 **`docs_bugs_b3_probe.swift`** reads what a layout dump cannot say: `exportButton` and `queueButton`
 on a real `ExportSheetController`, its view loaded and never shown, and `Exporter().export` called
@@ -30350,7 +31606,8 @@ RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_a4_proof.py --base-sour
 `work/docs-bugs-b4/` (ffmpeg with libx264, and ffprobe) on a scratch `CFFIXED_USER_HOME`. One
 instance, launched with `-RCDevRampRenderHold 8`, saves the two packages the probe opens and runs
 A1/A2: an `h264` export of a speed ramp at once, `export_status` polled every 0.1 s beside whether
-the file exists.
+the file exists. Since spec §11 #531 an export writes a hidden `.framejob-export-*` sibling until it
+lands, so A1/A2 and the probe's R1/R2 count that sibling as the file too.
 
 **`docs_bugs_b4_probe.swift`** runs the real controllers off-screen (activation policy
 `.prohibited`, a window 20,000 pt off every display), one process per mode, built with
@@ -30436,3 +31693,1727 @@ make app && RC_PROOF_APP=release python3 tools/proof/docs_bugs_c4_proof.py
 python3 tools/proof/docs_bugs_c4_proof.py --mutant <name>
 RC_PROOF_APP=<a base .app> python3 tools/proof/docs_bugs_c4_proof.py --base-rev <its sha> --expect-red
 ```
+
+## ai-docs b1 — drawn clips' pixel keys and exact media paths (`ai_docs_b1_proof.py`)
+
+ai-docs batch b1 (#524, #534, spec §11 #524, #534). The built app under a scratch home, driven over
+MCP, on projects built from `media/A.mov` (CoW-copied under `work/ai-docs-b1/media/` beside a copy
+named `A.mov ` with a trailing space) and a VP9 WebM `talk.webm` made with ffmpeg (with its own
+spaced copy). Launch 1 is plain: V rows are `set_video`'s crop, corner radius and chroma key on a
+text, shape and graphic clip (refused, cleared, a matte track's crop), L rows `switch_layout`
+refusing a camera layout that would crop or round a shape or graphic clip, P rows Paste Attributes
+leaving such a clip's own, M1–M3 and M5 `add_media`, `paste` and `import_media` keeping a path's
+spaces. Launch 2 (`-RCFFmpegImport always -RCFFmpegPath <ffmpeg>`) runs M4, a converted import's
+`original.path`. Z1 is each launch's parity grep. The docstring lists every row and marks the
+controls; every other row is red on the frozen base app (`main` at `d40d1f81`), and `--expect-red`
+exits 0 only when that holds. Its mutants are the core's: `core/tests/pixel_keys.rs` and
+`media_path_exact.rs` catch each.
+
+ai-docs r2b (#535, #536, spec §11 #535, #536) added, in launch 1, the E rows (`set_action_end`
+refusing a crop, corner radius or chroma key at the end of an action on a text, shape, graphic or
+adjustment clip, clearing and `off` allowed, a matte track's text crop allowed, a media clip's end
+taking all three) and the A rows (`set_video` refusing all three on an adjustment clip, clearing
+allowed, a matte track no exception, Paste Attributes leaving its own). Its core mutants are run by
+hand against `core/tests/pixel_keys.rs`.
+
+ai-docs r3 (#536 and #535's nest halves, spec §11 #536, CO-60, CO-62, VR-53 (b)) added, in launch
+1, the N rows on projects of A.mov twice, each clip nested alone with `nest`: N1 `set_video`
+refusing a corner radius and a chroma key on a nest clip, N2 (c) its crop taken and the two
+cleared, N3 `set_action_end` refusing the two at an action's end, N4 (c) the end's crop, its
+removal, radius 0 and `off`, N5 Paste Attributes giving a nest the crop and leaving its own two,
+N6 `switch_layout` side_by_side at 1 s, stacked at 0 (bases and cut ends) and `nest: true` writing
+a nest role's radius as 0, N7 `reframe_clip {follow: layout}` on 1080 × 1920 recognising such a
+switch and replaying it with radius 0, and N8 the same for a saved file whose nest ends hold the
+pre-#536 panel radius (21.6 ÷ the end's scale), reopened. Its core mutants are run by hand against
+`core/tests/nest_keys.rs`.
+
+```sh
+make app-debug && python3 tools/proof/ai_docs_b1_proof.py [--only V1,L2,M4]
+make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_b1_proof.py
+RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_b1_proof.py --expect-red
+```
+
+## ai-docs a1 — the playhead past the last media clip and the Loop's wrap hold (`ai_docs_a1_proof.py`; spec §11 #523)
+
+#523: a timeline whose last stretch held only text, shape, graphic or image clips got a composition
+only as long as its media, because `CompositionBuilder.addPlaceholderIfNeeded` added its
+`Blank.mp4` track only to a plan with no video track. `AVPlayer` clamped every seek past the media's
+end — `set_playhead`, `play_preview`'s `seek_to` (the ruler's `Playback.seek`) and the restore after
+an edit — and the item ended there, so the playhead went back to the media's end and the titles
+never played. The placeholder now runs after the audio tracks and also fires when the composition
+ends a tick or more short of the plan, its id one past every plan id. #520: every wrap of a Loop
+holds the player's clock for about 0.7 s, and so does every seek made while playing. Measured, not
+fixed; the issue stays open: the hold needs sound (a clip with its sound off, or a movie with no
+audio stream, holds about 0.02 s), and neither a forward-playing seek that does not wait for the
+compositor's frame (F1) nor a preview built with no audio taps (A1) brought it under 0.25 s.
+
+`python3 tools/proof/ai_docs_a1_proof.py [--only P1,W1,…] [--app PATH]` makes `vonly.mov` under
+`work/ai-docs-a1/` with ffmpeg, uses `media/A.mov` and `media/AV.mov`, and drives one launch on a
+scratch home; its docstring has the rows. It takes about eight minutes, most of it the W rows. W1–W3
+and W5–W7 are MEASURE rows, printed and never scored. It prints the default output device first.
+
+| Run | Result |
+|---|---|
+| The fix, Debug (output: AirPods Max, Bluetooth) | 12/12: P1 16.0 ×6; P2 11, 14, 20, 20; P3 16.0 after each edit and undo; P4 `to` 17.003; P5 `to` 11.981; P6 start 20.0; P7 6.5, `to` 7.005; W1 per-wrap hold median 0.724 s, W2 0.706 s, W3 0.681–0.699 s, W5 0.510 s; W6 0.015 / 0.022 s; W7 0.015 / 0.024 s |
+| The frozen base app (output: AirPods Max, Bluetooth) | 5/12: P1 10.0 ×6; P2 10.0 ×4; P3 9.999998 after each edit; P4 `to` 10.000; P5 `to` 10.000; P6 start 10.0; P7 read 5.0, `to` 5.000; the controls X1 (20.000 s), C1, C2, W4 and Z1 pass; W1 0.738 s, W2 0.712 s, W3 0.679–0.695 s, W5 0.536 s |
+| Release (output: AirPods Max, Bluetooth) | 12/12: the P rows as on Debug; W1 0.734 s, W2 0.699 s, W3 0.692–0.716 s, W5 0.562 s; W6 0.013 / 0.176 s (one wrap trial 0.445 s); W7 0.038 / 0.024 s |
+
+The #520 spike, W rows on Debug builds over the #523 fix with the built-in speakers (seek hold / per-wrap
+hold medians; W3 the runs at the loop start):
+
+| Build | W1 | W2 | W3 | W5 | W6 | W7 |
+|---|---|---|---|---|---|---|
+| The frozen base app | 0.695 | — | — | 0.552 | 0.019 / 0.024 | 0.024 / 0.016 |
+| F1: `seekingWaitsForVideoCompositionRendering = player.rate <= 0` in `startSeek` | 0.657 | 0.661 | 0.587–0.663 | 0.546 | 0.038 / 0.029 | 0.050 / 0.028 |
+| A1: `metering: false` in `Playback.startRebuild` | 0.447 | 0.277 | 0.406–0.414 | 0.196 | 0.010 / 0.022 | 0.018 / 0.016 |
+
+Neither ships. Two mutants, each by hand and reverted: M1 the guard back to `plan.videoTracks.isEmpty`
+(P1–P7 fail; X1 passes, as it does on the base); M2 `placeholderTrackID` back to the audio ids alone
+(P1 and P7 never scored: the instance stopped answering at the id clash and was stopped by its pid).
+
+## ai-docs c2 — what the app prints (`ai_docs_c2_proof.py`)
+
+ai-docs batch c2 (#521, #526, #532, #533, spec §11 #521, #526, #532). The built app under a scratch
+home, driven over MCP, on projects built from media made into `work/ai-docs-c2/media/` (two
+`say`-voiced WAVs and a 40 s and a 3 s ffmpeg test clip with sound). Launch 1 is plain: W rows are
+the Transcript tab's overlap sentence on a bare 1 s overlap (a word outside it held back with
+"Near an overlap between two clips: …", Edit ▸ Delete refused in the inspector's strip, far words
+editable); S rows are `snapshot_ui` layout dumps of the Document tab, the Sound, Shape, Picture and
+Color sub-tabs and the Generate Captions sheet (hidden views included) and `tools/list`, holding no
+word-bounded British colour or centre form; G3, G5 and G6 the toolbar's timecode on a 25/2, a
+30000/1001 and a `[60000, 2002]` canvas; G7 `tools/list`'s `burn_in_timecode` description on
+`render_frame` and `export` (non-drop at an NTSC rate only); F rows the Document tab's rate (`Fps.displayName`).
+Launches 2 and 3 put Animated GIF in the argument domain (`-FrameJobExportChoice`, nothing
+persisted, Export never pressed) and read the export sheet's readout at Project rate (12.5 fps, G1
+and G2) and at 24 fps (G4). Z1 is each launch's parity grep. The docstring lists every row and
+marks the controls; every other row is red on the frozen base app (`main` at `d40d1f81`), and
+`--expect-red` exits 0 only when that holds. The timecode mutants are the core's:
+`core/tests/timecode_rates.rs` catches each; `displayName`'s two (one zero stripped, the trailing
+"." kept) turn F1 and F2 red.
+
+```sh
+make app-debug && python3 tools/proof/ai_docs_c2_proof.py [--only W1,S5,G1,F2]
+make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_c2_proof.py
+RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_c2_proof.py --expect-red
+```
+
+## ai-docs c3 — a silent microphone under a Follow Speaker shot (`ai_docs_c3_proof.py`)
+
+ai-docs batch c3 (#527, spec §11 #527, amending VR-64 (d) and VR-66 (c)). The built app under a
+scratch home, driven over MCP, over F-TURNS (`vr6b_proof.py`'s `Doc`, W's analyses canned) with
+Mic A split at the last utterance's end + 0.6 s on the 30 fps grid, so its short piece holds only
+room tone, and its long piece's sound off. Launch 1 (`vr6b_proof.LAUNCH_1`) runs the F rows through
+`make_vertical_version` (`copy: false`): F1 the filed case framed on Mic B with A not talking, F6
+the same with no `mic_faces` falling back to faces on the weak match, F2 both microphones silent
+under the shot falling back to faces with the core's no-turn sentence, and the controls F3 (nothing
+muted), F4 (both A pieces muted), F5 (`reframe_clip` still refusing the silent microphone) and F7 (a
+microphone still being analysed still refusing). Launch 2 (`-RCDevAnalysisCanned YES
+-FrameJobFollowKind speaker`) reads File ▸ Make Vertical Version…'s sheet: S1 the filed fixture with
+no no-speech sentence, a summary and the not-sure note, S2 (control) the unmuted fixture's summary.
+Z1 is each launch's parity grep. The docstring lists every row and marks the controls; every other
+row is red on the frozen base app (`main` at `d40d1f81`), and `--expect-red` exits 0 only when that
+holds. Three mutants by `--mutant`: `vertical-refuses-silence` (F1), `reframe-allows-silence` (F5),
+`not-talking-drops-problems` (F7).
+
+```sh
+make app-debug && python3 tools/proof/ai_docs_c3_proof.py [--only F1,S1]
+make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_c3_proof.py
+python3 tools/proof/ai_docs_c3_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_c3_proof.py --expect-red
+```
+
+| Run | Result |
+|---|---|
+| The frozen base app, `--expect-red` | exit 0: F1, F2, F6 refused "make_vertical_version was refused: The microphone on track 3 has no speech between 00:00:00:00 and 00:02:37:00, …"; S1 showed that sentence and no summary; the controls F3, F4, F5, F7, S2 and Z1 passed |
+| The fix, Debug | 10/10: F1 `speaker` [{clip 5, mics [10, 7], mic_faces [1, 2]}], no reason, no cut, face 2 framed and face 1 not at W's middle; F2 W `followed`, "… because clip 5 has no turn of its microphones inside it, so there is no speaker to follow"; F6 the weak match's sentence (agrees only 0.00) |
+| Release | 10/10, the same answers as on Debug |
+| The three mutants, each on a tree copy | `vertical-refuses-silence` CAUGHT (F1 refused with the no-speech sentence), `reframe-allows-silence` CAUGHT (F5 answered "made no change"), `not-talking-drops-problems` CAUGHT (F7 answered and edited) |
+## ai-docs b2 — an export keeps its file, an exception fails one call (`ai_docs_b2_proof.py`, `ai_docs_b2_probe.swift`, `ai_docs_b2_inject.m`; nine mutants by `--mutant`; spec §11 #531, #525)
+
+ai-docs batch b2 (#531, #525). **`ai_docs_b2_proof.py`** makes its own fixtures under
+`work/ai-docs-b2/` (ffmpeg with libx264) on a scratch `CFFIXED_USER_HOME`. One instance runs the
+#531 rows over MCP on a 60 s 1080p clip, each export over a file a `done` export made first, in a
+folder of its own: K1–K3 cancel `h264`, `gif` and `vp9_webm` while they write, S1 cancels an
+`audio_wav` with two stems past the mix, G1 is a graphic that throws from frame 30, L1 an export over
+a file locked with `chflags uchg` (unlocked again whatever happens), N1 and C0 the controls. A
+second instance with `-RCDevExportFault video@40` runs F1. A cancel row polls `export_status` every
+10 ms and cancels on the state it wants, so the stage is measured, not timed.
+
+**`ai_docs_b2_probe.swift`** runs the real controllers off-screen, one process per mode, built
+with `FRAMEJOB_DEV_TOOLS` and a `default.metallib` like `docs_bugs_b4_probe.swift`: the Export…
+progress sheet's Cancel over an existing file (P1), three queue jobs to one path (Q1, Q2), and
+`AgentLane.shared.submit` with arguments that raise (A1, under lldb with the inject dylib). It names
+only symbols the base has and builds over `--base-sources`.
+
+**#525's E rows** need an Objective-C exception inside a tool call, and none is known in the app,
+so **`ai_docs_b2_inject.m`** (built with `cc -dynamiclib -fobjc-arc -framework Foundation` into
+`work/ai-docs-b2/`) wraps two methods: `+[NSJSONSerialization JSONObjectWithData:options:error:]`
+raises on data holding `FRAMEJOB_RAISE_525` (the server thread for `open_project`, the main hop for
+`get_project`), and `-[NSString stringByExpandingTildeInPath]` raises on main only, for a string
+holding `FRAMEJOB_RAISE_HOP_525`, which `new_project` reaches inside `onMainWhenIdle`. Every
+instance that can abort runs under `lldb --batch -k bt -k "process kill"`, so an abort stops in the
+debugger and no crash dialog comes up; the proof stops only the app pids it launched. A hardened
+build (Release) is copied with `ditto` and re-signed ad hoc without `runtime`, keeping its
+entitlements, and the E rows run on the copy once `codesign -dv` shows no `runtime` and the two
+executables match with their signatures removed; they are skipped by name only if that fails.
+
+```sh
+make app-debug && python3 tools/proof/ai_docs_b2_proof.py [--only K1,P1,Q1,A1,E1]
+make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_b2_proof.py
+python3 tools/proof/ai_docs_b2_proof.py --mutant <name>
+RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_b2_proof.py --base-sources <its app/Sources> --expect-red
+```
+
+## ai-docs r2c — the rest of the British spellings, and captures at a forced scale (`ai_docs_r2c_proof.py`; four mutants, and five for #541; spec §11 #526 as extended by #538 and #541, #539)
+
+ai-docs batch r2c (#538, #539). The built app under a scratch home, driven over MCP, on projects
+built from media made into `work/ai-docs-r2c/media/` (a `say`-voiced WAV and a 3 s ffmpeg clip with
+sound). Launch 1 pins `-FrameJobCaptionEngine apple` in the argument domain (a Release build
+shares the person's defaults): S1 and S2 read `tools/list` (no map form — analyse, normalise,
+recognise, neighbour, grey, labelled, summarise, standardised and their forms — and "analyses" only
+as `analysis_job`'s noun), S3 is the control that "cancelled" still occurs five times; S4 and S5 are
+the Export and Generate Captions sheets' layout dumps (hidden views included); S6–S10 are the
+messages a caller reads (`detect_silence`'s note, `normalize_clip`'s two refusals with the loudness
+cache removed, `add_transition`'s no-room sentence, `render_graphic`'s `interpolateColors` error);
+S11 the control `export_status` `cancelled` / "Cancelled."; C4 the control that a plain capture's
+`scale` is its window's. Launch 2 (`-RCDevCaptureScale 3`) captures the inspector and the Export
+sheet at 3× (C1, C2: the answer, the dump and the PNG's IHDR); launch 3 (`-RCDevCaptureScale 5`)
+reads the stderr line and the window's scale (C3). T1 scans `app/Sources`, `core/src` and
+`graphic/src` string literals (comments skipped, Swift interpolations and JS substitutions read as
+code) for a map form outside spec §11 #526's survivors; I1 holds the eight recaptured webps to their
+siblings' sizes. Z1 is each launch's parity grep. The docstring lists every row and marks the
+controls and the tree rows; every other row is red on the frozen base app (`main` at `eab6adf2`),
+and `--expect-red` (which skips the tree rows) exits 0 only when that holds. The four mutants are
+applied by hand to `UISnapshot.swift`, `AgentServer+Snapshot.swift` and `DevCaptureScale.swift`.
+
+**The Leveler's words (#541, spec §11 #526 as extended by #541).** Any `levell…` form, any case and
+with no word boundary, is a hit unless it is the JSON key `leveller`, which is told by its context
+and never by its file (`level_forms`): a string that is only the key or a path through it, or the
+key written as `{leveller:`, `leveller (null or {` or in the list `gate, leveller, de_esser`. S12
+reads `tools/list` with it (no hit, `set_audio` says "after the leveler", and the key still occurs
+there); T1's second scan reads the same three trees' literals with it, and fails too when it finds
+no key at all; T2 (a tree row) reads the site's pages, `sidebar.mjs`, `features.json` and
+`README.md`, where the word may stand only in a code span or a fenced block, or in an `"id"` value
+of `features.json`, and never in a page's path. The rows beside them are
+`clip_inspector2_probe.swift` T4 (the section's title), `audio_ap6b_probe.swift` R2 (Enhance's
+three sentences) and `audio_ap6b_proof.py` P4, P5 and P8 (the reasons over MCP, and the Status
+"Not leveling: it plays for under 0.4 s"). Five mutants, by hand: M1 the title back to
+"Leveller" (T4 and T1), M2 "Not levelling: " back (P8 and T1), M3 one Enhance sentence back (R2 and
+T1), M4 "after the leveller" back in `AgentCatalog+Properties.swift` (S12 and T1), and M5
+`level_forms` without its key contexts (T1 and S12 red on the kept keys).
+
+```sh
+make app-debug && python3 tools/proof/ai_docs_r2c_proof.py [--only S1,S12,C1,T1,T2]
+make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_r2c_proof.py
+RC_PROOF_APP=<a base .app> python3 tools/proof/ai_docs_r2c_proof.py --expect-red
+python3 tools/proof/ai_docs_r2c_proof.py --only T1,T2      # make test
+```
+
+T1 and T2 run in `make test` (#556), so a British form or a `levell…` form that comes back in
+a string literal, on a site page or in `README.md` fails the gate's `test` step. With only tree
+rows selected the proof chooses no app and writes nothing: `tools/proof/work/ai-docs-r2c` is
+wiped and made only when an app row runs.
+
+| Run | Result |
+|---|---|
+| The frozen base app, `--expect-red` | exit 0: S1 54 map forms, S2 "analyses" ×5, S4 "normalises", S5 "recognised", S6–S10 the British sentences, C1 and C2 scale 2 (the window's) with `-RCDevCaptureScale 3`, C3 no stderr line; the controls S3, S11, C4 and Z1 passed |
+| The fix, Debug | 18/18: C1 912 × 2157 px for 304 × 719 pt, C2 1440 × 2421 for 480 × 807, `window_facts.scale` 2 in both |
+| Release | 18/18, the same answers (C1 1317 × 2012 px for 439 × 670.5 pt: the Release editor's inspector is wider) |
+| The four mutants, Debug | `pass` ignoring `scale` CAUGHT (C1: 608 × 1438 px at an answered 3); the answer's `scale` left as the window's CAUGHT (C1: scale 2); any value honoured CAUGHT (C3: scale 5, no line); the stderr line dropped CAUGHT (C3) |
+
+## ai-docs r2a — the preview's half-second hold on play, on a wrap and on a mid-play seek (`ai_docs_r2a_proof.py`; #537, #520, held)
+
+#537: playing from paused holds the player's clock about 0.53 s before the playhead moves. #520:
+every Loop wrap holds about 0.5–0.7 s, and every seek made while playing about 0.5 s. Both need
+sound: a clip with its sound off, or a movie with no audio stream, holds about 0.01–0.06 s, and the
+hold is the same on Bluetooth and the built-in speakers. Four candidates were built over the tree,
+each alone, and none cleared a row, so nothing shipped and both issues stay open, held for the
+owner. Moving the taps after the effects (S3) about halves the hold, as round 1's preview with no
+taps did (A1, in "ai-docs a1" above); the time-pitch stage (S1, S2) accounts for under 0.1 s; prerolling
+a settled player (S4) changes nothing. What holds the remaining 0.2–0.4 s is not located.
+
+`python3 tools/proof/ai_docs_r2a_proof.py [--only H1,…] [--trials N] [--app PATH] [--expect-red]`
+imports `ai_docs_a1_proof.py` and re-points its folders under `work/ai-docs-r2a/`, so it measures
+with a1's W1–W7 code; its docstring has the rows and their lines. H1–H6 are HELD: each prints its
+numbers against its line, and none is scored until a fix takes it out of `HELD`. M1 (the meter
+still meters a 4 s play) and Z1 are scored. It prints the default output device first. A whole run
+takes about eleven minutes.
+
+| Run | Result |
+|---|---|
+| The frozen base app, H rows scored (`--expect-red`; built-in speakers) | exit 0, every H row red: H1 D median 0.533 s (`to` 3.491–3.515); H2 0.544 s; H3 seek hold 0.559 s; H4 per-wrap 0.718 s; H5 0.493 s; H6 runs pair 0.501, 0.541 s, lone 0.676, 0.675 s; M1 3.925 s metered, −21.77 LUFS; Z1. C1 (sound off) D 0.023 / seek 0.016 s, wraps [3.423, 0.086, 4.503]; C2 (no audio stream) D 0.013 / seek 0.023 / wrap 0.055 s |
+| This tree, Debug, held (built-in speakers) | 2/2 (M1, Z1); H1 0.532 s; H2 0.534 s; H3 0.492 s; H4 0.660 s; H5 0.648 s; H6 pair 0.674, 0.609 s, lone 0.543, 0.672 s. C1 D 0.011 / seek 0.012 / wrap 0.044 s, one Loop-on trial stalled (D 15.955 s, wrap 21.565 s); C2 D 0.016 / seek 0.010 s, wraps [0.395, 1.524, 4.074], poll runs [0.127, 2.158] |
+| This tree, Release, held (built-in speakers) | 2/2 (M1, Z1); H1 0.538 s; H2 0.531 s; H3 0.540 s; H4 0.698 s; H5 0.620 s; H6 pair 0.671, 0.684 s, lone 0.531, 0.671 s. C1 D 0.022 / seek 0.006 s, wraps [1.500, 0.422, 0.059], one Loop-on D of 20.565 s; C2 D 0.011 / seek 0.011 / wrap 0.041 s |
+
+The spike, H rows on Debug builds of this tree, 3 trials each, built-in speakers (medians in
+seconds; H1–H3 lines 0.10, H4–H5 0.12):
+
+| Build | H1 D | H2 D | H3 seek | H4 wrap | H5 wrap | M1 |
+|---|---|---|---|---|---|---|
+| The frozen base app (5 trials, above) | 0.533 | 0.544 | 0.559 | 0.718 | 0.493 | ok |
+| S1: a family with no scaled segment set to `.varispeed` in `audioParameters` | 0.471 | 0.450 | 0.439 | 0.609 | 0.574 | ok |
+| S2: the item `.varispeed` in `finishRebuild`, every metering mix input left nil | 0.447 | 0.451 | 0.462 | 0.574 | 0.579 | ok |
+| S3: `kMTAudioProcessingTapCreationFlag_PostEffects` in `AudioTap.make` | 0.359 | 0.281 | 0.212 | 0.411 | 0.365 | ok, its frames from −8191 |
+| S4: `preroll(atRate: 1)` after a seek lands paused and after a pause that stopped the player | 0.528 | 0.521 | 0.547 | 0.700 | 0.669 | ok |
+
+None cleared a row, so K1r (S1's shippable form) was not built and there are no mutants: no
+decision was added. S3's meter read its frames from −8191, the one-buffer-early stamp #335
+measured for a PostEffects tap, so shipping it would also teach the meter those stamps.
+
+```sh
+make app-debug && python3 tools/proof/ai_docs_r2a_proof.py [--only H1,H2,M1] [--trials 3]
+make app && RC_PROOF_APP=release python3 tools/proof/ai_docs_r2a_proof.py
+python3 tools/proof/ai_docs_r2a_proof.py --app <a base .app> --expect-red
+```
+
+## Hygiene a1 — five audio proof gaps (#404, #408, #396, #395, #368; spec §11 #395, #368)
+
+Five rows that did not measure what they said, or measured nothing. Each was seen red first.
+
+- **#404, a bare negative launch argument.** `-FrameJobNormalizeTargetLUFS -16` never reaches the
+  app: the argument domain reads `-16` as a flag. `audio_ap6_proof.py`'s V8 and
+  `loudness_normalize_proof.py`'s N10 passed only because −16 is Normalize's default. Both now
+  pass a plist fragment and a target that is not the default: V8 `'<real>-18</real>'` (on that
+  instance, `enhance_voice {target_lufs: −18}`, one undo, then the menu, compared with that
+  tool call's set), N10 `'<real>-20</real>'` (the export at −20 ±0.5 LUFS).
+  `proof_app.launch_arguments` refuses a bare negative number for every `mcp.launch`
+  (`proof_app.py --selftest` A1, A2; `--mutant bare-number`).
+- **#408, the Status memo's drop.** `audio_ap5_probe.swift` P11 builds the app's own Clip pane
+  over an untitled document, in no window, and reads Voice Isolation's Status: "Off"; "Rendering…"
+  while the render is held (`RampAudioRenders.devHoldKey` at 600 s, so the probe is built under
+  `FRAMEJOB_DEV_TOOLS`); then the hold is taken off, the held render dropped and wanted again, and
+  after the document's `.reversedMediaDidChange` the Status reads "Ready". A second leg, on a
+  text file declared as audio, ends "Not rendered: The isolated voice's source cannot be read: …".
+  P12 is the landing leg for Voice Effect. Nothing but the pane's `invalidate()` moves the words:
+  a settle changes neither the document's handles nor its published resolution. No sleep decides
+  a read. P11 and P12 run first in the probe, before another row's document wants a render.
+  **Found by P11 and fixed:** a forward clip's isolation whose source cannot be read failed in the
+  ramp renderer's words ("The retimed audio's source cannot be read"), because the two share
+  `RampAudioCache.renderSource`; `RampAudioRenders.perform` now rethrows it as the isolation's,
+  as the voice arm already did.
+- **#396, a segment inert at every point.** `audio_ap8b_probe.swift` A9, with mutant M15 (the
+  AP8b section above has both).
+- **#395, the queue's success line.** `export_status`'s `done` answer now carries `message`, the
+  queue row's sentence (spec §11 #395). `audio_ap10b_proof.py` S1 holds "Exported “Mix.wav” and 2
+  stems." and S6 "… and 1 stem." against the result's `stems`; `export_status_proof.py` A2 holds
+  "Exported “a1.mp4”." with no count.
+  **Found beside it and repaired:** `audio_ap10b_proof.py`'s C1 had failed since #531, which
+  writes every file of a job to a hidden `.framejob-export-*` sibling: the row looked for stems
+  1–2 at their own names during the write. It now requires at least three hidden siblings of one
+  size, the largest (the mix and two whole stems), nothing at a final name, then `cancelled` and
+  an empty folder.
+- **#368, P1's margin.** `play_preview {await_start: true}` (spec §11 #368) times the play from
+  the playhead's first move. `missing_audio_proof.py`'s P1 scores `to − playing_from` against
+  the same 900 000 floor and prints `start_seconds`.
+
+| Run | Result |
+|---|---|
+| `missing_audio_proof.py --only P1`, the old row, base Debug app, 1-minute load 133 | **P1 fail**: 847 841 ticks against 900 000 (43 of 43 frames composed) |
+| the new P1, Debug, load 121 | pass: 1 201 129 ticks, the start 0.741 s |
+| new P1, `Playback.setRate` mutated to `player.rate = 0` (Debug) | **fail**: "The preview did not start: its playhead had not moved 30 s after play_preview set the rate." |
+| new P1, `player.rate = rate * 0.5` (Debug) | **fail**: 603 506 ticks, the start 0.915 s |
+| V8 and N10 with the value bare (`-18`, `-20`) and the guard taken out of `mcp.launch` (base Debug app) | **V8 fail**: the menu's volume 15.781 against the tool's 11.935; **N10 fail**: −16.00 LUFS against −20 |
+| the same with the guard in | `ValueError: launch argument '-18' is a bare negative number: … pass '<real>-18</real>'`, nothing started |
+| V8 and N10 with the fragments (Debug) | 4/4 and 4/4: V8 volume 11.935 both ways; N10 −20.00 LUFS |
+| `proof_app.py --selftest` / `--mutant bare-number` | 17/17 / fails exactly A1 |
+| S1, S6 (`--only S1,S6`) and `export_status_proof.py` with the new checks, base Debug app | **S1, S6 fail** ("the queue row says None"); **A2 fail** ("message None"), 8/9 |
+| the same after the change (Debug) | 2/2; 9/9 |
+| S1, S6 with `ExportStemsPipeline.summary` dropped from the queue's line (Debug, by hand) | **both fail**: "Exported “Mix.wav”. Peak …" |
+| `audio_ap10b_proof.py` whole on Release before C1's repair | 11/12, **C1 fail**: "stems 1–2 on disk [False, False]" |
+| C1 repaired, with AP10b's M6 by hand (`fail` discards nothing; Debug) | **C1 fail**: two `.framejob-export-*.wav` left |
+| `audio_ap5_proof.py --probe` before the sentence fix | P11's fail leg read "Not rendered: The retimed audio's source cannot be read: …" |
+| `audio_ap5_proof.py --probe` | 13/13 |
+| `audio_ap5_proof.py --mutants` | 14/14 killed: `memo-not-dropped` and `isolation-failure-retimed` by P11, `voice-memo-not-dropped` by P12, the eleven older ones by their rows (`failure-silent` also fails P11, whose failing render then never settles) |
+| `audio_ap8b_proof.py --probe` | 9/9 |
+| `audio_ap8b_proof.py --mutants` | 15/15 killed: M15 by A9, M4–M12 and M14 by their rows, M1–M3 and M13 by their core tests |
+| `make gate` | PASS (876 s for the first whole run, under three lanes' load: names 5 s, typecheck 21 s, test 480 s, app 369 s) |
+| Release: `audio_ap6_proof.py` | 38/38 (V8: volume 11.935 by the tool and by the menu) |
+| Release: `loudness_normalize_proof.py` | 37/37 (N10: −1.01 dBFS; −20.00 LUFS) |
+| Release: `audio_ap10b_proof.py` | 12/12 (C1: siblings of 115 197 696, 115 197 696, 115 197 696 and 11 567 104 bytes) |
+| Release: `export_status_proof.py` | 9/9 |
+| Release: `missing_audio_proof.py` | 12/14, P1 pass at 1 200 784 ticks with the start 0.507 s (1-minute load about 190); K1 and K2 fail for want of `work/missing-audio-baseline/`, which only a tree that ran `--baseline` at bb73b35 holds |
+
+Four of AP5's older mutants (`scaled-isolated`, `export-no-wait`, `window-not-keyed`,
+`split-rounding`) were copied while `ExportStems.swift` carried M6's hand edit; those four were
+run again on the clean tree, 4/4 killed by the same rows.
+
+```sh
+python3 tools/proof/proof_app.py --selftest && python3 tools/proof/proof_app.py --mutant bare-number
+python3 tools/proof/audio_ap5_proof.py --probe && python3 tools/proof/audio_ap5_proof.py --mutants
+python3 tools/proof/audio_ap8b_proof.py --probe && python3 tools/proof/audio_ap8b_proof.py --mutants
+AP6_ONLY=menu python3 tools/proof/audio_ap6_proof.py <dir>/agent.sock
+LOUDNESS_ONLY=menu_rows python3 tools/proof/loudness_normalize_proof.py <dir>/agent.sock
+python3 tools/proof/audio_ap10b_proof.py <dir>/agent.sock --only S1,S6,C1
+python3 tools/proof/export_status_proof.py
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/missing_audio_proof.py --only P1
+```
+
+## Hygiene c2 — the screen catalog's fixtures and a held save (`screens.py` P2, 14b; `analysis_proof.py` A14 and two mutants; `transcript_tab_proof.py` B4; #443, #430, #429; spec §11 #429)
+
+**#443.** `screens.py`'s `SECTIONS` has held `video.behind_subject` since CO7's commit
+765bd0c1, so the issue's own finding was already done. P2 still failed, one cause later: two
+`static let …Key` literals no row covered, `FrameJobAnalysisMergeOnly` (#435's thread mark) and
+`RCDevMeasureHandBackHold` (#546). Both are now `NOT_SHOWN` rows, with `RCDevSaveHold`'s.
+
+**#430.** The `fillers` fixture is `demo` with a cached AssemblyAI transcript seeded for
+`speech.mov` (`_seed_filler_transcript`: the file and its marker, written into the open
+package's `cache/transcripts/` after the peaks wait, the marker's request copied from the
+file's own `requested`, the source stamped from the media file). Screen 14b names it, has no
+`skip`, and expects "1 cut · removes 00:00:00:16". The restored screen reported the sheet's
+Transcribe row as an ambiguous `NSStackView` (its width 365 pt in one look and 359 pt in the
+other); `FillerSheetController`'s `rowsStack` and each row now hug horizontally, and the
+screen reports no layout problem.
+
+**#429.** `-RCDevSaveHold <s>` (spec §11 #429) and row A14. The document is made, saved and
+closed on a plain launch; a launch with `-RCDevAnalysisHold 3 -RCDevSaveHold 25` opens it,
+wants a `shots` job over the first 100 frames and calls `save_project`. A14 passes when the
+job landed, its `save_waits` rose by one, the marker and `frames.bin` are in the package after
+the save, and `get_media_analysis` answers `cached: true` with cut 60. No clause compares
+clocks; the detail prints them. A run whose publish did not meet the save fails with
+"the publish did NOT wait for a save": it was seen once, on Debug with a 10 s hold and the
+whole file as the window, where the job's publish came after the save had returned.
+
+| Run | Result |
+|---|---|
+| `screens.py --only 11c-transcript-tab`, the base tree (a0b9a829), Debug | exit 1: "P2 fail — keys neither pinned nor in NOT_SHOWN ['FrameJobAnalysisMergeOnly', 'RCDevMeasureHandBackHold']", 5 pass, 1 fail |
+| `screens.py --only 14b-remove-filler-words-sheet` with the seed call disabled, Debug | exit 1: both looks "perform_menu_item: Clip ▸ Remove Filler Words… not found" |
+| the same before the layout fix, Debug | pass, 4 new problems (the two stacks, each look); with the row's hugging alone, 2 |
+| the same on this tree, Debug | 6 pass, 0 fail, 0 skip, 0 new problems |
+| `analysis_proof.py --only A14`, Debug | 2/2 (A14, Z1): `save_waits` 0 → 1 |
+| `--mutant write-outside-publish-app` (the store writes without the ledger), Debug | CAUGHT: `save_waits` 0 → 0, marker and payload MISSING after the save, cached False |
+| `--mutant save-not-announced` (`saveBegan` not called), Debug | CAUGHT: the same three clauses |
+| `--mutant write-outside-publish` (P9, its anchor moved with the call) | CAUGHT: P9 |
+| `RC_PROOF_APP=release analysis_proof.py` | 26/26 |
+| `RC_PROOF_APP=release screens.py` | 52 pass, 0 fail, 0 skip of 52; 0 new problems |
+| `RC_PROOF_APP=release transcript_tab_proof.py --only B4` | 1/1 |
+
+```sh
+make app-debug && python3 tools/proof/analysis_proof.py --only A14
+python3 tools/proof/analysis_proof.py --mutant write-outside-publish-app
+python3 tools/proof/screens.py --only 14b-remove-filler-words-sheet
+```
+
+## Hygiene batch b1 — instruments that no longer build or anchor (`tree_copy.py` `make_base_copy`, `default_base`, T7, T8; `co2a_proof.py` D15, MA, `--base`, `unmasked-dimmed`; `ramp_proof.py` U1, `--base`; `qualifier_proof.py` MA; `media_less_playback_probe.build_shader`; #433 #440 #388 #431)
+
+Four issues about proofs that had rotted while the product moved. No product file changed.
+
+**A base app is found and built whole** (#440, #388). `co2a_proof.py` D15 and `ramp_proof.py` U1
+both compare this build with "the build before the change", and both had pinned that build to one
+historical commit: D15 to `f82c5b20`'s `app/` linked against the TREE's core, which trapped at Write
+Agent Catalog once the core's op table gained ops that `app/` has no tool for; U1 to a
+`baseline.json` only a hand-run `--baseline` on the right build could write. Now:
+
+- `tree_copy.default_base()` answers the base and the rule that chose it: `HEAD` when the tree's
+  build inputs differ from it (uncommitted work is the change under test), else the merge-base of
+  `HEAD` and `main` (a lane's commits are), else `HEAD`. `--base REV` on either proof names another.
+- `tree_copy.make_base_copy(dest, rev)` is `make_copy` with every build input but `tools` replaced
+  by `git archive`'s — the tree's `build_inputs()` and the base's own, derived from each
+  `project.yml`, never listed by hand — and the tree's `core/` and `mcp-proxy/` release artifacts
+  cloned copy-on-write, so the base's cargo compiles the local crates only. `tools` stays the
+  tree's: `build_codecs.py` finds the tree from its own path, so the base uses the tree's encoders
+  and build tooling. The base is then built by `tree_copy.build_app`, with its own Swift, core,
+  header and `project.yml`. A base that will not build is a FAIL of the row.
+- D15 writes its one fixture at the BASE's format version, which the tree's app reads as an older
+  file. U1 makes its baseline before the tree's instance is launched and empties the work folder
+  again, so neither run reads the other's projects or exports, and keeps `baseline.json` (with
+  `base`, `config` and `plan_probe: base`) for the next run on the same base and build.
+- **U1's baseline plan is the base's** (the diff read's finding 1). `ramp_proof.base_probe` compiles
+  `ramp_spike_probe.swift` over the base copy's own `app/Sources`, bridging header and core, and
+  the baseline's plans are read by it. Read by the tree's probe, as they first were, both sides of
+  the plan clause came from one core, so the clause could not see a plan change, and a kept
+  baseline held the plan of the tree as it was on the day it was made: one tree, two verdicts. A
+  base the probe does not compile over is a FAIL of U1. `--baseline --app EXECUTABLE --base REV`
+  makes a base copy for the probe alone (only its core is built); without `--base` the plans are
+  the tree's probe's, `plan_probe: tree`, and U1 never keeps that baseline.
+- **A mutant is not CAUGHT by a D15 that compared nothing** (finding 2). When D15 fails before its
+  comparison (no base found, the base not built or not listening, either side's outputs not
+  made), `co2a_proof.py --mutant unmasked-dimmed` prints `the control could not be performed —
+  D15 compared nothing: …` and exits 2.
+- **When the tree's build inputs ARE the base's** (a change under `tools/` only, or a clean tree on
+  `main`), each row says so in its detail: it compared two builds of one source. For U1 that is
+  still #337's run-to-run check.
+
+This is not `reference_build.py`'s job: that builds the offscreen harness binary, and these two
+rows need `render_frame` and `export`, which only an app answers. The rule is the same one: the
+base is built from its own sources in a folder of its own, and a failed build is a scored failure.
+
+**Row MA** (#433) in `qualifier_proof.py` and `co2a_proof.py`: every anchor of every mutant occurs
+exactly once in the tree, text only, first in a plain run; the mutant builders count through the
+same function. `qualifier_proof.py`'s `SHOWN` had named a shader line HDR H-6 split in two, so
+`grade-reads-inline-q` and `coverage-blurred` could not be applied; it is now `SHOWN_GREY` and
+`SHOWN_END`. `co2a_proof.py`'s `miss-transparent` anchored on two lines CO10b's image branch
+repeated; its anchor gains the media branch's own line above. Since #554 the same count runs
+over every proof's table in `make test` ("Mutant anchors (mutant_anchors.py)" above); these two
+rows stay.
+
+**`unmasked-dimmed`**, D15's mutant: CO-27's gate given an off arm that multiplies an unmasked
+layer's alpha by 0.98. Removing the gate alone was measured first and SURVIVED (D15 2/2): the
+texture bound for a layer with no mask is the 1 × 1 white placeholder and `cutoutCover(1)` is
+exactly 1 at every edge and feather, so the gate and the placeholder each hold the identity alone.
+
+**`build_shader` makes its folder** (#388): `ramp_proof.probe()`, `constant_render_spike.py` and
+`ramp_spike/render_spike.py` build the shader before the probe whose builder made
+`work/ramp-spike/probe/`.
+
+**#431** was already fixed by #528 (5986c327): the three cloud-captions baselines are commits.
+
+| Run | Result |
+|---|---|
+| Before: `qualifier_proof.py --mutant grade-reads-inline-q`, `--mutant coverage-blurred` | exit 2 each, "the anchor occurs 0 times" |
+| After, Debug: the same two | MUTANT PASS each (Q3; Q4), 38/39 |
+| `qualifier_proof.py --only MA`; with one character of `SHOWN_GREY` changed | 1/1; 0/1 naming `coverage-blurred` |
+| Before: `co2a_proof.py --only D15` | FAIL, the base app did not build: "the core's op table has ops with no agent tool" |
+| After, Debug: `--only D15` (base 9f8f02aa, the tree's own inputs) | 2/2, 3 PNGs and 60 frames equal |
+| After, Debug: `--only D15 --base f82c5b20` (format 39, its own core) | 2/2, the base built in 87 s, 3 PNGs and 60 frames equal |
+| `co2a_proof.py --mutant ungated-cutout` (the gate removed; not kept) | SURVIVED, D15 2/2 |
+| `co2a_proof.py --mutant unmasked-dimmed` | CAUGHT, D15 failed (3 PNGs and the export differ) |
+| Before / after: `co2a_proof.py --mutant miss-transparent` | exit 2, "the anchor occurs 2 times" / CAUGHT, D3 failed |
+| Before: `ramp_proof.py --only P1` in a fresh tree | P1 fail, "xcrun metal failed … unable to open output file" |
+| After the folder fix: `--only P1,U1` from no probe folder | P1 pass; U1 fail, "baseline.json is missing" |
+| After: `--only U1` from no `ramp-baseline/` | U1 pass, its baseline made on 9f8f02aa (Debug) |
+| U1's hand mutant (`"spectral"` → `.timeDomain` in the tree's app), from no `ramp-baseline/` | U1 fail on the making run: CK05's two audio streams ≠ |
+| Fix pass, before: a core mutant adding a key to the plan (`plan.rs`), `--only U1`, baseline made | U1 pass, every plan `=` |
+| Fix pass, after: the same mutant, baseline made; then again, baseline kept | U1 fail both times, CX1, CX2 and CK05 plan `≠`, md5 and PCM `=` |
+| Fix pass, before / after: `co2a_proof.py --mutant unmasked-dimmed --base 0000000000` | `CAUGHT`, exit 0 / `the control could not be performed — D15 compared nothing`, exit 2 |
+| `tree_copy.py --selftest` | 8/8 |
+| Release, whole: `qualifier_proof.py` | 40/40 |
+| Release, whole: `co2a_proof.py` | 19/19 |
+| Release, whole: `env -u RC_ASSEMBLYAI_KEY ramp_proof.py` | 43/43 in 691 s |
+| `cloud_captions_probe.py --only chrome,extract,speakers` (#431's rows) | 114/114, 1 skipped by name |
+
+```sh
+python3 tools/proof/tree_copy.py --selftest
+python3 tools/proof/co2a_proof.py --only D15 [--base REV]
+python3 tools/proof/co2a_proof.py --mutant unmasked-dimmed
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py --only U1 [--base REV]
+python3 tools/proof/qualifier_proof.py --only MA
+```
+
+## #390 — Clip ▸ Voice ▸ (`voice_proof.py` V12–V14, M1–M5, `--menu`; seven mutants; `v2_menu.py` H1, H2; spec §11 AU-158)
+
+Clip ▸ Voice ▸ is the menu half of the Sound tab's Voice Effect section: a header per group, the
+sixteen kinds by bare name, a separator and None, built from `VoiceGroup` and `VoiceKind`, the
+list the popup's titles come from. Its decisions are `VoiceMenu.swift`'s and its rows are in the
+voice effects' proof.
+
+- **Probe rows** (no instance): V12 reads `AppDelegate().voiceMenu()` against a literal list
+  (headers, titles, tags, the selector, None at −1) and each popup title as
+  "<header>: <item>"; V13 `VoiceMenu.state` over three sound clips and a text clip (all radio;
+  radio + echo + none; no effect; only the text clip); V14 `targets`, `ops` and `kind(tag:)`
+  (Deep over `{high, 0.4, 8}`, `{echo, 1}` and none; None; tags 99, −1 and 2).
+- **Instance rows** (`--menu` runs I0 and these alone): M1–M5 perform the items through
+  `perform_menu_item` on two tone clips and a text clip, read `audio.voice` back through
+  `get_project`, and read each item's `enabled` and `state` from `perform_menu_item`'s listing.
+- **`--mutants NAME[,NAME]`** runs the named mutants; with no name, all eighteen.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `menu-mixed-as-on` | `state` answers on when only some targets carry the kind | V13 |
+| `menu-mixed-unmarked` | `state` answers off when only some carry it (Label's rule) | V13 |
+| `menu-none-unmarked` | None is never marked | V13 |
+| `menu-amount-from-first` | every target gets the first target's amount (the popup's rule) | V14 |
+| `menu-pitch-kept` | `VoiceProps.choosing` keeps the stored pitch | V14 (and V11) |
+| `menu-targets-all` | every selected clip is a target | V14 (and V13) |
+| `menu-order-flat` | `voiceMenu()` lists the kinds with no headers | V12 |
+
+| Run (2026-11-10) | Result |
+|---|---|
+| Before the Swift change, Debug: `voice_proof.py --probe` | 0/14, the probe does not build: `AppDelegate` has no member `voiceMenu` |
+| Before the Swift change, Debug: `voice_proof.py --menu` | 1/6: M1–M5 fail, "Clip has no item "Voice""; I0 ok |
+| The menu built, no `validateVoiceAction` line in `EditorViewController.swift`, Debug: `--menu` | 2/6: M1 (0 of 17 disabled, Radio ran), M2, M4 and M5 (nothing marked) fail; M3 and I0 ok |
+| With the line, Debug: `--probe`; `--menu` | 14/14; 6/6 |
+| `--mutants` with the seven names | 7/7 mutants killed, each by its row |
+| `v2_menu.py --only H` | 5/5: 223 leaves, 129 selectors, 129 rows, `no_action` 4 (the four headers) |
+| `v2_menu.py --only H` with the `setVoiceEffect:` row taken out of `inventory.json` (put back) | 3/5: H1 "menu selector missing from inventory", H2 differs at `setVoiceEffect:` |
+| Release, whole, after `make gate`: `RC_PROOF_APP=release voice_proof.py` | 46/46 |
+
+```sh
+python3 tools/proof/voice_proof.py --probe
+python3 tools/proof/voice_proof.py --menu
+python3 tools/proof/voice_proof.py --mutants menu-mixed-as-on,menu-mixed-unmarked,menu-none-unmarked,menu-amount-from-first,menu-pitch-kept,menu-targets-all,menu-order-flat
+python3 tools/proof/v2_menu.py --only H
+```
+
+## #434 — Find in the Transcript tab (`transcript_find_proof.py` F0–F13, Z0, A1–A5; fourteen mutants; `transcript_tab_proof.py` Z0; spec §11 TX-37…TX-39)
+
+Edit ▸ Find… (⌘F) opens Frame Job's own find bar above the Transcript tab's text. The proof is
+`transcript_find_proof.py` with `transcript_find_probe.swift`; its package, fixtures and launch
+are `transcript_tab_proof.py`'s.
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_find_proof.py [--only IDS]
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_find_proof.py --mutant NAME | --mutants
+```
+
+- **Probe rows** (the app's own editor window in the probe's process, 400 preloaded words shown
+  twice; keys and clicks through `NSWindow.sendEvent`): F1 the search alone; F2 the validator
+  and the open; F3 typing from the highlighted word; F4 Return, ⇧Return and keypad Enter; F5
+  Esc and the keys after it; F6 a click on a word and two Escs; F7 a rebuild under the bar; F8
+  the follow; F9 hiding the tab; F10 27,000 words in 900 paragraphs on a bare view; F11 the
+  marks' pixels; F12 a press on the bar's Next and Done; F13 leaving the tab with the text
+  focused. A window that is not key dispatches no mouse-down to a view, so the probe's click
+  sends the press through `sendEvent` (K-4's rule runs there) and then hands it to the view it
+  hit; F12 requires Next to step by exactly one.
+- **App rows**: Z0 the argument set and no parity line; A1 the menu item refused as disabled on
+  the Clip tab and run on Transcript; A2 and A3 the matches against TX-37 (a), (b) computed in
+  Python from the answer's `tokens` (ASCII words only: the twin lowercases); A4 a
+  `ripple_delete_ranges` under the open bar; A5 `screens.py --only 11d-transcript-find`.
+- `transcript_view` is one of `screens.py`'s step tools since this batch (screen 11d).
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `return-leaves` | the window no longer asks `keepReturn` | F4 |
+| `across-paragraphs` | paragraphs joined by a space | F1 |
+| `case-sensitive` | the compare options dropped | F1 |
+| `anchor-ignored` | the current match always the first | F3 |
+| `find-selects` | a step selects its match | F4 |
+| `close-keeps-keys` | closing leaves the keys in the hidden field | F5 |
+| `follow-while-finding` | the follow not paused by the bar | F8 |
+| `stale-after-rebuild` | `refreshFind` not called on a rebuild | F7 |
+| `find-measures-all` | every match measured at draw | F10 |
+| `always-enabled` | the validator arm removed | F2 |
+| `hide-keeps-bar` | hiding the tab leaves the bar open | F9 |
+| `reveal-on-estimate` | the text above the match not laid out before the scroll | F10 |
+| `keys-left-behind` | `handBackKeys` not called | F13 |
+| `view-esc-passes` | Esc in the text does not close the bar | F6 |
+
+Recorded 2026-11-10 on this tree: Release (`RC_PROOF_APP=release`) 20/20; `--mutants` fourteen
+caught; `transcript_tab_proof.py --only Z0,B4` on Release 2/2; `text_focus_proof.py` 57/57;
+`v2_menu.py --only H` on Release 5/5. F10 measured the last of 27,000 words estimated at
+88,601 pt and revealed at 130,078 pt in 0.059 s.
+
+## #583, #584, #593 — the Transcript view's whole layout, the follow at the ends and the top word across a width change (`transcript_find_proof.py` F15, F16; fifteen mutants; spec §11 TX-37 (d), TX-39 as amended)
+
+After a rebuild or a width change the Transcript view lays its whole text out once in idle time
+(`layOutAll()`), so its height and the scroller's knob are the text's own, and the top word is
+put back at the offset it had before the rebuild (#583). A follow tick whose scroll would be
+clamped to where the view already is runs no layout step (#584). A width change keeps the word
+that was at the visible top at its offset: the text laid out from the top through it, the word
+put back at once and handed to the pass (#593). Both rows are probe rows on F10's 27,000 words,
+and each prints its letters' verdicts.
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/transcript_find_proof.py --only F10,F14,F15,F16
+```
+
+- **F15** counts `layOut(through:)` calls (`layoutSteps`) on a view the pass has laid out:
+  (a) two ticks on the first words at scroll 0; (c) the control, a tick on word 18,000, after
+  which the height is still the reference's; (b) two ticks on the last words at the view's bottom;
+  (d) a view not laid out whole, its frame cut to the visible bottom by hand, where the tick must
+  still step.
+- **F16** compares with a reference view laid out in one run from the top with the pass off:
+  (a) no pass inside `show`, one after a turn, the reference's height; (b) the visible top and
+  the knob at word 18,000; (c) a rebuild there; (d) two rebuilds in one turn; (f) a scroll
+  before the pass; (e) a width change, alone and between a rebuild and its pass; (g) a width
+  change with no rebuild pending, against references at 340 and 322 pt too: (g1) word 18,000 in
+  sight at its offset straight after 304 → 340, (g2) after the pass at its offset and the
+  reference's place, (g3) a drag 340 → 322 → 304 with no turn between, the word at its offset
+  straight after each step and after the pass, (g4) a scroll before the pass wins, (g5) a drag from a word that starts a line at 304 pt and not at 322 pt; (h) a
+  legacy autohiding scroller shown inside `show`, whose anchor still wins.
+- F10's and F14's views keep the pass off (`longView(idle: false)`), because their mutants are
+  caught only while the far text is an estimate.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `follow-steps-at-ends` | the follow's skip removed (#584's old behaviour) | F15 (b) |
+| `skip-at-laid-out-end` | the bottom skip without `laidOutWhole` | F15 (d) |
+| `no-idle-layout` | `show` schedules no pass (#583's old behaviour) | F16 (a) (b) (c) (d) |
+| `idle-inside-rebuild` | `show` runs the pass itself | F16 (a) (d) (e) |
+| `idle-survives-rebuild` | scheduling does not invalidate the pending observer | F16 (d) |
+| `idle-loses-anchor` | the pass does not scroll its anchor back | F16 (c) (h) |
+| `idle-stale-anchor` | the waiting anchor taken whatever was scrolled since (in `standingAnchor()`) | F16 (f) (g4) |
+| `resize-stays-short` | a width change schedules no pass | F16 (e) (g2) (g3) (g5) |
+| `resize-drops-anchor` | a width change drops a waiting anchor before it takes one | F16 (e) (g5) |
+| `resize-no-anchor` | a width change takes no anchor (#593's old behaviour) | F16 (g1) (g2) (g3) (g5) |
+| `resize-restore-waits` | the arm does not put the word back; the pass does | F16 (g1) |
+| `resize-drops-offset` | the arm puts the word at the very top, not at its offset; the pass corrects it | F16 (g1) (g3) |
+| `resize-on-estimate` | the arm restores on estimates, nothing laid out from the top | F16 (g3) |
+| `resize-viewport-stays` | the arm lays out through the word with the viewport left where it was | F16 (g1)–(g5) |
+| `resize-stale-stamp` | the arm's anchor stamped with the clip's y from before its scroll | F16 (g5) |
+
+Red before the fix is the two old-behaviour mutants: `follow-steps-at-ends` gave two steps for
+two ticks at the bottom, and `no-idle-layout` left the knob at 0.9951 for word 18,000 and the
+top word 13.3 pt from the top after a rebuild. F15 (a) holds before the fix too: in a 600 pt
+view the first word's line starts at 25 pt, outside the 24 pt margin.
+
+For #593, F16 (g) was red on the tree before the fix: 304 → 340 left word 18,000 22,886.5 pt
+above the visible top, the pass kept another word, and the drag 340 → 322 → 304 ended at the
+top of the text (g1, g2, g3; g4 held). (g5), written after, fails under `resize-no-anchor`, the
+old arm; (h) passes under it, a guard for the arm nested in `show`. A mutant is scored by its
+row, so each one's letters above were read from the row's detail. `resize-drops-offset`,
+added on the diff read, survived (g1) and (g3) as first written, which claimed the word in
+sight but not its offset (offset 0.0 where it was 4.0 straight after each step, put right by
+the pass); both now claim the offset.
+
+Recorded 2026-11-11 on this tree: Release (`RC_PROOF_APP=release`) 23/23; `--mutants`
+twenty-eight caught (the nineteen before and these nine); `transcript_tab_proof.py` on Release
+26/26, its T6 a median rebuild of 52.1 ms over 27,000 words with the pass on (the bound is
+100); `docs_bugs_a3_proof.py --only P3,P4` on Release 3/3. F16 measured one pass over 27,000
+words at a median of 70 ms on a fresh view and 57 ms after a rebuild at word 18,000, 13.4 MB
+of footprint added, and the knob at word 18,000 at 0.6641.
+
+Recorded 2026-11-11 for #593 on this tree: Release (`RC_PROOF_APP=release`) 23/23; all
+thirty-three mutants caught, one `--mutant` run each, every new or moved one on the letters
+named above; `transcript_tab_proof.py` on Release 26/26, its T6 a median rebuild of 51.4 ms;
+`docs_bugs_a3_proof.py --only P3,P4` on Release 3/3. F16 measured a width step at word 18,000
+at 80.7 ms (304 → 340) and 59.3 and 50.7 ms (the drag's two steps), the text above the word
+laid out, where the old arm's step took 31.8 ms; one pass a median of 83 ms fresh and 80 ms
+after a rebuild, 13.6 MB of footprint added. Three lanes shared the machine. Then, with
+(g1) and (g3) claiming the offset: `--only F16` 2/2 on this tree ((g1) offset 4.0 straight
+after, (g3) 4.0 at 322 and at 304), and `resize-drops-offset` caught on (g1) and (g3), the
+thirty-fourth.
+
+## #387 — voice isolation and voice effects on a retimed clip (`audio_ap5_proof.py` P4, P13–P18, P8b, I7a–I7e, I11; `voice_proof.py` V15, V16, I11–I13; `audio_ap6_proof.py` V12; twelve mutants; spec §11 AU-55 and AU-145 as amended)
+
+A clip with a constant speed or a speed ramp is isolated, and voiced, BEFORE it is retimed: its
+padded window is rendered to a file (`RetimedSound.swift`, `IsolationMix.swift`) and the retimer
+reads that file in the media's place. The rows live in the proofs of the two features, and they
+replace four older ones, which described the limit this lifts: AP5's P4 ("no request for a
+time-scaled … segment") and I7 ("×2 plays dry"), AP14's I11 ("×2 with Keep pitch off: no voiced
+file") and AP6's "not isolatable" leg of E1 and V12 (noise reduction 0.5 in isolation's place).
+
+- **Probe rows** (`audio_ap5_probe.swift`). Their chains are rendered by the export's own wait
+  (`Exporter.withOfflineAudio`), with the DRY window written where the chain's isolation lands,
+  so a mix is the dry sound and a processed render must equal the dry one. `AP5_ROWS=P4,P13` in
+  the environment runs only the sections answering those rows; the mutants ask for their own.
+
+  | Row | What it holds |
+  |---|---|
+  | P4 | a ×1 segment gets a tapped request and no chain; ×2 with Keep pitch on a two-stage chain, ×2 with it off and a ramp three stages, each formable only once the file before it is on disk; a pending reverse none |
+  | P13 | the processed render against the dry render of the same segment: ×2 from 2.5 s, ×2 over 2–6 s of the file (both ends on a whole second), a ×1→×2 ramp and a clip whose source-in is under the pad, Keep pitch off, max \|Δ\| ≤ 1e-6; a ×1→×2 ramp from 2.5 s and from 2 s and a ×1→×12 ramp, Keep pitch on, ≤ −60 dB, and the frames Apple's unit read past the clip's last no more than the window holds |
+  | P8b | the export's wait ran its build with all three stages of each of P13's chains on disk |
+  | P18 | a metering build (the preview's) and an export build of each of P13's clips read identical; a live ×2 clip of the owner's recording: its two reads and the dry clip's each ≤ −10 dB (AVFoundation's time-pitch is not deterministic), and its lag against the dry clip, whose samples its window holds, ≤ 48 samples |
+  | P14 | the mix: dry 1 and isolated 0 give 1 − a at 0.5 and 0.25; a mono source stays mono; an Amount moved 0 → 1 over a two-leg map against the closed form, ≤ 1e-5 |
+  | P15 | a live clip of the recording (AAC) beside a ×1 clip of it: it reads its processed window at source-in − the window's first frame (less SY-24's 575 ticks at ×1.0005), scaled as the media, on a composition track of its own, with no tap; with the file removed it reads the media. A rendered segment plays its processed render, the dry one when only that exists, nothing with neither |
+  | P16 | ×2 and ×1.9 of one window name one isolation and one mix and two renders; Amount 1 and 0.5 one isolation, two mixes, two renders; a clip 2 s shorter another isolation; the dry render's name is the one the rule before #387 gives, spelled again in the probe |
+  | P17 | the Status of a retimed clip: "Rendering…" under a held render with the dry render wanted beside the chain, "Ready" once the last file lands (2 isolated and 2 ramp files with Keep pitch off, 2 and 0 with it on), "Not rendered: …" in the isolation's words; at ×16 (no audio segment) "Plays no sound" for Voice Isolation and Voice Effect |
+
+- **Instance rows.** The oracle is "isolating then retiming equals retiming the isolated file":
+  I2's ×1 isolated export, its left channel as a mono file, imported and given the same speed.
+  I7a ×2 with Keep pitch off and I7c's Keep pitch off ramp are compared with it sample against
+  sample (residual ≤ −40 dB, \|lag\| ≤ 0.5); I7b (×2, Keep pitch on) and I7c's Keep pitch on ramp
+  are Apple's time-pitch and are held to the pause floor and a lag (≤ 5 ms), the dry export's
+  lag and residual against the dry file retimed reported beside them. The floor's bound is 6 dB
+  (400 ms windows of a retimed clip span more media than I2's) and what the oracle lowers it,
+  within 1 dB (2 dB on the Keep pitch on ramp). I7d the Amount at 0.5; I7e what a rate edit, an
+  Amount and a trim render again; I11 a freeze frame.
+- **`voice_proof.py`**: V15 a ×2 clip's voice as a stage of its chain; V16 the pad silent to
+  the effect (Echo, an impulse 50 ms before the clip's first frame); I11 and I13a against the
+  ×1 voiced export retimed, I12 and I13b by telephone's K8 signature. `--retimed` runs I0 and
+  I11–I13 alone.
+- **A freeze frame.** `freeze_frame`'s still has no audio properties (`enabled.audio` false), so
+  the core refuses isolation on it by `set_audio` and by `paste_attributes` ("clip 7 has no audio
+  properties"): I11 is that refusal, not a render.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `retimed-dry` | `RetimedSound.chain` answers none for a retimed segment (the old behaviour) | P4 |
+| `map-unshifted` | the ramp render reads the processed window with the media's own map | P13 |
+| `pad-zero` | the window is not widened by the pad | P13 |
+| `mix-swapped` | `iso + a·(dry − iso)` | P14 |
+| `automation-unmapped` | the Amount's points read in source time | P14 |
+| `live-not-substituted` | `resolveSource` ignores the processed window | P15 |
+| `family-not-told` | `audioFamilies` splits by the media's format while `fill` inserts the window | P15 |
+| `amount-not-keyed` | the mix's name leaves the Amount out | P16 |
+| `dry-not-wanted` | the document stops wanting the dry ramp render | P17 |
+| `export-one-pass` | the export asks once | P8b |
+| `voice-retimed-dry` (`voice_proof.py`) | a retimed chain carries no voice | V15 |
+| `pad-voiced` (`voice_proof.py`) | the pad reaches the effect | V16 |
+| `sounding-not-keyed` (`voice_proof.py`) | a retimed voice render's name leaves out the frames the clip plays | V15 |
+
+Three older mutants were re-anchored on the new code and killed again: AP5's `scaled-isolated`
+(a time-scaled segment taken for a tapped one, P4) and `export-no-wait` (P8), AP14's
+`export-no-wait` (V8); AP6's `M3 isolation-swapped` now restores the removed arm (E1). Every
+other mutant of the three proofs had its anchor found exactly once in `app/Sources` and was not
+run again.
+
+| Run (2026-11-10) | Result |
+|---|---|
+| Debug: `audio_ap5_proof.py --probe` | 20/20 |
+| Debug: `audio_ap5_proof.py --mutants` with the ten names and the three re-anchored | 13/13 killed, each by its row (`pad-zero` survived P13 until the case with both ends on a whole second was added, then killed) |
+| Debug: `voice_proof.py --probe`; `--mutants export-no-wait,voice-retimed-dry,pad-voiced` | 16/16; 3/3 killed |
+| Debug, the fix pass: `voice_proof.py --mutants sounding-not-keyed` | 1/1 killed, by V15 |
+| Debug: `audio_ap6_probe.py`; `--mutants M3` | 10/10; 1/1 killed |
+| Debug: `audio_ap6b_probe.py`, twice | 14/15 (R5: three renders not byte-identical), then 15/15 |
+| `make gate` | PASS |
+| Release, whole, after `make gate`: `RC_PROOF_APP=release audio_ap5_proof.py` | 37/37. I7a: floor lowered 8.7 dB (the oracle 8.7), residual −67.2 dB, lag +0.000; I7b: 9.3 dB (9.3), lag +94.9 samples, its dry export against the dry file retimed lag −0.9 and residual −9.6 dB; I7c: Keep pitch off 10.2 dB (10.2), −66.6 dB, lag −0.000; Keep pitch on 8.3 dB (10.0), lag +22.0, its dry export against the dry file retimed lag −23.5 and residual +2.4 dB; I7d −63.7 dB; P13 max \|Δ\| 0.0 to 2.98e-8 with Keep pitch off and −329.3 to −335.6 dB with it on, the unit reading 6,661 frames past the clip's last at ×2 and 35,712 at ×12 |
+| Release, whole: `RC_PROOF_APP=release voice_proof.py` | 51/51. I11 −62.2 dB and I13a −64.1 dB against the oracle; I12 125 Hz −24.7 dB and 8 kHz −28.2 dB re 1 kHz (the oracle the same); I13b −27.3 and −27.5 dB |
+| Release: `audio_ap6_proof.py` on a `proof_app.py launch --app release` instance | 38/38. V12 at ×1.5: isolation 0.8, noise reduction 0, the pause floor 28.33 dB under Normalize-only, the export at −16.05 LUFS; no `Frame Job: ` line |
+| Release, whole: `env -u RC_ASSEMBLYAI_KEY ramp_proof.py` | 43/43 in 690 s (U1: dry constant and ramped clips equal to the base's, plan, md5 and PCM) |
+| Release, whole: `env -u RC_ASSEMBLYAI_KEY constant_render_proof.py` | 27 rows in 764 s, failed [] |
+
+```sh
+python3 tools/proof/audio_ap5_proof.py --probe
+python3 tools/proof/audio_ap5_proof.py --mutants retimed-dry,map-unshifted,pad-zero,mix-swapped,automation-unmapped,live-not-substituted,family-not-told,amount-not-keyed,dry-not-wanted,export-one-pass
+python3 tools/proof/audio_ap5_proof.py --instance --only I7a --only I7e --only I11
+python3 tools/proof/voice_proof.py --retimed
+python3 tools/proof/voice_proof.py --mutants voice-retimed-dry,pad-voiced,sounding-not-keyed
+```
+
+## A `framejob://` link (#385, spec §11 G-49)
+
+Three instruments, none of which needs a browser or leaves the machine:
+
+- **`graphic_link_server.py`** — the stand-in server both scripts fetch from: stdlib
+  `ThreadingHTTPServer` on `127.0.0.1`, a port the system picks. Its docstring lists the paths
+  (a package, a status, a redirect to anything, a redirect chain, a declared length, an endless
+  body, a stall, a drip, a held body, a multipart body).
+- **`graphic_link_probe.py`** (+ `graphic_link_probe.swift`) — the link's and the address's
+  rules, the fetch and the one-at-a-time rule, through `GraphicLink.swift`,
+  `GraphicLinkDownload.swift` and `GraphicLinkController.swift` alone, built by
+  `swift_build.build` with `FRAMEJOB_DEV_TOOLS` (a build is under a second, so each mutant is
+  its own build). 31 rows: U1–U9 make no request, F1–F9 fetch with small injected limits,
+  K1–K4 drive the controller with a stand-in hand-off. `--mutants` runs all twenty-two.
+- **`graphic_link_proof.py`** — the built app over MCP, driven by the dev tool `open_link`
+  (which hands `GraphicLinkController.shared.receive` a `kAEGetURL` event it built, with a
+  reader of its own in place of the alert): P1 the Info.plist's scheme, L1 the sheet's
+  `From:` line, L2 an import landing, L3 a tampered package, L4 refusals that send no request,
+  L5 a second link during a held fetch, L6 an instance without `-RCDevGraphicLinkLoopbackHTTP`.
+  Three instances in a scratch home. Its one app-tier mutant, `loopback-always`, builds a copy
+  of the tree.
+
+What none of them sees is GR-18's: Launch Services' choice of app, the Apple Event's delivery
+and a launch by a link, the browser's question, a real certificate, and how the alert reads.
+
+| Probe mutant | Edit | Must fail |
+|---|---|---|
+| `any-scheme` | any scheme is the link's | U2 |
+| `no-length` | the 2,048-byte cap dropped | U2b |
+| `any-action` | the action not compared | U3 |
+| `link-extras` | the user, port, path and fragment guards dropped | U3b |
+| `any-keys` | another key and a second `src` taken | U4 |
+| `http-src` | `http` taken as `https` | U5 |
+| `credentials` | the user and password test dropped | U6 |
+| `any-host` | the host rule dropped | U7, U7b |
+| `empty-label` | an empty label allowed | U7 |
+| `any-file-name` | the file name taken as given | U8 |
+| `switch-any-host` | the dev switch takes any `http` host | U9 |
+| `any-status` | any status taken | F2 |
+| `redirect-any` | redirects not held to the rule | F3, F3n |
+| `redirect-count` | the count not enforced | F4 |
+| `no-declared-cap` | the declared length not read | F5 |
+| `no-running-cap` | the running count not enforced | F6 |
+| `no-idle` | the idle timeout not set | F7 |
+| `no-total` | the total timer not started | F8 |
+| `many-answers` | a second response (a multipart body's next part) taken | F9 |
+| `no-single` | a second fetch allowed | K1 |
+| `keep-temp-read` | the folder kept after the read | K2 |
+| `keep-temp-refusal` | the folder kept after a refused fetch | K3 |
+
+`dist_check.py` gained D44–D47 (the switch's name in Release's binary and not in
+Distribution's; each Info.plist's one scheme, `framejob`) and `published_check.py` P26, P27;
+`dist_check_mutants.py` gained `link-scheme-release` and `link-scheme-dist`. D45 has no skeleton
+case, as D5 has none (the skeleton's binary is a link to the real one): it is seen failing by
+naming the Release app as `--dist`.
+
+```sh
+python3 tools/proof/graphic_link_probe.py             # scores: 31/31
+python3 tools/proof/graphic_link_probe.py --mutants   # mutants: 22/22 caught
+python3 tools/proof/graphic_link_proof.py             # 10/10 checks passed
+python3 tools/proof/graphic_link_proof.py --mutant loopback-always   # MUTANT PASS, L6
+```
+
+Recorded 2026-11-10 on this tree: the probe 30/30 and `--mutants` 21/21 caught, before F9; P1 against the
+Debug app built before the change, FAIL (`rows []`); `graphic_link_proof.py` on Debug 10/10 and
+on Release (`RC_PROOF_APP=release`, after the gate's `make app`) 10/10; `loopback-always`
+caught (L6: the link fetched and its sheet went up); `graphic_import_proof.py` 17/17 on Debug
+and on Release; `make dist` `dist_check: 47/47`, `published_check: 27/27`;
+`dist_check_mutants.py` 38/38; `dist_check.py --dist <the Release app>` 40/47 with D45 among
+the FAILs, and `published_check.py --app <the Release app>` 20/27 with P26 among them. F6c's
+listener had written 3,014,656 and 5,898,240 bytes on two runs when the 1 MiB cut-off closed
+the connection, which is why that row asserts the close and no size.
+
+The fix pass (2026-11-11, a second response refused, F9): `--mutant many-answers` caught ("F9
+fail — FETCHED 230 bytes after 1.0 s; FrameJobLink-* folders this fetch left: 41"), the probe
+31/31 (F9 "the server answered more than once", 0 folders left), `--mutants` 22/22 caught,
+`make gate` PASS, and `RC_PROOF_APP=release graphic_link_proof.py` 10/10.
+
+## Issue #550 — missing_audio_proof's baseline in the repository (missing_audio_proof.py K0, K1, K2; mutants Q1–Q7)
+
+K1 and K2 compared the control exports with raw PCM under `work/missing-audio-baseline/`, which
+is ignored, so both rows failed "no baseline" in every checkout that had not written its own.
+The baseline is now `tools/proof/missing_audio_baseline.json`, tracked, written only by
+`--baseline`, one control's entry at a time (`--only K1 --baseline` leaves T's as it was).
+
+- **What an entry holds.** Per export: channels, rate, `frames` and the sha256 of the first
+  `frames` frames of its interleaved pcm_f32le, and for `prores_422` the video md5. `frames` is
+  min(the timeline's frames, the export's frames) when it was recorded: the old common-length
+  rule with the baseline's side fixed. A run with fewer frames fails, naming both counts; what a
+  run has past them is reported, not scored.
+- **What it was recorded from.** The digests are the current tree's, not bb73b35's: that tree is
+  not to be rebuilt, and what the rows guard is the controls changing from here on. Each entry's
+  `recorded` says so: `head` is the tree the exporting app was built from (not the commit that
+  carries the file), `app` its configuration, the date, and the host (chip, macOS, ffmpeg).
+  Debug and Release export the same bytes (the Debug recording differed from the Release one in
+  `app` alone), so the rows run on either.
+- **The fixtures are part of it.** `toneA.m4a` and `toneB.m4a` are AAC written by whichever
+  ffmpeg made `media/`, so an entry stores the sha256 of each fixture it read. A fixture that is
+  not that file fails the row with a sentence saying so, never a digest mismatch; `--baseline`
+  there records that machine's.
+- **A failure names the host when it moved.** The PCM is Apple's AAC decode, the video Apple's
+  ProRes encode read back through ffmpeg. A failed digest on a host that is not the recording's
+  ends with both hosts and "re-record with --baseline if the app did not change"; on the
+  recording's host it says nothing more.
+- **K0** scores the comparison over PCM made in the script, with no app and no fixture
+  (`--only K0` launches nothing): ten clauses.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| Q1 | one hex digit of C's `audio_wav` sha256 in the file | K1 (K2 passes) |
+| Q2 | one hex digit of T's `prores_422` video md5 in the file | K2 (K1 passes) |
+| Q3 | `digest_compare` hashes the whole run | K0 "frames past the count are not scored" |
+| Q4 | the shorter-run refusal dropped, what there is hashed | K0 "a run shorter than the count" (the row still fails on the digest: the refusal is for its sentence) |
+| Q5 | the fixture check removed, C's recorded toneB sha256 altered | K1 passes where it fails with the check |
+| Q6 | app: `silentEnd` without the `sounding.isEmpty` guard (the #336 section's MU2) | K1, K2 audio |
+| Q7 | `host_note` always empty | K0 "another host is named" |
+
+| Run (2026-11-11) | Result |
+|---|---|
+| base d142e3e4, Debug, `--only K1,K2`, a worktree with no `work/` | K1, K2 FAIL "no baseline at …/work/missing-audio-baseline/C.json (run --baseline first)" |
+| `--only K1,K2 --baseline` (Release, built from d142e3e4) | wrote both entries: C and T each 814 400 frames of 2 ch 48 kHz for both presets, video md5 `fd0ac14a…` |
+| `missing_audio_proof.py` (Release), twice, each its own launch | **15/15** in 32 s and 33 s: K0 10/10 clauses, K1 and K2 "= the baseline's sha256 over 814400 frames; the run has +0 past them", X0 16/16 |
+| Q1, Q2, Q5 (Release) | Q1 K1 fails "audio_wav audio ≠", K2 passes; Q2 K2 fails "video md5 … ≠ baseline", K1 passes; the altered fixture digest fails K1 "toneB.m4a is not the file the baseline was recorded from", and passes under Q5 |
+| Q3, Q4, Q7 (`--only K0`) | each caught, 9/10 clauses, by the clause named above |
+| Q6 (Debug built with the mutant, `--only K1,K2`) | K1 and K2 fail: both presets' audio "≠ the baseline's sha256 over 814400 frames", the video md5 still the baseline's |
+| Debug rebuilt clean, `--only K0,K1,K2` | 5/5 against the Release-recorded file |
+
+## Issue #555 — the forty-document claim measured (open_documents_proof.py V0, D0, O1–O4, since #592 V1, O5, O6; mutants `timeout-only`, `any-fall`)
+
+The README, the root rulebook and four instruments said an instance deadlocks "somewhere past
+forty" documents open at once. That figure was from before `close_project` existed and nothing
+measured it. `open_documents_proof.py` does: each document is a 640×360 project with `AV.mov`
+placed (a picture and sound, so a player and its caches), opened through `open_project` and
+`new_project` in turn and never closed until the bound, with the threads (`ps -M`), resident
+memory (`ps -o rss=`), slowest call and one-minute load printed every ten.
+
+- **V0** — the verdict rule over made-up readings, no app. A call past `--call-seconds` (120)
+  is "slow" when it answered while three `ps -o %cpu=` readings were taken or any reading is
+  0.5 % or more; unanswered at 0 % it is sampled (`sample <pid> 5`, kept in
+  `work/open-documents/sample.txt`) and is "deadlock" only with `_performFileAccess` on the main
+  thread, else "hung". A timeout alone is never a hang: three lanes share this machine.
+- **D0** — the instance listens; no `Frame Job: ` line.
+- **O1** — the bound open at once, every call answered. **O2** — `get_project` on the first,
+  middle and last, and a `set_canvas` on the last read back. **O3** — every
+  `close_project {discard: true}` answers and `snapshot_ui {}` lists no editor window.
+- **O4** — the threads fall back under the count before the first document plus 64
+  (`close_project_proof.py` C3's margin), read 5, 15, 30 and 60 s after the last close.
+  It failed on the app as #555 measured it, which is the finding below, and passes since
+  #568 ("Issue #568" below). The instrument is in no make target.
+- **O5** — resident memory falls back under the reading before the first document plus three
+  quarters of what the bound added, read with O4's readings, which go on until both rules
+  hold; **V1** is its rule over made-up readings. **O6**, with `--heap` on Debug only, counts
+  no `EditorViewController` and no `Playback` left after the closes. All three since #592
+  ("Issue #592" below).
+
+```sh
+make app && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/open_documents_proof.py   # [--bound N] [--only-kind new|open] [--call-seconds S]
+python3 tools/proof/open_documents_proof.py --bound 4 --mutant timeout-only                              # V0 must fail
+```
+
+**Measured 2026-11-11, Release built from d142e3e4** (Apple M2 Max, macOS 26.5.1; the load is
+other lanes' builds): 75 packages made, saved and closed in 31 s, then
+
+| open | threads | resident MB | slowest call s | load (1 min) |
+|---|---|---|---|---|
+| 0 | 60 | 278 | | |
+| 10 | 101 | 414 | 0.3 | 27.9 |
+| 20 | 147 | 607 | 0.3 | 27.1 |
+| 30 | 196 | 797 | 0.3 | 27.1 |
+| 40 | 243 | 985 | 0.3 | 25.8 |
+| 50 | 292 | 1170 | 0.4 | 25.8 |
+| 60 | 341 | 1365 | 0.4 | 24.2 |
+| 70 | 390 | 1553 | 0.4 | 22.8 |
+| 80 | 437 | 1728 | 0.9 | 25.2 |
+| 90 | 496 | 1930 | 1.3 | 24.6 |
+| 100 | 551 | 2124 | 1.1 | 26.5 |
+| 110 | 602 | 2309 | 0.8 | 29.5 |
+| 120 | 647 | 2493 | 1.6 | 29.4 |
+| 130 | 700 | 2696 | 1.1 | 33.1 |
+| 140 | 745 | 2930 | 1.3 | 34.4 |
+| 150 | 807 | 3150 | 1.5 | 49.2 |
+| 150, 10 s later | 792 | 3144 | | 56.7 |
+
+- **No deadlock and no hang at 150 open** (75 by each door, opened in 102 s): O1 and O2 pass, no
+  call ran past 120 s, the slowest took 1.6 s. That is about 5.0 threads and 19 MB a document,
+  and more threads and memory than the instance the old report saw wedged (459 threads, 2 GB).
+  The old deadlock is not reproduced; nothing here says what removed it.
+- **O3 passes**: 150/150 closed in 5 s, no editor window left.
+- **O4 fails, and is the finding**: 773 threads and 3,051 MB 5 s after the last close, 768 and
+  3,061 MB at 60 s, against 60 before the first document. A run at `--bound 40` read the same
+  shape (71 threads before, 242 at the bound, 217 a minute after the closes, 954 MB). A
+  `sample` of an instance after ten such documents closed names what stays: ten each of
+  `com.apple.coremedia.audioqueue.source`, `.videoprocessor`, `.videomediaconverter`,
+  `.audiomentor` and `.videomentor`, with 408 MB resident against 122 MB at launch — each
+  closed document's player. It is the same after `close_project {discard: true}` and after
+  `save_project` then a plain `close_project`. A document closed before its preview was built
+  leaves far less (the 75 packages made, saved and closed one after another took the instance
+  only to 60 threads), which is why `close_project_proof.py`'s C3, sixty empty documents,
+  passes. The defect was filed as #568, whose section below has the fix and the row green.
+- Debug, in the loop: `--bound 12` 5/5 before O4 was split off; `--bound 4 --call-seconds
+  0.001` showed 25 overruns each read as "slow" (answered while the readings were taken);
+  `--mutant timeout-only` fails V0 (1/6 verdicts) and calls the first overrun a deadlock at
+  38.8 % CPU.
+
+## Issue #568 — a closed document's player (`document_close_probe.py` P0–P4, four mutants; `open_documents_proof.py` O4; spec §11 #568)
+
+**What held it.** Nothing of the app's. `heap <pid>` on a Debug instance after ten documents
+(each `AV.mov` on a 640×360 canvas) were opened and closed with `close_project {discard: true}`
+counted ten each of `EditorWindow`, `EditorViewController`, `Playback`, `AVPlayerItem`,
+`AudioTapContext` and `Compositor` still alive, and no `ProjectDocument` or
+`EditorWindowController`. One more document opened, and all ten were gone; that one closed, and
+it stayed in its turn. `leaks <pid> --traceTree` on the surviving window named its holders: the
+main thread's autorelease pool, the `NSEvent` in `NSApplication.currentEvent` (and the colour
+panel's toolbar's copy of it) and `_DPSNextEvent`'s frame. So AppKit keeps a closed window
+until another window opens in an instance that is driven in the background, and the editor's
+`deinit` was the only thing that dropped the player's item. Ten structural edits on one open
+document left its `AVPlayerItem` count at one: a rebuild leaks no item.
+
+**The fix** (spec §11 #568). `ProjectDocument.close()` shuts each of its editors' players
+itself (`releaseOnClose()` → `shutDownForClose()` → `Playback.shutDown()`), through the
+document's weak `editors` table, and a shut player stays shut: `shutDown()` discards a rebuild
+in flight and `update` returns before it publishes.
+
+**`document_close_probe.py`** — `document_close_probe.swift` over the whole of `app/Sources`
+(`scope_playhead_probe.py`'s build; no window shown). It holds each editor and its `Playback`
+strongly across the close and reads what the close itself did, never a deinit. **P0** each of
+three documents had an item and one editor in its table. **P1** `document.close()`, what
+`close_project` calls: at its return the player is shut, has no item and nothing built, and
+the key holds no project. **P2** the window's close button, `NSWindow.performClose(_:)`: the
+document is closed and the same holds. MCP cannot drive that door (`perform_menu_item` refuses
+File ▸ Close as a framework item), so the probe is where it is proved. **P3** `update` called on
+the shut player registers nothing and builds no item. **P4** a rebuild held on
+`Playback.rebuildHop` across the close, then run, lands on no item.
+
+```sh
+python3 tools/proof/document_close_probe.py                      # [--mutant NAME]
+make app && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/open_documents_proof.py --bound 40
+```
+
+| Run | Result |
+|---|---|
+| `open_documents_proof.py --bound 40`, Debug, before the fix | 5/6, exit 1: O4 62 threads before the first document, 242 at the bound, 218 a minute after the last close |
+| `document_close_probe.py` | 5/5, exit 0; P2's door `performClose` |
+| `--mutant no-close-shutdown` (`releaseOnClose()` without its loop) | caught: P1, P2, P3 and P4 fail |
+| `--mutant window-controllers` (the loop over `windowControllers`) | caught: P2 fails, no window controller left at the close; P1 passes |
+| `--mutant no-latch` (`update` without its `isShutDown` return) | caught: P3 fails, the key registered at once |
+| `--mutant no-generation-bump` (`shutDown()` without the bump) | caught: P4 fails, an item after the landing |
+| `RC_PROOF_APP=release open_documents_proof.py --bound 40` | 6/6, exit 0: O4 49 threads before, 219 at the bound, 34 five seconds after the last close (913 MB resident) |
+| `RC_PROOF_APP=release open_documents_proof.py` (150) | 6/6, exit 0: 70 threads and 248 MB before, 773 and 3,149 MB at the bound, 23 threads and 2,953 MB five seconds after the last close; slowest call 1.9 s |
+| `RC_PROOF_APP=release close_project_proof.py` | 12/12, exit 0 (C3: 17 threads before, 23 after) |
+
+**What stays, and is not fixed.** The closed window and its views, so its memory: the Debug
+`heap` after the fix still counts ten `EditorWindow`, `EditorViewController` and `Playback`
+after ten closes (no `AVPlayerItem`, `AudioTapContext` or `Compositor`), 15 threads against 66
+before the fix, and resident memory falls only when the next window opens (431 MB → 291 MB with
+one open). Three things were tried on Debug and freed nothing: one application-defined event
+posted after the close, the close inside an `autoreleasepool`, and `CATransaction.flush()` with
+`NSApp.updateWindows()` after it. Whether a person's close in a front app is held the same way
+was not measured: it is `docs/manual-checks.md` PB-19. #592 answered the views and the memory:
+the window now gives its editor up when it closes, and only the bare window waits ("Issue #592"
+below).
+
+## Issue #592 — a closed window's editor (`document_close_probe.py` P5–P7, mutants `no-detach`, `no-abort`; `open_documents_proof.py` V1, O5, O6, mutant `any-fall`; spec §11 #592)
+
+**What held it.** The window. #568's trace stands: AppKit keeps a closed `EditorWindow` until
+another window opens in an instance driven in the background. The window held its editor as its
+content view controller, and so the `EditorViewController`, its `Playback` and the whole view
+tree. On a Debug build of the tree before this change, `open_documents_proof.py --bound 10
+--heap` counted ten `EditorViewController`, ten `Playback` and ten `EditorWindow` after the ten
+closes (O6 red), and resident memory stayed where the bound had taken it (O5 red, below).
+
+**The fix** (spec §11 #592). `EditorWindow.close()` runs `super.close()` and then sets
+`contentViewController` to nil. Both doors end in that close after `releaseOnClose()` and the
+window's `willCloseNotification` observers have run. Two things the probe measured on the way:
+
+- With no content view controller AppKit takes the editor's root view out as the content view
+  too, so nothing is installed in its place (P5 green on a build with the nil assignment
+  alone).
+- Taking the tree out ENDS a field editor's editing: on that same build P7 failed with the
+  probe's own field's `controlTextDidEndEditing` counted once at the close, where the tree
+  before the change counted none. A field's end of editing is its commit, which would land in a
+  document already closed. So `releaseEditor()` first aborts the edit (`NSControl.abortEditing()`
+  on the field editor's control). A text view that is not a field editor (the Text tab's area,
+  the canvas's inline editor) is neither resigned nor ended by the detach (P7's text case,
+  measured on both builds), and no first responder is asked to resign.
+
+No `autoreleasepool` around the detach was needed (the plan's challenge asked for one if the
+pool held the editor): O6 counts none left without it. `isOneShot` set before the close, tried
+on Debug in case the windows' backing stores were what stayed, changed nothing (resident 82 MB
+over the reading before the first document after ten closes, against 83 without it) and is not
+in the tree.
+
+**Rows.** `document_close_probe.py` (its docstring is the long form): **P2** now also holds that
+the door that ran was `performClose`; **P5** P1's and P2's windows keep no content view
+controller, the root view is out of the window and under no superview, and the first responder
+is not in it; **P6** the window held strongly, as AppKit holds it, and the editor, its
+`Playback` and its root view held only weakly, all three are freed within 5 s of the close;
+**P7** text being typed at the close, in a field and in a text view of the probe's own, ends no
+editing and the tree still leaves. The fixture is six packages. `open_documents_proof.py`:
+**O5** resident memory falls back under the reading before the first document plus three
+quarters of what the bound added, read with O4's readings, which now go on until both rules
+hold; **V1** that rule over made-up readings; **O6** (`--heap`, Debug only: `heap` cannot attach
+to a hardened Release build) no `EditorViewController` and no `Playback` after the closes, the
+`EditorWindow` count printed.
+
+**Why three quarters.** The plan set half; the runs moved it. Five seconds after the last close
+the fixed tree kept 45–49 % of what the bound added (Debug `--bound 10`: 83 of 177 MB, and 82 of
+183 with `isOneShot`; Debug `--bound 4`: 34 of 76; Release `--bound 40`: 369 of 755), so half
+passed by 5 to 9 MB; the tree before it kept 98 % (Debug) and 104 % (Release). Three quarters
+sits between them with a quarter of the bound's growth on each side.
+
+**What the rest is.** A by-hand Debug run (ten documents with `AV.mov` opened through
+`new_project` and closed with `close_project {discard: true}`, `heap` and `vmmap -summary` at
+each step, from a fresh instance): 125 MB before, 406 MB with ten open, 279 MB after the closes
+(`heap`: no `EditorViewController`, no `Playback`, ten `EditorWindow`), and 275 MB after one
+more document was opened and closed, which left one `EditorWindow`. So the nine bare windows
+AppKit let go of were worth about 4 MB. Between ten open and ten closed `vmmap`'s resident
+`IOSurface` fell from 273.5 MB to 13.3 MB and `CoreAnimation` from 117.2 MB to 3.7 MB, while
+`MALLOC_SMALL (empty)`, pages the allocator has freed and still holds, rose from 4,944 KB to
+60.6 MB; after the one more window its dirty size was 6,208 KB. What a closed document leaves
+resident is the allocator's, not an object.
+
+```sh
+python3 tools/proof/document_close_probe.py                                          # [--mutant NAME]
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/open_documents_proof.py --bound 10 --heap  # Debug: O6
+make app && env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/open_documents_proof.py --bound 40
+python3 tools/proof/open_documents_proof.py --bound 4 --mutant any-fall              # V1 must fail
+```
+
+Measured 2026-11-11, the load average beside each figure (three lanes were building):
+
+| Run | Result |
+|---|---|
+| `document_close_probe.py`, the tree before the change | 5/8, exit 1: P5 and P6 fail (the controller and the root view still in both windows; editor, `Playback` and root view alive after 5 s), P7 fails on the tree not leaving (no editing ended) |
+| the same, the nil assignment alone (no abort) | 7/8, exit 1: P7 fails, the field's editing ended once at the close; the text view neither resigned nor ended |
+| `document_close_probe.py` | 8/8, exit 0; P2's door `performClose` |
+| P2's door by hand: the probe's `performClose` line taken out, then restored | P2 fails, door `shouldCloseWindowController` (the fallback left the document open too), and P5 fails; 6/8 |
+| `--mutant no-detach` | caught: P5, P6 and P7 fail |
+| `--mutant no-abort` | caught: P7 fails, the field's editing ended once at the close |
+| `--mutant no-close-shutdown` | caught: P1, P2, P3 and P4 fail |
+| `--mutant window-controllers`, `no-latch`, `no-generation-bump` | caught: P2; P3; P4 |
+| `open_documents_proof.py --bound 10 --heap`, Debug, the tree before the change | 7/9, exit 1: O5 244 MB before, 373 at the bound, 371 lowest after the closes (load 72.0); O6 ten each of `EditorViewController`, `Playback`, `EditorWindow` |
+| `open_documents_proof.py --bound 10 --heap`, Debug | 9/9, exit 0: O5 195, 378, 282 MB (line 332; load 37.4); O6 no `EditorViewController`, no `Playback`, ten `EditorWindow` |
+| `RC_PROOF_APP=release open_documents_proof.py --bound 40`, the tree before the change | 7/8, exit 1: O5 230 MB before, 928 at the bound, 959 to 958 at 5 to 60 s after the closes (load 35.7); its line under the final rule is 754 |
+| `RC_PROOF_APP=release open_documents_proof.py --bound 40` | 8/8, exit 0: O4 64 threads before, 297 with forty open, 73 five seconds after the last close; O5 202, 953, 557 MB (line 765; load 228.0) |
+| `RC_PROOF_APP=release open_documents_proof.py` (150) | 8/8, exit 0: 102 threads and 235 MB before, 768 and 3,125 MB at the bound, 26 threads and 1,476 MB five seconds after the last close (line 2,402; load 40.9); slowest calls 48.7 s, 4.7 s, 43.0 s and 52.8 s in the steps to 120, 130, 140 and 150 open (load 82 to 54) |
+| the same, once more | 3/8, exit 1: O1 fails at 148 open, `get_project` unanswered 147 s at 0 % CPU, read "hung" (768 threads, 3,093 MB; load 174.1 at the end); slowest 8.2 s, 9.6 s and 4.9 s in the steps to 120–140 |
+| `RC_PROOF_APP=release close_project_proof.py` | 12/12, exit 0 (C3: 15 threads before, 22 after) |
+
+**The slow calls past 110 open.** No code this change touches runs while documents are being
+opened: the close path runs for the 75 packages made before the table and then not until the
+last bound is held. The sample the second run kept (`work/open-documents/sample.txt`) shows the
+main thread making progress, not stopped: of 2,497 samples, 1,345 in `sandbox_check` under
+`-[NSDocument presentedItemDidChange]` → `_displayNameForURL:` and 934 waiting in
+`CABackingStoreGetFrontTexture`. #555's run at 150 open read no call over 1.6 s at loads of 23
+to 57, and #568's none over 1.9 s; these ran at 40 to 228. It is not this issue's, and is left to an issue of its own.
+
+**What stays.** The bare `EditorWindow`, AppKit's, until another window opens: small, by the
+measurement above. Whether a person's close in a front app frees the same way is
+`docs/manual-checks.md` PB-19.
+
+## A cache write against a held save (`save_hold_proof.py`; spec §11 #553, #552, #429)
+
+A save of a titled document lists `cache/` and later swaps the new package in, so a file
+written into the package between the two goes with the old one. `-RCDevSaveHold <s>` (dev
+tools only) holds every save of a launch in that window. A held launch holds every save,
+`new_project {path}`'s included, so each row's document is made, saved and closed on a plain
+launch first and opened on the held one. Needs `tools/proof/media/AV.mov`.
+
+**R1** (#553): the launch is `-RCDevRampRenderHold 3 -RCDevSaveHold 12`; the document holds
+2 s of `AV.mov` at ×1 and no `cache/ramp-audio/`. `set_speed` ×2 with Keep pitch off queues
+the render (held 3 s) and `save_project` is the next call, so the render runs inside the held
+save. It passes when no `.caf` is there as the save is sent, the render's `.caf` is in the
+package within 2 s of the save's return and is the folder's one file, and `export audio_wav`
+then succeeds; since #552 also `save_waits["ramp-audio"]` rose by one. **Z1**: no
+`Frame Job: ` line in any instance's log.
+
+**The gate rows** (#552). Every cache file is published through `CacheLedger.publish` under
+its writer's name, and the dev tool `cache_ledger` answers per cache folder `save_waits` (the
+publishes of each writer that found a save in flight and waited it out) and arms a gate that
+holds a named writer's next publish until a save of that folder is inside its hold. One launch
+with `-RCDevSaveHold 3`; a row arms its writers, triggers them with a call that returns at
+once, and sends `save_project` whenever a gate reads `waiting`. A row passes when its gate
+ended `save`, its `save_waits` rose by exactly one and its files are in the package.
+
+| Row | Writer | Trigger | Files under `cache/` |
+|---|---|---|---|
+| M1 | `thumbs` | `import_media` of `AV.mov` | `thumbs/<id>/complete.json` |
+| M2 | `peaks` | the same import | `peaks/<id>.bin`, `.complete.json` |
+| M3 | `loudness` | the same import | `loudness/<id>.bin`, `.complete.json` |
+| M4 | `sync-features` | the same import | `sync/<id>.bin`, `.pcm`, `.complete.json` |
+| M5 | `speech` | the same import | `speech/<id>.bin`, `.complete.json` |
+| D1 | `device-transcript` | the Transcript tab shown over 2 s of `speech.mov` | `device-transcripts/<id>-<language>.json` |
+| O1 | `ramp-audio` | `set_speed` ×2, Keep pitch off | one `.caf` in `ramp-audio/` |
+| O2 | `isolated` | `set_audio {isolation: 1, voice: echo}` on a second clip | one `.caf` in `isolated/` |
+| O3 | `voiced` | the same edit, wanted once the isolated render lands | one `.caf` in `voiced/` |
+
+D1 is a named skip, never a pass, on a Mac whose Transcript tab answers `no_model` or
+`failed`. Needs `tools/proof/media/speech.mov` too. `--mutant transcript-no-model` (#571)
+shows that arm on a Mac that has the model: in a tree copy the Transcript fill resolves its
+language against an empty list (`TranscriptTabSource.swift`), which is what a Mac with no
+model answers. Its verdict is its own, `SKIPPED D1 BY NAME`, exit 0 only when D1 is skipped
+with `no_model` in its sentence and never scored and every other row is scored and passes.
+The arm's `failed` status takes the same branch and is not forced.
+
+The gate mutants each keep one site's gate and drop the ledger (the mutant adds
+`CacheLedger.outside`), so the write falls inside the held save and is lost at the swap; each
+is caught only when its row fails with its count unchanged: `thumbs-outside` (M1),
+`peaks-outside` (M2), `loudness-outside` (M3), `sync-outside` (M4), `speech-outside` (M5),
+`transcript-outside` (D1), `render-move-outside` (O1–O3, one site). Under the last the three
+files are in the package again by the time the row reads it, because a render whose file is
+gone is wanted and rendered again, with no gate the second time; the count is what fails.
+
+`--mutant NAME` builds the app in a tree copy with the named decision broken (about 40 s) and
+runs its rows: `landing-in-package` (the landing file beside its destination and the folder
+made before the hold, as before #553; caught only when R1's export says "could not be moved
+into place") and `folder-before-publish` (the folder made before the hold, the landing still
+outside: an EXPECTED SURVIVOR, exit 0 when R1 passes, showing the row does not rest on where
+the folder is made).
+
+```sh
+make app-debug && python3 tools/proof/save_hold_proof.py
+python3 tools/proof/save_hold_proof.py --mutant landing-in-package
+python3 tools/proof/save_hold_proof.py --mutant transcript-no-model
+```
+
+Recorded 2026-11-11: on the Debug app of d142e3e4, before the change, R1 FAILED ("the render
+NOT there after it returned … the export FAILED: … the file could not be moved into place
+(errno 2)": that run's render, of the whole 5 s clip, was still writing when the package was
+swapped); with the change R1 passed ("the render there 0.01 s after it returned");
+`landing-in-package` CAUGHT ("the render could not be moved into place").
+
+Recorded 2026-11-11 with #552, on Debug: 11/11 rows (R1 `save_waits 0 → 1`, "the render there
+0.00 s after it returned"; each gate row "its gate ended save; save_waits 0 → 1"; D1 ran, this
+Mac has the on-device model). Mutants: `landing-in-package` CAUGHT, `folder-before-publish`
+SURVIVED as expected, and the seven gate mutants CAUGHT, each row reading `save_waits 0 → 0`
+with its files MISSING (O1–O3 with their files there, as above). `analysis_proof.py --only
+A14,P9` 3/3 and its mutants `write-outside-publish`, `write-outside-publish-app` and
+`save-not-announced` CAUGHT on the new anchor; `cache_pass_probe.py` 13/13.
+`ramp_proof.py` 43/43 on Debug. `make gate` PASS. On Release (`RC_PROOF_APP=release`, after
+the gate's `make app`): `save_hold_proof.py` 11/11, `analysis_proof.py` 26/26,
+`ramp_proof.py` 43/43.
+
+Recorded 2026-11-11 with #571, on Debug: `--mutant transcript-no-model` printed "skip D1 this
+Mac's Transcript tab answered no_model: ['This Mac has no speech model installed. Choose
+File ▸ Generate Captions…, pick a language and press Download.']", "10/10 rows passed;
+skipped ['D1']" (R1, M1–M5, O1–O3 and Z1 scored) and "MUTANT transcript-no-model SKIPPED D1
+BY NAME … 10 other rows scored", exit 0. Without the mutant the arm is not taken on this Mac
+(the 11/11 run above, where D1 ran).
+
+## #399, #549 — a live retimed clip past its limiter's ceiling, and AU-156's residue (`audio_ap6_proof.py` V17, V12; `audio_ap10c_proof.py` U1; `core/tests/link_edges.rs`; three mutants; spec §11 AU-162)
+
+**V17** (`AP6_ONLY=limiter`, `AP6_LEGS=a,c` for some legs) measures #399 before anything was
+decided: the owner's recording with a gate and the limiter at −1 dBTP, `normalize_clip`
+(loudness, −18), one fresh project per leg.
+
+| Row | What it holds |
+|---|---|
+| every leg | renders ≥ 2 and `limited_by` not `max_gain` and what its figures say (`limit_of`, AU-167: null within 0.1 LU of the target; a verify render's reading, not the model's capped figure); R0's peak at the solved volume 3 dB or more over the ceiling (the limiter is working); the `audio_wav` export ≤ −1 dBTP by both meters; the tap's own output at the ceiling: `loudness_meter`'s true peak over a 6 s `play_preview` around the pre-master stem's largest sample ≤ −1 + 0.001 |
+| (a) ×1, (b) ×1.5 and (f) ×0.75 Keep pitch off, (g) a Speed Dip to ×0.7 with Keep pitch on | rendered ahead of the tap: the verify render and the stem (`stems: tracks`) ≤ −1 + 0.001 |
+| (c) ×1.5, (d) ×0.5, (e) ×1.02 Keep pitch on, (h) ×1.5 Keep pitch on with #399's chain (target −16) | live: the verify render and the stem against the ceiling printed, NOT scored (AU-162) |
+
+Recorded 2026-11-11, after `make gate`:
+
+| Run | Result |
+|---|---|
+| Release: `audio_ap6_proof.py` whole on a `proof_app.py launch --app release` instance | 73/73; no `Frame Job: ` line. V17's verify renders: (a), (b), (f), (g) −1.0000 dBTP; (c) −0.5675 (+0.4325 dB over the ceiling); (d) +0.1493 (+1.1493); (e) −1.0000; (h) +0.7293 (+1.7293), #399's own +0.73. The tap −1.0000 dBTP in all eight legs. The rendered legs' stems −0.9998 to −1.0000 dBTP. V12's verify render +0.2407 dBTP (1.2407 dB over) |
+| Debug, the same instrument (`AP6_ONLY=limiter,speed`) | 32/32, V17's figures the same to four places; V12's verify render −0.9832 dBTP (0.0168 dB over), another outcome of the same stretch (#337) |
+| Debug at a −20 target, before the target moved to −18 | the limiter's work under 3 dB in (d); (c) read 1.6573 dB UNDER the ceiling and (d) 0.4883 under, the tap at −1.0000: the stretch re-shapes peaks either way |
+| Release: `audio_ap10c_proof.py` whole | 13/13. U1: `tools/list` publishes `["object", "null"]` for `set_track`'s `compressor` and `limiter`, neither required, and a null clears both |
+| Debug: `op_catalog_proof.py`, `op_argument_proof.py` | 23/23 and 205/205 |
+
+A stem is an integer file: it reads no sample over 0 dBFS, so (d)'s and (h)'s stems read lower
+than their verify renders.
+
+| Mutant | Edit | Killed by |
+|---|---|---|
+| limiter dropped | `AudioTapSchedule.swift`: `limiter: audio.limiter.map {` → `limiter: Optional<LimiterProps>.none.map {` (a Debug build) | V17 (a), (b), (g) on the tap row and the ceiling row (verify renders +5.1125, +5.2083, +4.3898 dBTP; the tap the same), (c) on the tap row (+6.2075 dBTP) |
+| no gate (the instrument) | `LIMITER_CHAIN` without its gate | V17 (a)'s first row: renders 0, where the model's capped −1.0000 would pass the ceiling row |
+| the lock ignored | `core/src/edit_link.rs`: `self.unlocked(partner.track) &&` removed | `an_overwrite_leaves_a_linked_picture_on_a_locked_track_whole` and its Insert twin (the picture cut to 2 s) |
+
+U1's new clause was red on a Debug build made before the two `set_track` rows in
+`AgentCatalog+Declarations.swift` (`{'compressor': 'object', 'limiter': 'object'}`) and green after.
+
+## #585 — a spike's rule hash, by entry (`spec_rule.py` S1–S6, seven mutants; spec §11 CAM-2 as amended)
+
+`ramp_spike.py`, `render_spike.py` and `camera_spike.py` write `rule_sha256` into `results.json`, so
+the rule a recorded run read is pinned. Until #585 it was the SHA-256 of the whole §11 file, which
+moved with every amendment to any entry of that file and held the file against the spec's split
+rule. `spec_rule.py` hashes the ENTRIES a run is judged by instead: `pin(name)` finds each ID of
+`RULES[name]` by its head line `- **<ID> — ` in whichever file of `designs/spec/11-decisions/`
+holds it, takes the entry through the line before the next non-blank line in column 0 (trailing
+blank lines out), and answers `rule_sha256` (the entries joined in order), `rule_entries` (each
+ID's file and hash) and `rule_method: "entries"`. Standard library only; no app, no build.
+
+```
+python3 tools/proof/spec_rule.py                          # the tree (make test)
+python3 tools/proof/spec_rule.py --selftest               # S1–S6 over scratch folders (make test)
+python3 tools/proof/spec_rule.py --selftest --mutant NAME # exit 1 naming exactly its rows
+```
+
+The tree check prints each `RULES` name's hash and each entry's file, line count and hash, and
+fails unless each spike's source calls `spec_rule.pin` with a string constant for every one of its
+names and nothing else, with no `RULE_FILE` left. The hash sites themselves run only in a real
+spike run (ffmpeg, the staticlib, a camera), which this does not make.
+
+| Row | What it holds | Mutants it catches |
+|---|---|---|
+| S1 | an entry ends at the next entry's head; an indented paragraph after an interior blank line is in it (CAM-2's shape); trailing blank lines are not | `stop-at-blank`, `whole-file`, `head-only` |
+| S2 | one entry hashes the same in mid-file, as the file's last, under another head in another file, and before a column-0 paragraph | `whole-file` |
+| S3 | a neighbour's amendment leaves the hash; one byte changed in the entry's last line moves it | `whole-file`, `head-only` |
+| S4 | `ZZ-1` does not find `ZZ-10`; an ID in no file, in two files and twice in one file is each refused by name | `prefix-loose`, `first-wins` |
+| S5 | `pin` over one entry is that entry's hash; over two, joined in order, order matters, both listed with their files | `first-entry-only` |
+| S6 | a spike's `pin` calls: a bare string literal is not a call, another spike's name, a computed name and a `RULE_FILE` left are each a problem | `literal-scan` |
+
+`whole-file` is the behaviour before #585. Recorded 2026-11-11:
+
+| Run | Result |
+|---|---|
+| `spec_rule.py --selftest` | 6/6, exit 0 |
+| each of the seven mutants, once | exit 1, `MUTANT PASS`, exactly the rows above |
+| `spec_rule.py` before the spikes were changed | exit 1, 9 problems (each spike: no `pin` call for its names, `RULE_FILE` named) |
+| `spec_rule.py` after | exit 0; SR-5 `f877f429…`, SR-7 `219498b0…`, SR-9 `ad79a637…`, SR-14 `673fbaaa…`, SR-17 `8c6b65ab…`, CAM-2 `cd3dca30…`, CAM-3 `b7aa0d56…` |
+| by hand, each restored byte-identical: `camera_spike.py`'s `--format` pin renamed; its other pin pointed at `ramp_spike`; `RULE_FILE` put back in `ramp_spike.py` | exit 1 each (1, 2 and 1 problems) |
+| `ramp_spike.py --selftest`, `render_spike.py --selftest`, `camera_spike.py --selftest` | 7, 15 and 5 rows, exit 0 |
+| `spec_rule.py` before and after SR-10…SR-12 moved to `speed-ramps-1b.md` | byte-identical output (SR-5, SR-7 and SR-9 keep their hashes and their file), while `shasum -a 256 speed-ramps.md` went from `a5ac8842…` to `68c832a7…` |
+
+## Issue #594 — the assistant proofs' body bound and the Anthropic proof budget (`assistant_lane_proof.py` B1, M3; `budget_proof.py` P; spec §11 P-9)
+
+The helper sends the assistant's tool definitions and its system prompt on every POST, and they
+had grown to about 396 KB, over the 256,000 bytes `assistant_prompt_eval.py` priced a worst POST
+from: H failed in every rehearsal, and the clearing rehearsal was refused at its own $3 cap. The
+owner raised the limit (spec §11 P-9): `BODY_BYTES_BOUND` is 480,000 bytes, about 20 % over the
+rehearsals' largest body, and the month's Anthropic proof budget is $40 (`budget.BUDGETS`).
+Every floor and suggested cap follows, printed by each proof's `headroom_lines`:
+
+| Proof | Worst POST | Floor | Suggested cap (was) |
+|---|---|---|---|
+| `assistant_prompt_eval.py` (`assistant_prompt_proof.py --live`), one run of six rows | $4.80 | $30.84 | $32.00 ($20.00) |
+| `assistant_clearing_proof.py` (`max_tokens` lowered to 8,000) | $3.60 | $4.64 | $5.00 ($3.00) |
+| `assistant_compaction_proof.py` | $4.80 | $10.96 | $11.50 ($8.00) |
+
+- **H** prints the largest body the relay saw beside the worst POST (`Relay.max_body`), and every
+  proof's budget line reads `budget.BUDGETS`.
+- **`budget_proof.py`'s P** pins `{anthropic 40, assemblyai 5}` and holds worst POST ≤ floor ≤
+  suggested cap ≤ $40 for all three proofs; before, only the prompt evaluation's chain was held.
+  The clearing and compaction chains are read in one child process. G1 seeds $39.00, G2 $40.00
+  in August and R2 $39.999.
+- **`assistant_lane_proof.py`'s B1** (in `make test`): the probe's L6 serialises the request's
+  fixed part as the helper sends it (the tool search entry and each assistant catalog entry as
+  `runnableTool` wraps it; the system prompt and the search guide), and B1 holds it plus
+  `CONVERSATION_BYTES_BOUND` (30,000: at least that, since the one live evaluation's body ran
+  about 11,000 bytes over its rehearsal's; twice the rehearsals' gap below is 7,388) within the
+  bound. **M3** is B1's comparison made to fail.
+
+Run on 2026-11-11 in a worktree of b86b605e, both keys out of every environment, the stand-in
+server and scratch ledgers only, nothing live:
+
+| Command | Result |
+|---|---|
+| Before the change, Debug: `assistant_clearing_proof.py --rehearse` | 1/6, exit 1: X1–X4 FAIL `cap: refused at $0.0000 of $3 (worst $3.04)`; H FAIL, "a body of 396,377 bytes … is over 256,000" (turn A) and 396,655 (turn B) |
+| `assistant_lane_proof.py` | 20/20, exit 0: B1 "395,666 bytes + 30,000 for the conversation = 425,666, within the body bound 480,000 (54,334 left)"; the probe measured `tools_bytes` 390,660 and `system_bytes` 5,007 over 122 assistant tools |
+| the same, `BODY_BYTES_BOUND` back to 256,000 | 19/20, exit 1: B1 FAIL "… OVER the body bound 256,000 (-169,666 left); raise BODY_BYTES_BOUND …" |
+| the same, the probe's `request_bytes` key renamed | 18/20, exit 1: B1 and M3 FAIL "no measured request: L6's request_bytes None" |
+| `budget_proof.py` | 23/23, exit 0; P "assistant_clearing_proof: worst POST $3.60 ≤ floor $4.64 ≤ suggested cap $5.00 ≤ $40 True; assistant_compaction_proof: … $4.80 ≤ $10.96 ≤ $11.50 … True; assistant_prompt_eval: … $4.80 ≤ $30.84 ≤ $32.00 … True" |
+| the same, `budget.py`'s Anthropic budget back to 25.00 | 21/23, exit 1: P and G1 FAIL (`$1.00 at $39.00 passes False`) |
+| the same, the clearing proof's `SUGGESTED_CAP` back to 3.00 | 22/23, exit 1: P FAIL, "assistant_clearing_proof: … ≤ suggested cap $3.00 ≤ $40 False" |
+| the same, the evaluation's `SUGGESTED_CAP` back to 20.00 at the new bound | 22/23, exit 1: P FAIL, "assistant_prompt_eval: … ≤ floor $30.84 ≤ suggested cap $20.00 ≤ $40 False" |
+| `budget_proof.py --mutant no-budget` / `unknown-as-zero` | 18/23 (P G1 R2 A2 A4) / 20/23 (W S2 S3), exit 1 each |
+| `spec_index_proof.py` with P-9 and its rows; with the folder total left at 26422 | 1323/1323; 1322/1323, exit 1 |
+| `make gate` | PASS: names, typecheck, fmt, lint, test (lane 20/20, budget 23/23), app (D25, D26) |
+| Release: `assistant_clearing_proof.py --rehearse` (default cap $5) | 6/6 pass, K skipped, exit 0; H "worst POST priced $3.0537; largest body 398,050 bytes" |
+| Release: `assistant_clearing_proof.py --mutant clearing-off` (default cap) | 4/6, exit 1: X1 FAIL (`context_management null, beta False`), X4 FAIL beside it, "mutant clearing-off: X1 FAIL — the mutant was caught" |
+| Release: `assistant_compaction_proof.py --rehearse` (default cap $11.50) | 8/8 pass, K skipped, exit 0; H "worst POST priced $4.2944; largest body 399,360 bytes" |
+| Release: `assistant_prompt_proof.py --rehearse` (default cap $32) | 25/25 pass, 1 skipped, exit 0; H "worst POST priced $4.2526; largest body 397,888 bytes" |
+| Release: `assistant_prompt_proof.py --rehearse --month-spent 39.99 --cap 10` | 19/25, exit 1: E1–E6 FAIL `budget: $39.9900 of the $40.00 Anthropic budget …` (worst cases $4.2411–$4.2432), "0 on the cap, 6 on the budget"; the stand-in logged 0 POSTs |
+
+The Debug rehearsals printed the same largest bodies (398,050, 399,360 and 397,888 bytes), and
+each is 2,222 to 3,694 bytes over the probe's 395,666: the probe's mirror of the helper's wire
+shape agrees with the bodies the relay measured. No paid run was made.
+
+## Road map "swift-helper" SA2 — the two helpers, driven (`agent_helper_drive.py`; sixteen allowed rows; eight mutants and `drive-same-helper`; spec §11 SA-4, SA-5, SA-6)
+
+**This section is SA2's record.** The comparison it describes ran until road map "swift-helper"
+SA4, which wrote the recordings from its last passing run and deleted the Bun side; the drive as
+it is now is the section "Road map "swift-helper" SA4" below (spec §11 SA-13).
+
+The Bun helper the app still ships and the Swift helper of `agent/Package.swift` that replaces it
+at SA3, each run as the app runs it, over the same scripted conversations on the stand-in API
+(`anthropic_fake.py`); their events and their requests are compared, and any difference outside
+an explicit list fails. In `make test`, straight after `make agent-test`. Loopback only, the
+dummy keys `proof-key` and `wrong-key`, both keys popped from every child, nothing paid.
+
+```
+python3 tools/proof/agent_helper_drive.py                         # B0, B1, the 27 cases, the 16 rows (make test)
+python3 tools/proof/agent_helper_drive.py --cases text,tools      # a subset (and the case each needs)
+python3 tools/proof/agent_helper_drive.py --bun PATH --swift PATH # built helpers in place of B0 and B1
+python3 tools/proof/agent_helper_drive.py --list                  # the cases, the rows, the mutants
+python3 tools/proof/agent_helper_drive.py --drop ROW              # without one row: exactly its cases FAIL (exit 1)
+python3 tools/proof/agent_helper_drive.py --rows-needed           # --drop for every row, over one run (exit 0)
+python3 tools/proof/agent_helper_drive.py --mutant NAME           # a Swift mutant, in place, rebuilt (exit 1 caught)
+python3 tools/proof/agent_helper_drive.py --mutant drive-same-helper  # both sides Swift (exit 1 caught)
+```
+
+**The helpers.** B0 is `agent/build.sh helper` into `work/agent_helper_drive/bun-target/` (no bun
+is `build.sh`'s own error and a FAIL). B1 is, since SA3, the release helper the app bundles:
+`agent_helper_build.release` runs `tools/agent/build_helper.sh` on the app build's scratch path
+`build/agent-swift` into `work/agent_helper_drive/swift/` (seconds while its stamp matches, spec
+§11 SA-8). Each helper gets exactly `HOME`, `TMPDIR` (scratch folders) and
+`PATH=/usr/bin:/bin`, as `AssistantSession` gives it, and the app's lines: sorted keys, compact,
+and `writeResult`'s spliced answers.
+
+**A case** is the stand-in's scenario, the app's steps and the Swift helper's expectation: its
+event types, its POSTs and all its requests, the stand-in's failures and, for the price cases, the
+feed's GETs, so two helpers failing alike still fail. Every wait is bounded; a hang, an exit other
+than 0 after stdin closes or a Swift stderr line without `framejob-agent: ` fails the case. The
+price feed is the drive's own loopback server, holding its answer until that helper's
+`context_usage` is read, so the two cannot race.
+
+| Case | What it holds |
+|---|---|
+| `handshake` | `prices` (bundled), `ready`, `context_usage`; the Models GET |
+| `text` | one round: the events, the body, the headers |
+| `thinking` | a thinking block with a signature: `progress_delta`, and the block replayed in the next request |
+| `tools` | five calls answered in reverse (text, an image and text, `isError`, `null`, no content) and an unknown tool: every request out before any answer, the results in the reply's order |
+| `two-turns` | `settings` turning clearing on between turns: `context_management`, the fourth beta, `tool_results_cleared` |
+| `settings-mid-turn` | `settings` during a tool wait (spec §11 AI-20): no clearing in that turn, its compaction at its end, clearing in the next |
+| `compaction` | with clearing on: the summary request without `context_management`, its `cost`, `compacted`, the swapped history |
+| `compaction-wrong-stop` | a text summary that stopped `end_turn` |
+| `compaction-wrong-stop-block` | a compaction block that stopped `end_turn` (row `summary-needs-compaction-stop`) |
+| `compaction-empty` | a `compaction` stop with a null block (row `empty-summary`) |
+| `cut-reply-tool-call` | `max_tokens` after two tool calls, past the limit: SA-4 (b) the same in both, (a) in the next request (row `unrun-calls-answered`) |
+| `stop-sentences` | `max_tokens`, `refusal` and #484's `model_context_window_exceeded` |
+| `pause-turn` | the resend |
+| `round-cap` | thirty tool rounds and a silent end |
+| `cancel-stream` | a cancel on a stalled reply's first `text_delta`: one partial `cost`, no error, the next send merged |
+| `cancel-tools` | a cancel during a tool wait and "Cancelled by the user." after it: no request after the cancel |
+| `stream-drop` | a reply cut short (row `error-stream-cut`) |
+| `stream-error` | an `overloaded_error` event mid-stream (row `error-event-status`) |
+| `retry` | four 529s with `retry-after-ms: 10`: four POSTs of one body |
+| `past-script`, `wrong-key` | 400 and 401: `API error <status>: <message>` in both |
+| `no-connection` | `api_base` at a closed port: three retries of each request (row `error-no-status`) |
+| `refusals` | `send` before `configure`, `send` during a turn |
+| `bad-lines` | a blank line, a line that is not JSON, `[1]`, an unknown type, `reset` after a turn, each answer marked off by a `configure` |
+| `configure-no-key` | `configure` with no `api_key` (row `configure-validated`) |
+| `prices-fetched` | a refresh from the held feed: `ready`, `context_usage`, then `prices` `fetched`; the cache file each wrote |
+| `prices-cached` | each helper started on the cache file the other wrote: `prices` `cached` before `ready`, a turn priced from it, no fetch |
+
+**What is compared.** The two event streams line for line, and every request (method, path,
+headers as a set with `anthropic-beta` as a list, body), as parsed JSON with each object's key
+order; numbers by value, so `1e-07` is `1e-7` (SA-6). A refreshed table's `as_of` and its cache
+file's `fetched_at` are clock readings: each must be an ISO 8601 instant inside the run and is
+then compared as `<clock>`.
+
+**The allowed rows** (`ALLOWED`). Each rewrites only the difference its decision names, and a full
+run fails a row that explained nothing in one of its declared cases ("allows nothing: remove it")
+or anything in another:
+
+| Row | Decision | Lets through | Cases |
+|---|---|---|---|
+| `system-breakpoint` | SA-5 | Bun's `system` string against Swift's one text block of that string with `cache_control` | every case with a POST |
+| `credential-header` | SA-5 | `x-api-key: <dummy>` against `authorization: Bearer <the same dummy>` | every case with a request |
+| `api-version` | SA-5 | `anthropic-version` 2023-06-01 against 2026-10-21 | every case with a request |
+| `beta-query` | SA-5 | `POST /v1/messages?beta=true` against `/v1/messages` | every case with a POST |
+| `client-headers` | SA-1 | eighteen named headers of the HTTP client and the SDK: `user-agent`, twelve `x-stainless-*`, `accept-encoding`, `accept-language`, `connection`, `content-length`, `host` | every case with a request |
+| `unrun-calls-answered` | SA-4 (a) | Swift's next user message starting with one "Not run: the reply stopped with <reason> before this call could run." per call | `cut-reply-tool-call` |
+| `summary-needs-compaction-stop` | SA-4 | Bun's later requests starting from a wrongly stopped summary block, Swift's from the conversation it kept | `compaction-wrong-stop-block` |
+| `empty-summary` | SA-4 (c) | Bun's `compacted` and its `context_usage` against Swift's `compaction_failed` "the summary came back empty" | `compaction-empty` |
+| `configure-validated` | SA-6 | Swift's "Bad message from the app: configure needs a string api_key" against Bun's `prices`, `ready` and a `context_usage` with no limit | `configure-no-key` |
+| `non-object-line` | SA-6 | Swift's "… expected a JSON object" against Bun's silence | `bad-lines` |
+| `reset-ignored` | SA-6 | Bun's `context_usage` of 0 after `reset` against Swift's silence, and Bun's `used` 0 against the context Swift kept until the next response | `bad-lines` |
+| `parser-text` | SA-6 | the JSON parsers' own words after "Bad message from the app: " | `bad-lines` |
+| `error-no-status` | SA-6 | `API error : <m>` against `API error: <m>` | `no-connection` |
+| `error-stream-cut` | SA-6 | the TypeScript SDK's "stream ended without producing a Message with role=assistant" against `API error: <m>` | `stream-drop` |
+| `error-event-status` | SA-6 | `API error : Overloaded` against `API error 529: Overloaded` | `stream-error` |
+| `cache-file-layout` | SA-6 | the same table indented by Bun, compact from Swift | `prices-fetched` |
+
+Two differences the road map expected need no row: the key order (no body and no event differs in
+it, so it is compared strictly) and SA-4 (b) (the 0.128.0 runner already skips that summary, so
+both helpers send nothing and say "no summary came back"). One that SA-4 did not list needs one:
+`summary-needs-compaction-stop`, from SA-4's "success needs both".
+
+**The stand-in's three keys** (`anthropic_fake.py`): `http_error` (a status and the API's error
+JSON, with `retry-after` and `retry-after-ms` when given), `"cut": "error"` (an `event: error`
+mid-stream) and a `thinking` block (one `thinking_delta`, one `signature_delta`). Each is inert
+without its key; no other proof's scenario held one when they were added.
+
+**Mutants** (`SWIFT_MUTANTS`, counted by `mutant_anchors.py`): since SA3 each is built by
+`agent_helper_build.mutant` on the persistent mutant tree `build/agent-swift-mutant/` (its own
+`agent/`, brought to the tree's by content, and its own scratch path), never in the tree's
+`agent/Sources`. A mutant is caught only when every
+case it names FAILs; one that does not build exits 2. `tool-results-reversed` (`tools`),
+`no-defer-loading` (`text`, `tools`, `compaction`, `retry`), `cost-before-done` (`text`, `tools`),
+`two-retries` (`retry`) and `summary-keeps-clearing` (`compaction`) make a difference outside the
+list; `system-loses-guide` (`text`, `tools`), `not-run-reworded` (`cut-reply-tool-call`) and
+`empty-summary-swapped` (`compaction-empty`) show the `system-breakpoint`, `unrun-calls-answered`
+and `empty-summary` rows no wider than their decisions. `--mutant drive-same-helper` runs the
+Swift helper on both sides: every row must allow nothing.
+
+**When SA3 and SA4 landed.** SA3 pointed B1 at the release helper and built the mutants with
+SA-8's builder (above; its section below). SA4 first ran this comparison once more with
+`--record`, 43/43, writing each case's recording from its Swift side; then it deleted the Bun side
+(B0, `--bun`, `ALLOWED`, `--drop`, `--rows-needed`, `drive-same-helper`) and kept the cases with
+their expectations, each now held to its recording (its section below).
+
+Run on 2026-11-12 in a worktree of 8bee8a56, other lanes building (load averages as `uptime`
+printed them):
+
+| Command | Result |
+|---|---|
+| The first run, before the list (every case, `--dump`) | 0/27: the headers and the system block in every request, then SA-4 (a) and (c), `compaction-wrong-stop-block`'s fourth difference, and SA-6's protocol and error wording; no key order differed anywhere and SA-4 (b) was equal |
+| `agent_helper_drive.py` (B0 and B1 built; load 49.71 → 43.43) | 43/43, exit 0, 22.65 s: `B0 ok — agent/build.sh helper, 0.564 s`, `B1 ok — scratch path kept; … complete! (1.51s), 2.277 s` |
+| `--rows-needed` (load 96.33 → 113.44) | exit 0: each row's declared cases FAIL without it and no other (23, 26, 26, 23, 26, then one each) |
+| `--drop summary-needs-compaction-stop --cases compaction-wrong-stop-block,compaction-empty,text` | exit 1: `caught — exactly compaction-wrong-stop-block failed` |
+| `--mutant drive-same-helper` | 27/43, exit 1: all sixteen rows `allows nothing: remove it` |
+| `--mutant` each of the eight (load 118.27 → 92.55) | exit 1 each, caught in its named cases; each file restored byte-identical and rebuilt. `no-defer-loading` first deleted its line and did not build under the suite's warnings-as-errors (exit 2), and was re-aimed to `_ = core` |
+| `--cases thinking,stream-error,retry` on the stand-in as it was at 8bee8a56 | 15/19, exit 1: all three FAIL; the file put back byte-identical |
+| `mutant_anchors.py` | PASS: `agent_helper_drive.py SWIFT_MUTANTS: 8 mutants, 8 anchors read` |
+| `make gate` (load 39.48 → 61.72), then again after two code edits (load 14.43 → 50.65) | PASS 776 s: names, typecheck, fmt, lint, test 517 s (`Executed 77 tests, with 0 failures`; the drive 43/43), app 201 s (D25, D26); then PASS 135 s: test 132 s (the drive 43/43, 27 cases in 16.3 s), the rest skipped as unchanged |
+
+## Road map "swift-helper" SA3 — the switch (`agent_build_proof.py`, `agent_helper_build.py`; spec §11 SA-8, SA-9, SA-10)
+
+The app's "Build Agent Helper" step is `tools/agent/build_helper.sh` (spec §11 SA-8): SwiftPM
+release on `build/agent-swift`, the tree from `$PROJECT_DIR`, a scrubbed environment, a stamp
+whose key digests the sources through links, the scratch path's own path recorded beside the key
+and read only on a miss (a scratch path made elsewhere is emptied), the destination removed
+first, then `strip -x` and a signature with the hardened runtime and no entitlements. What
+changed in the proofs, each described in its own section above: `dist_check.py` D10/D11 and
+`published_check.py` P8 (no entitlements), D42/D43 and P25 (`package slaude` at
+`agent/Package.resolved`'s revision, no `npm` or `runtime` header) and `dist_check_mutants.py`'s
+cases (39); `tree_copy.py`'s clone of the helper's scratch path and T9; `makefile_env_proof.py`'s
+fifth row and `--cold-helper`; `assistant_helper_proof.py`'s P0–P2; `prices_proof.py`'s T and A
+on the Swift suite and `swift-disagrees`; `assistant_lane_proof.py`'s B1 (SA-9) and
+`b1-empty-catalog`; `spend_proof.py`'s helper mutants; `agent_helper_drive.py`'s B1 and mutants;
+the relay in `assistant_prompt_eval.py` taking `Authorization: Bearer` and `budget_proof.py`'s R1
+and R5; `acknowledgements.py`'s S1 and S2 (SA-10).
+
+**`agent_build_proof.py`** (a line of `make test`) holds the script's rules over toy packages of
+the helper's shape (a kit embedding `table.json` through a relative link, the executable
+`framejob-agent`, a test target), each toy tree under `tools/agent/work/build-proof/` with its own
+copy of the script, no dependency and no network:
+
+- **K1** cold: built, the helper prints the toy's marker and table, `runtime` in its flags, no
+  entitlements, the stamp and the path record written; **K2** the same again: skipped;
+- **K3** a source edit: built in place (a sentinel in the scratch path survives); **K4** an edit
+  of the table the link points at: built (the key reads through links);
+- **K5** a second tree, `agent/` copied with `shutil.copytree` and the scratch path a `cp -cRp`
+  clone: skipped (a clone is served at another path); **K6** a fresh such clone with a source
+  edited: emptied (the clone's sentinel gone), its record now its own;
+- **K7** a tree whose `tools` is a link to another's builds its own `agent/`; `PROJECT_DIR` unset
+  is refused, naming it, with no helper written;
+- **K8** a package that does not compile, after a good build: non-zero, no helper at the
+  destination, no stamp (`failing_package()`, which `assistant_helper_proof.py`'s P1 runs);
+- **K9** both keys and `FJ_AGENT_STRICT` set by the caller: the manifest's `Context.environment`
+  sees no key (its text carries a fresh nonce, so SwiftPM's manifest cache cannot answer);
+- **K10** the script spells no `agent-swift-test`, and a sentinel in the suite's scratch path
+  survives every run.
+
+Mutants (`MUTANTS`, each one anchor of the script replaced in the copies; `EXPECTED` the rows that
+must FAIL, exactly): `path-in-key` K5; `no-table-in-key` K4 K5 (the link's target unread, and the
+copy's regular file read where the tree's link is not); `tree-from-script` K7;
+`miss-keeps-foreign` K6; `failure-masked` K8; `env-not-scrubbed` K9.
+
+**`agent_helper_build.py`** (imported): `release(destination)` runs the script on the tree, so a
+proof's helper shares the app build's scratch path and stamp; `mutant(name, edits, destination)`
+brings the persistent mutant tree `build/agent-swift-mutant/agent/` to the tree's `agent/` by
+content (`Package.swift`, `Package.resolved`, `Sources/`, `Tests/`, links followed), applies the
+edits (each anchor exactly once) and runs the script there, under `build/agent-swift-mutant.lock`.
+
+```sh
+python3 tools/proof/agent_build_proof.py                       # 10/10
+python3 tools/proof/agent_build_proof.py --mutant path-in-key  # exit 1, exactly K5 (and the other five)
+python3 tools/proof/assistant_lane_proof.py --mutant b1-empty-catalog   # B1 FAIL, exit 1
+python3 tools/proof/prices_proof.py --mutant swift-disagrees   # T and A FAIL naming opus-mixed, exit 1
+python3 tools/proof/makefile_env_proof.py --cold-helper --wall 1500     # the copy builds Slaude itself
+```
+
+Run on 2026-11-12 in a worktree of a012946f, other lanes building (load averages as `uptime`
+printed them; none of these is an idle figure):
+
+| Command | Result |
+|---|---|
+| `build_helper.sh` cold on the tree (load 7.40 → 50.92) | 82.53 s (SwiftPM's `complete! (80.09s)`, 2,401 files compiled, Slaude from SwiftPM's cache); the helper 35,610,496 bytes, `flags=0x10002(adhoc,runtime)`, no entitlements, `compaction_instructions` once in its bytes; again: `skipped`, 1.29 s |
+| `agent_build_proof.py`, first run | 10/10 in 14.4 s; its mutants on that instrument: three failed rows past their own (each toy tree ran tree A's script, and K6 inherited K5's emptied clone), so each tree got its own script and K6 its own clone; then each mutant exactly its rows |
+| `agent_build_proof.py` and its six mutants on the final instrument | 10/10; exit 1 each: `path-in-key` K5, `no-table-in-key` K4 K5, `tree-from-script` K7, `miss-keeps-foreign` K6 (SwiftPM failed on the moved clone, as SA0 saw), `failure-masked` K8, `env-not-scrubbed` K9 (`key seen`) |
+| `acknowledgements.py --selftest`, then each `--mutant` | 11/11; `MUTANT PASS` each: `dev-edges` G1, `nested-unchecked` L3, `slaude-missing-ok` S2 |
+| `acknowledgements.py --agent-scratch build/agent-swift` | 109 entries: 95 crates, `package slaude 4c6c2ca4…`, its `LICENSE` (identical to an Apache-2.0 text above), the SDK's `LICENSE` and `LICENSE-MIT`; no `npm`, no `runtime` |
+| `tree_copy.py --selftest` | 9/9 in 32.3 s; T9 FAIL with the clone made a link (8/9) |
+| `makefile_env_proof`'s fifth row over the pre-switch Release notices | FAIL: `agent/node_modules` present, no `package slaude`, `npm` and `runtime` kinds |
+| `prices_proof.py` (load 50.84 → 113.71) | 27/27; T `exit 0 in 80.451 s; 17 tests` (the suite's debug Slaude built cold); `--mutant swift-disagrees`: 25/27, exit 1, T and A naming `opus-mixed`, T in 4.4 s |
+| `assistant_lane_proof.py` | 20/20; B1 `the helper's first POST 399,414 bytes + 30,000 … = 429,414, within … 480,000 (50,586 left)`, 123 tools; `--mutant b1-empty-catalog`: B1 FAIL (`1 tools, not the catalog's 122 plus tool search`), exit 1 |
+| `budget_proof.py` with the relay as committed, then as changed | 20/24, R1–R4 FAIL (401: the relay took `x-api-key` only); 24/24, R1 forwarded with `authorization: Bearer proof-key`, R5 `x-api-key` forwarded and `Bearer wrong-key` 401 with nothing forwarded |
+| `make app` (Release), then again after two comment edits in `agent/` | 226.03 s, the helper step `skipped`; 6.61 s, the helper `built` incrementally |
+| On Release: `assistant_helper_proof.py` | 5/5 (P2d skipped, no `--dist`); P0 over the committed `project.yml`: FAIL (the step's keys are its Bun line) |
+| On Release: `spend_proof.py`, then each helper mutant | 21/21 in 94.9 s; exit 1 each: `stale-refresh` H3, `no-partial` H10 H11, `priced-twice` H12 (each mutant built in 6.5–10.4 s) |
+| `agent_helper_drive.py`, then each of the eight mutants | 43/43 in 18.6 s, B1 `skipped … 0.944 s`; exit 1 each, caught in its named cases; the mutant tree built cold for the first in 158.0 s, then 7.7–14.8 s each; the tree's `agent/` untouched |
+| On Release: session, spend UI, tab, settings, prompt (F, M, S) | 14/14 (KO 398,911 bytes, identical), 10/10, 26/26, 3/3, 18/18 |
+| On Release: the compaction, clearing and prompt rehearsals (the relay, Bearer) | 8/8 (largest body 402,782), 6/6 (401,392), 25/25 (401,310) |
+| On Release: `docs_bugs_c1_proof.py`, then `--mutant no-context-arm` | 35/35; `--mutant no-context-arm`: the copy's `make app` 365 s (its helper step missed on the edited `Turn.swift`, emptied the clone and built Slaude cold: the copy's path record names the copy), `MUTANT no-context-arm CAUGHT: C1 failed`, exit 1 |
+| `makefile_env_proof.py --wall 1500`, then `--cold-helper` | 5/5 in 365 s: the copy's Release build 350 s, its helper step `skipped` (the clone served), 15,179 files read, the notices `package slaude` and no npm or Bun; `--cold-helper`: 5/5 in 384 s, the copy's build 372 s with the helper step `built` from nothing (its own seconds are not printed apart from the build's) |
+| `make dist`, then `dist_check_mutants.py` | `make dist` 266.59 s: `dist_check: 47/47` (D10/D11 `holds no entitlements`, D42/D43 `109 entries, 95 crates, slaude 4c6c2ca4, 9 fonts`), `published_check: 27/27`; the Distribution build's helper step `skipped` on the same stamp; `dist_check_mutants: 39/39` in 71.08 s: `extra-entitlement-*` D10 / D11, `no-runtime-*` D8 / D9, `marker-*` D12 / D13, `acknowledgements-slaude-dropped-release` D42, `acknowledgements-bun-listed-dist` D43 |
+| `mutant_anchors.py` | PASS: `agent_build_proof.py MUTANTS: 6 mutants, 6 anchors read`, `spend_proof.py HELPER_MUTANTS: 3 mutants, 3 anchors read`, the drive's eight |
+| `make gate` | PASS 395 s (load 14.34 28.38 29.26 → 28.59 44.16 37.40): names 2 s, typecheck 10 s (its four warnings), fmt 4 s, lint 19 s, test 350 s (B1 `399,414 bytes`, `agent_build_proof.py` 10/10, `prices_proof.py` 27/27, `Executed 77 tests, with 0 failures`, the drive 43/43, `budget_proof.py` 24/24), app 8 s (the helper step `skipped`; D25, D26 ok) |
+
+## Road map "swift-helper" SA4 — the deletion, and the drive held to its recordings (`agent_helper_drive.py`, `agent_helper_recorded/`; eight mutants, six controls; spec §11 SA-11, SA-13)
+
+SA4 deleted the Bun helper (`agent/src/`, `package.json`, `bun.lock`, `tsconfig.json`,
+`entitlements.plist`, `build.sh`), `make typecheck`'s tsc, `gate.py`'s `bun --version` and road map
+12's A0 spike, `assistant_spike/` (spec §11 SA-11). The drive SA2 built (its section above) lost
+its Bun side and kept its 27 cases, each now held to a committed recording of the Swift helper
+(SA-13). In `make test`, straight after `make agent-test`. Loopback only, the dummy keys
+`proof-key` and `wrong-key`, nothing paid.
+
+```
+python3 tools/proof/agent_helper_drive.py                     # B1, the 27 cases, `recordings` (make test): 28/28
+python3 tools/proof/agent_helper_drive.py --cases text,tools  # a subset (and the case each needs), and `recordings`
+python3 tools/proof/agent_helper_drive.py --swift PATH        # a built helper in place of B1
+python3 tools/proof/agent_helper_drive.py --list              # the cases, the mutants, the controls
+python3 tools/proof/agent_helper_drive.py --mutant NAME       # a SWIFT_MUTANTS edit on the mutant tree (exit 1 caught)
+python3 tools/proof/agent_helper_drive.py --control NAME      # one case, its run or its recording altered (exit 0 held)
+python3 tools/proof/agent_helper_drive.py --record            # rewrite the recordings (never in make test)
+```
+
+**B1** is the release helper the app bundles (`agent_helper_build.release`, spec §11 SA-8), seconds
+while its stamp matches. Each case runs it as `AssistantSession` does, as SA2's section says.
+
+**A case** checks its `expect` first (event types, POSTs and requests, the stand-in's failures,
+the feed's GETs), then its recording, `agent_helper_recorded/<case>.json`: the event stream line
+for line, every request's method, path, body (parsed JSON with its key order at every level),
+headers and byte count, and the cache files the case names (their table and their bytes);
+numbers by value, so `1e-07` is `1e-7`. A request's first difference is named body first, then
+headers. A case with no recording FAILs, and the `recordings` row FAILs a recording with no case.
+
+**The three comparison rules**, the same placeholders put in the run and in the recording, and
+nothing else:
+- a fetched or cached table's `as_of` and a cache file's `fetched_at` must be an instant inside
+  the run, then `<clock>`;
+- a cache file's `source` must be this run's feed (its port is chosen per run), then `<feed>`;
+- `host`, `accept-language`, `accept-encoding`, `connection`, `x-stainless-arch`,
+  `x-stainless-os` and `x-stainless-runtime-version` (BY_PRESENCE: the stand-in's port,
+  URLSession, the OS, the toolchain) are held by presence, as `<by presence>`; a request's headers
+  are a set, written sorted. Every other header is held by value, `user-agent`,
+  `anthropic-version`, `authorization`, `anthropic-beta`, `content-length` and
+  `x-stainless-timeout` (#614's `NOT_GIVEN`) among them.
+
+The words after "Bad message from the app: " for a line that is not JSON are Slaude's parser's
+(`key must be a string at line 1 column 2`), so they are held by value with no rule.
+
+**`--record`** writes the recordings of the cases it runs, in that form, `json.dumps(indent=1)`,
+and prints each `new`, `same` or `changed: <the paths that moved>`. It refuses, writing nothing
+and exiting 2, with `--mutant` or `--control`, or when any case of the run fails a check other
+than its recording. Spec §11 SA-13 names the two re-records that need no new decision: `make
+prices` (only `cost`'s `dollars` and the bundled table's `as_of` may move) and a Slaude re-pin
+(only `user-agent`, the `x-stainless-*` held by value and the parser's words); any other change
+lands with its own SA- entry, the recordings' diff showing it.
+
+**Mutants** (`SWIFT_MUTANTS`, unchanged since SA3 and counted by `mutant_anchors.py`): each built by
+`agent_helper_build.mutant` on `build/agent-swift-mutant/`; caught only when every case it names
+FAILs. Five change only a request body, which only the recordings hold: `tool-results-reversed`,
+`no-defer-loading`, `summary-keeps-clearing`, `system-loses-guide`, `not-run-reworded`;
+`cost-before-done`, `two-retries` and `empty-summary-swapped` move the expectations too.
+
+**Controls** (`CONTROLS`; their names stay out of every identifier holding `MUTANT`):
+
+| Control | Case | Altered | Must |
+|---|---|---|---|
+| `recorded-event-field` | `text` | the recording's first `cost` at twice the dollars | FAIL |
+| `recorded-header` | `text` | the recording's POST with `anthropic-version: 2023-06-01` | FAIL |
+| `recorded-key-order` | `text` | the recording's POST body, its top-level keys reversed | FAIL |
+| `recorded-host-header-missing` | `text` | the recording's first request without `host` | FAIL |
+| `recorded-host-header-value` | `text` | the run's first request with other `host`, `accept-language` and `x-stainless-runtime-version`, its headers reversed | pass |
+| `feed-elsewhere` | `prices-fetched` | the run's cache file naming another feed | FAIL |
+
+**The bridge.** Before the deletion, the two-helper drive ran with `--record` (43/43: the 27
+cases and SA2's sixteen rows), so every recording is the Swift side of a run whose comparison with
+the Bun helper passed; then the plain run, 44/44 with the `recordings` row. `prices-cached` then
+started on the other helper's cache file and now on the one the Swift helper wrote; reading the
+Bun helper's indented cache stays `PriceTableTests`' (`make agent-test`).
+
+Run on 2026-11-12 in a worktree of 3833b404, other lanes building (load averages as `uptime`
+printed them):
+
+| Command | Result |
+|---|---|
+| Two helpers, `--record` (B0 `agent/build.sh helper, 0.629 s`) | 43/43, exit 0, 20.4 s; 27 `new`. The cache file held the feed's port, so the feed rule was added; `--record` again 43/43, 26 `same`, `prices-fetched` `changed: files.prices.json.table.source: 'http://127.0.0.1:53705/litellm.json' / '<feed>'` and its bytes |
+| Two helpers, plain | 44/44, exit 0, 20.0 s |
+| After the deletion, plain (load 29.25 → 49.95) | 28/28, exit 0, 135 s: B1 `emptied, then built: the scratch path was made at …/framejob-int/build/agent-swift, 126.884 s` |
+| `--record` on the same helper | 27/27, 27 `same`, no file changed |
+| `--mutant tool-results-reversed` with the recording comparison skipped by hand (reverted) | `SURVIVED — tools passed`, exit 0 |
+| `--mutant` each of the eight (load 16.55 → 10.58) | exit 1 each, caught in every named case; built in 5.4–6.5 s each; the five body mutants named by body paths, e.g. `body.tools[3]: keys only in recorded ['defer_loading']` |
+| `--control` each of the six | exit 0 each, `held`: five FAIL their case (e.g. `event 6: $.cost.dollars: 0.0012 / 0.0006`), `recorded-host-header-value` passes |
+| `--record --swift <the two-retries mutant> --cases retry`; `--record --mutant two-retries` | `record: refused — a case of this run failed, so nothing was written`, exit 2; refused, exit 2; no recording changed |
+| `text.json` moved aside, `--cases text`; a stray `no-such-case.json`, `--cases handshake` | 0/2, `no recording …` and `recordings FAIL — no recording for text`; 1/2, `recordings FAIL — a recording with no case: no-such-case`; both restored |
+| `gate.py --selftest` with `agent` back in `typecheck`'s inputs, then as committed | `FAIL M1 agent/Sources/FrameJobAgentKit/Turn.swift moves ['app', 'names', 'test', 'typecheck']`; PASS |
+| `make typecheck` with no bun on `PATH` | exit 0, 0 errors, the four baseline warnings |
+| `make gate` | PASS 722 s: names 2 s, typecheck 9 s, fmt 5 s, lint 22 s, test 465 s (the suite `Executed 77 tests, with 0 failures`, the drive 28/28), app 218 s (D25, D26 ok) |
+| `make dist` | 208.6 s: `dist_check: 47/47`, `published_check: 27/27` |
+
+## Road map "swift-helper" SA5 — the paid acceptance (three live proofs on the Swift helper; spec §11 P-9, AI-20)
+
+The owner's answer 3 in road map "swift-helper"'s §12: after SA4, the three paid proofs, serially
+in one month, each run's dollars reported, run by the orchestrator and never by a lane. None is in
+`make test` or `make gate`: each needs `--live --cap`, the owner's key and the month's budget
+(spec §11 P-3, P-6, P-9). Run on 2026-11-12 (UTC) on the Release app built from main at
+`900799a0`, the Swift helper on Slaude `4c6c2ca4`, one after another, and reported on #599:
+
+| Proof | Flags | Result | Settled |
+|---|---|---|---|
+| `assistant_clearing_proof.py` | `--live --cap 5` | 7/7, 0 skipped | $0.0758 |
+| `assistant_compaction_proof.py` | `--live --cap 11.50` | 9/9, 0 skipped | $0.2389 |
+| `assistant_prompt_proof.py` | `--live --cap 32` | 26/26, 0 skipped | $0.2309 |
+
+The month's Anthropic proof ledger read $0.0000 before and $0.5457 after, of the $40.00 budget.
+Every POST answered 200 on Slaude's API version `2026-10-21` with Bearer credentials (the relay
+forwards the helper's own headers but `DROPPED_HEADERS`); the largest body was 410,950 bytes
+against `BODY_BYTES_BOUND`'s 480,000. Nothing failed. Each figure is printed to four places from an
+unrounded sum, so the three settled figures add to $0.5456 against the ledger's $0.5457. The
+clearing run is the one AI-20 said was owed, and the second live run of that proof, the first on
+the Swift helper: the first, on the Bun helper, is the "Live run" of issue batch B54's section
+(2026-10-01, #208, `--cap 3`, 7/7, $0.1252). The compaction and prompt proofs' earlier live runs,
+on the Bun helper, are in issue batch B26's section and road map 12's A3 section. The road map's
+SA5 record holds the same figures, and spec §11 SA-13's recordings hold the
+`x-stainless-timeout: NOT_GIVEN` these runs sent (#614).
+
+## Issue #619 — an image past the API's 10 MB answered to the model as an error text (`agent_helper_drive.py` `image-too-large`; `ToolResultsTests`; six mutants; spec §11 SA-14)
+
+**What it proves.** Since #618 `render_frame` never scales its image, so one asked with no
+`max_width` can pass the Anthropic API's 10,485,760 bytes of base64, and the helper used to put it
+in the history, where every later request carried it and was refused until Clear. Now
+`ToolResults.convert` answers such an image with one text block in its place, "The image is too
+large to send: its base64 is <n> bytes and the API's limit for one image is 10,485,760. Ask again
+for a smaller one, with max_width where the tool takes it.", keeps the rest of the result, and
+marks it an error summarised by that sentence. Exactly at the limit the image is sent.
+
+**Rows.** The suite's `ToolResultsTests` (`make agent-test`): `testAnImagePastTheLimitBecomesAnErrorText`,
+`testAnImageExactlyAtTheLimitIsSent`, `testOnlyTheOversizedImageIsReplaced`; `ProcessTests`' 6 MB
+round trip is the under-limit control, unchanged. The drive's case `image-too-large`: the first
+`render_frame` answered with an image one byte past the limit (made in Python, never stored)
+beside "Written to /tmp/frame.jpg.", the retry at `width` 640 answered with the tiny `IMAGE`, then
+a second turn; its recording holds the event `is_error` with the sentence as its summary and
+requests 2–4 carrying the sentence and the text, never the image. Loopback only, nothing paid.
+
+    python3 tools/agent/agent_test.py --filter ToolResultsTests
+    python3 tools/proof/agent_helper_drive.py --cases image-too-large
+    python3 tools/proof/agent_helper_drive.py --mutant NAME   # each of the six below (exit 1 caught)
+
+**Mutants.** Five in `SWIFT_MUTANTS`, each failing `image-too-large`: `image-limit-off` (the size
+test never true), `image-limit-raised` (the limit 10,485,761), `image-limit-not-error` (the tool's
+own flag kept), `image-limit-drops-rest` (the whole result replaced by the sentence) and
+`image-limit-text-summary` (the summary the tool's first text). One in the drive's new
+`SUITE_MUTANTS`, `image-limit-at-boundary` (`>=`): a drive case at the limit would record the 10
+MB image it sends, so the edit is applied to the mutant tree's `agent/` under its lock and
+`agent_test.py --tree build/agent-swift-mutant --filter ToolResultsTests/testAnImageExactlyAtTheLimitIsSent`
+runs there; caught when that test's line says it failed. `mutant_anchors.py` reads both tables.
+
+**Recorded** (2026-11-12, on the release helper `build_helper.sh` builds). Before the change, with
+the sentence's helper written and no size test, `--filter ToolResultsTests`: 9 tests, the
+past-limit and mixed cases FAILED (`isError` false, the summary `(image)` and `Rendered.`, the
+image block sent), the at-limit case passed. With it: `make agent-test` 80 tests, 0 failures
+(the 6 MB round trip 6,001,179 bytes); `--record --cases image-too-large` printed `new` (23,146
+bytes); the whole drive 29/29, `recordings ok — 28 recordings, one per case`, every other
+recording unchanged. The mutants, each caught: `image-limit-off` and `image-limit-raised` on
+event 9's `is_error` (true / false) and request 2's tool result without `is_error`;
+`image-limit-not-error` the same, its summary still the sentence; `image-limit-drops-rest` on
+request 2's tool result, 2 blocks / 1; `image-limit-text-summary` on event 9's summary, "Written
+to /tmp/frame.jpg."; `image-limit-at-boundary` with `testAnImageExactlyAtTheLimitIsSent` failed
+(the mutant tree's suite, 52.5 s).

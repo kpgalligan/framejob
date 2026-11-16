@@ -145,7 +145,7 @@ TOOLS = {
     "T13": [("normalize_clip", "a stereo clip through its own mono and pan",
              "a stereo clip through its own channel pick, mono and pan"),
             ("normalize_clip", "a gate, a de-esser, a compressor or a voice effect",
-             "a gate, a de-esser, a leveller, a compressor or a voice effect")],
+             "a gate, a de-esser, a leveler, a compressor or a voice effect")],
     "T14": [("detach_audio", "media with no audio, or audio already detached",
              "media with no audio, audio already detached, or a sound that would overlap what is "
              "on the track below"),
@@ -214,7 +214,8 @@ SOURCES = {
     "W10": [(path, ["Title preset"], []) for path in (
         "core/src/edit.rs", "core/src/edit_described.rs", "core/src/model_text.rs",
         APP + "ReelOps.swift", APP + "BehindSubjectPlan.swift", APP + "AgentServer+Clips.swift",
-        "designs/spec/06b-edit-operations-clips.md", "designs/spec/07.10-rust-module-map.md",
+        "designs/spec/06b-edit-operations-clips.md", "designs/spec/06e-edit-operations-clip-patches.md",
+        "designs/spec/07.10-rust-module-map.md",
         "designs/spec/07.9g-agent-behind-subject.md", "designs/spec/09-keys-and-menus.md")],
 }
 

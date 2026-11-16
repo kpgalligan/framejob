@@ -9,7 +9,9 @@ struct IsolationWindow: Equatable {
 
 /// What the Sound tab's Voice Isolation section says about one clip (AU-56).
 enum IsolationStatus: Equatable {
-    case off, unsupported, waitingForReverse, rendering, ready, failed(String)
+    /// `noSound`: the clip asks, and no plan plays a sound of it (a clip
+    /// above the audio ceiling, ×12).
+    case off, noSound, waitingForReverse, rendering, ready, failed(String)
 }
 
 /// One isolated segment's render as the builder looks it up: the clip and
@@ -44,9 +46,10 @@ enum IsolationCache {
         cache.appendingPathComponent(directoryName, isDirectory: true)
     }
 
-    /// A segment the render serves (AU-55): ×1, no ramp and no freeze.
-    static func isolatable(_ s: PlanSegment) -> Bool {
-        s.duration > 0 && s.ramp == nil && !s.isTimeScaled
+    /// A segment isolated in the TAP (AU-53): ×1. A retimed one is isolated
+    /// through `RetimedSound.chain` instead (AU-55 as amended, #387).
+    static func isTapped(_ s: PlanSegment) -> Bool {
+        RetimedSound.kind(of: s) == .tapped
     }
 
     /// The nearest 48 kHz frame of a tick count, ⌊(2t + 12) / 25⌋ — floor
@@ -97,8 +100,8 @@ enum IsolationCache {
         return "\(media)-" + String(repeating: "0", count: max(0, 16 - hex.count)) + hex + ".caf"
     }
 
-    /// The one segment's request, or nil: the clip asks for isolation, the
-    /// segment is isolatable, there is an `isolated` folder, its media
+    /// The one ×1 segment's request, or nil: the clip asks for isolation, the
+    /// segment is tapped, there is an `isolated` folder, its media
     /// resolves and its reverse (when reversed) is not pending. The source is
     /// the reversed file for a reversed clip, else the media file
     /// (`RampAudioRenders` reads its 48 kHz copy).
@@ -106,7 +109,7 @@ enum IsolationCache {
         for s: PlanSegment, dsp: AudioDSPParameters, urls: [UInt32: URL],
         reverse: ReverseResolution
     ) -> RampAudioRequest? {
-        guard dsp.wantsIsolation(s.clip), isolatable(s), let directory = reverse.isolated,
+        guard dsp.wantsIsolation(s.clip), isTapped(s), let directory = reverse.isolated,
             let mediaFile = urls[s.media], !reverse.pending.contains(s.clip)
         else { return nil }
         let reversedFile = reverse.ready[s.clip]
@@ -120,7 +123,7 @@ enum IsolationCache {
             job: .isolation(window))
     }
 
-    /// Every isolated window of `plan`, one request per file.
+    /// Every tapped segment's isolated window of `plan`, one request per file.
     static func requests(
         plan: CompositionPlan, dsp: AudioDSPParameters, urls: [UInt32: URL],
         reverse: ReverseResolution
@@ -150,16 +153,18 @@ enum IsolationCache {
     }
 
     /// One clip's state in `document`: its built requests' (a failure first,
-    /// then a pending render), else why there is none. The plans are decoded
-    /// only when the clip asks for isolation (both with a nest open, as
-    /// `ensureRampAudio`).
+    /// then a pending render), else why there is none. A retimed segment
+    /// answers from its chain: ready when the file the composition plays
+    /// exists. A clip that asks while no plan sounds it answers `.noSound`.
+    /// The plans are decoded only when the clip asks for isolation (both
+    /// with a nest open, as `ensureRampAudio`).
     static func status(of clip: UInt32, in document: ProjectDocument) -> IsolationStatus {
         let dsp = AudioDSPParameters(snapshot: document.project.snapshot)
         guard dsp.wantsIsolation(clip) else { return .off }
         let reverse = ReverseSource.shared.resolution(for: document.recipeKey)
         let urls = document.mediaURLs()
         var states: [IsolationStatus] = []
-        var unsupported = false
+        var sounds = false
         var waiting = false
         var missing = false
         let handles = document.scope == nil
@@ -167,10 +172,17 @@ enum IsolationCache {
         for handle in handles {
             guard let plan = handle.plan else { continue }
             for s in plan.audioTracks.flatMap(\.segments) where s.clip == clip && s.duration > 0 {
-                if !isolatable(s) {
-                    unsupported = true
-                } else if reverse.pending.contains(clip) {
+                sounds = true
+                if reverse.pending.contains(clip) {
                     waiting = true
+                } else if !isTapped(s) {
+                    if let chain = RetimedSound.chain(
+                        for: s, dsp: dsp, urls: urls, reverse: reverse)
+                    {
+                        states.append(chain.status(voice: false))
+                    } else {
+                        missing = true
+                    }
                 } else if let request = request(for: s, dsp: dsp, urls: urls, reverse: reverse) {
                     states.append(status(of: request))
                 } else {
@@ -190,7 +202,7 @@ enum IsolationCache {
                     ? "the project has no cache folder to render it into"
                     : "its media cannot be found")
         }
-        return unsupported ? .unsupported : .off
+        return sounds ? .off : .noSound
     }
 
     /// The Status read-out's last answer (AU-56), so a refresh that changed
@@ -244,9 +256,10 @@ enum IsolationCache {
 }
 
 extension CompositionBuilder {
-    /// Each READY isolated segment's render, read into memory (AU-53): the
-    /// file `IsolationCache` names, when it exists as the composition is
-    /// built. A pending one is absent, and its clip plays dry.
+    /// Each READY isolated ×1 segment's render, read into memory (AU-53):
+    /// the file `IsolationCache` names, when it exists as the composition is
+    /// built. A pending one is absent, and its clip plays dry. A retimed
+    /// segment has none: its isolation is in the file it plays (AU-55).
     static func isolatedAudio(
         plan: CompositionPlan, urls: [UInt32: URL], reverse: ReverseResolution,
         dsp: AudioDSPParameters

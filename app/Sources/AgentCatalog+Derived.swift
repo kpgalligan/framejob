@@ -22,7 +22,7 @@ extension AgentServer {
                     + "waveforms, loudness, speech, sync, transcripts read on this Mac, the "
                     + "media analysis, reversed renders) and the graphic modules the kept clips "
                     + "draw, with every font and asset, are carried, so nothing is "
-                    + "re-analysed; media files are never copied (the new project points at the "
+                    + "re-analyzed; media files are never copied (the new project points at the "
                     + "same files), and a cloud transcript still owed a deletion stays behind. "
                     + "The project you name never changes and gets no undo step. Without path "
                     + "the new project opens untitled, with unsaved changes, named \"<name> "

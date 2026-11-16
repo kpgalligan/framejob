@@ -367,8 +367,8 @@ on-device starts always early (−109.6 to −1,185.6 ms), and TX3b measured "Pa
   start. Across instances TX-10 orders by the moved start.
 - **TX-18 — A missing cache.** With no voice cache the words are unmoved and the answer says so in
   its existing note (`get_timeline_transcript`'s `notes[]`, appended to `get_transcript`'s `note`):
-  "The word starts of “<name>” are where this Mac's recogniser put them, often early: it has no
-  voice cache yet. Call again once it has." With no peaks cache the move lands on the 32 ms cell
+  "The word starts of “<name>” are where this Mac's recognizer put them, often early: it has no
+  voice cache yet. Call again once it has." (amended by #526) With no peaks cache the move lands on the 32 ms cell
   grid (`b·chunk`). There is no new compute path: the open and import cache pass
   (`generateCaches`) already makes both caches, and a tool answers what is there now, as
   `detect_silence`'s `voice_pending` does. The tab re-reads a media's words when either cache lands

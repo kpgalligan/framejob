@@ -33,6 +33,10 @@ pass (Silero VAD) runs for L6, the step-2 figures and R5.
       per 1024 stereo frames.
   L9  a reversed and a ×2 clip of the off-mic fixture get curves on their
       played steps: a quiet phrase played first is boosted first.
+  L10 a Target and cap edit inside an action (clip 4's end `{}` then
+      `{target_db: 3, max_up_db: 6}`, on L6's caches) moves the plan text and
+      makes no curve (`curveBuilds`), the curves equal; clip 4 trimmed to 29 s
+      makes at least one (#413, AU-66 (e)).
   R1  `speechRange`: constant 0; two 10 s halves 12 dB apart 12.0 ±0.1; the
       mask honoured; nil under 300 speech steps.
   R2  `levellerRule` at 5.9 and 6.1 LU and with no range, with each sentence.
@@ -40,7 +44,23 @@ pass (Silero VAD) runs for L6, the step-2 figures and R5.
   R4  `choose` over one input twice is equal, the leveller on above 6 LU.
   R5  (not with --quick) the steady fixture's Enhance trial rendered three
       times through `ProcessedLoudness.render`, its isolated render wiped
-      before the third: byte-identical step energies (AP6b step 3).
+      before the third: byte-identical step energies (AP6b step 3). Its
+      detail says what differed (#567): per pair of renders, for the steps
+      and for the peaks, how many differ, the first one's index, time and
+      both values at 17 digits and the largest difference in dB; and whether
+      the isolated render made again before the third is the bytes it was.
+  R6  the comparison R5 reports with, over synthetic arrays: equal, one step
+      differing at a known index, another length.
+  R7  `StepLoudnessMeter` gives byte-identical step energies and peaks for
+      one programme fed whole, a step at a time, in 4,096-frame buffers and
+      in uneven ones (AU-160: R5's non-repeat was the meter summing a step
+      per reader buffer, #567).
+  R8  `LoudnessMeter` gives byte-identical sub-block sums
+      (`shortTermSubBlockSums`) and integrated, momentary and short-term
+      loudness for one programme, stereo and its left channel as mono, fed
+      whole, a sub-block at a time, in 4,096- and 1,024-frame buffers and in
+      uneven ones (#569). The two peaks are compared too and a difference
+      printed, not scored: they are maxima, not sub-block sums.
 
 Then, the step-2 figures (AU-67 (d)), printed: the speech range Enhance
 measures on the owner's recording and on the proof's off-mic and steady
@@ -48,13 +68,20 @@ fixtures (`make_fixtures`, shared with audio_ap6b_proof.py), each through a
 probe document's own loudness and speech caches; scored that the off-mic one
 is over 6 LU and the steady one at or under it (else the rule is a STOP).
 
---mutants runs M1–M10, M12–M15 and M17, each over its own copy of app/Sources,
+--mutants runs M1–M10, M12–M15 and M17–M20, each over its own copy of app/Sources,
 scored killed when its named row fails (the step-2 figures and R5 skipped);
 build failures are scored. M11 (`"leveller"` out of `TAP_KEYS`) is by hand
-against core/tests/audio_automation.rs. M16 (the non-repeat's fix reverted)
-has no edit to make: step 3 found nothing to fix (archive/audio.md's AP6b
-record). Needs ffmpeg, `say`, numpy and samples/Rode-usb-mic.m4a. Output is
+against core/tests/audio_automation.rs. M16 has no edit to make: AP6b's step 3
+found nothing to fix; the non-repeat's fix is AU-160's (#567) and its mutant
+is M19; M20 is AU-163's (#569), the same per-chunk sum restored in
+`LoudnessMeter`. Needs ffmpeg, `say`, numpy and samples/Rode-usb-mic.m4a. Output is
 under tools/proof/work/audio-ap6b-probe.
+
+--soak-r5 <minutes> runs R5 alone (`--r5-only`: a document holding the steady
+fixture, nothing else scored), each time in a fresh process on a fresh scratch
+folder, until one fails or the minutes are up; it prints the count and keeps
+a failing run's whole output as work/audio-ap6b-probe/soak-r5-fail.txt
+(#567: both recorded failures were under other builds, so run it under load).
 """
 import argparse
 from pathlib import Path
@@ -63,6 +90,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 import numpy as np
 
@@ -73,7 +101,7 @@ RODE = ROOT / "samples/Rode-usb-mic.m4a"
 WORK = ROOT / "tools/proof/work/audio-ap6b-probe"
 FIXTURES = WORK / "fixtures"
 RATE = 48000
-ROWS = [f"L{n}" for n in range(1, 10)] + [f"R{n}" for n in range(1, 6)]
+ROWS = [f"L{n}" for n in range(1, 11)] + [f"R{n}" for n in range(1, 9)]
 
 # The fixtures (spec AP6b's constraints): six 10 s `say` segments, 1.5 s apart,
 # over a −60 dBFS RMS white-noise bed, mono 48 kHz.
@@ -189,6 +217,40 @@ MUTANTS = [
          "let tick = Double(Int64(i)) * ticksPerFrame")]),
     ("M17 no-detection-pending", "L6", [
         (LEVELS, ": .unmeasurable(reason: noSpeechDetection)", ": .pending(what: \"speech\")")]),
+    # #413: the curves keyed by the whole plan text, automation included.
+    ("M18 curves-keyed-by-plan", "L10", [
+        (LEVELS, "        let key = Key(cache: cache.standardizedFileURL.path, plan: memoPlan(project))\n"
+                 "        var result: [UInt32: Curves] = [:]",
+         "        let key = Key(cache: cache.standardizedFileURL.path, plan: project.planJSON)\n"
+         "        var result: [UInt32: Curves] = [:]")]),
+    # #567, AU-160: a step's energy summed per feed chunk, as it was.
+    ("M19 step-summed-per-chunk", "R7", [
+        ("StepLoudness.swift", "    private var stepFilled = 0\n",
+         "    private var stepFilled = 0\n    private var chunkSum: Double = 0\n"),
+        ("StepLoudness.swift", "                from: channelBuffer + history, count: frames)\n",
+         "                from: channelBuffer + history, count: frames)\n"
+         "            var sum: Double = 0\n"
+         "            vDSP_svesqD(channelBuffer + history, 1, &sum, vDSP_Length(frames))\n"
+         "            chunkSum += sum\n"),
+        ("StepLoudness.swift", "        steps.append(stepSum / Double(stepFilled))\n",
+         "        steps.append(chunkSum / Double(stepFilled))\n"
+         "        chunkSum = 0\n        _ = stepSum\n")]),
+    # #569, AU-163: a sub-block's energy summed per feed chunk, as it was.
+    ("M20 sub-block-summed-per-chunk", "R8", [
+        ("Loudness.swift", "    private var subBlockFilled = 0\n",
+         "    private var subBlockFilled = 0\n    private var chunkSum: Double = 0\n"),
+        ("Loudness.swift",
+         "            (weighted + channel * hopFrames + subBlockFilled).update(\n"
+         "                from: channelBuffer + history, count: frames)\n",
+         "            (weighted + channel * hopFrames + subBlockFilled).update(\n"
+         "                from: channelBuffer + history, count: frames)\n"
+         "            var sum: Double = 0\n"
+         "            vDSP_svesqD(channelBuffer + history, 1, &sum, vDSP_Length(frames))\n"
+         "            chunkSum += sum\n"),
+        ("Loudness.swift",
+         "        ring[ringWrites % Self.subBlocksPerBlock] = subBlockSum\n",
+         "        subBlockSum = chunkSum\n        chunkSum = 0\n"
+         "        ring[ringWrites % Self.subBlocksPerBlock] = subBlockSum\n")]),
 ]
 
 
@@ -260,15 +322,20 @@ def step_two(stdout):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--sources", type=Path, default=ROOT / "app/Sources")
-    parser.add_argument("--mutants", action="store_true")
+    parser.add_argument("--mutants", nargs="?", const="", default=None, metavar="M12,M19",
+                        help="every mutant, or the ones named")
+    parser.add_argument("--soak-r5", type=float, default=None, metavar="MINUTES",
+                        help="R5 alone in fresh processes until one fails or the minutes are up")
     args = parser.parse_args()
     try:
         fixtures()
     except Exception as error:
         check("fixture construction", False, str(error))
         return 1
-    if args.mutants:
-        return mutants(args.sources)
+    if args.mutants is not None:
+        return mutants(args.sources, [n for n in args.mutants.split(",") if n])
+    if args.soak_r5 is not None:
+        return soak_r5(args.sources, args.soak_r5)
     rows, problem, stdout = run(args.sources, "probe")
     if rows is None:
         check("source probe builds", False, problem)
@@ -290,9 +357,43 @@ def main():
     return 0 if good else 1
 
 
-def mutants(sources):
+def soak_r5(sources, minutes):
+    """R5 alone, a fresh process and scratch folder each time, until one fails
+    or `minutes` have passed (#567). 0 when none failed."""
+    binary, problem = build(sources, "probe")
+    if binary is None:
+        check("source probe builds", False, problem)
+        return 1
+    began = time.monotonic()
+    runs = 0
+    while time.monotonic() - began < minutes * 60:
+        scratch = WORK / "soak-r5" / "scratch"
+        shutil.rmtree(scratch, ignore_errors=True)
+        scratch.mkdir(parents=True)
+        result = subprocess.run([str(binary), str(FIXTURES), str(scratch), "--r5-only"],
+                                capture_output=True, text=True, timeout=1800)
+        runs += 1
+        lines = [line for line in result.stdout.splitlines() if line.split()[1:2] == ["R5"]]
+        passed = bool(lines) and all(line.split()[0] == "ok" for line in lines)
+        if runs == 1 or not passed:
+            sys.stdout.write(result.stdout)
+        if not passed:
+            kept = WORK / "soak-r5-fail.txt"
+            kept.write_text(result.stdout + "\n--- stderr ---\n" + result.stderr)
+            elapsed = (time.monotonic() - began) / 60
+            print(f"\nR5 FAILED on run {runs} after {elapsed:.1f} min (exit "
+                  f"{result.returncode}); its output is {kept}")
+            return 1
+    elapsed = (time.monotonic() - began) / 60
+    print(f"\nR5 passed {runs} of {runs} runs in {elapsed:.1f} min "
+          f"({3 * runs} renders, {runs} isolation re-renders)")
+    return 0
+
+
+def mutants(sources, only=()):
     killed = 0
-    for name, row, edits in MUTANTS:
+    chosen = [m for m in MUTANTS if not only or m[0].split()[0] in only]
+    for name, row, edits in chosen:
         slug = name.split()[0]
         tree = WORK / f"mutant-{slug}" / "Sources"
         shutil.rmtree(tree, ignore_errors=True)
@@ -317,8 +418,8 @@ def mutants(sources):
         check(f"mutant {name} killed by {row}", dead,
               f"{row} {'failed' if dead else 'passed'}; failing rows: "
               + ", ".join(sorted(r for r, ok in rows.items() if not ok)))
-    print(f"\n{killed}/{len(MUTANTS)} mutants killed")
-    return 0 if killed == len(MUTANTS) else 1
+    print(f"\n{killed}/{len(chosen)} mutants killed")
+    return 0 if chosen and killed == len(chosen) else 1
 
 
 if __name__ == "__main__":

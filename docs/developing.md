@@ -15,10 +15,10 @@ this page points to them rather than repeating them.
 - **Rust** (stable, through `rustup`/`cargo`).
 - **[xcodegen](https://github.com/yonaskolb/XcodeGen)**, which generates the
   Xcode project.
-- **[bun](https://bun.sh)**, which builds and tests the assistant helper in
-  `agent/`. Every `make app` builds it, `make typecheck` typechecks it and
-  `make test` runs its tests; without bun they fail with
-  `error: bun is not installed` rather than skipping.
+- **The network, once per worktree**, for the assistant helper: every app
+  build makes it with SwiftPM (`tools/agent/build_helper.sh`), and a
+  worktree's first build fetches and compiles its dependency, Slaude, from
+  GitHub (Xcode's toolchain builds it; nothing else is installed for it).
 - **[cmake](https://cmake.org)** (`brew install cmake`), which builds the
   bundled AV1 and VP9 encoders (SVT-AV1 and libvpx, spec §11 CX-5) with the
   system's `/usr/bin/perl` and Xcode's clang; no nasm, yasm, meson or ninja.
@@ -36,23 +36,29 @@ this page points to them rather than repeating them.
   likewise fetches the encoders' two pinned tarballs, about 17 MB, into
   `build/codecs-downloads/`, checks each by SHA-256, and builds them into
   `build/codecs/` in about a minute; later builds reuse them by their stamp.
+  The first `make test` (through `make agent-test`) likewise fetches
+  [Slaude](https://github.com/kpgalligan/Slaude), the Swift client for the
+  Claude API that the coming Swift assistant helper is built on, at the
+  revision `agent/Package.swift` pins, and builds it in debug into
+  `build/agent-swift-test/` in about two minutes; later runs reuse it.
 
 ## Make targets
 
 | Target | What it does |
 |---|---|
-| `make app` | Builds the Rust core (release) and the bundled encoders (`make codecs`), generates the Xcode project, and builds the Release app into `build/Build/Products/Release/Frame Job.app` (about 90 s). |
+| `make app` | Builds the Rust core (release) and the bundled encoders (`make codecs`), generates the Xcode project, and builds the Release app into `build/Build/Products/Release/Frame Job.app` (about 90 s). Its "Build Agent Helper" step builds the Swift assistant helper with `tools/agent/build_helper.sh` (SwiftPM release on `build/agent-swift`, skipped by its stamp when `agent/` is unchanged); a worktree's first build fetches and compiles Slaude, about two minutes more. |
 | `make codecs` | Builds the bundled encoders, SVT-AV1 v4.2.0 and libvpx v1.17.0 (spec §11 CX-2..CX-5), with `tools/codecs/build_codecs.py`: each pinned tarball fetched and checked by SHA-256 (a mismatch fails, naming both digests), built arm64, static and encoder-only, and installed with its headers and licence texts into `build/codecs/`. A stamp keyed on the script, the pins and the tool versions makes a repeat a no-op; Xcode's "Build Codecs" step runs the same script. `tools/codecs/PROVENANCE.md` records the pins. |
 | `make app-debug` | The same (the Rust core and `make codecs` first) with the Debug configuration: `build/Build/Products/Debug/Frame Job Debug.app`, an app called "Frame Job Debug" with its own bundle id (`com.kgalligan.FrameJob.debug`) and settings. Unoptimised, so it rebuilds in seconds after a one-file edit. |
 | `make run` | `make app`, then opens it. |
-| `make typecheck` | `make codecs` first (the bridging header includes the encoders' headers, found with `-Xcc -Ibuild/codecs/include`), then typechecks every Swift file in `app/Sources` with `swiftc` (with the dev tools compiled in), then the helper's TypeScript with `tsc --noEmit`. Seconds. It is the only authoritative Swift check, but it stops before code generation, so only `make app` proves the app builds. |
-| `make test` | `make codecs` first, then the Rust tests of `core/`, `graphic/` and `mcp-proxy/`, then the scripted checks that need no app: the assistant's agent lane and prompt texts, the price function and the proofs' spend budgets (no network), the menu inventory and spec index against the tree, the self-tests of the encoder build, the acknowledgements' generator, the probe build, app-choice, gate and appcast scripts, the defaults clean-up, and the old-name residue check. |
+| `make typecheck` | `make codecs` first (the bridging header includes the encoders' headers, found with `-Xcc -Ibuild/codecs/include`), then typechecks every Swift file in `app/Sources` with `swiftc` (with the dev tools compiled in). Seconds. It is the only authoritative Swift check, but it stops before code generation, so only `make app` proves the app builds. |
+| `make test` | `make codecs` first, then the Rust tests of `core/`, `graphic/` and `mcp-proxy/`, then the scripted checks that need no app: the assistant's agent lane and prompt texts (the agent lane's B1 builds the release helper and measures its first request), the price function and the proofs' spend budgets (no network), the helper build script's rules over toy packages (`tools/proof/agent_build_proof.py`), the Swift assistant helper's suite (`make agent-test`) and its drive over scripted conversations on the stand-in API, every event and request held to its recording (`tools/proof/agent_helper_drive.py`), the menu inventory and spec index against the tree, the self-tests of the encoder build, the acknowledgements' generator, the probe build, app-choice, gate and appcast scripts, the defaults clean-up, the old-name residue check, the spelling scan of the app's strings, the site and `README.md`, and the count of every proof's mutant anchors in the tree. |
+| `make agent-test` | The suite of the Swift assistant helper in `agent/` (the SwiftPM package the app bundles, road map "swift-helper", `designs/adr/swift-helper.md`; the app's build makes its release product, never this debug build): `swift test` with the package's own targets held to no warnings, on `build/agent-swift-test/`, which `tools/agent/agent_test.py` empties first when it was copied from another tree. No network after the first fetch, dummy keys only. Part of `make test`. |
 | `make lint` | `cargo clippy --all-targets -- -D warnings` in `core/`, `graphic/` and `mcp-proxy/`. |
 | `make fmt` | `cargo fmt` in the same three crates. |
 | `make gate` | The one full verification: the name residue check, typecheck (held to exactly its known warnings), `cargo fmt --check`, lint, test, then `make app` with the Release app's entitlements and signature checked. Serial, stops at the first failure, and skips a step whose inputs and tools are byte-identical to its last pass (its state is in `build/gate/`). `make gate GATE_ARGS=--force` runs every step. |
 | `make dist` | `make app`, then the Distribution configuration — Release without the dev tools — into `build/Build/Products/Distribution/Frame Job.app`, then the binary and signature checks (`tools/proof/dist_check.py`) and the check the publish workflow runs on what it ships (`tools/proof/published_check.py`); both run, and it fails if either does. Only this target compiles the updater (Sparkle, `FRAMEJOB_UPDATER`), so only its build loads Sparkle.framework, and, signed ad hoc, it cannot be launched: library validation refuses the framework (spec §11 PUB-7). It is only ever checked, never run. Until the owner's EdDSA public key is in `project.yml`, the key rows (D31 and P20) fail, by design. |
 | `make project` | `xcodegen generate`, with the base version from `VERSION`. |
-| `make prices` | **Network.** Regenerates `agent/prices/anthropic.json` from LiteLLM's price table; the file's only writer, never run by another target. |
+| `make prices` | **Network.** Regenerates `agent/prices/anthropic.json` from LiteLLM's price table; the file's only writer, never run by another target. A refresh moves the prices in the helper drive's recordings, so follow it with `python3 tools/proof/agent_helper_drive.py --record`, whose printed changes must be only `dollars` and the bundled table's `as_of` (spec §11 SA-13). |
 | `make clean` | Removes `build/` (the built encoders and their downloaded tarballs with it, so the next build fetches them again), the generated project and `app/Info.plist`, and runs `cargo clean` in the three crates. |
 
 A single Rust test runs as `cd core && cargo test --release --test edge slip`
@@ -86,8 +92,9 @@ graphic/         Rust crate (a path dependency of core): the graphics engine —
 mcp-proxy/       Rust crate: framejob-mcp, the stdio MCP server bundled in
   src/ tests/      Contents/Helpers, which forwards to the app's socket and
                    launches the app on a tool call.
-agent/           The assistant helper: Bun and the Anthropic SDK's Tool Runner,
-  src/             built into Contents/Helpers/framejob-agent by build.sh.
+agent/           The assistant helper, a SwiftPM package on Slaude (road map
+  Package.swift    swift-helper), built into Contents/Helpers/framejob-agent by
+  Sources/ Tests/  tools/agent/build_helper.sh and tested by `make agent-test`.
   prices/          The Anthropic price table and the fixtures its readers run.
 app/
   Sources/         The AppKit app, programmatic UI (no storyboards).
@@ -101,12 +108,15 @@ designs/         spec/ (the normative spec, one file per section), adr/
 docs/            site/ (the public documentation site), graphics-api.md,
                  manual-checks.md, agents/ (what the engineering skills read),
                  this file.
+tools/agent/     build_helper.sh (every app build's assistant helper: SwiftPM release on
+                 build/agent-swift, its stamp, strip and signature) and agent_test.py
+                 (`make agent-test`: the Swift helper's suite and its scratch-path guard).
 tools/codecs/    build_codecs.py (`make codecs`: the bundled encoders' pins, their
                  fetch, digest check, build and stamp) and PROVENANCE.md.
 tools/licenses/  acknowledgements.py (every build's third-party notices,
                  Contents/Resources/Acknowledgements.txt) and its selftest
-                 (acknowledgements_selftest.py), the vendored texts it needs
-                 (bun/LICENSE.txt, spdx/MIT.txt) and PROVENANCE.md.
+                 (acknowledgements_selftest.py), the one vendored text it needs
+                 (spdx/MIT.txt) and PROVENANCE.md.
 tools/proof/     The verification scripts: mcp.py (the MCP client), the
                  per-feature proofs and probes, harness/ (the offscreen chrome
                  capture), swift_build.py, proof_app.py, gate.py.
@@ -213,31 +223,31 @@ the encoders again once.
 **The acknowledgements (spec §11 PUB-10, PUB-11).** Every build writes
 `Contents/Resources/Acknowledgements.txt` (project.yml's "Write
 Acknowledgements", `tools/licenses/acknowledgements.py`): each shipped crate
-(`cargo metadata` over every non-dev edge of `core/` and `mcp-proxy/`), each npm
-package the helper bundles (`agent/bun.lock`, a nested version read from its
-own `node_modules/<parent>/node_modules/` folder), Bun, Sparkle, the encoders, the
-voice-activity model and each font, each with its full licence text. A crate
-or package with no licence file gets the canonical SPDX text from
-`tools/licenses/spdx/` under its authors, and the build fails naming it when
-that text is not vendored; a licence file nested in a package must be listed
-in the generator's `NESTED`, or the build fails naming it. `make dist`'s
+(`cargo metadata` over every non-dev edge of `core/` and `mcp-proxy/`), Slaude,
+the assistant helper's one dependency (its revision and its texts read from the
+helper's resolved SwiftPM checkout under `build/agent-swift`, spec §11 SA-10:
+its own Apache-2.0 licence and the Anthropic Python SDK's it is transformed
+from), Sparkle, the encoders, the voice-activity model and each font, each with
+its full licence text. A crate with no licence file gets the canonical SPDX
+text from `tools/licenses/spdx/` under its authors, and the build fails naming
+it when that text is not vendored; a licence file nested in a package must be
+listed in the generator's `NESTED`, or the build fails naming it. `make dist`'s
 `dist_check.py` D42/D43 and the workflow's `published_check.py` P25 hold the
-file to every shipped component; P22–P24 hold the encoders (each one's own
+file to every shipped component (D44–D47 and P26, P27 hold the `framejob://`
+link's dev switch out of Distribution and its scheme to `framejob`); P22–P24 hold the encoders (each one's own
 string in the binary, which the archive's strip keeps; the load commands; the
 licence texts).
 
-**The Bun pin.** The helper is compiled by Bun, whose own licence
-(`tools/licenses/bun/LICENSE.txt`) is vendored at `BUN_LICENSE_VERSION` in
-`acknowledgements.py`. A Distribution build whose `bun --version` differs
-fails, and Debug and Release builds write a note into the file instead, so the
-workflow's setup-bun installs exactly that version
-(`acknowledgements.py --print-bun-version`). After upgrading Bun locally,
-re-vendor its licence as `tools/licenses/PROVENANCE.md` says.
+**The assistant helper on the runner.** The Archive's "Build Agent Helper"
+step runs `tools/agent/build_helper.sh`, so SwiftPM fetches Slaude from GitHub
+and compiles it in release on every publish (no cache is kept for it); the
+workflow installs no Bun (spec §11 SA-10).
 
 What only a real publish shows: a cache save on its first run, and on the
 second a hit, `codecs: reused <key>` in the Archive's log and no stamp
 warning; the Developer ID export keeping `Acknowledgements.txt` (P25 over the
-exported app); and setup-bun installing the pinned Bun.
+exported app); and SwiftPM building the helper inside the Archive, signed with
+the Developer ID identity and a timestamp, within the job's 60 minutes.
 
 The signing and notarization credentials are secrets in the repository's
 `publish` environment (Settings ▸ Environments), whose deployment branches are
@@ -304,7 +314,9 @@ Inspector, Timeline Track Height, Preview Quality) from a script.
 
 A Debug or Release build, never Distribution, also has dev-only tools over
 MCP: `snapshot_ui` (a capture of the editor, a sheet, Settings, Welcome or the
-recorder panel, with a layout dump), `perform_menu_item`, `cancel_sheet`,
+recorder panel, with a layout dump; launch with `-RCDevCaptureScale 1|2|3` to
+draw every capture at that scale whatever screen its window is on, as
+`screens.py` does at 2), `perform_menu_item`, `cancel_sheet`,
 `select_inspector_tab`, `play_preview` (plays a preview and answers the frames
 composed), `graphic_memory` (the graphic rasters' memory budget, and a
 simulated memory-pressure event), `loudness_meter` (the live loudness meter's
@@ -317,12 +329,21 @@ plus 1 s each side, in shots, faces and subjects — or waits for every such job
 and answers their runs, and always answers `lane_queued`, the requests the
 analysis lane has queued since launch; launch with `-RCDevAnalysisHold <s>`
 to hold each job, `-RCDevAnalysisCanned YES` to honour canned analyses),
+`cache_ledger` (for a project's cache folder, how many publishes of each cache
+writer met a save and waited it out, and a gate that holds a named writer's
+next publish until a save is inside its `-RCDevSaveHold <s>`),
 `transcript_view` (what a window's Transcript tab and its bar show, after
 setting the bar's Words from or Language, pressing Read, focusing its view,
 selecting words or clicking one; `stop_after` presses the bar's Stop that many
-seconds after its answer), `playback_rebuilds` (each preview rebuild of a
+seconds after its answer; `find` opens the tab's find bar and types into it, or
+closes it with null, and `find_step` steps to the next or previous match),
+`playback_rebuilds` (each preview rebuild of a
 window since the last reset, with the milliseconds to its build and to its
-landing; launch with `-RCDevRebuildHold <s>` to hold each rebuild's landing)
+landing; launch with `-RCDevRebuildHold <s>` to hold each rebuild's landing),
+`open_link` (hands the app a `framejob://graphic?src=…` link as a browser's
+click does and answers how it ended, in place of the alert; launch with
+`-RCDevGraphicLinkLoopbackHTTP YES` to let it fetch from a listener on
+`http://127.0.0.1`)
 and `assistant_send` / `assistant_answer` (an assistant turn against a
 stand-in server). To look at the chrome without a
 running app or a Screen Recording grant, use the offscreen harness in

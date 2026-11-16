@@ -58,7 +58,10 @@ Two colour rules the fixture obeys, both measured rather than assumed:
   one-colour gradient is then NOT byte-identical to the flat fill it should
   match. At 64/255 it is, at every angle and for radial too. Section 9
   scores both halves of that, because the trap is invisible until a check
-  fails for a reason that has nothing to do with the feature.
+  fails for a reason that has nothing to do with the feature. Since spec
+  §11 PR-21 a frame that shows a gradient is a 16-bit PNG, drawn at 16-bit
+  float with no dither, so section 9 compares DECODED levels (`Frame` reads
+  a 16-bit PNG to the nearest level) where it compared file digests.
 * **The plateau, not the ramp, is where a gradient's colours are read.**
   A `CGGradient` is sampled at pixel centres through an interpolation table
   of its own, so a ramp's own ends read within a couple of steps of the stop
@@ -188,6 +191,7 @@ import sys
 import zlib
 from array import array
 
+import png_read
 from mcp import MCP, ToolError, target
 
 SOCKET = target(sys.argv)
@@ -429,11 +433,23 @@ def decode_png(path):
 
 
 class Frame:
-    """One rendered PNG, decoded. Positions are pixel indices."""
+    """One rendered PNG, decoded. Positions are pixel indices.
+
+    Since spec §11 PR-21 a frame that shows a shape with a gradient is a 16-bit
+    PNG (sections 9–13 render nothing else), so a 16-bit one is read through
+    `png_read.rows8`, every sample rounded to the nearest 8-bit level, and
+    `depth` says which it was: every number below still means a level."""
 
     def __init__(self, path):
         self.path = path
-        self.width, self.height, self.depth, self.channels, self.rows = decode_png(path)
+        with open(path, "rb") as handle:
+            data = handle.read()
+        header = png_read.header(data)
+        if header is not None and header[2] == 16:
+            self.width, self.channels, self.rows = png_read.rows8(data)
+            self.height, self.depth = len(self.rows), 16
+        else:
+            self.width, self.height, self.depth, self.channels, self.rows = decode_png(path)
 
     def pixel(self, x, y):
         return tuple(self.rows[y][x * self.channels:(x + 1) * self.channels])
@@ -1098,20 +1114,23 @@ def flat_part(mcp):
     print("\n9 — G1: a one-colour gradient IS the flat fill")
     s = Session(mcp, "phase6-flat")
     clip = s.card(s.tracks()[0], grey(64))
-    flat = s.frame()
+    flat = s.image()
     for kind, angle in [("linear", 0.0), ("linear", 45.0), ("linear", 137.0),
                         ("radial", 0.0)]:
         s.op("set_shape", clips=[clip], patch={
             "gradient": gradient(kind, angle, [stop(0, 64), stop(1, 64)])})
-        check(s.frame() == flat,
-              f"a {kind} gradient at {angle:g}° between two identical 64/255 stops is "
-              "BYTE-identical to the flat fill — the clip-to-the-path decision's "
-              "cleanest consequence")
-    # And the trap that makes the rule above worth stating: `CGGradient`
-    # DITHERS, so a colour 8 bits cannot hold does NOT come back byte-exact.
-    # Asserted as a bound in both directions, so it holds whether or not a
-    # later macOS keeps dithering — what must never happen is a difference
-    # bigger than one step.
+        # Spec §11 PR-21: the gradient's frame is a 16-bit PNG and the flat
+        # card's an 8-bit one, so the claim is the decoded levels, not the bytes.
+        ramp = s.image()
+        check(flat.depth == 8 and ramp.depth == 16 and ramp.rows == flat.rows,
+              f"a {kind} gradient at {angle:g}° between two identical 64/255 stops is a "
+              f"{ramp.depth}-bit frame (spec §11 PR-21) whose every pixel is the flat fill's "
+              f"{flat.depth}-bit level — the clip-to-the-path decision's cleanest consequence")
+    # And the trap that made the rule above worth stating: `CGGradient`
+    # DITHERS, so a colour 8 bits cannot hold did NOT come back byte-exact. A
+    # saved frame's gradient is drawn at 16-bit float since PR-21, read here to
+    # the nearest level. Asserted as a bound in both directions — what must
+    # never happen is a difference bigger than one step.
     fraction = [0.25, 0.5, 0.75, 1.0]
     s.op("set_shape", clips=[clip], patch={"gradient": None, "fill": fraction})
     rough = s.image()
@@ -1126,8 +1145,8 @@ def flat_part(mcp):
                                    zip(rough.pixel(x, y), dithered.pixel(x, y))))
     check(worst <= 1,
           f"a gradient of a colour 8 bits CANNOT hold (0.25 → 63.75) stays within "
-          f"1/255 of the flat fill (worst {worst}) — `CGGradient` dithers, which is "
-          "why every fill in this fixture is k/255")
+          f"1/255 of the flat fill (worst {worst}) — a gradient drawn at 8 bits "
+          "dithers, which is why every fill in this fixture is k/255")
 
 
 def linear_part(mcp):

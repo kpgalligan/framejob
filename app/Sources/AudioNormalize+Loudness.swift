@@ -22,9 +22,13 @@ extension AudioNormalize {
     /// the target gets the clip limiter at this ceiling (AU-24).
     static let ceilingDBTP = -1.0
 
-    /// The cap that bit, when one did: only the volume ceiling is left (AU-24).
+    /// The cap that bit, when one did: the volume ceiling (AU-24; the note
+    /// names a limiter an action's end turns on as the likely reason when
+    /// one did the holding, AU-168), or the verify renders running out away
+    /// from the target (AU-167).
     enum Limit: String {
         case maxGain = "max_gain"
+        case verifyRenders = "verify_renders"
     }
 
     /// One clip's measurement, before any target.
@@ -47,6 +51,9 @@ extension AudioNormalize {
         /// The clip's base volume as read, which a solved row keeps when the
         /// solve lands within `keepVolumeDB` of it (AU-64 (f)).
         var currentVolume: Double? = nil
+        /// The clip's own limiter as read, nil when it has none: what AU-64
+        /// (f)'s keep rule compares the solve against.
+        var currentLimiter: LimiterProps? = nil
     }
 
     /// One rendered clip's solve (AU-64 (e)): the volume and limiter to
@@ -129,7 +136,7 @@ extension AudioNormalize {
                 problems.append(
                     Problem(
                         clip: id,
-                        reason: "is still being analysed — its loudness has not been measured "
+                        reason: "is still being analyzed — its loudness has not been measured "
                             + "yet. Try again in a moment."))
             case .reading(let reading):
                 if reading.playedTicks < ClipLoudness.minimumPlayedTicks {
@@ -145,13 +152,14 @@ extension AudioNormalize {
                         LoudnessReading(
                             clip: id, media: media, lufs: lufs, truePeak: reading.truePeak,
                             steps: reading.steps, stepPeaks: reading.stepPeaks,
-                            limiter: audio?.limiter, currentVolume: audio?.volume))
+                            limiter: audio?.limiter, currentVolume: audio?.volume,
+                            currentLimiter: audio?.limiter))
                 } else {
                     problems.append(
                         Problem(
                             clip: id,
                             reason: "is under −70 LUFS over the part of it that plays, so "
-                                + "there is no loudness to normalise."))
+                                + "there is no loudness to normalize."))
                 }
             }
         }
@@ -197,8 +205,7 @@ extension AudioNormalize {
                     resultTruePeakDBTP: 20 * log10(reading.truePeak * first),
                     limit: wanted <= maxGain ? nil : .maxGain, limiter: nil)
             } else {
-                var limiter = reading.limiter ?? LimiterProps()
-                limiter.ceilingDb = min(limiter.ceilingDb, ceilingDBTP)
+                let limiter = ceilingLimiter(reading.limiter)
                 let solved = solve(reading, target: target, wanted: first, limiter: limiter)
                 ops.append(
                     .setAudio(
@@ -219,14 +226,117 @@ extension AudioNormalize {
             targetLUFS: target, ops: ops, normalized: normalized, skipped: input.problems)
     }
 
+    /// AU-167, AU-64 (e): what stopped a solve the verify renders checked,
+    /// from its last render. The ceiling first: at `maxGain` and short by
+    /// more than the loop's tolerance. Otherwise a miss past the tolerance,
+    /// over or under, is the loop's bound: the loop goes on while it misses
+    /// and the volume can move, so it ended there only because
+    /// `LoudnessMeasureRun.maximumVerifyRenders` had run. nil when it landed.
+    static func verifiedLimit(volume: Double, resultLUFS: Double, targetLUFS: Double) -> Limit? {
+        let tolerance = LoudnessMeasureRun.verifyToleranceLU
+        if volume >= maxGain && resultLUFS < targetLUFS - tolerance { return .maxGain }
+        if abs(resultLUFS - targetLUFS) > tolerance { return .verifyRenders }
+        return nil
+    }
+
+    /// AU-168 (b): whether a limiter an action's end turns on, not the
+    /// ceiling, is the likely reason `result` stopped at ×32 short of the
+    /// target: `endLimiter` (`ProcessedLoudness.endLimiterOn`), and R0 at
+    /// `maxGain` with nothing more holding it would have reached the target,
+    /// so what the last render lacks of that is what a limiter took. A row
+    /// with no R0 (off the cache) has no such end.
+    static func actionLimiterHeld(_ result: LoudnessResult, endLimiter: Bool, targetLUFS: Double)
+        -> Bool
+    {
+        guard endLimiter, result.limit == .maxGain, let r0 = result.processedLUFS else {
+            return false
+        }
+        return r0 + 20 * log10(maxGain) >= targetLUFS - LoudnessMeasureRun.verifyToleranceLU
+    }
+
+    /// The tools' note for `rows` (AU-168 (c)): the clips of `document`'s
+    /// open container an action's end turns a limiter on for, read from the
+    /// project the run measured (each tool's stale test has passed). Main.
+    static func limitNote(_ rows: [LoudnessResult], in document: ProjectDocument, targetLUFS: Double)
+        -> String?
+    {
+        limitNote(
+            rows, endLimiters: endLimiterClips(in: document, rows.map(\.clip)),
+            targetLUFS: targetLUFS)
+    }
+
+    /// The clips of `clips` an action's end turns a limiter on for
+    /// (`ProcessedLoudness.endLimiterOn`), in `document`'s open container.
+    /// Main.
+    static func endLimiterClips(in document: ProjectDocument, _ clips: [UInt32]) -> Set<UInt32> {
+        let snapshot = document.editedProject.snapshot
+        return Set(clips.filter { ProcessedLoudness.endLimiterOn(snapshot.clip($0)) })
+    }
+
+    /// The `note` of `normalize_clip`, `enhance_voice` and `match_audio` for
+    /// the clips a limit stopped (AU-167): the ceiling's clips in the sentence
+    /// it has always had, but those an action's limiter likely held under
+    /// (`actionLimiterHeld`, `endLimiters` the clips it turns on for), whose
+    /// sentence names it in the ceiling's place (AU-168 (c)); the verify
+    /// bound's in their own with its usual cause, then where to read each
+    /// landing once. nil when none has one. The target is written to 0.001
+    /// LU, so a caller's −16 or −24.417 reads as it was asked and Match's
+    /// measured one does not run to seventeen figures (AU-168 (c)).
+    static func limitNote(_ rows: [LoudnessResult], endLimiters: Set<UInt32>, targetLUFS: Double)
+        -> String?
+    {
+        let shown = (targetLUFS * 1000).rounded() / 1000
+        func held(_ row: LoudnessResult) -> Bool {
+            actionLimiterHeld(
+                row, endLimiter: endLimiters.contains(row.clip), targetLUFS: targetLUFS)
+        }
+        func ids(_ limit: Limit, heldByAction: Bool = false) -> String? {
+            let clips = rows.filter { $0.limit == limit }.filter { held($0) == heldByAction }
+            return clips.isEmpty ? nil : clips.map { String($0.clip) }.joined(separator: ", ")
+        }
+        var sentences: [String] = []
+        if let ceiling = ids(.maxGain) {
+            sentences.append(
+                "Clip(s) \(ceiling) stopped short of \(shown) LUFS: the volume that reaches "
+                    + "it would pass the \(maxGainName) ceiling (limited_by max_gain).")
+        }
+        if let action = ids(.maxGain, heldByAction: true) {
+            sentences.append(
+                "Clip(s) \(action) stopped short of \(shown) LUFS at the \(maxGainName) "
+                    + "ceiling (limited_by max_gain), but the likely reason is a limiter an "
+                    + "action's end turns on: it holds the sound down harder as the volume "
+                    + "rises, so no volume reaches the target.")
+        }
+        if let bound = ids(.verifyRenders) {
+            let tolerance = String(format: "%g", LoudnessMeasureRun.verifyToleranceLU)
+            sentences.append(
+                "Clip(s) \(bound) ended more than \(tolerance) LU from \(shown) LUFS: the "
+                    + "renders that check the volume ran out before it landed within "
+                    + "\(tolerance) LU (limited_by verify_renders), usually because a limiter "
+                    + "holds the sound down harder as the volume rises.")
+        }
+        guard !sentences.isEmpty else { return nil }
+        return (sentences + ["result_lufs says where each landed."]).joined(separator: " ")
+    }
+
+    /// AU-24's limiter for a clip that needs one: its own with the ceiling
+    /// lowered to `ceilingDBTP` when above it, else the default there. The
+    /// processed solve puts the same one on mid-loop (AU-165 (b)).
+    static func ceilingLimiter(_ own: LimiterProps?) -> LimiterProps {
+        var limiter = own ?? LimiterProps()
+        limiter.ceilingDb = min(limiter.ceilingDb, ceilingDBTP)
+        return limiter
+    }
+
     /// A rendered clip's op and row (AU-64 (e), (f)): the solve's volume,
-    /// or the clip's own when it already carries the solved limiter and the
-    /// two are within `keepVolumeDB`, so a second press is an identity.
+    /// or the clip's own when it already carries the solved limiter (its own
+    /// as read, `currentLimiter`, never a chosen one, #400) and the two are
+    /// within `keepVolumeDB`, so a second press is an identity.
     private static func solvedRow(_ reading: LoudnessReading, _ solve: Solved)
         -> (ReelOp, LoudnessResult)
     {
         var volume = solve.volume
-        if solve.limiter == reading.limiter, let current = reading.currentVolume, current > 0,
+        if solve.limiter == reading.currentLimiter, let current = reading.currentVolume, current > 0,
             solve.volume > 0, abs(20 * log10(solve.volume / current)) <= keepVolumeDB
         {
             volume = current

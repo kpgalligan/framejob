@@ -117,7 +117,9 @@ pub struct OpRow {
 /// `with_clips` fields, `set_canvas.rescale_clips`, and the `alone` of
 /// `trim_start`, `trim_end` and `roll`) default to false when absent and
 /// reject null.
-/// Other optional fields are `Option<T>` and decode absence and null alike.
+/// Other optional fields are `Option<T>` and decode absence and null alike,
+/// except `set_track`'s `compressor` and `limiter`, where absent keeps and
+/// `null` clears (`track_dynamics::present`, spec §11 AU-150).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Argument {
     pub name: &'static str,

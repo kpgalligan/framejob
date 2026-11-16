@@ -13,8 +13,12 @@ typecheck`, which builds or reuses the bundled encoders first, `make codecs`, sp
 CX-5, passing only with no `error:` and exactly TYPECHECK_BASELINE's
 warnings, by file and message; `tools/codecs` is among its and `app`'s inputs, and
 `cmake --version` in the tool fingerprint; `tools/licenses`, the acknowledgements' generator
-and its vendored texts, spec §11 PUB-10, is among `app`'s, its `*.md` not), `fmt` (`cargo fmt --check` in core, graphic,
-mcp-proxy), `lint` (`make lint`), `test` (`make test`) and `app` (`make app`,
+and its vendored texts, spec §11 PUB-10, is among `app`'s, its `*.md` not, and so are
+`agent` and `tools/agent`, the helper's package and its build script, spec §11 SA-8, which
+`typecheck` does not read since the TypeScript went, SA-11), `fmt` (`cargo fmt --check` in core, graphic,
+mcp-proxy), `lint` (`make lint`), `test` (`make test`; of the `*.md` files only those under
+`designs/spec/` and `docs/` and the root `README.md`, which its spelling scan reads, #556, are
+its inputs) and `app` (`make app`,
 then dist_check's D25 and D26 over the Release app: its entitlements and its
 seal, the defect a no-op build once shipped and only `make dist` read).
 
@@ -51,7 +55,10 @@ HERE = "tools/proof/gate.py"
 GATE = ROOT / "build/gate"
 ALWAYS = (HERE, "Makefile")
 STEPS = ("names", "typecheck", "fmt", "lint", "test", "app")
-BOUNDS = {"names": 120, "typecheck": 600, "fmt": 120, "lint": 600, "test": 900, "app": 1500}
+# `test` builds the release assistant helper (road map "swift-helper" SA3, spec §11 SA-8, SA-9):
+# seconds while its stamp matches, Slaude's cold build (SA0's 122–392 s) in a worktree that has
+# none, on top of the 517–560 s SA1 and SA2 measured; so 1200, where 900 already stopped one run.
+BOUNDS = {"names": 120, "typecheck": 600, "fmt": 120, "lint": 600, "test": 1200, "app": 1500}
 COMMANDS = {
     "names": [["python3", "tools/proof/name_residue.py"],
               ["python3", "tools/proof/docs_site_proof.py", "--guide"]],
@@ -65,11 +72,12 @@ FOLDERS = {"fmt": ("core", "graphic", "mcp-proxy")}
 # The step's own files: folders and files, then which `*.md` count (none, unless named).
 STEP_INPUTS = {
     "names": (("",), ("",)),
-    "typecheck": (("app/Sources", "app/Bridging", "core/include", "agent", "tools/codecs"), ()),
+    "typecheck": (("app/Sources", "app/Bridging", "core/include", "tools/codecs"), ()),
     "fmt": (("core", "graphic", "mcp-proxy"), ()),
     "lint": (("core", "graphic", "mcp-proxy"), ()),
-    "test": (("",), ("designs/spec/", "docs/")),
-    "app": (("app", "agent", "core", "graphic", "mcp-proxy", "tools/codecs", "tools/licenses",
+    "test": (("",), ("designs/spec/", "docs/", "README.md")),
+    "app": (("app", "agent", "core", "graphic", "mcp-proxy", "tools/agent", "tools/codecs",
+             "tools/licenses",
              "project.yml", "VERSION",
              "docs/graphics-api.md", "docs/graphics-api.d.ts", "tools/proof/dist_check.py"),
             ("docs/graphics-api.md",)),
@@ -77,7 +85,7 @@ STEP_INPUTS = {
 EXCLUDED = ("archive/", ".secrets/")
 TOOLS = (["xcrun", "swiftc", "--version"], ["xcodebuild", "-version"],
          ["xcrun", "--show-sdk-path"], ["rustc", "-Vv"], ["cargo", "clippy", "-V"],
-         ["bun", "--version"], ["xcodegen", "--version"], ["cargo", "fmt", "--version"],
+         ["xcodegen", "--version"], ["cargo", "fmt", "--version"],
          ["cmake", "--version"])
 # `make typecheck`'s warnings at HEAD 0b380d2, verbatim (CLAUDE.md: "0 errors and 4 warnings",
 # deliberate, spec §11 W-8): (file basename, message). A fifth, or one gone, fails the step.
@@ -96,6 +104,8 @@ ERROR_LINE = re.compile(r"^(?!\s*(?:PASS|ok)\b).*(?:error:|error\[|FAILED|(?:^|\
                         r"|Fatal error|\*\*\*)")
 EXPECTED = {"no-tools": {"H2"}, "stamp-always": {"H3"}, "md-counted": {"M4", "M5", "M6"},
             "warning-count": {"W2"}}
+# The mutants, as `mutant_anchors.py` reads them: switches on MUTANT, no tree text.
+MUTANTS = tuple(sorted(EXPECTED))
 MUTANT = None
 
 
@@ -325,7 +335,7 @@ def selftest(mutant=None):
         ("M1", "app/Sources/Clip.swift", {"names", "typecheck", "test", "app"}),
         ("M1", "app/Bridging/x.h", {"names", "typecheck", "test", "app"}),
         ("M1", "core/include/framejob_core.h", every),
-        ("M1", "agent/src/agent.ts", {"names", "typecheck", "test", "app"}),
+        ("M1", "agent/Sources/FrameJobAgentKit/Turn.swift", {"names", "test", "app"}),
         ("M8", "tools/codecs/build_codecs.py", {"names", "typecheck", "test", "app"}),
         ("M8", "tools/licenses/acknowledgements.py", {"names", "test", "app"}),
         ("M2", "core/src/lib.rs", {"names", "fmt", "lint", "test", "app"}),
@@ -342,7 +352,8 @@ def selftest(mutant=None):
         ("M3", "docs/manual-checks.md", {"names", "test"}),
         ("M4", "archive/x.md", set()),
         ("M4", "archive/x.py", set()),
-        ("M4", "README.md", {"names"}),
+        ("M3", "README.md", {"names", "test"}),
+        ("M4", "tools/proof/README.md", {"names"}),
         ("M5", "core/CLAUDE.md", {"names"}),
         ("M5", "app/CLAUDE.md", {"names"}),
         ("M6", "designs/adr/x.md", {"names"}),
@@ -376,7 +387,7 @@ def selftest(mutant=None):
         for index, (name, message) in enumerate(pairs):
             lines += [f"app/Sources/{name}:{100 + index}:9: warning: {message}",
                       f"    |    `- warning: {message}"]
-        return "\n".join(lines) + extra + "\n$ tsc --noEmit\n"
+        return "\n".join(lines) + extra + "\n"
 
     row("W0", typecheck_verdict(log(TYPECHECK_BASELINE), 0) is None,
         "CONTROL: the four baseline warnings, at any line, each with its caret line, pass")
@@ -406,7 +417,7 @@ def main(argv=None):
     parser.add_argument("--wait", type=float, default=120.0,
                         help="seconds to wait for another gate's lock (default 120)")
     parser.add_argument("--selftest", action="store_true")
-    parser.add_argument("--mutant", choices=sorted(EXPECTED))
+    parser.add_argument("--mutant", choices=MUTANTS)
     args = parser.parse_args(argv)
     if args.selftest or args.mutant:
         return selftest(args.mutant)

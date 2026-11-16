@@ -192,7 +192,8 @@ hue_curves` in the copy's own `core/` (row CT). MUTANT PASS when every named row
   curves-before-wheels     step 4c.2 moved before 4c.1: O1
   ungraded-misses-curves   `ungraded` keeps the curves: V1 CT
   adjust-without-curves    the adjustment pass has no step 4c.2: J1
-  identity-kept            `set_video` stores an identity curve: N1 CT
+  identity-kept            `set_video` stores an identity curve: N1 H7 CT (H7's
+                           identity hue patch, since grading-4)
   identity-not-aligned     no identity alignment in an action: A2 A3 CT
   hue-wrap-dropped         a hue curve flat outside its first and last x: H4 P12
   hue-from-graded          the gain sampled at the turned hue: H13
@@ -356,8 +357,8 @@ MUTANTS = {
                               ["J1"]),
     "identity-kept": ([(
         "core/src/edit_props.rs",
-        "                    props.curves.drop_identities();\n",
-        "")], ["N1", "CT"]),
+        "        props.curves.drop_identities();\n",
+        "")], ["N1", "H7", "CT"]),
     "identity-not-aligned": ([(
         "core/src/actions.rs",
         "            align_identity_curves(&mut state, &mut target);\n",

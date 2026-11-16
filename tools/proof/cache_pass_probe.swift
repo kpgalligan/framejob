@@ -265,7 +265,7 @@ func documentSave() {
     let entered = DispatchSemaphore(value: 0)
     let holdEnded = Flag()
     let publisher = Thread {
-        ledger.publish(in: cache, for: nil) {
+        ledger.publish(in: cache, for: nil, as: "probe") {
             entered.signal()
             Thread.sleep(forTimeInterval: 2)
             holdEnded.set()
@@ -287,7 +287,7 @@ func documentSave() {
     _ = waitUntil(5) { holdEnded.isSet }
     let afterHold = holdEnded.at.map { returned >= $0 } ?? false
     let started = Date()
-    let answered = ledger.publish(in: cache, for: nil) {}
+    let answered = ledger.publish(in: cache, for: nil, as: "probe") {}
     let took = Date().timeIntervalSince(started)
     row("G3", afterHold && arrived != nil && answered && took < 1,
         String(format: "save returned %.2f s after the call, ", returned.timeIntervalSince(called))

@@ -16,13 +16,13 @@ extension AgentServer {
                 "Lays out a camera clip and the screen recording behind it at a time — what "
                     + "Clip ▸ Camera Layout ▸ and the Picture sub-tab's Layout section send at "
                     + "the playhead. One undo step, \"Camera Layout\". The answer's focus is the "
-                    + "[x, y] sent as the camera crop's centre, or null when none was. corner "
+                    + "[x, y] sent as the camera crop's center, or null when none was. corner "
                     + "puts the camera in a corner box (a quarter of the canvas "
                     + "wide, a third tall, 5 % in from the edges) square, rounded or as a "
                     + "circle, the screen at its full placement (as Add Clip places it); "
                     + "side_by_side puts the screen fitted in the left two-thirds and the "
                     + "camera cropped to fill the right third, with margins and a small "
-                    + "radius; stacked puts the screen across the top and the camera filling "
+                    + "radius (none on a nest clip); stacked puts the screen across the top and the camera filling "
                     + "the rest below; camera_full fills the canvas with the camera; "
                     + "screen_only hides the camera (opacity 0) where it is. Each role gets one "
                     + "layout action at `at` (all six of x, y, scale, crop, corner_radius and "
@@ -41,7 +41,11 @@ extension AgentServer {
                     + "camera_full and screen_only, since its zooms keep playing. Send nest: "
                     + "true to nest that role's clips first, in the same step, so the layout "
                     + "moves the nest and the zoom stays inside it (refused when one of them is "
-                    + "already laid out). Inside a nest (scope) the nest's canvas is the canvas.",
+                    + "already laid out). Also refused, before anything is written: a shape or "
+                    + "graphic clip the layout would crop or round, as the camera, the screen or "
+                    + "a clip in the reach (a crop alone is allowed on a matte track); move it "
+                    + "to another track, or end the reach before it with `through`. Inside a "
+                    + "nest (scope) the nest's canvas is the canvas.",
                 [
                     "camera": "The camera clip's id: a clip with a picture playing at `at`.",
                     "screen": "The screen clip's id, on a track behind the camera's. Absent: "
@@ -57,12 +61,12 @@ extension AgentServer {
                     "duration": "How long the switch eases, \(ticks) Default 0.5 s (300000), "
                         + "clamped to the clip and to its next layout action.",
                     "curve": "How the switch eases. Default ease_in_out.",
-                    "focus": "[x, y]: the point of the camera's picture a crop is centred on, "
-                        + "in the camera MEDIA's source pixels from the picture's centre, y "
+                    "focus": "[x, y]: the point of the camera's picture a crop is centered on, "
+                        + "in the camera MEDIA's source pixels from the picture's center, y "
                         + "down; clamped inside the picture. Omitted or null, the tool fills it "
                         + "as the menu does: the mean centroid of the camera clip's person "
                         + "masks when they are cached for every frame it plays (analyze_cutout's "
-                        + "centroid, less the media's centre), else nothing, which centres the "
+                        + "centroid, less the media's center), else nothing, which centers the "
                         + "crop. A filled focus is dropped when nest: true nests the camera, "
                         + "since the nest clip is not the media; a focus you send is sent as "
                         + "given.",

@@ -93,7 +93,7 @@ extension AgentServer {
         guard try doubleArg(a, "target_lufs") == nil else {
             throw ToolError(
                 message: "target_lufs is the loudness mode's target; with mode \"peak\" the "
-                    + "level is peak_db. Pass mode \"loudness\" to normalise to a loudness.")
+                    + "level is peak_db. Pass mode \"loudness\" to normalize to a loudness.")
         }
         let peakDB = try normalizePeakDB(a)
         guard let input = AudioNormalize.read(from: document, clips: clips) else {
@@ -110,7 +110,7 @@ extension AgentServer {
         guard !input.isEmpty else {
             let reasons = input.problems.map { $0.description }.joined(separator: " ")
             throw ToolError(
-                message: "Nothing could be normalised. \(reasons)")
+                message: "Nothing could be normalized. \(reasons)")
         }
         let plan = AudioNormalize.plan(input, peakDB: peakDB)
 
@@ -320,7 +320,11 @@ extension AgentServer {
     /// true peak is the processed one), its processed loudness and the renders
     /// it took (null and 0 off the cache), the volume written, the clip's
     /// limiter after the edit (AU-24), where it lands, and the volume ceiling
-    /// when it stopped it short; a note names each such clip.
+    /// or the verify renders when either stopped it away from the target
+    /// (AU-167); a note names each such clip, and a limiter an action's end
+    /// turns on as the likely reason for a ×32 stop (AU-168). The note and
+    /// `skipped` are what the button and the menu say at the inspector's foot
+    /// (AU-169).
     private func normalizeLoudness(
         _ a: [String: Any], document: ProjectDocument, clips: [UInt32], stop: AgentCallCancel?
     ) throws -> String {
@@ -347,7 +351,7 @@ extension AgentServer {
             }
             guard !input.isEmpty else {
                 let reasons = input.problems.map { $0.description }.joined(separator: " ")
-                throw ToolError(message: "Nothing could be normalised. \(reasons)")
+                throw ToolError(message: "Nothing could be normalized. \(reasons)")
             }
             let run = LoudnessMeasureRun(
                 document: document, jobs: AudioMeasureDoor.normalizeJobs(input, in: document),
@@ -363,7 +367,7 @@ extension AgentServer {
                 outcome.input, targetLUFS: requested, solved: outcome.solved)
             guard !plan.normalized.isEmpty else {
                 let reasons = plan.skipped.map { $0.description }.joined(separator: " ")
-                throw ToolError(message: "Nothing could be normalised. \(reasons)")
+                throw ToolError(message: "Nothing could be normalized. \(reasons)")
             }
             return try self.loudnessAnswer(plan, document: document)
         }
@@ -398,13 +402,10 @@ extension AgentServer {
         if !plan.skipped.isEmpty {
             fields["skipped"] = plan.skipped.map { $0.description }
         }
-        let limited = plan.normalized.filter { $0.limit != nil }
-        if !limited.isEmpty {
-            let ids = limited.map { String($0.clip) }.joined(separator: ", ")
-            fields["note"] =
-                "Clip(s) \(ids) stopped short of \(plan.targetLUFS) LUFS: the volume that reaches "
-                + "it would pass the \(AudioNormalize.maxGainName) ceiling (limited_by max_gain). "
-                + "result_lufs says where each landed."
+        if let note = AudioNormalize.limitNote(
+            plan.normalized, in: document, targetLUFS: plan.targetLUFS)
+        {
+            fields["note"] = note
         }
         return try editResult(document, "Normalize", plan.ops, fields)
     }

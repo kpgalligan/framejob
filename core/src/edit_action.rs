@@ -284,6 +284,9 @@ impl Project {
     ///
     /// `graphic` is `edit_action_graphic.rs`'s (G-34), read against
     /// `schema`; a prop the clip's map lacks gets its start in this edit.
+    /// A crop, corner radius or chroma key the end would put on a clip
+    /// `set_video` refuses it on is an `Err` (`check_end_pixel_keys`, spec
+    /// §11 #535, #536).
     pub fn set_action_end(
         &self,
         clip: u32,
@@ -345,6 +348,7 @@ impl Project {
         for path in &off {
             key_off(&mut merged, path);
         }
+        self.check_end_pixel_keys(target, patch, &merged)?;
 
         let mut next = self.clone();
         let Some(slot) = next.clip_mut(clip) else {

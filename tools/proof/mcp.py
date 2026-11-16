@@ -193,6 +193,18 @@ class MCP:
         except json.JSONDecodeError:
             return text
 
+    def call_content(self, tool, arguments):
+        """Call `tool` and answer its `content` list WHOLE — image blocks
+        included, which `call_with` drops (spec §11 PR-22's rows read
+        `render_frame`'s). An error answer raises `ToolError` as `call_with`
+        does."""
+        result = self._request("tools/call", {"name": tool, "arguments": arguments})
+        content = result.get("content", [])
+        if result.get("isError"):
+            text = "".join(part.get("text", "") for part in content if part.get("type") == "text")
+            raise ToolError(f"{tool}: {text}")
+        return content
+
     # ---- export, through the Export Queue (spec §11 #326) ----------------------
 
     def wait_export(self, export_id, seconds=None, interval=0.2):
@@ -587,7 +599,10 @@ def launch(binary, arguments=(), env=None, socket_path=None, log_path=None, seco
     `log_path` (else beside the socket), and waits up to `seconds` for its
     listening line. `client` is an `MCP` with `timeout`, or None when the
     instance did not come up. A built product older than its inputs is
-    refused first (`proof_app.StaleApp`), and nothing is started."""
+    refused first (`proof_app.StaleApp`), and so is a bare negative number
+    among `arguments` (`proof_app.launch_arguments`, a `ValueError`, #404);
+    nothing is started."""
+    arguments = proof_app.launch_arguments(arguments)
     proof_app.require_fresh(binary)
     socket_path = str(socket_path or scratch_socket())
     log_path = str(log_path or log_beside(socket_path))

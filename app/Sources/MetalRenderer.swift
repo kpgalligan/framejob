@@ -25,8 +25,9 @@ final class MetalRenderer {
     /// combination itself. Built with `blending: false`, which is the whole
     /// correctness argument — see `pipelineDescriptor`.
     ///
-    /// Fourteen pipelines from ten fragment functions: plain, plain + gather,
-    /// blend, blend + gather, the shadow, the matte resolve, the dissolve mix,
+    /// Fifteen pipelines from ten fragment functions: plain, plain + gather,
+    /// blend, blend + gather, the shadow, the matte resolve at each coverage
+    /// depth (spec §11 PR-19), the dissolve mix,
     /// the adjustment pass (`Compositor+Adjustment.swift`, spec §11 GR-6), the
     /// selection map (`Compositor+Selection.swift`, spec §11 GR-35), the
     /// input pass (`Compositor+Input.swift`, spec §11 GR-15), the output
@@ -38,8 +39,10 @@ final class MetalRenderer {
     /// The full-canvas quad that draws one blurred mask as a shadow (§7.5).
     let shadowPipeline: MTLRenderPipelineState
     /// The matte resolve pass and the matte pass's targets (spec §11 MT-6,
-    /// `Compositor+Matte.swift`).
+    /// `Compositor+Matte.swift`): into an `r8Unorm` coverage, and into the
+    /// `r16Unorm` one of a frame delivered deep (PR-19).
     let matteResolvePipeline: MTLRenderPipelineState
+    let matteResolveDeepPipeline: MTLRenderPipelineState
     let mattePool: MattePool
     /// The routed dissolve's mix (spec §11 MT-8, `Compositor+Dissolve.swift`).
     let dissolvePipeline: MTLRenderPipelineState
@@ -108,7 +111,8 @@ final class MetalRenderer {
     /// The working format (spec §11 PR-1): the attachment of every layer,
     /// blend, shadow and dissolve pipeline, and so of every target they draw
     /// into — the destination, each matte composite and dissolve half, and
-    /// the shadow pair. The coverage stays `r8Unorm`.
+    /// the shadow pair. The coverage is `r8Unorm`, or `r16Unorm` in a frame
+    /// delivered deeper than 8 bits (spec §11 PR-19).
     static let workingFormat: MTLPixelFormat =
         metalFormat(for: Compositor.outputPixelFormat) ?? .bgra8Unorm
 
@@ -161,7 +165,10 @@ final class MetalRenderer {
                     label: "Frame Job shadow", vertex: shadowVertex, fragment: shadowFragment)),
             let matteResolvePipeline = try? device.makeRenderPipelineState(
                 descriptor: MetalRenderer.matteResolveDescriptor(
-                    vertex: shadowVertex, fragment: resolveFragment)),
+                    vertex: shadowVertex, fragment: resolveFragment, deep: false)),
+            let matteResolveDeepPipeline = try? device.makeRenderPipelineState(
+                descriptor: MetalRenderer.matteResolveDescriptor(
+                    vertex: shadowVertex, fragment: resolveFragment, deep: true)),
             let dissolvePipeline = try? device.makeRenderPipelineState(
                 descriptor: MetalRenderer.pipelineDescriptor(
                     label: "Frame Job dissolve", vertex: shadowVertex, fragment: dissolveFragment)),
@@ -211,6 +218,7 @@ final class MetalRenderer {
         self.blendGatherPipeline = blendGatherPipeline
         self.shadowPipeline = shadowPipeline
         self.matteResolvePipeline = matteResolvePipeline
+        self.matteResolveDeepPipeline = matteResolveDeepPipeline
         self.mattePool = MattePool(device: device)
         self.dissolvePipeline = dissolvePipeline
         self.adjustPipeline = adjustPipeline
@@ -327,7 +335,10 @@ final class MetalRenderer {
         guard let target = texture(from: destination, live: &live) else {
             throw CompositorError.noDestinationTexture
         }
-        mattePool.beginFrame(width: target.width, height: target.height)
+        // A frame delivered deep resolves its mattes at 16 bits (spec §11 PR-19).
+        mattePool.beginFrame(
+            width: target.width, height: target.height,
+            deep: RecipeSource.shared.deliversDeep(instruction?.recipeKey ?? 0))
         defer { mattePool.endFrame() }
 
         let canvas = recipe?.canvas ?? RecipeCanvas(

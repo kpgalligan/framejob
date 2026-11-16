@@ -35,9 +35,13 @@
 //   F8  (#158) `checkF8`: every ask-first row's reason is a write ("It
 //       writes " or "It copies "), there is at least one, and the system
 //       prompt says "These tools write files, so each asks the person first: "
-//   M1–M6  each checker FAILS on a mutated copy of its input (M5: `"none"`
+//   F9  (#618, spec §11 PR-25) `checkF9`: the system prompt's `render_frame`
+//       paragraph holds `max_width` and "never scales", and `render_frame`
+//       publishes `max_width`: with no scale in the tool, that sentence is
+//       what keeps the assistant's image under the API's limits
+//   M1–M7  each checker FAILS on a mutated copy of its input (M5: `"none"`
 //       unquoted in the system prompt; M6: an ask-first row that spends money
-//       rather than writing)
+//       rather than writing; M7: "never scales" gone from the system prompt)
 //
 // The fixture is an untitled document edited through `AgentLane.submit`
 // pinned to it, as the assistant's session calls: two tracks, a text clip
@@ -382,6 +386,29 @@ func checkF8(_ rows: [AssistantToolRow], system: String) -> (Bool, String) {
                 + (problems.isEmpty ? "" : "; " + problems.joined(separator: "; ")))
 }
 
+/// F9 (#618, spec §11 PR-25): `render_frame` never scales its image, so the system prompt's
+/// `render_frame` paragraph is what keeps the assistant's image under the API's limits: it asks
+/// for `max_width` and says Frame Job never scales the image; and `max_width` is an argument the
+/// assistant's `render_frame` publishes.
+func checkF9(_ system: String, catalog: [[String: Any]]) -> (Bool, String) {
+    let paragraph = system.components(separatedBy: "\n")
+        .first { $0.hasPrefix("`render_frame`") } ?? ""
+    let tool = catalog.first { $0["name"] as? String == "render_frame" }
+    let properties = (tool?["inputSchema"] as? [String: Any])?["properties"] as? [String: Any]
+    let published = properties?["max_width"] != nil
+    var problems: [String] = []
+    if paragraph.isEmpty { problems.append("no paragraph starts with `render_frame`") }
+    for words in ["`max_width`", "never scales"] where !paragraph.contains(words) {
+        problems.append("\(words) not in it")
+    }
+    if !published { problems.append("render_frame publishes no max_width") }
+    return (problems.isEmpty,
+            "the `render_frame` paragraph, \(paragraph.count) characters: `max_width` "
+                + "\(paragraph.contains("`max_width`")), \"never scales\" "
+                + "\(paragraph.contains("never scales")); render_frame publishes max_width "
+                + "\(published)" + (problems.isEmpty ? "" : "; " + problems.joined(separator: "; ")))
+}
+
 // MARK: - The rows
 
 func rowF3() {
@@ -549,6 +576,8 @@ rowF6()
 rowF7()
 let f8 = checkF8(AssistantToolTable.rows, system: texts.system)
 row("F8", f8.0, f8.1)
+let f9 = checkF9(texts.system, catalog: catalog)
+row("F9", f9.0, f9.1)
 
 // The mutants: each checker must FAIL on its copy.
 let m1 = checkF1((texts.system + " `add_markers`", texts.guide, texts.compaction))
@@ -572,6 +601,10 @@ let m6 = checkF8(
         reason: "It spends the person's money.")],
     system: texts.system)
 row("M6", !m6.0, "an ask-first transcribe that spends money: F8 fails \(!m6.0) (\(m6.1))")
+// #618: the clause that says Frame Job never scales the image dropped from the system prompt.
+let m7 = checkF9(
+    texts.system.replacingOccurrences(of: "never scales", with: "sends"), catalog: catalog)
+row("M7", !m7.0, "\"never scales\" → \"sends\": F9 fails \(!m7.0) (\(m7.1))")
 
 for document in AgentServer.shared.openProjects() { document.close() }
 spin(0.2)

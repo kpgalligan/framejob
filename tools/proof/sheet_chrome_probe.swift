@@ -16,7 +16,7 @@
 // empty plan), Transcribe after `showProgress()`, AudioSync (an empty input)
 // and Rewrap (its own panel's content view). Each view but Rewrap's is the
 // content view of an offscreen borderless window, sized to fit; each is
-// captured with `UISnapshot.pass` into `<out dir>/<sheet>-<look>.png` and
+// captured through `cacheDisplay` as `UISnapshot.pass` does into `<out dir>/<sheet>-<look>.png` and
 // `UISnapshotLayout.report(root:skipping: nil)` into
 // `<out dir>/<sheet>-<look>.json`. `<out dir>/answer-<look>.json` lists the
 // sheets captured and any that were not, with why.
@@ -53,10 +53,17 @@ func finish() -> Never {
 
 /// Captures `root` as `<name>-<look>.png` and `.json`.
 func capture(_ name: String, _ root: NSView) {
-    guard let pass = UISnapshot.pass(root),
-        let png = pass.rep.representation(using: .png, properties: [:])
-    else {
-        failed[name] = "UISnapshot.pass gave no picture"
+    // `UISnapshot.pass` at the window's own scale, written out so the one probe
+    // builds over a tree from before its `scale` argument (spec §11 #539) too.
+    root.layoutSubtreeIfNeeded()
+    root.displayIfNeeded()
+    guard let rep = root.bitmapImageRepForCachingDisplay(in: root.bounds) else {
+        failed[name] = "cacheDisplay gave no picture"
+        return
+    }
+    root.cacheDisplay(in: root.bounds, to: rep)
+    guard let png = rep.representation(using: .png, properties: [:]) else {
+        failed[name] = "cacheDisplay gave no picture"
         return
     }
     let report = UISnapshotLayout.report(root: root, skipping: nil)

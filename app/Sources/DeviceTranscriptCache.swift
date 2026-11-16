@@ -147,7 +147,9 @@ enum DeviceTranscriptCache {
     @discardableResult
     static func store(_ heard: Heard, media: UInt32, stamp: Stamp, in cacheDir: URL) -> Bool {
         var written = false
-        let published = MediaImporter.CacheLedger.shared.publish(in: cacheDir, for: nil) {
+        let published = MediaImporter.CacheLedger.shared.publish(
+            in: cacheDir, for: nil, as: "device-transcript"
+        ) {
             let file = merged(
                 read(for: media, language: stamp.language, in: cacheDir), adding: heard,
                 stamp: stamp)

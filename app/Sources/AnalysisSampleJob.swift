@@ -13,8 +13,10 @@ import Foundation
 /// `min(longSide, the media's long side)`, over each of `request`'s ranges in
 /// order. `publish` is handed each range's samples at its end and every
 /// `publishInterval` mid-range, then only through the samples decided (every
-/// sample whose interval ended before the frame read); an index no frame
-/// served is absent from `found`.
+/// sample whose interval ended before the frame read), and so when the job is
+/// cancelled (spec §11 CJ-21 as amended by #435); an index no frame served is
+/// absent from `found`. A frame's picture is made only when it serves a
+/// sample (#437).
 enum AnalysisSampleJob {
 
     /// Runs `request`'s ranges (sample indices of `grid`) in order. False when
@@ -53,7 +55,7 @@ enum AnalysisSampleJob {
                 if let served = AnalysisFaces.samples(at: pts, after: previous, grid: grid),
                     served.upperBound >= range.lowerBound, served.lowerBound <= range.upperBound
                 {
-                    let value = try autoreleasepool { try analyse(picture) }
+                    let value = try autoreleasepool { try picture.picture { try analyse($0) } }
                     let mine = max(served.lowerBound, range.lowerBound)...min(
                         served.upperBound, range.upperBound)
                     for k in mine { job.found[k] = (pts, value) }
@@ -67,7 +69,14 @@ enum AnalysisSampleJob {
                     lastPublish = Date()
                 }
             }
-            guard finished else { return false }
+            guard finished else {
+                if job.decided >= job.from {
+                    AnalysisStore.publishCancelled(request) {
+                        try flush(&job, through: job.decided, publish: publish)
+                    }
+                }
+                return false
+            }
             if job.from <= range.upperBound {
                 try flush(&job, through: range.upperBound, publish: publish)
             }

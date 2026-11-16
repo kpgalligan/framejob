@@ -8,15 +8,26 @@ import Foundation
 /// switch's default settings; `SpeakerSwitch.turns` on them; each turn's
 /// track named back as its microphone's clip id.
 ///
-/// `read`'s problems (still being analysed, no speech detection) and SW-24's
-/// no-speech sentence refuse, in SW-24's words, as a `Refusal` carrying the
-/// bare sentence: `reframe_clip` prefixes it "reframe_clip was refused: ",
-/// `make_vertical_version` "make_vertical_version was refused: " and Make
-/// Vertical's sheet shows it as it is (road map creator-jobs VR6b, spec §11
-/// VR-64 (d), VR-66 (c)). A microphone `read` drops — its sound off — gets
-/// no turn and no refusal here: the core names it (VR-60 (d)). Main thread
-/// (it reads the document); names no `rc_*`.
+/// `read`'s problems (still being analysed, no speech detection) refuse, in
+/// SW-24's words, as a `Refusal` carrying the bare sentence: `reframe_clip`
+/// prefixes it "reframe_clip was refused: ", `make_vertical_version`
+/// "make_vertical_version was refused: " and Make Vertical's sheet shows it as
+/// it is (road map creator-jobs VR6b, spec §11 VR-64 (d), VR-66 (c)). SW-24's
+/// no-speech sentence refuses too with `silence: .refuses` (`reframe_clip`,
+/// VR-60 (c)); with `.notTalking` (Make Vertical, spec §11 #527) a microphone
+/// with no speech gets no turn, that person not talking in the shot. A
+/// microphone `read` drops — its sound off — gets no turn and no refusal here:
+/// the core names it (VR-60 (d)). Main thread (it reads the document); names
+/// no `rc_*`.
 enum FramingSpeaker {
+    /// What a microphone with no speech in the span does.
+    enum Silence {
+        /// `reframe_clip`: SW-24's no-speech sentence refuses (spec §11 VR-60 (c)).
+        case refuses
+        /// Make Vertical: no turn, that person not talking in the shot (spec §11 #527).
+        case notTalking
+    }
+
     /// Why nobody's turns could be read: SW-24's sentence, with no prefix.
     struct Refusal: Error {
         let sentence: String
@@ -24,9 +35,9 @@ enum FramingSpeaker {
 
     /// `[{from, to, mic}]` in the open container's timeline ticks, `mic` a clip
     /// id of `mics`.
-    static func turns(document: ProjectDocument, clip: ClipSnapshot, mics: [UInt32]) throws
-        -> [[String: Any]]
-    {
+    static func turns(
+        document: ProjectDocument, clip: ClipSnapshot, mics: [UInt32], silence: Silence
+    ) throws -> [[String: Any]] {
         let snapshot = document.editedProject.snapshot
         var clipOf: [UInt32: UInt32] = [:]
         var speakers: [SpeakerSwitch.Speaker] = []
@@ -44,7 +55,8 @@ enum FramingSpeaker {
             throw Refusal(
                 sentence: "the project's plan could not be read, so nobody's turns could be.")
         }
-        let problems = input.problems + SpeakerSwitch.silentMicrophones(input)
+        let problems =
+            input.problems + (silence == .refuses ? SpeakerSwitch.silentMicrophones(input) : [])
         guard problems.isEmpty else {
             throw Refusal(sentence: problems.joined(separator: " "))
         }

@@ -1486,7 +1486,7 @@ def row_eight(instance, fake):
     check("8: the default engine is the ON-DEVICE one — the call is answered by the "
           "on-device engine or its model, never by AssemblyAI",
           text is None or "not installed" in text or "ON-DEVICE" in text
-          or "No speech was recognised" in text,
+          or "No speech was recognized" in text,
           f"got {text!r}")
     check("8: and the fake's log is EMPTY", fake.log()["requests"] == [],
           f"got {routes(fake.log())!r}")
@@ -1768,7 +1768,7 @@ def row_b(instance, fake):
     `cloudFields` is never reached on a throwing path, so `uploaded` and
     `audio_seconds` are not in the answer at all. A project whose only media
     held no speech billed AssemblyAI for the whole file and then answered a
-    bare "No speech was recognised", with nothing about the money."""
+    bare "No speech was recognized", with nothing about the money."""
     print("\nB. a failed run names what it already cost (the reader review, R5\u00b72)")
     speech, _ = fixtures()
     # `words: []` IS an array and means zero words, so the media is uploaded,
@@ -1780,7 +1780,7 @@ def row_b(instance, fake):
     answer = session.error("transcribe", engine="assemblyai", place=False)
     check("B: the run still ends in its own sentence about the AUDIO",
           answer is not None
-          and "No speech was recognised in the audio that was transcribed." in answer,
+          and "No speech was recognized in the audio that was transcribed." in answer,
           f"got {answer!r}")
     check("B: and the refusal names the bill it already ran up",
           answer is not None
@@ -2741,7 +2741,9 @@ def main():
                     run_row(row_b, c, fake_c)
                     run_row(row_sc, c, fake_c)
         # RP (issue batch B24, #80): two instances of their own, so C is not
-        # loaded further (an instance deadlocks past ~40 open documents).
+        # loaded further (every open document costs an instance threads and
+        # memory: tools/proof/README.md, "Relaunch the instance between proof
+        # sessions").
         if time.time() - started > args.wall:
             skip_rows(1, f"the run passed its --wall bound of {args.wall:.0f} s before RP")
         else:

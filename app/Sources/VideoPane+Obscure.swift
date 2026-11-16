@@ -223,7 +223,7 @@ extension VideoPane {
             },
             enabled: { list().count < ObscureProps.max }, onEdit: {})
         add.toolTip =
-            "Add a 480 × 270 pixelated box at the centre of the layer — on the clip "
+            "Add a 480 × 270 pixelated box at the center of the layer — on the clip "
             + "itself, not on the action under the playhead"
         let place = commandButton(
             "Place on Canvas", #selector(EditorViewController.placeObscureRegion(_:)),

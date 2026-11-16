@@ -50,7 +50,7 @@ The largest square of the camera's picture, cropped to a circle in the corner yo
 
 ### Side by Side
 
-The screen is fitted in the left two-thirds and the camera is cropped to fill the right third. There's a margin of 4 % of the canvas's shorter side around and between them, and both have their corners rounded by 2 % of that side. It needs a screen.
+The screen is fitted in the left two-thirds and the camera is cropped to fill the right third. There's a margin of 4 % of the canvas's shorter side around and between them, and both have their corners rounded by 2 % of that side. A nest clip is given no corner radius, so it keeps square corners. It needs a screen.
 
 ### Stacked
 
@@ -77,6 +77,8 @@ Frame Job works out the camera and the screen from the selection and the playhea
 The clip drawing behind the camera is the front-most one playing at the playhead on a track behind the camera's. Frame Job passes over hidden tracks, [matte tracks](/canvas/matte-tracks/), [adjustment clips](/color/adjustment-clips/) and clips with their picture switched off.
 
 With no screen, the corner layouts, Camera Full and Screen Only lay out the camera alone. Side by Side and Stacked won't.
+
+A shape or graphic clip can be laid out only where the layout neither crops it nor rounds its corners, because it has no Crop or Corner Radius section. As the camera that means Corner, Camera Full or Screen Only; as the screen, any layout but Side by Side and Stacked, which round the screen's corners. The same goes for a later clip in the layout's reach. On a [matte track](/canvas/matte-tracks/) a crop is fine, but rounded corners still aren't.
 
 The items are dimmed when:
 
@@ -106,7 +108,7 @@ Those later clips keep their own actions, though an action that moves one can [s
 
 ## Resize or move a laid-out camera
 
-The layouts have fixed sizes and places. A switch on a clip's first frame, which is what a camera that landed with a recording has, is the easy case: select that one clip and drag it. A move, a nudge, a resize or a crop on the canvas changes the switch and the clip's own values together, so the clip moves on every frame, with or without the action selected. A rotate changes the clip's own values, which reach every frame too.
+The layouts have fixed sizes and places. A switch on a clip's first frame, which is what a camera that landed with a recording has, is the easy case: select the clip, alone or with others, and drag it or type in the [Transform](/canvas/transform/) rows. A move, a nudge, a resize or a crop on the canvas changes the switch and the clip's own values together, and so does a value typed in the Transform rows that the switch holds, its position, size or opacity. So the clip moves on every frame, with or without the action selected. A rotate, dragged or typed, changes the clip's own values, which reach every frame too.
 
 A switch later in a clip takes more. It's an action, and a clip shows an action's end state until a later action changes it. With the playhead past the switch and no action selected, a move, nudge, resize or crop on the camera changes nothing: Frame Job beeps, and [the foot of the inspector](/getting-started/refused-edits/#the-refusal-strip) names the switch's action and asks you to select it first. Before the switch, a drag changes the clip's own values, which show only until the switch. To go past it, change the layout itself.
 
@@ -122,8 +124,6 @@ A switch later in a clip takes more. It's an action, and a clip shows an action'
 
 </Steps>
 
-Typing is the one thing a first-frame switch does differently from a drag. A switch on a clip's first frame is one frame long, and that first frame shows the clip's own values. The Transform rows change one place, so with the action selected the first frame stays where it was. To move it too, put the playhead on the first frame, press <kbd>Esc</kbd>, and type the same values in the Transform rows.
-
 Each stretch of a [paused recording](/recording/pause-and-stop/#paused-recordings-are-stretches) has its own camera clip, so change each one.
 
 ## When a switch is refused
@@ -136,12 +136,13 @@ A switch that can't be made changes nothing. Frame Job beeps, and [the foot of t
 | "no clip draws behind clip 12 at 00:00:04:10 to be the screen" | Side by Side or Stacked found no screen. Pick another layout, or put a clip behind the camera. |
 | "clip 12 is a nest clip, which cannot draw a rounded corner or a circle." | A nest clip shows square corners only, so a nest can't take Rounded Corner or Circle as the camera. That goes for a later camera clip in the layout's reach too. Use Corner. |
 | "The screen clip 8 at 00:00:00:00 zooms (action 10); nest the screen's clips…" | The clip holds a zoom or another moving action after the playhead. See [A layout meets a zoom](/framing/layout-section/#a-layout-meets-a-zoom), which also covers the sheet Frame Job usually offers here. |
+| "clip 14 is a graphic clip and cannot take a camera layout's crop or corner radius" | The layout would crop or round a shape or graphic clip, as the camera, the screen or a later clip in the reach. Pick a layout that doesn't, move that clip to another track, or end the reach before it with another switch. |
 | "action 10 on clip 8 already runs from …, and two actions on one clip may not overlap" | Two actions on one clip can't overlap, and the switch's span runs into another action, such as a volume change. Move the playhead, shorten the switch in the [Layout section](/framing/layout-section/), or move that action. |
 
 ## Good to know
 
 - A layout sets position, scale, crop, corner radius and opacity on both clips, replacing what you'd set by hand. Rotation and everything else stay as they were.
-- A nest clip in Side by Side or Stacked keeps square corners.
+- A nest clip in Side by Side or Stacked keeps square corners: the layout gives it a corner radius of 0.
 - Side by Side stays side by side on a tall canvas if you choose it there. [Make Vertical Version](/framing/vertical-what-changes/) is what re-lays your switches for a new shape, and it turns Side by Side into Stacked on a canvas taller than wide.
 - The camera's crop in Circle, Side by Side and Stacked can [centre on the person](/framing/layout-section/#the-crop-centred-on-the-person) instead of the picture.
 

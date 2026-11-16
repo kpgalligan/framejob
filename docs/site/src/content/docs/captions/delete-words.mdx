@@ -64,7 +64,7 @@ The selection can grow as it does this. It widens over any word the cut would cu
 
 A cut runs from where the first word starts to where the next word you keep starts. The pause before the cut stays, and the pause after it goes.
 
-- **A long pause after the words.** The cut goes no more than one second past the end of the last deleted word, and the rest of the pause stays.
+- **A long pause after the words.** The cut goes no more than one second past the end of the last deleted word, and the rest of the pause stays. For words [read on this Mac](/captions/transcript-words/), that end is where the recogniser put it, which can be a little before or after where you hear the word stop, so a little more or less of the pause can stay than one second from the word's sound.
 - **Frames.** Both ends land on whole frames, and the end never passes the start of a word that stays.
 - **The last word on the timeline.** With no word after it, the cut ends where the word ends.
 - **A clip not read yet.** The cut stops at the start of a clip whose words haven't been read.
@@ -101,10 +101,10 @@ Some words are shown faint, because a cut at them would break something. Hold th
 | Where the word is | What the tab says |
 | --- | --- |
 | Inside a [nest](/editing/nests/) | "Inside nest *name*: open it (⌘↓) to cut its words." |
-| Under a [transition](/motion/transitions/) | "Under a transition: a cut here would leave one clip's tail under its neighbour." |
+| Near an overlap between two clips | "Near an overlap between two clips: a cut here would leave one clip's tail under the other." |
 | On a locked track | "Track *name* is locked: a cut would leave these words in place and move everything after them." |
 
-A nest or track with no name is given by its number. With a nest open, the tab shows only what's inside it, and a word there is no longer faint for being in that nest.
+Near an overlap means inside the stretch where two clips on one track overlap, or as far again either side of it, with a [transition](/motion/transitions/) there or not. A nest or track with no name is given by its number. With a nest open, the tab shows only what's inside it, and a word there is no longer faint for being in that nest.
 
 You can still click a faint word to move the playhead there, but a selection that holds one can't be deleted. A clip with a [speed ramp](/speed/make-a-ramp/) isn't faint: its words can be cut.
 
@@ -118,7 +118,7 @@ In these cases the tab beeps, keeps your selection and shows the reason at the f
 | A locked track has words inside the cut, even a track **Words from** is hiding. A locked track never moves, so its words would fall out of step. | "Track Music is locked and has words in this cut: unlock it to cut here." |
 | The cut would pass the project's limit of 4,096 clips while it's being made. Every clip the cut crosses is split first, so a project near the limit can pass it for a moment even if the cut ends with fewer. | "This cut would make 4097 clips; a project holds at most 4096. Lock a track that needs no cut, such as a music bed, or cut less." |
 
-Closing the gap can also fail for a reason of its own, such as a linked clip that would have to start before the start of the timeline. That reason shows in the same place.
+Closing the gap can also fail for a reason of its own, such as a linked clip that would have to start before the start of the timeline, or a track the cut reaches or moves that already has two clips overlapping by more than half the shorter one. That reason shows in the same place.
 
 ## Good to know
 

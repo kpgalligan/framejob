@@ -40,7 +40,8 @@
 | ⌥⌘N | New Recording… — the recorder panel (road map 3). The same item reads Stop Recording while one starts or runs, paused included, and stops it (§11 #478); a nil-target action on `AppDelegate`, so it resolves with no document open, as New Project does. Pause Recording and Resume Recording are the status item's rows (R2) and File ▸ Pause Recording, directly under this item, retitled Resume Recording while paused, with no key (#98). While a recording records shortcuts (§11 CU-61), the status item shows a keyboard mark ⌨︎ after the dot or ❚❚ and its menu's first row is a disabled "Recording keyboard shortcuts" and a separator |
 | ⌘, | Settings… — Frame Job ▸ Settings…, the app's one window for something PERSISTED beyond view state (road map 6 §5d): four panes, "MCP" (§11 MC-7), holding a visible blurb on how an MCP client reaches Frame Job, the bundled helper's path and the Copy MCP Command button, then "Assistant" (road map 12 A2), holding the Anthropic key and the model (§11 AI-8, AI-11) with no Verify, the chat settings (§11 AI-20) and the month's spend line and its note (§11 P-7), under it "Transcription", holding the AssemblyAI key, the region and a Verify button, and last "Playback", holding Background render and its delay (§11 G-38); the Assistant, Transcription and Playback headings each carry an info button whose popover holds the pane's explanation (§11 SH-5). macOS's own place for the item and its own key; the nudge pair below is the BARE `,` and `.`, so nothing is displaced. A nil-target selector on `AppDelegate`, so it resolves with no document open, as New Project does |
 | ⌥⌘I | Toggle inspector |
-| ⌃⌘T | View ▸ Transcript — show the inspector, pick its Transcript tab and make its view first responder (road map "creator-jobs" TX2a, §11 TX-20). ⌘T is Split; ⌃⌘T was free. Not a toggle. In the view (§11 TX-21): ← → select one word and seek to it, ↑ ↓ the word nearest in x on the line above or below, ⇧ with any of them extends the selection without seeking, ⌘A selects every word, Esc clears the selection (with none it reaches the editor); a drag selects a run; every selection's cut is the in/out range; ⌫, ⌦, Edit ▸ Delete and Edit ▸ Ripple Delete with words selected ripple them out as one step "Delete Words" (TX3a, §11 TX-31; on the timeline ⌫ lifts); every other key, Space, J, K, L, I, O and M included, works as on the timeline |
+| ⌃⌘T | View ▸ Transcript — show the inspector, pick its Transcript tab and make its view first responder (road map "creator-jobs" TX2a, §11 TX-20). ⌘T is Split; ⌃⌘T was free. Not a toggle. In the view (§11 TX-21): ← → select one word and seek to it, ↑ ↓ the word nearest in x on the line above or below, ⇧ with any of them extends the selection without seeking, ⌘A selects every word, Esc clears the selection (with none it closes the find bar when that is open, else reaches the editor); a drag selects a run; every selection's cut is the in/out range; ⌫, ⌦, Edit ▸ Delete and Edit ▸ Ripple Delete with words selected ripple them out as one step "Delete Words" (TX3a, §11 TX-31; on the timeline ⌫ lifts); every other key, Space, J, K, L, I, O and M included, works as on the timeline |
+| ⌘F | Edit ▸ Find… — the Transcript tab's find bar (§4.3e, §11 TX-37), enabled while that tab shows: its field takes the keys with its text selected; typing marks every match of the words shown and scrolls the current one into sight; Return steps to the next match and ⇧Return to the previous, wrapping, the field keeping the keys; ⌘Return selects the current match, moves the playhead to it and gives the keys to the text, as a click on its word does (§11 TX-43); Esc closes the bar and hands the keys back. While the Media tab shows its Search by name field, ⌘F gives that field the keys with its text selected (§4.3c, §11 TX-45); disabled on the other tabs. ⌘F was free (⇧⌘F is Freeze Frame); ⌘G and ⇧⌘G are Nest and Un-nest, so there is no Find Next key. It edits nothing |
 | ⌃⌘A | View ▸ Assistant — show the inspector, pick its Assistant tab and focus the composer (road map 12 A2, §11 AI-4). ⌘A is Select All and ⌥⌘A Select After Playhead; ⌃⌘A was free. Not a toggle: pressed on the Assistant tab it only refocuses the composer |
 | ⇧⌘P | Preview Window — a second window showing the same picture as the canvas, with no overlay (road map 2's phase 8b). A TOGGLE: the item carries a checkmark and the key both opens the window and puts it away |
 | ⌃⌘U | View ▸ Show Ungraded — the preview (and the Preview Window) as if no clip were graded, with an "Ungraded" tag (grading GR3, §11 GR-4). A checkmark toggle; view state, not persisted; never an export or Save Frame… |
@@ -110,7 +111,8 @@ Edit (Undo, Redo, Cut, Copy, Paste, Paste Attributes, Paste Graphic
 Properties (no key equivalent; the copied graphic's props onto the selected
 clips drawn by the same graphic, §11 G-32), Duplicate, Delete,
 Ripple Delete, Insert at Playhead, Overwrite at Playhead, Select All,
-Select After Playhead, Select All on Track), Clip (Split, Split at Shot Changes (road map
+Select After Playhead, Select All on Track, Find… ⌘F (the Transcript tab's find bar
+while that tab shows, §11 TX-37; the Media tab's search field while it shows, TX-45)), Clip (Split, Split at Shot Changes (road map
 "creator-jobs" CJ2b, §11 CJ-28, CJ-29: right after Split, no key equivalent; the selected
 clips of a video file split at every hard cut inside them as one undo step, under the
 Analyzing sheet while the cuts are found on this Mac; its mirror `split_at_shots`), Trim
@@ -201,7 +203,14 @@ project's `.cube` LUTs in media-list order and a second separator when there
 are any, then None — §11 GR-8 [b]; a LUT item is named by its file less
 `.cube`; a checkmark on the kind or LUT every grading target carries, a dash
 on one only some carry; for the selected clips that take a grade, off when
-none do; no key equivalent; undo "Look"; §11 GR-7), Remove Background (road map
+none do; no key equivalent; undo "Look"; §11 GR-7), Voice ▸ (§11 AU-158, the menu half of
+the Sound tab's Voice Effect section and a UI path `set_audio`'s `voice` mirrors: the headers
+Voice, Tone, Character and Space, each over its kinds — Pitch, High, Deep, Robot; Bass, Treble,
+Bright, Telephone, Radio; Lo-Fi, Distorted; Echo, Room, Hall, Plate, Cathedral — a separator,
+then None; for the selected clips with sound, off when there are none; a checkmark on the kind
+every such clip carries, a dash on one only some carry, None likewise for no effect; a kind
+keeps each clip's amount (1 with none) and clears a stored pitch; no key equivalent; undo
+"Voice Effect"), Remove Background (road map
 creator-jobs CO3, §11 CO-30 (e): enabled when the selection in the open scope holds a media
 or still clip of a video file with pictures, or an image clip (CO10b, §11 CO-108); checked when every such clip has Remove
 Background on, a dash when some do; all on turns every one off, otherwise the ones without

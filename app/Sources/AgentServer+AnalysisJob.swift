@@ -150,6 +150,10 @@ extension AgentServer {
                 "project": wanted.project ?? NSNull(), "media": Int(request.media.id),
                 "kind": request.kind.rawValue,
                 "ranges": request.ranges.map { [$0.lowerBound, $0.upperBound] },
+                // Publishes of this cache, kind and media that waited a save out (#429).
+                "save_waits": CacheLedgerDev.shared.saveWaits(
+                    in: request.cacheDir,
+                    writer: AnalysisStore.ledgerWriter(request.kind, media: request.media.id)),
             ]
             if let run = lane.run(of: request) {
                 row["queued_at"] = run.queuedAt
@@ -203,7 +207,7 @@ extension AgentServer {
                 + "get_media_analysis's media form) it wants that window's missing ranges "
                 + "under the document's dev owner — one per document, alive while it is open, "
                 + "keeping its earlier wants — and returns at once. With clips instead (spec "
-                + "VR-16) it wants what a VR command analyses (FramingAnalysis, VR-12): for "
+                + "VR-16) it wants what a VR command analyzes (FramingAnalysis, VR-12): for "
                 + "each media the clips show, the windows they play plus 1 s each side, in "
                 + "kinds shots, faces, subjects, answering wanted: {project, clips, requests}; "
                 + "kind, from and to are not read with clips. "
@@ -211,7 +215,9 @@ extension AgentServer {
                 + "\(Int(AnalysisLane.callWaitLimit))) it then waits until every job a dev "
                 + "owner wanted has ended. Answers {ok, now (process uptime), wanted: "
                 + "{project, media, hit}, lane_queued (requests the lane queued since "
-                + "launch), jobs: [{project, media, kind, ranges, queued_at, "
+                + "launch), jobs: [{project, media, kind, ranges, save_waits (publishes "
+                + "of that cache, kind and media that found a save of the package in flight "
+                + "and waited for it, since launch), queued_at, "
                 + "started_at, ended_at, outcome}], mask_wants: [{role, owner, media, kind, "
                 + "ranges, wanted, outcome, error, queued_at, started_at, ended_at}]}: every "
                 + "job a dev owner wanted since launch, and every want a cutout made (role "

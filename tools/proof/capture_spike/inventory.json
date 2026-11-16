@@ -331,6 +331,13 @@
    ],
    "note": "a selection"
   },
+  "findInTranscript:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Transcript.swift `@objc func findInTranscript(`"
+   ],
+   "note": "view state: the Transcript tab's find bar, its field first responder (spec §11 TX-37); beeps when the tab is not shown"
+  },
   "insertAdjustmentClip:": {
    "verdict": "none",
    "code": [
@@ -597,6 +604,13 @@
    "verdict": "none",
    "code": [
     "app/Sources/EditorViewController+Look.swift `func setLook(`"
+   ],
+   "note": "an edit"
+  },
+  "setVoiceEffect:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Voice.swift `func setVoiceEffect(`"
    ],
    "note": "an edit"
   },
@@ -1613,6 +1627,20 @@
     }
    ],
    "other_caller": "app/Sources/ProjectDocumentController.swift `GraphicImportSheetController.open(packageAt: url)` — a .fjgraphic opened from the Finder (spec §11 G-47 (a)); no menu item; its plan is refused"
+  },
+  "app/Sources/GraphicLinkController+App.swift:97": {
+   "token": "beginSheetModal",
+   "func": "showAlert",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/GraphicLinkController+App.swift `report: Self.showAlert` — a framejob:// link's Apple Event (spec §11 G-49 (h)); no menu item; the link is refused with a project window open"
+  },
+  "app/Sources/GraphicLinkController+App.swift:100": {
+   "token": "runModal",
+   "func": "showAlert",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/GraphicLinkController+App.swift `report: Self.showAlert` — a framejob:// link's Apple Event (spec §11 G-49 (h)); no menu item; the link is refused with no project window"
   },
   "app/Sources/GraphicPane+Source.swift:216": {
    "token": "runModal",

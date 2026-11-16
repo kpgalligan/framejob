@@ -1,6 +1,6 @@
 # 6c Edit operations — actions, tracks, markers, canvas, media
 
-The rules every op shares are §6a; the clip ops are §6b.
+The rules every op shares are §6a; the clip ops are §6b and §6e.
 
 ## Actions
 
@@ -35,7 +35,8 @@ The rules every op shares are §6a; the clip ops are §6b.
   placed in `layout` — `corner` (`shape` square, rounded or circle; `corner` bottom_right,
   bottom_left, top_right, top_left), `side_by_side`, `stacked`, `camera_full` or `screen_only` —
   each role written all six placement keys (`x`, `y`, `scale`, `crop`, `corner_radius`,
-  `opacity`) as `core/src/layout.rs` solves them. Per role the clip under `at` gets a LAYOUT
+  `opacity`) as `core/src/layout.rs` solves them, a nest clip's `corner_radius` written 0 (a nest
+  draws none and refuses one, §11 #536, amending CO-60). Per role the clip under `at` gets a LAYOUT
   ACTION at clip time `at − start` of `duration`, clamped to the clip and the next later layout
   action on it, at least one frame; at its first frame the layout is its base plus a one-frame
   layout action ending there. One starting at `at` is replaced, one running at `at` is shortened
@@ -52,7 +53,11 @@ The rules every op shares are §6a; the clip ops are §6b.
   clip in the reach with a non-layout action that moves it and ends after `at` — `The {screen|
   camera} clip {id} at {timecode} {zooms|moves} (action {a}); nest the {role}'s clips so the
   layout moves the nest and the {zoom|action} stays inside it.` (a screen at its full placement
-  is exempt in corner, camera_full and screen_only) — then `add_action`'s own. `nest: true`
+  is exempt in corner, camera_full and screen_only) — then, checked once every placement is
+  solved and before anything is written, a shape or graphic clip under `at` or in the reach that
+  the layout would give a corner radius, or a crop off a matte track: `clip {id} is a shape clip
+  and cannot take a camera layout's crop or corner radius` (§11 #524) — then `add_action`'s own.
+  `nest: true`
   nests the moving role's clips first and lays out the nest clip, refused `clip {id} is already
   laid out; a nest would lay it out twice.` when one is. One undo step.
 - **`reframe_clip {clip, follow, zoom=1, where_empty="fit", from_width?, from_height?, backdrop?,
@@ -110,7 +115,8 @@ The rules every op shares are §6a; the clip ops are §6b.
   `from_width × from_height` (the first of corner × square, rounded, circle × the four corners,
   `side_by_side`, `stacked`, `camera_full`, `screen_only` whose solve, `focus` the camera end's
   crop centre, gives the camera end and the screen end within 1 px in x, y, crop and radius and
-  0.001 in scale and opacity); every member's base takes `keep`'s rescale, the group's layout
+  0.001 in scale and opacity; a nest role's radius is not compared, so a switch written before
+  §11 #536 (the panel radius) and after (0) are both recognised, and the replay writes 0); every member's base takes `keep`'s rescale, the group's layout
   actions are removed and the switches composed again as `switch_layout` composes them, in time
   order at the camera action's start, with the duration and curve of the switch's longest role
   action not at its clip's first frame (else the camera's), `side_by_side` as `stacked` on a
@@ -227,8 +233,10 @@ The rules every op shares are §6a; the clip ops are §6b.
   at an action's end; set_video {cutout: null} removes it`), `video.hide_silent` (format 43,
   §11 CO-92: `video.hide_silent is not an animation target`, as a `patch` naming it — a `null`
   included — is too),
-  `text.words`, a required key (`video.opacity`), a key the group does not have and a path the patch
-  also names are each an **error**. Absent or `null` is none. The patch is walked like every other
+  `text.words`, a required key (`video.opacity`), a key the group does not have, a path the patch
+  also names and `audio.eq` beside one of its slots (§11 AU-88, #398: `off names both "audio.eq"
+  and "audio.eq.{slot}": keying the whole EQ off keys every slot off, so name one or the other`)
+  are each an **error**. Absent or `null` is none. The patch is walked like every other
   one (§5.4): the three groups it may name are `video`, `audio` and `text`, and an unknown key, a
   value of the wrong JSON kind or a misspelt variant anywhere in it is an **error** naming the
   dotted path with the group in it — `unknown key "video.filters[1].kindd" in an action end patch` —
@@ -243,7 +251,14 @@ The rules every op shares are §6a; the clip ops are §6b.
   `video.cutout` object naming `subject` or `quality` — a `null` included, `subject` first — is an
   **error** (format 39, §11 CO-20: `video.cutout.subject is not an animation target`): which
   subject and which masks are the clip's own, and the evaluator restores the base's; `edge`,
-  `feather` and `background` animate. A `graphic` object
+  `feather` and `background` animate. On a clip `set_video` refuses them on (a text, shape, graphic
+  or adjustment clip, §11 #524, #536; and a nest clip for `video.corner_radius` and `video.chroma`
+  only, #536), a `video.crop`, `video.corner_radius` or `video.chroma` the
+  patch names — a `null` included — whose value in the end it would store is not neutral (a crop
+  with a side other than 0, a radius other than 0, a chroma key present and not `null`) is an
+  **error** in `set_video`'s sentences, a crop on a matte track's text, shape or graphic clip and
+  on a nest clip allowed as there (§11 #535, K-7); removing one, ending it at neutral and `off` are allowed, and
+  an end already holding one is kept by every edit that does not name it. A `graphic` object
   is a graphic clip's props as a fourth target (format version 13, §11 G-34): `{props: {<key>:
   <value>}}`, each non-null prop checked as `set_graphic` checks it against `schema` — the module's
   CURRENT revision, which the app fills and never takes from a caller (G-4) — and refused under
@@ -338,6 +353,9 @@ The rules every op shares are §6a; the clip ops are §6b.
   record (§11, #63). The descriptor and the probe both carry `original`,
   the WebM or Matroska file a `.mov` copy was made from (§11 #228-O): `add_media` stores it, a
   probe with one replaces the stored one, a probe without one clears it, and no probe keeps it.
+  Every path — `add_media`'s, `original`'s, `relink_media`'s and a pasted media row's — is stored
+  and compared as given, never trimmed, so `A.mov ` (ending in a space) and `A.mov` are two files;
+  a blank one, or one of only spaces, is an **error** (§11 #534).
   They carry `cursor` the same way (format 38, §11 CU-39): `{path, bookmark?, in_picture}`, the
   cursor file recorded beside a video, stored, replaced, cleared and kept as `original` is; an
   empty path and any media but a video with a picture are errors in `check_media_fields`' words.
@@ -412,7 +430,7 @@ The rules every op shares are §6a; the clip ops are §6b.
 **This table is the SEMANTICS half of the op table, and it has a second
 half.** What an op MEANS is written here and in `core/src/edit.rs`'s module
 doc — including what an absent argument means, which is why the defaults are
-spelled in the rows of §6b and §6c. What an op TAKES — every argument's name, its JSON
+spelled in the rows of §6b, §6c and §6e. What an op TAKES — every argument's name, its JSON
 kind and whether the decoder requires it — is DATA, in `core/src/op_table.rs`,
 one row per op and one `Argument` per argument, published as one JSON Schema
 per op by `rc_op_schemas` (road map 7's D3). An argument carries a range there

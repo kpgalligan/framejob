@@ -179,7 +179,7 @@ func frame(
         draw(encoder, state: renderer.pipeline, source: source, uniforms: at)
         encoder.endEncoding()
     } else {
-        renderer.mattePool.beginFrame(width: target.width, height: target.height)
+        renderer.mattePool.beginFrame(width: target.width, height: target.height, deep: false)
         defer { renderer.mattePool.endFrame() }
         guard let composite = renderer.mattePool.takeComposite(),
               let first = pass(composite, clear: clearTransparent, buffer: buffer)

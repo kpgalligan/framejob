@@ -134,7 +134,7 @@ extension MediaImporter {
         let file = peaksURL(for: media.id, in: cacheDir)
         let marker = peaksMarkerURL(for: media.id, in: cacheDir)
         var published = false
-        CacheLedger.shared.publish(in: cacheDir, for: pass) {
+        CacheLedger.shared.publish(in: cacheDir, for: pass, as: "peaks") {
             guard ensureDirectory(file.deletingLastPathComponent()) else { return }
             guard (try? peaks.data.write(to: file, options: .atomic)) != nil else { return }
             guard writeStamp(PeaksStamp(stamp), to: marker) else {

@@ -245,7 +245,7 @@ do {
     let joined = try? base?.applying(.addTransition(clip: 71, kind: nil, duration: SEC)).project
     let heard = [words(1, [("alpha", 0.5), ("bravo", 3.8)]), words(2, [("charlie", 4.1), ("delta", 7)])]
     let got = read(joined, heard).words
-    let wall = "Under a transition: a cut here would leave one clip's tail under its neighbour."
+    let wall = "Near an overlap between two clips: a cut here would leave one clip's tail under the other."
     let lock = "Track T11 is locked: a cut would leave these words in place and move everything "
         + "after them."
     let walls = joined.map { SilenceDetector.overlapWalls($0.snapshot) } ?? []

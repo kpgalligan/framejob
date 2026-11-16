@@ -832,7 +832,13 @@ fn text_keeps_its_content_and_shape_keeps_its_geometry() {
     assert_eq!(title["text"], expected_text);
     assert_eq!(num(title, "/text/size"), 48.0);
     assert_eq!(num(title, "/text/line_spacing"), 1.0, "was 1.5");
-    assert_eq!(title["video"], written["video"], "video crossed as well");
+    // Video crossed as well, but for the text clip's own crop, corner
+    // radius and chroma key (spec §11 #524).
+    let mut expected_video = written["video"].clone();
+    for key in ["crop", "corner_radius", "chroma"] {
+        expected_video[key] = by_id(&before, "/clips", 30)["video"][key].clone();
+    }
+    assert_eq!(title["video"], expected_video, "video crossed as well");
 
     // The shape clip: its kind and geometry are its own; the rest — radius,
     // fill, the arrow head, and a stroke the payload cleared — is the

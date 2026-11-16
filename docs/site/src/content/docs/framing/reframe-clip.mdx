@@ -114,7 +114,7 @@ Shows the whole picture for the whole clip, scaled to fit the canvas. It needs n
 
 Lays a camera clip's [camera layouts](/framing/camera-layouts/), and its screen's, out again on the current canvas, as Make Vertical Version does. The agent can name the camera or the screen, and both change.
 
-Frame Job looks at each layout switch made on the old canvas, `from_width` × `from_height`, and works out which layout it was. Its position, crop and corner radius have to match that layout to within 1 px, and its scale and opacity to within 0.001. The switch is then made again on this canvas, at the same time and with the same length and curve. Without those two arguments the old canvas is taken to be the current one.
+Frame Job looks at each layout switch made on the old canvas, `from_width` × `from_height`, and works out which layout it was. Its position, crop and corner radius have to match that layout to within 1 px, and its scale and opacity to within 0.001. A nest clip's corner radius isn't compared, since a nest shows square corners, and the switch made again gives a nest clip a corner radius of 0. The switch is then made again on this canvas, at the same time and with the same length and curve. Without those two arguments the old canvas is taken to be the current one.
 
 - **Side by Side** becomes **Stacked** on a canvas taller than wide.
 - The cut pieces of the recording take the new layout.

@@ -21,7 +21,10 @@ extension AgentServer {
     /// canvas gestures — write `set_action_end` instead, because that is
     /// what editing an action's end state means. The agent still chooses —
     /// `set_video` changes the clip's BASE props, `set_action_end` an
-    /// action's end state.
+    /// action's end state. An inspector value on a clip with a first-frame
+    /// cut sends `set_video` and `set_action_end` together, so the cut and
+    /// the base move as one (`InspectorBinding.keepingCuts`, spec §11 #530);
+    /// an agent sends the two itself.
     ///
     /// **The patch goes to the core UNREAD** (deepening D1·3,
     /// `archive/roadmap-7.md` §2.3). Decoding the object into a
@@ -64,7 +67,9 @@ extension AgentServer {
 
     /// `set_audio` — the Audio tab (`AudioPane`), the timeline's fade
     /// handles (`FadeHandleSession`) and a drag on its volume line where the
-    /// clip's base volume is in force (`VolumeLineSession`, spec §11 AU-82).
+    /// clip's base volume is in force (`VolumeLineSession`, spec §11 AU-82);
+    /// its `voice` is also Clip ▸ Voice ▸ (`setVoiceEffect:`,
+    /// `EditorViewController+Voice.swift`, spec §11 AU-158).
     ///
     /// **The patch goes to the core UNREAD**, as `set_video`'s does (D1·4
     /// after D1·3, `archive/roadmap-7.md` §2.4). Its group holds no

@@ -108,6 +108,9 @@ HOME, DECOY = os.path.join(WORK, "home"), os.path.join(WORK, "decoy-home")
 SUPPORT = os.path.join("Library", "Application Support")
 REWRAPPED = os.path.join(HOME, SUPPORT, "Frame Job", "Rewrapped")
 DIGEST_NAME = re.compile(r"^[A-Za-z0-9_-]+-[0-9a-f]{16}\.mov$")
+# The mutants, as `mutant_anchors.py` reads them: M2 imports another fixture in `run`, no
+# tree text.
+MUTANTS = ("ffmpeg-copy",)
 
 rows = []
 
@@ -431,7 +434,7 @@ def run(mcp, where, fixtures, mutant):
 def main():
     parser = argparse.ArgumentParser()
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--mutant", choices=["ffmpeg-copy"])
+    mode.add_argument("--mutant", choices=MUTANTS)
     mode.add_argument("--control", choices=["decoy-home"],
                       help="the instance under a second scratch home: H0 must fail and no "
                            "tool may be called")

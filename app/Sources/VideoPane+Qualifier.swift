@@ -44,7 +44,7 @@ extension VideoPane {
                 mixed: { binding.mixedVideo { $0.qualifier.blur } }))
         let pick = commandButton(
             "Pick from Canvas", #selector(EditorViewController.pickQualifier(_:)),
-            toolTip: "Click the preview to centre the ranges on a color (Esc cancels)")
+            toolTip: "Click the preview to center the ranges on a color (Esc cancels)")
         let show = OptionCheckboxControl(
             label: "Show Selection",
             read: { [weak self] in
@@ -117,7 +117,7 @@ extension VideoPane {
         if range == .hue {
             func hue(_ q: ColorQualifier) -> QualifierHue { q.hue ?? .initial }
             fields = [
-                ("Centre", 360, { hue($0).center },
+                ("Center", 360, { hue($0).center },
                  { q, v in var h = hue(q); h.center = v; return ColorQualifierPatch(hue: .set(h)) }),
                 ("Width", 360, { hue($0).width },
                  { q, v in var h = hue(q); h.width = v; return ColorQualifierPatch(hue: .set(h)) }),

@@ -1,0 +1,51 @@
+{
+ "case": "handshake",
+ "events": [
+  {
+   "type": "prices",
+   "source": {
+    "kind": "bundled",
+    "as_of": "2026-09-28T06:07:45Z",
+    "problem": "no price cache is configured"
+   }
+  },
+  {
+   "type": "ready"
+  },
+  {
+   "type": "context_usage",
+   "used": 0,
+   "limit": 1000000
+  }
+ ],
+ "requests": [
+  {
+   "method": "GET",
+   "path": "/v1/models/claude-opus-5-5",
+   "headers": {
+    "accept": "application/json",
+    "accept-encoding": "<by presence>",
+    "accept-language": "<by presence>",
+    "anthropic-version": "2026-10-21",
+    "authorization": "Bearer proof-key",
+    "connection": "<by presence>",
+    "host": "<by presence>",
+    "user-agent": "Anthropic/Swift 2.3.0",
+    "x-stainless-arch": "<by presence>",
+    "x-stainless-async": "async:swift-concurrency",
+    "x-stainless-lang": "swift",
+    "x-stainless-os": "<by presence>",
+    "x-stainless-package-version": "2.3.0",
+    "x-stainless-raw-response": "raw",
+    "x-stainless-read-timeout": "600.0",
+    "x-stainless-retry-count": "0",
+    "x-stainless-runtime": "swift",
+    "x-stainless-runtime-version": "<by presence>",
+    "x-stainless-timeout": "NOT_GIVEN"
+   },
+   "body": null,
+   "bytes": 0
+  }
+ ],
+ "files": {}
+}

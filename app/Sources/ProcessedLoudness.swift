@@ -9,19 +9,79 @@ import Foundation
 /// BS.1770's relative gate counts, which the loudness cache cannot see.
 ///
 /// The pieces, in the order a press uses them: `needsRender` (which clips
-/// render at all, (a)); `measurementPlan` (the trial's plan cut to the clip,
-/// pre-fader, (c)); `render` (the export's waits, the build and one mix read,
-/// (d)); and `Memo`, the last R0 per clip, plan and chain, which At volume
-/// reads (g). The trial handle itself is made on main by the run, (b).
+/// render at all, (a), an action's end counted since AU-159 and its limiter
+/// since AU-165, `endSetsLimiter`; `endLimiterOn`, a limiter on at an action's end,
+/// is the tools' note's, AU-168);
+/// `measurementPlan` (the trial's plan cut to the clip, pre-fader, (c)); `render` (the export's waits, the build and one mix read,
+/// (d)); and `Memo`, the last R0 per document, clip, plan and chain, which At volume
+/// reads (g), with the verify render that answered a press (`Verified`, AU-165 (c)). The
+/// trial handle itself is made on main by the run, (b).
 enum ProcessedLoudness {
     /// One render at a time, off main.
     static let queue = DispatchQueue(
         label: "com.kgalligan.FrameJob.processed-loudness", qos: .userInitiated)
 
-    /// AU-64 (a): whether the clip's base audio has a stage the loudness
-    /// cache leaves out. Pan, mono, channels and the limiter are counted or
-    /// modelled by the cache reading, so a clip with only those plans off the
-    /// cache as before.
+    /// AU-64 (a) as AU-159 (a) and AU-165 (a) amend it: whether the clip
+    /// plays through a stage the loudness cache leaves out, in its base audio
+    /// or at the end of one of its actions with a duration above 0, or a
+    /// limiter an action's end sets. Read from the snapshot: never the plan,
+    /// the playhead or a selected action. It errs toward a render: an end's
+    /// EQ counts whatever its slots, and an action outside the played window
+    /// counts.
+    static func needsRender(_ clip: ClipSnapshot?) -> Bool {
+        guard let clip else { return false }
+        if needsRender(clip.audio) || endSetsLimiter(clip) { return true }
+        return clip.actions.contains { $0.duration > 0 && endNeedsRender($0.end.audio) }
+    }
+
+    /// AU-165 (a): whether an action of the clip with a duration above 0 has
+    /// the `limiter` key at its end, a limiter or a null keying the clip's
+    /// own off. The cache's model runs only the clip's own limiter over the
+    /// whole clip, so it sees neither, and an end limiter's threshold follows
+    /// the base volume (AU-22), so the solve checks it by render. The memo's
+    /// key names the same ends.
+    static func endSetsLimiter(_ clip: ClipSnapshot?) -> Bool {
+        guard let clip else { return false }
+        return clip.actions.contains { action in
+            guard action.duration > 0, let end = action.end.audio else { return false }
+            if case .some = end.limiter { return true }
+            return false
+        }
+    }
+
+    /// AU-168 (a): whether an action of the clip with a duration above 0
+    /// turns a limiter on at its end — `endSetsLimiter` less a null, which
+    /// keys the clip's own off. The tools' note and Enhance's reason name it
+    /// as the likely reason a ×32 stop fell short (`AudioNormalize
+    /// .actionLimiterHeld`).
+    static func endLimiterOn(_ clip: ClipSnapshot?) -> Bool {
+        guard let clip else { return false }
+        return clip.actions.contains { action in
+            guard action.duration > 0, let end = action.end.audio else { return false }
+            if case .some(.some) = end.limiter { return true }
+            return false
+        }
+    }
+
+    /// Whether an action's end switches one of (a)'s stages on: a `hum`,
+    /// `gate`, `de_esser`, `compressor`, `leveller` or `eq` that is not null,
+    /// an `isolation` or `noise_reduction` above 0. `voice` is the base's
+    /// alone (AU-88).
+    private static func endNeedsRender(_ end: AudioPatch?) -> Bool {
+        guard let end else { return false }
+        func on<T>(_ value: T??) -> Bool {
+            if case .some(.some) = value { return true }
+            return false
+        }
+        if on(end.eq) || on(end.hum) || on(end.gate) || on(end.deEsser) { return true }
+        if on(end.compressor) || on(end.leveller) { return true }
+        return (end.isolation ?? 0) > 0 || (end.noiseReduction ?? 0) > 0
+    }
+
+    /// The base half of `needsRender`: whether these props have a stage the
+    /// loudness cache leaves out. Pan, mono, channels and the limiter are
+    /// counted or modelled by the cache reading, so a clip with only those
+    /// plans off the cache as before.
     static func needsRender(_ audio: AudioProps?) -> Bool {
         guard let audio else { return false }
         if let eq = audio.eq, !eq.bypass, eq.activeCount > 0 { return true }
@@ -104,20 +164,33 @@ enum ProcessedLoudness {
 
     // MARK: - The memo's key
 
-    /// What one R0 was measured from: the clip, its measurement plan and its
-    /// chain (the audio props less volume, mute, fades, their shapes, the
-    /// duck and the limiter, which are the fader's or the solve's).
+    /// What one R0 was measured from: the document (its `recipeKey`, so two
+    /// open projects never share one, #401), the clip, its measurement plan
+    /// and its chain (the audio props less volume, mute, fades, their shapes,
+    /// the duck and the limiter, which are the fader's or the solve's).
+    ///
+    /// AU-159 (g): `plan` is the measurement plan with `limiter` taken out of
+    /// every automation point, because the core writes the BASE limiter into
+    /// each point and R0 is measured with that limiter cleared: left in, the
+    /// solve's own limiter would change the key and the reading would never
+    /// be found again. `chain` then names each action end that has the
+    /// `limiter` key, a null ("off") included, with the action's start,
+    /// duration and curve, so the key still follows a limiter an action
+    /// switches on or off, which R0 IS measured through.
     struct Key: Hashable {
+        let document: Int
         let clip: UInt32
         let plan: String
         let chain: String
     }
 
-    /// The key of `clip` in `project` (a scoped handle in a nest); nil when it
-    /// has no audio props or no audio segment.
-    static func key(clip: UInt32, project: ReelProject) -> Key? {
-        guard let a = project.snapshot.clip(clip)?.audio,
-            let measured = measurementPlan(project.planJSON, clip: clip)
+    /// The key of `clip` in `project` (a scoped handle in a nest) of the
+    /// document whose `recipeKey` is `document`; nil when it has no audio
+    /// props or no audio segment.
+    static func key(clip: UInt32, project: ReelProject, document: Int) -> Key? {
+        guard let snapshot = project.snapshot.clip(clip), let a = snapshot.audio,
+            let measured = measurementPlan(project.planJSON, clip: clip),
+            let plan = withoutPointLimiters(measured.json)
         else { return nil }
         let chain = AudioProps(
             mono: a.mono, keepPitch: a.keepPitch, pan: a.pan, compressor: a.compressor,
@@ -128,7 +201,43 @@ enum ProcessedLoudness {
         encoder.outputFormatting = [.sortedKeys]
         guard let data = try? encoder.encode(chain), let text = String(data: data, encoding: .utf8)
         else { return nil }
-        return Key(clip: clip, plan: measured.json, chain: text)
+        var ends = ""
+        for action in snapshot.actions where action.duration > 0 {
+            guard let limiter = action.end.audio?.limiter else { continue }
+            let value = limiter.map { "\($0.ceilingDb),\($0.release)" } ?? "off"
+            ends += "|\(action.start):\(action.duration):\(action.curve.rawValue):\(value)"
+        }
+        return Key(document: document, clip: clip, plan: plan, chain: text + ends)
+    }
+
+    /// A measurement plan's JSON with `limiter` removed from every
+    /// segment's automation points, keys sorted; nil when it cannot be read.
+    /// Only the memo's key reads it: `render` builds from the plan as it is.
+    private static func withoutPointLimiters(_ json: String) -> String? {
+        guard json.contains("\"automation\"") else { return json }
+        guard let data = json.data(using: .utf8),
+            var root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        else { return nil }
+        root["audio_tracks"] = (root["audio_tracks"] as? [[String: Any]] ?? []).map { item in
+            var track = item
+            track["segments"] = (track["segments"] as? [[String: Any]] ?? []).map { item in
+                var segment = item
+                guard let points = segment["automation"] as? [[String: Any]] else { return segment }
+                segment["automation"] = points.map { item -> [String: Any] in
+                    var point = item
+                    if var audio = point["audio"] as? [String: Any] {
+                        audio.removeValue(forKey: "limiter")
+                        point["audio"] = audio
+                    }
+                    return point
+                }
+                return segment
+            }
+            return track
+        }
+        guard let out = try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])
+        else { return nil }
+        return String(data: out, encoding: .utf8)
     }
 
     // MARK: - The render
@@ -283,8 +392,32 @@ enum ProcessedLoudness {
 
     // MARK: - The readout's memo
 
+    /// AU-165 (c): the verify render that answered a press on a clip with an
+    /// action-end limiter (`endSetsLimiter`): the volume and limiter it
+    /// rendered at, and its loudness and linear true peak through the fader
+    /// at that volume, as the clip plays at them.
+    struct Verified: Equatable {
+        let volume: Double
+        let limiter: LimiterProps?
+        let lufs: Double
+        let truePeak: Double
+
+        /// Whether a clip at `current` and `own` plays as this render did: the
+        /// same limiter, and the volume within `AudioNormalize.keepVolumeDB`
+        /// (the keep rule's figure, so a kept volume still reads it).
+        func holds(volume current: Double, limiter own: LimiterProps?) -> Bool {
+            guard own == limiter, current > 0, volume > 0 else { return false }
+            return abs(20 * log10(current / volume)) <= AudioNormalize.keepVolumeDB
+        }
+    }
+
+    /// What At volume reads for a clip: R0's steps and step peaks, and the
+    /// verify render that answered the last press since that R0, if any.
+    typealias Reading = (steps: [Double], peaks: [Double], verified: Verified?)
+
     /// AU-64 (g): the last R0 measured per `Key`, which At volume reads on a
-    /// clip that renders. 32 keys, oldest out first; emptied when a loudness
+    /// clip that renders, and beside it the verify render that answered a
+    /// press (AU-165 (c)). 32 keys, oldest out first; emptied when a loudness
     /// file lands or is withdrawn and when an offline render settles. Held
     /// through a live gesture for the same clip of the same document, as
     /// `ClipLoudness.Memo` holds its answer, so a Volume drag decodes no plan
@@ -294,11 +427,12 @@ enum ProcessedLoudness {
         static let capacity = 32
 
         private var entries: [Key: (steps: [Double], peaks: [Double])] = [:]
+        private var verified: [Key: Verified] = [:]
         private var order: [Key] = []
         private weak var heldDocument: ProjectDocument?
         private weak var heldProject: ReelProject?
         private var heldClip: UInt32?
-        private var held: (steps: [Double], peaks: [Double])?
+        private var held: Reading?
 
         private init() {
             NotificationCenter.default.addObserver(
@@ -314,16 +448,30 @@ enum ProcessedLoudness {
             ) { [weak self] _ in self?.removeAll() }
         }
 
+        /// A new R0 for `key`: any verify render stored beside the last one
+        /// goes with it.
         func store(_ key: Key, steps: [Double], peaks: [Double]) {
             assert(Thread.isMainThread)
             if entries.updateValue((steps, peaks), forKey: key) == nil { order.append(key) }
-            while order.count > Self.capacity { entries.removeValue(forKey: order.removeFirst()) }
+            verified.removeValue(forKey: key)
+            while order.count > Self.capacity {
+                let oldest = order.removeFirst()
+                entries.removeValue(forKey: oldest)
+                verified.removeValue(forKey: oldest)
+            }
             forget()
         }
 
-        func reading(for clip: UInt32, in document: ProjectDocument)
-            -> (steps: [Double], peaks: [Double])?
-        {
+        /// AU-165 (c): the verify render that answered a press, beside the R0
+        /// stored under `key`; nothing when no R0 is.
+        func storeVerified(_ key: Key, _ figures: Verified) {
+            assert(Thread.isMainThread)
+            guard entries[key] != nil else { return }
+            verified[key] = figures
+            forget()
+        }
+
+        func reading(for clip: UInt32, in document: ProjectDocument) -> Reading? {
             assert(Thread.isMainThread)
             if heldClip == clip, heldDocument === document,
                 document.isLiveEditing || heldProject === document.editedProject
@@ -331,7 +479,10 @@ enum ProcessedLoudness {
                 return held
             }
             let project = document.editedProject
-            let answer = Self.key(clip: clip, project: project).flatMap { entries[$0] }
+            let answer = Self.key(clip: clip, project: project, document: document.recipeKey)
+                .flatMap { key in
+                    entries[key].map { ($0.steps, $0.peaks, verified[key]) }
+                }
             heldDocument = document
             heldProject = project
             heldClip = clip
@@ -341,6 +492,7 @@ enum ProcessedLoudness {
 
         private func removeAll() {
             entries.removeAll()
+            verified.removeAll()
             order.removeAll()
             forget()
         }
@@ -352,8 +504,8 @@ enum ProcessedLoudness {
             held = nil
         }
 
-        private static func key(clip: UInt32, project: ReelProject) -> Key? {
-            ProcessedLoudness.key(clip: clip, project: project)
+        private static func key(clip: UInt32, project: ReelProject, document: Int) -> Key? {
+            ProcessedLoudness.key(clip: clip, project: project, document: document)
         }
     }
 }

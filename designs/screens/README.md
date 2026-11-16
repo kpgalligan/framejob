@@ -44,7 +44,8 @@ screens run in name order.
   steps run.
 - `steps`: calls, in order, `{"call": TOOL, "args": {…}}`. `TOOL` is one of
   `STEP_TOOLS`: `set_selection`, `set_playhead`, `detect_silence`,
-  `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`. Never give
+  `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`,
+  `transcript_view` (the Transcript tab's find bar, screen 11d). Never give
   `args` a `project`: `screens.py` adds the fixture's path to every call. A
   string `"$clip:<name>"` anywhere in `args` becomes that fixture clip's id.
   `"until_absent": KEY, "within": SECONDS` repeats the call every 0.5 s until its
@@ -58,7 +59,9 @@ screens run in name order.
   layout dump beside it. The two looks come from two instances, one launched
   with `-RCDevAppearance light` and one with `-RCDevAppearance dark`, so every
   step runs once per look; a capture that answers any other appearance fails the
-  screen.
+  screen. Both instances are launched with `-RCDevCaptureScale 2` (spec §11
+  #539), so every capture is drawn at 2× whatever display its window opened on;
+  a capture that answers any other `scale` fails the screen.
 - `after`: steps run after the captures, to put the app back — `cancel_sheet`
   for a screen that opened a sheet. A screen that leaves a sheet attached fails.
 - `expect`: `{"capture", "visible_text" | "no_visible_text"}`, checked on every
@@ -111,6 +114,15 @@ Built by `screens.py` on the first screen that names one, into
   `demo` is ready once both sound clips' (`video`'s and `tone`'s) peaks are
   cached: `screens.py` polls `detect_silence` in level mode until it answers
   no `pending_peaks`, so every capture draws the Music clip's waveform band.
+- `fillers` — `Fillers.framejob`: `demo`'s tracks, clips and media, and a
+  cached AssemblyAI transcript with filler words for `media/speech.mov`,
+  written by `screens.py` (`_seed_filler_transcript`) into the open package's
+  `cache/transcripts/` once the peaks are cached: the transcript file, whose
+  words hold one run of fillers ("um," "Uh" "er" at 2.45–2.95 s), and its
+  marker, stamped from the media file as it is. So Clip ▸ Remove Filler
+  Words… is enabled on the keyless instance (spec §11 CJ-12) and its sheet
+  finds one cut. `toneA.m4a` has no transcript, so the sheet keeps one row
+  to transcribe.
 - `animated` — `Animated.framejob` (issue batch B87 phase 3): one track,
   "Graphics", holding one clip, `graphic` — `lower-third` at 0, 5 s — with one
   action at clip 1–3 s whose end keys `size` 96, `accent` "#2d7ff9" and

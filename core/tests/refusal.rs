@@ -107,7 +107,7 @@ fn the_two_neighbour_rule_speaks_too() {
     // most ONE neighbour on each side (spec §11).
     project.refuses_with(
         &json!({"op": "move_clip", "clips": [17], "delta": -4050}),
-        "clip 15 would overlap more than one neighbour on one side (clips 16 and 17)",
+        "clip 15 would overlap more than one neighbor on one side (clips 16 and 17)",
     );
 }
 
@@ -415,7 +415,7 @@ fn a_cut_with_no_unused_material_says_how_much_it_has() {
     project.refuses_with(
         &json!({"op": "add_transition", "clip": 16, "duration": 100}),
         "the cut before clip 16 has no room for an overlap: the 100 frames asked for clamp \
-         to nothing against the two clips' unused material, their neighbours and the \
+         to nothing against the two clips' unused material, their neighbors and the \
          overlap rule; pass ripple: true to make the overlap by shifting the timeline \
          left instead",
     );

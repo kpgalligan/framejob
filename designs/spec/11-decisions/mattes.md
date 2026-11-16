@@ -104,7 +104,9 @@ it.
   specialization instead of two. `LayerUniforms` stays 104 floats. Targets are pooled per destination
   size and allocated on the first matted frame (at 3840×2160, 33.2 MB per matte and 8.3 MB per
   coverage). (Amended by PR-1: each matte's composite is `rgba16Float`, 66.4 MB at 3840×2160;
-  the `r8Unorm` coverage and its 8.3 MB stand.) The deferred E5 and E9 take the next free texture slots.
+  the `r8Unorm` coverage and its 8.3 MB stand.) (Amended by PR-19: in a frame delivered deeper
+  than 8 bits the coverage is `r16Unorm`, 16.6 MB at 3840×2160; every other frame keeps the
+  `r8Unorm` coverage and its 8.3 MB.) The deferred E5 and E9 take the next free texture slots.
 - **MT-7 — The chrome (owner, 2026-10-08, O2–O8).** No fifth header toggle and no shortcut. Set
   by Track ▸ Matte ▸ Off / Alpha / Inverted Alpha / Luma / Inverted Luma on the current track,
   and by the same submenu in the track's context menu after Solo, each checked for the track's
@@ -163,9 +165,9 @@ it.
 - **MT-9 — The matte pool keeps what recent frames used, and no cap drops a picture (#253;
   owner, 2026-10-08).** Amends MT-6's pooling sentence.
   - **Planning.** A frame's mattes are planned before any is drawn (`MattePlan`). Each cut set
-    is resolved as soon as the last matte it names is drawn. A matte's `bgra8Unorm` composite
-    goes back to the pool once every cut set naming it is resolved, so a later matte in the same
-    frame draws into it. A frame therefore holds as many composites at once as mattes are live
+    is resolved as soon as the last matte it names is drawn. A matte's `rgba16Float` composite
+    (PR-1) goes back to the pool once every cut set naming it is resolved, so a later matte in the
+    same frame draws into it. A frame therefore holds as many composites at once as mattes are live
     (one, for any number of mattes that each cut their own set). It also holds one `r8Unorm`
     coverage per distinct cut set, and those all outlive the destination pass.
   - **Between frames.** A frame is one `render` call. The pool keeps, of each kind, as many
@@ -175,7 +177,10 @@ it.
     ten matte pairs in one frame hold 33.2 MB + 10 × 8.3 MB = 116.1 MB, where MT-6's pool held
     414.7 MB. (Amended by PR-1: the composite is `rgba16Float`, 66.4 MB at 3840×2160, so ten
     matte pairs hold 66.4 MB + 10 × 8.3 MB = 149.4 MB, where MT-6's pool would hold 746.5 MB; the
-    coverage's 8.3 MB stands.)
+    coverage's 8.3 MB stands.) (Amended by PR-19: in a frame delivered deeper than 8 bits each
+    coverage is `r16Unorm`, 16.6 MB, so ten matte pairs hold 66.4 MB + 10 × 16.6 MB = 232.3 MB
+    there; a change of the frame's depth empties the coverages, as a size change empties the
+    pool.)
   - **No cap.** A frame that needs more targets gets them, and a target Metal cannot make fails
     the frame as before (`MatteError.noTarget`). A renderer that stops drawing keeps what its
     last 30 frames held until it draws again or is released with its player item or export.

@@ -247,7 +247,7 @@ if wanted("R3") {
     let ten = (101...110).map { track in
         S.AngleTrack(track: UInt32(track), clips: [S.Span(clip: UInt32(track), start: 0, end: t(5))])
     }
-    let analysing = "The microphone on track 3 is still being analysed — its loudness has not "
+    let analysing = "The microphone on track 3 is still being analyzed — its loudness has not "
         + "been measured yet. Try again in a moment."
     let unavailable = "Speech detection is unavailable on this Mac, so Switch by Speaker cannot "
         + "tell who is talking."

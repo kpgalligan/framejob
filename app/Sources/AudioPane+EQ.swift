@@ -59,13 +59,17 @@ extension AudioPane {
             current: current, ops: ops)
         return InspectorSection(
             id: "audio.eq", title: "EQ",
-            summary: {
-                guard let eq = binding.audioProps.eq else { return "off" }
-                return eq.bypass ? "bypassed" : "\(eq.activeCount) on"
-            },
+            summary: { AudioPane.eqSummary(binding.audioProps.eq) },
             reset: { binding.apply("EQ", audio: AudioPatch(eq: .some(nil))) },
             defaultExpanded: false,
             rows: rows)
+    }
+
+    /// The section's summary (AU-38): "off" with no EQ or one with no slot
+    /// on (bypassed or not, #407), "bypassed", else "N on".
+    static func eqSummary(_ eq: EqProps?) -> String {
+        guard let eq, eq.activeCount > 0 else { return "off" }
+        return eq.bypass ? "bypassed" : "\(eq.activeCount) on"
     }
 
     /// A slot's checkbox: on writes `fallback` into the slot (the EQ made if

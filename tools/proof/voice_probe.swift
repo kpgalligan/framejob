@@ -23,7 +23,15 @@
 //  V2  a synthetic voiced render read sample for sample at the placement with
 //      isolation 0.5 and its render also present (none applied on top),
 //      ≤ 1e-7 alone and ≤ 1e-4 behind the noise reducer's lead.
-//  V3  no request for amount 0, the kind pitch at 0 st, a time-scaled, ramped,
+//  V15 a ×2 clip's voice is a stage of its retimed chain (AU-145 as amended,
+//      #387): no tapped request; the voice job over the padded window with the
+//      clip's own frames as `sounding`, from the window's isolation when the
+//      clip isolates; then the render, with Keep pitch off; the sounding
+//      frames in the name.
+//  V16 the pad is silent to the effect: Echo with an impulse 50 ms before the
+//      clip's first frame leaves the clip's frames at 0, where the unsilenced
+//      window echoes it into them; an impulse inside the clip echoes.
+//  V3  no tapped request for amount 0, the kind pitch at 0 st, a time-scaled, ramped,
 //      freeze or pending-reverse segment, or an isolating clip whose isolated
 //      file is missing; once it is present, the request names it.
 //  V4  the name changes with window, kind, amount, semitones, isolation and
@@ -45,6 +53,17 @@
 //      each chain's `Report.latencyFrames` printed.
 //  V11 `VoiceProps(kind: .deep, amount: 1, pitch: nil).dictionary["pitch"]` is
 //      `NSNull`, and so is the section's kind-change value's.
+//  V12 Clip ▸ Voice ▸ (spec §11 AU-158) and the popup are one list:
+//      `AppDelegate().voiceMenu()` reads, header by header, as a literal list
+//      here, each kind tagged with its index in `VoiceKind.allCases` and sent
+//      to `setVoiceEffect:`, no header with an action, None −1 after a
+//      separator; and each popup title is "<its header>: <its item>".
+//  V13 the mark (`VoiceMenu.state`): checked when every target carries the
+//      kind, dashed when some do, off otherwise; None likewise for no effect.
+//  V14 what a choice writes (`VoiceMenu.targets`, `.ops`, `.kind(tag:)`): a
+//      text clip is no target; Deep over {high, 0.4, 8}, {echo, 1} and none
+//      gives {deep, 0.4}, {deep, 1}, {deep, 1} with no pitch; None clears
+//      all three; tag 99 is a stranger and −1 is None.
 //
 // `measure` prints, instead of the rows, one line per kind: `measure <kind>
 // m=<dB> dry=<LUFS> wet=<LUFS>`, where m is the dry recording's integrated
@@ -900,4 +919,262 @@ do {
             + "{high, 0.6, 8}: kind \(chosen?.kind.rawValue ?? "nil"), amount "
             + "\(chosen?.amount ?? -1), pitch \(String(describing: sent)); None: "
             + "\(none == nil ? "null" : "a voice")")
+}
+
+// =========================================================================
+// V12–V14 — Clip ▸ Voice ▸ (spec §11 AU-158)
+
+/// Three sound clips (dryA at 0, dryB at 13 s, the tones at 26 s) and a text
+/// clip at 40 s on the first track.
+func menuFixture() -> (document: ProjectDocument, sound: [UInt32], text: UInt32)? {
+    let document = ProjectDocument()
+    guard let a = place(document, dryA, seconds: 12, at: 0),
+        let b = place(document, dryB, seconds: 12, at: 13 * SEC),
+        let c = place(document, tones, seconds: 4, at: 26 * SEC)
+    else { return nil }
+    let track = document.project.snapshot.tracks[0].id
+    edit(document, "Text", [.addTextClip(track: track, at: 40 * SEC, duration: 2 * SEC)])
+    guard let text = document.project.snapshot.clips.first(where: { $0.start == 40 * SEC })?.id
+    else { return nil }
+    return (document, [a, b, c], text)
+}
+
+func setVoices(_ document: ProjectDocument, _ voices: [(UInt32, VoiceProps?)]) {
+    edit(
+        document, "Voices",
+        voices.map { .setAudio(clips: [$0.0], patch: AudioPatch(voice: .some($0.1))) })
+}
+
+func stateWord(_ state: NSControl.StateValue) -> String {
+    state == .on ? "on" : (state == .mixed ? "mixed" : "off")
+}
+
+do {
+    let menu = AppDelegate().voiceMenu()
+    let action = NSStringFromSelector(#selector(EditorViewController.setVoiceEffect(_:)))
+    var read: [String] = []
+    var header = ""
+    var popup: [String] = []
+    var wired = true
+    for item in menu.items {
+        if item.isSeparatorItem {
+            read.append("—")
+        } else if item.action == nil {
+            header = item.title
+            read.append("[\(item.title)]")
+            wired = wired && item.submenu == nil
+        } else {
+            read.append("\(item.title)#\(item.tag)")
+            wired = wired && item.action.map { NSStringFromSelector($0) } == action
+            if VoiceKind.allCases.indices.contains(item.tag) { popup.append("\(header): \(item.title)") }
+        }
+    }
+    let want = [
+        "[Voice]", "Pitch#0", "High#1", "Deep#2", "Robot#3",
+        "[Tone]", "Bass#4", "Treble#5", "Bright#6", "Telephone#7", "Radio#8",
+        "[Character]", "Lo-Fi#9", "Distorted#10",
+        "[Space]", "Echo#11", "Room#12", "Hall#13", "Plate#14", "Cathedral#15",
+        "—", "None#-1",
+    ]
+    let titles = AudioPane.voiceKinds.map(\.title)
+    let kinds = VoiceKind.allCases.map(\.rawValue) == [
+        "pitch", "high", "deep", "robot", "bass", "treble", "bright", "telephone", "radio", "lofi",
+        "distorted", "echo", "room", "hall", "plate", "cathedral",
+    ]
+    row("V12", menu.title == "Voice" && read == want && wired && kinds && popup == titles,
+        "Clip ▸ \(menu.title) ▸ reads \(read.joined(separator: " ")); every item to "
+            + "setVoiceEffect: and no header with an action: \(wired); the popup's titles are "
+            + "\"<header>: <item>\": \(popup == titles) (\(titles.first ?? "") … "
+            + "\(titles.last ?? ""))")
+}
+
+do {
+    guard let f = menuFixture() else {
+        row("V13", false, "the fixture did not build")
+        exit(0)
+    }
+    func states(_ kinds: [VoiceKind?], selected: [UInt32]) -> [String] {
+        let snapshot = f.document.project.snapshot
+        let targets = VoiceMenu.targets(
+            snapshot.clips.filter { selected.contains($0.id) }, in: snapshot)
+        return kinds.map { stateWord(VoiceMenu.state($0, targets: targets)) }
+    }
+    let all = f.sound + [f.text]
+    let radio = VoiceProps(kind: .radio)
+    setVoices(f.document, f.sound.map { ($0, radio) })
+    let same = states([.radio, .echo, nil], selected: all)
+    setVoices(f.document, [(f.sound[1], VoiceProps(kind: .echo)), (f.sound[2], nil)])
+    let split = states([.radio, .echo, nil, .hall], selected: all)
+    setVoices(f.document, f.sound.map { ($0, nil) })
+    let none = states([nil] + VoiceKind.allCases.map { Optional($0) }, selected: all)
+    let noTarget = states([.radio, nil], selected: [f.text])
+    let ok = same == ["on", "off", "off"] && split == ["mixed", "mixed", "mixed", "off"]
+        && none == ["on"] + Array(repeating: "off", count: 16) && noTarget == ["off", "off"]
+    row("V13", ok,
+        "all radio: Radio/Echo/None \(same) (want on, off, off); radio + echo + none: "
+            + "Radio/Echo/None/Hall \(split) (want mixed ×3, off); no effect: None and the "
+            + "sixteen \(none.prefix(3))… (want on, then off); only a text clip: Radio/None "
+            + "\(noTarget) (want off, off)")
+}
+
+do {
+    guard let f = menuFixture() else {
+        row("V14", false, "the fixture did not build")
+        exit(0)
+    }
+    setVoices(
+        f.document,
+        [(f.sound[0], VoiceProps(kind: .high, amount: 0.4, pitch: 8)),
+         (f.sound[1], VoiceProps(kind: .echo))])
+    func targets() -> [ClipSnapshot] {
+        let snapshot = f.document.project.snapshot
+        return VoiceMenu.targets(snapshot.clips, in: snapshot)
+    }
+    func voices() -> [String] {
+        let snapshot = f.document.project.snapshot
+        return f.sound.map { id in
+            guard let voice = snapshot.clips.first(where: { $0.id == id })?.audioProps.voice
+            else { return "none" }
+            return "\(voice.kind.rawValue) \(voice.amount) "
+                + (voice.pitch.map { "pitch \($0)" } ?? "no pitch")
+        }
+    }
+    let chosen = targets().map(\.id)
+    guard chosen == f.sound else {
+        // A stranger target's `set_audio` is invalid input, which `edit` exits on.
+        row("V14", false, "targets of the three sound clips and a text clip: \(chosen) (want \(f.sound))")
+        exit(0)
+    }
+    let deepOps = VoiceMenu.ops(.deep, targets: targets())
+    edit(f.document, "Voice Effect", deepOps)
+    let deep = voices()
+    let noneOps = VoiceMenu.ops(nil, targets: targets())
+    edit(f.document, "Voice Effect", noneOps)
+    let cleared = voices()
+    let empty = VoiceMenu.ops(.deep, targets: []).count + VoiceMenu.ops(nil, targets: []).count
+    let stranger = VoiceMenu.kind(tag: 99) == nil
+    let noneTag = VoiceMenu.kind(tag: -1).map { $0 == nil } ?? false
+    let deepTag = VoiceMenu.kind(tag: 2).map { $0 == .deep } ?? false
+    let ok = chosen == f.sound && deep == ["deep 0.4 no pitch", "deep 1.0 no pitch", "deep 1.0 no pitch"]
+        && cleared == ["none", "none", "none"] && deepOps.count == 3 && noneOps.count == 1
+        && empty == 0 && stranger && noneTag && deepTag
+    row("V14", ok,
+        "targets of the three sound clips and a text clip: \(chosen) (want \(f.sound)); Deep "
+            + "over {high, 0.4, 8}, {echo, 1}, none: \(deep) in \(deepOps.count) ops; None: "
+            + "\(cleared) in \(noneOps.count) op; no target: \(empty) ops; tag 99 a stranger: "
+            + "\(stranger), −1 None: \(noneTag), 2 deep: \(deepTag)")
+}
+
+// =========================================================================
+// V15 — a retimed clip's voice is a stage of its chain (AU-145 as amended, #387)
+
+do {
+    clearCaches()
+    var parts: [String] = []
+    var ok = true
+    let rampDir = RampAudioCache.directory(
+        in: isolatedDir.deletingLastPathComponent())
+    /// The fixture's clip at ×2, and its chain.
+    func chain(isolation: Double, keepPitch: Bool)
+        -> (RetimedSound.Chain, PlanSegment, RampAudioRequest?)?
+    {
+        guard let f = fixture(voice: VoiceProps(kind: .hall), isolation: isolation) else {
+            return nil
+        }
+        edit(f.document, "Speed", [.setSpeed(clip: f.clip, rate: 2, keepPitch: keepPitch)])
+        let reverse = ReverseResolution(
+            ready: [:], pending: [], rampAudio: rampDir, isolated: isolatedDir)
+        guard let s = f.segment,
+            let chain = RetimedSound.chain(for: s, dsp: f.dsp, urls: f.urls, reverse: reverse)
+        else { return nil }
+        return (chain, s, VoiceCache.request(for: s, dsp: f.dsp, urls: f.urls, reverse: reverse))
+    }
+    func voiceJob(_ request: RampAudioRequest) -> VoiceJob? {
+        if case .voice(let job) = request.job { return job }
+        return nil
+    }
+    let cases: [(String, Double, Bool, Int)] = [
+        ("isolated, Keep pitch off", 1, false, 3), ("Keep pitch off", 0, false, 2),
+        ("isolated, Keep pitch on", 1, true, 2), ("Keep pitch on", 0, true, 1),
+    ]
+    for (name, isolation, keepPitch, stages) in cases {
+        guard let (chain, s, tapped) = chain(isolation: isolation, keepPitch: keepPitch),
+            let job = voiceJob(chain.processed)
+        else {
+            ok = false
+            parts.append("\(name): no chain with a voice job")
+            continue
+        }
+        let window = RetimedSound.window(of: s)
+        let good = tapped == nil && chain.stages.count == stages && job.window == window
+            && job.sounding == RetimedSound.sounding(of: s) && job.sounding != window
+            && job.isolated == chain.isolation?.destination
+            && job.isolation == (isolation > 0 ? isolation : 0)
+            && (chain.isolation != nil) == (isolation > 0)
+            && chain.processed.destination.deletingLastPathComponent().lastPathComponent
+                == VoiceCache.directoryName
+            && (chain.render != nil) == !keepPitch
+            && (chain.render.map {
+                $0.source == chain.processed.destination
+                    && $0.sourceFirstFrame == chain.window.firstFrame
+            } ?? true)
+        ok = ok && good
+        parts.append("×2, \(name): no tapped request \(tapped == nil), \(chain.stages.count) "
+            + "stage(s) (want \(stages)), the voice over the window "
+            + "\(job.window.firstFrame)–\(job.window.endFrame) sounding "
+            + "\(job.sounding.map { "\($0.firstFrame)–\($0.endFrame)" } ?? "all of it"): \(good)")
+    }
+    let w = IsolationWindow(firstFrame: 0, endFrame: 96_000)
+    let plain = VoiceCache.name(
+        media: 1, mediaFile: dryA, reversed: false,
+        job: VoiceJob(window: w, settings: settings(.hall), isolated: nil, isolation: 0))
+    let inside = VoiceCache.name(
+        media: 1, mediaFile: dryA, reversed: false,
+        job: VoiceJob(
+            window: w, settings: settings(.hall), isolated: nil, isolation: 0,
+            sounding: IsolationWindow(firstFrame: 8_192, endFrame: 80_000)))
+    ok = ok && plain != nil && inside != nil && plain != inside
+    parts.append("the sounding frames are in the name: \(plain != inside)")
+    row("V15", ok, parts.joined(separator: "; "))
+}
+
+// =========================================================================
+// V16 — the pad is silent to the effect (AU-145 as amended)
+
+do {
+    // 6 s of silence with one impulse; the window is [1 s, 5 s), the clip
+    // plays [2 s, 4 s). Echo repeats 250 ms (12,000 frames) later.
+    let window = IsolationWindow(firstFrame: 48_000, endFrame: 240_000)
+    let sounding = IsolationWindow(firstFrame: 96_000, endFrame: 192_000)
+    func peakInClip(_ name: String, impulse: Int, sounding: IsolationWindow?) -> Float? {
+        var samples = [Float](repeating: 0, count: 6 * 48_000)
+        samples[impulse] = 0.9
+        let source = work.appendingPathComponent("v16-\(name).wav")
+        guard writeWAV(source, [samples, samples]) == nil else { return nil }
+        let destination = work.appendingPathComponent("v16-\(name).caf")
+        try? FileManager.default.removeItem(at: destination)
+        let job = VoiceRenderer.Job(
+            source: source,
+            job: VoiceJob(
+                window: window, settings: settings(.echo), isolated: nil, isolation: 0,
+                sounding: sounding),
+            destination: destination)
+        guard (try? VoiceRenderer.render(job, cancelled: { false })) != nil,
+            let out = readCAF(destination), let left = out.first
+        else { return nil }
+        // The clip's frames, past the impulse's own sample when it is inside.
+        let from = max(96_000, impulse + 2_400) - 48_000
+        return left[from..<(192_000 - 48_000)].map(abs).max()
+    }
+    let before = 96_000 - 2_400
+    let padded = peakInClip("pad", impulse: before, sounding: sounding)
+    let whole = peakInClip("whole", impulse: before, sounding: nil)
+    let own = peakInClip("own", impulse: 100_000, sounding: sounding)
+    let ok = (padded ?? 1) <= 1e-6 && (whole ?? 0) >= 1e-2 && (own ?? 0) >= 1e-2
+    func told(_ value: Float?) -> String { value.map { "\($0)" } ?? "no render" }
+    row("V16", ok,
+        "Echo, an impulse 50 ms before the clip's first frame, inside the window: the clip's "
+            + "frames peak \(told(padded)) (≤ 1e-6); with the pad not silenced \(told(whole)) "
+            + "(≥ 0.01, the echo it keeps out); an impulse inside the clip echoes: \(told(own)) "
+            + "(≥ 0.01)")
 }

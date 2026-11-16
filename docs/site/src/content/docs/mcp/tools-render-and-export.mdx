@@ -28,13 +28,15 @@ With no arguments, it draws the frame under the playhead at the canvas's size an
 | --- | --- |
 | The moment | [`t`](/mcp/render-frame/#t), in ticks. Default: the playhead. |
 | The file | [`path`](/mcp/render-frame/#path), [`format`](/mcp/render-frame/#format) (`png`, `jpeg` or `heic`) and [`max_width`](/mcp/render-frame/#max_width) (16 to 8192 pixels). |
+| The image | [`full_depth_image`](/mcp/render-frame/#full_depth_image): the file itself, not the 8-bit PNG copy a 16-bit PNG or a HEIC gets. |
 | What's drawn | [`burn_in_timecode`](/mcp/render-frame/#burn_in_timecode), [`ungraded`](/mcp/render-frame/#ungraded), [`sdr_version`](/mcp/render-frame/#sdr_version) and [`selection`](/mcp/render-frame/#selection). |
 | Scopes | [`waveform`, `parade` and `histogram`](/mcp/render-frame/#waveform-parade-and-histogram), [`vectorscope` and `vectorscope_zoom`](/mcp/render-frame/#vectorscope-and-vectorscope_zoom). Each scope also writes a JSON file beside the image. |
 
 The switches in the **View** menu never reach this tool, so an agent asks for those pictures here, whatever a person has switched on.
 
-It returns an image and a text block. The text gives the moment and the sizes, and its last sentence is "Written to `<path>`." Before that sentence it can add what each scope measured, or a note about:
+It returns an image and a text block. The image is the file, or an 8-bit PNG copy of it when the file is a 16-bit PNG or a HEIC, and it's always the file's size: Frame Job doesn't scale or cap it, by its size or by its sides. See [Image limits](/mcp/render-frame/#image-limits) for what the API takes and how `max_width` keeps an image inside it. The text gives the moment and the sizes, and its last sentence is "Written to `<path>`." Before that sentence it can add what each scope measured, or a note about:
 
+- An image that is an 8-bit copy of the file.
 - A JPEG that flattened a transparent canvas onto black.
 - A [graphic](/mcp/render-frame/#graphic-problems-in-the-answer) that warned or failed.
 - A recorded cursor that couldn't be drawn.
@@ -77,7 +79,7 @@ Every result has `export_id`, `status`, `path` and `elapsed`, the seconds since 
 | `queued` | `waiting`, the queue row's text, while the job waits for memory behind other AV1 and VP9 exports. |
 | `queued` or `running` | `estimated_seconds` on `av1`, `av1_webm`, `vp9_webm` and `vp9_alpha_webm`. |
 | `running` | `progress`, 0 to 1, and `phase` while the job has one: "Preparing…" until the file's writer exists, and "Measuring loudness…" during the loudness measurement. |
-| `done` | What the file holds: its size, the settings used, the `loudness` measured, and any `graphic_warnings` and `cursor_warnings`. |
+| `done` | `message`, the queue row's text, and what the file holds: its size, the settings used, the `loudness` measured, and any `graphic_warnings` and `cursor_warnings`. |
 | `failed`, `cancelled` | `reason`, the queue row's text. |
 
 [Export status](/mcp/export/#export-status) lists every key of a `done` result, and [The loudness report](/mcp/export/#the-loudness-report) explains `loudness`.

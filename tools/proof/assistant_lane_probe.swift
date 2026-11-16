@@ -440,8 +440,10 @@ func rowL6() {
     let ok = !dev.isEmpty && !names.contains("record_screen") && names.isDisjoint(with: dev)
         && !names.contains("close_project")
         && names.contains("transcribe") && names.contains("export") && missingCore.isEmpty
+    let configure = writeConfigure(tools)
     measure["l6"] = ["catalog": tools.count, "assistant": names.count, "dev": dev.sorted(),
-                     "core_tools": AssistantPrompt.coreTools]
+                     "core_tools": AssistantPrompt.coreTools,
+                     "configure": configure.path, "configure_bytes": configure.bytes]
     row("L6", ok,
         "\(tools.count) tools → \(names.count) for the assistant; record_screen "
             + "\(names.contains("record_screen")), close_project "
@@ -449,6 +451,29 @@ func rowL6() {
             + "\(!names.isDisjoint(with: dev)), transcribe \(names.contains("transcribe")), "
             + "export \(names.contains("export")), core tools \(AssistantPrompt.coreTools) "
             + "missing \(missingCore)")
+}
+
+/// The `configure` line the app writes to its helper (`AssistantSession`, spec §11 SA-5), for
+/// `assistant_lane_proof.py`'s B1 (#594, spec §11 P-9 as SA-9 amends it): the assistant catalog,
+/// `AssistantPrompt`'s four pieces, AI-11's default model and the dummy `proof-key`, tool-result
+/// clearing on (the request's largest form), no spend fields (so the helper B1 starts fetches no
+/// price table and writes no cache), serialised with sorted keys as `AssistantSession.write`
+/// writes it, into `<work>/configure.json`. B1 adds `api_base` (the stand-in) and runs the helper
+/// on it; the bytes it measures are the helper's own first POST. ("", 0) when it would not write.
+func writeConfigure(_ catalog: [[String: Any]]) -> (path: String, bytes: Int) {
+    var settings = AssistantChatSettings().helperJSON
+    settings["clear_tool_results"] = true
+    let configure: [String: Any] = [
+        "type": "configure", "api_key": "proof-key", "model": AssistantConfiguration.defaultModel,
+        "system": AssistantPrompt.system, "tools": AssistantToolTable.assistantCatalog(catalog),
+        "core_tools": AssistantPrompt.coreTools, "search_guide": AssistantPrompt.searchGuide,
+        "compaction_instructions": AssistantPrompt.compactionInstructions, "settings": settings,
+    ]
+    let path = (work as NSString).appendingPathComponent("configure.json")
+    guard let data = try? JSONSerialization.data(withJSONObject: configure, options: [.sortedKeys]),
+        (try? data.write(to: URL(fileURLWithPath: path))) != nil
+    else { return ("", 0) }
+    return (path, data.count)
 }
 
 // MARK: - The drag rows: L7, L8 (#144, AI-12), L9 and C1

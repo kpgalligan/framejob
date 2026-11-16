@@ -1,8 +1,9 @@
 ---
-/* The system has exactly two surfaces — warm ebony and cream — so the stock
-   three-option auto/light/dark <select> becomes a two-state toggle. The stored
-   key and the `data-theme` attribute stay Starlight's, so ThemeProvider's
-   no-FOUC inline script keeps working unchanged. */
+/* The site has exactly two looks, Neutral Light and Neutral Dark, so the stock
+   three-option auto/light/dark <select> becomes a two-state toggle: a 36px ghost
+   button like the header's other icon buttons. The stored key and the
+   `data-theme` attribute stay Starlight's, so ThemeProvider's no-FOUC inline
+   script keeps working unchanged. */
 import { Icon } from '@astrojs/starlight/components';
 ---
 
@@ -54,30 +55,29 @@ import { Icon } from '@astrojs/starlight/components';
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 2rem;
-      height: 2rem;
+      width: 2.25rem;
+      height: 2.25rem;
       padding: 0;
-      border: 1px solid var(--sl-color-hairline-light);
-      border-radius: var(--bl-radius-1);
+      border: 0;
+      border-radius: var(--bl-radius-md);
       background-color: transparent;
-      color: var(--sl-color-gray-2);
+      color: var(--bl-ink-muted);
       cursor: pointer;
     }
 
     .theme-toggle:hover {
-      background-color: var(--sl-color-gray-6);
-      border-color: var(--sl-color-gray-4);
-      color: var(--sl-color-white);
+      background-color: var(--bl-surface-sunken);
+      color: var(--bl-ink);
     }
 
-    /* 32px box, 44px target. */
+    /* 36px box, 44px target. */
     .theme-toggle::after {
       content: '';
       position: absolute;
-      inset: -0.375rem;
+      inset: -0.25rem;
     }
 
-    /* Show the surface you are on, not the one you would switch to. */
+    /* Show the look you are in, not the one you would switch to. */
     .icon-light {
       display: none;
     }

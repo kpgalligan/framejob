@@ -753,7 +753,7 @@
     {
      "id": "document-summary",
      "name": "Document summary rows",
-     "summary": "Read-only rows show Resolution, Frame rate, Duration, Tracks, Background and Colour.",
+     "summary": "Read-only rows show Resolution, Frame rate, Duration, Tracks, Background and Color.",
      "page": "projects/document-tab",
      "anchor": "the-document-summary",
      "where": "Document tab ▸ Document"
@@ -1058,11 +1058,11 @@
     {
      "id": "media-search",
      "name": "Search by name",
-     "summary": "A Search by name field narrows the list as you type, ignoring case and accents as the Finder does. Esc clears it.",
+     "summary": "A Search by name field narrows the list as you type, ignoring case and accents as the Finder does. ⌘F puts the cursor in it and Esc clears it.",
      "page": "projects/media-tab",
      "anchor": "search-by-name",
      "where": "Media tab ▸ Search by name",
-     "keys": "Esc"
+     "keys": "⌘F, Esc"
     },
     {
      "id": "media-sort",
@@ -7403,7 +7403,7 @@
     {
      "id": "audio-normalize-skips",
      "name": "Clips Normalize skips",
-     "summary": "Clips Normalize can't measure, such as nests, silent clips and clips not analysed yet, are left out and the rest are done.",
+     "summary": "Clips Normalize can't measure, such as nests, silent clips and clips not analysed yet, are left out and the rest are done. In Loudness mode the foot of the inspector names each clip left away from the target and each one skipped, except a nest or a clip with no sound.",
      "page": "audio/normalize",
      "anchor": "clips-normalize-skips",
      "where": "Clip ▸ Normalize"
@@ -7434,10 +7434,10 @@
     },
     {
      "id": "audio-enhance-leveller",
-     "name": "Enhance Voice: leveller",
-     "summary": "Enhance Voice turns on the leveller at its defaults when the speech's short-term loudness range is over 6 LU.",
+     "name": "Enhance Voice: leveler",
+     "summary": "Enhance Voice turns on the leveler at its defaults when the speech's short-term loudness range is over 6 LU.",
      "page": "audio/enhance-voice",
-     "anchor": "leveller",
+     "anchor": "leveler",
      "where": "Clip ▸ Enhance Voice"
     },
     {
@@ -7459,7 +7459,7 @@
     {
      "id": "audio-enhance-skips",
      "name": "Clips Enhance Voice skips",
-     "summary": "Enhance Voice leaves out what Normalize in Loudness mode does, plus clips with under 1 second of speech or not analysed yet.",
+     "summary": "Enhance Voice leaves out what Normalize in Loudness mode does, plus clips with under 1 second of speech or not analysed yet. The foot of the inspector names each clip left away from the target and each one skipped, except a nest or a clip with no sound.",
      "page": "audio/enhance-voice",
      "anchor": "clips-enhance-voice-skips",
      "where": "Clip ▸ Enhance Voice"
@@ -7507,7 +7507,7 @@
     {
      "id": "audio-match-refusals",
      "name": "When a clip can't be matched",
-     "summary": "A clip that can't be matched is skipped. If the reference can't be used or nothing matches, the foot of the inspector says why.",
+     "summary": "A clip that can't be matched is skipped, and the foot of the inspector names it and each clip left away from the reference's loudness. If the reference can't be used or nothing matches, it says why.",
      "page": "audio/match-audio",
      "anchor": "when-a-clip-cant-be-matched",
      "where": "Clip ▸ Match Audio…"
@@ -7539,7 +7539,7 @@
     {
      "id": "audio-isolation-status",
      "name": "Voice Isolation status",
-     "summary": "Shows what the isolated voice is doing, such as Rendering…, Ready or Plays without it at this speed.",
+     "summary": "Shows what the isolated voice is doing, such as Rendering…, Ready or Not rendered and a reason.",
      "page": "audio/voice-isolation",
      "anchor": "what-status-says",
      "where": "Clip tab ▸ Sound ▸ Voice Isolation ▸ Status"
@@ -7555,7 +7555,7 @@
     {
      "id": "audio-isolation-speed-limits",
      "name": "Voice Isolation and speed",
-     "summary": "Isolation plays only at normal speed; a speed change, ramp or freeze frame plays without it and Status says so.",
+     "summary": "Isolation works on a clip with a speed change or a speed ramp: the voice is isolated first, then retimed with the clip.",
      "page": "audio/voice-isolation",
      "anchor": "speed-ramps-and-freeze-frames",
      "where": "Clip tab ▸ Sound ▸ Voice Isolation ▸ Status"
@@ -7675,10 +7675,10 @@
     {
      "id": "audio-dynamics-wait-for-analysis",
      "name": "Waiting for the clip's loudness",
-     "summary": "Until a clip's loudness is measured it plays without the gate, leveller and de-esser, and an export waits for it.",
+     "summary": "Until a clip's loudness is measured it plays without the gate, leveler and de-esser, and an export waits for it.",
      "page": "audio/gate",
      "anchor": "before-the-clips-loudness-is-measured",
-     "where": "Clip tab ▸ Sound ▸ Gate, Leveller or De-esser"
+     "where": "Clip tab ▸ Sound ▸ Gate, Leveler or De-esser"
     },
     {
      "id": "audio-reduce-sibilance",
@@ -7803,50 +7803,50 @@
     {
      "id": "audio-ride-the-level",
      "name": "Ride the level",
-     "summary": "Turns the leveller on, evening out a voice that moves on and off the microphone by bringing each phrase toward a target.",
-     "page": "audio/leveller",
+     "summary": "Turns the leveler on, evening out a voice that moves on and off the microphone by bringing each phrase toward a target.",
+     "page": "audio/leveler",
      "anchor": "ride-the-level",
-     "where": "Clip tab ▸ Sound ▸ Leveller ▸ Ride the level"
+     "where": "Clip tab ▸ Sound ▸ Leveler ▸ Ride the level"
     },
     {
      "id": "audio-leveller-target",
-     "name": "Leveller target",
+     "name": "Leveler target",
      "summary": "Where it aims, in dB from the clip's loudness.",
-     "page": "audio/leveller",
+     "page": "audio/leveler",
      "anchor": "target",
-     "where": "Clip tab ▸ Sound ▸ Leveller ▸ Target"
+     "where": "Clip tab ▸ Sound ▸ Leveler ▸ Target"
     },
     {
      "id": "audio-leveller-max-boost",
-     "name": "Leveller Max Boost",
+     "name": "Leveler Max Boost",
      "summary": "The most it turns the clip up.",
-     "page": "audio/leveller",
+     "page": "audio/leveler",
      "anchor": "max-boost",
-     "where": "Clip tab ▸ Sound ▸ Leveller ▸ Max Boost"
+     "where": "Clip tab ▸ Sound ▸ Leveler ▸ Max Boost"
     },
     {
      "id": "audio-leveller-max-cut",
-     "name": "Leveller Max Cut",
+     "name": "Leveler Max Cut",
      "summary": "The most it turns the clip down.",
-     "page": "audio/leveller",
+     "page": "audio/leveler",
      "anchor": "max-cut",
-     "where": "Clip tab ▸ Sound ▸ Leveller ▸ Max Cut"
+     "where": "Clip tab ▸ Sound ▸ Leveler ▸ Max Cut"
     },
     {
      "id": "audio-leveller-response",
-     "name": "Leveller response",
+     "name": "Leveler response",
      "summary": "How smoothly it follows the voice within a phrase: shorter changes are smoothed out.",
-     "page": "audio/leveller",
+     "page": "audio/leveler",
      "anchor": "response",
-     "where": "Clip tab ▸ Sound ▸ Leveller ▸ Response"
+     "where": "Clip tab ▸ Sound ▸ Leveler ▸ Response"
     },
     {
      "id": "audio-leveller-status",
-     "name": "Leveller Status and Loudness readouts",
-     "summary": "Readouts say where the leveller aims on this clip, what it waits for or why it isn't levelling, and the loudness it's measured from.",
-     "page": "audio/leveller",
+     "name": "Leveler Status and Loudness readouts",
+     "summary": "Readouts say where the leveler aims on this clip, what it waits for or why it isn't leveling, and the loudness it's measured from.",
+     "page": "audio/leveler",
      "anchor": "status-and-loudness-readouts",
-     "where": "Clip tab ▸ Sound ▸ Leveller"
+     "where": "Clip tab ▸ Sound ▸ Leveler"
     },
     {
      "id": "audio-compressor",
@@ -7934,6 +7934,14 @@
      "page": "audio/voice-effects",
      "anchor": "choose-an-effect",
      "where": "Clip tab ▸ Sound ▸ Voice Effect ▸ Effect"
+    },
+    {
+     "id": "audio-voice-menu",
+     "name": "Clip ▸ Voice",
+     "summary": "Choose a voice effect from the Clip menu for every selected clip with sound; each clip keeps its own Amount.",
+     "page": "audio/voice-effects",
+     "anchor": "choose-from-the-clip-menu",
+     "where": "Clip ▸ Voice"
     },
     {
      "id": "audio-voice-pitch",
@@ -8082,7 +8090,7 @@
     {
      "id": "audio-voice-effect-status",
      "name": "Voice Effect status",
-     "summary": "Shows where the effect's render has got to, such as Rendering…, Ready or Plays without it at this speed.",
+     "summary": "Shows where the effect's render has got to, such as Rendering…, Ready or Not rendered and a reason.",
      "page": "audio/voice-effects",
      "anchor": "read-the-status",
      "where": "Clip tab ▸ Sound ▸ Voice Effect ▸ Status"
@@ -10130,6 +10138,33 @@
      "where": "Toolbar ▸ Loop, with words selected"
     },
     {
+     "id": "transcript-find",
+     "name": "Find in the transcript",
+     "summary": "Search the Transcript tab's words; every match is marked and the current one scrolled into view. Searching changes nothing in the project.",
+     "page": "captions/find-in-the-transcript",
+     "anchor": "open-the-find-bar",
+     "where": "Edit ▸ Find…",
+     "keys": "⌘F"
+    },
+    {
+     "id": "transcript-find-step",
+     "name": "Step through the matches",
+     "summary": "Return goes to the next match and ⇧Return to the previous one, wrapping at the ends.",
+     "page": "captions/find-in-the-transcript",
+     "anchor": "step-through-the-matches",
+     "where": "Transcript tab ▸ find bar",
+     "keys": "Return, ⇧Return"
+    },
+    {
+     "id": "transcript-find-select",
+     "name": "Choose a match",
+     "summary": "⌘Return in the find bar selects the match you're on, moves the playhead to it and gives the text the keyboard, so ⌫ deletes it next.",
+     "page": "captions/find-in-the-transcript",
+     "anchor": "act-on-a-match",
+     "where": "Transcript tab ▸ find bar",
+     "keys": "⌘Return"
+    },
+    {
      "id": "transcript-select-words",
      "name": "Selecting words",
      "summary": "Click a word, drag across a run, or extend with ⇧-click or ⇧ and an arrow, and ⌘A selects every word.",
@@ -12165,11 +12200,11 @@
     },
     {
      "id": "project-colour-row",
-     "name": "Colour row in the Document section",
-     "summary": "The Document section's Colour row shows the project's dynamic range.",
+     "name": "Color row in the Document section",
+     "summary": "The Document section's Color row shows the project's dynamic range.",
      "page": "hdr/dynamic-range",
-     "anchor": "the-colour-row",
-     "where": "Document tab ▸ Document ▸ Colour"
+     "anchor": "the-color-row",
+     "where": "Document tab ▸ Document ▸ Color"
     },
     {
      "id": "hlg-working-space",
@@ -12453,7 +12488,7 @@
     {
      "id": "what-stays-8-bit",
      "name": "What stays 8-bit",
-     "summary": "Text, shapes, captions, graphics, thumbnails and screen recordings are 8-bit, and still sit at reference white in HDR (HLG).",
+     "summary": "Text, captions, flat shapes, thumbnails and screen recordings are 8-bit, and still sit at reference white in HDR (HLG). A graphic and a shape's gradient are drawn deeper in an export or saved frame that keeps the depth, and at 8 bits elsewhere.",
      "page": "hdr/precision",
      "anchor": "what-stays-8-bit"
     }
@@ -12910,6 +12945,14 @@
      "page": "graphics/share-a-graphic",
      "anchor": "open-from-the-finder",
      "where": "Finder"
+    },
+    {
+     "id": "graphics-open-package-from-link",
+     "name": "Open a .fjgraphic from a link",
+     "summary": "A framejob://graphic?src= link on a web page makes Frame Job download a .fjgraphic from an https address and ask before importing it.",
+     "page": "graphics/share-a-graphic",
+     "anchor": "open-from-a-link",
+     "where": "Web page"
     },
     {
      "id": "graphics-import-from-file",
@@ -16938,7 +16981,7 @@
     {
      "id": "export-stems-overwrite",
      "name": "Overwriting and clean-up",
-     "summary": "A stem replaces a file of its name without asking, but never the project's media, and a cancelled or failed export removes what it wrote.",
+     "summary": "A stem replaces a file of its name without asking, but never the project's media, and only once every file is written; a cancelled or failed export removes what it wrote and leaves existing files as they were.",
      "page": "export/stems",
      "anchor": "overwriting-and-clean-up",
      "where": "Export sheet ▸ Stems"
@@ -17072,7 +17115,7 @@
     {
      "id": "export-cancel",
      "name": "Cancel a running export",
-     "summary": "Cancel stops the export and removes the half-written file.",
+     "summary": "Cancel stops the export and removes the half-written file, and a file it was replacing stays as it was.",
      "page": "export/progress-and-report",
      "anchor": "cancel-a-running-export",
      "where": "Exporting sheet ▸ Cancel"
@@ -17202,7 +17245,7 @@
     {
      "id": "export-save-frame-deep",
      "name": "Deep and HDR frames",
-     "summary": "A frame showing a deep still or 10-bit VP9 clip, and any PNG or HEIC from an HDR project, saves as 16-bit PNG or 10-bit HEIC.",
+     "summary": "A frame showing a graphic, a shape with a gradient, a deep still or a 10-bit VP9, HEVC or ProRes clip, and any PNG or HEIC from an HDR project, saves as 16-bit PNG or 10-bit HEIC.",
      "page": "export/save-frame",
      "anchor": "deep-and-hdr-frames",
      "where": "File ▸ Save Frame…"
@@ -18673,6 +18716,13 @@
      "anchor": "max_width"
     },
     {
+     "id": "mcp-render-frame-full-depth-image",
+     "name": "render_frame: full_depth_image",
+     "summary": "The image the model sees is an 8-bit PNG copy of a 16-bit PNG or a HEIC by default, at the file's size and never scaled to fit the API's limits; full_depth_image sends the file itself.",
+     "page": "mcp/render-frame",
+     "anchor": "full_depth_image"
+    },
+    {
      "id": "mcp-render-frame-burn-in",
      "name": "render_frame: burn_in_timecode",
      "summary": "Draws the project timecode over the picture.",
@@ -18798,7 +18848,7 @@
     {
      "id": "mcp-export-path",
      "name": "Export paths",
-     "summary": "An existing file at the path is replaced, and the file always ends in the preset's extension.",
+     "summary": "An existing file at the path is replaced only when the job finishes, and the file always ends in the preset's extension.",
      "page": "mcp/export",
      "anchor": "path-handling"
     },
@@ -19358,11 +19408,11 @@
     },
     {
      "id": "mcp-set-audio-leveller",
-     "name": "set_audio: leveller",
+     "name": "set_audio: leveler",
      "summary": "Evens out a speaker who moves on and off the mic, from a gain curve made ahead of time.",
      "page": "mcp/tools-set-audio",
-     "anchor": "leveller",
-     "where": "Clip tab ▸ Sound ▸ Leveller"
+     "anchor": "leveler",
+     "where": "Clip tab ▸ Sound ▸ Leveler"
     },
     {
      "id": "mcp-set-audio-de-esser",
@@ -19940,6 +19990,14 @@
      "page": "reference/clip-menu",
      "anchor": "look",
      "where": "Clip ▸ Look ▸"
+    },
+    {
+     "id": "ref-clip-voice",
+     "name": "Clip ▸ Voice ▸",
+     "summary": "Puts a voice effect on the clip's sound, or takes it off.",
+     "page": "reference/clip-menu",
+     "anchor": "voice",
+     "where": "Clip ▸ Voice ▸"
     },
     {
      "id": "ref-clip-remove-background",
@@ -20701,7 +20759,7 @@
     {
      "id": "ref-limits-audio",
      "name": "Audio",
-     "summary": "Clip volume reaches 3200 % and track volume +12 dB, and the gate, leveller and de-esser need a measured clip.",
+     "summary": "Clip volume reaches 3200 % and track volume +12 dB, and the gate, leveler and de-esser need a measured clip.",
      "page": "reference/limits",
      "anchor": "audio"
     },

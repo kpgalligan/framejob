@@ -5,16 +5,18 @@ P-6): `budget.py`, the relay's use of it in `assistant_prompt_eval.py`, and
 ledger here is a scratch file under `work/budget/` (made fresh), and row N
 proves the real one, `budget.LEDGER`, was not created or changed.
 
-  P   the budgets are the owner's $25 / $5; `LEDGER` is absolute and outside
-      the repo; worst POST ≤ the floor ≤ `SUGGESTED_CAP` ≤ $25
+  P   the budgets are the owner's $40 / $5 (spec §11 P-3 as P-9 amends it);
+      `LEDGER` is absolute and outside the repo; worst POST ≤ the floor ≤
+      `SUGGESTED_CAP` ≤ $40 for the prompt evaluation and, read in one child
+      process, the clearing and compaction proofs (#594)
   F1  the fold over a seeded file: last month's $30 counts nothing; this
       month's reserve 2 settled 0.5, open reserve 1, refused 9, orphan settle
       0.25 → $1.75; AssemblyAI's 4 settled 4 → $4.00
   F2  an absent file is $0; a line that is not JSON refuses naming the line,
       and `reserve` appends nothing
-  G1  at $24.00, a $1.00 reservation passes (the edge) and $0.01 is refused
+  G1  at $39.00, a $1.00 reservation passes (the edge) and $0.01 is refused
       `budget:` with exactly one `refused` line; `gate=False` still records
-  G2  $25 recorded last month does not count this month (an injected clock)
+  G2  $40 recorded last month does not count this month (an injected clock)
   G3  a nested folder is created; the file is 0600
   W   `anthropic_worst_row` over a fixture (two rows, one tiered) is the
       per-class maximum; no committed rate exceeds it
@@ -25,9 +27,14 @@ proves the real one, `budget.LEDGER`, was not created or changed.
       with no `message_stop` or a body with no `usage` is not whole
   U2  `Evaluation.finish` totals only integer usage values
   R1–R4  the relay over the stand-in: forwarded and settled $0.0006 at the
-      table; two POSTs refused by the budget with no cap reservation leaked;
-      a cap refusal writes no proofs'-ledger line; a dead upstream settles
-      at the reservation
+      table, a post with `Authorization: Bearer proof-key` (the Swift helper's
+      header, spec §11 SA-5) reaching the stand-in as `authorization` and no
+      `x-api-key`; two POSTs refused by the budget with no cap reservation
+      leaked; a cap refusal writes no proofs'-ledger line; a dead upstream
+      settles at the reservation
+  R5  the relay's other header and a stranger: an `x-api-key: proof-key` post
+      is forwarded as `x-api-key`, and `Authorization: Bearer wrong-key` is
+      answered 401 with nothing forwarded and nothing reserved
   A1  `assemblyai_rates()` reads `AssemblyAIRates`; a copy without the
       `static let perHour` line is a ValueError
   A2  `cloud_live_ledger`'s budget CONTROL holds
@@ -61,6 +68,7 @@ import json
 import math
 import os
 import shutil
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -75,8 +83,11 @@ UTC = datetime.timezone.utc
 SEPTEMBER = datetime.datetime(2026, 9, 15, 12, 0, 0, tzinfo=UTC)
 AUGUST = datetime.datetime(2026, 8, 31, 23, 59, 0, tzinfo=UTC)
 ROWS = ["P", "F1", "F2", "G1", "G2", "G3", "W", "S1", "S2", "S3", "S4", "U1", "U2",
-        "R1", "R2", "R3", "R4", "A1", "A2", "A3", "A4", "A5", "N"]
+        "R1", "R2", "R3", "R4", "R5", "A1", "A2", "A3", "A4", "A5", "N"]
 RESULTS = []
+# The mutants, as `mutant_anchors.py` reads them: both rebind a name of `budget` in memory
+# (`main`), no tree text.
+MUTANTS = ("no-budget", "unknown-as-zero")
 
 
 def score(row, ok, detail, *, instrument=False):
@@ -141,16 +152,57 @@ def independent_worst(table):
 # The rows.
 
 
+# The clearing and compaction proofs' chains, read in a child: importing
+# `assistant_clearing_proof` rebinds `assistant_session_proof.WORK` (through
+# `assistant_settings_proof`), and R1–R4 use that module's `Fake`.
+CHAINS = """
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import assistant_prompt_eval as ev
+import assistant_clearing_proof as clearing
+import assistant_compaction_proof as compaction
+print(json.dumps({
+    "assistant_clearing_proof": [clearing.worst_post(), clearing.cap_floor(),
+                                 clearing.SUGGESTED_CAP],
+    "assistant_compaction_proof": [ev.worst_post(), compaction.cap_floor(),
+                                   compaction.SUGGESTED_CAP],
+}))
+"""
+ANTHROPIC_BUDGET = 40.00  # written here without `budget.py`, so the pin is independent
+
+
+def other_chains():
+    """{proof: (worst POST, floor, suggested cap)} for the clearing and
+    compaction proofs, from one child process; raises when it cannot answer."""
+    env = dict(os.environ)
+    env.pop("ANTHROPIC_API_KEY", None)
+    env.pop("RC_ASSEMBLYAI_KEY", None)
+    ran = subprocess.run([sys.executable, "-B", "-c", CHAINS, HERE], cwd=ROOT, env=env,
+                         capture_output=True, text=True, timeout=120)
+    if ran.returncode != 0:
+        raise RuntimeError(f"the chains' child exited {ran.returncode}: "
+                           f"{ran.stderr.strip()[-300:]}")
+    lines = [line for line in ran.stdout.splitlines() if line.startswith("{")]
+    if not lines:
+        raise RuntimeError(f"the chains' child printed no JSON: {ran.stdout.strip()[-300:]}")
+    return {name: tuple(chain) for name, chain in json.loads(lines[-1]).items()}
+
+
 def row_p(budget, ev):
-    floor = (ev.worst_post(), ev.cap_floor(), ev.SUGGESTED_CAP)
+    chains = {"assistant_prompt_eval": (ev.worst_post(), ev.cap_floor(), ev.SUGGESTED_CAP)}
+    chains.update(other_chains())
     absolute = os.path.isabs(budget.LEDGER)
     outside = not os.path.abspath(budget.LEDGER).startswith(ROOT + os.sep)
-    budgets = budget.BUDGETS == {"anthropic": 25.00, "assemblyai": 5.00}
-    ordered = floor[0] <= floor[1] <= floor[2] <= 25.00
-    return budgets and absolute and outside and ordered, (
+    budgets = budget.BUDGETS == {"anthropic": ANTHROPIC_BUDGET, "assemblyai": 5.00}
+    ordered = {name: w <= f <= c <= ANTHROPIC_BUDGET for name, (w, f, c) in chains.items()}
+    wanted = {"assistant_prompt_eval", "assistant_clearing_proof", "assistant_compaction_proof"}
+    whole = set(chains) == wanted
+    return budgets and absolute and outside and whole and all(ordered.values()), (
         f"BUDGETS {budget.BUDGETS}; LEDGER {budget.LEDGER} absolute {absolute}, outside the "
-        f"repo {outside}; worst POST ${floor[0]:.2f} ≤ floor ${floor[1]:.2f} ≤ suggested cap "
-        f"${floor[2]:.2f} ≤ $25 {ordered}")
+        f"repo {outside}; "
+        + "; ".join(f"{name}: worst POST ${w:.2f} ≤ floor ${f:.2f} ≤ suggested cap ${c:.2f} ≤ "
+                    f"${ANTHROPIC_BUDGET:.0f} {ordered[name]}"
+                    for name, (w, f, c) in sorted(chains.items())))
 
 
 def seed_lines(path, entries):
@@ -214,8 +266,8 @@ def row_f2(budget):
 def row_g1(budget):
     path = scratch("g1", "spend.jsonl")
     spend = budget.SpendLedger(path, "anthropic", "budget_proof", "g1", now=at(SEPTEMBER))
-    seed = spend.reserve(24.00, "seed", gate=False)
-    spend.settle(seed, 24.00, "seed")
+    seed = spend.reserve(39.00, "seed", gate=False)
+    spend.settle(seed, 39.00, "seed")
     try:
         spend.reserve(1.00, "edge")
         edge = True
@@ -232,7 +284,7 @@ def row_g1(budget):
     recorded = len(kinds(path, "reserve")) - before
     ok = (edge and past is not None and past.startswith("budget: ") and refused_lines == 1
           and recorded == 1)
-    return ok, (f"$1.00 at $24.00 passes {edge}; $0.01 at $25.00: {past!r:.220}; refused "
+    return ok, (f"$1.00 at $39.00 passes {edge}; $0.01 at $40.00: {past!r:.220}; refused "
                 f"lines {refused_lines}; gate=False recorded {recorded}")
 
 
@@ -241,12 +293,12 @@ def row_g2(budget):
     clock = {"now": AUGUST}
     spend = budget.SpendLedger(path, "anthropic", "budget_proof", "g2",
                                now=lambda: clock["now"])
-    seed = spend.reserve(25.00, "august", gate=False)
-    spend.settle(seed, 25.00, "seed")
+    seed = spend.reserve(40.00, "august", gate=False)
+    spend.settle(seed, 40.00, "seed")
     august = (spend.month(), spend.month_total())
     clock["now"] = SEPTEMBER
     september = (spend.month(), spend.month_total(), spend.refusal(1.00))
-    ok = (august == ("2026-08", 25.0) and september[:2] == ("2026-09", 0.0)
+    ok = (august == ("2026-08", 40.0) and september[:2] == ("2026-09", 0.0)
           and september[2] is None)
     return ok, f"August {august}; September {september}"
 
@@ -384,11 +436,14 @@ def row_u2(ev):
 # R: the relay over the stand-in.
 
 
-def post(base, body):
+def post(base, body, header="authorization", key="proof-key"):
+    """POST `body` with `Authorization: Bearer <key>` (the Swift helper's header), or with
+    `x-api-key: <key>` when `header` names it."""
     raw = json.dumps(body).encode()
+    credential = ({"authorization": f"Bearer {key}"} if header == "authorization"
+                  else {"x-api-key": key})
     request = urllib.request.Request(base + "/v1/messages", data=raw, method="POST",
-                                     headers={"content-type": "application/json",
-                                              "x-api-key": "proof-key"})
+                                     headers={"content-type": "application/json", **credential})
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
             return response.status, response.read(), raw
@@ -397,8 +452,18 @@ def post(base, body):
 
 
 def stand_in_posts(fake):
-    return len([r for r in fake.log().get("requests", [])
-                if r.get("method") == "POST" and r.get("path", "").startswith("/v1/messages")])
+    return len(stand_in_requests(fake))
+
+
+def stand_in_requests(fake):
+    return [r for r in fake.log().get("requests", [])
+            if r.get("method") == "POST" and r.get("path", "").startswith("/v1/messages")]
+
+
+def credential_of(request):
+    """{header: value} of the stand-in's logged credential headers (only dummies are logged)."""
+    return {name: value for name, value in (request.get("headers") or {}).items()
+            if name in ("authorization", "x-api-key")}
 
 
 def message(budget_word):
@@ -431,23 +496,48 @@ def row_r1(budget, ev, fake):
         before = stand_in_posts(fake)
         status, data, raw = post(relay.base, message("forward"))
         worst = ev.measure(raw)[0]
-        forwarded = stand_in_posts(fake) - before
+        sent = stand_in_requests(fake)
+        forwarded = len(sent) - before
     finally:
         relay.stop()
     reserves, settles = kinds(spend.path, "reserve"), kinds(spend.path, "settle")
+    header = credential_of(sent[-1]) if forwarded == 1 else None
     ok = (status == 200 and forwarded == 1 and len(reserves) == 1 and len(settles) == 1
           and abs(reserves[0]["worst"] - worst) < 1e-12
           and abs(settles[0]["dollars"] - 0.0006) < 1e-12 and settles[0]["basis"] == "table"
           and settles[0]["id"] == reserves[0]["id"] and settles[0].get("model")
-          == "claude-opus-5-5")
-    return ok, (f"status {status}, {forwarded} forwarded; reserved "
+          == "claude-opus-5-5" and header == {"authorization": "Bearer proof-key"})
+    return ok, (f"status {status}, {forwarded} forwarded with {header}; reserved "
                 f"{[r['worst'] for r in reserves]} (measure ${worst:.6f}); settled "
                 f"{[(s['dollars'], s['basis'], s.get('usage')) for s in settles]}")
 
 
+def row_r5(budget, ev, fake):
+    fake.scenario([{"content": [{"type": "text", "text": "R5: forwarded."}],
+                    "stop_reason": "end_turn"}])
+    relay, spend = relay_for(budget, ev, fake.base, 10.0, "R5")
+    try:
+        before = stand_in_posts(fake)
+        status, _, _ = post(relay.base, message("x-api-key"), header="x-api-key")
+        sent = stand_in_requests(fake)
+        forwarded = len(sent) - before
+        header = credential_of(sent[-1]) if forwarded == 1 else None
+        lines = len(lines_of(spend.path))
+        stranger, data, _ = post(relay.base, message("stranger"), key="wrong-key")
+        leaked = stand_in_posts(fake) - before - forwarded
+        stranger_lines = len(lines_of(spend.path)) - lines
+    finally:
+        relay.stop()
+    ok = (status == 200 and forwarded == 1 and header == {"x-api-key": "proof-key"}
+          and stranger == 401 and leaked == 0 and stranger_lines == 0)
+    return ok, (f"x-api-key: status {status}, {forwarded} forwarded with {header}; Bearer "
+                f"wrong-key: status {stranger} ({error_text(data)!r:.80}), {leaked} forwarded, "
+                f"{stranger_lines} proofs'-ledger lines")
+
+
 def row_r2(budget, ev, fake):
     worst = ev.measure(json.dumps(message("refused")).encode())[0]
-    relay, spend = relay_for(budget, ev, fake.base, 1.5 * worst, "R2", seeded=24.999)
+    relay, spend = relay_for(budget, ev, fake.base, 1.5 * worst, "R2", seeded=39.999)
     try:
         before = stand_in_posts(fake)
         answers = [post(relay.base, message("refused")) for _ in range(2)]
@@ -620,7 +710,7 @@ def row_a5():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--mutant", choices=["no-budget", "unknown-as-zero"],
+    parser.add_argument("--mutant", choices=MUTANTS,
                         help="break one thing in memory; the rows it guards must FAIL")
     args = parser.parse_args()
 
@@ -669,8 +759,9 @@ def main():
         guarded("R1", row_r1, budget, ev, fake)
         guarded("R2", row_r2, budget, ev, fake)
         guarded("R3", row_r3, budget, ev, fake)
+        guarded("R5", row_r5, budget, ev, fake)
     except Exception as error:  # noqa: BLE001
-        for row in ("R1", "R2", "R3"):
+        for row in ("R1", "R2", "R3", "R5"):
             if row not in [r for r, _, _ in RESULTS]:
                 score(row, False, f"the stand-in could not run: {type(error).__name__}: {error}",
                       instrument=True)

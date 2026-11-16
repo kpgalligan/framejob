@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 
 // The live loudness meter's probe (road map "audio" AP7, spec §11 AU-70..AU-78),
@@ -522,4 +523,249 @@ do {
     gap("T16", "a 1 s gap on one track", seconds: 1, twoTracks: false)
     gap("T16", "a 0.3 s gap on one of two tracks", seconds: 0.3, twoTracks: true)
     gap("T16", "a 1 s gap on one of two tracks", seconds: 1, twoTracks: true)
+}
+
+// MARK: - T17: the tap and the player's filler (AU-161)
+
+do {
+    let sink = LevelMeterSink()
+    let context = AudioTapContext(track: .inert, isolation: nil, meter: sink)
+    context.prepare(
+        channelCount: 2, sampleRate: 48000, maxFrames: 4096,
+        formatFlags: AudioFormatFlags(kAudioFormatFlagIsFloat | kAudioFormatFlagIsNonInterleaved),
+        bitsPerChannel: 32)
+    let list = AudioBufferList.allocate(maximumBuffers: 2)
+    let l = UnsafeMutablePointer<Float>.allocate(capacity: 4096)
+    let r = UnsafeMutablePointer<Float>.allocate(capacity: 4096)
+    defer { l.deallocate(); r.deallocate(); free(list.unsafeMutablePointer) }
+    /// One 4096-frame buffer of 0.5 / −0.25 through the tap.
+    func through(_ time: CMTime, sourced: Bool) {
+        for i in 0..<4096 {
+            l[i] = 0.5
+            r[i] = -0.25
+        }
+        list[0] = AudioBuffer(mNumberChannels: 1, mDataByteSize: 4096 * 4, mData: l)
+        list[1] = AudioBuffer(mNumberChannels: 1, mDataByteSize: 4096 * 4, mData: r)
+        context.process(
+            list.unsafeMutablePointer, frames: 4096, time: time, startOfStream: false,
+            sourced: sourced)
+    }
+    // The filler carries samples here, which the player's never does: a mark
+    // must hold none of them whatever they are.
+    through(CMTime(value: 960000, timescale: 48000), sourced: false)
+    let filler = sink.ring.drain()
+    let mark = filler.chunks.first
+    say("T17", filler.chunks.count == 1 && !filler.overran && mark?.start == 960000 && mark?.frames == 0
+        && mark?.filler == 4096 && mark?.left.isEmpty == true && mark?.right.isEmpty == true
+        && mark?.sampleRate == 48000 && mark?.streamEnd == 964096,
+        "a buffer with no duration at 960000: \(filler.chunks.count) chunk(s), start \(mark?.start ?? -1), frames \(mark?.frames ?? -1), "
+            + "length \(mark?.filler ?? -1), samples \(mark?.left.count ?? -1), overran \(filler.overran) (want 1, 960000, 0, 4096, 0, false)")
+    through(CMTime(value: 963072, timescale: 48000), sourced: true)
+    let audio = sink.ring.drain()
+    let chunk = audio.chunks.first
+    say("T17", audio.chunks.count == 1 && !audio.overran && chunk?.start == 963072 && chunk?.frames == 4096
+        && chunk?.filler == 0 && chunk?.channels == 2 && chunk?.left.allSatisfy { $0 == 0.5 } == true
+        && chunk?.right.allSatisfy { $0 == -0.25 } == true,
+        "a sourced buffer at 963072: \(audio.chunks.count) chunk(s), start \(chunk?.start ?? -1), frames \(chunk?.frames ?? -1), "
+            + "length \(chunk?.filler ?? -1), left \(chunk?.left.first ?? .nan), right \(chunk?.right.first ?? .nan)")
+    through(CMTime.invalid, sourced: false)
+    through(CMTime.invalid, sourced: true)
+    let untimed = sink.ring.drain().chunks.count
+    say("T17", untimed == 0, "a buffer with no time, filler or not: \(untimed) chunk(s) (want 0)")
+    // A pause's fillers (measured: twelve a second for five seconds) cost no
+    // frames, so sixty-three of them and then audio overrun nothing.
+    for _ in 0..<63 { through(CMTime(value: 967168, timescale: 48000), sourced: false) }
+    through(CMTime(value: 970240, timescale: 48000), sourced: true)
+    let after = sink.ring.drain()
+    let held = after.chunks.filter { $0.frames == 0 && $0.start == 967168 }.count
+    say("T17", held == 63 && !after.overran && after.chunks.last?.frames == 4096,
+        "63 fillers at one frame, then audio: \(held) marks, overran \(after.overran), the audio's frames \(after.chunks.last?.frames ?? -1)")
+}
+
+// MARK: - T18: marks in the sum (AU-161)
+
+/// `steadyPair`'s signals with each track delivering only `delivers`: the
+/// reference for a play whose tracks did not start on one frame.
+func steadyReference(_ delivers: [[Range<Int64>]], rate: Int, from: Int64, to: Int64) -> LoudnessReport {
+    let tracks = [
+        ProbeTrack(sine(997, amplitude: 0.1, rate: rate), sounding: [0..<Int64(60 * rate)],
+                   delivers: delivers[0], rate: rate),
+        ProbeTrack(sine(311, amplitude: 0.08, rate: rate), sounding: [0..<Int64(60 * rate)],
+                   delivers: delivers[1], rate: rate),
+    ]
+    return reference(tracks, rate: rate, from: from, to: to).finish()
+}
+
+do {
+    let rate = 48000
+    let far = Int64(60 * rate)
+    func marks(_ track: ProbeTrack, at frame: Int64, _ count: Int = 1) {
+        for _ in 0..<count { track.sink.mark(start: frame, frames: 4096, sampleRate: rate) }
+    }
+    func tick(_ rig: Rig) {
+        rig.now += 0.03
+        rig.live.consume(rig.meters, rate: rig.playRate, now: rig.now)
+    }
+    /// Audio goes on from `a` on track 1 and `b` on track 2, for `seconds`.
+    func resume(_ rig: Rig, _ a: Int64, _ b: Int64, seconds: Double = 2) {
+        rig.t = min(a, b)
+        rig.tracks[0].cursor = a
+        rig.tracks[1].cursor = b
+        rig.run(to: max(a, b) + rig.seconds(seconds))
+    }
+
+    // (a) A seek as the player delivers it (measured, #405): each track's
+    // fillers of the old position, track 1's at the new one, and in a later
+    // tick track 2's stale filler, its own at the new position and track 1's
+    // first audio; the audio 3072 and 4096 frames past the seek's frame.
+    do {
+        let rig = Rig(rate: rate, steadyPair(rate: rate))
+        rig.run(to: rig.seconds(3))
+        let before = rig.live.reading
+        let old = rig.t
+        let p = old + rig.seconds(2)
+        marks(rig.tracks[0], at: old)
+        marks(rig.tracks[1], at: old, 2)
+        marks(rig.tracks[0], at: p, 2)
+        tick(rig)
+        let jumped = rig.live.reading
+        marks(rig.tracks[1], at: old)
+        marks(rig.tracks[1], at: p)
+        rig.tracks[0].put((p + 3072)..<(p + 7168))
+        tick(rig)
+        resume(rig, p + 7168, p + 4096)
+        let r = rig.live.reading
+        let span = (r.toFrame ?? 0) - (r.fromFrame ?? 0)
+        let ref = steadyReference([[0..<far], [(p + 4096)..<far]], rate: rate,
+                                  from: r.fromFrame ?? 0, to: r.toFrame ?? 0)
+        let dI = abs((r.integratedLUFS ?? .nan) - (ref.integratedLUFS ?? .nan))
+        say("T18", jumped.resets == before.resets + 1 && r.resets == before.resets + 1 && r.lastReset == .jump
+            && r.fromFrame == p + 3072 && rig.live.fedFrames == span && span >= rig.seconds(1.9) && dI <= 0.01,
+            "a seek with fillers: resets \(before.resets) → \(jumped.resets) → \(r.resets) (want +1 once, \(r.lastReset?.rawValue ?? "nil")), "
+                + "from \(r.fromFrame ?? -1) (want \(p + 3072), the first audio), fed \(rig.live.fedFrames) of \(span), |ΔI| \(fmt(dI)) (≤ 0.01)")
+    }
+
+    /// Three seconds, one more buffer per track the sum never reaches, a stop.
+    func paused() -> (rig: Rig, reached: Int64, stream: Int64, reading: LiveLoudnessReading) {
+        let rig = Rig(rate: rate, steadyPair(rate: rate))
+        rig.run(to: rig.seconds(3))
+        for track in rig.tracks {
+            track.put(track.cursor..<(track.cursor + 4096))
+            track.cursor += 4096
+        }
+        rig.live.stop()
+        return (rig, rig.live.reading.toFrame ?? -1, rig.tracks[0].cursor, rig.live.reading)
+    }
+    func continued(_ name: String, _ rig: Rig, _ before: LiveLoudnessReading, reached: Int64,
+                   _ a: Int64, _ b: Int64) {
+        resume(rig, a, b)
+        let r = rig.live.reading
+        let span = (r.toFrame ?? 0) - (r.fromFrame ?? 0)
+        let ref = steadyReference([[0..<reached, a..<far], [0..<reached, b..<far]], rate: rate,
+                                  from: r.fromFrame ?? 0, to: r.toFrame ?? 0)
+        let dI = abs((r.integratedLUFS ?? .nan) - (ref.integratedLUFS ?? .nan))
+        say("T18", r.resets == before.resets && r.fromFrame == before.fromFrame && rig.live.fedFrames == span
+            && (r.toFrame ?? 0) >= max(a, b) + rig.seconds(1.9) && dI <= 0.01,
+            "\(name): resets \(before.resets) → \(r.resets) (want no reset), from \(r.fromFrame ?? -1) (kept \(before.fromFrame ?? -1)), "
+                + "the sum at \(reached), audio again at \(a) and \(b), fed \(rig.live.fedFrames) of \(span), |ΔI| \(fmt(dI)) (≤ 0.01)")
+    }
+
+    // (b) Pause and continue (measured): three fillers at each stream's end,
+    // then audio 3072 and 7167 frames past it.
+    do {
+        let (rig, reached, stream, before) = paused()
+        for track in rig.tracks { marks(track, at: stream, 3) }
+        continued("pause and continue", rig, before, reached: reached, stream + 3072, stream + 7167)
+    }
+    // (c) A pause of six seconds (measured): sixty-three fillers a track that
+    // a second stop drains before the audio comes, 3072 and 2560 frames on.
+    do {
+        let (rig, reached, stream, before) = paused()
+        for track in rig.tracks { marks(track, at: stream, 63) }
+        rig.live.stop()
+        continued("a long pause, its fillers drained by a stop", rig, before, reached: reached,
+                  stream + 3072, stream + 2560)
+    }
+    // (d) The tolerance is the stream's, not wider: audio more than 0.1 s past
+    // where the stream stood is a jump, stopped or not.
+    do {
+        let (rig, _, stream, before) = paused()
+        resume(rig, stream + 5375, stream + 5375)
+        let r = rig.live.reading
+        say("T18", r.resets == before.resets + 1 && r.lastReset == .jump && r.fromFrame == stream + 5375,
+            "a stop, then audio 5375 frames past the stream with no filler: resets \(before.resets) → \(r.resets) (\(r.lastReset?.rawValue ?? "nil")), "
+                + "from \(r.fromFrame ?? -1) (want +1, jump, \(stream + 5375))")
+    }
+    // (f) A seek made while paused, or just before the stop: the marks at the
+    // new position are drained by a stop (the second one, or the first), and
+    // the audio after them is the jump, forwards and backwards (AU-161 (c)).
+    for (name, secondStop, offset) in [("a seek while paused, its marks drained by a second stop", true, Int64(20)),
+                                       ("a seek just before the stop", false, Int64(20)),
+                                       ("a seek back while paused", true, Int64(-2))] {
+        let rig: Rig, stream: Int64, before: LiveLoudnessReading
+        if secondStop {
+            let rest = paused()
+            (rig, stream, before) = (rest.rig, rest.stream, rest.reading)
+        } else {
+            rig = Rig(rate: rate, steadyPair(rate: rate))
+            rig.run(to: rig.seconds(3))
+            (stream, before) = (rig.tracks[0].cursor, rig.live.reading)
+        }
+        let p = stream + rig.seconds(Double(offset))
+        for track in rig.tracks { marks(track, at: p, 2) }
+        rig.live.stop()
+        let rested = rig.live.reading
+        resume(rig, p + 3072, p + 4096)
+        let r = rig.live.reading
+        let span = (r.toFrame ?? 0) - (r.fromFrame ?? 0)
+        let ref = steadyReference([[0..<far], [(p + 4096)..<far]], rate: rate,
+                                  from: r.fromFrame ?? 0, to: r.toFrame ?? 0)
+        let dI = abs((r.integratedLUFS ?? .nan) - (ref.integratedLUFS ?? .nan))
+        say("T18", rested.resets == before.resets && r.resets == before.resets + 1 && r.lastReset == .jump
+            && r.fromFrame == p + 3072 && rig.live.fedFrames == span && span >= rig.seconds(1.9) && dI <= 0.01,
+            "\(name), to \(p): resets \(before.resets) → \(rested.resets) → \(r.resets) (\(r.lastReset?.rawValue ?? "nil")), "
+                + "from \(r.fromFrame ?? -1) (want +1 at the audio, jump, \(p + 3072)), fed \(rig.live.fedFrames) of \(span), |ΔI| \(fmt(dI)) (≤ 0.01)")
+    }
+    // (g) A tick at rate 0 takes two buffers rendered ahead out of the rings
+    // before it stops: the stream stands past them, so the pause's fillers
+    // there and the audio after them are a resume.
+    do {
+        let rig = Rig(rate: rate, steadyPair(rate: rate))
+        rig.run(to: rig.seconds(3))
+        let reached = rig.live.reading.toFrame ?? -1
+        for track in rig.tracks {
+            track.put(track.cursor..<(track.cursor + 4096))
+            track.put((track.cursor + 4096)..<(track.cursor + 8192))
+            track.cursor += 8192
+        }
+        rig.playRate = 0
+        tick(rig)
+        rig.playRate = 1
+        let before = rig.live.reading
+        let stream = rig.tracks[0].cursor
+        for track in rig.tracks { marks(track, at: stream, 3) }
+        continued("a tick at rate 0 that took 8192 frames rendered ahead, then pause and continue", rig, before,
+                  reached: reached, stream + 3072, stream + 2560)
+    }
+    // (e) A stream that ran on at another rate is not resumed: ×2 for a second
+    // and a stop (and a second stop, as a tick at rate 0 makes), and a stop
+    // and then ×2, each followed by ×1 where it stands.
+    for stopFirst in [false, true] {
+        let rig = Rig(rate: rate, steadyPair(rate: rate))
+        rig.run(to: rig.seconds(3))
+        let before = rig.live.reading
+        if stopFirst { rig.live.stop() }
+        rig.playRate = 2
+        rig.run(to: rig.seconds(4))
+        if !stopFirst {
+            rig.live.stop()
+            rig.live.stop()
+        }
+        rig.playRate = 1
+        rig.run(to: rig.seconds(6))
+        let r = rig.live.reading
+        say("T18", r.resets == before.resets + 1 && r.lastReset == .jump && r.fromFrame.map { $0 >= rig.seconds(4) } == true,
+            "\(stopFirst ? "a stop, then ×2 for 1 s" : "×2 for 1 s, then two stops"), then ×1: resets \(before.resets) → \(r.resets) "
+                + "(\(r.lastReset?.rawValue ?? "nil")), from \(r.fromFrame ?? -1) (want +1, jump, ≥ \(rig.seconds(4)))")
+    }
 }

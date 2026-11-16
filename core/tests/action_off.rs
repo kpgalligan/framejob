@@ -277,6 +277,23 @@ fn off_refuses_an_unknown_slot_a_deeper_path_and_a_slot_the_patch_names() {
     );
 }
 
+#[test]
+fn off_refuses_the_whole_eq_beside_one_of_its_slots_in_either_order() {
+    // #398: `key_off` would write the slot's `{slot: null}` over the whole
+    // EQ's `null`, dropping the whole-EQ off in silence.
+    let project = eq_project(json!({}));
+    let sentence = "off names both \"audio.eq\" and \"audio.eq.high_pass\": keying the whole EQ \
+                    off keys every slot off, so name one or the other";
+    for off in [
+        json!(["audio.eq", "audio.eq.high_pass"]),
+        json!(["audio.eq.high_pass", "audio.eq"]),
+    ] {
+        assert_eq!(project.errors(&op(json!({}), off)), sentence);
+    }
+    let whole = project.apply(&op(json!({}), json!(["audio.eq"])));
+    assert_eq!(end(&whole), json!({ "audio": { "eq": null } }));
+}
+
 // ---- a qualifier range keyed off (spec §11 GR-36) --------------------------
 
 /// Clip 11 as an adjustment clip with all three ranges on, and one linear

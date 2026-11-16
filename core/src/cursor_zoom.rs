@@ -233,11 +233,20 @@ pub(crate) fn plan_zooms(
                 continue;
             }
             let cut = end(w[0]);
-            let in_force = moved
+            // Only the hold spanning the cut is in force there: a hold
+            // closed at or before it (its Back maybe too short to plan)
+            // leaves no aim behind (#447).
+            let spanning = plan
+                .holds
                 .iter()
-                .filter(|(_, p)| p.to <= cut)
-                .max_by_key(|(_, p)| p.to)
-                .and_then(|(_, p)| p.aim);
+                .rposition(|&(lo, hi)| lo < cut && cut < hi);
+            let in_force = spanning.and_then(|h| {
+                moved
+                    .iter()
+                    .filter(|(_, p)| p.hold == h && p.to <= cut)
+                    .max_by_key(|(_, p)| p.to)
+                    .and_then(|(_, p)| p.aim)
+            });
             if let Some(aim) = in_force {
                 let target = next.require_clip(w[1].id)?;
                 let region = zoom_region(&next, target, 0, aim, scale);

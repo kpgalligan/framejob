@@ -488,9 +488,15 @@ to pay a toll starts from it. A file not listed has no named seam yet.
 
 - `GraphicPrefetch.swift`: at 600 since #127 G6 phase 4 (spec §11 G-38), which moved `Slot`
   unchanged to the foot of `LayerRenderersGraphic.swift` (a pure move committed alone, 3551b60).
-  The next seam: the background-pass branches (`start(background:)`'s arm, `stopBackground`,
-  the pass's end line) out whole to a `GraphicPrefetch+Background.swift` extension, with what
-  they read made internal, a pure move gated alone before anything else lands in the file.
+  #596 (spec §11 PR-18) paid the next toll with a pure move gated alone: `stopBackground` and
+  the pass's two arms of `draw` and `finish` (as `passDeferred` and `passFinished`, bodies
+  unchanged, the guards left at their call sites) out to `GraphicPrefetch+Background.swift`,
+  with `Entry`, `Session`, `Job`, `sessions` and `release(_:from:)` made internal; 575 lines
+  after it, 576 once PR-18's worker line landed. The rest of that seam, if the file is at the
+  cap again: `start`'s refusal arm and its `beginAhead` line, `claim`'s and `insert`'s `full`
+  arms, `stop`'s and `work`'s end lines and `logLine`'s pass branch, each one statement inside a
+  lock hold or a wait loop, four of them other proofs' mutant anchors
+  (`background_render_proof.py`), so a move there re-points those tables.
 
 - `ProjectSnapshot.swift`: a property group's snapshot types out, whole. The precedents are
   `TextProps.swift`, `ProjectSnapshot+Graphic.swift`, `MediaSnapshot.swift` (issue batch
@@ -816,6 +822,14 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   1336 before, 1182 after; `ProjectDocument+Reverse.swift` is 169. The next seam:
   `generateCaches()` with its doc to `ProjectDocument+Caches.swift` (SW4a, the road map's cap
   table).
+- `ProjectDocument.swift`: #568 gave up `close()`'s body before the close took on shutting the
+  editors' players: the once-only block with its comment moved verbatim to
+  `ProjectDocument+Close.swift` as `releaseOnClose()`, the override keeping `releaseOnClose()`
+  and `super.close()` (so `co2b_proof.py`'s anchor on `override func close()` still matches);
+  `didReleaseRecipeKey` stayed, since an extension cannot hold it, and lost `private`. A pure
+  move gated alone. `wc -l app/Sources/ProjectDocument.swift`: 1182 before, 1172 after;
+  `ProjectDocument+Close.swift` is 20. The next seam is unchanged: `generateCaches()` with its
+  doc to `ProjectDocument+Caches.swift`.
 - `InspectorPane.swift`: the precedents are `InspectorSection.swift`, `InspectorSlider.swift`,
   `InspectorBinding+Writes.swift` and `InspectorRows.swift` (issue batch B87 phase 3: `// MARK: -
   Row builders` through `changedRGBA`, a pure move gated alone before `inspectorRow(discrete:)`
@@ -941,7 +955,11 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `add_shape_clip` still read through typed locals, `private` for the other sixteen; a pure move
   gated with GR1's other four, the Debug catalog equal before and after, parsed. `wc -l
   app/Sources/AgentCatalog+Clips.swift`: 706 before, 513 after; `AgentCatalog+Properties.swift`
-  is 247. No next seam is named.
+  is 247. #602 paid the next, ahead of `lift_range`'s `tracks` sentence: the three range and
+  time rows (`lift_range`, `insert_time`, `close_gap`) went whole to `AgentCatalog+Range.swift`
+  as `rangeTools(ticks:trackDescription:)`, spliced back in after `audioTools` and before
+  `set_speed`; a pure move gated alone, the Debug catalog equal before and after, parsed.
+  `wc -l`: 592 before, 563 after; `AgentCatalog+Range.swift` is 57. No next seam is named.
 - `AgentServer+Scope.swift`: the envelope rule (`checkCallScope`, `effectiveScope`, `idScope`,
   `addressed`, `checkDocumentLevelTicks`, `scopeLanding`, `scopeFailure`) against `set_scope` the
   tool (`setScope`, `nestScopePath`, `pathToClip`, `applyNestScope`, `commonPrefix`,
@@ -1033,6 +1051,13 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   name the moved pair. A pure move gated alone. `wc -l app/Sources/Playback.swift`: 592 before,
   550 after; `Playback+PreviewQuality.swift` 54 → 100. The next seam: `refreshPausedFrame()` out
   to `Playback+Scope.swift`.
+- `Playback.swift`: #568 paid that seam before `shutDown()` and its latch: `refreshPausedFrame()`
+  with its doc moved verbatim to the end of `Playback+Scope.swift`, reading `rate` and
+  `currentItem` where it read `player.rate` and `player.currentItem`; `player` stays private. The
+  type's doc and `+Scope`'s name it. A pure move gated alone. `wc -l app/Sources/Playback.swift`:
+  590 before, 548 after; `Playback+Scope.swift` 63 → 106. The next seam: `// MARK: - Transport`
+  (`play`, `pause`, `togglePlayPause`, `setRate`) out to a `Playback+Transport.swift` behind an
+  internal setter for the player's rate.
 - `AppDelegate+Menus.swift`: a submenu builder out (the precedent is
   `AppDelegate+GraphicMenu.swift`). The grading road map's GR1 moved the Clip menu's submenu
   builders (`backgroundMenu`, `transitionMenu`, `motionMenu`, `motionSlotMenu`, `labelMenu`,

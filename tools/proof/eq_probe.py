@@ -28,8 +28,11 @@ AU-30..AU-36, AU-39).
       samples within the first 4 s, with EQ, hum and a left pick.
   Q10 µs per 1024 stereo frames at all 17 positions, reported.
   Q11 on a noise-reduced track the head stages switch at the head lookup's cut.
+  Q12 the EQ section's summary (`AudioPane.eqSummary`, AU-38 as amended, #407):
+      "off" with no EQ and for a stored `set_audio {eq: {}}`, bypassed or not;
+      "1 on" with a high-pass on, "bypassed" with it bypassed.
 
---mutants runs M1..M10, each over its own copy of app/Sources, scored killed
+--mutants runs M1..M10 and M12, each over its own copy of app/Sources, scored killed
 when one of its named rows fails; build failures are scored. M11 (the patch
 template without `hum`) is by hand against core/tests/audio_eq.rs. Needs
 ffmpeg, numpy and samples/Rode-usb-mic.m4a. Output is under
@@ -51,7 +54,7 @@ RODE = ROOT / "samples/Rode-usb-mic.m4a"
 WORK = ROOT / "tools/proof/work/eq-probe"
 FIXTURES = WORK / "fixtures"
 FS = 48000
-ROWS = [f"Q{n}" for n in range(1, 12)]
+ROWS = [f"Q{n}" for n in range(1, 13)]
 
 # (name, killing rows, [(file, old, new), …])
 MUTANTS = [
@@ -92,6 +95,10 @@ MUTANTS = [
          "static let sampleRate = 44_100.0")]),
     ("M10 hum-q-not-depth-scaled", ["Q1"], [
         ("AudioBiquad.swift", "q: 10 * Double(k) / a,", "q: 10 * Double(k),")]),
+    ("M12 empty-eq-counted", ["Q12"], [
+        ("AudioPane+EQ.swift",
+         "        guard let eq, eq.activeCount > 0 else { return \"off\" }\n",
+         "        guard let eq else { return \"off\" }\n")]),
 ]
 
 # ---- the oracle: RBJ's cookbook in numpy ------------------------------------
@@ -288,7 +295,7 @@ def main():
         check("source probe builds", False, problem)
         return 1
     good = all(rows.get(row) for row in ROWS)
-    good &= check("every row Q1..Q11 ran", all(row in rows for row in ROWS),
+    good &= check("every row Q1..Q12 ran", all(row in rows for row in ROWS),
                   ", ".join(row for row in ROWS if row not in rows) or "")
     passed = sum(1 for row in ROWS if rows.get(row))
     print(f"\n{passed}/{len(ROWS)} rows passed")

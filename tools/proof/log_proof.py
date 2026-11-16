@@ -279,7 +279,10 @@ the depth test is `>= 8`), `vpcc-depth-nibble` (L14, L16, L17: the depth
 read as byte 6's low nibble, the chroma and range bits), `vp9-track-wide`
 (L18: `shows` counts the composition track by any description it lists, not
 its segment at the frame time) and `vp9-jpeg-deep` (L18: `render_frame`
-passes `keepsDepth: true` for JPEG too). `hevc-read-always` (L18, docs bugs b3,
+passes `keepsDepth: true` for JPEG too; a survivor, recorded as equivalent as
+`precision_proof.py`'s `jpeg-deep` is: the JPEG's bytes do not move, at full
+size or at `max_width` 512, run 2026-11-11 for #577, and L18 stays the
+guard). `hevc-read-always` (L18, docs bugs b3,
 spec §11 PR-14: `renderFrameReported`'s bits test dropped, so a frame the
 generator answers deep is re-read). `isDeep`'s VP9 subtype guard has no
 mutant: no fixture but VP9 carries a `vpcC` atom (L16 prints each file's), so
@@ -676,8 +679,8 @@ MUTANTS = {
                          "            if (CompositionBuilder.keyed(track, \"formatDescriptions\") "
                          "as? [CMFormatDescription] ?? []).contains(where: isDeep) "
                          "{ return true }\n")], ["L18"]),
-    "vp9-jpeg-deep": ([(RENDER_SWIFT, "            graphics: graphics, keepsDepth: format.carriesDepth)\n",
-                        "            graphics: graphics, keepsDepth: true)\n")], ["L18"]),
+    "vp9-jpeg-deep": ([(RENDER_SWIFT, "            graphics: graphics, keepsDepth: format.carriesDepth,\n",
+                        "            graphics: graphics, keepsDepth: true,\n")], ["L18"]),
     "hevc-read-always": ([("app/Sources/Exporter+Frame.swift",
                            "        if keepsDepth, let shallow = image, shallow.bitsPerComponent <= 8,\n",
                            "        if keepsDepth, image != nil,\n")], ["L18"]),

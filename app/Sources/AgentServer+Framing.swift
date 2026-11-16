@@ -138,7 +138,8 @@ extension AgentServer {
             {
                 do {
                     filled?["turns"] = try FramingSpeaker.turns(
-                        document: document, clip: shown, mics: call.mics ?? [])
+                        document: document, clip: shown, mics: call.mics ?? [],
+                        silence: .refuses)
                 } catch let refusal as FramingSpeaker.Refusal {
                     throw ToolError(message: "reframe_clip was refused: " + refusal.sentence)
                 }

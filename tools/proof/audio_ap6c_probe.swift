@@ -343,7 +343,7 @@ do {
             refusals.append(refusal.op + ": " + refusal.reason)
         }
     }
-    let analysed = RecordingEnhance.isAnalysed([3], in: document)
+    let analysed = RecordingEnhance.isAnalysed([3], in: document, scope: document.scope)
     RecordingEnhance.follow(voiceOver(wav.path), in: document)
     let enhanceTimer = RecordingEnhance.timer(of: document)
     let deadline = Date().addingTimeInterval(20)
@@ -356,7 +356,7 @@ do {
     check("P5", "after .enhance the follow has ended: not pending, its timer invalid, one refusal "
             + "of enhance_voice naming −70 LUFS",
           measured.value && analysed && !RecordingEnhance.isPending(document)
-            && enhanceTimer?.isValid == false && refusals.count == 1
+            && !RecordingEnhance.isMeasuring(document) && enhanceTimer?.isValid == false && refusals.count == 1
             && refusals.first?.hasPrefix("enhance_voice: Nothing could be enhanced.") == true
             && refusals.first?.contains("−70 LUFS") == true,
           "measured \(measured.value), analysed \(analysed), pending "

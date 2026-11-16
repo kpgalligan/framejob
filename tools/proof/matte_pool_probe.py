@@ -34,6 +34,12 @@ default. **A build failure is a scored FAILURE (B0), never an exit.**
     and (0, 0) after frame 50.
 - **P3**: a new destination size empties the pool, and the targets taken
   after it are that size.
+- **P4** (spec §11 PR-19, #597): at 64×64, a frame begun deep after a shallow
+  one holds its composite and no coverage; its coverage is a new `r16Unorm`
+  texture and its composite the one the shallow frame took; a second deep
+  frame keeps that coverage, and a shallow one after it makes a new `r8Unorm`
+  one. Printed beside it: one 3840×2160 coverage's `allocatedSize` at each
+  depth, as the device reports it.
 
 `--mutant NAME` builds the probe over a COPY of one Swift file with one
 anchor replaced (asserted to occur exactly once), in place of the tree's,
@@ -43,6 +49,8 @@ into its own folder, and runs every row:
   trim-never     (`Compositor+Matte.swift`) `endFrame` releases nothing: P2
   trim-early     (`Compositor+Matte.swift`) the window is `keepFrames − 1`
                  frames: P2
+  depth-kept     (`Compositor+Matte.swift`) a depth change keeps the
+                 coverages: P4
 (`matte_proof.py`'s `free-ignores-liveness` and `early-resolve` edit
 `MattePlan.swift` too, and are scored by its N5 against the app.)
 Rule R: exit 0 = every named row FAILED (caught), 1 = one passed (survived),
@@ -82,6 +90,11 @@ MUTANTS = {
         "Compositor+Matte.swift",
         "        let window = MattePool.keepFrames\n",
         "        let window = MattePool.keepFrames - 1\n", ["P2"]),
+    # Spec §11 PR-19: a depth change keeps the coverages of the other depth.
+    "depth-kept": (
+        "Compositor+Matte.swift",
+        "            self.deep = deep\n            coverages = []\n",
+        "            self.deep = deep\n", ["P4"]),
 }
 rows = {}
 
@@ -198,6 +211,7 @@ def main():
     if "error" in pool:
         check("P2 the pool on the device", False, pool["error"])
         check("P3 a new size", False, pool["error"])
+        check("P4 a new depth", False, pool["error"])
     else:
         print(f"       device: {pool.get('device')}", flush=True)
         check("P2 take, give, take is the same texture; two takes are two",
@@ -221,8 +235,22 @@ def main():
               and r.get("old_size") == [64, 64] and r.get("composite_size") == [32, 16]
               and r.get("coverage_size") == [32, 16] and r.get("composite_is_new") is True,
               json.dumps(r, sort_keys=True))
+        d = pool.get("depth") or {}
+        r8, r16 = d.get("r8"), d.get("r16")
+        uhd = d.get("uhd_bytes") or {}
+        print(f"       one 3840x2160 coverage: {uhd.get('shallow', 0):,} B r8Unorm, "
+              f"{uhd.get('deep', 0):,} B r16Unorm ({UHD:,} and {2 * UHD:,} B of pixels)",
+              flush=True)
+        check("P4 a deep frame after a shallow one: its composite kept, a new r16Unorm coverage; "
+              "the same depth keeps it; a shallow frame after makes a new r8Unorm one",
+              r8 is not None and r16 is not None and d.get("shallow_format") == r8
+              and d.get("after_deep_begin") == [1, 0] and d.get("composite_kept") is True
+              and d.get("deep_format") == r16 and d.get("deep_is_new") is True
+              and d.get("deep_again_same") is True and d.get("back_format") == r8
+              and d.get("back_is_new") is True,
+              json.dumps({k: v for k, v in d.items() if k != "uhd_bytes"}, sort_keys=True))
 
-    scored = ["B0", "P1", "P2", "P3"]
+    scored = ["B0", "P1", "P2", "P3", "P4"]
     passed = sum(1 for name in scored if rows.get(name))
     print(f"{passed}/{len(scored)}")
     if args.mutant:

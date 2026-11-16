@@ -35,6 +35,9 @@ final class AudioPane: InspectorPaneView {
     let isolationMemo = IsolationCache.Memo()
     /// Voice Effect's Status read-out (AU-146), dropped with it.
     let voiceMemo = IsolationCache.Memo(compute: VoiceCache.status(of:in:))
+    /// The Volume section's Normalize button, whose tooltip follows the
+    /// chosen mode in every open window (AU-15, #406).
+    weak var normalizeButton: OptionButtonControl?
 
     override init(inspector: InspectorViewController) {
         super.init(inspector: inspector)
@@ -46,6 +49,15 @@ final class AudioPane: InspectorPaneView {
         NotificationCenter.default.addObserver(
             self, selector: #selector(offlineAudioSettled(_:)), name: .reversedMediaDidChange,
             object: nil)
+        // Normalize's mode or target changed in any window (#406).
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(normalizeChoiceChanged(_:)),
+            name: NormalizeChoice.didChangeNotification, object: nil)
+    }
+
+    @objc private func normalizeChoiceChanged(_ note: Notification) {
+        normalizeButton?.toolTip = AudioPane.normalizeTip()
+        inspector?.refresh(isLive: false)
     }
 
     @objc private func offlineAudioSettled(_ note: Notification) {
@@ -155,9 +167,11 @@ final class AudioPane: InspectorPaneView {
     /// **A run that can normalise nothing beeps**, and so does a second press
     /// on an already-normalised selection: `apply` refuses an empty op list,
     /// and `ProjectDocument.applyEdit` refuses an identity edit — the recorded
-    /// consequence `SpeedSheetController` carries for the same reason. The
-    /// button is not the place that explains WHY a clip was skipped; the tool
-    /// reports each reason by name under `skipped`.
+    /// consequence `SpeedSheetController` carries for the same reason. In
+    /// Loudness mode the inspector's foot then names each clip skipped or
+    /// left away from the target, and says the press changed nothing when it
+    /// did (spec §11 AU-169, `AudioMeasureDoor.land`); the tool reports the
+    /// same under `skipped` and `note`.
     /// The selected clips Normalize is offered for, which is `audioClips`
     /// minus the ones `AudioNormalize` could only refuse.
     ///
@@ -521,7 +535,7 @@ final class AudioPane: InspectorPaneView {
             id: "audio.mix", title: "Mix",
             summary: {
                 let pan = binding.audioProps.pan
-                if abs(pan) < 0.005 { return binding.audioProps.mono ? "mono" : "centre" }
+                if abs(pan) < 0.005 { return binding.audioProps.mono ? "mono" : "center" }
                 return String(format: "%@ %.0f", pan < 0 ? "left" : "right", abs(pan) * 100)
             },
             reset: { binding.apply("Mix", audio: AudioPatch(mono: false, pan: 0)) },
@@ -538,7 +552,7 @@ final class AudioPane: InspectorPaneView {
                     [
                         inspectorReadout {
                             let pan = binding.audioProps.pan
-                            if abs(pan) < 0.005 { return "centre" }
+                            if abs(pan) < 0.005 { return "center" }
                             return String(
                                 format: "%@ %.0f", pan < 0 ? "left" : "right", abs(pan) * 100)
                         }

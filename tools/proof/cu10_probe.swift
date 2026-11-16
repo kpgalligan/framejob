@@ -1,8 +1,9 @@
 // Road map creator-jobs CU10 — the recorder polishes on landing, the rows no grant and no media
 // are needed for (spec §11 CU-100…CU-103): the recorder panel's "When it lands:" rows (Q1), their
 // keys' absent readings, persist and restore (Q2), their enabling and `applyPolish`'s gates (Q3),
-// `RecordingPolish.commands(of:)`'s order (Q4), `decide`'s arms (Q5), and `record_screen`'s
-// polish refusals and stranger lists (Q6).
+// `RecordingPolish.commands(of:)`'s order (Q4), `decide`'s arms (Q5), `record_screen`'s
+// polish refusals and stranger lists (Q6), and the follow-ups' clips read in the landing's
+// container while a nest is open (Q7, #458).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own `main.swift`,
 // against `libframejob_core.a`, through `swift_build.py`:
@@ -168,6 +169,61 @@ do {
     row("Q6", problems, "recordingPolish refuses place then keys, in the order auto_zoom, "
         + "shortcut_overlays, speed_up_typing, in CU-102 (b)'s sentences; voice_over and camera "
         + "refuse the three by name")
+}
+
+// MARK: - Q7: the follow-ups read the landing's container (#458)
+
+do {
+    var problems: [String] = []
+    let second: Ticks = 600_000
+    // A screen recording at P with a cursor file, landed at the top level as clip `landed`; a
+    // nest holding a clip of another media; the open container the nest.
+    let screen = "/nowhere/cu10-q7-screen.mov"
+    let doc = ProjectDocument()
+    let track = doc.project.snapshot.tracks.first?.id ?? 0
+    doc.performGroupedEdit("Media", [
+        .addMedia(descriptor: MediaDescriptor(
+            path: screen, kind: .video, duration: 5 * second, width: 1920, height: 1080,
+            fps: .thirty, hasVideo: true, hasAudio: false,
+            cursor: MediaCursor(path: "/nowhere/cu10-q7-screen.cursor", inPicture: true))),
+        .addMedia(descriptor: MediaDescriptor(
+            path: "/nowhere/cu10-q7-other.mov", kind: .video, duration: 5 * second, width: 1920,
+            height: 1080, fps: .thirty, hasVideo: true, hasAudio: false)),
+    ])
+    let media = doc.project.snapshot.media
+    let screenID = media.first { $0.path == screen }?.id ?? 0
+    let otherID = media.first { $0.path != screen }?.id ?? 0
+    doc.performGroupedEdit("Clips", [
+        .addClip(track: track, media: screenID, at: 0),
+        .addClip(track: track, media: otherID, at: 10 * second),
+    ])
+    let clips = doc.project.snapshot.clips
+    let landed = clips.first { $0.source.mediaID == screenID }?.id ?? 0
+    let inner = clips.first { $0.source.mediaID == otherID }?.id ?? 0
+    doc.performGroupedEdit("Nest", [.nest(clips: [inner])])
+    let after = doc.project.snapshot
+    let nestClip = after.clips.first { $0.source.nestID != nil }
+    if let nestClip, let nest = nestClip.source.nestID {
+        doc.setNestPath([NestScopeStep(nest: nest, clip: nestClip.id)], playhead: 0, selection: [])
+    }
+    expect(&problems, "the open container is the nest", doc.scope != nil, true)
+    expect(&problems, "the landed clip is not in the open container",
+           doc.editedProject.snapshot.clip(landed) == nil, true)
+    let found = RecordingPolish.screenClips([screen], in: doc, scope: nil)
+    expect(&problems, "screenClips in the landing's container", found, [landed])
+    expect(&problems, "present in the landing's container",
+           RecordingEnhance.present([landed], in: doc, scope: nil), [landed])
+    let busy = RecordingEnhance.isBusy(doc, scope: nil)
+    expect(&problems, "busy while the nest is open", busy, true)
+    let step = RecordingPolish.decide(
+        command: .autoZoom, clips: found, enhancing: false, ready: true, busy: busy, elapsed: 0)
+    expect(&problems, "decide waits, not drops", "\(step)", "\(RecordingPolish.Step.wait)")
+    let enhance = RecordingEnhance.decide(
+        clips: RecordingEnhance.present([landed], in: doc, scope: nil), analysed: true,
+        busy: busy, elapsed: 0)
+    expect(&problems, "Enhance waits, not drops", "\(enhance)", "\(RecordingEnhance.Step.wait)")
+    row("Q7", problems, "with a nest open, the landed screen clip \(landed) is still found in the "
+        + "landing's (top-level) container; busy, so both follow-ups wait rather than drop")
 }
 
 // MARK: - The panel

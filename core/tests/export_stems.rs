@@ -9,9 +9,10 @@
 //! clip's track; overlapping clips on one track both labelled with it);
 //! `tracks` and `names` group, order and name their stems as AU-108 says
 //! (`Track N` for an unnamed track, the ` (Track N)` suffix, `/` and `:` as
-//! `-`); a muted track, a track silenced by another's solo and a track of
-//! pictures only have no stem; every refusal names its cause; only the three
-//! audio rows list `stems`; and settings not asked for stems carry no key.
+//! `-`, names compared Unicode-equivalent and ignoring case); a muted track,
+//! a track silenced by another's solo and a track of pictures only have no
+//! stem; every refusal names its cause; only the three audio rows list
+//! `stems`; and settings not asked for stems carry no key.
 
 mod common;
 
@@ -237,6 +238,32 @@ fn names_mode_groups_case_insensitively_by_the_first_spelling() {
             ("Track 4", &[5]),
             ("Track 5", &[6]),
         ])
+    );
+}
+
+#[test]
+fn names_differing_only_in_unicode_normalisation_are_one_name() {
+    // APFS stores a precomposed and a decomposed é, in any case, as one file
+    // name, so they group in `names` and take the suffix in `tracks` (#394).
+    let grouped = one_each(vec![
+        track(2, "caf\u{e9}"),
+        track(3, "CAFE\u{301}"),
+        track(4, "Music"),
+    ]);
+    assert_eq!(
+        stems(&grouped, "audio_wav", "names"),
+        named(&[("caf\u{e9}", &[2, 3]), ("Music", &[4])])
+    );
+    let apart = one_each(vec![track(2, "caf\u{e9}"), track(3, "cafe\u{301}")]);
+    assert_eq!(
+        stems(&apart, "audio_wav", "tracks"),
+        named(&[("caf\u{e9}", &[2]), ("cafe\u{301} (Track 2)", &[3])])
+    );
+    // A letter precomposed only in lowercase against its decomposed capital.
+    let caron = one_each(vec![track(2, "\u{1F0}"), track(3, "J\u{30C}")]);
+    assert_eq!(
+        stems(&caron, "audio_wav", "names"),
+        named(&[("\u{1F0}", &[2, 3])])
     );
 }
 

@@ -16,8 +16,10 @@ struct AudioBiquadCoefficients: Equatable {
 
 /// What one clip's EQ and hum notch ask the stage for, in the stage's units,
 /// held to the model's ranges (a hand-edited file can carry anything; the
-/// core's `clamp_eq` and `clamp_hum` say the same). Plain stored values and
-/// small structs only, so comparing two on the audio thread allocates nothing.
+/// core's `clamp_eq` and `clamp_hum` say the same for every value a file can
+/// hold. A NaN frequency, which no JSON carries, is 1000 Hz here and its
+/// slot's own default there). Plain stored values and small structs only, so
+/// comparing two on the audio thread allocates nothing.
 struct AudioEQSettings: Equatable {
     /// A Butterworth pass: its corner and how many sections (1 is
     /// 12 dB/octave, 2 is 24).

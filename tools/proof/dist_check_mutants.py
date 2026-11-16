@@ -20,13 +20,23 @@ framework removed, its binary's signature removed (`sparkle-unsigned`) or its
 first helper (`dist_check.sparkle_helper_paths`' order) re-signed ad hoc
 without the hardened runtime, or the Info.plist copy's `SUFeedURL` emptied
 (`feed-empty`), its `SUPublicEDKey` made base64 of 31 bytes (`key-short`) or,
-in Release's, its `SUFeedURL` set to Distribution's (`release-feed`), or a
+in Release's, its `SUFeedURL` set to Distribution's (`release-feed`), or its one
+`CFBundleURLTypes` row given a second scheme, `framejob-debug` (`link-scheme`, either side,
+which D46 or D47 must refuse; spec §11 G-49 (i)), or a
 licence text removed (`licence-missing`: Distribution's `libvpx/LICENSE`, which
 D41 must refuse) or changed (`licence-changed`: a byte appended to Release's
 `svt-av1/PATENTS.md`, which D40 must refuse), or the acknowledgements removed
-(`acknowledgements-missing`, Release's, which D42 must refuse) or their first
+(`acknowledgements-missing`, Release's, which D42 must refuse), their first
 `== crate ` header line deleted (`acknowledgements-crate-dropped`,
-Distribution's, which D43 must refuse). The
+Distribution's, which D43 must refuse), their `== package slaude ` header line
+deleted (`acknowledgements-slaude-dropped`, Release's, D42) or a
+`== runtime bun 1.3.6 ==` header added, the Bun helper's entry (`acknowledgements-bun-listed`,
+Distribution's, D43; spec §11 SA-10). The helper's mutations (spec §11 SA-8):
+`no-runtime` re-signs it ad hoc without the hardened runtime, `extra-entitlement`
+with the hardened runtime and `com.apple.security.cs.allow-jit`, the Bun helper's
+one entitlement, which D10 / D11 must refuse now that it holds none, and
+`marker` writes the needle over its `compaction_instructions` bytes and re-signs
+it with the hardened runtime. The
 other side is the real app. Nothing is written into `build/`. Seven cases
 mutate a whole bundle, the real app `ditto`ed to `<case>/<side>/Frame Job.app`:
 `app-entitlements` re-signs Distribution ad hoc with
@@ -54,13 +64,13 @@ turns the first of Release's load commands at least as long as
 refuse (CX-4: never a codec dylib).
 
 A case passes iff dist_check's FAIL ids equal the expected set exactly, its
-last line is `dist_check: <43 - |set|>/43`, and it exits 0 for an empty set
+last line is `dist_check: <47 - |set|>/47`, and it exits 0 for an empty set
 and 1 otherwise. `control` (both real) and `skeleton` (both skeletons,
 helpers, proxies and snapshots copied untouched) expect nothing to fail: they
 prove the skeleton is not itself a failure. A setup command that fails (a
 copy, a `codesign`, the offset not found) is a scored FAIL naming it. Each
 case's directory is removed after scoring. The last line is
-`dist_check_mutants: <passed>/36`; the exit is 0 only at 36/36.
+`dist_check_mutants: <passed>/39`; the exit is 0 only at 39/39.
 
 The control needs a Distribution build whose `SUPublicEDKey` passes D31: until
 the owner's key lands, build Distribution with a stand-in 32-byte key on the
@@ -85,7 +95,6 @@ import proof_app  # noqa: E402
 ROOT = dist_check.ROOT
 WORK = os.path.join(HERE, "work", "dist_check_mutants")
 DIST_CHECK = os.path.join(HERE, "dist_check.py")
-AGENT_ENTITLEMENTS = os.path.join(ROOT, "agent", "entitlements.plist")
 ANCHOR = b"compaction_instructions"
 FAIL_ID = re.compile(r"^  FAIL (D\d+)\b", re.M)
 LAST = re.compile(r"dist_check: (\d+)/(\d+)\s*$")
@@ -100,7 +109,6 @@ CASES = [
     ("no-runtime-dist", ("dist",), "no-runtime", {"D9"}),
     ("extra-entitlement-release", ("release",), "extra-entitlement", {"D10"}),
     ("extra-entitlement-dist", ("dist",), "extra-entitlement", {"D11"}),
-    ("no-entitlements-dist", ("dist",), "no-entitlements", {"D11"}),
     ("marker-release", ("release",), "marker", {"D12"}),
     ("marker-dist", ("dist",), "marker", {"D13"}),
     ("app-entitlements-dist", ("dist",), "app-entitlements", {"D14"}),
@@ -128,6 +136,11 @@ CASES = [
     ("licence-changed-release", ("release",), "licence-changed", {"D40"}),
     ("acknowledgements-missing-release", ("release",), "acknowledgements-missing", {"D42"}),
     ("acknowledgements-crate-dropped-dist", ("dist",), "acknowledgements-crate-dropped", {"D43"}),
+    ("acknowledgements-slaude-dropped-release", ("release",), "acknowledgements-slaude-dropped",
+     {"D42"}),
+    ("acknowledgements-bun-listed-dist", ("dist",), "acknowledgements-bun-listed", {"D43"}),
+    ("link-scheme-release", ("release",), "link-scheme", {"D46"}),
+    ("link-scheme-dist", ("dist",), "link-scheme", {"D47"}),
 ]
 # The cases that mutate a whole `ditto`ed bundle rather than a skeleton.
 WHOLE = {"app-entitlements", "app-entitlements-mic-only", "noop-sign", "seal-broken",
@@ -182,7 +195,7 @@ def info_plist(app, real_app, other_app, mutation):
     (spec §11 PUB-6..PUB-8, D30–D32)."""
     target = os.path.join(app, dist_check.INFO_PLIST)
     copy_in(os.path.join(real_app, dist_check.INFO_PLIST), target)
-    if mutation not in ("feed-empty", "key-short", "release-feed"):
+    if mutation not in ("feed-empty", "key-short", "release-feed", "link-scheme"):
         return
     try:
         with open(target, "rb") as handle:
@@ -191,12 +204,15 @@ def info_plist(app, real_app, other_app, mutation):
             info["SUFeedURL"] = ""
         elif mutation == "key-short":
             info["SUPublicEDKey"] = base64.b64encode(b"\1" * 31).decode("ascii")
+        elif mutation == "link-scheme":
+            info["CFBundleURLTypes"][0]["CFBundleURLSchemes"].append("framejob-debug")
         else:
             with open(os.path.join(other_app, dist_check.INFO_PLIST), "rb") as handle:
                 info["SUFeedURL"] = plistlib.load(handle)["SUFeedURL"]
         with open(target, "wb") as handle:
             plistlib.dump(info, handle)
-    except (OSError, KeyError, ValueError, plistlib.InvalidFileException) as error:
+    except (OSError, KeyError, IndexError, TypeError, ValueError,
+            plistlib.InvalidFileException) as error:
         raise SetupError(f"rewrite {target}: {error}")
 
 
@@ -290,24 +306,35 @@ def licences(app, real_app, mutation):
         raise SetupError(f"mutate {target}: {error}")
 
 
+# The header a notices mutation deletes, by its start; and the Bun helper's entry, which
+# `acknowledgements-bun-listed` adds (spec §11 SA-10).
+DROPPED = {"acknowledgements-crate-dropped": "== crate ",
+           "acknowledgements-slaude-dropped": "== package slaude "}
+BUN_HEADER = "== runtime bun 1.3.6 =="
+
+
 def acknowledgements(app, real_app, mutation):
-    """The skeleton's Acknowledgements.txt, a COPY of the real bundle's, removed or its first
-    `== crate ` header line deleted (spec §11 PUB-10, D42/D43)."""
+    """The skeleton's Acknowledgements.txt, a COPY of the real bundle's, removed, its first
+    `== crate ` or its `== package slaude ` header line deleted, or a `runtime bun` header
+    added (spec §11 PUB-10, SA-10, D42/D43)."""
     if mutation == "acknowledgements-missing":
         return
     target = os.path.join(app, dist_check.ACKNOWLEDGEMENTS)
     copy_in(os.path.join(real_app, dist_check.ACKNOWLEDGEMENTS), target)
-    if mutation != "acknowledgements-crate-dropped":
+    if mutation not in DROPPED and mutation != "acknowledgements-bun-listed":
         return
     try:
         with open(target, encoding="utf-8") as handle:
             lines = handle.read().split("\n")
-        first = next(i for i, line in enumerate(lines) if line.startswith("== crate "))
-        del lines[first]
+        if mutation in DROPPED:
+            first = next(i for i, line in enumerate(lines) if line.startswith(DROPPED[mutation]))
+            del lines[first]
+        else:
+            lines += [BUN_HEADER, "Licence: MIT", ""]
         with open(target, "w", encoding="utf-8") as handle:
             handle.write("\n".join(lines))
     except (OSError, StopIteration) as error:
-        raise SetupError(f"drop a crate header from {target}: {error!r}")
+        raise SetupError(f"{mutation} in {target}: {error!r}")
 
 
 def proxy_and_snapshot(case_dir, app, real_app, other_app, mutation):
@@ -393,15 +420,12 @@ def skeleton(case_dir, side, real, mutation, needle):
     helper = os.path.join(app, dist_check.HELPER)
     copy_in(source, helper, 0o755)
     if mutation == "no-runtime":
-        sign(helper, "--entitlements", AGENT_ENTITLEMENTS)
+        sign(helper)
     elif mutation == "extra-entitlement":
         extra = os.path.join(case_dir, "extra.plist")
         with open(extra, "wb") as handle:
-            plistlib.dump({"com.apple.security.cs.allow-jit": True,
-                           "com.apple.security.cs.disable-library-validation": True}, handle)
+            plistlib.dump({"com.apple.security.cs.allow-jit": True}, handle)
         sign(helper, "--options", "runtime", "--entitlements", extra)
-    elif mutation == "no-entitlements":
-        sign(helper, "--options", "runtime")
     elif mutation == "marker":
         with open(helper, "r+b") as handle:
             data = handle.read()
@@ -410,7 +434,7 @@ def skeleton(case_dir, side, real, mutation, needle):
                 raise SetupError(f"{ANCHOR.decode()} not found in the helper copy")
             handle.seek(offset)
             handle.write(needle)
-        sign(helper, "--options", "runtime", "--entitlements", AGENT_ENTITLEMENTS)
+        sign(helper, "--options", "runtime")
     return app
 
 
@@ -462,8 +486,8 @@ def main():
             "dist": os.path.abspath(arguments.dist)}
 
     print("road map 12 A4, #145, road map 14 MC3, B88, spec §11 PUB-6..PUB-10 and CX-4, CX-5 — "
-          "dist_check's helper rows (D6–D13), D14, D15–D32, D35, D36, D38 and D40–D43, each "
-          "made to fail on purpose\n")
+          "dist_check's helper rows (D6–D13), D14, D15–D32, D35, D36, D38, D40–D43, D46 and "
+          "D47, each made to fail on purpose\n")
     print(f"  release:      {real['release']}")
     print(f"  distribution: {real['dist']}\n")
     needle, reason = dist_check.read_needle()

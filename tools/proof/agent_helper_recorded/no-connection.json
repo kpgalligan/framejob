@@ -1,0 +1,33 @@
+{
+ "case": "no-connection",
+ "events": [
+  {
+   "type": "prices",
+   "source": {
+    "kind": "bundled",
+    "as_of": "2026-09-28T06:07:45Z",
+    "problem": "no price cache is configured"
+   }
+  },
+  {
+   "type": "ready"
+  },
+  {
+   "type": "context_usage",
+   "used": 0,
+   "limit": null
+  },
+  {
+   "type": "turn_started"
+  },
+  {
+   "type": "error",
+   "message": "API error: Connection error."
+  },
+  {
+   "type": "turn_finished"
+  }
+ ],
+ "requests": [],
+ "files": {}
+}

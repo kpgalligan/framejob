@@ -157,14 +157,17 @@ class Session:
         before it can measure anything. The cache is written by a
         fire-and-forget task at import, so a normalise issued in the same
         breath legitimately answers "still being analysed"
-        (`phase5_proof.py` argues the same wait)."""
+        (`phase5_proof.py` argues the same wait, and its bound: 600 s since
+        #591, the cache lane being slow on a loaded machine)."""
         media = self.media(movie)
         peaks = os.path.join(self.path, "cache", "peaks", f"{media}.bin")
-        for _ in range(300):
-            if os.path.exists(peaks):
-                return media
+        began = time.monotonic()
+        while not os.path.exists(peaks):
+            if time.monotonic() - began >= 600:
+                raise RuntimeError(
+                    f"{self.name}: cache/peaks/{media}.bin was never written (600 s)")
             time.sleep(0.05)
-        raise RuntimeError(f"{self.name}: cache/peaks/{media}.bin was never written")
+        return media
 
     def place(self, media, at, track=None):
         track = track if track is not None else self.project()["tracks"][0]["id"]
@@ -497,6 +500,12 @@ def locked_track(mcp):
             "an insert onto the same track, with room to spare",
             f"track {track} is locked, so an insert cannot open room on it",
             track=track, media=media, at=40 * SEC)
+    # spec §11 #602 (c): a lift held to a locked track names it rather than
+    # skipping it, as the plain lift skips every locked track in silence.
+    refused(s, "lift_range", "lift_range",
+            "a lift held to the same track, over a clip it would cut",
+            f"track {track} is locked, so nothing on it can be lifted",
+            **{"from": 2 * SEC, "to": 4 * SEC, "tracks": [track]})
 
     print("\n4c — the lock comes off, and the same call lands")
     # Undone rather than set back, so the only edit left on the stack above
@@ -685,7 +694,7 @@ def the_transition_cut(mcp):
             "a cut whose two clips have no unused material names the frames asked for",
             f"the cut before clip {b} has no room for an overlap: the {frames} frames "
             "asked for clamp to nothing against the two clips' unused material, their "
-            "neighbours and the overlap rule; pass ripple: true to make the overlap by "
+            "neighbors and the overlap rule; pass ripple: true to make the overlap by "
             "shifting the timeline left instead",
             clip=b, duration=SEC // 2)
 
@@ -916,6 +925,221 @@ def the_non_edits_that_speak(mcp):
     undo_claim(s, start)
 
 
+# ---- a cut too close to a transition (spec §11 #427) ----------------------
+
+
+def foot(s, name):
+    """The inspector's refusal strip as `snapshot_ui`'s layout dump reads it:
+    every shown text beginning "Refused" (a dev tool, so Debug and Release
+    only, which is where this script runs)."""
+    png = os.path.join(WORK, f"{name}-{os.getpid()}.png")
+    s.op("snapshot_ui", window="editor", view="inspector", path=png)
+    with open(os.path.splitext(png)[0] + ".layout.json") as handle:
+        dump = json.load(handle)
+    return [v.get("text") for v in dump.get("views", [])
+            if (v.get("text") or "").startswith("Refused") and not v.get("hidden")]
+
+
+def the_cut_rule(mcp):
+    """A cut that would leave a piece too short for the transition it
+    carries is refused (spec §11 #427, `core/src/edit_cut_rule.rs`), judged
+    on what the op would store, and the sentence names the clips the pieces
+    were cut from: a second piece's id exists only in the answer that was
+    refused.
+
+    The fixture is the ten-second card twice on one track, the second moved
+    two seconds onto the first, which mints a cross dissolve: a [0, 10 s)
+    and b [8 s, 18 s). A cut at 7 s leaves a's piece [7 s, 10 s), 3 s, under
+    b by 2 s, more than half of it (1.5 s). Every number below is computed
+    here, never read back."""
+    print("\n11 — a cut too close to a transition is refused, naming the clips it cut (#427)")
+    s = Session(mcp, "refusal-cut")
+    media = s.media("A.mov")
+    a = s.place(media, 0)
+    b = s.place(media, 10 * SEC)
+    s.op("move_clip", clips=[b], delta=-2 * SEC)
+    landed("the fixture is a [0, 10 s) and b [8 s, 18 s), dissolving",
+           [[c["start"], c["duration"], c.get("transition_in") is not None]
+            for c in s.project()["clips"]],
+           [[0, 10 * SEC, False], [8 * SEC, 10 * SEC, True]])
+    cut = 7 * SEC
+    sentence = (f"clips {a} and {b} would overlap by {2 * SEC} ticks, more than half of the "
+                f"shorter piece the cut leaves ({(10 * SEC - cut) // 2} ticks); cut further "
+                f"from their transition, or shorten it first")
+
+    print("\n11a — a real edit, whose undo step every answer below must leave alone")
+    start = undo_marker(s, lambda: s.op("set_clip", clips=[a], patch={"name": "Marker"}))
+
+    print("\n11b — split, lift and ripple at 7 s, each refused naming a and b")
+    refused(s, "split", "split", "a split at 7 s", sentence, at=cut)
+    refused(s, "lift_range", "lift_range", "a lift of {0, 7 s}", sentence,
+            **{"from": 0, "to": cut})
+    refused(s, "ripple_delete_range", "ripple_delete_range", "a ripple of {0, 7 s}", sentence,
+            **{"from": 0, "to": cut})
+
+    print("\n11c — a list with one range too close is refused whole")
+    # {12 s, 13 s} alone leaves b's head [8 s, 12 s) holding the dissolve.
+    # With {0, 7 s} beside it, a's 3 s piece meets b's 4 s head at 0 s and
+    # 1 s after the closes: the same 2 s against half of 3 s.
+    refused(s, "ripple_delete_ranges", "ripple_delete_ranges",
+            "the harmless {12 s, 13 s} beside {0, 7 s}", sentence,
+            ranges=[[12 * SEC, 13 * SEC], [0, cut]])
+
+    print("\n11d — the person's door: Edit ▸ Ripple Delete over {0, 7 s}")
+    s.op("set_selection", clips=[])
+    s.op("set_range", start=0, end=cut)
+    before = s.text()
+    s.op("perform_menu_item", path=["Edit", "Ripple Delete"])
+    check(s.text() == before, "Edit ▸ Ripple Delete with the range set changed nothing")
+    strip = foot(s, "refusal-cut-foot")
+    check(strip == [f"Refused: {sentence}"],
+          f"…and the inspector's foot reads the sentence whole; got {strip}")
+    s.op("set_range")
+
+    print("\n11e — the bound is the rule's own, and a range that removes the piece applies")
+    applied(s, "split", "a split at 6 s, whose 4 s piece holds the 2 s dissolve exactly",
+            at=6 * SEC)
+    landed("…and it LANDED, a's piece starting at 6 s",
+           sorted(c["start"] for c in s.project()["clips"]), [0, 6 * SEC, 8 * SEC])
+    s.op("undo")
+    applied(s, "lift_range", "a lift of {7 s, 10 s}, which takes a's piece and b's head",
+            **{"from": cut, "to": 10 * SEC})
+    landed("…and it LANDED: a [0, 7 s), then b's rest from 10 s",
+           sorted([c["start"], c["duration"]] for c in s.project()["clips"]),
+           [[0, cut], [10 * SEC, 8 * SEC]])
+    s.op("undo")
+
+    print("\n11f — a lift held to the track named leaves every other track alone (#602)")
+    first = s.project()["tracks"][0]["id"]
+    other = s.op("add_track")["new_tracks"][0]
+    c = s.place(media, cut, track=other)
+    applied(s, "lift_range", "a lift of {7 s, 10 s} held to a and b's track",
+            **{"from": cut, "to": 10 * SEC, "tracks": [first]})
+    after = s.project()["clips"]
+    landed("…and it LANDED there alone: a [0, 7 s), b's rest from 10 s, and c on the other "
+           "track still [7 s, 17 s), uncut",
+           sorted([x["track"] == other, x["start"], x["duration"]] for x in after),
+           [[False, 0, cut], [False, 10 * SEC, 8 * SEC], [True, cut, 10 * SEC]])
+    landed("…the other track's one clip is still c", [x["id"] for x in after
+                                                      if x["track"] == other], [c])
+    s.op("undo")
+    for tracks, wanted in (
+            ([], "lift_range: tracks is empty — name at least one track, or leave it out for "
+                 "every unlocked track."),
+            ([first, 999_999], "lift_range: No track has id 999999. get_project lists the "
+                               "tracks.")):
+        before = s.text()
+        message = s.error("lift_range", **{"from": cut, "to": 10 * SEC, "tracks": tracks})
+        check(message == wanted and s.text() == before,
+              f"tracks {tracks} is an error naming the argument, nothing changed — {wanted!r}; "
+              f"got: {shown(message)}")
+    s.op("undo")
+    s.op("undo")
+
+    print("\n11g — and not one refusal was an undo step")
+    undo_claim(s, start)
+
+
+# ---- a clip ripple closes up to its neighbour (spec §11 #601) --------------
+
+
+def the_clip_ripple(mcp):
+    """`ripple_delete {clips}` of a clip with a transition into its next
+    neighbour closes only up to where that neighbour starts, every unlocked
+    track shifting by that one amount, and is refused in THE overlap rule's
+    sentence when a track it moved would still break the rule (spec §11
+    #601, `core/src/edit_time.rs`).
+
+    The fixture is the ten-second card four times on one track, b, c and d
+    moved two seconds onto a, then c and d two more onto b, each move minting
+    a cross dissolve: a [0, 10 s), b [8 s, 18 s), c [16 s, 26 s), d [26 s,
+    36 s). Ripple-deleting b used to shift by b's 10 s at 18 s, leaving c at
+    16 s (it starts inside b) and sliding d to 16 s, wholly under c (the
+    issue). Closing up to c's start shifts by 8 s at 16 s: c to 8 s, still
+    dissolving from a, and d to 18 s. Every number below is computed here,
+    never read back."""
+    print("\n12 — a clip ripple closes up to the neighbour it dissolves into (#601)")
+    s = Session(mcp, "refusal-ripple")
+    media = s.media("A.mov")
+    a = s.place(media, 0)
+    b = s.place(media, 10 * SEC)
+    c = s.place(media, 20 * SEC)
+    d = s.place(media, 30 * SEC)
+    s.op("move_clip", clips=[b, c, d], delta=-2 * SEC)
+    s.op("move_clip", clips=[c, d], delta=-2 * SEC)
+
+    def placements():
+        return [[x["id"], x["start"], x["duration"], x.get("transition_in") is not None]
+                for x in sorted(s.project()["clips"], key=lambda x: (x["track"], x["start"]))]
+
+    def back_to(text, most):
+        """Undo until the project reads `text` again, at most `most` times:
+        exactly the undos the edits above made, and never one past `text`,
+        so a red run (an op that applied where it should refuse, or the
+        reverse) still reaches the rows after it."""
+        for _ in range(most):
+            if s.text() == text:
+                return
+            s.op("undo")
+
+    fixture = [[a, 0, 10 * SEC, False], [b, 8 * SEC, 10 * SEC, True],
+               [c, 16 * SEC, 10 * SEC, True], [d, 26 * SEC, 10 * SEC, False]]
+    landed("the fixture is a [0, 10 s), b [8 s, 18 s), c [16 s, 26 s), d [26 s, 36 s), "
+           "b and c dissolving in", placements(), fixture)
+    closed = [[a, 0, 10 * SEC, False], [c, 8 * SEC, 10 * SEC, True],
+              [d, 18 * SEC, 10 * SEC, False]]
+
+    print("\n12a — a real edit, whose undo step every answer below must leave alone")
+    start = undo_marker(s, lambda: s.op("set_clip", clips=[a], patch={"name": "Marker"}))
+    marked = s.text()
+
+    print("\n12b — ripple-deleting b closes up to c's start, 8 s, not b's 10 s")
+    applied(s, "ripple_delete", "ripple_delete of b", clips=[b])
+    landed("…and it LANDED: c at 8 s still dissolving from a, d at 18 s butting c "
+           "(the issue left c at 16 s and d under it)", placements(), closed)
+
+    print("\n12c — a range cut on that track then applies (the issue's second half)")
+    # {22 s, 23 s} lies inside d alone once closed up, clear of the dissolve.
+    # Unfixed, c and d both sat at [16 s, 26 s) and the cut refused naming
+    # them, as every range cut that moved the track did.
+    applied(s, "ripple_delete_range", "ripple_delete_range {22 s, 23 s}",
+            **{"from": 22 * SEC, "to": 23 * SEC})
+    back_to(marked, 2)
+
+    print("\n12d — the person's door: b selected, Edit ▸ Ripple Delete")
+    s.op("set_selection", clips=[b])
+    s.op("perform_menu_item", path=["Edit", "Ripple Delete"])
+    landed("…and it LANDED where the tool's did", placements(), closed)
+    back_to(marked, 1)
+    s.op("set_selection", clips=[])
+
+    print("\n12e — a track the ripple moves that still breaks the rule refuses it whole")
+    # x straddles 16 s on a second track and stays; y, at 20 s, moves 8 s to
+    # 12 s, under x by 8 s against half of either clip's 10 s.
+    other = s.op("add_track")["new_tracks"][0]
+    x = s.place(media, 10 * SEC, track=other)
+    y = s.place(media, 20 * SEC, track=other)
+    with_xy = s.text()
+    sentence = (f"clips {x} and {y} would overlap by {8 * SEC} ticks, more than half of the "
+                f"shorter clip ({10 * SEC // 2} ticks)")
+    refused(s, "ripple_delete", "ripple_delete", "ripple_delete of b over x and y", sentence,
+            clips=[b])
+    back_to(with_xy, 1)
+    s.op("set_selection", clips=[b])
+    s.op("perform_menu_item", path=["Edit", "Ripple Delete"])
+    check(s.text() == with_xy, "Edit ▸ Ripple Delete with b selected changed nothing")
+    strip = foot(s, "refusal-ripple-foot")
+    check(strip == [f"Refused: {sentence}"],
+          f"…and the inspector's foot reads the sentence whole; got {strip}")
+    back_to(with_xy, 1)
+    s.op("set_selection", clips=[])
+    back_to(marked, 3)             # y, x and the track
+    landed("…and three undos take the second track away again", placements(), fixture)
+
+    print("\n12f — and not one refusal was an undo step")
+    undo_claim(s, start)
+
+
 def summary(aborted=None):
     """The last line, and the exit status. An op that unexpectedly refused or
     errored — a `ToolError` no check was waiting for — aborts the run and is
@@ -947,6 +1171,8 @@ def main():
     the_action_rules(mcp)
     off_the_track_stack(mcp)
     the_non_edits_that_speak(mcp)
+    the_cut_rule(mcp)
+    the_clip_ripple(mcp)
     summary()
 
 

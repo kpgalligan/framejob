@@ -13,7 +13,7 @@
   - C6b, 4K on every row and the idle speed figures (CX-18 amended) (`4e01d24`)
   - The close: this record (the commit that moved the original to `archive/`)
 - **Original:** `archive/codec-export.md` is the full record. It has no section numbers, so it is cited by its own headings: "orig C3" is its "C3 — AV1 in WebM, with Opus" section, "orig C1 fix pass" that phase's "Fix pass 1", and "orig S §3" the spike's "3. Containers".
-- **Spec decisions:** CX-1..CX-18 in spec §11 (`designs/spec/11-decisions/codec-export.md`). They stay binding, and where the original or this record words them differently, §11's text wins:
+- **Spec decisions:** CX-1..CX-18 in spec §11 (`designs/spec/11-decisions/codec-export.md`, from CX-16 `codec-export-2.md`). They stay binding, and where the original or this record words them differently, §11's text wins:
   - CX-1 the four rows (owner); CX-2 SVT-AV1 alone and its three speeds (owner); CX-3 libvpx at one speed (owner); CX-4 the encoders platform-side; CX-5 the build policy; CX-6 the WebM writer in Rust (owner); CX-7 Opus from AudioToolbox; CX-8 HDR; CX-9 the rate model; CX-10 AV1 on M1/M2; CX-11 the working arrangement.
   - CX-12 C1's shape; CX-13 AV1's rate a soft cap, quality first (owner); CX-14 C2's one 10-bit `av1` row; CX-15 C3's `av1_webm`, writer and Opus; CX-16 C4's `vp9_webm` and the SDR import labels; CX-17 C5's `vp9_alpha_webm`; CX-18 C6a's memory limit and estimate, amended by C6b.
   - Amended: CX-5 (by PUB-10); CX-6 and CX-7 (by CX-15); CX-8 (by CX-16); CX-9 (1) and (4) on the AV1 rows (by CX-13); CX-12 (by CX-14, then CX-15); CX-13 (by CX-14); CX-14 (by CX-15); CX-15 (by CX-16, then CX-17); CX-16 (by CX-17); CX-17 (6) (in C5's fix pass, before its code); CX-18 (by C6b). This road map amended HD-5's row list, HD-14 (c), HD-18 (b), HD-19 (b), G-35 and #326's `queued` answer; #378's own §11 entry amends G-17.
@@ -92,7 +92,7 @@ Mutants, each run on its phase's final instrument and each caught: C0 three (`bu
 - #379: open. C3's one unreproduced hang, the WebM audio pump stopping early; one reader per output closed the starvation it caused, but its cause was not found in 42 later exports.
 - #381: open. Keeping a `vp9_alpha_webm`'s alpha on re-import (C5's "to file").
 - #382: open. An `av1` MP4 export hung once in `encoder_limit_proof.py`'s Q1, its video read stuck in `copyNextSampleBuffer` with no compositor request in flight (C5's fix pass).
-- #383: open. 4K GIF and APNG memory outside the encoder limit (C6b's finding 2).
+- #383: closed as recorded (owner, 2026-11-12): a sentence on the site's GIF and APNG page; the image rows stay outside the ledger.
 - #380: open, filed beside #376's acknowledgements: whether the LGPL-2 JavaScriptCore inside the bun-compiled assistant helper needs more than a notice. Not this road map's code.
 - Nothing else is known to be unfinished, so no issue was filed at the close.
 

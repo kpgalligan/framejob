@@ -437,7 +437,8 @@ governs a module now.
   `round(Δ × speed)` mover the six placement sites used to write out. Cut
   out of `model_query.rs` by road map 7 §10's phase A.
 - `time.rs` — `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode
-  format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`). Snapping keeps
+  format/parse (`HH:MM:SS:FF`, non-drop at an NTSC rate and in real seconds
+  at any other fractional rate (spec §11 #532), and `HH:MM:SS.mmm`). Snapping keeps
   frame indices wide through directional adjustment and saturates only at the
   public tick/index result. `frames_in` (whole grid frames in a length),
   `frames_back` (the grid position k frames before the frame nearest a
@@ -538,7 +539,13 @@ governs a module now.
 - `edit_clip.rs` — clip construction and placement callers: `add_clip`, move,
   duplicate, delete, join (the described clips are `edit_described.rs`'s);
   move, split, delete and duplicate take a linked
-  partner through `edit_link.rs`'s closures. `whole_media_length`,
+  partner through `edit_link.rs`'s closures. `split_clips` is `cut_clips`
+  (the cut alone, `pub(crate)`) then `edit_cut_rule.rs`'s `cut_refusal`;
+  `cut_under_playhead` is ⌘K's selection cut the same way, with no rule.
+  Both go through the private `cut_ids` (the cut over ids as given);
+  `cut_on_tracks` is the same cut over the clips on named tracks with no
+  partner added (spec §11 #602).
+  `whole_media_length`,
   `edit_clip_timing.rs`'s `trim_end` and `set_speed` hold a media clip's window INSIDE its file, each
   through `source_window.rs`'s one bound, so
   `in + duration × speed ≤ media.duration` and the plan's segment rate is
@@ -574,7 +581,7 @@ governs a module now.
 - `edit_retime.rs` — `retime_range` (road map creator-jobs CU9a, spec §11
   CU-90).
   - The range `[from, to)` is played at `rate` on every unlocked track.
-  - Both bounds are cut by `split_under_playhead`. The pieces (unlocked
+  - Both bounds are cut by `cut_under_playhead`, asking no rule. The pieces (unlocked
     clips wholly inside) are found before `shift_clips` moves everything at
     or after `to` by `to′ − to`, partners included.
   - Each piece starts at `f(s)` and lasts `f(e) − f(s)`, where
@@ -585,7 +592,8 @@ governs a module now.
   - Markers inside map through `f`; markers after move with the shift. Two
     markers landing on one tick are refused, never dropped. A scoped view
     has none.
-  - Errors, then refusals (1)–(7) in CU-90's order. A rate of 1 is an
+  - Errors, then refusals (1)–(7) in CU-90's order, then THE overlap rule
+    on what it would store (spec §11 #427 (h)). A rate of 1 is an
     identity once in range. AU-94's sentence comes through `edit_link.rs`'s
     `linked_rate_sentence`.
 - `edit_pieces.rs` — `copy_pieces` (road map "creator-jobs" SW1, spec §11
@@ -664,7 +672,13 @@ governs a module now.
   cannot blend), and `snap_motion` / `snap_animation`, which put the ticks a
   patch or checked copied group carries on the frame grid AFTER the range
   check, so a refusal names what the caller sent. What a patch may CARRY is
-  `patch.rs`'s and nothing here restates it.
+  `patch.rs`'s and nothing here restates it. `check_pixel_keys` (#524) and
+  `check_end_pixel_keys` (#535) share `pixel_keys_refusal`: crop, corner
+  radius or chroma on a `sectionless_kind` clip (text, shape, graphic,
+  adjustment, #536) is an `Err`, read from the patch, crop allowed on a
+  matte track but for an adjustment clip (K-7); `cornerless_kind` adds the
+  nest clip, which is refused a corner radius or chroma key on any track
+  and takes the crop (#536's nest half).
 - `patch.rs` — reading a caller-authored patch, cut out of `edit_props.rs`
   under the size rule: `Group` — the four PATCH groups; `paste_attributes` takes these four and
   `graphic` as `edit_paste_attributes.rs`'s `PasteGroup`, and a patch has no
@@ -752,20 +766,51 @@ governs a module now.
   (a rate change
   normalizes top-level and each stored nest's clip times through `frame_grid.rs`
   and drops the second of two top-level markers a coarser grid lands on one tick).
-- `edit_time.rs` — ripple, insert time, `ripple_delete_ranges` (the pairs are
-  ordered, MERGED — touching as well as overlapping — then cut and closed
-  right to left as ONE edit; the singular delegates to it), `lift_range`
-  (the hole left open), `close_gap` (refuses rather than closing part way, and
-  refuses naming what is there when `at` is on a clip or nothing follows it,
-  spec §11 #88),
-  freeze frame, `shift_clips`, `shifted` (what a shift moves: every unlocked
+- `edit_time.rs` — ripple (`ripple_delete`: a merged span ends at the
+  earliest start of a clip not removed that begins strictly inside a removed
+  clip on that clip's own unlocked track, `closing_end`, every unlocked track
+  shifting by that one amount, and the op refuses in the overlap rule's
+  sentence when a track it moved breaks the rule, spec §11 #601), insert
+  time, `close_gap` (refuses rather than
+  closing part way, and refuses naming what is there when `at` is on a clip
+  or nothing follows it, spec §11 #88), freeze frame, `Span` and `union`
+  (`pub(crate)`, `edit_range.rs` shares them), `shift_clips`, `shifted` (what a shift moves: every unlocked
   clip at or after the boundary and each one's linked partner;
   `shift_clips` moves exactly that set and answers a refusal, nothing moved,
   when a partner would start before 0), and `locked_track` — THE locked-track
-  refusal's sentence, written once here for its five callers
-  (`close_gap`, `edit_insert.rs`'s `insert_clip`, `edit_transition.rs`'s
+  refusal's sentence, written once here for its six callers
+  (`close_gap`, `edit_insert.rs`'s `insert_clip`, `edit_transition_shift.rs`'s
   rippled form, `edit_retime.rs`'s `retime_range`, `edit_pieces.rs`'s
-  `copy_pieces`), each passing the clause after the comma.
+  `copy_pieces`, `edit_range.rs`'s `lift_range` on a track it is given),
+  each passing the clause after the comma.
+- `edit_range.rs` — the range cuts, moved out of `edit_time.rs` whole
+  (#427's toll): `ripple_delete_ranges` (the pairs are ordered, MERGED —
+  touching as well as overlapping — then cut and closed right to left as ONE
+  edit; the singular delegates to it), `lift_range` (the hole left open),
+  `ordered_range` and `clear_range` (both bounds cut by `edit_clip.rs`'s
+  `cut_under_playhead`, asking no rule, then what lies wholly between
+  removed on unlocked tracks); `lift_range`'s optional `tracks` holds both
+  the cut (`edit_clip.rs`'s `cut_on_tracks`, no partner added from another
+  track) and the removal to the tracks named, a named locked track refused
+  in `locked_track`'s words (spec §11 #602). Each op asks `edit_cut_rule.rs`'s
+  `cut_refusal` once, of its result — `ripple_delete_ranges` of the whole
+  list's, so a list is refused whole (spec §11 #427).
+- `edit_cut_rule.rs` — a cut and THE overlap rule (spec §11 #427): `Pieces`
+  (each second half's SOURCE clip — `new`, `halved`, `source`, `of`; moved
+  from `edit_keep_range.rs`, which shares it) and `Project::cut_refusal`:
+  the rule asked of what a cut would STORE, on each track whose clips' ids,
+  starts or durations changed, judged whole; an over-long pair a cut made (a
+  second half, or a first half shorter than before, its two source clips not
+  already past the limit before the op) named by its source clips in its own
+  sentence ("…more than half of the shorter piece the cut leaves (N ticks);
+  cut further from their transition, or shorten it first"); a pair already
+  past the limit, even one the cut reaches, in the rule's own sentence by
+  its source clips (`transition.rs`'s `past_limit`); any other violation in
+  the rule's own. The cutters that ask no rule are `edit_clip.rs`'s
+  `cut_clips` and `cut_under_playhead` (through `finish`, so `validate` and
+  the caps still judge each cut); `split_clips` (so `split`, `insert_clip`
+  and `freeze_frame`), `edit_range.rs`'s ops, `overwrite_clip` and
+  `retime_range` ask it.
 - `edit_keep_range.rs` — `keep_range` (road map "creator-jobs" CJ5a, spec
   §11 CJ-50): the project as `[from, to)` of its top-level timeline moved to
   0 — both bounds cut on every track, locks ignored, through `split_clip`
@@ -781,7 +826,8 @@ governs a module now.
   compositions of split + insert time + add made ONE op so a drop is one
   undo step and carries the rule neither half states — an insert cuts only
   the destination track (and a cut clip's linked partner, AU-92) and then
-  shifts every unlocked one.
+  shifts every unlocked one. `overwrite_clip` cuts through `cut_clips` and
+  asks `cut_refusal` once the span is cleared (spec §11 #427).
   `roll` is a front trim on its clip, so it advances `graphic.in` as
   `trim_start` does; the predecessor's end is an end trim and keeps `length`.
 - `edit_transition.rs` — the WRITE half of a transition: `set_transition`,
@@ -838,6 +884,8 @@ governs a module now.
   read of a `null` for an unknown or a required key) and `key_off` (written
   after the merge and the prune; a non-object group slot is replaced by `{}`,
   never indexed). `END_PATCH` is `edit_action_graphic.rs`'s too.
+  `set_action_end` also asks `edit_props.rs`'s `check_end_pixel_keys` of the
+  merged end (#535).
 - `speed_map.rs` — a media clip's SPEED MAP (speed ramps SR-10): the
   clip-time → source-time function its speed actions make (the ease
   integrals of `actions.rs`'s curves), `is_ramped` (media clips only),
@@ -896,7 +944,10 @@ governs a module now.
   G-32 (e)). `skip_missing` drops a named group the payload
   clip lacks and skips a target that cannot take one. **The copied props are
   shape-checked once, the first time a target takes them**: a paste nothing
-  takes never reads the map. `patch::Group` gains no variant for it.
+  takes never reads the map. `patch::Group` gains no variant for it. A text,
+  shape, graphic or adjustment target keeps its own crop, corner radius and
+  chroma, and a nest target its own corner radius and chroma, taking the
+  crop (#524, #536).
 - `edit_zoom.rs` — `add_zoom_action`, the screencast zoom, and `ZoomRegion`,
   the one op ARGUMENT that is a caller-authored object: its `Deserialize` is
   written out rather than derived so it answers as a patch does — an object
@@ -926,9 +977,11 @@ governs a module now.
 - `layout_recognise.rs` — a camera layout recognised from the placements it wrote (road map
   creator-jobs VR5b, spec §11 VR-53 (b)), pure, beside `layout.rs` (at its cap):
   `RECOGNISE_PX` 1, `RECOGNISE_RATIO` 0.001, `alike`, `focus_of` (the camera crop's
-  centre), `same_source` (kind and media or nest, `in` ignored) and `recognise` (the first
-  of corner × shapes × corners, side by side, stacked, camera full, screen only whose
-  solves on the authored canvas are `alike` the ends; `Err(Camera)` / `Err(Screen)`).
+  centre), `same_source` (kind and media or nest, `in` ignored), `RoleEnd` (a role's end,
+  its source size and whether it is a nest) and `recognise` (the first of corner × shapes ×
+  corners, side by side, stacked, camera full, screen only whose solves on the authored
+  canvas are `alike` the ends, a nest role's radius not compared, spec §11 #536;
+  `Err(Camera)` / `Err(Screen)`).
 - `edit_layout.rs` · `edit_layout_reach.rs` — `switch_layout` (CO-61, CO-62, CO-64):
   `edit_layout.rs` `LayoutSwitch`, the roles (the camera; a given screen behind it, or the
   front-most shown, non-matte picture clip behind it at `at`), the nest-clip refusal for
@@ -941,7 +994,10 @@ governs a module now.
   and `nest_clips`, each refusal inherited; `edit_layout_reach.rs` a `Role` and its reach
   (to the next later layout action on the track, `through` or the track's end),
   `mover_refusal` (a non-layout mover ending after `at`, a full-placement screen exempt in
-  corner, camera_full and screen_only) and `laid_out`.
+  corner, camera_full and screen_only) and `laid_out`. `compose_switch` refuses up front a
+  shape or graphic role or reach clip the layout would crop (off a matte track) or round
+  (#524), so every `at` and every replay answers alike, and writes a nest clip's radius as
+  0 (#536, amending CO-60).
 - `edit_adjustment.rs` — `Source::Adjustment`'s rules (spec §11 GR-6):
   `add_adjustment_clip`, and the refusals every other door asks it for — a
   transition (from `add_transition`, `set_transition`, `set_transition_style`
@@ -1027,7 +1083,9 @@ governs a module now.
   `oklab_mix` (G-40); anything else, a malformed end, or a prop
   with no start, held and switched at the end. Total. `names_prop` is
   `set_graphic`'s and `paste_attributes`' question.
-- `transition.rs` — overlap detection, THE overlap rule (spec §11), eased
+- `transition.rs` — overlap detection, THE overlap rule (spec §11),
+  `past_limit`, its over-limit sentence written once (`check_overlap_rule`'s
+  and `edit_cut_rule.rs`'s), eased
   progress at *t*. An overlap with no kind still dissolves
   (`unwrap_or_default`), and `add_clip` onto an overlap mints a
   `cross_dissolve`, so a no-transition baseline is built by moving clips
@@ -1213,8 +1271,8 @@ governs a module now.
   `Project::speech_spans` (`Project::played_speech` — the media's speech on
   the played part in project time, unwidened, which `video_gate.rs` reads
   too — then `widened(spans, before, after)`, merged), `speech_gain` (the MINIMUM over spans of `audio_duck.rs`'s
-  `extent_gain`), `speech_breaks` (each span's four edges and the
-  release/attack crossings) and `duck_ramps` (the plan's `ducks`). Nothing
+  `extent_gain`), `speech_breaks` (each span's four edges and every
+  crossing of two overlapping spans' curves, #386) and `duck_ramps` (the plan's `ducks`). Nothing
   here edits.
 - `clip_source_time.rs` — source time to clip time, the one mapping (road
   map "creator-jobs" VR2a1, spec §11 VR-20): `clip_time_of_source` (a
@@ -1392,8 +1450,8 @@ governs a module now.
   no partial value — never "the canvas is translucent".
 - `export_stems.rs` — an audio export's stems (spec §11 AU-107, AU-108):
   `Stem` and `Project::export_stems(StemsMode)` — heard tracks (labelled by
-  `CompTrack::track`, not `silenced`) grouped per track or per trimmed name
-  ignoring case, ordered, named (`Track N`, `/` and `:` as `-`, ` (Track N)`
+  `CompTrack::track`, not `silenced`) grouped per track or per trimmed name,
+  Unicode-equivalent and ignoring case, ordered, named (`Track N`, `/` and `:` as `-`, ` (Track N)`
   then ` (Track N, k)` until unique), none heard refused; read by `export.rs`.
 - `agent.rs` — embedded MCP server (streamable HTTP, tools only).
   **Generic** — knows nothing about video; the host registers the catalog
@@ -1456,10 +1514,13 @@ governs a module now.
   from `vpcc`; spec §11 CX-16 (10)); the app writes the blobs and the PQ label only for transfer 16. The only payload read
   is the first VP9 keyframe's header, each Opus packet's TOC and each Vorbis
   packet's first byte.
-- `ffi_graphic.rs` — the twelve `rc_graphic_*` exports (road map 10 §5e; the
+- `ffi_graphic.rs` — the thirteen `rc_graphic_*` exports (road map 10 §5e; the
   eleventh `rc_graphic_image_cache`, G-39: set the decoded-image cache's
   limit, answer its bytes; the twelfth `rc_graphic_library_usage`, G-46: the
-  font files and assets the library's draws used; two re-exported from
+  font files and assets the library's draws used; the thirteenth
+  `rc_graphic_rasterize_deep`, PR-15: `rc_graphic_rasterize` at 16 bits a
+  channel, premultiplied RGBA, for a frame delivered deeper than 8 bits; two
+  re-exported from
   `ffi_graphic_pending.rs`)
   and the ONLY module of `core/src/` that names the `graphic` crate (spec
   §11 G-2; `core/tests/graphic_ffi.rs` reads `core/src/` to hold it). An
@@ -1513,7 +1574,12 @@ dependency, so the core's `serde_json` has it too; `Cargo.toml` spells it
 out. `svgtypes` 0.16.1 (usvg's own pin, already in the lock) for its
 named-colour table only, so a stored name agrees with what usvg draws
 (`model_color.rs`). `sha2` for the `.fjgraphic` manifest's checksums
-(G-46; also `graphic_ffi.rs`'s revision oracle).
+(G-46; also `graphic_ffi.rs`'s revision oracle). `unicode-normalization`
+(with `tinyvec`, already in the lock through `graphic`) for
+`export_stems.rs`'s name comparison only: stem names compare decomposed,
+lowercased and recomposed (NFD, lowercase, NFC), because APFS treats
+canonically equivalent spellings, in any case, as one file name (spec §11
+AU-108, #394).
 
 **One implementation per algorithm.** Before writing time math, find the
 existing implementation and route through it. Shared constants have exactly

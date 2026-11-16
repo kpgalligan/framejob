@@ -2,7 +2,7 @@
 """The assistant's prompt texts, live context and evaluation — road map 12
 A3 (spec §11 AI-7, AI-9, AI-15).
 
-  F1–F8, M1–M6  the probe (`assistant_prompt_probe.swift`, compiled over
+  F1–F9, M1–M7  the probe (`assistant_prompt_probe.swift`, compiled over
           `app/Sources` minus `main.swift` through `swift_build.py`, reused
           when every input is byte-identical to a cached build's): the texts
           in `AssistantPrompt.swift` checked against the code that decides
@@ -11,7 +11,7 @@ A3 (spec §11 AI-7, AI-9, AI-15).
           `none`/`null` literal to double quotes and the no-scope word to the
           live context block's; F8 holds each ask-first row's reason to a
           write (#158). `--probe` runs these alone:
-          no app, no bun — the line `make test` runs.
+          no app — the line `make test` runs.
 Launch S (the built app `proof_app` picks, a scratch socket, a dummy
 `-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in):
   S0  no `Frame Job: ` line
@@ -47,7 +47,7 @@ The month's budget (spec §11 P-3, P-6): a keyed `--live` reserves every POST
 in the proofs' ledger, `budget.LEDGER`, and nothing else ever opens it. A
 rehearsal uses a scratch ledger, `work/assistant_prompt/rehearsal/spend.jsonl`,
 deleted first; `--month-spent D` (rehearsal only) seeds it with D dollars
-already spent this month, so `--month-spent 24.99` shows every E row refused
+already spent this month, so `--month-spent 39.99` shows every E row refused
 `budget:` with nothing sent to the stand-in. `--mutant bare-send` builds a tree copy (`tree_copy.make_copy`, into
 `work/assistant_prompt/mutant/tree`) whose `send` writes the bare
 text and runs S2 against it: it must FAIL (exit 1; 0 when it
@@ -59,7 +59,7 @@ not be performed — <why>`.
 Safety: every child's environment has `ANTHROPIC_API_KEY` and
 `RC_ASSEMBLYAI_KEY` popped; the app and helper get only the dummy
 `proof-key`. The real key is read once, by `assistant_prompt_eval.anthropic_key`,
-and leaves this process only as the relay's `x-api-key` to the live API. Rule
+and leaves this process only as the relay's credential header to the live API. Rule
 H: only this script's process groups are killed, with the helper children
 each app started.
 """
@@ -85,10 +85,13 @@ SOURCES = os.path.join(ROOT, "app", "Sources")
 PROBE_SWIFT = os.path.join(HERE, "assistant_prompt_probe.swift")
 LIB = os.path.join(ROOT, "core", "target", "release", "libframejob_core.a")
 WALL_BUILD, WALL_RUN, WALL_TURN = 900, 300, 60
-PROBE_ROWS = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "M1", "M2", "M3", "M4", "M5",
-              "M6"]
+PROBE_ROWS = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "M1", "M2", "M3", "M4",
+              "M5", "M6", "M7"]
 EVAL_ROWS = ["E1", "E2", "E3", "E4", "E5", "E6", "H", "K"]
 SEND = "AssistantPrompt.message(text, document: document)"
+# The mutants: a file from the repo root, the text that must occur there once, and its
+# replacement. `build_mutant` reads it and `mutant_anchors.py` counts the anchor.
+MUTANTS = {"bare-send": ("app/Sources/AssistantSession.swift", SEND, "text")}
 TAG = "framejob_context"
 
 
@@ -349,20 +352,21 @@ def stand_in_posts():
 # The mutant: `send` writes the bare text.
 
 
-def build_mutant(asp):
+def build_mutant(name, asp):
+    file, anchor, mutated = MUTANTS[name]
     base = os.path.join(WORK, "mutant")
     tree_copy.remove_tree(base)
     root, reason = tree_copy.make_copy(os.path.join(base, "tree"))
     if root is None:
         return None, reason
-    session = os.path.join(root, "app", "Sources", "AssistantSession.swift")
+    session = os.path.join(root, file)
     with open(session) as handle:
         text = handle.read()
-    if text.count(SEND) != 1:
-        return None, f"AssistantSession.swift has {text.count(SEND)} `{SEND}`, not 1"
+    if text.count(anchor) != 1:
+        return None, f"{os.path.basename(file)} has {text.count(anchor)} `{anchor}`, not 1"
     with open(session, "w") as handle:
-        handle.write(text.replace(SEND, "text"))
-    print(f"mutant: `{SEND}` → `text` in the copy; building it (up to {WALL_BUILD} s)…",
+        handle.write(text.replace(anchor, mutated))
+    print(f"mutant: `{anchor}` → `{mutated}` in the copy; building it (up to {WALL_BUILD} s)…",
           flush=True)
     app, reason = tree_copy.build_app(root, WALL_BUILD, env=child_env())
     if app is None:
@@ -388,7 +392,7 @@ def main():
     parser.add_argument("--month-spent", type=float, dest="month_spent",
                         help="with --rehearse: seed the scratch proofs' ledger with this many "
                              "dollars already spent this month")
-    parser.add_argument("--mutant", choices=["bare-send"],
+    parser.add_argument("--mutant", choices=sorted(MUTANTS),
                         help="S2 alone, against a build whose send writes the bare text; FAILS")
     args = parser.parse_args()
     if args.cap is not None and not (math.isfinite(args.cap) and args.cap > 0):
@@ -438,7 +442,7 @@ def main():
         try:
             fake = asp.Fake(os.path.join(WORK, "fake"))
             secrets = asp.secret_folder()
-            app, why = build_mutant(asp)
+            app, why = build_mutant(args.mutant, asp)
             if app is None:
                 score("S2", False, f"the mutant did not build: {why}", instrument=True)
                 print(f"0/1\nmutant {args.mutant}: the control could not be performed — "

@@ -6,7 +6,7 @@ description: Even out a clip's loud and quiet passages by turning down whatever 
 import { Steps } from '@astrojs/starlight/components';
 import AtAGlance from '@components/AtAGlance.astro';
 
-The compressor evens out a clip's loud and quiet passages by turning down whatever goes above a threshold. It reacts moment by moment and acts only on what's over the threshold. For a voice that drifts on and off the microphone, the [Leveller](/audio/leveller/) is the better fit. This page covers a clip's compressor. A track has one of its own, on [Track compressor and limiter](/audio/track-dynamics/).
+The compressor evens out a clip's loud and quiet passages by turning down whatever goes above a threshold. It reacts moment by moment and acts only on what's over the threshold. For a voice that drifts on and off the microphone, the [Leveler](/audio/leveler/) is the better fit. This page covers a clip's compressor. A track has one of its own, on [Track compressor and limiter](/audio/track-dynamics/).
 
 <AtAGlance where="Clip tab ▸ Sound ▸ Compressor" tools="set_audio" />
 
@@ -65,7 +65,7 @@ With an [action](/audio/animate-sound/) selected, the controls write the action'
 ## Good to know
 
 - The compressor acts before the clip's volume, fades and ducking, so moving the Volume slider doesn't change how hard it compresses.
-- It runs after [Noise Reduction](/audio/noise-reduction/), the [Gate](/audio/gate/), the [Leveller](/audio/leveller/) and the [De-esser](/audio/de-esser/), so the threshold is compared with sound they've already worked on.
+- It runs after [Noise Reduction](/audio/noise-reduction/), the [Gate](/audio/gate/), the [Leveler](/audio/leveler/) and the [De-esser](/audio/de-esser/), so the threshold is compared with sound they've already worked on.
 - [Normalize](/audio/normalize/) in Loudness mode measures through it.
 - [Enhance Voice](/audio/enhance-voice/) sets a compressor for you, with its threshold at the speech's typical peak and makeup that gives back the loudness it takes.
 - On a nest clip the compressor has no effect. Open the nest with <kbd>⌘↓</kbd> and set it on the clips inside.
@@ -77,7 +77,7 @@ With an [action](/audio/animate-sound/) selected, the controls write the action'
 ## Related
 
 - [Limiter](/audio/limiter/)
-- [Leveller](/audio/leveller/)
+- [Leveler](/audio/leveler/)
 - [Track compressor and limiter](/audio/track-dynamics/)
 - [Enhance Voice](/audio/enhance-voice/)
 - [Animate sound with actions](/audio/animate-sound/)

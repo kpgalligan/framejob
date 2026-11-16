@@ -307,7 +307,7 @@ fn a_file_of_another_kind_is_refused_in_the_rules_sentence() {
     let probe = json!({"kind": "audio", "duration": 3_000_000, "has_audio": true});
     project().refuses_with(
         &json!({"op": "relink_media", "media": 1, "path": " /m/tone.m4a ", "probe": probe}),
-        "media 1 is video media and /m/tone.m4a is audio: relink it to a file of the same \
+        "media 1 is video media and  /m/tone.m4a  is audio: relink it to a file of the same \
          kind, or import this one as new media",
     );
 }

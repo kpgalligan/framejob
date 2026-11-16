@@ -72,8 +72,8 @@ The switches are the track header's toggles and **Track ▸ Hide Video**, **Mute
 | `matte` | string | No | `none`, `alpha`, `alpha_inverted`, `luma` or `luma_inverted`. See [Track mattes](#track-mattes). |
 | `volume` | number | No | The track's fader as a linear gain from 0 to 4, multiplying every clip's own volume on it. 1 is unity, 4 is +12.04 dB and 0 is silent. |
 | `pan` | number | No | The track's balance, from −1 (left) to 1 (right). It's a constant-power balance after each clip's own pan, and a mono source isn't panned. |
-| `compressor` | object | No | The track's compressor, or `null` for off. See [A track's compressor and limiter](#a-tracks-compressor-and-limiter). |
-| `limiter` | object | No | The track's limiter, or `null` for off. See [A track's compressor and limiter](#a-tracks-compressor-and-limiter). |
+| `compressor` | object or null | No | The track's compressor, or `null` for off. See [A track's compressor and limiter](#a-tracks-compressor-and-limiter). |
+| `limiter` | object or null | No | The track's limiter, or `null` for off. See [A track's compressor and limiter](#a-tracks-compressor-and-limiter). |
 | `scope` | integer | No | Look the track up inside this nest. |
 | `project` | string | No | Path of the open project to act on. Default: the frontmost one. |
 

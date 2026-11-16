@@ -28,9 +28,13 @@ Rows:
       "shortcuts"`, in the order auto_zoom, shortcut_overlays, speed_up_typing, in CU-102 (b)'s
       sentences, exact; `recordingSourceKind` refuses the three by name with voice_over (in
       `voiceOverScreenOnlyArguments` order, a null not given) and with camera.
+  Q7  #458: a document with a top-level clip of a screen media with a cursor file and a nest,
+      the nest open: `screenClips` and `RecordingEnhance.present` with the landing's scope (nil)
+      still find the landed clip, `isBusy` is true, and both `decide`s answer wait, not drop.
 
 Mutants (spec §11 CU-103): `place-admitted` and `keys-admitted` (Q6), `enhance-ignored` and
-`ready-ignored` (Q5), `absent-zoom-off` (Q2) and `shortcuts-without-keys` (Q3).
+`ready-ignored` (Q5), `absent-zoom-off` (Q2) and `shortcuts-without-keys` (Q3); #458's
+`open-container` (Q7), `RecordingEnhance.container(of:scope:)` answering the open container.
 
 Exit (rule R): a plain run exits 0 iff every row passed and 1 when a row failed; a build
 failure is B0's FAIL there. A `--mutant` run exits 1 when every row the mutant names failed
@@ -49,8 +53,8 @@ import swift_build
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/cu10-probe"
-ROWS = ["B0", "Q1", "Q2", "Q3", "Q4", "Q5", "Q6"]
-SWIFT_ROWS = ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6"]
+ROWS = ["B0", "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7"]
+SWIFT_ROWS = ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7"]
 WALL = 120
 
 # name: (the rows it must fail, [(file, before, after), ...]) — spec §11 CU-103.
@@ -81,6 +85,11 @@ MUTANTS = {
         ("RecorderPanelController+Polish.swift",
          "            polishBoxes.shortcutOverlays.state == .on && choice.keys == .shortcuts\n",
          "            polishBoxes.shortcutOverlays.state == .on\n")]),
+    "open-container": (["Q7"], [
+        ("RecordingEnhance.swift",
+         "        if document.scope == scope { return document.editedProject }\n"
+         "        return scope.flatMap { document.project.scoped($0) } ?? document.project\n",
+         "        return document.editedProject\n")]),
 }
 
 

@@ -212,8 +212,9 @@ enum SpeakerSwitch {
         let a = ReelTime.format(input.from, fps: input.fps, frames: true)
         let b = ReelTime.format(input.to, fps: input.fps, frames: true)
         out += silentMicrophones(input)
-        // SW-84: a read angle with no step whose mouth can be read.
-        for angle in input.faces where angle.activity.count == count
+        // SW-84: a read angle with no step whose mouth can be read; an empty range has no step
+        // (#456).
+        for angle in input.faces where count > 0 && angle.activity.count == count
             && !angle.activity.contains(where: { $0 != nil })
         {
             out.append(

@@ -1,9 +1,10 @@
 import AppKit
 
 /// `TranscriptView`'s geometry: a UTF-16 range's rects, the token or the
-/// paragraph timecode under a point, the top visible token, and the scroll
-/// that brings a token to the top. Every rect is in the view's (flipped)
-/// coordinates: the text container's offset by `TranscriptView.inset`.
+/// paragraph timecode under a point, the top visible token, the layout a far
+/// scroll needs first, and the scroll that brings a token to the top. Every
+/// rect is in the view's (flipped) coordinates: the text container's offset
+/// by `TranscriptView.inset`.
 extension TranscriptView {
 
     /// The text location `offset` UTF-16 units into the document.
@@ -135,14 +136,111 @@ extension TranscriptView {
         return index
     }
 
-    /// Scrolls `index`'s line to the visible top. Laid out twice: the first
-    /// scroll lands on an estimate for text never laid out, which the
-    /// viewport layout there settles.
-    func scrollToToken(_ index: Int) {
-        for _ in 0..<2 {
-            guard let rect = rects(forToken: index).first else { return }
-            scroll(to: rect.minY - 4)
+    /// Lays the text out from the top through `range` and for a viewport's
+    /// height below it, and sizes the view to it. A scroll to a far word
+    /// needs it first: the word's rect is an estimate until the text above is
+    /// laid out, and the view is only as tall as what is laid out from the
+    /// top (measured on 900 paragraphs: the last word estimated at 88,601 pt,
+    /// laid out at 130,078 pt, in a view 979 pt tall), so a scroll onto an
+    /// estimate lands short and is clamped shorter. Laying out 27,000 words
+    /// whole took 0.06 s. The viewport below is what lets a word reach the
+    /// visible top: laid out through the word and no further, the view ends
+    /// at its paragraph (#558: token 18,000 of 27,000 came to rest at the
+    /// visible bottom). `range`'s own paragraph and those below are
+    /// invalidated first: a paragraph laid out on its own, as a measurement
+    /// or the walk here does, keeps the place its estimate gave it until it
+    /// is laid out again in one run from the top (measured: the paragraph
+    /// after one at 86,015 pt placed at 58,837 pt). On a text already laid
+    /// out whole (`layOutAll()`) the same run from the top keeps it whole.
+    func layOut(through range: NSRange) {
+        layoutSteps += 1
+        guard range.location != NSNotFound, let start = location(range.location),
+            let end = location(NSMaxRange(range))
+        else { return }
+        // The paragraphs below, a viewport's worth, counted in heights: their
+        // places mean nothing yet.
+        var below = -(enclosingScrollView?.contentView.bounds.height ?? 0)
+        var last: NSTextLocation = end
+        var own = true
+        layoutManager.enumerateTextLayoutFragments(from: end, options: [.ensuresLayout]) {
+            fragment in
+            if !own { below += fragment.layoutFragmentFrame.height }
+            own = false
+            last = fragment.rangeInElement.endLocation
+            return below < 0
         }
+        if let stale = NSTextRange(location: start, end: last) {
+            layoutManager.invalidateLayout(for: stale)
+        }
+        guard let all = NSTextRange(location: contentStorage.documentRange.location, end: last)
+        else { return }
+        layoutManager.ensureLayout(for: all)
+        layoutViewport()  // the view grows to the height laid out
+    }
+
+    /// Asks for the whole text to be laid out when the run loop is next
+    /// idle (spec §11 TX-37 (d) as amended by #583): a one-shot observer
+    /// before the main loop waits, in the default mode only, so the pass is
+    /// never part of the rebuild that asked for it (TX-21's bound) and never
+    /// runs under a scroller's or a divider's drag. One pass is pending at
+    /// most: asking again drops the one before, which is how the next
+    /// rebuild drops a pass that has not run.
+    func scheduleWholeLayout() {
+        guard laysOutWhenIdle else { return }
+        if let pending = wholeLayoutObserver { CFRunLoopObserverInvalidate(pending) }
+        wholeLayoutObserver = nil
+        guard !tokenStarts.isEmpty else { return }
+        // Order 0: meant to run before AppKit's and Core Animation's own
+        // before-waiting observers (the paint order is not measured).
+        let observer = CFRunLoopObserverCreateWithHandler(
+            nil, CFRunLoopActivity.beforeWaiting.rawValue, false, 0
+        ) { [weak self] _, _ in self?.layOutAll() }
+        wholeLayoutObserver = observer
+        CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .defaultMode)
+    }
+
+    /// The word to keep at the visible top, and its offset from it: a
+    /// rebuild's or a width change's anchor still waiting for its pass while
+    /// the view is where that left it, else the word at the top now (a scroll
+    /// since then wins); nil out of sight with none waiting. Reads only.
+    func standingAnchor() -> (token: Int, offset: CGFloat)? {
+        let clipY = enclosingScrollView?.contentView.bounds.minY
+        if let kept = wholeLayoutAnchor, let clipY, abs(kept.clipY - clipY) <= 0.5 {
+            return (kept.token, kept.offset)
+        }
+        // Out of sight there is no top word to keep, and no scroll.
+        guard !visibleRect.isEmpty, let top = topVisibleToken(), let rect = rects(forToken: top).first
+        else { return nil }
+        return (top, rect.minY - visibleRect.minY)
+    }
+
+    /// Lays every paragraph out in one run from the top, so the view is as
+    /// tall as the text and the scroller's knob reads the true position, and
+    /// puts `standingAnchor()`'s word back at its offset from the visible top.
+    /// Nothing is invalidated first: one layout over the whole document
+    /// re-places the paragraphs the viewport or a measurement had placed from
+    /// estimates (measured: word 26,000 of 27,000, measured at 95,447 pt
+    /// before the pass, at 125,187 pt after it, where a layout from the top
+    /// puts it).
+    func layOutAll() {
+        wholeLayoutObserver = nil
+        let anchor = standingAnchor()
+        wholeLayoutAnchor = nil
+        layoutManager.ensureLayout(for: layoutManager.documentRange)
+        layoutViewport()  // the view grows to the text's height
+        if let anchor, let rect = rects(forToken: anchor.token).first {
+            scroll(to: rect.minY - anchor.offset)
+        }
+        laidOutWhole = true
+        wholeLayouts += 1
+    }
+
+    /// Scrolls `index`'s line to the visible top, the text from the top
+    /// through it laid out first (`layOut(through:)`, #558).
+    func scrollToToken(_ index: Int) {
+        layOut(through: tokenRange(index))
+        guard let rect = rects(forToken: index).first else { return }
+        scroll(to: rect.minY - 4)
     }
 
     /// The token nearest in x on the laid-out line above (`up`) or below

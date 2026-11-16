@@ -51,7 +51,7 @@ The box on screen still shows the frame at the playhead, while a drag starts fro
 
 Two things on the canvas always edit the clip itself:
 
-- A drag on a multi-clip selection. Only a single selected clip can have a selected action.
+- A drag on a multi-clip selection. Only a single selected clip can have a selected action. A clip with a [camera layout on its first frame](/framing/camera-layouts/#resize-or-move-a-laid-out-camera) is the exception: its layout moves with it.
 - Resizing a shape's box, or dragging a line's or arrow's end points. A shape's own properties can't animate. Moving a shape still writes the action's end.
 
 ## Switch a property off
@@ -162,7 +162,7 @@ The two default items are greyed while the row already holds its default.
 - Typing the number a field already shows isn't an edit, so it doesn't add the row to the action.
 - Some rows always change the clip, whatever is selected. Most are marked ⊘, and the buttons that add or remove a filter or region show a boxed **clip** tag. [What an action can animate](/motion/what-can-animate/) lists them.
 - Adding or removing a filter or an obscure region changes the clip even inside an action, though dialling a value inside one animates. If the action already animates that list, the whole list then switches at the action's end rather than ramping.
-- With several clips selected, the fields edit the clips themselves. The action lane reads "Select one clip to edit its actions."
+- With several clips selected, the fields edit the clips themselves, and a camera layout on a selected clip's first frame with them. The action lane reads "Select one clip to edit its actions."
 - An end value Frame Job won't take shows the reason at the foot of the inspector. See [When an edit is refused](/motion/change-an-action/#when-an-edit-is-refused).
 - Selecting an action isn't an undo step, but each change to its end state is.
 

@@ -18,7 +18,9 @@ extension AgentServer {
     /// The reference's loudness, then each target's row: `set` (exactly the
     /// patch's keys in `set_audio`'s spelling), the EQ and its fit, and
     /// Normalize's figures for the volume; the skips by name. A second
-    /// identical call is an identity: "Match Audio made no change".
+    /// identical call is an identity: "Match Audio made no change". `note`
+    /// and `skipped` are what the sheet's Match says at the inspector's foot
+    /// (spec §11 AU-169).
     func matchAudio(_ a: [String: Any]) throws -> String {
         let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16)
         try requireServerThread("match_audio")
@@ -69,7 +71,7 @@ extension AgentServer {
     }
 
     /// The answer to `plan`, on main: the reference, the rows, the skips,
-    /// the ceiling's note and the edit.
+    /// the limits' note (AU-167, AU-168) and the edit.
     private func matchAnswer(
         _ plan: AudioMatch.Plan, input: AudioMatch.Input, referenceLUFS: Double,
         document: ProjectDocument
@@ -91,13 +93,11 @@ extension AgentServer {
         if !plan.skipped.isEmpty {
             fields["skipped"] = plan.skipped.map { $0.description }
         }
-        let limited = plan.matched.filter { $0.loudness?.limit != nil }
-        if !limited.isEmpty, let target = plan.targetLUFS {
-            let ids = limited.map { String($0.clip) }.joined(separator: ", ")
-            fields["note"] =
-                "Clip(s) \(ids) stopped short of \(target) LUFS: the volume that reaches it "
-                + "would pass the \(AudioNormalize.maxGainName) ceiling (limited_by max_gain). "
-                + "result_lufs says where each landed."
+        if let target = plan.targetLUFS,
+            let note = AudioNormalize.limitNote(
+                plan.matched.compactMap(\.loudness), in: document, targetLUFS: target)
+        {
+            fields["note"] = note
         }
         return try editResult(document, AudioMatch.actionName, plan.ops, fields)
     }

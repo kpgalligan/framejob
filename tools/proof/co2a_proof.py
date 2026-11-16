@@ -3,11 +3,16 @@
 `cutout` key (spec §11 CO-20, CO-21, CO-23) and Remove Background drawn from
 the cached masks (CO-24…CO-29).
 
-    python3 tools/proof/co2a_proof.py [--only B0,D13p,…] [--mutant NAME] [--app PATH]
+    python3 tools/proof/co2a_proof.py [--only B0,D13p,…] [--mutant NAME] [--app PATH] [--base REV]
 
 CO2a1's app fixture is a version-38 project over a copy of `media/A.mov`
 (640×360, 30 fps, 10 s): one clip at 0 for 6 s and one zoom action over [1 s,
 3 s) ending at scale 2, on a 1280×720 canvas.
+
+**MA** (#440's batch; text only, no app, first in a plain run): every anchor of
+every mutant in `MUTANTS` occurs exactly once in the tree's file
+(`anchor_count`, which `mutant_app` counts through too), so an anchor a later
+change repeated or moved fails the next plain run by the mutant's name.
 
 **Probe rows** (`co2a_probe.swift` with `cutout_spike/mask_track_writer.swift`,
 built from `app/Sources` with `FRAMEJOB_DEV_TOOLS` through `swift_build.py`; no
@@ -74,13 +79,33 @@ The canned launch's rows:
   both read k.
 - D15 a cutout-less project (A.mov, corner radius, shadow, a zoom action):
   3 `render_frame` PNGs and a 2 s `prores_4444` export's per-frame md5 equal
-  those of the base's app (`BASE`: the tree copied, its `app/` replaced by
-  `git archive BASE app`, built by `tree_copy.build_app`).
+  those of the base's app. The base is the commit the change under test
+  started from, FOUND, not pinned (#440): `--base REV`, else
+  `tree_copy.default_base()` (`HEAD` when the tree's build inputs differ from
+  it, else the merge-base of `HEAD` and `main`). Its app is built WHOLE, from
+  its own Swift, core, header and `project.yml` (`tree_copy.make_base_copy`,
+  then `tree_copy.build_app`), because a pinned `app/` linked against the
+  tree's core stops building the day the core's op table moves; a base that
+  will not build is a FAIL of the row. Both instances open one fixture,
+  written at the BASE's format version (the lower of its header's and the
+  tree's), which the tree's app reads as an older file. The row names the
+  base, and says so when the tree's build inputs ARE the base's: it then
+  compared two builds of one source.
 - Z1 each launch's `grep "Frame Job: "` prints nothing.
 
 `--mutant NAME`: CO2a2's decision broken in a tree copy (`tree_copy.py`), the
 copy built as the proof's configuration, and only its rows run; CAUGHT (exit
-0) when one of them fails.
+0) when one of them fails. A D15 that failed BEFORE its comparison (no base
+found, the base not built or not listening, either side's outputs not made)
+catches nothing: the run prints `the control could not be performed` and
+exits 2, as when the mutant's own copy does not build. `unmasked-dimmed` is D15's: CO-27's gate gains an
+off arm, so a layer with NO mask has its alpha multiplied by 0.98 instead of
+being left alone, and the mutant app's frames are compared with the base's.
+(Removing the gate alone is not a mutant D15 can see, measured 2026-11-09: the
+texture bound for a layer with no mask is the 1 × 1 white placeholder, and
+`cutoutCover` of 1 is exactly 1 at every edge and feather, so the ungated
+shader draws the same bytes. The gate and the placeholder each hold the
+identity on their own.)
 
 Prints `scores: P/N`; exits 0 iff every scored row passed.
 """
@@ -116,10 +141,11 @@ HEADER = ROOT / "core/include/framejob_core.h"
 MOVIE = ROOT / "tools/proof/media/A.mov"
 CALL_BOUND = 300
 SEC = 600_000
+TEXT_ROWS = ["MA"]
 PROBE_ROWS = ["B0", "D13p", "D1p"]
 DRAWN = ["D1", "D11", "D16", "D2", "D3", "D4", "D6", "D7", "D12", "D15"]
 APP_ROWS = ["D8", "D10", "D13", "D14"] + DRAWN + ["Z1"]
-ROWS = PROBE_ROWS + APP_ROWS
+ROWS = TEXT_ROWS + PROBE_ROWS + APP_ROWS
 FFMPEG = cutout_spike.FFMPEG
 BARCODE_DIR = cutout_spike.MEDIA / "co2a"
 BARCODE = BARCODE_DIR / "barcode.mov"
@@ -140,8 +166,12 @@ SATURATED = 192
 D2_TIMES = [3 * SEC // 2, 5 * SEC // 3, 19 * SEC // 10]
 D4_TIMES = [SEC // 3, SEC, 5 * SEC // 3]
 D15_TIMES = [SEC // 4, SEC, 3 * SEC // 2]
-# The integration HEAD CO2a2 was built on: D15's base app.
-BASE = "f82c5b202e4d517abb20a85882cfc61bf99a7377"
+# D15's base (#440), found by `choose_base`: sha, rule (how it was chosen), version (the
+# fixture's format version). Empty when no base could be chosen, which fails D15.
+D15_BASE = {}
+# Why D15 failed BEFORE its comparison (no base, the base not built or not listening, either
+# side's outputs not made). A mutant is never CAUGHT by one of these: no frame was compared.
+D15_UNCOMPARED = []
 CANNED = ["-RCDevAnalysisCanned", "YES"]
 # No job may land beside a canned marker (CO-22: a cut-out clip wants its masks at once).
 HELD = ["-RCDevAnalysisHold", "3600"]
@@ -166,8 +196,11 @@ MUTANTS = {
         "                sourceTick: Ticks((Double(CutoutLookup.sourceTick(segment, at: t))\n"
         "                    / pack.grid.frameTicks).rounded() * pack.grid.frameTicks),\n")]),
     "miss-transparent": (["D3"], [(
-        DRAW, "            let texture = cutoutMasks.texture(pack, slot: slot)\n"
+        # The line above is the media branch's own: CO10b's image branch repeats the two below.
+        DRAW, "                pivot: plan.pivots[segment.clip]),\n"
+        "            let texture = cutoutMasks.texture(pack, slot: slot)\n"
         "        else { return placeholder }\n",
+        "                pivot: plan.pivots[segment.clip]),\n"
         "            let texture = cutoutMasks.texture(pack, slot: slot)\n"
         "        else { uniforms.opacity = 0; return placeholder }\n")]),
     "shadow-placeholder": (["D6"], [(
@@ -183,6 +216,12 @@ MUTANTS = {
     "pivot": (["D16"], [(
         LOOKUP, "ReverseMirror.mirrored(sourceTick, about: $0) - 1 }",
         "ReverseMirror.mirrored(sourceTick, about: $0) }")]),
+    # CO-27's gate: a layer with no mask drawn runs exactly the arithmetic it ran before.
+    # (Ungating alone draws the same bytes: the placeholder is white and cutoutCover(1) is 1.)
+    "unmasked-dimmed": (["D15"], [(
+        SHADER, "    if (u.cutoutEnabled > 0.5) {\n"
+        "        alpha *= cutoutCover(cutout, samp, cutoutUV, u);\n    }\n",
+        "    alpha *= u.cutoutEnabled > 0.5 ? cutoutCover(cutout, samp, cutoutUV, u) : 0.98;\n")]),
 }
 RENDER_TIMES = [SEC // 2, 2 * SEC, 4 * SEC]
 DEFAULTS = {"subject": "person", "quality": "standard", "background": "remove",
@@ -1057,9 +1096,39 @@ def d12(client):
 
 # ---- D15: the base app ------------------------------------------------------------------
 
+def base_version(sha):
+    """`RC_FORMAT_VERSION` off `sha`'s header, or None."""
+    shown = subprocess.run(["git", "-C", str(ROOT), "show",
+                            f"{sha}:core/include/framejob_core.h"],
+                           capture_output=True, text=True, timeout=120)
+    match = re.search(r"#define RC_FORMAT_VERSION (\d+)", shown.stdout)
+    return int(match.group(1)) if shown.returncode == 0 and match else None
+
+
+def choose_base(rev):
+    """Fills `D15_BASE` from `--base REV` or `tree_copy.default_base()`; the reason it
+    could not, or None."""
+    if rev:
+        sha, rule = tree_copy.resolve(rev), f"--base {rev}"
+        if sha is None:
+            return f"--base {rev} names no commit"
+    else:
+        sha, rule = tree_copy.default_base()
+        if sha is None:
+            return f"no base could be found: {rule}"
+    version = base_version(sha)
+    if version is None:
+        return f"the base {sha[:8]}'s header has no `#define RC_FORMAT_VERSION <n>` line"
+    D15_BASE.update(sha=sha, rule=rule, version=min(version, format_version()))
+    print(f"  D15's base: {sha} — {rule}; the fixture is written at format "
+          f"{D15_BASE['version']} (the base's {version}, the tree's {format_version()})",
+          flush=True)
+    return None
+
+
 def d15_fixture():
     return {
-        "version": format_version(),
+        "version": D15_BASE["version"],
         "canvas": {"width": W, "height": H, "fps": [30, 1]},
         "media": [{"id": 1, "path": str(movie()), "kind": "video", "duration": 10 * SEC,
                    "width": 640, "height": 360, "fps": [30, 1], "has_video": True,
@@ -1097,29 +1166,28 @@ def d15_outputs(client, tag):
 
 
 def base_app():
-    """The base's app (`BASE`): the tree copied, its `app/` replaced by `git archive BASE
-    app`, built by `tree_copy.build_app` (the proof's configuration)."""
-    made, reason = tree_copy.make_copy(str(WORK.parent / "co2a-base"))
+    """The base's app (`D15_BASE`): the tree as that commit had it, whole
+    (`tree_copy.make_base_copy`), built by `tree_copy.build_app` (the proof's
+    configuration)."""
+    made, _, reason = tree_copy.make_base_copy(str(WORK.parent / "co2a-base"), D15_BASE["sha"])
     if made is None:
         return None, reason
-    shutil.rmtree(Path(made) / "app")
-    archive = subprocess.run(["git", "-C", str(ROOT), "archive", BASE, "app"],
-                             capture_output=True, timeout=120)
-    if archive.returncode != 0:
-        return None, f"git archive {BASE} app: {archive.stderr[-300:]}"
-    untar = subprocess.run(["tar", "-x", "-C", made], input=archive.stdout,
-                           capture_output=True, timeout=120)
-    if untar.returncode != 0:
-        return None, f"tar: {untar.stderr[-300:]}"
     app, reason = tree_copy.build_app(Path(made), BUILD_BOUND)
     return (proof_app.executable(app), None) if app else (None, reason)
 
 
-def d15(ours):
+def d15_uncompared(why):
+    """D15 failed before its comparison: scored a FAIL, and kept for a mutant's verdict."""
+    D15_UNCOMPARED.append(why)
+    check("D15", False, why)
+
+
+def d15(ours, mutant=False):
     """`ours` the outputs of this build; the base's from its own instance."""
+    sha = D15_BASE["sha"]
     binary, why = base_app()
     if binary is None:
-        check("D15", False, f"the base app did not build: {why}")
+        d15_uncompared(f"the base app ({sha[:8]}, {D15_BASE['rule']}) did not build: {why}")
         return
     log = WORK / "base.log"
     launched = mcp.launch(str(binary), [],
@@ -1127,15 +1195,22 @@ def d15(ours):
                           log_path=str(log), timeout=CALL_BOUND)
     try:
         if launched.client is None:
-            check("D15", False, "the base app did not listen")
+            d15_uncompared(f"the base app ({sha[:8]}) did not listen")
             return
-        theirs = d15_outputs(launched.client, "base")
+        try:
+            theirs = d15_outputs(launched.client, "base")
+        except Exception as error:  # noqa: BLE001 — the base's failure, not a difference
+            d15_uncompared(f"the base app's ({sha[:8]}) outputs: {type(error).__name__}: {error}")
+            return
     finally:
         launched.stop()
+    one_source = not mutant and not tree_copy.inputs_differ(sha)
+    note = (" — the tree's build inputs ARE the base's, so this compared two builds of one "
+            "source" if one_source else "")
     same = [a is not None and a == b for a, b in zip(ours[0], theirs[0])]
     check("D15", len(same) == 3 and all(same),
-          f"3 render_frames of a cutout-less project, PNG bytes against the base {BASE[:8]}'s "
-          f"app: {same}")
+          f"3 render_frames of a cutout-less project (format {D15_BASE['version']}), PNG bytes "
+          f"against the base {sha[:8]}'s app ({D15_BASE['rule']}): {same}{note}")
     check("D15", ours[1] and ours[1] == theirs[1],
           f"a 2 s prores_4444 export: {len(ours[1])} frames' md5 against the base's "
           f"{len(theirs[1])}, {'equal' if ours[1] == theirs[1] else 'different'}")
@@ -1163,11 +1238,11 @@ def launch_rows(binary, arguments, log, bodies):
             except Exception as error:  # noqa: BLE001 — a row's failure, never the run's
                 for name in names & selected:
                     check(name, False, f"{type(error).__name__}: {error}")
-        if "D15" in selected and any("D15" in names for names, _ in bodies):
+        if "D15" in selected and D15_BASE and any("D15" in names for names, _ in bodies):
             try:
                 ours = d15_outputs(launched.client, "ours")
             except Exception as error:  # noqa: BLE001
-                check("D15", False, f"this build's outputs: {type(error).__name__}: {error}")
+                d15_uncompared(f"this build's outputs: {type(error).__name__}: {error}")
     finally:
         launched.stop()
         try:
@@ -1179,7 +1254,7 @@ def launch_rows(binary, arguments, log, bodies):
     return ours
 
 
-def app_rows(binary):
+def app_rows(binary, mutant=False):
     ours = None
     try:
         if selected & {"D1", "D11", "D16", "D12"}:
@@ -1199,7 +1274,7 @@ def app_rows(binary):
         launch_rows(binary, [], WORK / "instance-real.log", real)
     if ours is not None:
         try:
-            d15(ours)
+            d15(ours, mutant)
         except Exception as error:  # noqa: BLE001
             check("D15", False, f"{type(error).__name__}: {error}")
 
@@ -1210,6 +1285,8 @@ def main():
     parser.add_argument("--only")
     parser.add_argument("--mutant", choices=sorted(MUTANTS))
     parser.add_argument("--app")
+    parser.add_argument("--base", metavar="REV",
+                        help="D15's base commit (default: tree_copy.default_base())")
     args = parser.parse_args()
     if args.mutant:
         selected = set(MUTANTS[args.mutant][0]) | {"Z1"}
@@ -1234,22 +1311,53 @@ def main():
     else:
         print(f"CO2a1 and CO2a2 — the cutout in the model and drawn ({proof_app.config()} "
               "build)", flush=True)
+    anchors_row()
+    if "D15" in selected:
+        try:
+            why = choose_base(args.base)
+        except (OSError, subprocess.TimeoutExpired, RuntimeError) as error:
+            why = f"{type(error).__name__}: {error}"
+        if why:
+            d15_uncompared(why)
     probe_rows(force=bool(selected & set(DRAWN)))
     if selected & set(APP_ROWS):
         binary = binary or proof_app.binary()
         if binary.suffix == ".app":
             binary = proof_app.executable(binary)
-        app_rows(binary)
+        app_rows(binary, mutant=bool(args.mutant))
     failed = [name for name, runs in results.items() if not all(ok for ok, _ in runs)]
     passed = [name for name in results if name not in failed]
     print(f"\nscores: {len(passed)}/{len(results)}" + (f"; failed {failed}" if failed else ""))
     if args.mutant:
         named = set(MUTANTS[args.mutant][0])
-        caught = bool(named & set(failed))
+        caught = bool(named & (set(failed) - ({"D15"} if D15_UNCOMPARED else set())))
+        if not caught and D15_UNCOMPARED and "D15" in named:
+            print(f"mutant {args.mutant}: the control could not be performed — D15 compared "
+                  f"nothing: {'; '.join(D15_UNCOMPARED)}")
+            return 2
         print(f"MUTANT {args.mutant} {'CAUGHT' if caught else 'SURVIVED'}: "
               f"{', '.join(sorted(named))} {'failed' if caught else 'passed'}")
         return 0 if caught else 1
     return 0 if not failed and results else 1
+
+
+def anchor_count(root, path, anchor):
+    """How many times `anchor` occurs in `root`'s `path`; 0 when it cannot be read."""
+    try:
+        return (Path(root) / path).read_text().count(anchor)
+    except OSError:
+        return 0
+
+
+def anchors_row():
+    """MA: every mutant's every anchor occurs exactly once in the tree."""
+    wrong = [f"{name}: {count} times in {path}: {anchor!r}"
+             for name, (_, edits) in sorted(MUTANTS.items())
+             for path, anchor, _ in edits
+             for count in [anchor_count(ROOT, path, anchor)] if count != 1]
+    total = sum(len(edits) for _, edits in MUTANTS.values())
+    check("MA", not wrong, f"every anchor of the {len(MUTANTS)} mutants ({total} anchors) "
+          "occurs exactly once in the tree" + (": " + "; ".join(wrong) if wrong else ""))
 
 
 def mutant_app(name):
@@ -1258,10 +1366,10 @@ def mutant_app(name):
         return None, reason
     for path, anchor, replacement in MUTANTS[name][1]:
         target = Path(made) / path
-        text = target.read_text()
-        if text.count(anchor) != 1:
-            return None, f"the anchor occurs {text.count(anchor)} times in {path}"
-        target.write_text(text.replace(anchor, replacement))
+        count = anchor_count(made, path, anchor)
+        if count != 1:
+            return None, f"the anchor occurs {count} times in {path}"
+        target.write_text(target.read_text().replace(anchor, replacement))
     app, reason = tree_copy.build_app(Path(made), BUILD_BOUND)
     return (proof_app.executable(app), None) if app else (None, reason)
 

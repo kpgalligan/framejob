@@ -150,9 +150,11 @@ enum VolumeLine {
         on clip: ClipSnapshot, at clipTime: Ticks, project: ReelProject, nextId: UInt32, fps: Fps
     ) -> (prefix: [ReelOp], action: UInt32, volume: Double)? {
         let frame = max(fps.frameDuration, 1)
-        let t = ReelTime.snapToFrame(clipTime, fps: fps)
-        guard t >= 0, t < clip.duration,
-              let volume = (project.clipState(clip.id, at: clip.start + t)?["audio"]
+        guard clipTime >= 0, clipTime < clip.duration else { return nil }
+        let t = min(
+            ReelTime.snapToFrame(clipTime, fps: fps),
+            TimelineTranscript.frameFloor(clip.duration - 1, fps: fps))
+        guard let volume = (project.clipState(clip.id, at: clip.start + t)?["audio"]
                   as? [String: Any])?["volume"] as? Double
         else { return nil }
         if let inside = clip.actions.first(where: { $0.start <= t && t < $0.endTime }) {

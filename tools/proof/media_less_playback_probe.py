@@ -195,6 +195,12 @@ def build_shader(probe):
     air = os.path.join(probe, "Compositor.air")
     if os.path.exists(lib) and os.path.getmtime(SHADER) < os.path.getmtime(lib):
         return lib, None
+    # The folder is made here (#388): a caller whose probe is built AFTER its
+    # shader (`ramp_proof.probe`, the ramp spikes) has not made it yet.
+    try:
+        os.makedirs(probe, exist_ok=True)
+    except OSError as error:
+        return None, f"the probe folder {probe} could not be made: {error}"
     step = bounded.run(["xcrun", "-sdk", "macosx", "metal", "-c", SHADER, "-o", air], 300)
     if step["rc"] != 0:
         return None, "xcrun metal failed: " + step["stderr"].strip()[:300]

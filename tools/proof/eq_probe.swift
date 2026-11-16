@@ -7,7 +7,7 @@ import MediaToolbox
 // The EQ, hum notch and channel pick's probe (road map "audio" AP3, spec §11
 // AU-30..AU-36), compiled with app/Sources through swift_build. Arguments: the
 // fixtures folder, a scratch folder. Prints one "ok"/"FAIL" line per check,
-// each row's name first (Q2..Q11), for eq_probe.py to score; Q1's responses
+// each row's name first (Q2..Q12), for eq_probe.py to score; Q1's responses
 // are written as JSON and named on a "Q1JSON <file>" line for the script's own
 // numpy oracle.
 
@@ -709,4 +709,49 @@ do {
             + "reducer's 10.7 ms late", headLeadIs(track) && abs(gap) <= 1,
           "onset at sample \(onset.map(String.init) ?? "none"), \(f3(gap)) ms from the cut; "
             + "head lead \(track.headLead)")
+}
+
+// MARK: - Q12 the section's summary for an EQ with no slot on (#407)
+
+do {
+    var notes: [String] = []
+    var good = AudioPane.eqSummary(nil) == "off"
+    notes.append("no EQ \"\(AudioPane.eqSummary(nil))\"")
+    var current = try? ReelProject.from(json: """
+        {"version": \(RC_FORMAT_VERSION),
+         "canvas": {"width": 320, "height": 180, "fps": [30, 1], "background": [0, 0, 0, 1]},
+         "media": [{"id": 1, "path": "/fixtures/stereo.wav", "kind": "audio",
+                    "duration": 6000000, "has_video": false, "has_audio": true}],
+         "tracks": [{"id": 3, "name": "Track 1"}],
+         "clips": [{"id": 2, "track": 3, "start": 0, "duration": 600000,
+                    "source": {"kind": "media", "media": 1, "in": 0},
+                    "audio": {"channels": "both"}}],
+         "next_id": 10}
+        """)
+    // Each step's patch, the summary it must read, and what it describes.
+    let steps: [([String: Any], String, String)] = [
+        (["eq": [String: Any]()], "off", "eq {}"),
+        (["eq": ["bypass": true]], "off", "eq {} bypassed"),
+        (["eq": ["bypass": false, "high_pass": ["frequency": 80]]], "1 on", "high_pass on"),
+        (["eq": ["bypass": true]], "bypassed", "high_pass on, bypassed"),
+    ]
+    for (patch, want, label) in steps {
+        let edit = current.map { project in
+            Result { try project.applying(.setAudioRaw(clips: [2], patch: patch)) }
+        }
+        guard case .success(.applied(let next))? = edit else {
+            good = false
+            notes.append("\(label): not applied (\(edit.map { "\($0)" } ?? "no project"))")
+            current = nil
+            continue
+        }
+        current = next
+        let eq = next.snapshot.clip(2)?.audio?.eq
+        let summary = AudioPane.eqSummary(eq)
+        good = good && eq != nil && summary == want
+        notes.append("\(label): stored \(eq == nil ? "no eq" : "an eq") reading \"\(summary)\" "
+            + "(want \"\(want)\")")
+    }
+    check("Q12", "the EQ summary reads \"off\" with no EQ and with an EQ no slot is on, "
+            + "bypassed or not", good, notes.joined(separator: "; "))
 }

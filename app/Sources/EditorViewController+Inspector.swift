@@ -60,6 +60,9 @@ extension EditorViewController {
         NotificationCenter.default.addObserver(
             self, selector: #selector(documentDidRefuse(_:)),
             name: .projectDocumentDidRefuse, object: document)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(documentDidNote(_:)),
+            name: .projectDocumentDidNote, object: document)
 
         timeline?.registerForDraggedTypes([.frameJobMedia])
         previewCanvas?.registerForDraggedTypes([.frameJobMedia])
@@ -73,6 +76,16 @@ extension EditorViewController {
               let refusal = note.userInfo?["refusal"] as? ReelRefusal
         else { return }
         inspector?.showRefusal(refusal)
+    }
+
+    /// A measured press's notice (spec §11 AU-169): the clips Normalize,
+    /// Enhance Voice or Match Audio left away from the target or skipped,
+    /// at the inspector's foot. Nothing beeps for it.
+    @objc func documentDidNote(_ note: Notification) {
+        guard let document, note.object as? ProjectDocument === document,
+              let notice = note.userInfo?["notice"] as? AudioMeasureNotice
+        else { return }
+        inspector?.showNotice(notice)
     }
 
     /// Project → inspector, from `refreshFromDocument`. `isLive` rides

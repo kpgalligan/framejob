@@ -169,7 +169,7 @@ extension AgentServer {
             "enhance": [
                 "type": "boolean",
                 "description": "Run enhance_voice over the microphone's clips once they "
-                    + "land and their sound is analysed, as its own undo step (default "
+                    + "land and their sound is analyzed, as its own undo step (default "
                     + "false); the answer gains enhance or enhance_error. Refused "
                     + "without microphone: true (or source voice_over), and with "
                     + "place: false.",

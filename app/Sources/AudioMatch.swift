@@ -113,7 +113,7 @@ enum AudioMatch {
             guard case .reading(let reading) = answer else {
                 if answer == .pending {
                     return problem(
-                        "is still being analysed — its loudness has not been measured yet. Try "
+                        "is still being analyzed — its loudness has not been measured yet. Try "
                             + "again in a moment.")
                 }
                 return .problem(
@@ -138,7 +138,7 @@ enum AudioMatch {
                     ?? AudioEnhance.speechSpans(media, cache: document.cacheDirectory)
             else {
                 return problem(
-                    "is still being analysed — its speech has not been detected yet. Try again "
+                    "is still being analyzed — its speech has not been detected yet. Try again "
                         + "in a moment.")
             }
             return .reading(
@@ -174,7 +174,7 @@ enum AudioMatch {
                             clip: id, media: media, lufs: reading.lufs ?? 0,
                             truePeak: reading.truePeak, steps: reading.steps,
                             stepPeaks: reading.stepPeaks, limiter: audio?.limiter,
-                            currentVolume: audio?.volume),
+                            currentVolume: audio?.volume, currentLimiter: audio?.limiter),
                         speech: speech, current: audio ?? AudioProps()))
             }
         }

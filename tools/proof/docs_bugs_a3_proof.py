@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Docs-bugs batch a3 (#469, #476, #471, #481, #485; spec §11 CI-17, CI-18): canvas selection and
-the inspector around it; and batch a5's CI-19 rows (#469's second half).
+the inspector around it; batch a5's CI-19 rows (#469's second half); ai-docs a2's rows (#529,
+#530; spec §11 #529, #530), the F rows; and ai-docs r2b's rows (#540, spec §11 #540), the G rows.
 
     python3 tools/proof/docs_bugs_a3_proof.py [--only D1,N3,…] [--tree PATH] [--expect-red]
                                               [--mutant NAME]
@@ -9,9 +10,9 @@ The projects are made by the app under test over MCP (`proof_app.binary()`, `RC_
 `work/docs_bugs_a3/`, saved and closed, from media ffmpeg makes in `work/docs_bugs_a3_media/`. A
 recording with a camera lands through `land_recording`, the recording's own code. Every row runs
 through `docs_bugs_a3_probe.swift`, the app's own sources on those packages: a drag, a click and a
-key press can't be sent over MCP. D1 and N3 are also read back through the app under test: what D1
-saved is rendered beside the undragged project, and `snapshot_ui` captures the preview with the
-nest selected and with nothing selected. N1's click has no MCP door, so N3's capture is the app's
+key press can't be sent over MCP. D1, N3, F1, F6, F7 and F8 are also read back through the app
+under test: what D1 and the F rows saved is rendered beside the untouched project, and `snapshot_ui`
+captures the preview with the nest selected and with nothing selected. N1's click has no MCP door, so N3's capture is the app's
 word for it. V1 is an MCP row on the app under test alone.
 
 `--tree PATH` builds the probe from `PATH/app/Sources`, its bridging header and
@@ -27,7 +28,8 @@ Red on the base unless marked CONTROL:
   "Move" that restores them all; the render differs where the camera went and where it left. D2 a
   corner scale. D3 a nudge. D4 clicked on the timeline first. D5 frame 0, the cut selected: frame 0
   moves too. D6 frame 0 after Esc. D8 (CONTROL) before the zoom: the base, the box follows. D9 (CONTROL) a plain clip. D10 (CONTROL) a rotate on a clip with a cut: the base, on
-  every frame, the cut's end gains no key. D12 (CONTROL) a multi-selection: the base. D13
+  every frame, the cut's end gains no key. D12 a multi-selection ({C, S}), C dragged: C's base and
+  cut end both at −500, −300, its three states equal, "Move" (rescored by ai-docs a2, #529). D13
   (CONTROL) a shape's box scale on a clip with a cut: the base.
 - #469's second half (batch a5, CI-19, the owner's "Refuse and explain"). "Refused" is the strip at
   the inspector's foot reading the exact sentence, no undo step, and the base and every action's
@@ -66,11 +68,52 @@ Red on the base unless marked CONTROL:
   280–440 pt (the base comes back under 280).
   S3 ⌥⌘I, then a drag out: shown, the key false, a new window shown. S4 (CONTROL) ⌥⌘I, then a new
   window hidden.
+- #529 (ai-docs a2, spec §11 #529): with no action selected, a multi-selection's gesture writes each
+  written clip's first-frame cut and its base. On the `cam` fixture, C the camera and S the screen,
+  both landed with a cut (CO-80); the states are read at frame 0, frame 1 and 4 s. F1 {C, S}, C
+  dragged: S's states equal and moved by the travel, its base x its cut end x, one Undo puts both
+  back, and the saved package renders differently where C went at all three times. F2 a corner
+  scale on C: its scale state equal at all three, "Scale". F3 a ← nudge: C 623 at all three, S −1
+  at all three, "Nudge". F4 (CONTROL) a rotate on C: the base, the cut end gains no rotation,
+  "Rotate". F5 (CONTROL) `pairzoom` {a, b} at 5 s, a dragged: both bases move, b's finished zoom
+  (not a cut) keeps its end x, no refusal, "Move".
+- #530 (ai-docs a2, spec §11 #530): a value typed in Transform on a clip with a cut writes the cut
+  and its base. F6 C clicked at 4 s (no action), X −500: base and cut end −500, the states −500,
+  "Position", one Undo puts both back to 624, and the read-back as F1's. F7 at 0, the cut selected,
+  X −500: the same. F8 as F7 with Y −300. F9 no action, Scale 50: base and cut end 0.5. F10
+  (CONTROL) no action, Rotation 30: the base 30, the cut end has no rotation. F11 the cut
+  selected, Motion Blur 50: base and cut end 0.5. F12 (CONTROL) the `late` fixture, no action, X
+  −400: the base, the late action's end x 100. F13 {C, S}, X −500: both bases and both cut ends
+  −500. F14 base and cut end at motion blur 0.3, no action, Motion Blur 50: both 0.5.
+- #540 (ai-docs r2b, spec §11 #540): with no action selected, an inspector write on a clip with a
+  first-frame cut never sends the cut a whole or null `cutout`, only those of its background, edge
+  and feather that differ from the base cutout. Fixture `bg`: the landed camera with a base cutout
+  {subject: person}, one filter and one obscure region, and its cut's end naming cutout
+  {background: keep}, a filter and a region; `bgoff` is `bg` with the base cutout set to null;
+  `img` is an image clip (a 64 × 64 PNG) with a base cutout {subject: person} and a first-frame
+  cut (the six layout keys at the clip's own placement) whose end names cutout {background:
+  keep}. Each row presses the control through its own handler with the clip selected, no action
+  selected, and reads the ops built, each one's answer and the list's, the undo step, the window's
+  sheet, the stored base and cut end and `clip_state` at frame 0, frame 1 and the playhead. G1
+  (`bg`, 4 s) Remove background unticked: no op sends the cut a whole, null or `off` cutout, the
+  list applies, "Remove Background", no sheet, the base cutout null and the cutout null in all three
+  states. G2 the Background header's Reset: the same, with an undo step. G3 (`bgoff`) Remove
+  background ticked: the base cutout whole, the cut's end cutout {background: remove, edge: 0,
+  feather: 0}, the three states' background equal, "Remove Background", no sheet. G4 (CONTROL)
+  Filters ▸ Add Filter and G5 (CONTROL) Obscure ▸ Add Region: applied, two entries in all three
+  states. G6 (CONTROL) the Background popup set to Remove: applied, "Cutout Background". G7
+  (`img`, 2 s) the Subject popup set to Foreground: no `set_action_end` on the cut, applied,
+  "Cutout Subject", no sheet, the base subject foreground, the cut's end cutout still
+  {background: keep}, and the background keep at frame 1 and 2 s.
 - Z1 (CONTROL) `grep "Frame Job: "` on the log prints nothing.
 
 `--mutant NAME` breaks one decision in a `tree_copy.py` copy, builds the probe from it and runs only
 the row it must fail: CAUGHT exits 1, SURVIVED exits 0, a control that could not be performed exits
-2. `cut-any-key` D10, `cut-any-start` D11, `no-cut-base` D5, batch a5's nine (`held-any-time` D8
+2. `cut-any-key` D10, `cut-any-start` D11 and F12, `no-cut-base` D5, ai-docs a2's seven
+(`multi-no-held` D12, F1, F2 and F3, `multi-front-only` F1 and F3, `typed-no-cut` F6, F9 and F13,
+`typed-no-base` F7, F8 and F11, `typed-any-key` F10, `typed-cut-placement-only` F11,
+`typed-held-placement-only` F14), ai-docs r2b's three (`held-whole-cutout` G1, G2, G3 and G7,
+`held-part-dropped` G3, `held-cutout-undiffed` G7), batch a5's nine (`held-any-time` D8
 and D23, `held-cut-too` D21, `held-earliest` D19, `held-any-key` D17, `held-on-press` D18,
 `held-shape-scale` D24, `held-no-nudge` D15, `held-width-as-scale` D25, `held-selection-first`
 D27), `nest-no-motion` N11 (the core: the
@@ -84,9 +127,11 @@ import hashlib
 import json
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import time
+import zlib
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -110,13 +155,19 @@ CALL_BOUND = 300
 
 PROBE_ROWS = ([f"D{i}" for i in range(1, 28)] + [f"N{i}" for i in range(1, 14)]
               + [f"P{i}" for i in range(1, 7)] + [f"M{i}" for i in range(1, 6)]
-              + [f"S{i}" for i in range(1, 5)])
+              + [f"S{i}" for i in range(1, 5)] + [f"F{i}" for i in range(1, 15)]
+              + [f"G{i}" for i in range(1, 8)])
 MCP_ROWS = ["V1"]
 ROWS = PROBE_ROWS + MCP_ROWS + ["Z1"]
-CONTROLS = {"D8", "D9", "D10", "D12", "D13", "D17", "D18", "D21", "D22", "D23", "D24", "D25",
-            "D27", "V1", "N8", "N9", "N10", "N13", "P6", "M4", "M5", "S4", "Z1"}
+CONTROLS = {"D8", "D9", "D10", "D13", "D17", "D18", "D21", "D22", "D23", "D24", "D25",
+            "D27", "V1", "N8", "N9", "N10", "N13", "P6", "M4", "M5", "S4", "F4", "F5", "F10",
+            "F12", "G4", "G5", "G6", "Z1"}
+# The rows the app under test renders back after the probe.
+RENDERED = {"D1", "N3", "F1", "F6", "F7", "F8"}
 
 TARGET = "app/Sources/CanvasEditTarget.swift"
+CUTOUT = "app/Sources/CutoutProps.swift"
+WRITES = "app/Sources/InspectorBinding+Writes.swift"
 CANVAS = "app/Sources/PreviewCanvasView.swift"
 BOX = "app/Sources/CanvasLayerBox.swift"
 REGION = "app/Sources/EditorViewController+ZoomRegion.swift"
@@ -138,7 +189,7 @@ MUTANTS = {
     "cut-any-key": (["D10"], [(
         TARGET, "              Self.holds(cut.end, gesture)\n",
         "              Self.holds(cut.end, gesture) || true\n")]),
-    "cut-any-start": (["D11"], [(
+    "cut-any-start": (["D11", "F12"], [(
         TARGET, "        action.start == 0 && action.duration <= frame && ",
         "        action.duration <= frame && ")]),
     "no-cut-base": (["D5"], [(
@@ -167,6 +218,58 @@ MUTANTS = {
         EDITOR, COLLAPSE + "        false\n", COLLAPSE + "        subview === inspectorContainer\n")]),
     "no-key-clear": (["S3"], [(PANES, CLEAR_KEY, "")]),
     "no-show-clamp": (["S2"], [(PANES, SHOW_CLAMP, "        return\n")]),
+    # ai-docs a2, #529 and #530: one per decision.
+    "multi-no-held": (["D12", "F1", "F2", "F3"], [(
+        TARGET, "        if editTarget.selected == nil, selection.count > 1 {\n"
+                "            return editTarget.holding(\n"
+                "                gesture, clips: selection.sorted().compactMap { snapshot.clip($0) },\n"
+                "                frame: snapshot.canvas.fps.frameDuration)\n"
+                "        }\n", "")]),
+    "multi-front-only": (["F1", "F3"], [(
+        TARGET, "                gesture, clips: selection.sorted().compactMap { snapshot.clip($0) },\n",
+        "                gesture, clips: [primaryBox?.id].compactMap { $0 }"
+        ".compactMap { snapshot.clip($0) },\n")]),
+    "typed-no-cut": (["F6", "F9", "F13"], [(
+        WRITES, "                if !held.isEmpty {\n", "                if false, !held.isEmpty {\n")]),
+    "typed-no-base": (["F7", "F8", "F11"], [(
+        WRITES, "                if let animatable = structural(video: patch, for: clip).animatable {\n",
+        "                if false, let animatable = structural(video: patch, for: clip).animatable {\n")]),
+    "typed-any-key": (["F10"], [(
+        WRITES, "                let held = patch.held(by: cut.end.video, "
+                "cutoutBase: clip.video?.cutout)\n",
+        "                let held = patch\n")]),
+    "typed-cut-placement-only": (["F11"], [(
+        WRITES, "                    kept.append(.setVideo(clips: [clip.id], patch: animatable))\n",
+        "                    kept.append(.setVideo(clips: [clip.id], patch: VideoPatch(\n"
+        "                        x: animatable.x, y: animatable.y, scale: animatable.scale,\n"
+        "                        rotation: animatable.rotation, opacity: animatable.opacity,\n"
+        "                        crop: animatable.crop, cornerRadius: animatable.cornerRadius)))\n")]),
+    "typed-held-placement-only": (["F14"], [(
+        TARGET, "        let names = Set(end.dictionary.keys)\n",
+        "        let names = Set(end.dictionary.keys).intersection(\n"
+        "            [\"x\", \"y\", \"scale\", \"rotation\", \"opacity\", \"crop\", \"corner_radius\"])\n")]),
+    # ai-docs r2b, #540: one per decision.
+    "held-whole-cutout": (["G1", "G2", "G3", "G7"], [(
+        TARGET, "        if names.contains(\"cutout\") {\n"
+                "            switch cutout {\n"
+                "            case .some(.some(let whole)):\n"
+                "                let part = whole.animatable(changedFrom: cutoutBase)\n"
+                "                next.cutoutPart = part.isEmpty ? nil : part\n"
+                "            case .some(.none): break\n"
+                "            case .none: next.cutoutPart = cutoutPart\n"
+                "            }\n"
+                "        }\n",
+        "        next.cutout = kept(cutout, \"cutout\")\n"
+        "        next.cutoutPart = kept(cutoutPart, \"cutout\")\n")]),
+    "held-part-dropped": (["G3"], [(
+        TARGET, "                let part = whole.animatable(changedFrom: cutoutBase)\n"
+                "                next.cutoutPart = part.isEmpty ? nil : part\n",
+        "                _ = whole\n")]),
+    "held-cutout-undiffed": (["G7"], [(
+        CUTOUT, "            background: background == base?.background ? nil : background,\n"
+                "            edge: edge == base?.edge ? nil : edge,\n"
+                "            feather: feather == base?.feather ? nil : feather)\n",
+        "            background: background, edge: edge, feather: feather)\n")]),
     # Batch a5, CI-19: one per decision.
     "held-any-time": (["D8", "D23"], [(
         TARGET, "            .filter { !isCut($0, frame: frame) && $0.endTime <= clipTime }\n",
@@ -280,6 +383,67 @@ def nest_fixture(c, name, after=None):
     return finish(c, a, {"behind": behind, "front": front, "nest": nest})
 
 
+REGION = {"kind": "blur", "shape": "rect", "x": 0, "y": 0, "width": 200, "height": 100}
+
+
+def png(path, side=64):
+    """A `side` × `side` opaque RGBA PNG, written with zlib alone."""
+    def chunk(kind, data):
+        body = kind + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
+
+    rows = b"".join(b"\x00" + bytes((200, 120, 40, 255)) * side for _ in range(side))
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", side, side, 8, 6,
+                                                                       0, 0, 0))
+                     + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
+
+
+def cutout_fixtures(c, out):
+    """#540's: `bg`, `bgoff` and `img` (the module doc)."""
+    a = fresh(c, "bg")
+    c.call_with("land_recording", {**a, "movie": str(MEDIA / "screen.mov"),
+                                   "voice": [str(MEDIA / "silence.m4a")],
+                                   "camera": str(MEDIA / "camera.mov")})
+    camera = next(x for x in c.call_with("get_project", a)["project"]["clips"]
+                  if (x.get("video") or {}).get("x") == 624)
+    cam, cut = camera["id"], camera["actions"][0]["id"]
+    for tool, args in (
+            ("set_video", {"clips": [cam], "patch": {"cutout": {"subject": "person"}}}),
+            ("set_video", {"clips": [cam], "patch": {"filters": [{"kind": "blur", "amount": 0.5}]}}),
+            ("set_video", {"clips": [cam], "patch": {"obscure": [REGION]}}),
+            ("set_action_end", {"clip": cam, "action": cut,
+                                "patch": {"video": {"cutout": {"background": "keep"}}}}),
+            ("set_action_end", {"clip": cam, "action": cut,
+                                "patch": {"video": {"filters": [{"kind": "blur", "amount": 1.0}]}}}),
+            ("set_action_end", {"clip": cam, "action": cut,
+                                "patch": {"video": {"obscure": [{**REGION, "x": 50}]}}})):
+        c.call_with(tool, {**a, **args})
+    out["bg"] = finish(c, a, {"camera": cam, "cut": cut})
+
+    path = FIXTURES / "bgoff.framejob"
+    # Not `cache/`: the closed document's passes may still be writing a thumbnail there.
+    shutil.copytree(out["bg"]["path"], path, ignore=shutil.ignore_patterns("cache"))
+    a = {"project": str(path)}
+    c.call_with("open_project", {"path": str(path)})
+    c.call_with("set_video", {**a, "clips": [cam], "patch": {"cutout": None}})
+    out["bgoff"] = finish(c, a, {"camera": cam, "cut": cut})
+
+    picture = FIXTURES / "picture.png"
+    png(picture)
+    a = fresh(c, "img")
+    media = c.call_with("import_media", {**a, "path": str(picture)})["media"]
+    clip = clip_of(c, a, track0(c, a), media)
+    c.call_with("set_video", {**a, "clips": [clip], "patch": {"cutout": {"subject": "person"}}})
+    video = next(x for x in c.call_with("get_project", a)["project"]["clips"]
+                 if x["id"] == clip).get("video") or {}
+    action = c.call_with("add_action", {**a, "clip": clip, "at": 0,
+                                        "duration": FRAME})["new_actions"][0]
+    end = layout_end(video.get("x", 0), video.get("y", 0), video.get("scale", 1))
+    end["video"]["cutout"] = {"background": "keep"}
+    c.call_with("set_action_end", {**a, "clip": clip, "action": action, "patch": end})
+    out["img"] = finish(c, a, {"clip": clip, "cut": action})
+
+
 def make_fixtures(c):
     shutil.rmtree(FIXTURES, ignore_errors=True)
     FIXTURES.mkdir(parents=True)
@@ -294,6 +458,7 @@ def make_fixtures(c):
     camera = next(x for x in clips if (x.get("video") or {}).get("x") == 624)
     screen = next(x for x in clips if x["id"] != camera["id"])
     out["cam"] = finish(c, a, {"camera": camera["id"], "screen": screen["id"]})
+    cutout_fixtures(c, out)
 
     a = fresh(c, "zoom")
     clip = clip_of(c, a, track0(c, a), imported(c, a, "screen.mov"))
@@ -471,6 +636,9 @@ def difference(a, b):
 
 CORNER = (1344, 756, 480, 270)    # where the camera lands
 AIMED = (220, 105, 480, 270)      # where D1's drag sends it: x −500, y −300
+# Where each ai-docs a2 row sends the camera: F1 x −500, y −300; F6 and F7 x −500; F8 y −300.
+WENT = {"F1": AIMED, "F6": (220, 756, 480, 270), "F7": (220, 756, 480, 270),
+        "F8": (1344, 105, 480, 270)}
 
 
 def read_back(c):
@@ -498,6 +666,26 @@ def read_back(c):
             c.call_with("close_project", {"project": str(project), "discard": True})
         check("D1", all(left > 5 and went > 5 for left, went in scores),
               f"render against the undragged project, (corner, aimed): {scores}")
+
+    rows = [name for name in WENT if name in selected]
+    if rows:
+        base = out / "cam-untouched.framejob"
+        shutil.copytree(FIXTURES / "cam.framejob", base)
+        c.call_with("open_project", {"path": str(base)})
+        times = (("frame0", 0), ("frame1", FRAME), ("t4", 4 * SEC))
+        untouched = {tag: render(str(base), f"untouched-{tag}", t) for tag, t in times}
+        for name in rows:
+            edited = WORK / f"run/run-{name}.framejob"
+            c.call_with("open_project", {"path": str(edited)})
+            box = WENT[name]
+            scores = [difference(region(untouched[tag], box),
+                                 region(render(str(edited), f"{name}-{tag}", t), box))
+                      for tag, t in times]
+            c.call_with("close_project", {"project": str(edited), "discard": True})
+            check(name, all(s > 5 for s in scores),
+                  f"render against the untouched project where the camera went {box}, at frame 0, "
+                  f"frame 1 and 4 s: {scores}")
+        c.call_with("close_project", {"project": str(base), "discard": True})
 
     if "N3" in selected:
         nest = json.loads((FIXTURES / "fixtures.json").read_text())["nest"]
@@ -668,7 +856,9 @@ def score(r):
     told("D10", lambda x: x["base"] not in (None, 0) and x["end_rotation"] is None
          and all(near(s, x["base"]) for s in x["states"]) and x["undo"] == "Rotate")
     told("D11", lambda x: refused(x, 1, "position", "move"))
-    told("D12", lambda x: near(x["base_x"], -500, 14) and x["end_x"] == 624 and x["undo"] == "Move")
+    told("D12", lambda x: near(x["base_x"], -500, 14) and near(x["base_y"], -300, 14)
+         and near(x["end_x"], -500, 14) and near(x["end_y"], -300, 14)
+         and together(x["xs"], -500) and together(x["ys"], -300) and x["undo"] == "Move")
     told("D13", lambda x: x["width"] > x["width_before"] and x["end_scale"] == x["end_scale_before"]
          and x["end_x"] == x["end_x_before"] and x["undo"] == "Scale")
 
@@ -703,6 +893,107 @@ def score(r):
          and refused(x, 1, "position and size", "resize"))
     told("D27", lambda x: x["pressed"] == [FIXTURE_IDS["pairzoom"]["b"]] and silent(x, "Move")
          and abs(moved_x(x)) > 50 and x["other_before"] == x["other_after"])
+
+    # ai-docs a2: #529 and #530.
+    def equal(values):
+        return all(v is not None for v in values) and max(values) - min(values) < 0.001
+
+    def shifted(before, after, by, slack=0.01):
+        return (len(before) == len(after) == 3
+                and all(near(b2 - b1, by, slack) for b1, b2 in zip(before, after)))
+
+    def both(p, key, value, slack=0.01):
+        return near(p[f"base_{key}"], value, slack) and near(p[f"end_{key}"], value, slack)
+
+    def back(x, key, value):
+        """One Undo put the base and the cut's end back to `value`."""
+        return both(x["undone"], key, value)
+
+    told("F1", lambda x: camera_moved(x) and x["undo"] == "Move"
+         and equal(x["screen_xs"]) and shifted(x["screen_before"], x["screen_xs"], -1124, 14)
+         and near(x["screen"]["base_x"], x["screen"]["end_x"])
+         and together(x["undone"]["xs"], 624, 0.01) and together(x["undone"]["ys"], 351, 0.01)
+         and x["undone_screen"] == x["screen_before"])
+    told("F2", lambda x: x["hit"].startswith("handle(") and equal(x["scales"])
+         and x["scales"][0] > 0.80 and near(x["base_scale"], x["end_scale"])
+         and x["undo"] == "Scale")
+    told("F3", lambda x: together(x["xs"], 623, 0.01) and together(x["ys"], 351, 0.01)
+         and shifted(x["screen_before"], x["screen_xs"], -1) and x["undo"] == "Nudge")
+    told("F4", lambda x: x["hit"].startswith("rotation(")
+         and x["camera"]["base_rotation"] not in (None, 0) and x["camera"]["end_rotation"] is None
+         and all(near(s, x["camera"]["base_rotation"]) for s in x["states"])
+         and x["undo"] == "Rotate")
+    told("F5", lambda x: near(x["a_after"] - x["a_before"], -400, 14)
+         and near(x["b_after"] - x["b_before"], x["a_after"] - x["a_before"])
+         and x["b_end_before"] == x["b_end_after"] == 600 and x["strip"] is None
+         and x["undo"] == "Move")
+    # F6 types with no action selected, F7 and F8 with the cut selected by the click at frame 0.
+    for name, key, value, cut in (("F6", "x", -500, False), ("F7", "x", -500, True),
+                                  ("F8", "y", -300, True)):
+        told(name, lambda x, key=key, value=value, cut=cut: both(x["after"], key, value)
+             and together(x["states"], value, 0.01) and x["undo"] == "Position"
+             and (x["selected_before"] is not None) == cut
+             and back(x, key, 624 if key == "x" else 351))
+    told("F9", lambda x: both(x["after"], "scale", 0.5) and together(x["states"], 0.5, 0.001)
+         and x["undo"] == "Scale")
+    told("F10", lambda x: near(x["after"]["base_rotation"], 30) and x["after"]["end_rotation"] is None
+         and together(x["states"], 30, 0.01) and x["undo"] == "Rotation")
+    told("F11", lambda x: x["selected_before"] is not None and both(x["after"], "blur", 0.5)
+         and together(x["states"], 0.5, 0.001) and x["undo"] == "Motion Blur")
+    told("F12", lambda x: x["selected_before"] is None and near(x["after"]["base_x"], -400)
+         and x["after"]["end_x"] == 100 and x["undo"] == "Position")
+    told("F13", lambda x: both(x["camera"], "x", -500) and both(x["screen"], "x", -500)
+         and together(x["xs"], -500, 0.01) and together(x["screen_xs"], -500, 0.01)
+         and x["undo"] == "Position")
+    told("F14", lambda x: both(x["setup"], "blur", 0.3) and both(x["after"], "blur", 0.5)
+         and together(x["states"], 0.5, 0.001) and x["undo"] == "Motion Blur")
+
+    # ai-docs r2b: #540.
+    def ops(x):
+        return [json.loads(op["op"]) for ed in x.get("edits") or [] for op in ed["ops"]]
+
+    def lists_apply(x):
+        return bool(x.get("edits")) and all(ed["list"] == "applied" for ed in x["edits"])
+
+    def on_cut(x, cut):
+        return [op for op in ops(x) if op.get("op") == "set_action_end" and op.get("action") == cut]
+
+    def whole_or_null(op):
+        video = (op.get("patch") or {}).get("video") or {}
+        cutout = video.get("cutout", {}) if "cutout" in video else {}
+        return ("cutout" in video and (cutout is None or "subject" in cutout or "quality" in cutout)
+                or "video.cutout" in (op.get("off") or []))
+
+    def cutouts(x):
+        return [x["states_after"][k]["cutout"] for k in ("f0", "f1", "at")]
+
+    def end_cutout(x):
+        return ((x["after"].get("end") or {}).get("video") or {}).get("cutout")
+
+    bg_cut = FIXTURE_IDS["bg"]["cut"]
+    img_cut = FIXTURE_IDS["img"]["cut"]
+    for name in ("G1", "G2"):
+        told(name, lambda x, name=name: lists_apply(x) and x["sheet"] is None
+             and not any(whole_or_null(op) for op in on_cut(x, bg_cut))
+             and (x["undo"] == "Remove Background" if name == "G1" else x["undo"] != "")
+             and x["after"]["base_cutout"] is None and all(c is None for c in cutouts(x)))
+    told("G3", lambda x: lists_apply(x) and x["sheet"] is None and x["undo"] == "Remove Background"
+         and not any(whole_or_null(op) for op in on_cut(x, bg_cut))
+         and x["after"]["base_cutout"] is not None
+         and end_cutout(x) == {"background": "remove", "edge": 0, "feather": 0}
+         and all(c is not None for c in cutouts(x))
+         and len({c.get("background") for c in cutouts(x)}) == 1)
+    told("G4", lambda x: lists_apply(x) and x["sheet"] is None
+         and all(len(x["states_after"][k]["filters"] or []) == 2 for k in ("f0", "f1", "at")))
+    told("G5", lambda x: lists_apply(x) and x["sheet"] is None
+         and all(x["states_after"][k]["obscure_count"] == 2 for k in ("f0", "f1", "at")))
+    told("G6", lambda x: lists_apply(x) and x["sheet"] is None and x["undo"] == "Cutout Background")
+    told("G7", lambda x: lists_apply(x) and not on_cut(x, img_cut) and x["sheet"] is None
+         and x["undo"] == "Cutout Subject"
+         and json.loads(x["after"]["base_cutout"]).get("subject") == "foreground"
+         and end_cutout(x) == {"background": "keep"}
+         and all((x["states_after"][k]["cutout"] or {}).get("background") == "keep"
+                 for k in ("f1", "at")))
 
     nest = FIXTURE_IDS["nest"]["nest"]
     behind = FIXTURE_IDS["nest"]["behind"]
@@ -835,9 +1126,9 @@ def run_rows(binary, tree):
             if row not in results:
                 check(row, False, "the fixtures were not made")
         return
-    if probe_rows(tree) and selected & {"D1", "N3"}:
+    if probe_rows(tree) and selected & RENDERED:
         if not with_app(binary, "read-back", read_back):
-            for row in selected & {"D1", "N3"}:
+            for row in selected & RENDERED:
                 check(row, False, "the read-back did not finish")
 
 

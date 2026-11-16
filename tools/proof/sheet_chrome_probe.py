@@ -12,7 +12,8 @@ built as `main.swift` over that tree and over the working tree's
 `swift_build.build(defines=["FRAMEJOB_DEV_TOOLS"])`; the core is unchanged,
 so both link the one staticlib. Each binary runs once per look (`light`,
 `dark`), each run building the six sheets' views without presenting them
-and capturing each with `UISnapshot.pass` (a PNG) and
+and capturing each through `cacheDisplay`, as `UISnapshot.pass` does at the
+window's scale (a PNG), and
 `UISnapshotLayout.report` (a JSON layout dump).
 
 Rows:

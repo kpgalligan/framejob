@@ -406,7 +406,7 @@ final class ExportWriter {
         let cancelled = cancelRequested
         lock.unlock()
         // A cancel that lands while the container is being closed still means
-        // "I do not want this file": the sheet removes the destination on a
+        // "I do not want this file": `Exporter.finish` removes the file on a
         // cancelled result, and a file the user cancelled out of is not one to
         // hand back because the timing was unlucky.
         guard !cancelled else {

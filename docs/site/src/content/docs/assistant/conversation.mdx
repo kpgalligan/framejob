@@ -61,6 +61,7 @@ The Assistant reads the same message in full, so it can correct itself. A `faile
 | `failed: The person declined: …` | You chose **Deny**, or the question was declined for you. The Assistant won't try that call again this turn unless you ask. |
 | `failed: Cancelled by the user.` | **Stop** cancelled the call before it started. See [Stop a turn](/assistant/stop-a-turn/). |
 | `failed: … is not available to the assistant: …` | The Assistant isn't allowed that tool. The reason names the menu item to use instead. See [What it won't do](/assistant/what-it-will-not-do/). |
+| `failed: The image is too large to send: …` | A tool answered with a picture whose base64 is over 10 MB, the most the Anthropic API takes in one image, so the Assistant was told its size instead of being sent it. It usually asks again for a smaller picture, and the conversation carries on. |
 
 ## Permission lines
 

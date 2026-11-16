@@ -357,8 +357,9 @@ SOURCE_MUTANTS = {
                    "(path as NSString)")],
     "reveal-copy": [("MediaDescriptor.swift", "originalURL(for: media) ?? mediaURL(for: media)",
                      "mediaURL(for: media) ?? originalURL(for: media)")],
+    # Re-aimed (#554): the cursor files' re-anchor (CU-52) now runs between the two.
     "no-recopy": [("ProjectDocument+MissingCopies.swift",
-                   "return recopyingMissingCopies(anchored)", "return anchored")],
+                   "return recopyingMissingCopies(cursors)", "return cursors")],
     "main-watch": [("ProjectDocument+MissingCopies.swift",
                     "let shown = Thread.isMainThread || MediaImporter.isWithoutAsking"
                     " ? nil : watch",

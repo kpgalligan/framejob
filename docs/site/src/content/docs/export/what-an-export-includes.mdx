@@ -29,10 +29,10 @@ Some of what a file holds has to be made first. An export waits for all of it, a
 | [Rendered sound](/speed/ramp-audio/) | Every speed ramp, and every clip at a constant speed other than ×1 with Keep pitch off | "Clip 4's retimed audio could not be rendered: …" |
 | The isolated voice | Every clip with [Voice Isolation](/audio/voice-isolation/) | "Clip 4's isolated voice could not be rendered: …" |
 | The voice effect | Every clip with a [voice effect](/audio/voice-effects/) | "Clip 4's voice effect could not be rendered: …" |
-| The clip's measured loudness and speech | Every clip with the [gate](/audio/gate/), [leveller](/audio/leveller/) or [de-esser](/audio/de-esser/) on, because their thresholds follow it | See below |
+| The clip's measured loudness and speech | Every clip with the [gate](/audio/gate/), [leveler](/audio/leveler/) or [de-esser](/audio/de-esser/) on, because their thresholds follow it | See below |
 | Cursor tracks | Every clip with a [recorded cursor](/recording/cursor/) | The clip draws without its cursor, the export goes on, and the finished line counts a cursor warning |
 
-Only the loudness wait has a limit. If a measurement hasn't finished after five minutes, the export fails with "Clip 4's loudness or speech has not been measured yet, so its gate, leveller and de-esser cannot be set. Wait for their Status rows to show the clip's loudness, then export again." A clip that will never be measured, because it's silent or under 0.4 seconds, doesn't hold the export up and exports as the preview plays it.
+Only the loudness wait has a limit. If a measurement hasn't finished after five minutes, the export fails with "Clip 4's loudness or speech has not been measured yet, so its gate, leveler and de-esser cannot be set. Wait for their Status rows to show the clip's loudness, then export again." A clip that will never be measured, because it's silent or under 0.4 seconds, doesn't hold the export up and exports as the preview plays it.
 
 While it waits, the [progress sheet](/export/progress-and-report/) reads "Preparing “Board.mp4”…", and a row in the [Export Queue](/export/export-queue/#rows-and-their-states) reads `Preparing… · 0 %`. You can cancel at any point. An Animated GIF or Animated PNG has no sound, so it waits only for masks and cursor tracks.
 

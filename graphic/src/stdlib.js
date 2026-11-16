@@ -116,7 +116,7 @@ function spring(options) {
 // value outside its range throws; nothing is clamped.
 function __parseColour(text) {
   const fail = () => {
-    throw new Error(`interpolateColors: cannot parse colour "${text}"`);
+    throw new Error(`interpolateColors: cannot parse color "${text}"`);
   };
   let s = String(text);
   if (/[^\x00-\x7f]/.test(s)) fail();

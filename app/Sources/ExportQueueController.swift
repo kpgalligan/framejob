@@ -104,12 +104,12 @@ final class ExportQueueController {
         /// The file landed.
         case completed
         /// Stopped by a person, either before it started or mid-write — in
-        /// which case its half-written file has been removed.
+        /// which case its half-written sibling has been removed and the path
+        /// keeps the file it had (spec §11 #531).
         case cancelled
-        /// The exporter refused or failed. Whatever it had written is LEFT on
-        /// disk, which is `ExportProgressSheetController`'s posture and not a
-        /// new one: a cancel is a person saying "not this", where a failure is
-        /// evidence, and the file names itself in the message.
+        /// The exporter refused or failed. Its half-written sibling is
+        /// removed and the path keeps the file it had, as for a cancel (spec
+        /// §11 #531); the message says why.
         case failed
 
         /// Whether the job is over, however it ended — the test for "may be
@@ -176,23 +176,16 @@ final class ExportQueueController {
         /// arrives ten times a second and would otherwise wipe the "Stopping…"
         /// a person had just asked for.
         var phase: String?
-        /// Set on a COMPLETED job when a later job starts writing to the same
-        /// path, because from that moment this row's file is not this row's
-        /// any more — `Exporter.startWriting` removes whatever is at the
-        /// destination before it builds its pipeline, so the earlier export is
-        /// gone whether the later one succeeds, fails or is cancelled.
+        /// Set on a COMPLETED job when a later job to the same path SUCCEEDS,
+        /// because from that moment this row's file is not this row's any more
+        /// (spec §11 #531). Until then it is: every export writes a hidden
+        /// sibling and renames it over the path only on its success, so a
+        /// later job that fails or is cancelled leaves this row's file as it
+        /// was.
         ///
         /// The row stops claiming "Exported …" and stops offering Show in
         /// Finder. It is a fact about what happened rather than a state: the
         /// job really did complete, and rewriting its `state` would lose that.
-        ///
-        /// One case marks it where the file in fact survives, and it is the
-        /// honest direction of the two: a later job whose COMPOSITION fails to
-        /// build returns before the delete, so nothing was destroyed. It is
-        /// left alone rather than reached for, because knowing which failures
-        /// precede the delete means reading `Exporter`'s stages from here, and
-        /// a shared destination implies a shared project — a build that failed
-        /// for job 2 would almost always have failed for job 1.
         var superseded: Bool = false
         /// What the graphics warned while a COMPLETED job's file was drawn
         /// (G-24 (c)): the row's count and its tooltip's list.
@@ -306,17 +299,16 @@ final class ExportQueueController {
     /// given here was that "the save panel asked about replacing an existing
     /// file both times", and that is false in exactly the case that matters:
     /// `NSSavePanel` prompts only when something is at the path as Save is
-    /// confirmed, and job 1 spends its build and its whole loudness
-    /// measurement pass with nothing at the destination — `Exporter.export`
-    /// does both before `startWriting` deletes and `AVAssetWriter` creates —
-    /// so two Add to Queue actions in quick succession are never asked
-    /// anything. Refusing here would still be wrong: overwriting your own
+    /// confirmed, and job 1 puts nothing at the destination until it
+    /// succeeds — it writes a hidden sibling and renames it over the path only
+    /// at its end (spec §11 #531) — so two Add to Queue actions in quick
+    /// succession are never asked anything. Refusing here would still be wrong: overwriting your own
     /// export is a thing a person is allowed to do, and the queue must not be
     /// the one place in the app where they may not. What was wrong was the
-    /// silence AFTERWARDS, and `launch` is where that is answered — the
-    /// earlier row is marked `superseded` the moment a later job starts
-    /// writing to its path, so no row goes on offering a file that another
-    /// job has since deleted or replaced.
+    /// silence AFTERWARDS, and `finished` is where that is answered — the
+    /// earlier row is marked `superseded` the moment a later job to its path
+    /// succeeds, so no row goes on offering a file that another job has
+    /// since replaced.
     @discardableResult
     func enqueue(
         project: ReelProject, urls: [UInt32: URL], settings: ExportSettings, to url: URL,
@@ -383,19 +375,6 @@ final class ExportQueueController {
         jobs[index].progress = 0
         jobs[index].message = nil
         jobs[index].phase = Self.preparing
-        // Any COMPLETED row naming this same path stops claiming its file
-        // here, and here rather than when the file is actually deleted: the
-        // delete happens inside `Exporter.startWriting`, seconds later and in
-        // a file this one may not reach into, and being early is the honest
-        // direction — a row that stops offering a file just before it is
-        // destroyed costs a person nothing, where one that offers it just
-        // after sends them to the Finder for something that is gone.
-        for other in jobs.indices
-        where other != index && jobs[other].state == .completed
-            && jobs[other].destination == job.destination
-        {
-            jobs[other].superseded = true
-        }
         // The job's own reverse resolution, held against its own handle for
         // exactly the length of this write. At most one pin exists at a time,
         // which is the invariant `ReverseSource.pin` asks its callers for and
@@ -442,7 +421,6 @@ final class ExportQueueController {
         let measured = report.map { " \($0.summary)." } ?? ""
         let warnings = exporter?.graphicWarnings ?? []
         let cursorWarnings = exporter?.cursorWarnings ?? []
-        let replaced = exporter?.replacedDestination ?? false
         exporter = nil
         // The pin goes with the exporter, and from `pinnedProject` rather than
         // from the job, so that releasing it cannot depend on the job still
@@ -459,6 +437,14 @@ final class ExportQueueController {
             case .success(let url):
                 jobs[index].state = .completed
                 jobs[index].progress = 1
+                // Any other COMPLETED row naming this path stops claiming its
+                // file now, when this job's file has replaced it (spec §11 #531).
+                for other in jobs.indices
+                where other != index && jobs[other].state == .completed
+                    && jobs[other].destination == jobs[index].destination
+                {
+                    jobs[other].superseded = true
+                }
                 jobs[index].graphicWarnings = warnings
                 jobs[index].cursorWarnings = cursorWarnings
                 jobs[index].loudness = report
@@ -469,26 +455,9 @@ final class ExportQueueController {
                     + Exporter.cursorWarningSuffix(cursorWarnings, hover: false) + measured
             case .failure(let error):
                 if case Exporter.ExportError.cancelled = error {
-                    // A cancelled job leaves nothing behind, and this line is
-                    // DEFENCE IN DEPTH rather than the thing that achieves it
-                    // — measured, because the obvious reading is wrong and a
-                    // reader who believes it would be relying on a guarantee
-                    // this line does not provide. Both pipelines already
-                    // clean up after themselves: `AVAssetWriter.cancelWriting()`
-                    // removes its own part-file (`ExporterWriter.swift` says
-                    // so where it calls it) and `ImageSequenceWriter.report`
-                    // removes its own. Deleting this line changes no observable
-                    // outcome — phase 7's proof mutated it away and scored
-                    // 77/77 — so the check beside it is written as the OUTCOME
-                    // ("nothing is left behind") and not as a guard on this
-                    // call. Keep it: it costs nothing, it states the policy
-                    // where the policy is decided, and it is what holds if a
-                    // third pipeline ever arrives that is less tidy.
-                    // `ExportProgressSheetController.finished` is the same line
-                    // for the same reason. It runs only once the exporter has
-                    // replaced the file: before that, what is at the path is
-                    // the file the person already had (spec §11 #470).
-                    if replaced { try? FileManager.default.removeItem(at: jobs[index].destination) }
+                    // Nothing to remove: a cancelled job wrote only its hidden
+                    // sibling, which `Exporter.finish` has removed, and the
+                    // path keeps whatever file it had (spec §11 #531).
                     jobs[index].state = .cancelled
                     jobs[index].progress = 0
                     jobs[index].message = "Cancelled."

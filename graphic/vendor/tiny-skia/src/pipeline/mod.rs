@@ -61,6 +61,8 @@ use crate::wide::u32x8;
 
 mod blitter;
 #[rustfmt::skip] mod highp;
+// Frame Job (spec §11 PR-15): PR-13's offset, for a deep pixmap read at 8 bits.
+pub(crate) use highp::dither_offset_256;
 #[rustfmt::skip] mod lowp;
 
 const MAX_STAGES: usize = 32; // More than enough.
@@ -173,10 +175,35 @@ impl PixmapRef<'_> {
     }
 }
 
+impl PixmapRef<'_> {
+    // Frame Job (spec §11 PR-15): the residual bytes of the gathered pixels.
+    #[inline(always)]
+    pub(crate) fn gather_lo(lo: &[u8], index: u32x8) -> [[u8; 4]; highp::STAGE_WIDTH] {
+        let index: [u32; 8] = bytemuck::cast(index);
+        core::array::from_fn(|i| {
+            let at = index[i] as usize * 4;
+            [lo[at], lo[at + 1], lo[at + 2], lo[at + 3]]
+        })
+    }
+}
+
 impl SubPixmapMut<'_> {
     #[inline(always)]
     pub(crate) fn offset(&self, dx: usize, dy: usize) -> usize {
         self.real_width * dy + dx
+    }
+
+    // Frame Job (spec §11 PR-15): both planes from `(dx, dy)`.
+    #[inline(always)]
+    pub(crate) fn deep_at_xy(
+        &mut self,
+        dx: usize,
+        dy: usize,
+    ) -> (&mut [PremultipliedColorU8], &mut [u8]) {
+        let offset = self.offset(dx, dy);
+        let hi: &mut [PremultipliedColorU8] = bytemuck::cast_slice_mut(&mut *self.data);
+        let lo = self.lo.as_deref_mut().unwrap();
+        (&mut hi[offset..], &mut lo[offset * 4..])
     }
 
     #[inline(always)]
@@ -351,6 +378,8 @@ pub struct TileCtx {
 pub struct RasterPipelineBuilder {
     stages: ArrayVec<Stage, MAX_STAGES>,
     force_hq_pipeline: bool,
+    // Frame Job (spec §11 PR-15): the destination is deep, so a gradient pushes no dither.
+    pub deep_dst: bool,
     pub ctx: Context,
 }
 
@@ -359,6 +388,7 @@ impl RasterPipelineBuilder {
         RasterPipelineBuilder {
             stages: ArrayVec::new(),
             force_hq_pipeline: false,
+            deep_dst: false,
             ctx: Context::default(),
         }
     }

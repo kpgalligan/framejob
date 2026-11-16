@@ -22,10 +22,17 @@ a line's end or before its start maps to the line's last or first character
 (the line answers NSNotFound off its glyphs) and never traps; T15p eighteen
 drags along a line (the middle, top or bottom line shown; straight, wobbling ±3
 pt, or 80 pt past the edge; paused, then looping while playing) move the scroll
-by no more than 0.5 pt (TX-22 at CP1).
+by no more than 0.5 pt (TX-22 at CP1). T16 (#444) a voice cache replaced under
+shown `.assemblyai` words (alpha [10.0, 10.4) s, beta [12.9, 13.3) s, preloaded
+with an all-voiced cache) and announced as `word_onset_probe.swift`'s U9 does:
+within 5 s one pause token follows clip 3's alpha and beta starts a paragraph.
+T17 (#444) the same landing while the tab's cloud load of a planted transcript
+is held (`TranscriptTabSource.loadHold`, as U10): after the release the cloud
+words show with the new cache's pause and paragraph break.
 
 App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
-  Z0  no `Frame Job: ` line; `transcript_view` takes exactly click, focus,
+  Z0  no `Frame Job: ` line; `transcript_view` takes exactly click, find and
+      find_step (#434, TX-38; `transcript_find_proof.py` proves them), focus,
       language, project, read, select, select_pause (TX3b), stop_after, wait
       and words_from.
   M1  `perform_menu_item ["View","Transcript"]` shows the tab with the view
@@ -42,7 +49,10 @@ App rows (the app `proof_app` chooses; `RC_PROOF_APP=release` for the record):
   T6  a 3,600 s silent AAC with 27,000 words in 900 paragraphs (1.6 s gaps)
       served by the fake through `transcribe {engine: assemblyai, place:
       false}`: 900 paragraphs, and over 5 `split`s the median
-      `last_rebuild_ms` is under 100.
+      `last_rebuild_ms` is under 100. RELEASE ONLY (spec §11 V-4, #522): on
+      a Debug app (its `CFBundleIdentifier` is Debug's) T6 is a named SKIP,
+      because the 100 ms bound is a Release number and a Debug rebuild of
+      the same tab takes about 250 ms; the rest of the proof runs on either.
   T11 `transcript_spike/view_spike.py --measure` meets TX-S2's rule.
   T12 A (under the playhead) and the long WAV, both read on this Mac: A's
       tokens appear while `fill.media` is still the long WAV's; a hidden tab
@@ -88,6 +98,12 @@ a mutant is caught when every row it names fails.
                          the words (B1; a tree copy)
   stop-cancels-all       the bar's Stop drops every owner's want
                          (`TranscriptFill.drop()`) (B3; a tree copy)
+  speech-kept            the pane's `reloadSpeech` call removed: a landed voice
+                         cache leaves the kept one in the table (T16)
+  paragraphs-kept        `reloadSpeech` ends after its drop: the pause set is
+                         not read again (T16's paragraph half)
+  cloud-epoch-unchecked  a cloud load that read before a landing merges what
+                         it read (T17)
 
 Exit: 0 iff every row passed or was a named host SKIP (a mutant run: 0 when
 caught, 1 when it survived, 2 when the control could not be performed).
@@ -97,6 +113,7 @@ import contextlib
 import json
 import os
 from pathlib import Path
+import plistlib
 import shutil
 import statistics
 import subprocess
@@ -115,7 +132,8 @@ ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/transcript_tab"
 PROBE = ROOT / "tools/proof/transcript_tab_probe.swift"
 FONTS = ROOT / "app/Resources/Fonts"
-PROBE_ROWS = ["T0", "T1", "T3p", "T4p", "T5", "T7", "T8", "T9", "T10", "T13p", "T14p", "T15p"]
+PROBE_ROWS = ["T0", "T1", "T3p", "T4p", "T5", "T7", "T8", "T9", "T10", "T13p", "T14p", "T15p",
+              "T16", "T17"]
 APP_ROWS = ["Z0", "M1", "T2", "T3", "T4", "T6", "T12", "B1", "B2", "B3"]
 OTHER_ROWS = ["T11", "B4"]
 ROWS = PROBE_ROWS + APP_ROWS + OTHER_ROWS
@@ -123,6 +141,11 @@ SEC = 600_000
 KEY = "proof-key"
 TOOL = "transcript_view"
 HIDDEN = 'transcript_view: select_inspector_tab {tab: "transcript"} first.'
+# T6 alone is pinned to Release (spec §11 V-4; #522): the root CLAUDE.md's
+# `release_only=` for one row of a proof whose other rows run on Debug, so
+# `git grep release_only= tools/proof` finds it here.
+T6_RELEASE_ONLY = ("its 100 ms median rebuild is a Release number: a Debug build "
+                   "rebuilds the same 27,000 tokens in about 250 ms")
 
 TT = "TranscriptTokens.swift"
 TH = "TranscriptView+Highlight.swift"
@@ -132,6 +155,7 @@ TF = "TranscriptFill.swift"
 IV = "InspectorViewController.swift"
 TL = "TranscriptView+Layout.swift"
 TD = "TranscriptView+Delete.swift"
+TP = "TranscriptPane.swift"
 MUTANTS = {
     "highlight-containment": ("probe", ["T3p"], [
         (TT, "        return low == 0 ? nil : low - 1\n",
@@ -157,6 +181,15 @@ MUTANTS = {
     "drag-follows": ("probe", ["T15p"], [
         (TK, "        personScrolled()  // a press pauses the follow, as a scroll does (TX-22 at CP1)\n", ""),
         (TD, "        personScrolled()  // the follow waits while the person selects (TX-22 at CP1)\n", "")]),
+    "speech-kept": ("probe", ["T16"], [
+        (TP, "            source.reloadSpeech(media: media)\n", "")]),
+    "paragraphs-kept": ("probe", ["T16"], [
+        (TS, "        guard shown, let heard = words[media], deviceItems[media] == nil,\n",
+         "        if true { return }\n"
+         "        guard shown, let heard = words[media], deviceItems[media] == nil,\n")]),
+    "cloud-epoch-unchecked": ("probe", ["T17"], [
+        (TS, "                    if epochs[media] != self.epoch(media) "
+             "{ self.reloadSpeech(media: media) }\n", "")]),
     "one-wait": ("app", ["T12"], [(TS, "let take = 1\n", "let take = pending.count\n")]),
     "words-from-ignored": ("app", ["B1"], [
         (TS, "        let instances = read.instances.filter { wordsFrom == nil || $0.track == wordsFrom }\n",
@@ -321,6 +354,22 @@ def snap(ticks, fps):
     return round(round(ticks / frame) * frame)
 
 
+def is_debug_app(app_path):
+    """True when `app_path` (a bundle or its executable) is a Debug build:
+    its `CFBundleIdentifier` is Debug's own (spec §11 V-5). A path outside a
+    products folder is read the same way, so a frozen Debug copy counts."""
+    import proof_app
+    bundle = Path(app_path)
+    if bundle.parent.name == "MacOS":
+        bundle = bundle.parents[2]
+    try:
+        with open(bundle / "Contents/Info.plist", "rb") as handle:
+            identifier = plistlib.load(handle).get("CFBundleIdentifier")
+    except (OSError, plistlib.InvalidFileException):
+        return False
+    return identifier == proof_app.DOMAINS["debug"]
+
+
 def app_rows(results, wanted, app_path, files):
     import assistant_session_proof as sp
     import cloud_captions_probe
@@ -371,8 +420,9 @@ def app_rows(results, wanted, app_path, files):
                 complaints = [line for line in app.log().splitlines() if "Frame Job: " in line]
                 schema = app.mcp.schemas().get(TOOL, {}).get("inputSchema", {})
                 keys = sorted(schema.get("properties", {}))
-                return (not complaints and keys == ["click", "focus", "language", "project", "read",
-                                                    "select", "select_pause", "stop_after", "wait",
+                return (not complaints and keys == ["click", "find", "find_step", "focus",
+                                                    "language", "project", "read", "select",
+                                                    "select_pause", "stop_after", "wait",
                                                     "words_from"],
                         f"parity lines {complaints[:3]}; properties {keys}")
             run("Z0", z0)
@@ -461,6 +511,9 @@ def app_rows(results, wanted, app_path, files):
                 close(state["t2"])
 
             def t6():
+                if is_debug_app(app_path):
+                    return None, (f"release_only: {T6_RELEASE_ONLY}; run it with "
+                                  "RC_PROOF_APP=release")
                 words = cloud_words()
                 cloud.scenario(aai, words=words, disfluent_words=words)
                 s = session_of("t6")

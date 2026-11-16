@@ -130,6 +130,7 @@ enum AudioRateCopy {
     private static func write(track: AVAssetTrack, source: URL, trim: CMTime, to url: URL)
         -> String?
     {
+        ReaderPool.note("AudioRateCopy.write")
         let channels = Int(
             min(max(CompositionBuilder.audioFormatSignature(of: track)?.channels ?? 2, 1), 2))
         let settings = settings(channels: channels)

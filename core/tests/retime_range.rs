@@ -221,13 +221,19 @@ fn a_transition_touching_the_closed_range_is_refused_before_markers() {
     later["transition_in"] = json!({"kind": "cross_dissolve"});
     let clips = vec![media_clip(10, 1, 0, 4 * SEC, 1, 0), later];
     let markers = json!([{"id": 70, "time": 4 * SEC}, {"id": 71, "time": 4 * SEC + FRAME}]);
-    let p = project(tracks(1), clips.clone(), markers);
+    let p = project(tracks(1), clips, markers);
     // The overlap runs 3 s – 4 s; a range starting at 4 s meets its end.
     let sentence = "clip 11 has a transition from clip 10 from 1800000 to 2400000 ticks, which \
                     touches the range; move the range off it or remove the transition";
     p.refuses_with(&retime(4 * SEC, 6 * SEC, 4.0), sentence);
     p.refuses_with(&retime(SEC, 3 * SEC, 4.0), sentence);
     // Clear of it by a frame the transition is no reason; the markers are.
+    // A cut that close would leave clip 11's head too short for a one-second
+    // dissolve (spec §11 #427), so the frame is measured against a one-frame
+    // one, which a two-frame head holds.
+    let mut short = media_clip(11, 1, 4 * SEC - FRAME, 4 * SEC + FRAME, 1, 10 * SEC);
+    short["transition_in"] = json!({"kind": "cross_dissolve"});
+    let clips = vec![media_clip(10, 1, 0, 4 * SEC, 1, 0), short];
     let p = project(tracks(1), clips, json!([]));
     applied(&p, &retime(4 * SEC + FRAME, 6 * SEC, 2.0));
 }

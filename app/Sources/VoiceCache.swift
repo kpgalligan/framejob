@@ -9,6 +9,11 @@ struct VoiceJob: Equatable {
     let settings: VoiceSettings
     let isolated: URL?
     let isolation: Double
+    /// A retimed segment's window is wider than what the clip plays (AU-55
+    /// as amended, #387): the frames it plays, the input silent outside
+    /// them, so the effect starts cold at the clip's first frame as it does
+    /// at ×1 (AU-142). Nil for a ×1 segment, whose window is what it plays.
+    var sounding: IsolationWindow? = nil
 }
 
 /// The `cache/voiced/` half of the package (spec §5.6, §11 AU-144): a clip
@@ -24,8 +29,9 @@ enum VoiceCache {
 
     /// `<media>-<16 hex>.caf`: FNV-1a 64 over the MEDIA file's path, size and
     /// modification second, `VoiceChain.version`, the reversal, the window,
-    /// the kind, amount and semitones, and the isolation amount with the
-    /// isolated file's name (or `none`). `IsolationCache.name`'s hash. Nil
+    /// the kind, amount and semitones, the isolation amount with the
+    /// isolated file's name (or `none`), and a retimed segment's sounding
+    /// frames (appended only then). `IsolationCache.name`'s hash. Nil
     /// when the media cannot be stat'ed.
     static func name(media: UInt32, mediaFile: URL, reversed: Bool, job: VoiceJob) -> String? {
         let attributes = try? FileManager.default.attributesOfItem(atPath: mediaFile.path)
@@ -38,6 +44,7 @@ enum VoiceCache {
             + "|w\(window.firstFrame):\(window.endFrame)"
             + "|k\(s.kind.rawValue)|a\(s.amount)|s\(s.semitones)"
             + "|i\(job.isolation)|f\(job.isolated?.lastPathComponent ?? "none")"
+            + (job.sounding.map { "|o\($0.firstFrame):\($0.endFrame)" } ?? "")
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
         for byte in key.utf8 {
             hash = (hash ^ UInt64(byte)) &* 0x0000_0100_0000_01b3
@@ -46,8 +53,9 @@ enum VoiceCache {
         return "\(media)-" + String(repeating: "0", count: max(0, 16 - hex.count)) + hex + ".caf"
     }
 
-    /// The one segment's request, or nil: the clip has a voice that is not
-    /// inert, the segment is isolatable (AU-145), there is a `voiced`
+    /// The one ×1 segment's request, or nil (a retimed segment's is a stage
+    /// of `RetimedSound.chain`, AU-145 as amended): the clip has a voice that
+    /// is not inert, the segment is tapped, there is a `voiced`
     /// folder, its media resolves, its reverse (when reversed) is not
     /// pending — and, when the clip isolates, its isolated render is on disk
     /// (AU-143), whose file the job names.
@@ -55,7 +63,7 @@ enum VoiceCache {
         for s: PlanSegment, dsp: AudioDSPParameters, urls: [UInt32: URL],
         reverse: ReverseResolution
     ) -> RampAudioRequest? {
-        guard let settings = dsp.voice(for: s.clip), IsolationCache.isolatable(s),
+        guard let settings = dsp.voice(for: s.clip), IsolationCache.isTapped(s),
             let directory = reverse.voiced, let mediaFile = urls[s.media],
             !reverse.pending.contains(s.clip)
         else { return nil }
@@ -103,14 +111,15 @@ enum VoiceCache {
     /// off with no voice or an inert one; a failure first (the voice's own,
     /// or its isolation's as "its isolated voice was not rendered"), then a
     /// pending render (isolation's included), then ready; else why there is
-    /// none.
+    /// none. A retimed segment answers from its chain's last file (AU-145
+    /// as amended); a clip no plan sounds answers `.noSound`.
     static func status(of clip: UInt32, in document: ProjectDocument) -> IsolationStatus {
         let dsp = AudioDSPParameters(snapshot: document.project.snapshot)
         guard dsp.voice(for: clip) != nil else { return .off }
         let reverse = ReverseSource.shared.resolution(for: document.recipeKey)
         let urls = document.mediaURLs()
         var states: [IsolationStatus] = []
-        var unsupported = false
+        var sounds = false
         var waiting = false
         var missing = false
         let handles = document.scope == nil
@@ -118,10 +127,17 @@ enum VoiceCache {
         for handle in handles {
             guard let plan = handle.plan else { continue }
             for s in plan.audioTracks.flatMap(\.segments) where s.clip == clip && s.duration > 0 {
-                if !IsolationCache.isolatable(s) {
-                    unsupported = true
-                } else if reverse.pending.contains(clip) {
+                sounds = true
+                if reverse.pending.contains(clip) {
                     waiting = true
+                } else if !IsolationCache.isTapped(s) {
+                    if let chain = RetimedSound.chain(
+                        for: s, dsp: dsp, urls: urls, reverse: reverse)
+                    {
+                        states.append(chain.status(voice: true))
+                    } else {
+                        missing = true
+                    }
                 } else if let request = request(for: s, dsp: dsp, urls: urls, reverse: reverse) {
                     states.append(IsolationCache.status(of: request))
                 } else if dsp.isolation(for: clip) > 0, reverse.voiced != nil,
@@ -151,12 +167,12 @@ enum VoiceCache {
                     ? "the project has no cache folder to render it into"
                     : "its media cannot be found")
         }
-        return unsupported ? .unsupported : .off
+        return sounds ? .off : .noSound
     }
 }
 
 extension CompositionBuilder {
-    /// Each READY voiced segment's render, read into memory (AU-143, AU-145):
+    /// Each READY voiced ×1 segment's render, read into memory (AU-143, AU-145):
     /// the file `VoiceCache` names, when it exists as the composition is
     /// built. A pending one is absent, and its clip plays without the effect
     /// (with its isolation, if that render is ready).

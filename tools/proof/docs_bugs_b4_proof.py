@@ -18,7 +18,8 @@ with an action over [0, 1 s) ending at ×2), the ramp's renders removed from the
 
 - App, over MCP: A1 `export h264` of the ramp project at once: every `running` poll with no file at
   the path reads `phase` "Preparing…" or "Measuring loudness…", and one reads "Preparing…". A2 (c)
-  a `running` poll with the file there has no phase, and the job is `done`.
+  a `running` poll with the file there has no phase, and the job is `done`. "The file" is the path
+  or the hidden `.framejob-export-*` sibling the export writes until it lands (spec §11 #531).
 - Probe, `docs_bugs_b4_probe.swift` through `swift_build.build()` with `FRAMEJOB_DEV_TOOLS` and a
   `default.metallib` from this tree's shaders, the same source on the base and the fix, off-screen:
   P1 AV1 Speed, P2 WAV Bit depth, P3 WAV Stems, each moved with "Master" selected: the Preset popup
@@ -27,7 +28,8 @@ with an action over [0, 1 s) ending at ×2), the ramp's renders removed from the
   "Writing": every 10 ms sample until the button is live again reads "Stopping…". R1 one queued
   `h264` job of the ramp under `-RCDevRampRenderHold 6`, sampled straight after `enqueue` and every
   20 ms: every running sample with no file reads "Preparing… · N %" or "Measuring loudness… · N %".
-  R2 (c) once the file exists a "Writing · N %" sample, then `completed`. T1 an H.264 sheet past 40 %
+  R2 (c) once the file exists a "Writing · N %" sample, then `completed`. The file is told the same
+  way as in A1. T1 an H.264 sheet past 40 %
   "Writing": `applicationShouldTerminate` answers `.terminateCancel`, the window's frame and
   `NSApp.isActive` unchanged, the export finishes and ffprobe reads the file (exit 0, 60.000 s);
   on `.terminateNow` the probe exits as a quit would. T2 (c) asked after the sheet finished:
@@ -226,7 +228,8 @@ def export_rows(client, ramp):
     polls = []
     while True:
         status = client.call_with("export_status", {"export_id": answer["export_id"]})
-        polls.append((status.get("status"), status.get("phase"), out.exists()))
+        sibling = any(entry.name.startswith(".framejob-export-") for entry in WORK.iterdir())
+        polls.append((status.get("status"), status.get("phase"), out.exists() or sibling))
         if status.get("status") in ("done", "failed", "cancelled") or time.monotonic() - began > JOB_BOUND:
             break
         time.sleep(0.1)

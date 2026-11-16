@@ -4,7 +4,8 @@ import Foundation
 /// spec §11 P-4, P-5): the spend folder, the price-table fields `configure`
 /// carries, the ledger line each `cost` event becomes, the view of an event a
 /// dev tool may return, and the turn's cost line. The helper prices every
-/// response (`agent/src/priceTable.ts`, `pricing.ts`); this file only records
+/// response (`agent/Sources/FrameJobAgentKit/Pricing.swift`, `PriceTable.swift`);
+/// this file only records
 /// the dollars it computed and formats them and their dates. No pricing
 /// arithmetic is done here (road map 13 §2).
 ///
@@ -55,7 +56,7 @@ enum AssistantSpend {
         return AppSupport.directory
     }
 
-    /// `configure`'s `price_cache` and `price_feed` (`agent/src/protocol.ts`):
+    /// `configure`'s `price_cache` and `price_feed` (`Protocol.swift`'s `Configure`):
     /// the cache in the spend folder, when there is one and, with the
     /// base-URL override set, only beside `-RCPriceFeed`.
     static func configureFields(

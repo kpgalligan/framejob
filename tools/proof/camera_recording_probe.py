@@ -537,9 +537,10 @@ MUTANTS = {
         ("AgentServer+RecordingCamera.swift", "        var format: String?\n",
          GRANT_AFTER_LOOKUP + "        var format: String?\n")]),
     "camera-format-elsewhere-admitted": (["T7"], [
+        # Re-aimed (#554): `given` gained `.map(\.0) + landing` at CO8 (CO-83 (a)).
         ("AgentServer+RecordingCamera.swift",
-         'let given = [("camera", camera), ("camera_format", format)].filter { $0.1 != nil }',
-         'let given = [("camera", camera)].filter { $0.1 != nil }')]),
+         '[("camera", camera), ("camera_format", format)].filter { $0.1 != nil }.map(\\.0)',
+         '[("camera", camera)].filter { $0.1 != nil }.map(\\.0)')]),
     # Re-aimed at CR3c (CAM-11 (3)): the live rule reads `cameraWanted`.
     "format-popup-live": (["P11"], [
         ("RecorderPanelController+Camera.swift",
@@ -691,13 +692,16 @@ MUTANTS = {
          "        let y = (ch / 2 - cornerInsetFraction * ch - sh * scale / 2).rounded()\n",
          "        let y = -(ch / 2 - cornerInsetFraction * ch - sh * scale / 2).rounded()\n")]),
     "remainder-camera-dropped": (["L8"], [
+        # Re-aimed (#554): the guard's condition became `more` when ripples joined it.
         ("RecordingLanding+Remainder.swift",
-         "guard result.segments.count > 1 || hasMicrophone || hasLeftOutVoice || hasCamera else {",
-         "guard result.segments.count > 1 || hasMicrophone || hasLeftOutVoice else {")]),
+         "let more = result.segments.count > 1 || hasMicrophone || hasLeftOutVoice || hasCamera\n",
+         "let more = result.segments.count > 1 || hasMicrophone || hasLeftOutVoice\n")]),
     "camera-format-alone-admitted": (["T9"], [
+        # Re-aimed (#554): the screen rule reads `beside` since CO8 (CO-83 (a)); the format
+        # is left out of it, so `camera_format` alone passes.
         ("AgentServer+RecordingCamera.swift",
-         "guard kind != .screen || format == nil || camera != nil else {",
-         "guard kind != .screen || format == nil || camera != nil || true else {")]),
+         'let beside = (format != nil ? ["camera_format"] : []) + landing\n',
+         "let beside = landing\n")]),
     "camera-ids-unwritten": (["T10"], [
         ("AgentServer+RecordingResult.swift",
          '        if let id = ids?.cameraClip { fields["camera_clip"] = Int(id) }\n', "")]),

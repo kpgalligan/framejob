@@ -391,6 +391,13 @@ final class AnalysisLane: @unchecked Sendable {
         condition.unlock()
     }
 
+    #if FRAMEJOB_DEV_TOOLS
+    /// Probes only: a running request's fraction, as its job's progress callback sets it.
+    func devSetProgress(_ fraction: Double, of request: AnalysisRequest) {
+        setProgress(fraction, of: request)
+    }
+    #endif
+
     /// `-RCDevAnalysisHold <s>`: the job waits s seconds first, polling
     /// cancellation every 50 ms (dev tools only).
     private func hold(cancelled: () -> Bool) {

@@ -124,6 +124,7 @@ These keys beep instead of acting when:
 | <kbd>⌘⌫</kbd> | **Edit ▸ Ripple Delete**. It closes the gap, and with nothing selected it acts on the in/out range. |
 | <kbd>⌘A</kbd> | **Edit ▸ Select All** |
 | <kbd>⌥⌘A</kbd> | **Edit ▸ Select After Playhead** |
+| <kbd>⌘F</kbd> | **Edit ▸ Find…**. On the Transcript tab it opens the find bar, see [Find in the transcript](/captions/find-in-the-transcript/). On the Media tab it puts the cursor in **Search by name**, see [The Media tab](/projects/media-tab/#search-by-name). |
 
 ### Clips and nests
 
@@ -199,10 +200,21 @@ These work while the [Transcript tab](/captions/transcript-tab/)'s text has the 
 | <kbd>↑</kbd> <kbd>↓</kbd> | Selects the word on the line above or below and moves the playhead to it. Beeps at the first and last line. |
 | <kbd>⇧</kbd> with an arrow | Extends the selection without moving the playhead. |
 | <kbd>⌘A</kbd> | Selects every word. |
-| <kbd>⎋</kbd> | Clears the selection. |
+| <kbd>⎋</kbd> | Clears the selection. With nothing selected and the find bar open, closes the find bar. |
 | <kbd>⌫</kbd>, <kbd>⌦</kbd> or <kbd>⌘⌫</kbd> | Deletes the selected words and closes the gap, one undo step called Delete Words. With a pause selected, it shortens the pause to 0.2 s each end, one undo step called Delete Pause. |
 
 Every other key, <kbd>Space</kbd> and <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> included, works as it does on the timeline.
+
+### Transcript find field
+
+These work while the cursor is in the [find bar](/captions/find-in-the-transcript/)'s field.
+
+| Key | What it does |
+| --- | --- |
+| <kbd>↩</kbd> or keypad Enter | Goes to the next match, and back to the first after the last. |
+| <kbd>⇧↩</kbd> | Goes to the previous match. |
+| <kbd>⌘↩</kbd> | Selects the match you're on, moves the playhead to it and gives the transcript text the keyboard. |
+| <kbd>⎋</kbd> | Closes the find bar. |
 
 ### Assistant message field
 
@@ -237,7 +249,7 @@ The time lands on the nearest frame. A time with a leading minus goes to the sta
 | <kbd>Tab</kbd> | Applies the value. A click elsewhere does too. |
 | <kbd>⎋</kbd> | Throws the typing away and keeps the old value. |
 
-In the Media tab's search field, <kbd>⎋</kbd> empties the field. See [Inspector fields](/getting-started/inspector-fields/).
+In the Media tab's search field, <kbd>⎋</kbd> empties the field, and <kbd>⌘F</kbd> puts the cursor there. See [Inspector fields](/getting-started/inspector-fields/).
 
 ## Modes that Esc leaves
 

@@ -110,7 +110,7 @@ extension TranscriptCut {
     }
 
     /// The count `check_caps` sees after `clear_range`'s second split
-    /// (`core/src/edit_time.rs`, `clear_range`): `total`, plus one per
+    /// (`core/src/edit_range.rs`, `clear_range`): `total`, plus one per
     /// unlocked-track clip of the container cut at the range's start, plus
     /// one per one cut at its end.
     static func clipsPeak(cutting range: Range, container: ProjectSnapshot, total: Int) -> Int {

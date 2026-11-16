@@ -14,7 +14,10 @@ import Foundation
 /// to timeline time on the canvas grid, drops one within a canvas frame of
 /// either edge, counts the ceiling with the linked partners `split` also
 /// cuts BEFORE any op, and answers one `split` per cut, latest first, so the
-/// original id keeps the head.
+/// original id keeps the head. Those splits are tried one at a time on the
+/// container first, because a list of ops does not stop at a refusal
+/// (`ReelEdit.swift`): a cut the overlap rule refuses refuses the whole
+/// command, nothing split (spec §11 #427 (e)).
 enum ShotSplit {
     static let actionName = "Split at Shot Changes"
 
@@ -40,6 +43,8 @@ enum ShotSplit {
         case nothingToSplit(named: Bool)
         case ceiling(added: Int, room: Int)
         case notCached(UInt32)
+        /// A `split` the core refused, in the rule's own sentence.
+        case cut(String)
 
         var errorDescription: String? {
             switch self {
@@ -57,6 +62,8 @@ enum ShotSplit {
             case .notCached(let media):
                 return "The shot analysis of media \(media) is no longer in the project's "
                     + "cache; choose \(ShotSplit.actionName) again."
+            case .cut(let why):
+                return "\(ShotSplit.actionName) was refused at split: \(why)"
             }
         }
     }
@@ -141,7 +148,8 @@ enum ShotSplit {
 
     /// The ops and what they cut, from the store. Main thread. Throws
     /// `notCached` when a window misses again, `ceiling` when the splits
-    /// would pass the clip ceiling, and `analysisRequest`'s errors.
+    /// would pass the clip ceiling, `cut` when the core refuses one of them
+    /// on the edited container, and `analysisRequest`'s errors.
     static func plan(_ targets: [Target], in document: ProjectDocument) throws -> Plan {
         if let missing = try wants(targets, in: document).first {
             throw Refusal.notCached(missing.media.id)
@@ -190,6 +198,10 @@ enum ShotSplit {
         }
         let room = Int(RC_MAX_CLIPS) - clipCount(document.project.snapshot)
         guard added <= room else { throw Refusal.ceiling(added: added, room: max(0, room)) }
+        var trial = SwitchAngle.Trial(project: document.editedProject)
+        for op in ops {
+            if let why = try trial.require(op) { throw Refusal.cut(why) }
+        }
         return Plan(ops: ops, cuts: cuts, added: added)
     }
 

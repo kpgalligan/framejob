@@ -4,6 +4,13 @@
 // (G-7) → a premultiplied BGRA texture, the one layout `Compositor.metal`
 // samples.
 //
+// **A frame delivered deeper than 8 bits draws its graphics deep** (spec §11
+// PR-15): when the key's `resolve` answers `deep`, the raster is 16 bits a
+// channel and the texture `.rgba16Unorm`, under a key of its own (`:16`).
+// Every other key draws today's dithered 8-bit raster, byte for byte. A
+// matte member is drawn at its key's depth like any other layer: a deep
+// frame's matte coverage is deep too (PR-19).
+//
 // **The texture key is the SVG TEXT**, not the recipe's hash — a departure
 // from `LayerRenderers.swift`'s "the recipe's hash is the whole key", made
 // by design §5d: the module is JavaScript the user edits, so the same hash
@@ -67,14 +74,16 @@ extension LayerRenderers {
                 for: recipeKey)
         }
         let width = Int(size.width), height = Int(size.height)
+        let deep = resolved.deep
         let key = LayerRenderers.textureKey(
-            svg: drawn.svg, width: width, height: height, libraryVersion: set.libraryVersion)
+            svg: drawn.svg, width: width, height: height, libraryVersion: set.libraryVersion,
+            deep: deep)
         let slot = GraphicPrefetch.Slot(
             name: name, frame: frame, width: width, height: height, propsJSON: propsJSON,
-            ctxJSON: ctxJSON)
+            ctxJSON: ctxJSON, deep: deep)
         var refused: [GraphicDiagnostic]?
         var made = false
-        let rendered = cached(key, graphic: true) {
+        let rendered = cached(key, pool: .graphics) {
             made = true
             let raster: GraphicRaster
             do {
@@ -83,7 +92,8 @@ extension LayerRenderers {
                 {
                     raster = try prefetched.get()
                 } else {
-                    raster = try set.library.rasterize(drawn.svg, width: width, height: height)
+                    raster = try set.library.rasterize(
+                        drawn.svg, width: width, height: height, deep: deep)
                 }
             } catch {
                 refused = GraphicDiagnostic.of(error)
@@ -142,7 +152,7 @@ extension LayerRenderers {
         let hex = digest.map { String(format: "%02x", $0) }.joined()
         let key = "graphic-error:" + hex + ":"
             + "\(Int(size.width.rounded()))x\(Int(size.height.rounded()))"
-        return cached(key, graphic: true) {
+        return cached(key, pool: .graphics) {
             guard let context = LayerRenderers.bitmap(size) else { return nil }
             let bounds = CGRect(x: 0, y: 0, width: context.width, height: context.height)
             Self.paintErrorCard(text, in: context, bounds: bounds)
@@ -171,29 +181,39 @@ extension LayerRenderers {
         }
     }
 
-    /// `"graphic:" + SHA-256(svg) + ":" + w×h + ":" + libraryVersion`.
-    static func textureKey(svg: String, width: Int, height: Int, libraryVersion: String) -> String {
+    /// `"graphic:" + SHA-256(svg) + ":" + w×h + ":" + libraryVersion`, and `":16"` after it
+    /// for a deep raster (spec §11 PR-15), so the two depths never serve each other.
+    static func textureKey(
+        svg: String, width: Int, height: Int, libraryVersion: String, deep: Bool = false
+    ) -> String {
         let digest = SHA256.hash(data: Data(svg.utf8))
         let hex = digest.map { String(format: "%02x", $0) }.joined()
         return "graphic:" + hex + ":" + "\(width)x\(height)" + ":" + libraryVersion
+            + (deep ? ":16" : "")
     }
 
     /// Uploads an engine raster — already premultiplied BGRA, rows
     /// `stride` bytes apart, row 0 the top — to a `.bgra8Unorm` texture of
-    /// the raster's own size.
+    /// the raster's own size; a deep one (premultiplied RGBA, 16 bits a
+    /// channel) to an `.rgba16Unorm` texture (spec §11 PR-15).
     func upload(_ raster: GraphicRaster) -> Rendered? {
         guard raster.width > 0, raster.height > 0 else { return nil }
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: .bgra8Unorm, width: raster.width, height: raster.height,
-            mipmapped: false)
+            pixelFormat: raster.isDeep ? .rgba16Unorm : .bgra8Unorm, width: raster.width,
+            height: raster.height, mipmapped: false)
         descriptor.usage = [.shaderRead]
         descriptor.storageMode = .managed
         guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
-        raster.bgra.withUnsafeBytes { bytes in
+        let fill = { (bytes: UnsafeRawBufferPointer) in
             guard let base = bytes.baseAddress else { return }
             texture.replace(
                 region: MTLRegionMake2D(0, 0, raster.width, raster.height), mipmapLevel: 0,
                 withBytes: base, bytesPerRow: raster.stride)
+        }
+        if raster.isDeep {
+            raster.rgba16.withUnsafeBytes(fill)
+        } else {
+            raster.bgra.withUnsafeBytes(fill)
         }
         return Rendered(
             texture: texture, size: CGSize(width: raster.width, height: raster.height))
@@ -202,8 +222,11 @@ extension LayerRenderers {
 
 extension GraphicPrefetch {
     /// One graphic layer's inputs — exactly what `LayerRenderers.graphic` is
-    /// called with. Member order is load-bearing (`graphics_proof.py`'s
-    /// `frame-plus-one` anchor in `LayerRenderersGraphic.swift`).
+    /// called with — and the depth it is drawn at, its key's (spec §11
+    /// PR-15), carried by the slot so a held raster counts its own bytes
+    /// (`rasterBytes`). Member order is
+    /// load-bearing (`graphics_proof.py`'s `frame-plus-one` anchor in
+    /// `LayerRenderersGraphic.swift`).
     struct Slot: Hashable {
         let name: String
         let frame: Int
@@ -211,5 +234,6 @@ extension GraphicPrefetch {
         let height: Int
         let propsJSON: String
         let ctxJSON: String
+        let deep: Bool
     }
 }

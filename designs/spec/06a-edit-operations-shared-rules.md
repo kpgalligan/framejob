@@ -1,6 +1,6 @@
 # 6a Edit operations — the rules every op shares
 
-The clip ops are §6b; the action, track, marker, canvas and media ops, and the op table's two halves, are §6c.
+The clip ops are §6b and §6e; the action, track, marker, canvas and media ops, and the op table's two halves, are §6c.
 
 All ops take clip/track/marker *ids*. Caller-supplied timeline tick arguments
 are snapped to the document's frame grid before placement or storage, usually
@@ -33,7 +33,10 @@ partner on an UNLOCKED track with it — locks win over links everywhere:
   (a sound lead is kept), and the track delta is anchored on and applied to the NAMED clips only:
   a partner keeps its own track, so a sound half dragged to a track of its own goes alone.
 - `delete` takes a picture's sound with it, but a linked SOUND half (its picture off) named alone
-  is deleted alone and its picture stays, silent. `ripple_delete` takes both either way.
+  is deleted alone and its picture stays, silent. `ripple_delete` takes both either way, and when
+  the two halves' neighbours would stop the hole at different places (a picture dissolving into
+  its next clip, its sound butting the next sound) the span ends at the first of them, every track
+  shifting by that one amount (§11 #601).
 - A timeline-wide shift — the ripples, `close_gap`, `insert_time`, `retime_range`,
   `add_transition`'s ripple form —
   moves each moved clip's partner too, whatever its own start, and refuses, nothing moved, when
@@ -47,9 +50,23 @@ partner on an UNLOCKED track with it — locks win over links everywhere:
 - Whatever an op leaves one-sided (half a pair deleted, nested or overwritten) is cleared before
   its result is compared or stored, so no op writes a one-sided link.
 
-**How to read a "refuses" in §6b and §6c.** An op the core understood answers one of
+**A cut is judged by the overlap rule on what it would store** (§11 #427). `split`,
+`lift_range`, `ripple_delete_range`, `ripple_delete_ranges`, `overwrite_clip` and `retime_range`
+are refused, nothing cut, when their result breaks the overlap rule (§6b `move_clip`) on a track
+they changed — a piece left too short for the transition it carries — judged once on the result
+and never at each cut, because a range removes pieces a cut on the way left too short;
+`insert_clip` and `freeze_frame` are refused as their `split` is. A pair a cut made too long is
+named by the clips its pieces were cut from: "clips 10 and 11 would overlap by 600000 ticks, more
+than half of the shorter piece the cut leaves (540000 ticks); cut further from their transition,
+or shorten it first"; a pair already past the limit before the op, even one whose clip the op
+cuts, answers the rule's own sentence by its source clips, and any other violation on a changed
+track the rule's own sentence. A list is refused whole, and nothing is repaired: no transition is
+shortened or removed. `ripple_delete {clips}` cuts nothing, but is judged the same way on each
+track its shift moved, refused in the rule's own sentence (§11 #601).
+
+**How to read a "refuses" in §6b, §6c and §6e.** An op the core understood answers one of
 three ways (§5.5): it applies, it is an **identity**, or a rule **refuses**
-it and hands back that rule's own sentence. The rows of §6b and §6c name the RULE,
+it and hands back that rule's own sentence. The rows of §6b, §6c and §6e name the RULE,
 which is what a reader needs — a row that says an op refuses on an empty
 selection or when nothing changes is naming an identity, which carries no
 sentence, and every other "refuses" is a rule that either speaks already or

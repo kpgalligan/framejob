@@ -79,11 +79,19 @@ enum TextFocus {
 
     /// Where a click keeps the typing: a field editor's field, or the
     /// `OptionFieldControl` that frames it (its margins and chevron are the
-    /// field's own); else the text view's scroll view, so a scroller is
+    /// field's own), or the `TextFocusHosting` view around it (the
+    /// Transcript tab's find bar, whose buttons are the field's own, spec
+    /// §11 TX-37 (e)); else the text view's scroll view, so a scroller is
     /// inside; else the text view.
     static func host(of text: NSTextView) -> NSView {
         if text.isFieldEditor, let field = text.delegate as? NSView {
-            return (field.superview as? OptionFieldControl) ?? field
+            if let framed = field.superview as? OptionFieldControl { return framed }
+            var around = field.superview
+            while let view = around {
+                if view is TextFocusHosting { return view }
+                around = view.superview
+            }
+            return field
         }
         return text.enclosingScrollView ?? text
     }
@@ -111,6 +119,27 @@ enum TextFocus {
         }
     }
 
+    /// K-4 (3)'s one exception (spec §11 TX-37 (e), TX-43): nil unless the
+    /// key-down `event` is a Return or keypad Enter in a field editor whose
+    /// field is a `TextFocusKeepsReturn`; then which of the field's three it
+    /// is — one `leavesOnKey` would take is `.next`, or `.previous` with ⇧,
+    /// and one with exactly ⌘ held (⇪ and the keypad and fn flags allowed)
+    /// is `.select`. The window asks this BEFORE `leavesOnKey`, hands the
+    /// field the key and spends it, so the field keeps the keys. Never while
+    /// an input method has marked text. Pure.
+    static func keptReturn(_ event: NSEvent, in text: NSTextView) -> KeptReturn? {
+        guard event.keyCode == 36 || event.keyCode == 76,
+            text.delegate is TextFocusKeepsReturn
+        else { return nil }
+        if leavesOnKey(event, in: text, fullKeyboardAccess: false) {
+            return event.modifierFlags.contains(.shift) ? .previous : .next
+        }
+        guard event.type == .keyDown, text.isFieldEditor, !text.hasMarkedText() else { return nil }
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            .subtracting([.capsLock, .numericPad, .function])
+        return flags == .command ? .select : nil
+    }
+
     /// True when a mouse-down whose content hit is `hit` leaves `text`: a
     /// hit outside its host. nil — the click is outside the content view,
     /// on the title bar — never leaves.
@@ -119,6 +148,21 @@ enum TextFocus {
         return !hit.isDescendant(of: host(of: text))
     }
 }
+
+/// Which of a `TextFocusKeepsReturn` field's Returns a key is (spec §11
+/// TX-37 (e), TX-43): Return, ⇧Return, ⌘Return.
+enum KeptReturn: Equatable { case next, previous, select }
+
+/// A field whose Return is its own (spec §11 TX-37 (e), TX-43): the editor
+/// window hands it the key instead of taking the keys back, read from the
+/// event. Only the Transcript tab's find field adopts it.
+protocol TextFocusKeepsReturn: AnyObject {
+    func returnPressed(_ key: KeptReturn)
+}
+
+/// A view whose whole area is its text field's host for `TextFocus.host`:
+/// a click on a control beside the field keeps the typing.
+protocol TextFocusHosting: NSView {}
 
 /// The bare-key map's modifier rule, read by `handleEditorKey` (#61).
 enum EditorKey {
@@ -172,8 +216,41 @@ final class EditorWindow: NSWindow {
         fatalError("EditorWindow does not support NSCoder")
     }
 
+    /// A closed editor window gives its editor up at the close (spec §11 #592).
+    /// AppKit keeps a closed window for as long as it likes — in an instance
+    /// driven in the background, until another window opens — and with its
+    /// content view controller it kept the editor, its `Playback` and the whole
+    /// view tree. Both doors end here, after `super.close()`: `close_project`'s
+    /// `document.close()` closes each window controller's window, and the close
+    /// button's close closes the document from inside this close's
+    /// `willCloseNotification`, so every observer of that notification and the
+    /// document's `releaseOnClose()` have run before the tree goes.
+    override func close() {
+        super.close()
+        releaseEditor()
+    }
+
+    /// The editor out of the window: with no content view controller the
+    /// window's content view is no longer the editor's root view (measured,
+    /// `document_close_probe.py` P5). A field being typed in has its editing
+    /// ABORTED first: taking the tree out of the window would otherwise end it,
+    /// and its end of editing is its commit, into a document already closed
+    /// (P7). A closed window never committed it before #592 either. A text
+    /// view is not resigned by the detach (measured), so it needs nothing.
+    /// Runs twice harmlessly.
+    private func releaseEditor() {
+        guard contentViewController is EditorViewController else { return }
+        if let text = firstResponder as? NSText, text.isFieldEditor,
+            let field = text.delegate as? NSControl
+        {
+            field.abortEditing()
+        }
+        contentViewController = nil
+    }
+
     override func sendEvent(_ event: NSEvent) {
         // A key that leaves is spent; a click that leaves is then delivered.
+        if keepReturn(for: event) { return }
         if leaveText(for: event), event.type == .keyDown { return }
         leaveCanvas(for: event)
         switch SpaceKey.route(
@@ -190,6 +267,39 @@ final class EditorWindow: NSWindow {
         case .responder, nil:
             super.sendEvent(event)
         }
+    }
+
+    /// Read by `performKeyEquivalent(with:)` in place of `isKeyWindow` when
+    /// set (spec §11 TX-48). Internal: a probe's window is never key, so its
+    /// key-window rows set it; the app never does.
+    var keyWindowStandIn: Bool?
+
+    /// ⌘Return in the find field (spec §11 TX-43) at the window's other
+    /// door: `NSApplication` offers a ⌘ key-down to the key window's key
+    /// equivalents, then to the menus, before it dispatches the key through
+    /// `sendEvent`, so the key is taken here too. A key taken here is spent,
+    /// so `sendEvent` never sees it; every other key is `super`'s. Taken
+    /// only while this is the key window, asked before `keepReturn` acts, so
+    /// a ⌘ key offered to another window's key equivalents never selects in
+    /// its transcript (TX-48).
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if keyWindowStandIn ?? isKeyWindow, keepReturn(for: event, taking: [.select]) { return true }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    /// `TextFocus.keptReturn` applied: true when `event` was a Return the
+    /// field being typed in keeps (the find bar's next, previous and
+    /// select) and `keys` names, now spent. Nothing is taken while a sheet
+    /// is attached.
+    private func keepReturn(
+        for event: NSEvent, taking keys: Set<KeptReturn> = [.next, .previous, .select]
+    ) -> Bool {
+        guard event.type == .keyDown, attachedSheet == nil,
+            let text = TextFocus.typing(firstResponder),
+            let kept = TextFocus.keptReturn(event, in: text), keys.contains(kept)
+        else { return false }
+        (text.delegate as? TextFocusKeepsReturn)?.returnPressed(kept)
+        return true
     }
 
     /// `TextFocus`'s rule applied: true when `event` left the text, first

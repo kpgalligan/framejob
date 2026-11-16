@@ -51,7 +51,7 @@ Only tracks you can hear get a stem:
 - While any track is soloed, only the soloed tracks have one.
 - A track with no sound on it, only pictures or nothing, has none.
 
-With **One per Track Name**, tracks whose names match share one file. The match ignores case and any spaces at either end, and the file is named the way the first of those tracks is spelled. A track with no name gets its own file. Name your tracks in [Add, rename and reorder tracks](/timeline/manage-tracks/).
+With **One per Track Name**, tracks whose names match share one file. The match ignores case, any spaces at either end, and whether an accented letter such as é was typed as one character or as a letter and an accent, and the file is named the way the first of those tracks is spelled. A track with no name gets its own file. Name your tracks in [Add, rename and reorder tracks](/timeline/manage-tracks/).
 
 If no track can be heard, the sheet shows "stems: no track is heard, so there is no stem to write", and **Export…** and **Add to Queue** are greyed out.
 
@@ -63,7 +63,7 @@ A stem is named after the mix and its track, and sits in the same folder. Export
 | --- | --- |
 | A track with no name | Its header's label: `Mix - Track 3.wav` |
 | A `/` or `:` in a track name | Written as `-` |
-| A name an earlier stem already has, ignoring case | Its track's label follows: `Mix - vo (Track 2).wav` |
+| A name an earlier stem already has, matched the same way | Its track's label follows: `Mix - vo (Track 2).wav` |
 | That name is taken too | A count follows the label: `Mix - vo (Track 2, 2).wav` |
 
 No two stems share a file.
@@ -80,7 +80,7 @@ There's one exception. If a stem's file would be one of the project's own media 
 
 The stems are written one after another after the mix, and the progress bar counts them. When it's done, the line reads "Exported “Mix.wav” and 3 stems.", and its loudness figures are the mix's. A row in the [Export Queue](/export/export-queue/) ends its first sentence the same way.
 
-Cancelling, or a failure part-way, removes the mix and every stem already written. A file the job hadn't yet replaced stays.
+The mix and the stems are written under hidden names and put in place only when every one of them is complete, the stems first. Cancelling, or a failure part-way, removes everything the job wrote, and an existing mix or stem file stays as it was. If a file can't be replaced as the job finishes, the stems already put in place stay.
 
 ## Stems are pre-master
 

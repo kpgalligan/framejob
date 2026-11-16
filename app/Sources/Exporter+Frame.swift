@@ -45,10 +45,13 @@ extension Exporter {
     /// is the only way a proof script can photograph a burn-in at all.
     ///
     /// `graphics` is pinned on the frame's own key, as `export` pins it on
-    /// its own; nil draws every graphic's slate. `keepsDepth` is the caller's
-    /// format (`carriesDepth`): when true and `DeepVideoFrame.reads` the frame (a deep still,
-    /// PR-9, or a deep VP9 track, PR-12), `DeepStillFrame.read`'s reader reads it, and
-    /// it re-reads a frame the generator answers 8-bit while it shows a deep source (PR-14).
+    /// its own; nil draws every graphic's slate, and the pin is marked deep when
+    /// the reader reads the frame and `keepsDepth` (PR-15), as the key itself is for a
+    /// gradient shape (PR-16) and a matte's coverage (PR-19). `keepsDepth` is the caller's
+    /// format (`carriesDepth`): when true and `DeepVideoFrame.reads` the frame (a graphic,
+    /// PR-20, a gradient shape, PR-21, a deep still, PR-9, or a deep VP9 track, PR-12),
+    /// `DeepStillFrame.read`'s reader reads it, and it re-reads a frame the generator answers
+    /// 8-bit while it shows a deep source (PR-14), or deep while it draws a matte (PR-19).
     static func renderFrame(
         project: ReelProject, urls: [UInt32: URL], at t: Ticks, maxWidth: Int?,
         options: RecipeOptions = .none, graphics: GraphicSet? = nil, keepsDepth: Bool = false
@@ -110,7 +113,15 @@ extension Exporter {
                 image: nil, graphics: GraphicRegistry.shared.reports(for: key),
                 cursorWarnings: cursorWarnings, uncut: uncut)
         }
-        if DeepVideoFrame.reads(project, built, urls: urls, at: t, options: options, keepsDepth: keepsDepth) {
+        let reads = DeepVideoFrame.reads(
+            project, built, urls: urls, at: t, options: options, keepsDepth: keepsDepth)
+        // Spec §11 PR-15, PR-20, PR-21: a frame the reader reads, in a format that keeps depth,
+        // draws its graphics and its gradient shapes deep (a frame that draws either is always
+        // read here); every other frame keeps the dithered 8-bit raster.
+        if reads {
+            // PR-16: a gradient shape is drawn deep too, whether or not a graphic set is pinned.
+            if keepsDepth { RecipeSource.shared.markDeep(key) }
+            if keepsDepth { GraphicRegistry.shared.markDeep(key) }
             return RenderedFrame(
                 image: DeepStillFrame.read(built, at: t, maxWidth: maxWidth),
                 graphics: GraphicRegistry.shared.reports(for: key), cursorWarnings: cursorWarnings,
@@ -130,13 +141,24 @@ extension Exporter {
         }
         var image = try? generator.copyCGImage(
             at: CompositionBuilder.time(max(0, t)), actualTime: nil)
+        // The generator answered deep with the frame's mattes resolved at 8 bits: the reader
+        // reads it again with its key deep (PR-19). A frame with no matte is not read twice, and
+        // a frame that draws a graphic or a gradient shape never gets here when `keepsDepth`
+        // (PR-20, PR-21: `reads` took it).
+        if keepsDepth, let first = image, first.bitsPerComponent > 8,
+            drawsMatte(project, at: t, options: options)
+        {
+            RecipeSource.shared.markDeep(key)
+            image = DeepStillFrame.read(built, at: t, maxWidth: maxWidth) ?? image
+        }
         // The generator's depth follows the lowest track that has video, so a
         // deep clip above an 8-bit one comes back 8-bit (spec §11 PR-14). A
-        // frame already deep never asks, so HEVC or ProRes alone stays byte
-        // for byte; a read that fails keeps the generator's image.
+        // frame already deep never asks, so HEVC or ProRes alone stays byte for
+        // byte; a read that fails keeps the generator's image.
         if keepsDepth, let shallow = image, shallow.bitsPerComponent <= 8,
             DeepVideoFrame.showsDeepSource(project, built, at: t, options: options)
         {
+            RecipeSource.shared.markDeep(key)
             image = DeepStillFrame.read(built, at: t, maxWidth: maxWidth) ?? image
         }
         return RenderedFrame(

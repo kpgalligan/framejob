@@ -120,8 +120,10 @@ extension VerticalVersion {
     }
 
     /// VR-64 (d): each speaker clip's subjects with `turns`, read through `FramingSpeaker.turns`
-    /// over its own microphones; a clip with no subjects is left as it is. Main thread (it reads
-    /// the document); throws `FramingSpeaker.Refusal`.
+    /// over its own microphones; a clip with no subjects is left as it is. A microphone with no
+    /// speech under the clip gets no turn, that person not talking there (spec §11 #527); a clip
+    /// with no turn at all is the core's to refuse, and VR-64 (c) retries it as `face`. Main
+    /// thread (it reads the document); throws `FramingSpeaker.Refusal`.
     static func withTurns(
         _ subjects: [UInt32: [String: Any]], speaker: [SpeakerClip], document: ProjectDocument
     ) throws -> [UInt32: [String: Any]] {
@@ -130,7 +132,7 @@ extension VerticalVersion {
         for entry in speaker {
             guard var own = out[entry.clip], let clip = snapshot.clip(entry.clip) else { continue }
             own["turns"] = try FramingSpeaker.turns(
-                document: document, clip: clip, mics: entry.mics)
+                document: document, clip: clip, mics: entry.mics, silence: .notTalking)
             out[entry.clip] = own
         }
         return out
@@ -138,7 +140,8 @@ extension VerticalVersion {
 
     /// VR-66 (c): the sheet's reading for Speaker on `project` with the ticked microphones in
     /// `settings.mics` — the turns filled, then the core's match on the reference clip (the
-    /// longest speaker clip, ties to the lower id) with its own microphones. Main thread.
+    /// longest speaker clip, ties to the lower id) with its own microphones. A microphone with no
+    /// speech is read as nobody talking on it, never refused (spec §11 #527). Main thread.
     static func speakerReading(
         document: ProjectDocument, project: ReelProject, settings: VerticalSettings,
         subjects: [UInt32: [String: Any]], missing: Set<UInt32>

@@ -185,7 +185,7 @@ APP_ROWS = ["L1", "L3"] + DRAWING_ROWS + ATTACH_ROWS + SECTION_ROWS + RECORDER_R
 ROWS = PROBE_ROWS + APP_ROWS
 RENDER_TIMES = [SEC // 2, 2 * SEC, 4 * SEC]
 SCALE_SENTENCE = "video.cursor.scale must be between 0.25 and 8, not 9"
-COLOR_SENTENCE = 'video.cursor.click_color must be a CSS colour (spec §11 G-12), not "#ffg"'
+COLOR_SENTENCE = 'video.cursor.click_color must be a CSS color (spec §11 G-12), not "#ffg"'
 
 results = {}
 skips = {}

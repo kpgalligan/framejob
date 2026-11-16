@@ -7,7 +7,9 @@ ideal map, in export and in playback? Measured through SR1's instrument
 (`ramp_spike.py`'s fixtures, Z0, classifiers and probe, whose `render` group
 calls the renderer, built `-O`), against rendered and composition controls
 and a planted fault, by SR-7's rule (fixed before the run; `results.json`
-pins the §11 file's SHA-256). The answers are in `archive/speed-ramps.md`'s
+pins the SHA-256 of the §11 entries the run is judged by, `spec_rule.py`'s
+`RULES`; until #585, 2026-11-11, of the whole §11 file). The answers are in
+`archive/speed-ramps.md`'s
 SR1b record. SR1c (SR-9) re-runs arm ON on SR-8's resample-then-pitch-shift
 renderer with `--verdict on`, adding the rendered pitch (PR, LG), rendered-only
 constant controls (`aux`) and a 15 kHz band render (`band`, BW); its answers
@@ -43,7 +45,6 @@ network; every child runs under `graphics_spike/bounded.py`.
 import argparse
 import array
 import bisect
-import hashlib
 import json
 import math
 import shutil
@@ -56,6 +57,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import ramp_spike as rs  # noqa: E402
+import spec_rule  # noqa: E402
 from export_offset_proof import click_value, read_ffmpeg, summary  # noqa: E402
 from media_less_playback_probe import build_shader  # noqa: E402
 
@@ -69,10 +71,6 @@ BAND_WAV = WORK / "band.wav"
 BAND_HZ = 15000.0
 GLIDE_WAV = WORK / "glide.wav"
 LEAD_DIR = WORK / "lead"
-RULE_FILE = rs.RULE_FILE  # SR-7 and SR-9
-# SR-14, the rule `--verdict rate` judges by: the §11 file split at the road
-# map's close, and SR-13 on are in the second file.
-RATE_RULE_FILE = ROOT / "designs/spec/11-decisions/speed-ramps-2.md"
 
 SEC, FRAME, RATE = rs.SEC, rs.FRAME, rs.RATE
 SOURCE_IN = rs.SOURCE_IN
@@ -1147,11 +1145,14 @@ def main():
 def run(args, groups, names, everything):
     score = rs.Score()
     started = time.time()
-    rule_file = RATE_RULE_FILE if args.verdict == "rate" else RULE_FILE
-    rule_sha = hashlib.sha256(rule_file.read_bytes()).hexdigest()
+    # The entries this run is judged by, hashed one by one (#585): SR-5, SR-7 and SR-17, with
+    # SR-9 under `on` and SR-9 and SR-14 under `rate`.
+    rule = (spec_rule.pin("render_spike --verdict rate") if args.verdict == "rate"
+            else spec_rule.pin("render_spike --verdict on") if args.verdict == "on"
+            else spec_rule.pin("render_spike"))
     info = rs.host()
     score.row("H0", "measured", f"{info['model']}, macOS {info['macos']}, load {info['load']}, "
-              f"Frame Job pids {info['framejob_pids'] or 'none'}; rule_sha256 {rule_sha[:16]}…")
+              f"Frame Job pids {info['framejob_pids'] or 'none'}; rule_sha256 {rule['rule_sha256'][:16]}…")
     past = [f"{n} ends at {source_end_ticks(everything[n]) / SEC:.3f} s" for n in names
             if source_end_ticks(everything[n]) > rs.SOURCE_LIMIT]
     if past:
@@ -1229,7 +1230,7 @@ def run(args, groups, names, everything):
                   + (f"; {len(failed)} failed: " + " | ".join(failed[:4]) if failed else ""))
         if not ok:
             score.instrument.append(f"R-{group}")
-    return score_run(score, groups, names, staged, everything, lines, started, rule_sha, info,
+    return score_run(score, groups, names, staged, everything, lines, started, rule, info,
                      args.verdict)
 
 
@@ -1395,7 +1396,7 @@ def signals_of(lines, name, v, side, shift):
     return out[0], out[1], (f["bars"] if f else None), residual
 
 
-def score_run(score, groups, names, staged, everything, lines, started, rule_sha, info,
+def score_run(score, groups, names, staged, everything, lines, started, rule, info,
               verdict_of="both"):
     if "plan" in groups:
         for name in staged:
@@ -1641,7 +1642,7 @@ def score_run(score, groups, names, staged, everything, lines, started, rule_sha
     print(f"\nVERDICT: {verdict} — {why}")
     RESULTS.write_text(json.dumps({
         "commit": rs.commit(), "date": time.strftime("%Y-%m-%d %H:%M:%S %z"),
-        "seconds": round(time.time() - started), "rule_sha256": rule_sha, "host": info,
+        "seconds": round(time.time() - started), **rule, "host": info,
         "m1_ms": m1, "pt1": pt1_ok, "rows": score.rows, "renders": reports,
         "variants": {n: {"map_breakpoints": len(everything[n]["map"][0]) if everything[n]["map"]
                          else None,

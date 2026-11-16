@@ -250,7 +250,7 @@ pub(crate) fn check_typed(key: &str, entry: &Value, value: &Value) -> Result<Val
         }
         "color" => {
             let colour = value.as_str().and_then(normalise_color).ok_or_else(|| {
-                wrong("a CSS colour (#rgb, #rgba, #rrggbb, #rrggbbaa, rgb(), rgba(), hsl(), hsla() or a colour name)")
+                wrong("a CSS color (#rgb, #rgba, #rrggbb, #rrggbbaa, rgb(), rgba(), hsl(), hsla() or a color name)")
             })?;
             return Ok(Value::String(colour));
         }

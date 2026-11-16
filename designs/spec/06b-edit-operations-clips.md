@@ -3,6 +3,10 @@
 The rules every op shares are §6a; the action, track, marker, canvas and media ops are §6c;
 the transition ops are §6d.
 
+The patch ops (`set_video`, `set_audio`, `set_text`, `set_shape`, `set_graphic` and `set_clip`) and
+`set_enabled` are §6e, moved there unchanged on 2026-11-11 because this file had passed the spec's
+~500-line split rule (#548).
+
 ## Clips
 
 - **`add_clip {track, media, at}`** — Whole media as one clip at `at`; source in 0; Fit scale if
@@ -83,7 +87,8 @@ the transition ops are §6d.
   there. Nothing shifts and no other track is touched, but for a cut clip's linked partner on an
   unlocked track, which is cut at the same bounds and paired (§11 AU-92) — the partner's middle
   piece stays, unlinked; the named track is cleared whether or not it is locked, exactly as
-  `ripple_delete` removes the clips it was given.
+  `ripple_delete` removes the clips it was given. Refused, nothing cut, when the cleared span
+  breaks the overlap rule on a track the cuts changed (§6a, §11 #427).
 - **`move_clip {clips, delta, track?}`** — Shifts by `delta` ticks (may be negative; clamps at 0)
   and optionally to another track (all selected clips keep their relative track offsets). **Overlap
   rule** on the destination track: a clip may overlap at most one neighbour on each side, and each
@@ -172,7 +177,7 @@ the transition ops are §6d.
   second half runs on to the original end rate along the original curve from the rate at the cut —
   exact for `linear` and `ease_out`, re-eased for `ease_in` and `ease_in_out`, which alone are lowered
   to the largest end rate that fits when they would read past the file (§11 SR-18 (e)). Refuses when
-  `at` is not strictly inside.
+  `at` is not strictly inside, and when the cut would break the overlap rule (§6a, §11 #427).
   **Omitting** `clips` — not passing a flag — means every unlocked clip `at` is strictly inside, the
   ⌘T-with-no-selection case.
   A linked partner on an unlocked track is cut too, and the halves are paired: both cut, the
@@ -183,8 +188,14 @@ the transition ops are §6d.
 - **`ripple_delete {clips}` / `ripple_delete_range {from, to}`** — Removes; then for each removed
   span (union of the removed clips' spans, processed right-to-left) shifts every clip on
   **unlocked** tracks whose start ≥ span end left by the span length. Clips on other tracks that
-  straddle a span are left in place. Range form: every unlocked clip is split at both bounds first,
-  the middle pieces removed, then the shift. Every clip a shift moves moves by that ONE delta, so
+  straddle a span are left in place. Clips form: a merged span ENDS at the earliest start of a
+  surviving clip that begins strictly inside one of its removed clips on that clip's own unlocked
+  track (a transition out of it), so that neighbour closes up onto the span's start and nothing
+  slides under it; a removed clip on a locked track pulls nothing back; and the op is refused,
+  nothing removed, when a track it moved breaks the overlap rule, in the rule's own sentence
+  (§11 #601). Range form: every unlocked clip is split at both bounds first,
+  the middle pieces removed, then the shift; refused, nothing cut, when the result breaks the
+  overlap rule (§6a, §11 #427). Every clip a shift moves moves by that ONE delta, so
   clips that abutted still abut — at a rate whose frame is not a whole number of ticks (7 fps) a
   moved start may sit a tick off the grid (§11 #42). Each named clip's linked partner on an unlocked track is removed too, either half named. Every shift (these, `ripple_delete_ranges`, `close_gap`, `insert_time` and `add_transition`'s ripple form) also moves each moved clip's partner on an unlocked track, whatever its own start, and refuses, nothing moved, when a partner would start before 0: "clip S would start before 0: it leads its linked clip P by N ticks" (§11 AU-91).
 
@@ -195,11 +206,18 @@ the transition ops are §6d.
   `ripple_delete_range`s**, and the difference is visible in the document: a cut at a boundary that
   no longer exists would mint a fragment and burn an id. `set_gained_transitions` runs once at the
   end, over the unlocked tracks. Markers do not move, as they do not for the singular. An empty
-  list, and a list that merges to nothing, change nothing. Written by Clip ▸ Remove Silences… as one
+  list, and a list that merges to nothing, change nothing. Refused WHOLE when what the list would
+  store breaks the overlap rule (§6a, §11 #427). Written by Clip ▸ Remove Silences… as one
   undo step, whatever the number of cuts.
-- **`lift_range {from, to}`** — `ripple_delete_range` without the close: every unlocked clip is
-  split at both bounds and the middles removed, and NOTHING moves — every clip after the range keeps
-  the moment it had, and so do the markers. ⌫ with a range and nothing selected, where ⌘⌫ ripples.
+- **`lift_range {from, to, tracks?}`** — `ripple_delete_range` without the close: every unlocked
+  clip is split at both bounds and the middles removed, and NOTHING moves — every clip after the
+  range keeps the moment it had, and so do the markers. ⌫ with a range and nothing selected, where
+  ⌘⌫ ripples. With `tracks`, only the clips on those tracks are cut and removed, and every other
+  track keeps exactly what it had, a linked partner there included (its link follows `split`'s
+  uncut-partner rule); a named locked track refuses, "track N is locked, so nothing on it can be
+  lifted", an unknown id is an error and an empty list changes nothing (§11 #602). Switch by
+  Speaker's Replace the shots on clears its track this way. Refused as `ripple_delete_range` is
+  under the overlap rule (§6a, §11 #427).
 - **`keep_range {from, to}`** — The project as `[from, to)` of its top-level timeline, moved to
   start at 0 (§11 CJ-50). Both bounds are snapped and clamped to 0; `to` not after `from` is an error.
   Every clip on every track, locked or not, is cut at both bounds by `split`'s rules; at an edge
@@ -236,7 +254,8 @@ the transition ops are §6d.
   a clip that ends after `from`; in clip order, a nest clip, a caption page with timed words or a
   linked clip in the range (AU-94's sentence); a transition touching `[from, to]`; two markers that
   would share a time (unscoped only); a piece whose rate would pass ×0.1–×1000, named by its source
-  clip and the rate, or that would last under one frame.
+  clip and the rate, or that would last under one frame; the overlap rule on what it would store
+  (§6a, §11 #427).
 
 - **`set_speed {clip, rate?, duration?, keep_pitch?}`** — Two arms, exactly one given; both or
   neither is an **error** (§11 #190). `rate` sets the rate. `duration` FITS the clip: it is snapped,
@@ -349,7 +368,11 @@ the transition ops are §6d.
   or target carries no rate profile and no window changes (§11 SR-19 (f)). A video group's
   `qualifier` follows the clip kind (§11 GR-13): dropped onto a picture clip (said in the tool's
   description, not its answer — D2-1), an adjustment target's own kept when the payload clip is
-  not an adjustment clip, copied between two adjustment clips. **`graphic` is the
+  not an adjustment clip, copied between two adjustment clips. A text, shape, graphic or
+  adjustment target keeps its own `crop`, `corner_radius` and `chroma` (§11 #524, #536), and a
+  nest target its own `corner_radius` and `chroma`, taking the `crop` (#536); onto any
+  other clip they travel
+  with the group. **`graphic` is the
   fifth group, and only when NAMED** (§11 G-32, amending G-10): a side has it when its source is a
   graphic and it has a `graphic` description, and a target TAKES it when it has it and its
   `graphic.name` is the payload clip's. It copies `props` WHOLE — a target key the payload lacks is
@@ -403,96 +426,3 @@ the transition ops are §6d.
   base motion/text timings normalized to the document's grid (§11, D7-3), including a legacy
   off-grid nest; a ramped clip's speed actions are snapped but not clamped into it, and its
   duration held again against them (§11 SR-19 (g)). An **error** when `clip` is not a nest clip. The returning clips' links are mapped to their fresh ids (§11 AU-96).
-
-- **`set_video {clips, patch}` / `set_audio` / `set_text` / `set_shape`** — Merge the patch into the
-  base props. Refuses if nothing changes. `set_audio` refuses a patch that ITSELF sets
-  `duck.mode` to `speech` on a clip that is not a media clip or whose media has no `speech`
-  (`audio.duck.mode speech needs the clip's media to carry speech spans (set_media_speech)`,
-  format version 29, §11 AU-111); any other edit of a clip already holding such a duck applies.
-  `set_audio` takes the gate and the de-esser as `gate` and `de_esser` (format version 33, §11
-  AU-43, AU-45, AU-46): objects that merge per key, `{}` storing the defaults and `null` clearing,
-  each field refused out of range by its dotted path (`audio.gate.hold must be between 0 and
-  300000 ticks, not 400000`); both thresholds are dB relative to the clip's measured loudness.
-  It takes the leveller as `leveller` the same way (format version 37, §11 AU-66:
-  `audio.leveller.<field>`, its target relative to the loudness too; the first build's
-  `threshold_db` is an unknown key). An unknown key, a value of the wrong JSON kind or a
-  misspelt variant anywhere in the patch is an **error** that names the dotted path to it, array
-  indices included, and the value sent — `unknown key "filters[1].kindd" in a video patch`, `bad
-  value at "shadow" in a video patch: expected an object, not 5`, ``bad value at "filters[1].kind"
-  in a video patch: unknown variant `glw`, expected one of `blur`, …`` — so a number where a shadow
-  belongs is refused rather than read as a clear, and a list where an object belongs (or an object
-  where a string belongs) is refused rather than read field by field; `add_text_clip`'s `text` and
-  `add_shape_clip`'s `shape` answer in the same words. One value is refused by the CLIP rather than
-  by the vocabulary: `video.blend` on a nest clip is an **error** naming it (format version 6),
-  because a nest is flattened rather than composited offscreen and there is no group picture for a
-  blend to combine with. It fires on the MERGED value only, so `{"blend": "normal"}` on a nest clip
-  is the identity and refuses instead — otherwise an all-or-nothing `paste_attributes` of an
-  ordinary look onto a nest clip would fail over a value that changes nothing. `set_action_end` does
-  not range-check, so the same rule is enforced again in the evaluator (§5.4's `clamp_video`), which
-  closes the recipe, `clip_state` and both export writers at once. A `video.filters` entry must name
-  BOTH `kind` and `amount` — `missing key "filters[0].kind" in a video patch` — because a list
-  replaces whole, so an entry is merged over nothing and the keys it leaves out would be completed
-  from the type's defaults into a half-strength blur nobody asked for; the file reader keeps that
-  completion, so an older file still opens with the defaults it always had. `video.obscure` and
-  `shape.gradient.stops` entries are NOT held to it: their omitted keys leave the entry recognisably
-  the thing the caller named. `video.motion` (format version 8) deep-merges like every other nested
-  object — `{"motion": {"in": …}}` keeps a stored `out`, and `{"motion": {"in": null}}` clears that
-  slot alone. The APP's two writers still send the WHOLE object with nil slots as `null` (the
-  inspector's Motion section and Clip ▸ Motion ▸ know all three slots), which is the same rule
-  spelled out rather than a second one; an AGENT's patch is the caller's own object, forwarded
-  unread (§7.9). `{"motion": null}` clears the field, and a motion whose three slots are all null is
-  normalised to `null` before the range checks run, so one clip has one spelling of "no motion".
-  `video.cutout` (format 39, §11 CO-20) merges too and `null` removes it; a `media`, `still` or
-  `image` clip takes one (a text, shape, graphic, adjustment or nest clip is an **error** naming
-  what it is), and `quality: "best"` is an error until Best masks are made. `subject:
-  "foreground"` (format 41, §11 CO-100) is an image clip's only: on a `media` or `still` clip it
-  is an **error** (`clip 3 is a media clip and cannot take a foreground cutout: only an image clip
-  can`), from `set_video`, `paste` and `paste_attributes` alike.
-  `video.behind_subject` (format 40, §11 CO-52) is a boolean: any drawing clip takes it but an
-  adjustment or a nest clip, each an **error** naming what it is (`clip 4 is an adjustment clip and
-  cannot be put behind a subject`), from `set_video`, `paste` and `paste_attributes` alike.
-  `video.motion_blur` (format 42, §11 CU-113) is 0–1: above 0, a nest or an adjustment clip is an
-  **error** naming what it is (`clip 9 shows a nest and cannot take motion blur: set it on the
-  clips inside`, `clip 4 is an adjustment clip and cannot take motion blur`), from `set_video`,
-  `paste` and `paste_attributes` alike; 0 removes the key.
-  `video.hide_silent` (format 43, §11 CO-90…CO-92) is `{media, pre_roll, hold, fade}`, each time
-  0–3,000,000 ticks (`video.hide_silent.fade must be between 0 and 3000000 ticks, not 3000001`);
-  `media` must be named (`video.hide_silent.media is required: the media whose speech the clip
-  follows`), a media of the project (`video.hide_silent.media 9 is not a media of this project`)
-  with sound (`video.hide_silent.media 4 has no sound to follow`), and a nest clip refuses it
-  (`clip 9 shows a nest and cannot hide while silent: set it on the clips inside`) — each an
-  **error**, from `set_video`, `paste` and `paste_attributes` alike; `null` removes it. Paste and
-  `paste_attributes` carry the gate's media as a non-shown row (the look LUT's rule, §11 GR-8): a
-  row absorbed by path or appended, a payload without it dropping the gate.
-  `audio.voice` (format version 34, §11 AU-140) merges the same way, and as `video.look` does, a voice
-  merged over nothing must name `kind`: `{"voice": {"amount": 0.5}}` on a clip with no voice is an
-  **error**, ``bad value at "voice" in an audio patch: missing field `kind` ``.
-  `set_text` can patch `case`, `words` and `word_style` like any declared key (format version 9, §11
-  W-10); a `words` entry must name both `start` and `end`, and a non-empty `words` whose length is
-  not the content's token count is an **error** in the rule's own words — `this text is timed word
-  by word: 4 timings for 5 words` — as are a word time outside D7-1's envelope, an `end` before its
-  `start`, a `start` before the previous word's, and a `word_style` value out of range
-  (`active_scale` 1.0–1.5, colours 0–1, a negative pill padding or radius, `pause_dim` 0–1 — format
-  version 12, §11 W-12: `text.word_style.pause_dim must be between 0 and 1, not 2`). The check runs on what
-  the caller sent; the word times are then snapped to the grid, nearest, a negative one staying
-  negative. A content edit that changes the count sends `words: []` in the same patch.
-- **`set_graphic {clips, patch, schema?}`** — Patches each graphic clip's `name`, `width`, `height`,
-  `length` (`null`: it ends with the clip, `in` + the clip's duration — G-9·c; else snapped nearest,
-  at least one frame) and `props`, which merges key by key: a value is stored in the key's own slot
-  or appended, a `null` removes its key and the rest keep their order — unchecked, so a key the
-  schema no longer has can still be removed — each other value checked as `add_graphic_clip` checks
-  them, and the merged map holds at most 64 (an **error** naming the count). `in` is an **error** —
-  `trim_start`, `roll`, `split` and `add_transition` move it (road map 10's G-9 and G-18, recorded
-  here by G2b) — and so is a clip that is not a graphic, an unknown key and a malformed `schema`.
-  With a `schema`, a `null` for a prop an action on the clip names stores the schema's default
-  instead, so the action's ramp keeps a start (§11 G-34 (d)); without one, or for a key the schema
-  lacks, it removes. The identity when nothing changes, a colour re-sent in another spelling
-  included.
-- **`set_clip {clips, patch: {name?: string | null, label?: string | null}}`** — The fifth patch op:
-  sets or clears the clip's own name and label (§5.2). Inside the patch an absent key keeps, `null`
-  clears, and so does an empty string — after the trim a name gets on its way in — because an
-  unnamed clip is `null`, not `""`. Any other key is an **error**, checked before the clip ids. A
-  patch rather than two optional `Option<T>` envelope arguments lets "keep" and "clear" differ. A
-  `split`, `duplicate`, `detach_audio` or `paste` carries both along (they clone the clip);
-  `paste_attributes` never does. Refuses if nothing changes.
-- **`set_enabled {clip, video?, audio?}`** — Visibility/mute per clip.

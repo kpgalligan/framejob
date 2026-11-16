@@ -120,7 +120,7 @@ fn an_appended_row_stores_its_original_as_add_media_does() {
         .find(|m| m["path"] == json!("/m/added.mov"))
         .cloned()
         .expect("the row added");
-    assert_eq!(row["original"]["path"], json!("/o/a.webm"));
+    assert_eq!(row["original"]["path"], json!("  /o/a.webm  "));
     assert!(row["original"]["bookmark"].is_null(), "{row}");
     assert_eq!(row["original"], added_row["original"]);
 }

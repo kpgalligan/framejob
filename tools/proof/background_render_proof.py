@@ -215,7 +215,7 @@ MUTANTS = {
           "                    && heldTotal + kept.aheadBytes >= budgetBytes", ""),
          (PREFETCH,
           "        while session.follows, aheadOrigin?.key == session.key, !session.stopped,\n"
-          "            !roomAhead(for: slots) { condition.wait() }\n", "")], "B12"),
+          "            !roomAhead(for: slots, key: session.key) { condition.wait() }\n", "")], "B12"),
     "ahead-evicted-first": (
         [(MEMORY, ", ahead[name] == nil else { continue }", " else { continue }")], "B12"),
     "background-beside-play": (

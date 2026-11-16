@@ -5,6 +5,8 @@
 //
 // - `co3-probe <request.json>`: the rows. The request names `work` (this run's folder). One
 //   JSON object on stdout, `{"rows": [{"id", "pass", "detail"}]}`.
+// - `co3-probe header <request.json>`: I9 alone, in a process of its own, because it registers
+//   `-RCDevAnalysisHold 3600` before the lane's first job. Same request and answer as the rows.
 // - `co3-probe centroid <request.json>`: the probe's OWN centroid of a pack (I6), never
 //   `CutoutStatus.centroid`: `MaskPack` reads the file, and the arithmetic is this file's — per
 //   frame whose grid index lies in `need` and `coverage` and whose mask is found, `Σ v·(2x + 1)
@@ -30,6 +32,16 @@
 //   `CutoutStatus.centroid` agrees.
 // - I8 `CutoutStatus.progress`: need 0…999, covered 0…399, running 0…999 at f 0.4 → 0.400;
 //   running 200…999 at f 0.25 → 0.400; no running request → 0.400.
+// - I9 (header mode, #438) a cut-out clip's Background section, shut, in an offscreen window
+//   with the masks job held: its Status and its header summary both read "Analyzing 0 %"; the
+//   running request's fraction set to 0.5 (`AnalysisLane.devSetProgress`), within 1.5 s both
+//   read "Analyzing 50 %" — a progress-only tick refreshes the header too.
+// - I10 (#438) `CutoutStatus.stamp` of a media at `work/stamp.mov` is nil while the file is
+//   absent and non-nil once it is written: a nil stamp is not memoised.
+// - I11 (#438) `AgentServer.cutoutDetails` over three hand-made details with a counting `read`:
+//   with nothing kept it reads 3; with [ready, analysing, failed] kept under the same handles it
+//   reads only the analysing clip and returns the kept ready and failed details; with the same
+//   kept and another `project` handle it reads 3.
 
 import AppKit
 
@@ -83,6 +95,11 @@ func probeCentroid(
 }
 
 let arguments = CommandLine.arguments
+let headerMode = arguments.count == 3 && arguments[1] == "header"
+if headerMode {
+    // Before the lane's first job: every masks job holds before its first frame.
+    UserDefaults.standard.register(defaults: [AnalysisLane.devHoldKey: 3600])
+}
 if arguments.count == 3, arguments[1] == "centroid" {
     var answer: [String: Any] = ["ok": false]
     if let data = FileManager.default.contents(atPath: arguments[2]),
@@ -108,12 +125,14 @@ if arguments.count == 3, arguments[1] == "centroid" {
     exit(0)
 }
 
-guard arguments.count == 2,
-    let requestData = FileManager.default.contents(atPath: arguments[1]),
+guard arguments.count == 2 || headerMode,
+    let requestData = FileManager.default.contents(atPath: arguments[arguments.count - 1]),
     let request = (try? JSONSerialization.jsonObject(with: requestData)) as? [String: Any],
     let workPath = request["work"] as? String
 else {
-    for id in ["I1", "I3", "I5", "I6p", "I8"] { row(id, false, "the request could not be read") }
+    for id in headerMode ? ["I9"] : ["I1", "I3", "I5", "I6p", "I8", "I10", "I11"] {
+        row(id, false, "the request could not be read")
+    }
     printJSON(["rows": rows])
     exit(0)
 }
@@ -225,6 +244,81 @@ let defaults: [String: Any] = [
     "subject": "person", "quality": "standard", "background": "remove", "edge": 0.0,
     "feather": 0.0,
 ]
+
+// ---- I9 (header mode) --------------------------------------------------------------------------
+
+if headerMode {
+    var problems: [String] = []
+    if let (document, ids) = makeDocument(clips: 1),
+        let media = document.project.snapshot.media.first?.id,
+        let cacheDir = document.intendedCacheDirectory
+    {
+        let clip = ids[0]
+        document.performGroupedEdit(
+            "Cutout", [.setVideo(clips: [clip], patch: VideoPatch(cutout: .some(CutoutProps())))])
+        let pane = clipPane(document, [clip], action: nil)
+        let window = NSWindow(
+            contentRect: NSRect(x: -20_000, y: 0, width: 320, height: 900), styleMask: [.titled],
+            backing: .buffered, defer: false)
+        window.contentView = pane
+        kept.append(window)
+        pane.refresh()
+        let section = pane.sections.first { $0.id == "video.cutout" }
+        let readout = section.flatMap { labelled($0, "Status") }.flatMap { row in
+            walk(row).lazy.compactMap { $0 as? OptionDisplayControl }.first
+        }
+        func summary() -> String? {
+            section.flatMap { section in
+                Mirror(reflecting: section.header).children
+                    .first { $0.label == "lastSummary" }?.value as? String
+            }
+        }
+        func both(_ words: String, within seconds: Double) -> Bool {
+            let deadline = Date().addingTimeInterval(seconds)
+            while Date() < deadline {
+                if readout?.text == words, summary() == words { return true }
+                spin(0.05)
+            }
+            return readout?.text == words && summary() == words
+        }
+        func running() -> AnalysisRequest? {
+            CutoutStatus.runningRequest(
+                CutoutStatus.ownerRequests(document.maskOwner, media: media, cacheDir: cacheDir))
+        }
+        if section == nil || readout == nil { problems.append("no Background section or Status") }
+        if section?.isExpanded == true { problems.append("the section is open") }
+        let first = both("Analyzing 0 %", within: 10)
+        if !first {
+            problems.append(
+                "before: Status \(String(describing: readout?.text)), header "
+                    + "\(String(describing: summary())) (want \"Analyzing 0 %\")")
+        }
+        var request: AnalysisRequest?
+        let deadline = Date().addingTimeInterval(10)
+        while request == nil, Date() < deadline {
+            request = running()
+            if request == nil { spin(0.05) }
+        }
+        if let request {
+            AnalysisLane.shared.devSetProgress(0.5, of: request)
+            spin(1.5)
+            if readout?.text != "Analyzing 50 %" || summary() != "Analyzing 50 %" {
+                problems.append(
+                    "after the fraction 0.5: Status \(String(describing: readout?.text)), header "
+                        + "\(String(describing: summary())) (want \"Analyzing 50 %\" both)")
+            }
+        } else {
+            problems.append("no running masks request within 10 s")
+        }
+    } else {
+        problems.append("the fixture could not be made")
+    }
+    row("I9", problems.isEmpty,
+        problems.isEmpty
+            ? "Status and header \"Analyzing 0 %\", then both \"Analyzing 50 %\" after a progress tick"
+            : problems.joined(separator: "; "))
+    finish()
+}
 
 // ---- I1 -------------------------------------------------------------------------------------
 
@@ -426,6 +520,64 @@ do {
     let ok = [a, b, c].allSatisfy { abs($0 - 0.4) < 1e-9 }
     row("I8", ok, String(format: "running 0…999 at 0.4 → %.3f; running 200…999 at 0.25 → %.3f; "
         + "none → %.3f (each 0.400)", a, b, c))
+}
+
+// ---- I10 ------------------------------------------------------------------------------------
+
+if let (document, _) = makeDocument(clips: 1), let media = document.project.snapshot.media.first {
+    let url = work.appendingPathComponent("stamp.mov")
+    let cacheDir = document.intendedCacheDirectory ?? work
+    try? FileManager.default.removeItem(at: url)
+    let absent = CutoutStatus.stamp(media: media, url: url, cacheDir: cacheDir, in: document)
+    let wrote = (try? Data("co3 stamp".utf8).write(to: url)) != nil
+    let present = CutoutStatus.stamp(media: media, url: url, cacheDir: cacheDir, in: document)
+    row("I10", absent == nil && wrote && present != nil,
+        "absent file: \(absent == nil ? "nil" : "a stamp") (want nil); written \(wrote); then "
+            + "\(present == nil ? "nil" : "a stamp") (want a stamp)")
+} else {
+    row("I10", false, "the fixture could not be made")
+}
+
+// ---- I11 ------------------------------------------------------------------------------------
+
+if let (document, _) = makeDocument(clips: 1), let (other, _) = makeDocument(clips: 1) {
+    func detail(_ clip: UInt32, _ state: CutoutState) -> CutoutStatus.Detail {
+        CutoutStatus.Detail(
+            status: CutoutClipStatus(
+                clip: clip, media: nil, state: state, frames: 1, covered: 0, subjectFound: false,
+                error: nil),
+            media: nil, need: [], coverage: [], pack: nil, owner: nil, cacheDir: nil)
+    }
+    let clips: [UInt32] = [1, 2, 3]
+    let p = document.project, e = document.editedProject, p2 = other.project
+    var reads: [UInt32] = []
+    let read = { (clip: UInt32) -> CutoutStatus.Detail in
+        reads.append(clip)
+        return detail(clip, .analyzing(0.7))
+    }
+    let a = AgentServer.cutoutDetails(clips, kept: nil, project: p, edited: e, read: read)
+    let readA = reads
+    reads = []
+    let held = AgentServer.CutoutPoll(
+        details: [detail(1, .ready), detail(2, .analyzing(0.5)), detail(3, .failed("gone"))],
+        project: p, edited: e)
+    let b = AgentServer.cutoutDetails(clips, kept: held, project: p, edited: e, read: read)
+    let readB = reads
+    reads = []
+    let c = AgentServer.cutoutDetails(clips, kept: held, project: p2, edited: e, read: read)
+    let readC = reads
+    let states = { (poll: AgentServer.CutoutPoll) in poll.details.map { "\($0.status.state)" } }
+    let pass = readA == [1, 2, 3] && a.details.count == 3
+        && readB == [2]
+        && b.details.map(\.status) == [held.details[0].status, detail(2, .analyzing(0.7)).status,
+                                       held.details[2].status]
+        && readC == [1, 2, 3] && c.details.allSatisfy { $0.status.state == .analyzing(0.7) }
+    row("I11", pass,
+        "(a) nothing kept: read \(readA) (want [1, 2, 3]); (b) same handles: read \(readB) (want "
+            + "[2]), states \(states(b)); (c) another project handle: read \(readC) (want [1, 2, 3]), "
+            + "states \(states(c))")
+} else {
+    row("I11", false, "the fixture could not be made")
 }
 
 finish()

@@ -111,7 +111,9 @@ fn general() -> Handle {
 
 /// A clip with three actions, a transition and non-default base props, on a
 /// track where it overlaps a predecessor — everything `split` has to carry
-/// across a cut. Clip 20 runs 2 400 000 – 14 400 000.
+/// across a cut. Clip 20 runs 2 400 000 – 14 400 000. The overlap is 300 000
+/// ticks, so the earliest cut below (600 000 into clip 20) leaves a first
+/// half the transition still fits, which a cut must (spec §11 #427).
 fn split_project() -> Handle {
     Handle::from_json(
         r#"{
@@ -124,7 +126,7 @@ fn split_project() -> Handle {
   ],
   "tracks": [{"id": 2, "name": "Track 1"}],
   "clips": [
-    {"id": 10, "track": 2, "start": 0, "duration": 3000000,
+    {"id": 10, "track": 2, "start": 0, "duration": 2700000,
      "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {}},
     {"id": 20, "track": 2, "start": 2400000, "duration": 12000000,
      "source": {"kind": "media", "media": 1, "in": 1200000}, "speed": 1.0,
@@ -683,8 +685,11 @@ fn op_table() -> Vec<Value> {
         json!({"op": "add_speed_ramp", "clip": 10, "shape": "speed_dip", "rate": 0.5,
                "from": 2400000, "to": 4800000}),
         // Clip 46 on the front track is the camera, the nest clip 41 behind
-        // it the screen, side by side at 1 s.
-        json!({"op": "switch_layout", "camera": 46, "layout": "side_by_side", "at": 600000}),
+        // it the screen, side by side at 1 s, held only to 5 s: the graphic
+        // clip 48 starting at 7 s on the screen's track would be rounded,
+        // which a graphic clip refuses (spec §11 #524).
+        json!({"op": "switch_layout", "camera": 46, "layout": "side_by_side", "at": 600000,
+               "through": 3000000}),
         // `core/tests/reframe_clip.rs` measures the framing.
         json!({"op": "reframe_clip", "clip": 47, "follow": "center", "zoom": 2.0}),
         json!({"op": "set_action", "clip": 10, "action": 11, "curve": "linear"}),

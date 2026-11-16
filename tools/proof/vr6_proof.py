@@ -38,7 +38,7 @@ Rows:
 - P5 `get_project`'s `media` byte-identical before and after P1.
 - P6 the refusals in their sentences, nothing changed: `mics: [A]`, `[A, A]`, the two-shot as a
   microphone, `mic_faces: [1]`, a canned cut inside the clip (frame 300, 00:00:10:00), Mic A's
-  loudness cache removed (SW-24's "still being analysed"), Mic B's sound off with `mic_faces:
+  loudness cache removed (SW-24's "still being analyzed"), Mic B's sound off with `mic_faces:
   [1, 2]` given (the sound-off sentence naming Mic B).
 
 `--mutant NAME` runs the named row on a mutated build: CAUGHT exits 1, SURVIVED 0, a control that
@@ -265,7 +265,7 @@ class Doc:
 
     def frame(self, **arguments):
         """`reframe_clip {follow: speaker, mics: [A, B]}` plus `arguments`, polled while a
-        microphone is still being analysed (the import's caches)."""
+        microphone is still being analyzed (the import's caches)."""
         call = {"clip": self.c_wide, "follow": "speaker", "mics": [self.c_a, self.c_b],
                 **arguments}
         deadline = time.monotonic() + CACHE_BOUND
@@ -273,7 +273,7 @@ class Doc:
             try:
                 return self.call_with("reframe_clip", call)
             except mcp.ToolError as error:
-                if "still being analysed" not in str(error) or time.monotonic() > deadline:
+                if "still being analyzed" not in str(error) or time.monotonic() > deadline:
                     raise
             time.sleep(2)
 
@@ -364,7 +364,7 @@ def switch_shots(client, manifest):
                 answer = doc.call("switch_by_speaker", apply=False, min_shot=2)
                 break
             except mcp.ToolError as error:
-                if "still being analysed" not in str(error) or time.monotonic() > deadline:
+                if "still being analyzed" not in str(error) or time.monotonic() > deadline:
                     raise
             time.sleep(2)
         return expected_shots(answer, doc)
@@ -465,7 +465,7 @@ def p6_cut(client, manifest):
             path.unlink()
         why = refused(lambda: doc.call_with("reframe_clip", {
             "clip": doc.c_wide, "follow": "speaker", "mics": [doc.c_a, doc.c_b]}))
-        sentence = (f"The microphone on track {doc.mic_a_track} is still being analysed — its "
+        sentence = (f"The microphone on track {doc.mic_a_track} is still being analyzed — its "
                     f"loudness has not been measured yet.")
         check("P6", why is not None and sentence in why and model(doc.state()) == base,
               f"Mic A's loudness removed: {why!r}")

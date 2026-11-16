@@ -50,18 +50,24 @@ The probe `spend_probe.swift` (over `app/Sources`, `build_probe`'s line):
       unknown + partial is the unknown line
 
     python3 tools/proof/spend_proof.py
-    python3 tools/proof/spend_proof.py --mutant stale-refresh    # H2, H3 on a scratch agent/
-                                                                # with REFRESH_AFTER_MS = 0:
-                                                                # H3 FAILs (exit 1)
+    python3 tools/proof/spend_proof.py --mutant stale-refresh    # H2, H3 on a helper mutant whose
+                                                                # refresh is due at once
+                                                                # (refreshAfter 0): H3 FAILs
     python3 tools/proof/spend_proof.py --mutant unknown-as-zero  # S rows over a Sources copy
                                                                 # rendering unknown as $0.0000:
                                                                 # S1 FAILs (exit 1)
-    python3 tools/proof/spend_proof.py --mutant no-partial       # H10..H12 on a scratch agent/
+    python3 tools/proof/spend_proof.py --mutant no-partial       # H10..H12 on a helper mutant
                                                                 # whose catch emits no partial
                                                                 # cost: H10, H11 FAIL (exit 1)
-    python3 tools/proof/spend_proof.py --mutant keep-unpriced    # H10..H12 on a scratch agent/
-                                                                # that keeps a priced response
-                                                                # in flight: H12 FAILs (exit 1)
+    python3 tools/proof/spend_proof.py --mutant priced-twice     # H10..H12 on a helper mutant
+                                                                # that also prices a complete
+                                                                # response as partial: H12 FAILs
+
+The helper mutants (`HELPER_MUTANTS`, each an edit of the Swift helper's `agent/Sources`) are
+built by `agent_helper_build.mutant` on the persistent mutant tree, never in the tree's own
+`agent/` (road map "swift-helper" SA3, spec §11 SA-8). `priced-twice` takes the place of the Bun
+helper's `keep-unpriced`: the Swift loop keeps no response in flight after it returns, so there is
+nothing to keep, and the mutant prices the returned response a second time instead.
 
 A mutant whose instrument did not build could not perform its control
 (exit 2); so, by rule R (issue batch B13), could one whose named row (H3,
@@ -99,6 +105,7 @@ sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
 import assistant_helper_proof as ahp  # noqa: E402
 import assistant_session_proof as asp  # noqa: E402
 import assistant_tab_proof as atp  # noqa: E402
+import agent_helper_build  # noqa: E402
 import bounded  # noqa: E402
 import prices  # noqa: E402
 
@@ -732,75 +739,35 @@ def rows_s(score, sources=None, label=""):
 # The mutants.
 
 
-def stale_helper():
-    """(helper path, None) or (None, reason): a scratch agent/ with
-    REFRESH_AFTER_MS = 0, built by its own build.sh into a scratch bundle."""
-    base = os.path.join(WORK, "stale-refresh")
-    shutil.rmtree(base, ignore_errors=True)
-    scratch = os.path.join(base, "agent")
-    shutil.copytree(AGENT, scratch, ignore=shutil.ignore_patterns("node_modules"))
-    path = os.path.join(scratch, "src", "priceTable.ts")
-    with open(path) as f:
-        text = f.read()
-    old = "REFRESH_AFTER_MS = 86_400_000"
-    if text.count(old) != 1:
-        return None, f"`{old}` occurs {text.count(old)} times in priceTable.ts, not once"
-    with open(path, "w") as f:
-        f.write(text.replace(old, "REFRESH_AFTER_MS = 0"))
-    target = os.path.join(base, "target")
-    os.makedirs(target)
-    built = bounded.run(["/bin/sh", os.path.join(scratch, "build.sh"), "helper"], WALL_BUILD,
-                        env=child_env({"TARGET_BUILD_DIR": target,
-                                       "CONTENTS_FOLDER_PATH": "Frame Job.app/Contents"}))
-    helper = os.path.join(target, "Frame Job.app", "Contents", "Helpers", "framejob-agent")
-    if built["expired"] or built["rc"] != 0 or not os.path.exists(helper):
-        tail = [line for line in (built["stdout"] + built["stderr"]).splitlines()
-                if line.strip()][-3:]
-        return None, f"build.sh helper exit {built['rc']} (expired {built['expired']}): {tail}"
-    return helper, None
-
-
-# name: (the text in agent/src/main.ts, exactly once, what it becomes, the rows it names)
+KIT = "agent/Sources/FrameJobAgentKit/"
+# name: (the file from the repo root, the text there exactly once, what it becomes, the rows it
+# names); each built by `agent_helper_build.mutant`.
 HELPER_MUTANTS = {
-    "no-partial": ("      emitCost(inFlight.message, turnPrices, true);\n", "",
-                   ["H10", "H11"]),
-    "keep-unpriced": ("      const message = await stream.finalMessage();\n"
-                      "      inFlight.message = undefined;\n",
-                      "      const message = await stream.finalMessage();\n", ["H12"]),
+    "stale-refresh": (KIT + "PriceTable.swift",
+                      "    public static let refreshAfter: TimeInterval = 86_400\n",
+                      "    public static let refreshAfter: TimeInterval = 0\n", ["H3"]),
+    "no-partial": (KIT + "Turn.swift", "                emitCost(snapshot, turn, partial: true)\n",
+                   "                _ = snapshot\n", ["H10", "H11"]),
+    "priced-twice": (KIT + "Turn.swift",
+                     "            return Reply(message: message, param: param)\n",
+                     "            emitCost(message, turn, partial: true)\n"
+                     "            return Reply(message: message, param: param)\n", ["H12"]),
 }
 
 # mutant: the rows it names; caught only when every one of them FAILed.
-MUTANT_ROWS = {"stale-refresh": ["H3"], "unknown-as-zero": ["S1"],
-               **{name: rows for name, (_, _, rows) in HELPER_MUTANTS.items()}}
+MUTANT_ROWS = {"unknown-as-zero": ["S1"],
+               **{name: rows for name, (_, _, _, rows) in HELPER_MUTANTS.items()}}
 
 
-def cut_helper(name):
-    """(helper path, None) or (None, reason): a scratch agent/ with one of
-    `HELPER_MUTANTS` applied to main.ts, built by its own build.sh into a
-    scratch bundle (`stale_helper`'s shape)."""
-    old, new, _ = HELPER_MUTANTS[name]
-    base = os.path.join(WORK, name)
-    shutil.rmtree(base, ignore_errors=True)
-    scratch = os.path.join(base, "agent")
-    shutil.copytree(AGENT, scratch, ignore=shutil.ignore_patterns("node_modules"))
-    path = os.path.join(scratch, "src", "main.ts")
-    with open(path) as f:
-        text = f.read()
-    if text.count(old) != 1:
-        return None, f"{old!r} occurs {text.count(old)} times in main.ts, not once"
-    with open(path, "w") as f:
-        f.write(text.replace(old, new))
-    target = os.path.join(base, "target")
-    os.makedirs(target)
-    built = bounded.run(["/bin/sh", os.path.join(scratch, "build.sh"), "helper"], WALL_BUILD,
-                        env=child_env({"TARGET_BUILD_DIR": target,
-                                       "CONTENTS_FOLDER_PATH": "Frame Job.app/Contents"}))
-    helper = os.path.join(target, "Frame Job.app", "Contents", "Helpers", "framejob-agent")
-    if built["expired"] or built["rc"] != 0 or not os.path.exists(helper):
-        tail = [line for line in (built["stdout"] + built["stderr"]).splitlines()
-                if line.strip()][-3:]
-        return None, f"build.sh helper exit {built['rc']} (expired {built['expired']}): {tail}"
-    return helper, None
+def mutant_helper(name):
+    """(helper path, None) or (None, reason): `HELPER_MUTANTS[name]` built on the mutant tree."""
+    file, anchor, replacement, _ = HELPER_MUTANTS[name]
+    helper, detail = agent_helper_build.mutant(name, [(file, anchor, replacement)],
+                                               os.path.join(WORK, name, "framejob-agent"))
+    if helper is None:
+        return None, detail
+    print(f"helper: {detail}", flush=True)
+    return str(helper), None
 
 
 def unknown_as_zero_sources():
@@ -826,8 +793,7 @@ def unknown_as_zero_sources():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--mutant", choices=["stale-refresh", "unknown-as-zero",
-                                             *HELPER_MUTANTS],
+    parser.add_argument("--mutant", choices=["unknown-as-zero", *HELPER_MUTANTS],
                         help="a made-to-fail variant; its named row must FAIL (exit 1)")
     args = parser.parse_args()
     os.makedirs(WORK, exist_ok=True)
@@ -862,26 +828,17 @@ def main():
             fake = asp.Fake(os.path.join(WORK, "fake"))
             feed = Feed()
             ctx = {}
-            if args.mutant == "stale-refresh":
-                helper, why = stale_helper()
+            if args.mutant in HELPER_MUTANTS:
+                helper, why = mutant_helper(args.mutant)
                 if helper is None:
-                    score("H3", False, f"the mutant did not build: {why}", instrument=True)
-                    print(f"mutant {args.mutant}: the control could not be performed — "
-                          f"the mutant did not build: {why}", flush=True)
-                    return 2
-                for row_id, function in H_ROWS[1:3]:
-                    guarded(row_id, lambda f=function: (lambda ok, d: (
-                        ok, "(REFRESH_AFTER_MS = 0) " + d))(*f(helper, fake, feed, ctx)))
-            elif args.mutant in HELPER_MUTANTS:
-                helper, why = cut_helper(args.mutant)
-                if helper is None:
-                    for row_id in HELPER_MUTANTS[args.mutant][2]:
+                    for row_id in HELPER_MUTANTS[args.mutant][3]:
                         score(row_id, False, f"the mutant did not build: {why}",
                               instrument=True)
                     print(f"mutant {args.mutant}: the control could not be performed — "
                           f"the mutant did not build: {why}", flush=True)
                     return 2
-                for row_id, function in CUT_ROWS:
+                rows = H_ROWS[1:3] if args.mutant == "stale-refresh" else CUT_ROWS
+                for row_id, function in rows:
                     guarded(row_id, lambda f=function: (lambda ok, d: (
                         ok, f"({args.mutant}) " + d))(*f(helper, fake, feed, ctx)))
             else:

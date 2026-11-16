@@ -89,12 +89,13 @@ Frame Job beeps and gives the reason at the foot of the inspector:
 | A file is missing or can't be read | [Relink it](/projects/relink-media/), then choose the command again. |
 | The analysis of a file failed | The message names the file and the reason. Nothing is split. |
 | The analysis is no longer in the project's cache | Choose the command again, and Frame Job reads the file again. |
+| A cut would leave a piece too short for a [transition](/motion/transitions/), the transition covering more than half of it | Nothing is split, and the message names the two clips. Shorten that transition, then choose the command again. |
 
 ## With an agent
 
 `split_at_shots` works on the clips it's given, and lists any it can't cut under `skipped`. Without a list, it takes every clip of a video file on an unlocked track, so a clip on a locked track is cut only when it's named. It shows no sheet. It waits up to 60 seconds for the cuts, and if they aren't ready it stops without splitting and keeps what it has saved so far, so calling it again carries on.
 
-With no cut inside any clip, it reports that no clips were added and leaves no undo step. See [Tools: cutting and deleting](/mcp/tools-cut-and-delete/#split_at_shots).
+With no cut inside any clip, it reports that no clips were added and leaves no undo step. If one cut would leave a piece too short for a transition, it splits nothing and says why. See [Tools: cutting and deleting](/mcp/tools-cut-and-delete/#split_at_shots).
 
 [`get_media_analysis`](/mcp/tools-analysis/#get_media_analysis), with the kind `shots`, reads a file's cuts without splitting anything. See [Tools: reading analysis](/mcp/tools-analysis/).
 

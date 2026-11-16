@@ -133,10 +133,11 @@ enum AnalysisFrames {
 
     /// Reads every kept frame of `range` (index, pts in ticks, picture),
     /// preceded by the pre-roll's frames (indices below the range), in
-    /// presentation order. False when `cancelled()` stopped it.
+    /// presentation order. False when `cancelled()` stopped it. The picture
+    /// is made only when the callback asks for it (#437).
     static func read(
         range: ClosedRange<Int>, grid: AnalysisGrid, source: Source, longSide: Int,
-        cancelled: () -> Bool, frame: (Int, Int64, AnalysisPicture) throws -> Void
+        cancelled: () -> Bool, frame: (Int, Int64, LazyAnalysisPicture) throws -> Void
     ) throws -> Bool {
         let first = range.lowerBound
         let firstTick = grid.ticks(of: first)
@@ -177,7 +178,7 @@ enum AnalysisFrames {
     /// whether to go on. False when `cancelled()` stopped it.
     private static func decode(
         _ source: Source, longSide: Int, from: Ticks, to: Ticks, cancelled: () -> Bool,
-        each: (Int64, AnalysisPicture) throws -> Bool
+        each: (Int64, LazyAnalysisPicture) throws -> Bool
     ) throws -> Bool {
         let range = CMTimeRange(
             start: CMTime(value: from, timescale: 600_000),
@@ -198,7 +199,7 @@ enum AnalysisFrames {
 
     private static func decodeDirect(
         _ source: Source, longSide: Int, range: CMTimeRange, cancelled: () -> Bool,
-        each: (Int64, AnalysisPicture) throws -> Bool
+        each: (Int64, LazyAnalysisPicture) throws -> Bool
     ) throws -> Bool {
         let asset = AVURLAsset(
             url: source.url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
@@ -225,13 +226,20 @@ enum AnalysisFrames {
         reader.add(output)
         var upright = Upright(transform: transform)
         return try pump(reader, output, cancelled: cancelled) { pts, buffer in
-            try upright.picture(of: buffer) { try each(pts, $0) }
+            try each(
+                pts,
+                LazyAnalysisPicture { body in
+                    _ = try upright.picture(of: buffer) {
+                        try body($0)
+                        return true
+                    }
+                })
         }
     }
 
     private static func decodeConverted(
         _ source: Source, input: ThumbnailInput, longSide: Int, range: CMTimeRange,
-        cancelled: () -> Bool, each: (Int64, AnalysisPicture) throws -> Bool
+        cancelled: () -> Bool, each: (Int64, LazyAnalysisPicture) throws -> Bool
     ) throws -> Bool {
         let key = RecipeSource.shared.register()
         defer { RecipeSource.shared.unregister(key) }
@@ -261,7 +269,14 @@ enum AnalysisFrames {
         reader.add(output)
         var scratch: [UInt8] = []
         return try pump(reader, output, cancelled: cancelled) { pts, buffer in
-            try halfToBGRA(buffer, into: &scratch) { try each(pts, $0) }
+            try each(
+                pts,
+                LazyAnalysisPicture { body in
+                    _ = try halfToBGRA(buffer, into: &scratch) {
+                        try body($0)
+                        return true
+                    }
+                })
         }
     }
 
@@ -308,102 +323,5 @@ enum AnalysisFrames {
         var transform = CGAffineTransform.identity
         value.getValue(&transform, size: MemoryLayout<CGAffineTransform>.size)
         return transform
-    }
-
-    /// A half-float RGBA buffer rounded to 8-bit BGRA in `scratch`.
-    static func halfToBGRA(
-        _ buffer: CVPixelBuffer, into scratch: inout [UInt8], _ body: (AnalysisPicture) throws -> Bool
-    ) throws -> Bool {
-        CVPixelBufferLockBaseAddress(buffer, .readOnly)
-        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
-        guard let base = CVPixelBufferGetBaseAddress(buffer) else { return true }
-        let width = CVPixelBufferGetWidth(buffer)
-        let height = CVPixelBufferGetHeight(buffer)
-        let row = CVPixelBufferGetBytesPerRow(buffer)
-        if scratch.count != width * height * 4 { scratch = [UInt8](repeating: 0, count: width * height * 4) }
-        func byte(_ v: Float16) -> UInt8 { UInt8((min(max(Float(v), 0), 1) * 255).rounded()) }
-        scratch.withUnsafeMutableBufferPointer { out in
-            for y in 0..<height {
-                let src = (base + y * row).assumingMemoryBound(to: Float16.self)
-                for x in 0..<width {
-                    let o = (y * width + x) * 4
-                    out[o] = byte(src[x * 4 + 2])
-                    out[o + 1] = byte(src[x * 4 + 1])
-                    out[o + 2] = byte(src[x * 4])
-                    out[o + 3] = 255
-                }
-            }
-        }
-        return try scratch.withUnsafeBufferPointer { pointer in
-            try body(
-                AnalysisPicture(
-                    width: width, height: height, bytesPerRow: width * 4,
-                    bytes: pointer.baseAddress!))
-        }
-    }
-
-    /// The direct reader's turn upright: the transform's quarter turns and
-    /// mirror (`orientationCode` classifies nothing else), each display pixel
-    /// read from the natural pixel under its centre. Identity is no copy.
-    struct Upright {
-        let a: Int, b: Int, c: Int, d: Int
-        var scratch: [UInt8] = []
-
-        init(transform t: CGAffineTransform) {
-            func unit(_ v: CGFloat) -> Int { v > 0.5 ? 1 : (v < -0.5 ? -1 : 0) }
-            a = unit(t.a)
-            b = unit(t.b)
-            c = unit(t.c)
-            d = unit(t.d)
-        }
-
-        var isIdentity: Bool { a == 1 && b == 0 && c == 0 && d == 1 }
-
-        mutating func picture(
-            of buffer: CVPixelBuffer, _ body: (AnalysisPicture) throws -> Bool
-        ) throws -> Bool {
-            CVPixelBufferLockBaseAddress(buffer, .readOnly)
-            defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
-            guard let base = CVPixelBufferGetBaseAddress(buffer) else { return true }
-            let w = CVPixelBufferGetWidth(buffer)
-            let h = CVPixelBufferGetHeight(buffer)
-            let row = CVPixelBufferGetBytesPerRow(buffer)
-            let source = base.assumingMemoryBound(to: UInt8.self)
-            guard !isIdentity, a * d - b * c != 0 else {
-                return try body(
-                    AnalysisPicture(width: w, height: h, bytesPerRow: row, bytes: source))
-            }
-            // The natural rect's corners through the rotation; the display
-            // origin is their minimum.
-            let xs = [0, a * w, c * h, a * w + c * h]
-            let ys = [0, b * w, d * h, b * w + d * h]
-            let minX = xs.min()!, minY = ys.min()!
-            let dw = xs.max()! - minX
-            let dh = ys.max()! - minY
-            if scratch.count != dw * dh * 4 { scratch = [UInt8](repeating: 0, count: dw * dh * 4) }
-            let (a, b, c, d) = (a, b, c, d)
-            scratch.withUnsafeMutableBufferPointer { out in
-                for y in 0..<dh {
-                    for x in 0..<dw {
-                        // Twice the centre, so the inverse (the transpose) stays integral.
-                        let u = 2 * (x + minX) + 1
-                        let v = 2 * (y + minY) + 1
-                        let nx = min(w - 1, max(0, (a * u + b * v - 1) / 2))
-                        let ny = min(h - 1, max(0, (c * u + d * v - 1) / 2))
-                        let s = source + ny * row + nx * 4
-                        let o = (y * dw + x) * 4
-                        out[o] = s[0]
-                        out[o + 1] = s[1]
-                        out[o + 2] = s[2]
-                        out[o + 3] = s[3]
-                    }
-                }
-            }
-            return try scratch.withUnsafeBufferPointer { pointer in
-                try body(
-                    AnalysisPicture(
-                        width: dw, height: dh, bytesPerRow: dw * 4, bytes: pointer.baseAddress!))
-            }
-        }
     }
 }

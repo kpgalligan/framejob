@@ -541,10 +541,15 @@ extension ReelOp {
 
     /// The same cut without the close: ⌫ with a range and nothing
     /// selected. Every clip after the range keeps the moment it had.
-    static func liftRange(from: Ticks, to: Ticks) -> ReelOp {
+    /// `tracks` holds it to those tracks (spec §11 #602, Switch by
+    /// Speaker's Replace the shots on): nil leaves the key out, which is
+    /// every unlocked track, and an empty list is SENT, because dropping it
+    /// would turn "no track" into "every track".
+    static func liftRange(from: Ticks, to: Ticks, tracks: [UInt32]? = nil) -> ReelOp {
         var a = OpArgs()
         a.put("from", from)
         a.put("to", to)
+        a.put("tracks", tracks)
         return ReelOp(name: "lift_range", args: a.values)
     }
 

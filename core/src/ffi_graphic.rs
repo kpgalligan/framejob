@@ -328,6 +328,65 @@ pub unsafe extern "C" fn rc_graphic_rasterize(
     }
 }
 
+/// `rc_graphic_rasterize` at 16 bits a channel (spec §11 PR-15), for a
+/// frame delivered deeper than 8 bits: draws `svg` into `out_rgba16`, `w`×`h`
+/// premultiplied RGBA rows of native-endian 16-bit values with 65,535 as 1,
+/// `stride` VALUES apart, the values past `w × 4` in a row untouched. A
+/// gradient keeps its levels and takes no dither. False with one error
+/// Diagnostic through `diag_out` on failure, and nothing written; on success
+/// `diag_out` is written only when there are warnings.
+///
+/// # Safety
+/// `lib` must be NULL or a live library handle; `svg` must be NULL or a
+/// valid NUL-terminated C string; `out_rgba16` must be NULL or point to
+/// `h × stride` writable, aligned 16-bit values; `diag_out` must be NULL or
+/// a valid pointer to writable `*mut c_char`, freed with `rc_string_free`.
+#[no_mangle]
+pub unsafe extern "C" fn rc_graphic_rasterize_deep(
+    lib: *const RcGraphicLibrary,
+    svg: *const c_char,
+    w: u32,
+    h: u32,
+    out_rgba16: *mut u16,
+    stride: usize,
+    diag_out: *mut *mut c_char,
+) -> bool {
+    let body = || {
+        if lib.is_null() {
+            return Err(diag_error("library is NULL".to_string()));
+        }
+        let svg = unsafe { read_cstr(svg, "svg") }.map_err(diag_error)?;
+        if out_rgba16.is_null() {
+            return Err(diag_error("out_rgba16 is NULL".to_string()));
+        }
+        if !(out_rgba16 as usize).is_multiple_of(std::mem::align_of::<u16>()) {
+            return Err(diag_error("out_rgba16 is not aligned".to_string()));
+        }
+        let len = (h as usize)
+            .checked_mul(stride)
+            .filter(|&n| n <= isize::MAX as usize / 2)
+            .ok_or_else(|| diag_error("height × stride overflows".to_string()))?;
+        let out = unsafe { slice::from_raw_parts_mut(out_rgba16, len) };
+        let library = frozen(unsafe { &*lib });
+        graphic::rasterize_deep(&library, &svg, w, h, out, stride).map_err(|d| diag_json(&[d]))
+    };
+    unsafe {
+        fallible_op_wrapped(
+            diag_out,
+            "rasterizing a graphic",
+            false,
+            body,
+            |warnings| {
+                if !warnings.is_empty() {
+                    set_message(diag_out, &diag_json(&warnings));
+                }
+                true
+            },
+            diag_error,
+        )
+    }
+}
+
 /// Releases a graphic handle. NULL-tolerant.
 ///
 /// # Safety

@@ -27,6 +27,7 @@ A few arguments read differently from what their kind suggests:
 | Every boolean | May also be sent as the string `"true"`, `"1"`, `"false"` or `"0"`. |
 | `text` on `add_text_clip`, `shape` on `add_shape_clip` | May be a plain string: the words, or the kind of shape. |
 | `kind` on `set_transition`, `region` on `add_zoom_action` | Must be sent even when null, because null means something: no transition, or zoom back out. |
+| `compressor`, `limiter` on `set_track` | May be null, which turns it off. Left out, it keeps what's there. |
 | `rate` on `set_speed` and `add_speed_ramp` | Published as ×0.1 to ×1000. A rate outside that is brought into range, with no error. Zero or less stops the call. |
 | `fps` on `set_canvas` | Each of its two numbers must be at least 1. |
 | `clips` on every tool but `set_selection`, `groups` on `paste_attributes`, `ranges` on `ripple_delete_ranges` and `copy_pieces` | Can't be empty: the call stops and names the argument. On `set_selection`, an empty `clips` selects nothing. |

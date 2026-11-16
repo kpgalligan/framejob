@@ -1,6 +1,6 @@
-// Road map "creator-jobs" CJ3 — rows P1–P5 of `faces_proof.py`, driven through
-// the app's own `AnalysisFaces`, `AnalysisStore.publishFile`, `AnalysisStamp`
-// and `AgentServer.facesAnswer`.
+// Road map "creator-jobs" CJ3 — rows P1–P7 of `faces_proof.py`, driven through
+// the app's own `AnalysisFaces`, `AnalysisStore.publishFile`, `AnalysisStamp`,
+// `AgentServer.facesAnswer`, `AnalysisFrames.read` and `AnalysisSampleJob`.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, with `-D FRAMEJOB_DEV_TOOLS`, module `FrameJob`, against
@@ -8,8 +8,9 @@
 //
 //   faces_probe <request.json>
 //
-// The request names `fixture` (a movie: P4's stamp, P5's clip) and `work` (a
-// scratch folder this run owns). The answer is one JSON object on stdout,
+// The request names `fixture` (a movie: P4's stamp, P5's clip, P6's job),
+// `rotated` (P7's rotation-tagged movie) and `work` (a scratch folder this run
+// owns). The answer is one JSON object on stdout,
 // `{"rows": [{"id", "pass", "detail"}], "row_bytes": {…}}`.
 import AppKit
 
@@ -23,7 +24,8 @@ let arguments = CommandLine.arguments
 guard arguments.count == 2,
     let data = try? Data(contentsOf: URL(fileURLWithPath: arguments[1])),
     let request = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-    let fixturePath = request["fixture"] as? String, let workPath = request["work"] as? String
+    let fixturePath = request["fixture"] as? String, let workPath = request["work"] as? String,
+    let rotatedPath = request["rotated"] as? String
 else {
     FileHandle.standardError.write(Data("usage: faces_probe <request.json>\n".utf8))
     exit(2)
@@ -295,6 +297,99 @@ do {
             + "and to that to answers \(answered): \(refused.prefix(160))")
 } catch {
     row("P5", false, "threw \(error)")
+}
+
+// MARK: - P6 a cancelled faces job keeps the samples decided (#435)
+
+if let (_, media, _) = made {
+    func request(_ dir: URL) -> AnalysisRequest? {
+        AnalysisStamp.make(kind: .faces, media: media, url: fixtureURL, input: nil, fullRange: false)
+            .map {
+                AnalysisRequest(
+                    kind: .faces, cacheDir: dir, media: media, url: fixtureURL, stamp: $0,
+                    input: nil, ranges: [0...99])
+            }
+    }
+    let wholeDir = folder("p6-whole"), cutDir = folder("p6-cancelled")
+    var halfway = false
+    var whole: Bool?, cut: Bool?, thrown: String?
+    do {
+        if let a = request(wholeDir) {
+            whole = try AnalysisFaces.run(a, cancelled: { false }, progress: { _ in })
+        }
+        if let b = request(cutDir) {
+            cut = try AnalysisFaces.run(
+                b, cancelled: { halfway }, progress: { if $0 >= 0.5 { halfway = true } })
+        }
+    } catch {
+        thrown = error.localizedDescription
+    }
+    func samples(_ dir: URL) -> [Sample]? {
+        AnalysisStore.readPayload(.faces, media: media.id, file: AnalysisFaces.payloadName, in: dir)
+            .flatMap { AnalysisFaces.decode($0)?.samples }
+    }
+    let coverage = AnalysisStore.readMarker(.faces, media: media.id, in: cutDir)?.coverage ?? []
+    var k = -1
+    if coverage.count == 1, coverage[0].count == 2, coverage[0][0] == 0 { k = coverage[0][1] }
+    var equal = false
+    if k >= 0, let w = samples(wholeDir), let c = samples(cutDir), w.count > k, c.count > k {
+        equal = AnalysisFaces.encode(Array(w[0...k])) == AnalysisFaces.encode(Array(c[0...k]))
+    }
+    row("P6", thrown == nil && whole == true && cut == false && k >= 0 && k < 99 && equal,
+        "samples 0…99: the whole run answered \(String(describing: whole)); cancelled at half "
+            + "\(String(describing: cut)) (want false), coverage \(coverage) (want one range "
+            + "[0, k], k < 99); samples 0…\(k) "
+            + "\(equal ? "byte-equal to the whole run's" : "DIFFER or are missing")"
+            + (thrown.map { "; threw \($0)" } ?? ""))
+} else {
+    row("P6", false, "the fixture \(fixturePath) did not probe")
+}
+
+// MARK: - P7 a rotated media's picture turned upright only when asked (#437)
+
+let rotatedURL = URL(fileURLWithPath: rotatedPath)
+if let descriptor = try? MediaImporter.probeBlocking(url: rotatedURL),
+    let blank = ReelProject.new(width: 1080, height: 1920, fps: Fps(num: 30, den: 1)),
+    let project = (try? blank.applying(.addMedia(descriptor: descriptor)))?.project,
+    let media = project.snapshot.media.last
+{
+    do {
+        let frames = AnalysisGrid(media: media)
+        let source = AnalysisFrames.Source(media: media, url: rotatedURL, input: nil)
+        let before = AnalysisFrames.uprightsMade()
+        var delivered = 0
+        _ = try AnalysisFrames.read(
+            range: 0...min(149, frames.lastIndex), grid: frames, source: source, longSide: 720,
+            cancelled: { false }
+        ) { _, _, _ in delivered += 1 }
+        let unasked = AnalysisFrames.uprightsMade() - before
+        let request = AnalysisRequest(
+            kind: .faces, cacheDir: folder("p7"), media: media, url: rotatedURL, stamp: base,
+            input: nil, ranges: [0...49])
+        var seen = 0
+        var sizes: [[Int]] = []
+        let start = AnalysisFrames.uprightsMade()
+        _ = try AnalysisSampleJob.run(
+            request, grid: AnalysisKind.faces.grid(of: media), longSide: 720, publishInterval: 30,
+            cancelled: { false }, progress: { _ in seen += 1 },
+            analyse: { picture -> Int in
+                sizes.append([picture.width, picture.height])
+                return sizes.count
+            }, publish: { _, _ in })
+        let turned = AnalysisFrames.uprightsMade() - start
+        let want = AnalysisFrames.size(of: media, longSide: 720)
+        let wrong = sizes.filter { $0 != [want.width, want.height] }
+        row("P7", delivered > 0 && unasked == 0 && !sizes.isEmpty && turned == sizes.count
+                && sizes.count < seen && wrong.isEmpty && want.height > want.width,
+            "(a) read over 0…149 never asking: \(delivered) frames delivered, Upright ran "
+                + "\(unasked) times (want 0); (b) the sample job over samples 0…49: \(seen) frames, "
+                + "\(sizes.count) analysed, Upright ran \(turned) times (want \(sizes.count)); every "
+                + "picture \(want.width) × \(want.height): \(wrong.isEmpty ? "yes" : "NO, \(wrong.prefix(3))")")
+    } catch {
+        row("P7", false, "threw \(error.localizedDescription)")
+    }
+} else {
+    row("P7", false, "the rotated fixture \(rotatedPath) did not probe")
 }
 
 let out = try JSONSerialization.data(withJSONObject: ["rows": rows].merging(extra) { a, _ in a })

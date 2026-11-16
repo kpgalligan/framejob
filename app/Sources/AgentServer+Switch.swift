@@ -78,6 +78,9 @@ extension AgentServer {
         let track: UInt32?
         let asked: ReelProject
         let scope: UInt32?
+        /// `mute_cameras` and `apply`, read with the other arguments before any planning (#457).
+        let mute: Bool?
+        let apply: Bool
     }
 
     /// SW-26 (c) as SW-86 amends it: on the server thread (`creatorOffMainTools`), the container
@@ -104,7 +107,7 @@ extension AgentServer {
                 throw ToolError(message: error.localizedDescription)
             }
             guard wants.isEmpty else { return (call, wants, nil) }
-            return (call, wants, try finishSpeakerSwitch(a, call, input))
+            return (call, wants, try finishSpeakerSwitch(call, input))
         }
         if let answer { return answer }
         try waitForFaces(wants, document: call.document, stop: stop)
@@ -114,7 +117,7 @@ extension AgentServer {
                     message: "the project changed while \(SpeakerSwitch.actionName) was "
                         + "analyzing, so nothing was switched. Call switch_by_speaker again.")
             }
-            return try finishSpeakerSwitch(a, call, try speakerInput(call))
+            return try finishSpeakerSwitch(call, try speakerInput(call))
         }
     }
 
@@ -123,6 +126,8 @@ extension AgentServer {
     private func speakerCall(_ a: [String: Any]) throws -> SpeakerCall {
         let document = try target(a)
         var settings = try speakerSettings(a)
+        let mute = try boolArg(a, "mute_cameras")
+        let apply = try boolArg(a, "apply") ?? true
         let fps = document.editedProject.snapshot.canvas.fps
         let from = try intArg(a, "from").map { ReelTime.snapToFrame(Ticks($0), fps: fps) }
         let to = try intArg(a, "to").map { ReelTime.snapToFrame(Ticks($0), fps: fps) }
@@ -200,7 +205,7 @@ extension AgentServer {
         let range = from.flatMap { f in to.map { (from: f, to: $0) } }
         return SpeakerCall(
             document: document, settings: settings, pairing: pairing, range: range, track: track,
-            asked: document.project, scope: document.scope)
+            asked: document.project, scope: document.scope, mute: mute, apply: apply)
     }
 
     private func speakerInput(_ call: SpeakerCall) throws -> SpeakerSwitch.Input {
@@ -218,9 +223,9 @@ extension AgentServer {
 
     /// SW2b's sequence over `input`, main thread: Replace's track, `plan`, `edit`, then the edit
     /// unless `apply` is false, and the answer with SW-86's `mode` and, in the faces mode, `note`.
-    private func finishSpeakerSwitch(
-        _ a: [String: Any], _ call: SpeakerCall, _ input: SpeakerSwitch.Input
-    ) throws -> String {
+    private func finishSpeakerSwitch(_ call: SpeakerCall, _ input: SpeakerSwitch.Input) throws
+        -> String
+    {
         let document = call.document
         let track = call.track
         let snapshot = document.editedProject.snapshot
@@ -237,7 +242,7 @@ extension AgentServer {
             }
             throw ToolError(message: refused + "nothing was planned.")
         }
-        let mute = try boolArg(a, "mute_cameras") ?? SpeakerSwitch.muteDefault(input)
+        let mute = call.mute ?? SpeakerSwitch.muteDefault(input)
         let answer: SpeakerSwitch.EditAnswer
         do {
             answer = try SpeakerSwitch.edit(
@@ -256,7 +261,7 @@ extension AgentServer {
             edit = made
         }
 
-        let apply = try boolArg(a, "apply") ?? true
+        let apply = call.apply
         if apply {
             try performGroupedEdit(document, SpeakerSwitch.actionName, edit.ops)
             document.selection = edit.selection

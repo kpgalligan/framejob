@@ -74,6 +74,9 @@ extension FillerSheetController {
             line.orientation = .horizontal
             line.alignment = .centerY
             line.spacing = 12
+            // The row is as wide as its text and button: without it the row's
+            // and `rowsStack`'s widths are ambiguous inside the section (#430).
+            line.setHuggingPriority(.defaultHigh, for: .horizontal)
             rowsStack.addArrangedSubview(line)
             mediaRows.append(MediaRow(media: media, name: name, estimate: estimate, button: button))
         }

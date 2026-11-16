@@ -525,6 +525,8 @@ impl PixmapMut<'_> {
         let pixmap_src = PixmapRef::from_bytes(&[0, 0, 0, 0], 1, 1).unwrap();
 
         let mut p = RasterPipelineBuilder::new();
+        // Frame Job (spec §11 PR-15): a deep pixmap is masked in highp, which reads and writes both planes.
+        p.set_force_hq_pipeline(self.lo.is_some());
         p.push(pipeline::Stage::LoadMaskU8);
         p.push(pipeline::Stage::LoadDestination);
         p.push(pipeline::Stage::DestinationIn);

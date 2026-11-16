@@ -21,7 +21,7 @@ import CoreText
 enum GraphicSheetBackground {
     case transparent, checker, color(CGColor)
 
-    static let accepted = "transparent, checker, or a hex colour (#rgb, #rrggbb, #rrggbbaa)"
+    static let accepted = "transparent, checker, or a hex color (#rgb, #rrggbb, #rrggbbaa)"
 
     /// `transparent`, `checker`, or `#rgb` / `#rrggbb` / `#rrggbbaa`, in any
     /// case; nil for anything else.

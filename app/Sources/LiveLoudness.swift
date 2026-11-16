@@ -27,6 +27,13 @@ import Foundation
 /// a track that has not moved yet drops its old stream until it does
 /// (`LiveLoudness+Sum.swift`'s `admit`).
 ///
+/// **The player's filler is a mark** (AU-161). While paused, and at a
+/// seek's frame, the player hands each tap silent buffers with no duration;
+/// the tap writes one as its frame and length, no samples. A mark moves or
+/// continues its track as the silence did, and is summed nowhere: after a
+/// seek the measurement begins at the first audio. After a stop, audio that
+/// continues its track's stream is a resume however far the sum is behind.
+///
 /// The lane and the sum are `LiveLoudness+Sum.swift`, under the 400-line rule.
 ///
 /// MAIN THREAD ONLY: `Playback`'s meter timer is its one caller, so, like
@@ -114,12 +121,15 @@ final class LiveLoudness {
             drained.append((lane, got.chunks))
         }
         if playRate == 0 {
-            stop()
+            stop(holding: drained)
             return
         }
         // AU-72: measured only at ×1; at any other rate the chunks are discarded.
         guard playRate == 1 else {
-            for item in drained { item.lane.stream = item.chunks.last?.end ?? item.lane.stream }
+            for item in drained {
+                item.lane.stream = item.chunks.last?.streamEnd ?? item.lane.stream
+                item.lane.resuming = false
+            }
             dropPending()
             bars = nil
             lastAdvance = nil
@@ -156,6 +166,7 @@ final class LiveLoudness {
             lane.pending = []
             lane.end = nil
             lane.awaiting = nil
+            lane.resuming = false
             if reason == .overrun { lane.stream = nil }
         }
         reached = nil
@@ -178,10 +189,27 @@ final class LiveLoudness {
     /// Rate 0: what the rings still hold was rendered ahead and never heard,
     /// so it is dropped; frames already summed stay measured, though the
     /// player renders ahead of the playhead (AU-72). M, S, I and TP hold
-    /// their last ×1 values.
-    func stop() {
+    /// their last ×1 values. A stop that ends a measured play leaves each
+    /// track RESUMING (AU-161); one after another rate, or a second one,
+    /// changes nothing, since that stream ran on unmeasured. What a stop
+    /// drops moves a track's stream only where it continues it: a chunk
+    /// that does not (a seek's mark, made while paused or just before the
+    /// stop) is another position, so the audio after it is a move and is
+    /// asked the reset rule. `drained` is what a tick already took from the
+    /// rings.
+    func stop(holding drained: [(lane: LiveLoudnessLane, chunks: [MixChunk])] = []) {
+        let measured = lastAdvance != nil
+        var held: [ObjectIdentifier: [MixChunk]] = [:]
+        for item in drained { held[ObjectIdentifier(item.lane), default: []] += item.chunks }
         for lane in lanes.values {
-            lane.stream = lane.track.sink.ring.drain().chunks.last?.end ?? lane.stream
+            let chunks = (held[ObjectIdentifier(lane)] ?? []) + lane.track.sink.ring.drain().chunks
+            for chunk in chunks {
+                if let stream = lane.stream, let rate, !continues(chunk.start, after: stream, rate: rate) {
+                    continue
+                }
+                lane.stream = chunk.streamEnd
+            }
+            lane.resuming = measured || lane.resuming
         }
         dropPending()
         bars = nil

@@ -272,21 +272,37 @@ fn seed_shader(p: &mut Pipeline) {
 }
 
 pub fn load_dst(p: &mut Pipeline) {
+    if p.pixmap_dst.lo.is_some() {
+        load_dst_deep(p, STAGE_WIDTH);
+        return p.next_stage();
+    }
     load_8888(p.pixmap_dst.slice4_at_xy(p.dx, p.dy), &mut p.dr, &mut p.dg, &mut p.db, &mut p.da);
     p.next_stage();
 }
 
 pub fn load_dst_tail(p: &mut Pipeline) {
+    if p.pixmap_dst.lo.is_some() {
+        load_dst_deep(p, p.tail);
+        return p.next_stage();
+    }
     load_8888_tail(p.tail, p.pixmap_dst.slice_at_xy(p.dx, p.dy), &mut p.dr, &mut p.dg, &mut p.db, &mut p.da);
     p.next_stage();
 }
 
 pub fn store(p: &mut Pipeline) {
+    if p.pixmap_dst.lo.is_some() {
+        store_deep(p, STAGE_WIDTH);
+        return p.next_stage();
+    }
     store_8888(&p.r, &p.g, &p.b, &p.a, p.pixmap_dst.slice4_at_xy(p.dx, p.dy));
     p.next_stage();
 }
 
 pub fn store_tail(p: &mut Pipeline) {
+    if p.pixmap_dst.lo.is_some() {
+        store_deep(p, p.tail);
+        return p.next_stage();
+    }
     store_8888_tail(&p.r, &p.g, &p.b, &p.a, p.tail, p.pixmap_dst.slice_at_xy(p.dx, p.dy));
     p.next_stage();
 }
@@ -310,6 +326,10 @@ pub fn store_u8_tail(_: &mut Pipeline) {
 
 pub fn gather(p: &mut Pipeline) {
     let ix = gather_ix(p.pixmap_src, p.r, p.g);
+    if let Some(lo) = p.pixmap_src.lo {
+        load_deep(&p.pixmap_src.gather(ix), &PixmapRef::gather_lo(lo, ix), &mut p.r, &mut p.g, &mut p.b, &mut p.a);
+        return p.next_stage();
+    }
     load_8888(&p.pixmap_src.gather(ix), &mut p.r, &mut p.g, &mut p.b, &mut p.a);
 
     p.next_stage();
@@ -332,8 +352,19 @@ fn ulp_sub(v: f32) -> f32 {
     bytemuck::cast::<u32, f32>(bytemuck::cast::<f32, u32>(v) - 1)
 }
 
-fn load_mask_u8(_: &mut Pipeline) {
-    // unreachable
+fn load_mask_u8(p: &mut Pipeline) {
+    // Frame Job (spec §11 PR-15): upstream leaves this to lowp; a deep pixmap's `apply_mask` runs highp.
+    let offset = p.mask_ctx.offset(p.dx, p.dy);
+    let mut c = [0.0; 8];
+    for i in 0..p.tail {
+        c[i] = p.mask_ctx.data[offset + i] as f32;
+    }
+    p.r = f32x8::default();
+    p.g = f32x8::default();
+    p.b = f32x8::default();
+    p.a = f32x8::from(c) / f32x8::splat(255.0);
+
+    p.next_stage();
 }
 
 fn mask_u8(p: &mut Pipeline) {
@@ -668,7 +699,20 @@ fn clip_color(r: &mut f32x8, g: &mut f32x8, b: &mut f32x8, a: f32x8) {
     *b = clip(*b);
 }
 
+fn source_over_rgba_deep(p: &mut Pipeline, n: usize) {
+    load_dst_deep(p, n);
+    p.r = mad(p.dr, inv(p.a), p.r);
+    p.g = mad(p.dg, inv(p.a), p.g);
+    p.b = mad(p.db, inv(p.a), p.b);
+    p.a = mad(p.da, inv(p.a), p.a);
+    store_deep(p, n);
+    p.next_stage();
+}
+
 pub fn source_over_rgba(p: &mut Pipeline) {
+    if p.pixmap_dst.lo.is_some() {
+        return source_over_rgba_deep(p, STAGE_WIDTH);
+    }
     let pixels = p.pixmap_dst.slice4_at_xy(p.dx, p.dy);
     load_8888(pixels, &mut p.dr, &mut p.dg, &mut p.db, &mut p.da);
     p.r = mad(p.dr, inv(p.a), p.r);
@@ -681,6 +725,9 @@ pub fn source_over_rgba(p: &mut Pipeline) {
 }
 
 pub fn source_over_rgba_tail(p: &mut Pipeline) {
+    if p.pixmap_dst.lo.is_some() {
+        return source_over_rgba_deep(p, p.tail);
+    }
     let pixels = p.pixmap_dst.slice_at_xy(p.dx, p.dy);
     load_8888_tail(p.tail, pixels, &mut p.dr, &mut p.dg, &mut p.db, &mut p.da);
     p.r = mad(p.dr, inv(p.a), p.r);
@@ -881,6 +928,9 @@ fn sample(
     y = tile(y, ctx.spread_mode, pixmap.height() as f32, ctx.inv_height);
 
     let ix = gather_ix(pixmap, x, y);
+    if let Some(lo) = pixmap.lo {
+        return load_deep(&pixmap.gather(ix), &PixmapRef::gather_lo(lo, ix), r, g, b, a);
+    }
     load_8888(&pixmap.gather(ix), r, g, b, a);
 }
 
@@ -1242,6 +1292,13 @@ fn dither_hash(mut x: u32) -> u32 {
     x
 }
 
+// Frame Job (spec §11 PR-15): PR-13's offset for the pixel at `(x, y)` in 1/256 levels (under ±112),
+// for a deep pixmap read at 8 bits (`pixmap::collapse`). The same hash and span as `dither`.
+pub(crate) fn dither_offset_256(x: u32, y: u32) -> i32 {
+    let h = dither_hash(dither_hash(y ^ DITHER_SEED) ^ x);
+    (((h >> 8) as f32 / 16_777_216.0 - 0.5) * DITHER_SPAN * 256.0) as i32
+}
+
 fn dither(p: &mut Pipeline) {
     let y = p.dy as u32;
     let row = dither_hash(y ^ DITHER_SEED);
@@ -1275,6 +1332,83 @@ fn cond_to_mask(cond: u32x8) -> u32x8 {
         if cond[6] != 0 { !0 } else { 0 },
         if cond[7] != 0 { !0 } else { 0 },
     ])
+}
+
+// Frame Job (spec §11 PR-15): the deep planes. A channel is `hi × 256 + (lo as i8)` in 1/256 levels,
+// 65280 = 1.
+const DEEP_ONE: f32 = 65280.0;
+
+#[inline(always)]
+fn load_deep(
+    hi: &[PremultipliedColorU8; STAGE_WIDTH], lo: &[[u8; 4]; STAGE_WIDTH],
+    r: &mut f32x8, g: &mut f32x8, b: &mut f32x8, a: &mut f32x8,
+) {
+    const FACTOR: f32 = 1.0 / DEEP_ONE;
+    let v = |h: u8, l: u8| (((h as i32) << 8) + (l as i8 as i32)) as f32 * FACTOR;
+    let rr: [f32; 8] = core::array::from_fn(|i| v(hi[i].red(), lo[i][0]));
+    let gg: [f32; 8] = core::array::from_fn(|i| v(hi[i].green(), lo[i][1]));
+    let bb: [f32; 8] = core::array::from_fn(|i| v(hi[i].blue(), lo[i][2]));
+    let aa: [f32; 8] = core::array::from_fn(|i| v(hi[i].alpha(), lo[i][3]));
+    *r = f32x8::from(rr);
+    *g = f32x8::from(gg);
+    *b = f32x8::from(bb);
+    *a = f32x8::from(aa);
+}
+
+#[inline(always)]
+fn load_dst_deep(p: &mut Pipeline, n: usize) {
+    let mut h = [PremultipliedColorU8::TRANSPARENT; STAGE_WIDTH];
+    let mut l = [[0u8; 4]; STAGE_WIDTH];
+    {
+        let (hi, lo) = p.pixmap_dst.deep_at_xy(p.dx, p.dy);
+        if n == STAGE_WIDTH {
+            // The full width reads fixed arrays, so no bound is checked per pixel.
+            let hi8: &[PremultipliedColorU8; STAGE_WIDTH] = arrayref::array_ref!(hi, 0, STAGE_WIDTH);
+            let lo8: &[u8; STAGE_WIDTH * 4] = arrayref::array_ref!(lo, 0, STAGE_WIDTH * 4);
+            let lo8: &[[u8; 4]; STAGE_WIDTH] = bytemuck::cast_ref(lo8);
+            return load_deep(hi8, lo8, &mut p.dr, &mut p.dg, &mut p.db, &mut p.da);
+        }
+        h[..n].copy_from_slice(&hi[..n]);
+        for i in 0..n {
+            l[i].copy_from_slice(&lo[i * 4..i * 4 + 4]);
+        }
+    }
+    load_deep(&h, &l, &mut p.dr, &mut p.dg, &mut p.db, &mut p.da);
+}
+
+#[inline(always)]
+fn store_deep(p: &mut Pipeline, n: usize) {
+    let conv = |v: &f32x8| -> [i32; 8] {
+        (v.max(f32x8::default()).min(f32x8::splat(1.0)) * f32x8::splat(DEEP_ONE)).round_int().into()
+    };
+    let (r, g, b, a) = (conv(&p.r), conv(&p.g), conv(&p.b), conv(&p.a));
+    let (hi, lo) = p.pixmap_dst.deep_at_xy(p.dx, p.dy);
+    #[inline(always)]
+    fn one(v: i32) -> (u8, u8) {
+        let h = (v + 128) >> 8;
+        (h as u8, (v - (h << 8)) as u8)
+    }
+    if n == STAGE_WIDTH {
+        let hi8: &mut [PremultipliedColorU8; STAGE_WIDTH] = arrayref::array_mut_ref!(hi, 0, STAGE_WIDTH);
+        let lo8: &mut [u8; STAGE_WIDTH * 4] = arrayref::array_mut_ref!(lo, 0, STAGE_WIDTH * 4);
+        for i in 0..STAGE_WIDTH {
+            let ((hr, lr), (hg, lg), (hb, lb), (ha, la)) = (one(r[i]), one(g[i]), one(b[i]), one(a[i]));
+            hi8[i] = PremultipliedColorU8::from_rgba_unchecked(hr, hg, hb, ha);
+            lo8[i * 4] = lr;
+            lo8[i * 4 + 1] = lg;
+            lo8[i * 4 + 2] = lb;
+            lo8[i * 4 + 3] = la;
+        }
+        return;
+    }
+    for i in 0..n {
+        let ((hr, lr), (hg, lg), (hb, lb), (ha, la)) = (one(r[i]), one(g[i]), one(b[i]), one(a[i]));
+        hi[i] = PremultipliedColorU8::from_rgba_unchecked(hr, hg, hb, ha);
+        lo[i * 4] = lr;
+        lo[i * 4 + 1] = lg;
+        lo[i * 4 + 2] = lb;
+        lo[i * 4 + 3] = la;
+    }
 }
 
 #[inline(always)]

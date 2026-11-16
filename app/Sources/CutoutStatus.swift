@@ -381,7 +381,8 @@ enum CutoutStatus {
     private static var stamps: [StampKey: StampEntry] = [:]
 
     /// The stamp of `kind` `ProjectDocument.analysisRequest` would make for `media` at `url`:
-    /// its asset read only when the media, its URL or its LUT's URL changed. Main thread.
+    /// its asset read only when the media, its URL or its LUT's URL changed; a nil stamp is never
+    /// memoised. Main thread.
     static func stamp(
         media: MediaSnapshot, url: URL, cacheDir: URL, in document: ProjectDocument,
         kind: AnalysisKind = .masks
@@ -396,6 +397,10 @@ enum CutoutStatus {
         let (input, fullRange) = ProjectDocument.analysisInput(media: media, url: url, urls: urls)
         let stamp = AnalysisStamp.make(
             kind: kind, media: media, url: url, input: input, fullRange: fullRange)
+        guard let stamp else {
+            stamps[key] = nil  // read again next time: the file may only be absent now (#438)
+            return nil
+        }
         stamps[key] = StampEntry(media: media, lut: lut, stamp: stamp)
         return stamp
     }

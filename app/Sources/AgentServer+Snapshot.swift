@@ -37,7 +37,7 @@ extension AgentServer {
 
     private static let captureArguments = ["view", "path", "fill_preview", "layout"]
     private static let appearanceRefusal = "appearance is refused: switched on a live window it "
-        + "left colours built in the launch appearance, a mix the app never draws. Launch the "
+        + "left colors built in the launch appearance, a mix the app never draws. Launch the "
         + "instance with -RCDevAppearance light or -RCDevAppearance dark instead."
 
     func snapshotUI(_ a: [String: Any]) throws -> String {
@@ -67,7 +67,11 @@ extension AgentServer {
         var passes = 0
         var settled = false
         while passes < UISnapshot.settleLimit {
-            guard let next = onMain({ UISnapshot.pass(subject.root) }) else {
+            guard
+                let next = onMain({
+                    UISnapshot.pass(subject.root, scale: DevCaptureScale.scale(for: subject.window))
+                })
+            else {
                 throw ToolError(message: "The \(request.window.rawValue) window did not draw.")
             }
             passes += 1
@@ -240,7 +244,7 @@ extension AgentServer {
                     let panel = NSStringFromClass(type(of: sheet))
                     throw ToolError(
                         message: "The attached sheet is a file panel (\(panel)), drawn out of "
-                            + "process: it would capture as one colour.")
+                            + "process: it would capture as one color.")
                 }
                 return (
                     UISnapshot.Subject(
@@ -259,7 +263,7 @@ extension AgentServer {
             guard request.fill, request.region == nil || request.region == .preview,
                 let canvas = editor.previewCanvas
             else { return (subject, nil) }
-            let width = ceil(canvas.playerHost.frame.width * window.backingScaleFactor)
+            let width = ceil(canvas.playerHost.frame.width * DevCaptureScale.scale(for: window))
             let context = FillContext(
                 project: document.editedProject, urls: document.mediaURLs(),
                 playhead: document.playhead,
@@ -278,7 +282,7 @@ extension AgentServer {
         let match = subject.root.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua])
         var result: [String: Any] = [
             "window_facts": UISnapshot.facts(window),
-            "scale": Double(window.backingScaleFactor),
+            "scale": Double(DevCaptureScale.scale(for: window)),
             "appearance": match == .darkAqua ? "dark" : "light",
         ]
         guard let editor = subject.editor, let content = window.contentView else { return result }
@@ -339,7 +343,10 @@ extension AgentServer {
                 + "facts, for the editor the four regions' rects and the preview well's, and "
                 + "with layout the problems a layout dump found (ambiguous layout, a view past "
                 + "its superview, a truncated text field; AppKit's private _NS views counted "
-                + "apart). The dump itself is written beside the PNG as <name>.layout.json.",
+                + "apart). The dump itself is written beside the PNG as <name>.layout.json. "
+                + "The capture's scale is its window's unless the instance was launched with "
+                + "-RCDevCaptureScale 1, 2 or 3, which draws it at that many pixels per point on "
+                + "any screen; window_facts.scale stays the window's.",
             [
                 "window": [
                     "type": "string",

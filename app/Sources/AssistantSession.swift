@@ -13,7 +13,8 @@ struct AssistantOpenError: Error {
 
 /// One window's assistant conversation (spec §11 AI-4), run by the helper in
 /// `Contents/Helpers` (AI-1): Rasterize's `AssistantHelperSession`, ported.
-/// JSON lines over the helper's stdin and stdout (`agent/src/protocol.ts`):
+/// JSON lines over the helper's stdin and stdout (spec §7.9b,
+/// `agent/Sources/FrameJobAgentKit/Protocol.swift`):
 /// the helper streams events and asks for tool calls, and each call goes
 /// through `AgentLane.submit` (AI-2), never `AgentServer.execute`, pinned to
 /// this window's project (AI-5). Road map 12 A1.
@@ -360,8 +361,12 @@ final class AssistantSession {
         writeLine(#"{"type":"tool_result","call_id":\#(quotedID),"result":\#(result)}"#)
     }
 
+    /// Sorted keys, so the same catalog is the same `configure` bytes on every launch and the
+    /// helper's cached tools-and-system prefix with it (spec §11 SA-5).
     private func write(_ message: [String: Any]) {
-        guard let data = try? JSONSerialization.data(withJSONObject: message),
+        var options: JSONSerialization.WritingOptions = []
+        options.insert(.sortedKeys)
+        guard let data = try? JSONSerialization.data(withJSONObject: message, options: options),
             let line = String(data: data, encoding: .utf8)
         else { return }
         writeLine(line)

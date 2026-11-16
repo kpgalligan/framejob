@@ -264,7 +264,7 @@ enum AudioNormalize {
                 problems.append(
                     Problem(
                         clip: id,
-                        reason: "is still being analysed — its waveform has not been written "
+                        reason: "is still being analyzed — its waveform has not been written "
                             + "yet. Try again in a moment."))
                 continue
             }
@@ -276,7 +276,7 @@ enum AudioNormalize {
                     Problem(
                         clip: id,
                         reason: "is silent over the part of it that plays, so there is no level "
-                            + "to normalise."))
+                            + "to normalize."))
                 continue
             }
             readings.append(Reading(clip: id, media: cited[0].media, peak: loudest))

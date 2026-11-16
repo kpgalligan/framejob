@@ -50,7 +50,8 @@ extension AgentServer {
             "description": "Draw the project timecode over the picture, topmost — the export "
                 + "sheet's Burn in timecode checkbox. Default: false. It is a review copy's "
                 + "reference, so it reads the DOCUMENT'S timecode in the document's own "
-                + "spelling (the toolbar's, non-drop, HH:MM:SS:FF or HH:MM:SS.mmm), and it "
+                + "spelling (the toolbar's, HH:MM:SS:FF — non-drop at an NTSC rate, real "
+                + "seconds at any other fractional rate — or HH:MM:SS.mmm), and it "
                 + "shows PROJECT time even in a file written from the in/out range: a range "
                 + "export starting at 00:00:10:00 begins at 00:00 carrying a burn-in that "
                 + "reads 00:00:10:00, which is the number a note about that frame needs.",
@@ -139,10 +140,32 @@ extension AgentServer {
                     + "cursor of media M is not drawn: <why>.\" A clip with set_video cutout "
                     + "waits up to 30 s for its masks (a picture with subject foreground, its "
                     + "foreground masks; any other, its person masks); past that it is drawn "
-                    + "uncut and a sentence before the last names it. In an "
+                    + "uncut and a sentence before the last names it. A PNG or HEIC of a frame "
+                    + "showing a graphic, a shape with a gradient, a still deeper than 8 bits or "
+                    + "a 10-bit VP9, HEVC or ProRes clip is 16-bit (a HEIC 10-bit), about two "
+                    + "and a half times an 8-bit PNG's size for camera footage; a JPEG is always "
+                    + "8-bit. The image block of such a PNG, and of any HEIC, is an 8-bit PNG "
+                    + "copy of the frame and a sentence before the last says so; the file keeps "
+                    + "its depth. full_depth_image puts the file itself in the image block "
+                    + "instead: a 16-bit PNG of a 1080p frame of camera footage can pass the "
+                    + "5 MB limit below, so pass max_width with it. "
+                    // Spec §11 PR-24 (#612), PR-25 (#618): the API's limits on an image; the
+                    // block is never capped or scaled for them, on its bytes or its sides.
+                    + "What the API does with an image: its base64 may be at most 5 MB on "
+                    + "Amazon Bedrock and 10 MB on the Anthropic API itself; an image past "
+                    + "8000 px on a side is refused; once a request holds more than 20 images "
+                    + "(a long conversation's earlier frames count) a stricter limit applies, "
+                    + "which 3000 px a side stays under on every platform; and the newest "
+                    + "Claude models downscale an image past 2576 px on its long edge, so more "
+                    + "is not seen. Frame Job never caps or scales the image block for these "
+                    + "limits, on its bytes or its sides: the block is the file's size, so a "
+                    + "3840 × 2160 frame's can pass 5 MB and is sent as it is, and max_width is "
+                    + "the caller's control. It sets the width and the height follows the "
+                    + "aspect, so on a tall canvas choose a max_width that brings the height "
+                    + "under too. In an "
                     + "HLG project (set_canvas output) the frame is a 16-bit PNG or a 10-bit "
-                    + "HEIC labelled BT.2100 HLG; a JPEG, and any frame asked with "
-                    + "sdr_version, is the project's SDR version, labelled BT.709. Its scopes "
+                    + "HEIC labeled BT.2100 HLG; a JPEG, and any frame asked with "
+                    + "sdr_version, is the project's SDR version, labeled BT.709. Its scopes "
                     + "read the picture it draws: in an HLG project the HLG signal, each JSON "
                     + "adding signal \"hlg\" and, for the waveform, parade and histogram, scale "
                     + "(the HLG % ticks in cd/m², reference white at 75 %), the luma and "
@@ -153,10 +176,28 @@ extension AgentServer {
                         "type": "integer",
                         "description": "The moment to render, \(ticks) Default: the playhead.",
                     ],
+                    // Spec §11 PR-24 (#612), PR-25 (#618): the caller's control over the API's
+                    // limits on an image, its bytes and its sides; the range stays 16…8192.
                     "max_width": [
                         "type": "integer", "minimum": 16, "maximum": 8192,
                         "description": "Cap the image's width in px, aspect kept and never "
-                            + "upscaled. Default: the canvas's own size.",
+                            + "upscaled; the height follows the width. This is the caller's "
+                            + "control over the API's limits on an image, which Frame Job does "
+                            + "not enforce and never scales the image to meet: its base64 may "
+                            + "be at most 5 MB on Amazon Bedrock and 10 MB on the Anthropic API, "
+                            + "an image past 8000 px on a side is refused, 3000 px a side stays "
+                            + "under the stricter limit once a request holds more than 20 "
+                            + "images, and the newest Claude models downscale past 2576 px on "
+                            + "the long edge. Default: the canvas's own size.",
+                    ],
+                    // Spec §11 PR-22: the image block, never the file's depth.
+                    "full_depth_image": [
+                        "type": "boolean",
+                        "description": "Put the file itself in the image block, the 16-bit PNG "
+                            + "or the HEIC, instead of the 8-bit PNG copy a deep frame's PNG and "
+                            + "every HEIC get. The file written is the same either way. A "
+                            + "full-depth 1080p frame can pass the 5 MB image limit; max_width "
+                            + "keeps it under. Default false.",
                     ],
                     "path": [
                         "type": "string",
@@ -189,7 +230,7 @@ extension AgentServer {
                     "selection": [
                         "type": "integer",
                         "description": "An adjustment clip's id: draw what its video.qualifier "
-                            + "selects instead of grading — grey, white fully graded, black "
+                            + "selects instead of grading — gray, white fully graded, black "
                             + "untouched, its blurred selection when video.qualifier.blur is "
                             + "above 0, times any matte cutting it, its strength not applied "
                             + "— with every layer in front of it left out; black where the clip "
@@ -218,7 +259,7 @@ extension AgentServer {
                         "type": "boolean",
                         "description": "Also measure the frame's vectorscope, View ▸ Scopes' "
                             + "Vectorscope: Rec. 709 Cb and Cr of the encoded values in "
-                            + "256 × 256 bins centred on neutral (bin 128). The text says what "
+                            + "256 × 256 bins centered on neutral (bin 128). The text says what "
                             + "share of pixels is neutral, and <image path>.vectorscope.json "
                             + "holds the counts (256 arrays by Cr bin, indexed by Cb bin), the "
                             + "zoom, off_plot (the pixels left off the plot at a zoom, 0 at 1), "
@@ -230,7 +271,7 @@ extension AgentServer {
                         "type": "integer", "enum": [1, 2, 4],
                         "description": "The vectorscope's zoom, as a vectorscope slot's 1× 2× "
                             + "4× cells: each pixel is binned 128 + round(255 × zoom × Cb) (and "
-                            + "Cr), so ×2 and ×4 spread a near-grey picture over more bins; at "
+                            + "Cr), so ×2 and ×4 spread a near-gray picture over more bins; at "
                             + "2 and 4 a pixel off the plot is not counted and the text says "
                             + "what share lie off it. Needs vectorscope: true. Default 1.",
                     ],
@@ -317,14 +358,14 @@ extension AgentServer {
                     ],
                     "loudness_lufs": [
                         "type": "number", "minimum": -70, "maximum": 0,
-                        "description": "Normalise the whole mix to this integrated loudness, "
+                        "description": "Normalize the whole mix to this integrated loudness, "
                             + "in LUFS — the sheet's Loudness popup, whose rows are -14 "
                             + "(streaming), -16 (podcast) and -23 (EBU R 128 broadcast). The "
                             + "export measures itself first and then applies ONE gain to "
                             + "everything, solved through the master limiter every export "
                             + "runs at peak_dbtp, so the file lands on the target and its "
                             + "loudest peaks are limited rather than the whole mix capped. "
-                            + "Omit not to normalise: the export still measures, still "
+                            + "Omit not to normalize: the export still measures, still "
                             + "limits at the ceiling and still reports. Ignored where there "
                             + "is no sound to measure (gif, apng).",
                     ],
@@ -399,13 +440,15 @@ extension AgentServer {
                     + "and phase while it has one: \"Preparing…\" until the file's writer "
                     + "exists (renders, masks and measurements still being made, nothing on "
                     + "disk) and \"Measuring loudness…\" during the loudness pass. done "
-                    + "adds what the file holds: ok, bytes, the settings that were used "
+                    + "adds message, the queue row's sentence (\"Exported “name”\", then "
+                    + "\" and N stems\" when stems were written), and "
+                    + "what the file holds: ok, bytes, the settings that were used "
                     + "(preset, container, codec, width, height, fps [num, den], start, "
                     + "duration), burn_in_timecode, dynamic_range in an HLG project (the "
                     + "picture written), encoder_speed on av1 and av1_webm, audio_bits on "
                     + "audio_wav and audio_aiff, stems [{name, tracks, path}] when stems was "
                     + "asked (each file beside the mix), loudness for every format "
-                    + "that carries sound, normalised or not — summary, integrated_lufs, "
+                    + "that carries sound, normalized or not — summary, integrated_lufs, "
                     + "true_peak_dbtp, "
                     + "sample_peak_dbfs, gain_db, ceiling_dbtp (the master limiter's), "
                     + "limited_db (how far it turned the hottest peak down), capped_by_gain "

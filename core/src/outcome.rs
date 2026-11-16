@@ -57,7 +57,8 @@ pub enum Outcome {
     ///
     /// The rules that speak, after road map 7's D2·1 and D2·3 and spec §11
     /// #88: the overlap rule (`transition.rs`, the sentence every placement
-    /// op hands on), a locked track (`edit_time.rs`'s `locked_track`, at
+    /// op hands on, and since #427 a cut's own, `edit_cut_rule.rs`), a
+    /// locked track (`edit_time.rs`'s `locked_track`, at
     /// `close_gap`, `insert_clip` and a rippled transition), the last track
     /// and a track that still holds clips, a media row a clip still shows
     /// and a marker on a tick another holds (`edit_track.rs`), a cut with
@@ -88,7 +89,7 @@ pub enum Outcome {
     /// `edit_clip`'s `move_clips`, `delete_clips` and `duplicate_clips`,
     /// `edit_props`'s `patch_clips` (the one guard behind all five patch
     /// ops), `edit_nest`'s `nest_clips`, `edit_paste`'s `paste` (an empty
-    /// payload), and `edit_time`'s `ripple_delete` and
+    /// payload), `edit_time`'s `ripple_delete` and `edit_range`'s
     /// `ripple_delete_ranges` (ranges that merge to nothing). Nothing was
     /// ASKED for at any of them, so there is no rule a sentence could name.
     /// The other two, `split_clips` and `paste_attributes`, reach the same

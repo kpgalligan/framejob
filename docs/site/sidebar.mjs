@@ -248,7 +248,7 @@ export const sidebar = [
         collapsed: true,
         items: [
           'audio/eq',
-          'audio/leveller',
+          'audio/leveler',
           'audio/compressor',
           'audio/limiter',
           'audio/voice-effects',
@@ -332,6 +332,7 @@ export const sidebar = [
           'captions/transcript-tab',
           'captions/transcript-words',
           'captions/follow-the-transcript',
+          'captions/find-in-the-transcript',
           'captions/delete-words',
           'captions/shorten-pauses',
           'captions/transcript-keys',

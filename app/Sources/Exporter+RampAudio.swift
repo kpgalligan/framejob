@@ -15,10 +15,10 @@ extension Exporter {
     /// render into, or a render that failed, fails the export
     /// `rampAudioFailed`; an isolated window the same way fails it
     /// `isolationFailed`, a voiced one `voiceFailed`; `cancelled()` answering
-    /// true fails it `cancelled`. The voices are wanted in a second wait,
-    /// after the first: a voice over an isolated clip is rendered from that
-    /// clip's isolated file (AU-143), so its request exists only once that
-    /// file does.
+    /// true fails it `cancelled`. The renders are wanted in passes: a voice
+    /// over an isolated clip is rendered from that clip's isolated file
+    /// (AU-143), and a retimed clip's from its processed window (AU-55 as
+    /// amended), so each such request exists only once that file does.
     /// The sheet reads "Preparing…" throughout. On `buildQueue`, never main.
     static func withRampAudio<T>(
         plan: CompositionPlan, urls: [UInt32: URL], settings: ExportSettings, key: Int,
@@ -45,12 +45,10 @@ extension Exporter {
         let ramped = plan.audioTracks.contains(where: { $0.segments.contains { $0.ramp != nil } })
         let dsp = AudioDSPSource.shared.parameters(for: key)
         let segments = plan.audioTracks.lazy.flatMap(\.segments)
-        let isolated = segments.contains {
-            dsp.wantsIsolation($0.clip) && IsolationCache.isolatable($0)
-        }
-        let voiced = segments.contains {
-            dsp.voice(for: $0.clip) != nil && IsolationCache.isolatable($0)
-        }
+        // Every sounding segment is isolated and voiced, ×1 in the tap and
+        // retimed through its chain (AU-55, AU-145 as amended, #387).
+        let isolated = segments.contains { dsp.wantsIsolation($0.clip) && $0.duration > 0 }
+        let voiced = segments.contains { dsp.voice(for: $0.clip) != nil && $0.duration > 0 }
         guard ramped || isolated || voiced else { return try build() }
         let reverse = ReverseSource.shared.resolution(for: key)
         if ramped, reverse.rampAudio == nil,
@@ -64,7 +62,7 @@ extension Exporter {
         }
         if isolated, reverse.isolated == nil,
             let orphan = segments.first(where: {
-                dsp.wantsIsolation($0.clip) && IsolationCache.isolatable($0)
+                dsp.wantsIsolation($0.clip) && $0.duration > 0
                     && urls[$0.media] != nil && !reverse.pending.contains($0.clip)
             })
         {
@@ -73,26 +71,32 @@ extension Exporter {
         }
         if voiced, reverse.voiced == nil,
             let orphan = segments.first(where: {
-                dsp.voice(for: $0.clip) != nil && IsolationCache.isolatable($0)
+                dsp.voice(for: $0.clip) != nil && $0.duration > 0
                     && urls[$0.media] != nil && !reverse.pending.contains($0.clip)
             })
         {
             throw ExportError.voiceFailed(
                 clip: orphan.clip, message: "the project has no cache folder to render it into")
         }
-        let requests = RampAudioCache.requests(plan: plan, urls: urls, reverse: reverse)
-            + IsolationCache.requests(plan: plan, dsp: dsp, urls: urls, reverse: reverse)
-        if !requests.isEmpty {
-            try wait(for: requests, wanting: requests, key: key, cancelled: cancelled)
-        }
-        if voiced {
-            let voices = VoiceCache.requests(plan: plan, dsp: dsp, urls: urls, reverse: reverse)
-            if !voices.isEmpty {
-                try wait(for: voices, wanting: requests + voices, key: key, cancelled: cancelled)
-            }
+        // A render made from another's file can be asked for only once that
+        // file exists (a voice over an isolation, AU-143; a retimed clip's
+        // mix and its render, AU-55 as amended): ask, wait, and ask again
+        // until a pass names nothing new. The longest chain is three files.
+        var wanted: [RampAudioRequest] = []
+        for _ in 0..<offlineAudioPasses {
+            let fresh = RetimedSound.exportRequests(
+                plan: plan, dsp: dsp, urls: urls, reverse: reverse
+            ).filter { request in !wanted.contains { $0.destination == request.destination } }
+            if fresh.isEmpty { break }
+            wanted += fresh
+            try wait(for: wanted, wanting: wanted, key: key, cancelled: cancelled)
         }
         return try build()
     }
+
+    /// The most passes `withOfflineAudio` asks in: one per file of the
+    /// longest chain, and the one that names nothing new.
+    static let offlineAudioPasses = 4
 
     /// Wants `wanting` under `key` (a want replaces the owner's set) and
     /// waits for `requests`, a failure thrown as its job's error.
@@ -107,7 +111,7 @@ extension Exporter {
             switch request.job {
             case .ramp:
                 throw ExportError.rampAudioFailed(clip: request.clip, message: message)
-            case .isolation:
+            case .isolation, .mix:
                 throw ExportError.isolationFailed(clip: request.clip, message: message)
             case .voice:
                 throw ExportError.voiceFailed(clip: request.clip, message: message)

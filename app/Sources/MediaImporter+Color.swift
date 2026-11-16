@@ -35,7 +35,8 @@ extension MediaImporter {
     /// for an `av01` track, of its `av1C` record's and first sample's
     /// metadata OBUs, and for an `hvc1` or `hev1` track of the first sample's
     /// SEI (`firstSample`) — `{pq: {}}` when none reads; nil for any track
-    /// that is not PQ. Synchronous (spec §11 W-8).
+    /// that is not PQ. Synchronous (spec §11 W-8); `probeAsset` calls it on
+    /// `MediaImporter.readQueue`, off the cooperative pool (#367, #369).
     static func detectedPQ(
         _ descriptions: [CMFormatDescription], track: AVAssetTrack, asset: AVAsset
     ) -> MediaColor? {
@@ -100,6 +101,7 @@ extension MediaImporter {
     /// (`outputSettings: nil`): an x265 track's first buffer holds no sample,
     /// so empty buffers are skipped. The reader is cancelled once it has one.
     private static func firstSample(of track: AVAssetTrack, in asset: AVAsset) -> Data? {
+        ReaderPool.note("MediaImporter.firstSample")
         guard let reader = try? AVAssetReader(asset: asset) else { return nil }
         let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
         output.alwaysCopiesSampleData = false

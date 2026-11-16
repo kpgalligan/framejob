@@ -123,7 +123,7 @@ Each group replaces the target's whole group, and nothing is merged:
 
 | Group | What travels | What the target keeps |
 | --- | --- | --- |
-| `video` | Every picture setting, position and scale included. | An adjustment clip keeps its own [qualifier](/color/qualifiers/) when the copied clip isn't an adjustment clip. A picture clip takes no qualifier. |
+| `video` | Every picture setting, position and scale included. | An adjustment clip keeps its own [qualifier](/color/qualifiers/) when the copied clip isn't an adjustment clip. A picture clip takes no qualifier. A text, shape, graphic or adjustment clip keeps its own crop, corner radius and chroma key, and a nest clip its own corner radius and chroma key. |
 | `audio` | Every sound setting, mute and keep pitch included. | Nothing. |
 | `text` | Every text setting. | Its words and their timings. |
 | `shape` | Every shape setting. | Its kind, width, height, and `from` and `to` points. |

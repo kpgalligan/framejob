@@ -153,7 +153,8 @@ pub(crate) struct OffPath<'a> {
 /// three), a group an end patch may not name, `video.motion`, `text.words` and
 /// `video.cutout` (spec §11 CO-20), a path
 /// `patch` also names, and whatever the group's read says of a `null` there
-/// — an unknown key, a REQUIRED key (`video.opacity`).
+/// — an unknown key, a REQUIRED key (`video.opacity`); and last, once every
+/// path has passed its own checks, `audio.eq` beside one of its slots (#398).
 pub(crate) fn check_off<'a>(patch: &Value, off: &'a [String]) -> Result<Vec<OffPath<'a>>, String> {
     let mut paths = Vec::with_capacity(off.len());
     for path in off {
@@ -214,6 +215,17 @@ pub(crate) fn check_off<'a>(patch: &Value, off: &'a [String]) -> Result<Vec<OffP
             key,
             slot,
         });
+    }
+    // The whole EQ keyed off already keys every slot off; `key_off` would
+    // write the slot's `{slot: null}` over the EQ's `null` (#398).
+    let whole_eq = |p: &OffPath| p.group == "audio" && p.key == "eq";
+    if paths.iter().any(|p| whole_eq(p) && p.slot.is_none()) {
+        if let Some(slot) = paths.iter().filter(|p| whole_eq(p)).find_map(|p| p.slot) {
+            return Err(format!(
+                "off names both \"audio.eq\" and \"audio.eq.{slot}\": keying the whole EQ off \
+                 keys every slot off, so name one or the other"
+            ));
+        }
     }
     Ok(paths)
 }

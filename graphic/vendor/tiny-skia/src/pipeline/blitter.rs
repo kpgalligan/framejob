@@ -76,9 +76,14 @@ impl<'a, 'b: 'a> RasterPipelineBlitter<'a, 'b> {
             memset2d_color = Some(PremultipliedColorU8::TRANSPARENT);
         }
 
+        // Frame Job (spec §11 PR-15): a deep destination is drawn in highp, and its gradients undithered.
+        let deep = pixmap.lo.is_some();
+        let force_hq = paint.force_hq_pipeline || deep;
+
         let blit_anti_h_rp = {
             let mut p = RasterPipelineBuilder::new();
-            p.set_force_hq_pipeline(paint.force_hq_pipeline);
+            p.set_force_hq_pipeline(force_hq);
+            p.deep_dst = deep;
             if !paint.shader.push_stages(paint.colorspace, &mut p) {
                 return None;
             }
@@ -118,7 +123,8 @@ impl<'a, 'b: 'a> RasterPipelineBlitter<'a, 'b> {
 
         let blit_rect_rp = {
             let mut p = RasterPipelineBuilder::new();
-            p.set_force_hq_pipeline(paint.force_hq_pipeline);
+            p.set_force_hq_pipeline(force_hq);
+            p.deep_dst = deep;
             if !paint.shader.push_stages(paint.colorspace, &mut p) {
                 return None;
             }
@@ -155,7 +161,8 @@ impl<'a, 'b: 'a> RasterPipelineBlitter<'a, 'b> {
 
         let blit_mask_rp = {
             let mut p = RasterPipelineBuilder::new();
-            p.set_force_hq_pipeline(paint.force_hq_pipeline);
+            p.set_force_hq_pipeline(force_hq);
+            p.deep_dst = deep;
             if !paint.shader.push_stages(paint.colorspace, &mut p) {
                 return None;
             }
@@ -352,6 +359,10 @@ impl Blitter for RasterPipelineBlitter<'_, '_> {
                     self.pixmap.pixels_mut()[start..end]
                         .iter_mut()
                         .for_each(|p| *p = c);
+                    // Frame Job (spec §11 PR-15): a solid colour is on a level.
+                    if let Some(lo) = self.pixmap.lo.as_deref_mut() {
+                        lo[start * 4..end * 4].fill(0);
+                    }
                 }
             }
 

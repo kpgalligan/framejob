@@ -11,6 +11,9 @@ final class LiveLoudnessLane {
     var stream: Int64?
     /// Frames dropped while awaiting its move; nil when not awaiting.
     var awaiting: Int64?
+    /// Stopped, and no audio delivered since: what continues its stream is a
+    /// resume wherever the sum stood (spec §11 AU-161).
+    var resuming = false
     private var spanRate = 0
     private var spanFrames: [Range<Int64>] = []
 
@@ -61,6 +64,14 @@ extension LiveLoudness {
     /// hands each track a buffer or two of the old position after a seek or
     /// a play from elsewhere, so what continues its old stream is dropped
     /// until it moves, for at most `stallLag` of frames.
+    ///
+    /// A MARK (the player's filler, AU-161: a position and a length, no
+    /// samples) is asked all of this as the chunk of silence it used to be:
+    /// it moves or continues its track, and what follows continues its
+    /// length. It is summed nowhere, so a measurement that begins at a mark
+    /// begins at the first frame of audio after it. After a stop, a track's
+    /// audio that continues its stream is a resume, not a move, however far
+    /// the stop left the sum behind it.
     func admit(_ drained: [(lane: LiveLoudnessLane, chunks: [MixChunk])], rate: Int, now: TimeInterval) {
         var items: [(lane: LiveLoudnessLane, chunks: [MixChunk], first: Int?, last: Int?)] = []
         for (lane, all) in drained where !all.isEmpty {
@@ -71,13 +82,15 @@ extension LiveLoudness {
             for chunk in all {
                 let moved = lane.stream.map {
                     !continues(chunk.start, after: $0, rate: rate)
-                        || end.map { !continues(chunk.start, after: $0, rate: rate) } ?? false
+                        || (!lane.resuming
+                            && end.map { !continues(chunk.start, after: $0, rate: rate) } ?? false)
                 } ?? (reached != nil)
-                lane.stream = chunk.end
-                end = chunk.end
+                lane.stream = chunk.streamEnd
+                end = chunk.streamEnd
+                if chunk.frames > 0 { lane.resuming = false }
                 if let dropped = lane.awaiting {
                     if !moved, dropped < Self.frames(Self.stallLag, rate) {
-                        lane.awaiting = dropped + Int64(chunk.frames)
+                        lane.awaiting = dropped + Int64(chunk.frames + chunk.filler)
                         continue
                     }
                     lane.awaiting = nil
@@ -109,9 +122,15 @@ extension LiveLoudness {
         }
         if fresh || moves.contains(where: { isJump($0.chunks[$0.first ?? 0].start, rate: rate) }) {
             if !fresh { reset(.jump) }
+            // A track that has delivered since the reset (a mark in an
+            // earlier tick, with the sum not begun) has moved already: it
+            // is not put back to awaiting, and what it hands over now is kept.
             let moved = Set(moves.map { ObjectIdentifier($0.lane) })
-            for lane in allLanes where !moved.contains(ObjectIdentifier(lane)) {
+            for lane in allLanes where !moved.contains(ObjectIdentifier(lane)) && lane.end == nil {
                 lane.awaiting = 0
+            }
+            for item in items where item.first == nil && item.lane.end != nil {
+                for chunk in item.chunks { enqueue(chunk, to: item.lane, rate: rate) }
             }
             for item in moves {
                 for chunk in item.chunks[(item.last ?? 0)...] {
@@ -158,6 +177,7 @@ extension LiveLoudness {
             }
         }
         lane.end = max(lane.end ?? chunk.end, chunk.end)
+        // A mark ends here: the track has delivered TO its frame, nothing past it.
         guard chunk.frames > 0 else { return }
         if let reached {
             // Frames the sum already passed are not summed again.
@@ -172,7 +192,7 @@ extension LiveLoudness {
             start: chunk.start + Int64(skip), frames: chunk.frames - skip,
             channels: chunk.channels, sampleRate: chunk.sampleRate,
             left: Array(chunk.left[skip...]),
-            right: chunk.channels == 2 ? Array(chunk.right[skip...]) : [])
+            right: chunk.channels == 2 ? Array(chunk.right[skip...]) : [], filler: chunk.filler)
     }
 
     /// Sums every frame every waited-on track has delivered past.

@@ -41,7 +41,7 @@ At a threshold of 1 token (AI-18) every turn ends compacted. The rows:
 
 `--wrong` scripts the mistakes: C1, C2, C4, C5 and C6 must FAIL, C0, C3 and
 H pass. `--month-spent D` seeds the rehearsal's scratch proofs' ledger
-(`work/assistant_compaction/rehearsal/spend.jsonl`) so `24.99` refuses every
+(`work/assistant_compaction/rehearsal/spend.jsonl`) so `39.99` refuses every
 POST `budget:`. A turn a refused POST touched FAILs its rows naming `cap:` or
 `budget:` (C1–C4 for turn 1; C5 and C6 for either turn). `--live` without
 `--cap` prints the headroom and exits 2 before launching anything.
@@ -51,7 +51,7 @@ to the compaction instructions and runs the right rehearsal against it: rule R �
 anchor or build fails, C3 is never scored or any row is an instrument failure.
 
 Safety: the key is read once, by `assistant_prompt_eval.anthropic_key`, and
-leaves this process only as the relay's `x-api-key`; the app and helper get
+leaves this process only as the relay's credential header; the app and helper get
 the dummy `proof-key`. A rehearsal or mutant never opens the proofs' ledger.
 Rule H: a turn is stopped past 600 s and a build killed past 900 s; only this
 script's process groups are killed.
@@ -81,12 +81,15 @@ BURN_TO = 71
 INTRO_AT = 600_000
 OUTRO_AT = 2_700_000
 POSTS = 2 * ev.ROUNDS_PER_ROW + 2
-SUGGESTED_CAP = 8.00
+SUGGESTED_CAP = 11.50
 TURN_SECONDS = 600
 WALL_BUILD = 900
 MODEL = "claude-opus-5-5"
 ANCHOR = '"compaction_instructions": AssistantPrompt.compactionInstructions,'
 MUTATED = '"compaction_instructions": AssistantPrompt.compactionInstructions + " Be brief.",'
+# The mutants: a file from the repo root, the text that must occur there once, and its
+# replacement. `build_mutant` reads it and `mutant_anchors.py` counts the anchor.
+MUTANTS = {"extra-instruction": ("app/Sources/AssistantSession.swift", ANCHOR, MUTATED)}
 ROWS = ["C0", "C1", "C2", "C3", "C4", "C5", "C6", "H", "K"]
 TURN1_ROWS = ["C1", "C2", "C3", "C4"]
 T1 = ("Change the title's text to Hello Frame Job, rename the Shapes track to Boxes, and add a "
@@ -155,8 +158,7 @@ def headroom_lines(cap):
         "estimate billing every definition byte",
         f"floor: worst POST + the conversation bound = ${cap_floor():.2f}; suggested cap "
         f"${SUGGESTED_CAP:.2f}",
-        "budget: $25.00 a calendar month (UTC) for Anthropic, before each POST, in the proofs' "
-        "ledger (spec §11 P-6)",
+        ev.budget_line(),
         expected_line(),
     ]
     if cap is None:
@@ -517,7 +519,7 @@ def row_c4(ctx):
         (f"title clip id {ids['title']}", re.search(rf"\b{ids['title']}\b", text)),
         (f"Shapes track id {ids['shapes']}", re.search(rf"\b{ids['shapes']}\b", text)),
         (f"Intro marker id {intro_id}", re.search(rf"\b{intro_id}\b", text)),
-        ("Hello Frame Job", "hello framejob" in text.lower()),
+        ("Hello Frame Job", "hello frame job" in text.lower()),
         ("Boxes", "boxes" in text.lower()),
         ("Intro", "intro" in text.lower()),
         ("the frame", re.search(r"\b(frame|render\w*)\b", text, re.I)),
@@ -690,20 +692,21 @@ def converse(asp, atp, app_path, secrets, relay, texts, folder, stand_in, wrong,
 # The mutant: the session's compaction instructions carry one sentence more.
 
 
-def build_mutant(asp, child_env):
+def build_mutant(name, asp, child_env):
+    file, anchor, mutated = MUTANTS[name]
     base = os.path.join(WORK, "mutant")
     tree_copy.remove_tree(base)
     root, reason = tree_copy.make_copy(os.path.join(base, "tree"))
     if root is None:
         return None, reason
-    session = os.path.join(root, "app", "Sources", "AssistantSession.swift")
+    session = os.path.join(root, file)
     with open(session) as handle:
         text = handle.read()
-    if text.count(ANCHOR) != 1:
-        return None, f"AssistantSession.swift has {text.count(ANCHOR)} `{ANCHOR}`, not 1"
+    if text.count(anchor) != 1:
+        return None, f"{os.path.basename(file)} has {text.count(anchor)} `{anchor}`, not 1"
     with open(session, "w") as handle:
-        handle.write(text.replace(ANCHOR, MUTATED))
-    print(f"mutant: `{ANCHOR}` → `{MUTATED}` in the copy; building it (up to {WALL_BUILD} s)…",
+        handle.write(text.replace(anchor, mutated))
+    print(f"mutant: `{anchor}` → `{mutated}` in the copy; building it (up to {WALL_BUILD} s)…",
           flush=True)
     app, reason = tree_copy.build_app(root, WALL_BUILD, env=child_env())
     if app is None:
@@ -720,7 +723,7 @@ def main():
                         help="the conversation against the stand-in, scripted")
     parser.add_argument("--live", action="store_true",
                         help="the conversation against the real API; needs --cap and the key")
-    parser.add_argument("--mutant", choices=["extra-instruction"],
+    parser.add_argument("--mutant", choices=sorted(MUTANTS),
                         help="the right rehearsal against a build whose compaction instructions "
                              "carry one sentence more; C3 FAILS")
     parser.add_argument("--wrong", action="store_true",
@@ -761,7 +764,7 @@ def main():
     release = os.path.join(ROOT, asp.APP_PATH)
     if args.mutant:
         try:
-            release, why = build_mutant(asp, asp.child_env)
+            release, why = build_mutant(args.mutant, asp, asp.child_env)
         except Exception as error:  # noqa: BLE001 — rule R: a setup that cannot run exits 2
             release, why = None, f"{type(error).__name__}: {error}"
         if release is None:

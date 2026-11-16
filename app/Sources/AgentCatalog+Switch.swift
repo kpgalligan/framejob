@@ -85,7 +85,7 @@ extension AgentServer {
                     + "camera is its own, paired front to back, and the one angle no speaker uses "
                     + "is the wide. The range is from/to, else the In–Out range, else the selected "
                     + "angle clips' extent. It reads each microphone's loudness and speech caches "
-                    + "(made at import; a pending one is refused as still being analysed) and "
+                    + "(made at import; a pending one is refused as still being analyzed) and "
                     + "cuts a shot `lead` before each new speaker's turn, holds through short "
                     + "replies (min_turn) and silence, shows the wide during crosstalk and merges "
                     + "shots under min_shot. It writes, as ONE undo step \"Switch by Speaker\": a "
@@ -113,7 +113,7 @@ extension AgentServer {
                     + "project}. Refused, nothing "
                     + "changed, naming every reason at once: fewer than two angles or more than "
                     + "nine, a speaker without a microphone or an angle, one microphone for two "
-                    + "speakers (outside the faces mode), a microphone still being analysed or "
+                    + "speakers (outside the faces mode), a microphone still being analyzed or "
                     + "with no speech, a camera whose faces are still being found or show no "
                     + "mouth that can be read, a faces analysis that failed, was stopped or did "
                     + "not finish within the wait, a project changed while it waited, a stretch "
@@ -161,7 +161,7 @@ extension AgentServer {
                     ],
                     "min_shot": [
                         "type": "number", "minimum": 0.5, "maximum": 30,
-                        "description": "Seconds: a shorter shot merges into a neighbour. "
+                        "description": "Seconds: a shorter shot merges into a neighbor. "
                             + "Default 2; 3 in the faces mode.",
                     ],
                     "min_turn": [

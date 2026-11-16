@@ -128,8 +128,6 @@ enum CompositionBuilder {
             videoTracks.append(track)
         }
 
-        try addPlaceholderIfNeeded(to: composition, plan: plan)
-
         // The sample-level audio settings the plan cannot carry (pan, the
         // compressor, noise reduction). Resolved once per build and frozen
         // into the taps: they are not in the plan, so `Playback` treats a
@@ -144,7 +142,13 @@ enum CompositionBuilder {
         // Its assets are held across the fill: a track does not retain its
         // asset, and an optimised build ends a local at its last use.
         var rampAssets: [URL: AVURLAsset] = [:]
-        let ramps = rampAudioTracks(plan: plan, urls: urls, reverse: reverse, assets: &rampAssets)
+        let ramps = rampAudioTracks(
+            plan: plan, urls: urls, reverse: reverse, dsp: dsp, assets: &rampAssets)
+        // A constant-speed Keep pitch on clip that isolates or has a voice
+        // effect reads its processed window, when it is on disk (AU-55 as
+        // amended); held with the ramp renders' assets, for their reason.
+        let processed = processedAudioTracks(
+            plan: plan, urls: urls, reverse: reverse, dsp: dsp, assets: &rampAssets)
         // An isolated clip's ready renders, read into memory (AU-53).
         let isolated = isolatedAudio(plan: plan, urls: urls, reverse: reverse, dsp: dsp)
         // A voiced clip's ready renders, in place of its isolation (AU-143).
@@ -153,8 +157,9 @@ enum CompositionBuilder {
             try addAudioTracks(
                 to: composition, plan: plan, urls: audioURLs, reverse: reverse, dsp: dsp,
                 metering: metering, assets: &audioAssets, reversedAssets: &reversedAssets,
-                ramps: ramps, isolated: isolated, voiced: voiced)
+                ramps: ramps, processed: processed, isolated: isolated, voiced: voiced)
         }
+        try addPlaceholderIfNeeded(to: composition, plan: plan)
 
         // Source orientation is read once per media and then attached per
         // instruction, so the compositor can turn a rotated source's sampling
@@ -220,7 +225,14 @@ enum CompositionBuilder {
     private static let placeholderName = "Blank"
 
     /// Gives a timeline of nothing but graphics, text, shapes and images a
-    /// video track to tick against — for the preview's item and the exports.
+    /// video track to tick against — for the preview's item and the exports —
+    /// and a timeline whose last stretch holds only those clips a
+    /// composition as long as its plan (#523): with media to 10 s and titles
+    /// to 20 s the composition would end at 10 s, and `AVPlayer` clamps every
+    /// seek past it and ends the item there. So it runs after the audio
+    /// tracks, and fires when the plan has no video track or when the
+    /// composition, audio and silence included, ends a tick or more short of
+    /// the plan; within a tick it is left to `+InstructionRanges`.
     ///
     /// Those layers need no decoding, so §7.2 gives them no composition
     /// track — and a composition with no track renders nothing offline. An
@@ -235,14 +247,18 @@ enum CompositionBuilder {
     /// names no track for these layers — so it costs one decoded 16×16 frame
     /// and contributes no pixels.
     ///
-    /// Its track id is one past the plan's own numbering, so it can never
-    /// collide with a track a recipe names. If the resource is missing the
-    /// composition keeps no track: exports fail and the preview's item does
-    /// not play — never a crash (road map 10 §10.8).
+    /// Its track id is one past every plan id, video and audio, so it can
+    /// never collide with a track a recipe names, and it is never one of
+    /// `videoTracks`, so `convertsSources` sees the plan's tracks only. If
+    /// the resource is missing the composition is left as it was — a
+    /// media-less one keeps no track: exports fail and the preview's item
+    /// does not play — never a crash (road map 10 §10.8).
     private static func addPlaceholderIfNeeded(
         to composition: AVMutableComposition, plan: CompositionPlan
     ) throws {
-        guard plan.videoTracks.isEmpty, plan.duration > 0,
+        guard plan.duration > 0,
+            plan.videoTracks.isEmpty
+                || composition.duration <= time(plan.duration - 1),
             let url = Bundle.main.url(forResource: placeholderName, withExtension: "mp4")
         else { return }
         let asset = AVURLAsset(url: url)
@@ -320,11 +336,16 @@ enum CompositionBuilder {
     ///
     /// **A ramp segment plays its render** (`ramps`, spec §11 SR-6, SR-12):
     /// the whole file from 0 at ×1, never scaled, empty time while pending.
+    ///
+    /// **A segment in `processed` reads its processed window** (spec §11
+    /// AU-55 as amended, #387): the same range, counted from the media frame
+    /// that file starts at, scaled as the media would be.
     static func fill(
         _ track: AVMutableCompositionTrack, segments: [PlanSegment], mediaType: AVMediaType,
         urls: [UInt32: URL], reverse: ReverseResolution, assets: inout [UInt32: AVURLAsset],
         reversedAssets: inout [UInt32: AVURLAsset], shift: AudioShift = .none,
-        ramps: [RampSegmentKey: AVAssetTrack] = [:]
+        ramps: [RampSegmentKey: AVAssetTrack] = [:],
+        processed: [IsolationSegmentKey: ProcessedSource] = [:]
     ) throws {
         var cursor: Ticks = 0
         for segment in segments {
@@ -337,7 +358,8 @@ enum CompositionBuilder {
 
             guard let source = resolveSource(
                 for: segment, mediaType: mediaType, urls: urls, reverse: reverse,
-                assets: &assets, reversedAssets: &reversedAssets, ramps: ramps)
+                assets: &assets, reversedAssets: &reversedAssets, ramps: ramps,
+                processed: processed)
             else {
                 // Missing media, unreadable media, or a reverse that has not
                 // been rendered: hold the place with empty time so every later
@@ -352,8 +374,11 @@ enum CompositionBuilder {
                 continue
             }
 
+            // A processed window's frame 0 is the media's `firstFrame`.
+            let windowStart: Ticks = mediaType == .audio && segment.ramp == nil
+                ? processed[IsolationSegmentKey(segment)]?.firstTick ?? 0 : 0
             let requested = CMTimeRange(
-                start: time(place.sourceIn), duration: time(place.sourceDuration))
+                start: time(place.sourceIn - windowStart), duration: time(place.sourceDuration))
             do {
                 if mediaType == .video, let tail = heldTail(segment, of: source) {
                     if tail.covered > 0 {

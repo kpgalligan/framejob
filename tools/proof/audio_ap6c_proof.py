@@ -21,11 +21,14 @@ is phase5_proof's BS.1770 on an exported WAV.
   V3  enhance false on both doors: no enhance keys, enhance_pending false, no
       sheet, the audio unchanged after 5 s, undo's top "Add Recording".
   V4  an instance held with -RCDevRampRenderHold 3 and Normalize's target at
-      −18, the panel door: (a) new project — the Measuring Sound sheet seen
+      −18, the panel door with no follow_wait (it would wait the measurement
+      out, #546), the sheet polled for: (a) new project — the Measuring Sound sheet seen
       (FAIL if never), the audio-only export −18 ±0.5 LUFS, one undo "Enhance
       Voice"; (b) into a document — undo "Enhance Voice" then "Add Recording";
       (c) cancel_sheet during the hold — unchanged, undo's top "Add
-      Recording", enhance_pending false, no sheet 2 s and 5 s after.
+      Recording", no sheet 2 s and 5 s after, and a second panel landing
+      with no enhance then answers enhance_pending false: Cancel ended the
+      measurement (#546).
   V5  movie + microphone: only mic_clip enhanced, the movie clip's sound not
       touched.
   V6  record_screen's refusals, exact, the project byte-identical: enhance
@@ -364,10 +367,9 @@ def panel_rows():
 
         # (a) a new project.
         voice = rode()
-        answer = h.call("land_recording", voice=[voice], door="panel", enhance=True,
-                        follow_wait=90)
+        answer = h.call("land_recording", voice=[voice], door="panel", enhance=True)
         doc = Doc(h, voice)
-        seen = sheet_up(doc, "v4a") or wait_sheet(doc, "v4a", bound=10)
+        seen = wait_sheet(doc, "v4a")
         check(answer.get("landed") == "new_project" and seen,
               f"V4 (a) landed {answer.get('landed')}, the Measuring Sound sheet seen: {seen}")
         gone = wait_no_sheet(doc)
@@ -386,8 +388,8 @@ def panel_rows():
         s = Session(h, "ap6c-v4b")
         doc = Doc(h, s.path)
         answer = h.call("land_recording", voice=[rode()], door="panel", enhance=True,
-                        follow_wait=90, project=s.path)
-        seen = sheet_up(doc, "v4b") or wait_sheet(doc, "v4b", bound=10)
+                        project=s.path)
+        seen = wait_sheet(doc, "v4b")
         gone = wait_no_sheet(doc)
         first, second = doc.undo(), doc.undo()
         check(answer.get("landed") == "document" and seen and gone is not None
@@ -398,11 +400,10 @@ def panel_rows():
         # (c) Cancel during the hold.
         s = Session(h, "ap6c-v4c")
         doc = Doc(h, s.path)
-        answer = h.call("land_recording", voice=[rode()], door="panel", enhance=True,
-                        follow_wait=90, project=s.path)
+        h.call("land_recording", voice=[rode()], door="panel", enhance=True, project=s.path)
         clips = [c["id"] for c in doc.project()["clips"]]
         landed = {c: doc.audio(c) for c in clips}
-        seen = sheet_up(doc, "v4c") or wait_sheet(doc, "v4c", bound=10)
+        seen = wait_sheet(doc, "v4c")
         cancelled = {}
         if seen:
             cancelled = doc.op("cancel_sheet")
@@ -413,6 +414,8 @@ def panel_rows():
         time.sleep(HOLD)
         after = {c: doc.audio(c) for c in clips}
         top = doc.undo()
+        answer = h.call("land_recording", voice=[os.path.join(FIX, "silent.m4a")], door="panel",
+                        project=s.path)
         check(seen and answer.get("enhance_pending") is False and not at2 and not at5
               and after == landed and top == "Add Recording",
               f"V4 (c) sheet seen {seen}, cancel_sheet {json.dumps(cancelled)[:80]}, "

@@ -7,9 +7,13 @@ import Foundation
 /// layout through pan · fold · pick — which the three stages' relative
 /// thresholds (and the leveller's target) are added to.
 ///
-/// **Measured once per (cache folder, plan text, the clip's channel
-/// matrix).** A trim moves the plan and a pan or a pick moves the matrix, so
-/// either measures again; a property edit that moves neither reads the memo.
+/// **Measured once per (cache folder, plan text less its segments'
+/// `automation`, the clip's channel matrix).** A trim moves the plan and a
+/// pan or a pick moves the matrix, so either measures again; a property edit
+/// that moves neither reads the memo, and so does an edit that moves only an
+/// action's automation points (a Target or cap inside an action, AU-66 (e),
+/// #413), which no reading or curve reads. The key's plan text is made once
+/// per handle.
 /// A PENDING answer — no loudness file yet, or no cache folder — is never
 /// memoised, and the media files are read through a fresh `MediaCacheLoader`
 /// each time (it would hold a miss as pending), so the first ask after the
@@ -88,6 +92,17 @@ final class AudioDynamicsLevels {
     private var curveOrder: [Key] = []
     private var files: [String: [UInt32: MediaLoudness]] = [:]
     private var observer: NSObjectProtocol?
+    /// The last handle whose memo plan was made, and that plan.
+    private weak var keyedProject: ReelProject?
+    private var keyedPlan = ""
+    private var builtCurves = 0
+
+    /// How many clips' curves have been made (a probe's count, #413).
+    var curveBuilds: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return builtCurves
+    }
 
     private init() {
         observer = NotificationCenter.default.addObserver(
@@ -131,7 +146,7 @@ final class AudioDynamicsLevels {
         guard let cache else {
             return Dictionary(uniqueKeysWithValues: wanted.map { ($0.id, .pending) })
         }
-        let key = Key(cache: cache.standardizedFileURL.path, plan: project.planJSON)
+        let key = Key(cache: cache.standardizedFileURL.path, plan: memoPlan(project))
 
         var result: [UInt32: Level] = [:]
         var missing: [ClipSnapshot] = []
@@ -188,6 +203,49 @@ final class AudioDynamicsLevels {
     }
 
     // MARK: - Inside
+
+    /// The memo key's plan text for `project`: `planWithoutAutomation`, made
+    /// once per handle.
+    private func memoPlan(_ project: ReelProject) -> String {
+        lock.lock()
+        if keyedProject === project {
+            defer { lock.unlock() }
+            return keyedPlan
+        }
+        lock.unlock()
+        let plan = Self.planWithoutAutomation(project.planJSON)
+        lock.lock()
+        keyedProject = project
+        keyedPlan = plan
+        lock.unlock()
+        return plan
+    }
+
+    /// `planJSON` with every `audio_tracks[].segments[]`'s `automation`
+    /// removed, keys sorted; unreadable text is answered as it is.
+    static func planWithoutAutomation(_ planJSON: String) -> String {
+        guard let data = planJSON.data(using: .utf8),
+            var root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        else { return planJSON }
+        if let tracks = root["audio_tracks"] as? [[String: Any]] {
+            root["audio_tracks"] = tracks.map { track -> [String: Any] in
+                var track = track
+                if let segments = track["segments"] as? [[String: Any]] {
+                    track["segments"] = segments.map { segment -> [String: Any] in
+                        var segment = segment
+                        segment.removeValue(forKey: "automation")
+                        return segment
+                    }
+                }
+                return track
+            }
+        }
+        guard
+            let out = try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys]),
+            let text = String(data: out, encoding: .utf8)
+        else { return planJSON }
+        return text
+    }
 
     private static func level(_ answer: ClipLoudness.Answer) -> Level {
         switch answer {
@@ -306,7 +364,7 @@ extension AudioDynamicsLevels {
         guard let cache else {
             return Dictionary(uniqueKeysWithValues: wanted.map { ($0.id, .pending(what: "loudness")) })
         }
-        let key = Key(cache: cache.standardizedFileURL.path, plan: project.planJSON)
+        let key = Key(cache: cache.standardizedFileURL.path, plan: memoPlan(project))
         var result: [UInt32: Curves] = [:]
         var missing: [ClipSnapshot] = []
         lock.lock()
@@ -329,6 +387,9 @@ extension AudioDynamicsLevels {
         }
         var made: [UInt32: CurveEntry] = [:]
         for clip in missing {
+            lock.lock()
+            builtCurves += 1
+            lock.unlock()
             let own = (segments[clip.id] ?? []).filter { $0.media == segments[clip.id]?.first?.media }
             let media = own.first.flatMap { snapshot.media($0.media) }
             let responses = Self.responses(clip)

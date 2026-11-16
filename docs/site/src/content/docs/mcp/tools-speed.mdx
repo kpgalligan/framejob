@@ -188,6 +188,7 @@ Inside a nest, the nest's own tracks are retimed and no marker moves. Unlike `se
 | Two markers would land on one time. | Move one of them first. |
 | A clip would play past ×0.1 or ×1000. The message names the clip and the rate. | Pick a gentler rate, or set the clip's own speed first. |
 | A clip would last under one frame. The message names it. | Pick a gentler rate. |
+| A cut at `from` or `to` would leave a piece too short for a transition near it. The message names the two clips. | Move the bound further from the transition, or shorten it. |
 
 ## `set_reversed`
 

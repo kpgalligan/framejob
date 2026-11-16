@@ -167,9 +167,11 @@ final class ExportProgressSheetController: NSViewController {
         }
     }
 
-    /// The one exit for all three outcomes. Cancelling closes the sheet and
-    /// removes the half-written file; success and failure both turn the sheet
-    /// into its own result panel rather than trading it for an alert.
+    /// The one exit for all three outcomes. Cancelling closes the sheet; the
+    /// half-written file was a hidden sibling `Exporter.finish` has already
+    /// removed, and the path keeps the file it had (spec §11 #531). Success
+    /// and failure both turn the sheet into its own result panel rather than
+    /// trading it for an alert.
     private func finished(_ result: Result<URL, any Error>) {
         Self.writing.remove(self)
         didFinish = true
@@ -206,8 +208,6 @@ final class ExportProgressSheetController: NSViewController {
             revealButton.isEnabled = true
         case .failure(let error):
             if case Exporter.ExportError.cancelled = error {
-                // Only a file this export replaced (spec §11 #470).
-                if exporter.replacedDestination { try? FileManager.default.removeItem(at: destination) }
                 dismiss(self)
                 return
             }

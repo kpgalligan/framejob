@@ -256,7 +256,10 @@ impl Gradient {
         push_stages_post(p);
 
         // Frame Job (spec §11 PR-13): every gradient is dithered before blend and store.
-        p.push(pipeline::Stage::Dither);
+        // Frame Job (spec §11 PR-15): a deep store keeps the levels, so it takes no dither.
+        if !p.deep_dst {
+            p.push(pipeline::Stage::Dither);
+        }
 
         true
     }

@@ -74,7 +74,7 @@ final class DocumentPane: InspectorPaneView {
                 summaryRow("Background") {
                     DocumentPane.colorName(binding.documentCanvas.background)
                 },
-                summaryRow("Colour") { binding.documentCanvas.output.colourName },
+                summaryRow("Color") { binding.documentCanvas.output.colourName },
             ])
     }
 

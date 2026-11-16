@@ -76,12 +76,15 @@ COUNTED = {
     "designs/spec/11-decisions/agent-connection.md": 7,
     "designs/spec/11-decisions/assistant.md": 6,
     "designs/spec/11-decisions/cloud-captions.md": 3,
-    "designs/spec/11-decisions/deepening.md": 9,
+    "designs/spec/11-decisions/deepening-2.md": 5,
+    "designs/spec/11-decisions/deepening-3.md": 4,
     "designs/spec/11-decisions/dev-tools.md": 6,
     "designs/spec/11-decisions/foundations.md": 1,
     "designs/spec/11-decisions/grading-3.md": 1,
     "designs/spec/11-decisions/grading.md": 6,
-    "designs/spec/11-decisions/graphics.md": 5,
+    "designs/spec/11-decisions/graphics.md": 2,
+    "designs/spec/11-decisions/graphics-2.md": 2,
+    "designs/spec/11-decisions/graphics-5.md": 1,
     "designs/spec/11-decisions/pricing.md": 5,
     "designs/spec/11-decisions/publishing.md": 3,
     "designs/spec/11-decisions/recording.md": 7,
@@ -129,6 +132,8 @@ COUNTED = {
     "tools/proof/silence_spike/README.md": 1,
 }
 
+# The mutants, as `mutant_anchors.py` reads them: switches on MUTANT, no tree text.
+MUTANTS = ("ge-count", "no-untracked", "text-history-paths")
 MUTANT = None
 
 
@@ -261,7 +266,7 @@ def selftest(mutant: str | None = None) -> int:
 def main(argv=None):
     parser = argparse.ArgumentParser(description="rename R1: the old name's residue (NM-8)")
     parser.add_argument("--selftest", action="store_true")
-    parser.add_argument("--mutant", choices=("ge-count", "no-untracked", "text-history-paths"))
+    parser.add_argument("--mutant", choices=MUTANTS)
     arguments = parser.parse_args(argv)
     if arguments.selftest or arguments.mutant:
         return selftest(arguments.mutant)

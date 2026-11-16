@@ -21,10 +21,26 @@ probe  (no app) `cache_lane_probe.swift` built over `app/Sources` through
        at once. L2 40 bodies from one thread start within 1 of their
        submission index. L3 L1's 40 bodies all finish within 10 s. L4 a body
        through `MediaImporter.onCacheLane` from a `Task.detached` runs on the
-       queue labelled `CacheLane.label`. C1 (reported, plain runs only, when
-       the long fixtures can be made) 30 s of `long-sine` read on a GCD queue
-       alone, then again while one blocking task per core holds the Swift
-       cooperative pool: whether the GCD read stalls.
+       queue labelled `CacheLane.label`. Issue #369 (every `AVAssetReader`
+       user audited against spec §11 #367): L5 a body through
+       `MediaImporter.offPool` from a `Task.detached` runs on the queue
+       labelled `MediaImporter.readQueueLabel`. R0 (control) the witness
+       `ReaderPool` reads a note from a `Task.detached` as on the cooperative
+       pool and one from a serial GCD queue as off it. R1 `waitForProbe` of
+       `pq.mov` answers `color.pq`, and `DecoderSupport.decodesFirstFrame` and
+       `MediaImporter.firstSample` both ran, neither on the pool. R2
+       `MediaImporter.thumbnails` of a fresh UUID-named copy of `hlg441.mov`,
+       awaited in a `Task.detached`, wrote its 48 kHz audio copy
+       (`AudioRateCopy.write`) off the pool. The two fixtures (FIXTURES,
+       `hevc_videotoolbox` Main 10 as `hdr_proof.hevc10` makes them, 320×180
+       2 s `testsrc2`: `pq.mov` bt2020/smpte2084/bt2020nc with no audio and no
+       HDR10 metadata, `hlg441.mov` bt2020/arib-std-b67/bt2020nc with a 440 Hz
+       44.1 kHz AAC sine) are built once into `fixtures/` and passed as
+       `--pq`/`--hlg` on every probe run, plain and mutant; one that cannot be
+       made leaves its row not performed (exit 2). C1 (reported, plain runs
+       only, when the long fixtures can be made) 30 s of `long-sine` read on a
+       GCD queue alone, then again while one blocking task per core holds the
+       Swift cooperative pool: whether the GCD read stalls.
 app    one owned instance (`mcp.launch`, stopped by its pid). F0 the long
        fixtures exist and are 48 kHz. P1 the spike's 20 W packages
        (`constant_render_spike.w_package`, `SETTLE` off), each saved and closed
@@ -43,7 +59,10 @@ app    one owned instance (`mcp.launch`, stopped by its pid). F0 the long
 Mutants. Probe mutants are source copies (`cache_pass_probe.mutate`'s
 shape) and run B0 and their row: `wide` (width 64; L1), `lifo` (the pending
 list taken from its end; L2), `slot-leak` (the running count never
-decremented; L3), `inline` (the body run on the submitting thread; L4). App
+decremented; L3), `inline` (the body run on the submitting thread; L4),
+`probe-inline` (`probeAsset`'s hop back to the two direct calls; R1),
+`thumbs-inline` (`thumbnails`' hop back to a direct `thumbnailReader`; R2) and
+`pool-blind` (`ReaderPool.isCooperative` answers false; R0). App
 mutants are tree copies built by `tree_copy.build_app` (`RC_PROOF_APP`
 chooses the configuration, held to Release by RELEASE_ONLY) and run F0, D0,
 P1 and W1. The scored app mutant is `no-lane` (the three `onCacheLane`
@@ -87,6 +106,7 @@ PACKAGES = WORK / "packages"
 DOCS = WORK / "docs"
 LOG = WORK / "framejob.log"
 SAMPLE = WORK / "sample-W1.txt"
+FIXTURES = WORK / "fixtures"
 PROBE_SOURCE = ROOT / "tools/proof/cache_lane_probe.swift"
 SOURCES = ROOT / "app/Sources"
 
@@ -107,6 +127,15 @@ RELEASE_ONLY = ("W1 and W2 bound decode work in wall seconds, and a Debug decode
 
 WIDTH = ("MediaCacheLane.swift", "static let width = 2", "static let width = 64")
 INLINE = ("MediaCacheLane.swift", "queue.async(execute: run)", "run()")
+PROBE_HOP = (
+    "            let (detected, decodes) = await offPool {\n"
+    "                (detectedColor(descriptions) ?? detectedPQ(descriptions, track: track, asset: asset),\n"
+    "                 DecoderSupport.decodesFirstFrame(of: track, in: asset))\n"
+    "            }\n")
+PROBE_DIRECT = (
+    "            let (detected, decodes) = (\n"
+    "                detectedColor(descriptions) ?? detectedPQ(descriptions, track: track, asset: asset),\n"
+    "                DecoderSupport.decodesFirstFrame(of: track, in: asset))\n")
 
 # name: (group, the row it must fail, [(file, before, after), ...])
 MUTANTS = {
@@ -116,6 +145,13 @@ MUTANTS = {
     "slot-leak": ("probe", "L3", [
         ("MediaCacheLane.swift", "running -= 1", "_ = running")]),
     "inline": ("probe", "L4", [INLINE]),
+    "probe-inline": ("probe", "R1", [("MediaImporter.swift", PROBE_HOP, PROBE_DIRECT)]),
+    "thumbs-inline": ("probe", "R2", [
+        ("MediaImporter.swift",
+         "await offPool { thumbnailReader(for: media, asset: asset, track: track, input: input) }",
+         "thumbnailReader(for: media, asset: asset, track: track, input: input)")]),
+    "pool-blind": ("probe", "R0", [
+        ("ReaderPool.swift", 'label.hasSuffix(".cooperative")', "false")]),
     "no-lane": ("app", "W1", [
         ("MediaImporter.swift",
          "return await onCacheLane {\n"
@@ -193,9 +229,69 @@ def build_probe(sources, here):
     return binary, None
 
 
+# name: (probe flag, primaries, transfer, matrix, with 44.1 kHz audio)
+FIXTURE_SPECS = {
+    "pq": ("--pq", "bt2020", "smpte2084", "bt2020nc", False),
+    "hlg441": ("--hlg", "bt2020", "arib-std-b67", "bt2020nc", True),
+}
+
+
+def make_fixture(name):
+    """`fixtures/<name>.mov`, made once by `hevc_videotoolbox` Main 10 as
+    `hdr_proof.hevc10` makes its fixtures: (path, None) or (None, why)."""
+    _, primaries, transfer, matrix, audio = FIXTURE_SPECS[name]
+    out = FIXTURES / f"{name}.mov"
+    want = {"codec_name": "hevc", "profile": "Main 10", "color_primaries": primaries,
+            "color_transfer": transfer, "color_space": matrix}
+
+    def check():
+        done = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_streams", "-of", "json", str(out)],
+            capture_output=True, text=True, timeout=60)
+        streams = json.loads(done.stdout or "{}").get("streams", [])
+        video = next((s for s in streams if s.get("codec_type") == "video"), {})
+        sound = [s for s in streams if s.get("codec_type") == "audio"]
+        wrong = {k: video.get(k) for k, v in want.items() if video.get(k) != v}
+        if audio and not (sound and sound[0].get("sample_rate") == "44100"):
+            wrong["audio"] = [s.get("sample_rate") for s in sound]
+        if not audio and sound:
+            wrong["audio"] = "present"
+        return wrong
+
+    try:
+        if out.exists() and not check():
+            return out, None
+        if not all(shutil.which(t) for t in ("ffmpeg", "ffprobe")):
+            return None, "ffmpeg and ffprobe are needed"
+        FIXTURES.mkdir(parents=True, exist_ok=True)
+        partial = FIXTURES / f"{name}.partial.mov"
+        inputs = ["-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30:duration=2"]
+        if audio:
+            inputs += ["-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100:duration=2"]
+        params = f"color_primaries={primaries}:color_trc={transfer}:colorspace={matrix}"
+        command = (["ffmpeg", "-y", "-v", "error", *inputs,
+                    "-vf", f"format=yuv420p10le,setparams={params}",
+                    "-c:v", "hevc_videotoolbox", "-profile:v", "main10", "-pix_fmt", "p010le",
+                    "-tag:v", "hvc1", "-b:v", "8M",
+                    "-color_primaries", primaries, "-color_trc", transfer,
+                    "-colorspace", matrix]
+                   + (["-c:a", "aac", "-ar", "44100"] if audio else ["-an"])
+                   + [str(partial)])
+        done = subprocess.run(command, capture_output=True, text=True, timeout=300)
+        if done.returncode != 0:
+            return None, f"ffmpeg exited {done.returncode}: {done.stderr.strip()[-300:]}"
+        partial.replace(out)
+        wrong = check()
+        if wrong:
+            return None, f"ffprobe reads {wrong}"
+        return out, None
+    except Exception as error:  # a fixture that cannot be made leaves its row not performed
+        return None, f"{type(error).__name__}: {error}"
+
+
 def probe_group(run, mutant):
-    """B0 and L1–L4 (a mutant: B0 and its row). False when a mutant's control
-    could not be performed."""
+    """B0, L1–L5 and R0–R2 (a mutant: B0 and its row). False when a mutant's
+    control could not be performed."""
     here = WORK / "probe" / (f"mutant-{mutant}" if mutant else "tree")
     shutil.rmtree(here, ignore_errors=True)
     here.mkdir(parents=True)
@@ -209,14 +305,23 @@ def probe_group(run, mutant):
         sources = here / "Sources"
     binary, why = build_probe(sources, here)
     run.row("B0", "ok" if binary else "FAIL", why or f"built from {sources}")
-    arguments, c1_why = [], None
+    arguments, c1_why, fixture_why = [], None, {}
+    if binary:
+        for name, (flag, *_) in FIXTURE_SPECS.items():
+            path, why = make_fixture(name)
+            if path is None:
+                fixture_why[flag] = f"{name}.mov: {why}"
+            else:
+                arguments += [flag, str(path)]
     if binary and not mutant:
         try:
             crs.make_long()
-            arguments = [str(crs.LONG["sine"])]
+            arguments += [str(crs.LONG["sine"])]
         except Exception as error:  # C1 is reported only; no fixture, no measurement
             c1_why = f"not measured: no long fixture ({type(error).__name__}: {error})"
-    wanted = [MUTANTS[mutant][1]] if mutant else ["L1", "L2", "L3", "L4"]
+    wanted = ([MUTANTS[mutant][1]] if mutant
+              else ["L1", "L2", "L3", "L4", "L5", "R0", "R1", "R2"])
+    needs = {"R1": "--pq", "R2": "--hlg"}
     if binary is None:
         for name in wanted:
             run.row(name, "FAIL", "not run: the probe did not build")
@@ -235,12 +340,17 @@ def probe_group(run, mutant):
         why = f"no answer: {error}"
     for name in wanted:
         got = answered.get(name)
-        if got is None:
+        if needs.get(name) in fixture_why:
+            run.row(name, "FAIL", f"not performed: {fixture_why[needs[name]]}")
+            run.not_performed.append(f"{name}: {fixture_why[needs[name]]}")
+        elif got is None:
             run.row(name, "FAIL", f"not scored: {why or 'the probe did not answer it'}")
             if mutant:
                 run.not_performed.append(f"mutant {mutant}: {name} not scored")
         else:
             run.row(name, "ok" if got["pass"] else "FAIL", got["detail"])
+            if got["detail"].startswith("not performed"):
+                run.not_performed.append(f"{name}: {got['detail']}")
     if not mutant:
         got = answered.get("C1")
         run.row("C1", "reported", got["detail"] if got else (c1_why or f"not measured: {why}"))

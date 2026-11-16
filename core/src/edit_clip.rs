@@ -39,6 +39,7 @@
 
 use std::collections::HashMap;
 
+use crate::edit_cut_rule::Pieces;
 use crate::edit_link::{pair_split_halves, relink_copies};
 use crate::edit_split::split_clip;
 use crate::model::{AudioProps, Clip, Media, MediaKind, Project, Source, Track, VideoProps};
@@ -311,12 +312,78 @@ impl Project {
     ///
     /// A linked partner is cut too, and the halves are paired (spec §11
     /// AU-92, `edit_link.rs`'s `pair_split_halves`).
+    ///
+    /// **Refused, nothing cut, when the cut would break THE overlap rule**
+    /// on a track it changed — a piece left too short for the transition it
+    /// carries — in `edit_cut_rule.rs`'s sentence (spec §11 #427).
     pub fn split_clips(&self, clips: &[u32], at: Ticks) -> Result<Outcome, String> {
-        let at = self.snapped(at);
+        let mut pieces = Pieces::new();
+        let Some(next) = self.cut_clips(clips, at, &mut pieces)? else {
+            return Ok(Outcome::Identity);
+        };
+        if let Some(why) = self.cut_refusal(&next, &pieces) {
+            return Ok(Outcome::Refused(why));
+        }
+        Ok(Outcome::Applied(next))
+    }
+
+    /// [`Project::split_clips`]' cut with no rule asked: each named clip
+    /// and its linked partner cut at `at`, the halves paired, each second
+    /// half's source recorded in `pieces`, and the result through `finish`
+    /// (so `validate` and the caps judge every cut, as they always did).
+    /// `None` when nothing was cut.
+    ///
+    /// The range ops, `overwrite_clip` and `retime_range` cut through this
+    /// and ask the overlap rule once, of what they would store: a piece one
+    /// cut leaves too short may be one they remove (spec §11 #427 (a)).
+    pub(crate) fn cut_clips(
+        &self,
+        clips: &[u32],
+        at: Ticks,
+        pieces: &mut Pieces,
+    ) -> Result<Option<Project>, String> {
         let ids = self.with_links(clips)?;
+        self.cut_ids(&ids, at, pieces)
+    }
+
+    /// Cuts every clip on the named tracks that `at`, snapped, is strictly
+    /// inside, and nothing else: unlike [`Project::cut_clips`] no linked
+    /// partner is added from another track, so a track not named keeps
+    /// exactly what it had and an uncut partner is paired by
+    /// `pair_split_halves`' uncut arm (spec §11 #602 (b)). A locked track
+    /// is skipped, though `lift_range`, the one caller, refuses one first.
+    pub(crate) fn cut_on_tracks(
+        &self,
+        tracks: &[u32],
+        at: Ticks,
+        pieces: &mut Pieces,
+    ) -> Result<Option<Project>, String> {
+        let snapped = self.snapped(at);
+        let ids: Vec<u32> = self
+            .clips
+            .iter()
+            .filter(|c| tracks.contains(&c.track))
+            .filter(|c| self.track(c.track).is_some_and(|t| !t.locked))
+            .filter(|c| c.start < snapped && snapped < clip_end(c))
+            .map(|c| c.id)
+            .collect();
+        self.cut_ids(&ids, at, pieces)
+    }
+
+    /// The cut both of those share, over `ids` exactly as given: each cut
+    /// at `at`, snapped, the halves paired, each second half's source
+    /// recorded in `pieces`, and the result through `finish`. `None` when
+    /// nothing was cut.
+    fn cut_ids(
+        &self,
+        ids: &[u32],
+        at: Ticks,
+        pieces: &mut Pieces,
+    ) -> Result<Option<Project>, String> {
+        let at = self.snapped(at);
         let mut next = self.clone();
         let mut halves: Vec<(u32, u32)> = Vec::new();
-        for id in ids {
+        for &id in ids {
             // `split_clip` allocates the second half's id first.
             let second = next.next_id;
             if split_clip(&mut next, id, at) {
@@ -324,10 +391,18 @@ impl Project {
             }
         }
         if halves.is_empty() {
-            return Ok(Outcome::Identity);
+            return Ok(None);
         }
         pair_split_halves(&mut next, &halves);
-        self.finish(next)
+        for (first, second) in &halves {
+            pieces.halved(*first, *second);
+        }
+        // `finish` never refuses, and a cut that minted a clip is never an
+        // identity.
+        match self.finish(next)? {
+            Outcome::Applied(cut) => Ok(Some(cut)),
+            Outcome::Identity | Outcome::Refused(_) => Ok(None),
+        }
     }
 
     /// Cuts every clip on an UNLOCKED track that `at` falls strictly inside
@@ -339,15 +414,29 @@ impl Project {
     /// identity, which is the same answer a list of clips none of which
     /// straddles `at` gets there.
     pub fn split_under_playhead(&self, at: Ticks) -> Result<Outcome, String> {
+        self.split_clips(&self.under_playhead(at), at)
+    }
+
+    /// [`Project::split_under_playhead`]'s selection cut by
+    /// [`Project::cut_clips`], asking no rule.
+    pub(crate) fn cut_under_playhead(
+        &self,
+        at: Ticks,
+        pieces: &mut Pieces,
+    ) -> Result<Option<Project>, String> {
+        self.cut_clips(&self.under_playhead(at), at, pieces)
+    }
+
+    /// Every clip on an unlocked track that `at`, snapped, is strictly
+    /// inside.
+    fn under_playhead(&self, at: Ticks) -> Vec<u32> {
         let at = self.snapped(at);
-        let ids: Vec<u32> = self
-            .clips
+        self.clips
             .iter()
             .filter(|c| self.track(c.track).is_some_and(|t| !t.locked))
             .filter(|c| c.start < at && at < clip_end(c))
             .map(|c| c.id)
-            .collect();
-        self.split_clips(&ids, at)
+            .collect()
     }
 
     /// Removes the named clips. Gaps stay — rippling is `edit_time`'s job

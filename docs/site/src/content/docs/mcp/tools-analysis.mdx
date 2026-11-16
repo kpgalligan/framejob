@@ -72,7 +72,7 @@ With `clip`, each cut, sample or window also has `clip_time`, in ticks from the 
 
 ### Long analyses and big answers
 
-A call waits at most 60 s. After that it stops and says how much of the window was covered, for example "The faces analysis of media 2 covered 41.0 s of the window's 120.0 s in the 60 s a call waits; what it covered is kept — call again to continue." What was covered is kept, so another call carries on from there.
+A call waits at most 60 s. After that it stops and says how much of the window was covered, for example "The faces analysis of media 2 covered 41.0 s of the window's 120.0 s in the 60 s a call waits; what it covered is kept — call again to continue." What was covered is kept, and so is anything found after it before the call gave up, so another call carries on from there.
 
 An answer over 512 KiB of cuts, runs, samples or windows is refused, and the sentence names the largest `to` that fits. So read a long file in `from` and `to` windows. Here's how much fits in one answer:
 

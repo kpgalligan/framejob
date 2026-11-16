@@ -13,7 +13,9 @@ import AppKit
 /// over the tab's `cutTable()`), and `cut` is the selection's plan. Since
 /// TX3b (TX-34) it clicks a pause token (`select_pause`, the mouse's
 /// `TranscriptView.clickPause`) and answers the pauses shown, the selected
-/// one and, with one selected, its plan as `cut`.
+/// one and, with one selected, its plan as `cut`. Since #434 (TX-38) it
+/// drives the find bar (`find`, `find_step`) and answers `find`
+/// (`AgentServer+TranscriptFind.swift`).
 ///
 /// **It runs on the SERVER thread** (`devOffMainTools`) so `wait` may poll
 /// the tab's source until it is settled; every step is an `onMain` hop.
@@ -55,6 +57,7 @@ extension AgentServer {
             throw ToolError(message: "select, click and select_pause each set the selection: pass one.")
         }
         let bar = try transcriptBarArguments(a)
+        let find = try transcriptFindArguments(a)
         if select != nil || click != nil || selectPause != nil,
             bar.wordsFrom != nil || bar.language != nil
         {
@@ -84,6 +87,7 @@ extension AgentServer {
                     message: "select_pause names pause \(selectPause); the tab shows \(shownPauses).")
             }
             try Self.checkBar(bar, pane)
+            try Self.checkFind(find, pane)
             if let track = bar.wordsFrom { pane.bar.chooseWordsFrom(track) }
             if let language = bar.language { pane.bar.chooseLanguage(language) }
             if bar.read { pane.bar.pressRead() }
@@ -91,6 +95,7 @@ extension AgentServer {
             if let select { view.select(select.map { $0[0]...$0[1] }) }
             if let click { view.click(token: click) }
             if let selectPause { view.clickPause(selectPause) }
+            Self.applyFind(find, pane)
             return pane
         }
         let deadline = Date().addingTimeInterval(wait)
@@ -261,6 +266,7 @@ extension AgentServer {
                 ]
             },
             "pause_selection": view.pauseSelection ?? NSNull(),
+            "find": Self.findAnswer(pane),
             "first_responder": view.window?.firstResponder === view,
             "fill": fill,
             "owns_want": source.ownsWant,
@@ -322,8 +328,9 @@ extension AgentServer {
                 + "pauses shown, select_pause together with select or click, select, click or "
                 + "select_pause together with words_from or language, read together with "
                 + "words_from or language, "
-                + "stop_after while Stop is not shown, and read while Read is not shown.",
-            [
+                + "stop_after while Stop is not shown, and read while Read is not shown."
+                + Self.transcriptFindProse,
+            Self.transcriptFindProperties.merging([
                 "focus": [
                     "type": "boolean",
                     "description": "true makes the transcript view first responder, as a click "
@@ -372,7 +379,7 @@ extension AgentServer {
                     "type": "boolean",
                     "description": "true presses the bar's Read, shown after Stop.",
                 ],
-            ])
+            ]) { own, _ in own })
     }
 }
 #endif

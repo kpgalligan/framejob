@@ -77,7 +77,9 @@ impl Fps {
     /// The integer frame count per timecode second used by NON-DROP
     /// timecode: `ceil(num/den)`, so 30000/1001 counts 00..29 and
     /// 24000/1001 counts 00..23. Non-drop deliberately drifts from wall
-    /// clock; that drift is the definition, not a bug. `None` for a
+    /// clock; that drift is the definition, not a bug. Only an NTSC rate
+    /// ([`Fps::counts_nominal_seconds`]) counts timecode this way; any other
+    /// fractional rate counts real seconds (spec §11 #532). `None` for a
     /// degenerate rate.
     pub fn nominal(self) -> Option<i64> {
         if !self.is_valid() {
@@ -93,6 +95,24 @@ impl Fps {
             Some(n)
         }
     }
+
+    /// True when a timecode second at this rate is `nominal()` frames: an
+    /// NTSC rate, whose denominator over the gcd of its terms is 1001, so
+    /// `[60000, 2002]` is `[30000, 1001]` and `[120120, 1001]` (120, whole)
+    /// is not. Every other rate counts real seconds (spec §11 #532); at a
+    /// whole rate the two counts agree.
+    pub fn counts_nominal_seconds(self) -> bool {
+        self.is_valid() && self.den / gcd(self.num, self.den) == 1001
+    }
+}
+
+/// Greatest common divisor, Euclid's. `gcd(a, 0) == a`.
+fn gcd(a: u32, b: u32) -> u32 {
+    let (mut a, mut b) = (a, b);
+    while b != 0 {
+        (a, b) = (b, a % b);
+    }
+    a
 }
 
 // ---- rational helpers ----------------------------------------------------
@@ -365,8 +385,49 @@ pub fn ticks_to_seconds(t: Ticks) -> f64 {
 
 // ---- timecode ------------------------------------------------------------
 
-/// Non-drop timecode: `"HH:MM:SS:FF"` when `frames`, else
-/// `"HH:MM:SS.mmm"`. Negative times get a leading `-`. Hours are not
+/// The whole second a non-negative frame `index` reads in, and the frame
+/// within it. At an NTSC rate a second is `nominal()` frames (non-drop); at
+/// any other rate SS is the second the frame starts in,
+/// `floor(index·den/num)`, and FF counts from that second's first frame,
+/// `ceil(SS·num/den)`, so a 12.5 fps second holds 13 frames then 12 (spec
+/// §11 #532). `None` for a degenerate rate.
+fn timecode_split(index: i128, fps: Fps) -> Option<(i128, i128)> {
+    if !fps.is_valid() {
+        return None;
+    }
+    if fps.counts_nominal_seconds() {
+        let nominal = i128::from(fps.nominal()?);
+        return Some((index.div_euclid(nominal), index.rem_euclid(nominal)));
+    }
+    let num = i128::from(fps.num);
+    let den = i128::from(fps.den);
+    let seconds = (index * den).div_euclid(num);
+    let first = (seconds * num + den - 1).div_euclid(den);
+    Some((seconds, index - first))
+}
+
+/// [`timecode_split`]'s inverse: the frame index `frames` after the first
+/// frame of whole second `seconds`. `None` for a degenerate rate or an
+/// overflow.
+fn timecode_index(seconds: i128, frames: i128, fps: Fps) -> Option<i128> {
+    if !fps.is_valid() {
+        return None;
+    }
+    let first = if fps.counts_nominal_seconds() {
+        seconds.checked_mul(i128::from(fps.nominal()?))?
+    } else {
+        let den = i128::from(fps.den);
+        seconds
+            .checked_mul(i128::from(fps.num))?
+            .checked_add(den - 1)?
+            .div_euclid(den)
+    };
+    first.checked_add(frames)
+}
+
+/// Timecode: `"HH:MM:SS:FF"` when `frames` — non-drop at an NTSC rate, real
+/// seconds at any other fractional rate (spec §11 #532, [`timecode_split`])
+/// — else `"HH:MM:SS.mmm"`. Negative times get a leading `-`. Hours are not
 /// wrapped — a 100-hour timeline prints `100:00:00:00`. A degenerate rate
 /// falls back to the milliseconds form, which does not need a rate.
 ///
@@ -382,12 +443,10 @@ pub fn format_timecode(t: Ticks, fps: Fps, frames: bool) -> String {
     let sign_of = |reading: i128| if t < 0 && reading != 0 { "-" } else { "" };
 
     if frames {
-        if let (Some(nominal), Some(index)) =
-            (fps.nominal(), frame_index(clamp_ticks(magnitude), fps))
+        if let Some((index, (total_seconds, ff))) = frame_index(clamp_ticks(magnitude), fps)
+            .and_then(|index| timecode_split(i128::from(index), fps).map(|split| (index, split)))
         {
             let sign = sign_of(i128::from(index));
-            let ff = index % nominal;
-            let total_seconds = index / nominal;
             let ss = total_seconds % 60;
             let mm = (total_seconds / 60) % 60;
             let hh = total_seconds / 3600;
@@ -430,7 +489,6 @@ pub fn parse_timecode(s: &str, fps: Fps) -> Option<Ticks> {
         // Frames form. Only the last field may name frames, and none of the
         // fields may carry a fraction — "00:00:01:12.5" is not a timecode.
         [hh, mm, ss, ff] => {
-            let nominal = fps.nominal()?;
             let hours = parse_digits(hh)?;
             let minutes = parse_digits(mm)?;
             let seconds = parse_digits(ss)?;
@@ -438,10 +496,7 @@ pub fn parse_timecode(s: &str, fps: Fps) -> Option<Ticks> {
             let whole = hours
                 .checked_mul(3600)?
                 .checked_add(minutes.checked_mul(60)?)?;
-            let index = whole
-                .checked_add(seconds)?
-                .checked_mul(i128::from(nominal))?;
-            let index = index.checked_add(frames)?;
+            let index = timecode_index(whole.checked_add(seconds)?, frames, fps)?;
             i128::from(tick_at_frame(clamp_ticks(index), fps)?)
         }
         [hh, mm, ss] => {

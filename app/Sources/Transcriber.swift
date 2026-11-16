@@ -119,7 +119,7 @@ final class Transcriber {
                 return "\(name) is not installed on this Mac. A person has to install it: open "
                     + "File ▸ Generate Captions…, choose it under Language, and press Download."
             case .unavailable(let name):
-                return "The \(name) recogniser is not available right now."
+                return "The \(name) recognizer is not available right now."
             case .unreadable(let name):
                 return "“\(name)” has no audio that could be read."
             case .failed(let reason):
@@ -129,7 +129,7 @@ final class Transcriber {
             case .cancelled:
                 return "The transcription was cancelled."
             case .nothingRecognized:
-                return "No speech was recognised in the audio that was transcribed."
+                return "No speech was recognized in the audio that was transcribed."
             }
         }
     }
@@ -324,7 +324,7 @@ final class Transcriber {
                 if runs.isEmpty {
                     problems.append(
                         CaptionLayout.Problem(
-                            tag: "clip \(job.clip)", reason: "no speech was recognised in it"))
+                            tag: "clip \(job.clip)", reason: "no speech was recognized in it"))
                 }
             } catch TranscribeError.cancelled {
                 throw TranscribeError.cancelled

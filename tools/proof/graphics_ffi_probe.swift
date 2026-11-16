@@ -148,5 +148,56 @@ do {
     answer["p9"] = ["drew": false, "diagnostics": failure(error)]
 }
 
+// P10 — the deep raster of frame 30 (spec §11 PR-15), beside the 8-bit one.
+if let deep = try? library.rasterize(thirty.svg, width: 1920, height: 1080, deep: true) {
+    var far = 0
+    if deep.rgba16.count == 1920 * 1080 * 4, thirty.raster.bgra.count == deep.rgba16.count {
+        let order = [2, 1, 0, 3]
+        for pixel in 0..<(1920 * 1080) {
+            for c in 0..<4 {
+                let eight = Int(thirty.raster.bgra[pixel * 4 + order[c]]) * 257
+                far = max(far, abs(eight - Int(deep.rgba16[pixel * 4 + c])))
+            }
+        }
+    }
+    answer["p10"] = ["values": deep.rgba16.count, "bgra": deep.bgra.count, "deep": deep.isDeep,
+                     "bytes": deep.byteCount, "eight_bytes": thirty.raster.byteCount,
+                     "eight_deep": thirty.raster.isDeep, "stride": deep.stride, "far": far,
+                     "warnings": diagnostics(deep.warnings)]
+} else {
+    answer["p10"] = ["drew": false]
+}
+
+// P11 — `Exporter.graphicsDeep` for every row the core lists, in an SDR and an HLG project.
+func depths(_ project: ReelProject, _ overrides: [String: Any]?) -> [String: Any] {
+    var out: [String: Any] = [:]
+    for preset in ReelExport.presets() {
+        if let settings = try? ReelExport.settings(project, preset: preset.id, overrides: overrides) {
+            out[preset.id] = Exporter.graphicsDeep(settings)
+        } else {
+            out[preset.id] = "refused"
+        }
+    }
+    return out
+}
+if let empty = ReelProject.new(width: 1920, height: 1080, fps: Fps(num: 30, den: 1)),
+   let track = empty.snapshot.tracks.first?.id,
+   let sdr = (try? empty.applying(ReelOp.addShapeClip(track: track, at: 0, shape: .rectangle)))?
+       .project,
+   let hlg = (try? sdr.applying(ReelOp.setCanvas(output: .hlg)))?.project {
+    answer["p11"] = ["sdr": depths(sdr, nil), "hlg": depths(hlg, nil),
+                     "pq": depths(hlg, ["dynamic_range": "pq"]),
+                     "sdr_version": depths(hlg, ["dynamic_range": "sdr"])]
+} else {
+    answer["p11"] = ["made": false]
+}
+
+// P12 — the texture key: today's string at 8 bits, another when deep.
+answer["p12"] = [
+    "eight": LayerRenderers.textureKey(svg: "<svg/>", width: 640, height: 360, libraryVersion: "v"),
+    "deep": LayerRenderers.textureKey(
+        svg: "<svg/>", width: 640, height: 360, libraryVersion: "v", deep: true),
+]
+
 answer["ok"] = true
 finish()

@@ -9,7 +9,9 @@ import AppKit
 /// one `set_audio` per clip, never through `InspectorBinding.ops(audio:)`,
 /// whose one shared patch and action routing would both be wrong
 /// (`AudioPane.normalize`'s argument). Nothing to enhance, or a second
-/// press, beeps. `enhance_voice` runs the same read, run and plan.
+/// press, beeps, and the inspector's foot says why, as it names a clip left
+/// away from the target (spec §11 AU-169). `enhance_voice` runs the same
+/// read, run and plan.
 extension AudioPane {
 
     /// The button, its tooltip the rules in a sentence.

@@ -15,6 +15,10 @@ in §6).
   every `make app`, and a nested executable of H1's size, signed separately.
   **Amended by NM-5** (rename R0): `Contents/Helpers/reelcut-agent` is now
   `Contents/Helpers/framejob-agent`.
+  **Amended by SA-1** (2026-11-12, road map "swift-helper"): the helper becomes a Swift
+  executable built from a SwiftPM package in `agent/` on Slaude, the owner's Swift client for the
+  Claude API. What this entry says of Bun, the Tool Runner and the one TypeScript in the product,
+  and its risk of Bun in every `make app`, holds until that road map's switch (SA3) lands.
 - **AI-2 — The helper owns no tools; every call goes through `AgentServer.execute` by way of
   one lane.** An `AgentLane` holds one lock around every tool call from either caller, the MCP
   trampoline and the assistant session; the trampoline's call to it is the only wiring change
@@ -97,6 +101,10 @@ in §6).
   changed in Settings, and with "Clear old tool results" on, the API's clearing is a second
   rewrite — of what the model sees in a request past 150 000 tokens, possibly mid-turn, not of
   the helper's history. Each clearing breaks the prompt cache once.
+  **Amended by SA-4** (2026-11-12, road map "swift-helper"): from that road map's switch (SA3),
+  compaction is the Swift helper's explicit rule (`Compaction.swift`, `Turn.swift`) in place of the
+  Tool Runner's in `agent/src/main.ts`: a final reply's unrun tool calls are answered at once, no
+  summary is requested after such a reply, and an empty summary is a failure, never a swap.
 - **AI-10 — Each tool call the assistant makes is its own undo step,** exactly as an MCP call
   is. A turn is not grouped, and the Edit menu names the step as it would for the same call
   from MCP (§6.4). Risk accepted: a ten-call turn is ten Undos.
@@ -123,6 +131,9 @@ in §6).
   variable cannot be persisted in the app's defaults, which is R6-9 (c)'s reason. Risk
   accepted: a person who exports it sends their environment's key, and only that, to the
   server it names.
+  **Amended by SA-5** (2026-11-12, road map "swift-helper"): from that road map's switch (SA3),
+  `api_base` is read by the Swift helper's `Protocol.swift` in place of the shared `protocol.ts`;
+  what it means, and where the app takes it from, do not change.
 - **AI-14 — A selection change that is not a click on a clip leaves the Assistant tab
   showing; a click on a clip still shows Clip.** The inspector's switch to Clip on a changed
   selection (`InspectorViewController.refresh(isLive:)`) runs only from the Media and Document
@@ -145,6 +156,9 @@ in §6).
   Risk accepted: about sixty tokens on every message, and the block is the state at send time,
   so after its own edits the model re-reads with `get_project`.
   **Amended by NM-5** (rename R0): `<reelcut_context>` is now `<framejob_context>`.
+  **Amended by SA-11** (2026-11-12, road map "swift-helper" SA4): "`agent/` is one diff with
+  Rasterize (#147)" is struck; `agent/` is Frame Job's own package, with no identity rule. The
+  rest stands: `configure` is still the helper's only system channel.
 - **AI-16 — Stop stops a running `export` or on-device `transcribe`; any other running call
   finishes.** Each call the session submits carries a per-call token through
   `AgentLane.submit`, and Stop cancels the running call's token. The lane answers a call whose
@@ -236,6 +250,13 @@ in §6).
   `FrameJobAssistantAutoCompact`; `ReelcutAssistantAutoCompactTokens` is now
   `FrameJobAssistantAutoCompactTokens`; `ReelcutAssistantClearToolResults` is now
   `FrameJobAssistantClearToolResults`.
+  **Amended by SA-4** (2026-11-12, road map "swift-helper"): from that road map's switch (SA3),
+  `CLEAR_TRIGGER_TOKENS` is the Swift helper's `Request.clearTriggerTokens`, still 150 000.
+  **Run** (road map "swift-helper" SA5): the capped live clearing proof
+  (`tools/proof/assistant_clearing_proof.py --live`) has run twice, each 7/7 with none skipped: on
+  2026-10-01 on the Bun helper (#208, `--cap 3`, $0.1252 settled) and on 2026-11-12 on the Swift
+  helper (`--cap 5`, $0.0758), so `context_management` has reached the real API and no live
+  clearing proof is owed. The risk's other halves stand.
 - **AI-21 — The ask-first question names the file the tool will write, covers every path the
   model chose, and is not put for a call that can only be refused on its path** (docs bugs c1,
   #461, #462, #494; amends AI-7). (a) `new_project`, `render_frame` and `render_graphic` are

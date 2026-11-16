@@ -35,32 +35,53 @@ def replace_once(path, before, after):
     path.write_text(text.replace(before, after))
 
 
-def mutate(core, name):
-    source = core / "src"
-    if name == "null-as-absent":
-        path = source / "edit.rs"
-        replace_once(path, "        #[serde(default)]\n        ripple: bool,",
-                     "        #[serde(default, deserialize_with = \"null_is_false\")]\n        ripple: bool,")
-        anchor = "use crate::time::{Fps, Ticks};\n"
-        helper = ("\nfn null_is_false<'de, D: serde::Deserializer<'de>>(source: D) "
-                  "-> Result<bool, D::Error> {\n"
-                  "    Ok(Option::<bool>::deserialize(source)?.unwrap_or(false))\n}\n")
-        replace_once(path, anchor, anchor + helper)
-        return [("op_nullability", "every_optional_field_has_its_real_null_contract")]
-    if name == "unsnapped-marker":
-        path = source / "edit_track.rs"
-        replace_once(path,
-                     "        let at = self.snapped(at).max(0);\n        if let Some(existing) = self.markers.iter().find(|m| m.time == at) {",
-                     "        let at = at.max(0);\n        if let Some(existing) = self.markers.iter().find(|m| m.time == at) {")
-        return [("op_ticks", "marker_off_grid_rounds_before_storage")]
-    if name == "nearest-transition":
-        replace_once(source / "edit_transition.rs", "        let requested = duration / frame;",
-                     "        let requested = (duration + frame / 2) / frame;")
-        replace_once(source / "edit_transition_shift.rs", "        let asked = duration / frame;",
-                     "        let asked = (duration + frame / 2) / frame;")
-        return [("op_ticks", "transition_floor_handle_mode"),
-                ("op_ticks", "transition_floor_ripple_mode")]
-    raise RuntimeError(f"unknown mutant {name}")
+# The negative controls: each mutant's edits (a file from the repo root, the text that must
+# occur there exactly once, its replacement), the tests that must then fail, and the text their
+# failure must carry. `mutate` and `negative` read this table and `mutant_anchors.py` counts
+# its anchors in `make test`.
+SERDE_USE = "use crate::time::{Fps, Ticks};\n"
+MUTANTS = {
+    "null-as-absent": {
+        "edits": [
+            ("core/src/edit.rs", "        #[serde(default)]\n        ripple: bool,",
+             "        #[serde(default, deserialize_with = \"null_is_false\")]\n        ripple: bool,"),
+            ("core/src/edit.rs", SERDE_USE,
+             SERDE_USE + "\nfn null_is_false<'de, D: serde::Deserializer<'de>>(source: D) "
+             "-> Result<bool, D::Error> {\n"
+             "    Ok(Option::<bool>::deserialize(source)?.unwrap_or(false))\n}\n"),
+        ],
+        "tests": [("op_nullability", "every_optional_field_has_its_real_null_contract")],
+        "signature": '"ripple":null}: no clip with id 1',
+    },
+    "unsnapped-marker": {
+        "edits": [
+            ("core/src/edit_track.rs",
+             "        let at = self.snapped(at).max(0);\n        if let Some(existing) = self.markers.iter().find(|m| m.time == at) {",
+             "        let at = at.max(0);\n        if let Some(existing) = self.markers.iter().find(|m| m.time == at) {"),
+        ],
+        "tests": [("op_ticks", "marker_off_grid_rounds_before_storage")],
+        "signature": "assertion `left == right` failed",
+    },
+    "nearest-transition": {
+        "edits": [
+            # Round to nearest instead of counting down: half a frame added before the count.
+            ("core/src/edit_transition.rs", "        let requested = frames_in(duration, fps);",
+             "        let requested = frames_in(duration + crate::time::one_frame(fps) / 2, fps);"),
+            ("core/src/edit_transition_shift.rs", "        let asked = frames_in(duration, fps);",
+             "        let asked = frames_in(duration + crate::time::one_frame(fps) / 2, fps);"),
+        ],
+        "tests": [("op_ticks", "transition_floor_handle_mode"),
+                  ("op_ticks", "transition_floor_ripple_mode")],
+        "signature": "assertion `left == right` failed",
+    },
+}
+
+
+def mutate(root, name):
+    """Apply a mutant's edits under `root`, a folder holding a copy of `core/`."""
+    for file, before, after in MUTANTS[name]["edits"]:
+        replace_once(root / file, before, after)
+    return MUTANTS[name]["tests"]
 
 
 def positive():
@@ -77,17 +98,16 @@ def positive():
 
 
 def negative(name):
-    signature = {
-        "null-as-absent": '"ripple":null}: no clip with id 1',
-        "unsnapped-marker": "assertion `left == right` failed",
-        "nearest-transition": "assertion `left == right` failed",
-    }[name]
+    signature = MUTANTS[name]["signature"]
     with tempfile.TemporaryDirectory(prefix=f"framejob-contract-{name}-") as temp:
         temp = Path(temp)
         core = temp / "core"
-        shutil.copytree(ROOT / "core", core,
-                        ignore=shutil.ignore_patterns("target", ".git", ".DS_Store"))
-        commands = mutate(core, name)
+        # `core/Cargo.toml` names `../graphic` and its vendored tiny-skia by path, so the copy
+        # holds both crates side by side as the tree does.
+        for crate in ("core", "graphic"):
+            shutil.copytree(ROOT / crate, temp / crate,
+                            ignore=shutil.ignore_patterns("target", ".git", ".DS_Store"))
+        commands = mutate(temp, name)
         for suite, test in commands:
             result = cargo(core, suite, test, target=temp / "target")
             if "Finished `release` profile" not in result.stdout:
@@ -101,8 +121,7 @@ def negative(name):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mutant", choices=("null-as-absent", "unsnapped-marker",
-                                             "nearest-transition"))
+    parser.add_argument("--mutant", choices=tuple(MUTANTS))
     args = parser.parse_args()
     try:
         if args.mutant:

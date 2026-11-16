@@ -15,8 +15,8 @@ F1–F5, Q0–Q4, Y1), and the UI — the Speed section's Rate inside an action,
 band, the ×12 question for an end rate, the Speed sheet's ramp line — and
 `set_action` on an action past its clip's end (SR5: G1–G6, Z1, Z2).
 
-    env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py [--only IDS]
-    env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py --baseline
+    env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py [--only IDS] [--base REV]
+    env -u RC_ASSEMBLYAI_KEY RC_PROOF_APP=release python3 tools/proof/ramp_proof.py --baseline [--base REV] [--app EXECUTABLE]
     env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py --only E1 --mutant expect-shift
     env -u RC_ASSEMBLYAI_KEY python3 tools/proof/ramp_proof.py --only L1,L2,L3 --mutant keep-shift
 
@@ -58,9 +58,19 @@ D4  `speed: "fast"`, and `speed: 2` on a text clip's action, are each an
 D5  `undo` takes D1's speed out of the end, and `redo` puts it back.
 X0  the fixtures made and read back (`ramp_spike.z0`).
 U1  CX1 (×1), CX2 (×2, keep pitch off) and CK05 (×0.5, keep pitch on), each
-    4 s of the clicks fixture, rebuilt as `--baseline` built them: the plan
+    4 s of the clicks fixture, rebuilt as the baseline built them: the plan
     text and `prores_422`'s video md5 equal `work/ramp-baseline/baseline.json`'s
-    exactly. Every audio stream (`audio_wav`'s and `prores_422`'s, all three
+    exactly. The baseline is the BASE's app's — the commit the change under
+    test started from, found, not pinned (#388): `--base REV`, else
+    `tree_copy.default_base()` — and the row MAKES it when `baseline.json` is
+    missing or names another base or another build configuration: the base
+    built whole in `work/ramp-base/` (`tree_copy.make_base_copy`, `build_app`),
+    driven as `--baseline` drives it, BEFORE this build's instance is launched
+    and in a work folder emptied again afterwards, so neither run reads the
+    other's files. A base that will not build, or a baseline run that fails,
+    is a FAIL of U1. The row names the base, and says so when the tree's build
+    inputs ARE the base's (it then compared two builds of one source, which
+    is still #337's run-to-run check). Every audio stream (`audio_wav`'s and `prores_422`'s, all three
     projects) is decoded (pcm_f32le, its own channels) and must be identical
     to the baseline's same stream, kept beside `baseline.json`, over
     min(round(timeline × rate), its length, the baseline's length). Each
@@ -244,11 +254,26 @@ Z2  (main instance) AV.mov 2 s ramped [0, 2 s) to ×2, `trim_end` to 1 s: `set_a
     curve ease_out` applies on the past-end speed action and `set_action_end
     {speed: 2.5}` applies; the span and the clip's duration are kept.
 
-`--baseline` (before any SR2b app edit, on Release) builds CX1, CX2 and CK05
-and writes `tools/proof/work/ramp-baseline/baseline.json`: the commit and dirt
-of the app's own tree (`--app` may name another checkout's build), the app,
-each project's plan text and md5s, and every audio stream's decoded PCM beside
-it (`<name>-<stream>.f32`); it runs no row but X0 and prints `BL`.
+`--baseline` makes U1's baseline by hand (U1 makes its own when it has none
+for its base): it builds CX1, CX2 and CK05 on the BASE's app (`--base REV`,
+else `tree_copy.default_base()`, built whole as U1 builds it) and writes
+`tools/proof/work/ramp-baseline/baseline.json`: `base` (the commit) and
+`config` (debug or release), the commit and dirt of the app's own tree, the
+app, each project's plan text and md5s, and every audio stream's decoded PCM
+beside it (`<name>-<stream>.f32`); it runs no row but X0 and prints `BL`.
+With `--app EXECUTABLE` it drives that app instead of building one, and
+records `base` only when `--base` names the commit that app was built from;
+without it U1 makes its own baseline again, which is the safe side.
+**The baseline's plan text is the BASE's**: it is read by `base_probe`,
+`ramp_spike_probe` compiled over the base copy's own `app/Sources`, header
+and core (with `--app … --base …` a base copy is made for the probe alone
+and only its core built), and `baseline.json` records `plan_probe: base`.
+U1 keeps a baseline only with that mark, so its plan clause answers the
+same for one tree whether the baseline was kept or made, and a change to
+the core's plan or to Swift's reading of it fails the clause; a probe that
+will not build over the base is a FAIL of U1. Only `--baseline --app` with
+no `--base` reads the plans with this tree's probe (`plan_probe: tree`),
+and U1 never keeps that one.
 `--mutant expect-shift` moves E1's expected clicks 2 ms late (no rebuild): E1
 must fail. `--mutant keep-shift` moves each L row's expectation
 `keep_shift_s(variant)` late, 2 × its ceiling + 1 ms, so a shifted click lands
@@ -291,6 +316,9 @@ WORK = ROOT / "tools/proof/work/ramp"
 EXPORTS = WORK / "exports"
 PROBE_WORK = WORK / "probe"
 BASELINE = ROOT / "tools/proof/work/ramp-baseline/baseline.json"
+# The base's tree, built whole for U1's baseline (#388); outside WORK, which each run empties.
+BASE_COPY = ROOT / "tools/proof/work/ramp-base"
+BUILD_BOUND = 1500
 AV_MOV = ROOT / "tools/proof/media/AV.mov"
 SPEECH_MOV = ROOT / "tools/proof/media/speech.mov"
 SILENCE_MOV = ROOT / "tools/proof/media/silence.mov"
@@ -1033,6 +1061,34 @@ def probe():
     return (binary, None) if binary else (None, how)
 
 
+def base_probe(copy):
+    """(binary, None) or (None, why): the spike probe over the BASE copy's own
+    `app/Sources`, bridging header and core (`tree_copy.make_base_copy`'s
+    folder), so the baseline's plan is the base's and not this tree's. The
+    plan group opens no shader. A copy whose app was not built (`--baseline
+    --app … --base …`) builds its core first."""
+    copy = Path(copy)
+    library = copy / "core/target/release/libframejob_core.a"
+    if not library.exists():
+        made = bounded.run(["make", "rust"], BUILD_BOUND, cwd=str(copy))
+        if made["rc"] != 0 or made["expired"] or not library.exists():
+            return None, (f"the base's core did not build: make rust rc {made['rc']} (expired "
+                          f"{made['expired']}): {(made['stdout'] + made['stderr'])[-400:]}")
+    folder = WORK / "base-probe"
+    folder.mkdir(parents=True, exist_ok=True)
+    entry = folder / "main.swift"
+    entry.write_text(rs.PROBE_SWIFT.read_text())
+    try:
+        swift_build.build(
+            sources=swift_build.app_sources(copy / "app/Sources") + [entry],
+            output=folder / "ramp-spike-probe", defines=["FRAMEJOB_DEV_TOOLS"],
+            bridging_header=copy / "app/Bridging/FrameJob-Bridging-Header.h", library=library,
+            timeout=rs.BUILD_WALL)
+    except swift_build.SwiftBuildFailed as error:
+        return None, "the base's probe did not build: " + " | ".join(error.diagnostics[:6])
+    return folder / "ramp-spike-probe", None
+
+
 def plans(binary, packages):
     """{name: plan text} through the probe's `plan` group; raises on a miss."""
     PROBE_WORK.mkdir(parents=True, exist_ok=True)
@@ -1058,10 +1114,12 @@ def by_pcm(name, stream):
 
 def u1_probe(binary, state):
     built = state.get("u1")
-    if not BASELINE.exists():
-        check("U1", False, f"{BASELINE.relative_to(ROOT)} is missing — run --baseline first")
+    sha, rule, why = state.get("baseline", (None, None, "no baseline was asked for"))
+    if why:
+        check("U1", False, f"the baseline could not be made: {why}")
         return
-    base = json.loads(BASELINE.read_text())["projects"]
+    record = json.loads(BASELINE.read_text())
+    base = record["projects"]
     if built is None:
         check("U1", False, "the projects were not built")
         return
@@ -1075,7 +1133,7 @@ def u1_probe(binary, state):
         for stream in [k for k in built[name]["md5"] if by_pcm(name, k)]:
             kept = base[name].get("pcm", {}).get(stream)
             if kept is None:
-                ok, why = False, "no baseline PCM — run --baseline again"
+                ok, why = False, "baseline.json holds no PCM for it"
             else:
                 ok, why = pcm_compare(pcm_of(built[name]["audio"][stream]),
                                       ((BASELINE.parent / kept["file"]).read_bytes(),
@@ -1088,7 +1146,10 @@ def u1_probe(binary, state):
                       f"{'=' if plan_ok else '≠'}, md5 "
                       + ("=" if md5_ok else f"{exact} ≠ {base[name]['md5']}")
                       + (f", pcm {'; '.join(pcm_text)}" if pcm_text else ""))
-    check("U1", same, "; ".join(detail) + f" (baseline {json.loads(BASELINE.read_text())['commit']})")
+    note = ("" if tree_copy.inputs_differ(sha) else
+            "; the tree's build inputs ARE the base's, so this compared two builds of one source")
+    check("U1", same, "; ".join(detail) + f" (the baseline is the base {sha[:8]}'s "
+          f"{record.get('config')} app's, its plans read by the base's own probe — {rule}{note})")
 
 
 def p1_probe(binary, state):
@@ -1867,20 +1928,105 @@ def run_probe(chosen, state):
             check(name, False, f"the probe read could not run: {type(error).__name__}: {error}")
 
 
-def baseline(binary):
-    """`--baseline`: X0, then CX1, CX2 and CK05 built and read into
-    `baseline.json`; 0 when it is written."""
+def wanted_base(rev):
+    """`(sha, rule)` of the base U1 compares against — `--base REV`, else
+    `tree_copy.default_base()` — or `(None, reason)`."""
+    if not rev:
+        return tree_copy.default_base()
+    sha = tree_copy.resolve(rev)
+    return (sha, f"--base {rev}") if sha else (None, f"--base {rev} names no commit")
+
+
+def base_baseline(sha, rule):
+    """The baseline made from the base `sha`'s own app, built whole in
+    `BASE_COPY`; the reason it was not, or None. `WORK` is emptied after it."""
+    config = proof_app.config()
+    print(f"  U1's baseline: making it on the base {sha} ({rule}), a {config} build",
+          flush=True)
+    made, _, why = tree_copy.make_base_copy(str(BASE_COPY), sha)
+    if made is None:
+        return why
+    try:
+        app, why = tree_copy.build_app(Path(made), BUILD_BOUND)
+        if app is None:
+            return f"the base app ({sha[:8]}) did not build: {why}"
+        try:
+            why = baseline(proof_app.executable(app), base=sha, config=config, copy=made)
+        except Exception as error:  # the base instance's own failure, kept with its log
+            why = f"{type(error).__name__}: {error}"
+        if why is None:
+            return None
+        kept = BASELINE.parent / "failed-framejob.log"
+        with contextlib.suppress(OSError):
+            BASELINE.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(WORK / "framejob.log", kept)
+        return (f"the base app's ({sha[:8]}) baseline run failed: {why} (its log: "
+                f"{kept.relative_to(ROOT)})")
+    finally:
+        tree_copy.remove_tree(str(BASE_COPY))
+        tree_copy.remove_tree(str(WORK))
+        WORK.mkdir(parents=True)
+
+
+def app_baseline(binary, rev):
+    """`--baseline --app`: the baseline made on `binary`. With `--base REV`,
+    the commit `binary` was built from, the plans are read by that commit's
+    own probe (a base copy made for it, its app not built) and `base` is
+    recorded; without, by this tree's probe and no base is recorded. The
+    reason it was not written, or None."""
+    if not rev:
+        return baseline(binary)
+    made, sha, why = tree_copy.make_base_copy(str(BASE_COPY), rev)
+    if made is None:
+        return why
+    try:
+        return baseline(binary, base=sha, config=proof_app.config(), copy=made)
+    finally:
+        tree_copy.remove_tree(str(BASE_COPY))
+
+
+def ensure_baseline(rev):
+    """U1's baseline for its base, kept or made: `(sha, rule, None)`, or
+    `(sha, rule, reason)` when it could not be made. One is kept only when it
+    names this base and this build configuration AND its plans were read by
+    the base's own probe: a plan read by the tree's probe is the tree's as it
+    was that day, which a later commit can move."""
+    sha, rule = wanted_base(rev)
+    if sha is None:
+        return None, None, rule
+    try:
+        kept = json.loads(BASELINE.read_text())
+    except (OSError, ValueError):
+        kept = {}
+    if (kept.get("base") == sha and kept.get("config") == proof_app.config()
+            and kept.get("plan_probe") == "base"):
+        print(f"  U1's baseline: kept, made {kept.get('made')} on the base {sha} ({rule}), a "
+              f"{kept.get('config')} build", flush=True)
+        return sha, rule, None
+    try:
+        return sha, rule, base_baseline(sha, rule)
+    except Exception as error:  # an instrument that breaks is U1's FAIL, not an exit
+        return sha, rule, f"{type(error).__name__}: {error}"
+
+
+def baseline(binary, base=None, config=None, copy=None):
+    """X0, then CX1, CX2 and CK05 built on `binary` and read into
+    `baseline.json` (with `base` and `config` when the caller knows which
+    commit and build `binary` is); the reason it was not written, or None.
+    The plans are read by the probe of `copy` (the base's own tree,
+    `base_probe`) when given, else by this tree's; `plan_probe` records
+    which."""
+    shutil.rmtree(BASELINE.parent, ignore_errors=True)   # never a half-old baseline
     state = {}
     x0(None, state)
     if not state["fixtures"]:
-        return 1
+        return "the fixtures were not made (X0)"
     log = WORK / "framejob.log"
     launched = mcp.launch(str(binary), arguments=["-RCDevRampRenderHold", str(HOLD_S)],
                           env=bounded.child_env(), log_path=str(log), timeout=CALL_BOUND)
     if launched.client is None:
         launched.stop()
-        print(f"BL fail — the app did not listen at {launched.socket_path}")
-        return 1
+        return f"the app did not listen at {launched.socket_path}"
     try:
         print(f"  instance PID {launched.child.pid} at {launched.socket_path}", flush=True)
         built = build_constants(launched.client)
@@ -1888,10 +2034,9 @@ def baseline(binary):
         launched.stop()
         mcp.remove_scratch(launched.socket_path)
     found = complaints(log)
-    probe_binary, why = probe()
+    probe_binary, why = base_probe(copy) if copy else probe()
     if probe_binary is None or found:
-        print(f"BL fail — probe {why}; complaints {found[:5]}")
-        return 1
+        return f"probe {why}; complaints {found[:5]}"
     text = plans(probe_binary, {n: b["package"] for n, b in built.items()})
     tree = subprocess.run(["git", "-C", str(Path(binary).parent), "rev-parse", "--show-toplevel"],
                           capture_output=True, text=True).stdout.strip() or str(ROOT)
@@ -1899,6 +2044,8 @@ def baseline(binary):
                             text=True).stdout.strip()
     dirty = subprocess.run(["git", "-C", tree, "status", "--porcelain", "--", "app", "core",
                             "graphic", "agent"], capture_output=True, text=True).stdout.strip()
+    if base:    # a base copy is `git archive`'s, inside this tree: the tree's dirt is not its own
+        commit, dirty = base, ""
     BASELINE.parent.mkdir(parents=True, exist_ok=True)
     pcm = {}
     for name in CONSTANTS:
@@ -1911,7 +2058,8 @@ def baseline(binary):
                     "file": kept, "channels": channels, "rate": rate,
                     "frames": len(data) // (4 * channels)}
     record = {"commit": commit, "tree": tree, "app_inputs_dirty": bool(dirty),
-              "app": str(binary),
+              "app": str(binary), **({"base": base, "config": config} if base else {}),
+              "plan_probe": "base" if copy else "tree",
               "made": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
               "projects": {n: {"rate": CONSTANTS[n][0], "keep_pitch": CONSTANTS[n][1],
                                "length": CONSTANTS[n][2], "plan": text[n],
@@ -1921,8 +2069,10 @@ def baseline(binary):
     for name in CONSTANTS:
         print(f"BL {name}: plan {len(text[name])} chars, {built[name]['md5']}"
               + (f", pcm {pcm[name]}" if name in pcm else ""))
-    print(f"BL pass — {BASELINE.relative_to(ROOT)} at {commit} (app inputs dirty {bool(dirty)})")
-    return 0
+    print(f"BL pass — {BASELINE.relative_to(ROOT)} at {commit} (app inputs dirty {bool(dirty)}"
+          + (f"; base {base}, {config}" if base else "; no base recorded")
+          + f"; plans read by {'the base' if copy else 'this tree'}'s probe)", flush=True)
+    return None
 
 
 def main():
@@ -1931,6 +2081,8 @@ def main():
     parser.add_argument("--app", type=Path, default=None)
     parser.add_argument("--only", default="")
     parser.add_argument("--baseline", action="store_true")
+    parser.add_argument("--base", metavar="REV", default=None,
+                        help="U1's base commit (default: tree_copy.default_base())")
     parser.add_argument("--mutant", choices=MUTANTS, default=None)
     args = parser.parse_args()
     MUTANT = args.mutant
@@ -1943,8 +2095,17 @@ def main():
         return 1
     precision_proof.WORK = WORK
     if args.baseline:
-        print(f"speed ramps SR2b — the constant clips' baseline — {binary}", flush=True)
-        return baseline(binary)
+        if args.app:
+            print(f"speed ramps SR2b — the constant clips' baseline — {binary}", flush=True)
+            why = app_baseline(binary, args.base)
+        else:
+            print("speed ramps SR2b — the constant clips' baseline, on the base's own app",
+                  flush=True)
+            sha, rule = wanted_base(args.base)
+            why = rule if sha is None else base_baseline(sha, rule)
+        if why:
+            print(f"BL fail — {why}")
+        return 1 if why else 0
     chosen = [r for r in ROWS[1:] if not args.only or r in args.only.split(",")]
     if any(r in SR2B_ROWS[1:] for r in chosen) and "X0" not in chosen:
         chosen.insert(0, "X0")
@@ -1957,6 +2118,8 @@ def main():
           f"and the UI — "
           f"{binary}" + (f" — mutant {MUTANT}" if MUTANT else ""), flush=True)
     state = {}
+    if "U1" in chosen:      # before this build's instance: the two runs share no file
+        state["baseline"] = ensure_baseline(args.base)
     run_app(binary, chosen, state)
     run_probe(chosen, state)
     run_mapper(chosen)

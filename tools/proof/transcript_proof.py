@@ -197,7 +197,8 @@ MUTANTS = {
              "$1.index)\n"
              "        }.map(\\.word)\n",
          "        words.map(\\.word)\n")]),
-    "device-past-clip-end": (["P2"], [(TR, "            guard run.start < end else { continue }\n",
+    # Re-aimed (#554): the filter reads the moved `start` again.
+    "device-past-clip-end": (["P2"], [(TR, "            guard start < end else { continue }\n",
                                        "")]),
     "fillers-reported-any": (["P3"], [
         (TR, "FillerDetector.fillersFile(for: media, url: url, in: cacheDir) != nil", "true")]),

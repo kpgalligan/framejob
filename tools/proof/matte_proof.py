@@ -118,7 +118,8 @@ window less 8 px and every 16th more than 16 px clear of it within ±8 of
 - **F1** (its own project): a graphic module drawing the same window on
   the matte track over the card: `render_frame` shows the cut, and the
   `prores_422` export's `graphic prefetch:` line has hits > 0 and
-  mismatched 0.
+  mismatched 0: the worker and the compositor ask for the same slot, the
+  member drawn at its key's depth (spec §11 PR-19).
 Issue batch B90 (#252): nested dissolves and zooms. Phase 1 MEASURED them,
 each row asserting the picture of the day ("pre"); since phase 4 (spec §11
 MT-8, the routed dissolve) each row asserts the EXACT mix and prints the
@@ -183,7 +184,10 @@ FAIL:
                               B0 MM CT
   core-no-override            the source keeps shadow, reflection, blend
                               (`LayerRoles`' `drawn_into` since B90 phase 4): P6
-  handler-drops-matte         the handler drops `matte`: A1 G0
+  handler-drops-matte         the handler drops `matte`: A1 G0 (run with
+                              `--only` project P's rows and Z1: every later
+                              project's fixture sets its matte through the
+                              handler, so a whole run answers 2, #578)
   (MT3)
   dissolve-no-cover           the dissolve's cover ignores the matte: T3
   nest-always-carries         `nest` keeps every matte: N4
@@ -225,7 +229,6 @@ plain run exits 0 iff every scored row passed.
 import argparse
 import atexit
 import json
-import struct
 import subprocess
 import sys
 from pathlib import Path
@@ -235,6 +238,7 @@ sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import png_read  # noqa: E402
 import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 from hevc_alpha_proof import own_core  # noqa: E402
@@ -297,8 +301,8 @@ MUTANTS = {
         "                    drawn_into: false && *drawn_into,", ["P6"]),
     "handler-drops-matte": (
         "app/Sources/AgentServer+Tracks.swift",
-        "solo: solo, matte: matte)",
-        "solo: solo, matte: nil)", ["A1", "G0"]),
+        "solo: solo, matte: matte,",
+        "solo: solo, matte: nil,", ["A1", "G0"]),
     # MT3
     "dissolve-no-cover": (
         "app/Resources/Shaders/Compositor.metal",
@@ -464,16 +468,15 @@ class Doc:
 
 
 def rgba(path):
-    """A PNG at `path` as RGBA bytes through ffmpeg, or None — bounded."""
-    try:
-        width, height = struct.unpack(">II", Path(path).read_bytes()[16:24])
-        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-f", "rawvideo",
-                              "-pix_fmt", "rgba", "-"], capture_output=True, timeout=120,
-                             env=bounded.child_env()).stdout
-    except (OSError, struct.error, subprocess.TimeoutExpired):
+    """A PNG at `path` as RGBA bytes in 8-bit levels, or None — bounded. Read through
+    `png_read.rgba8`, which rounds a 16-bit sample to the nearest level: since spec §11 PR-21 a
+    frame that shows a gradient shape (project L's) is a 16-bit PNG, and ffmpeg's own `rgba`
+    conversion of one is not round-to-nearest, so L2 read that way missed by up to 2 levels."""
+    got = png_read.rgba8(path, env=bounded.child_env())
+    if got is None:
         return None
-    return raw if (width, height) == (WIDTH, HEIGHT) and len(raw) == width * height * 4 \
-        else None
+    width, height, raw = got
+    return raw if (width, height) == (WIDTH, HEIGHT) else None
 
 
 def px(raw, x, y):

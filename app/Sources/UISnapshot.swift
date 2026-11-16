@@ -207,11 +207,33 @@ enum UISnapshot {
 
     // MARK: - Capture
 
-    /// One pass: lay out, display, `cacheDisplay` the root, copy its bytes.
-    static func pass(_ root: NSView) -> Pass? {
+    /// One pass: lay out, display, `cacheDisplay` the root at `scale`, copy
+    /// its bytes. At the window's own scale the rep is AppKit's caching rep,
+    /// so a capture on a 2× host is what it always was; at another scale
+    /// (`DevCaptureScale`, spec §11 #539) it is a rep of that rep's format at
+    /// `round(bounds × scale)` pixels, tagged with its colour space.
+    static func pass(_ root: NSView, scale: CGFloat) -> Pass? {
         root.layoutSubtreeIfNeeded()
         root.displayIfNeeded()
-        guard let rep = root.bitmapImageRepForCachingDisplay(in: root.bounds) else { return nil }
+        guard let template = root.bitmapImageRepForCachingDisplay(in: root.bounds) else {
+            return nil
+        }
+        var rep = template
+        if scale != root.window?.backingScaleFactor {
+            let size = root.bounds.size
+            guard
+                let scaled = NSBitmapImageRep(
+                    bitmapDataPlanes: nil,
+                    pixelsWide: Int((size.width * scale).rounded()),
+                    pixelsHigh: Int((size.height * scale).rounded()),
+                    bitsPerSample: template.bitsPerSample,
+                    samplesPerPixel: template.samplesPerPixel, hasAlpha: template.hasAlpha,
+                    isPlanar: false, colorSpaceName: template.colorSpaceName,
+                    bitmapFormat: template.bitmapFormat, bytesPerRow: 0, bitsPerPixel: 0)
+            else { return nil }
+            rep = scaled.retagging(with: template.colorSpace) ?? scaled
+            rep.size = size
+        }
         root.cacheDisplay(in: root.bounds, to: rep)
         guard let data = rep.bitmapData else { return nil }
         return Pass(rep: rep, bytes: Data(bytes: data, count: rep.bytesPerRow * rep.pixelsHigh))

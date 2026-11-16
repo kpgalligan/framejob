@@ -100,6 +100,18 @@ struct CutoutPatch: Codable, Equatable {
     var isEmpty: Bool { background == nil && edge == nil && feather == nil }
 }
 
+extension CutoutProps {
+    /// Those of background, edge and feather that differ from `base`'s, as a sparse part; all
+    /// three when `base` is nil. Empty when all three are equal. What a whole cutout sends a
+    /// first-frame cut (spec §11 #540): never `subject` or `quality`, which an end refuses.
+    func animatable(changedFrom base: CutoutProps?) -> CutoutPatch {
+        CutoutPatch(
+            background: background == base?.background ? nil : background,
+            edge: edge == base?.edge ? nil : edge,
+            feather: feather == base?.feather ? nil : feather)
+    }
+}
+
 /// Where a recipe cutout's masks come from: a media's pack (CO-3), or an
 /// image clip's picture (CO-101), drawn since CO10b from its one mask of the
 /// kind its subject asks (`masks` or `foreground`, spec §11 CO-105, CO-107).

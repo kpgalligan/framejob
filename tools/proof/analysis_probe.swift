@@ -1,4 +1,4 @@
-// Road map "creator-jobs" CJ2a — rows P1–P9 of `analysis_proof.py`, driven
+// Road map "creator-jobs" CJ2a — rows P1–P11 of `analysis_proof.py`, driven
 // through the app's own `AnalysisStamp`, `AnalysisStore`, `AnalysisShots`,
 // `AnalysisFrames`, `AnalysisLane`'s request and `AnalysisClipTimes`.
 //
@@ -379,6 +379,108 @@ do {
             + "payload \(during.1) (want false, false); after saveEnded: returned \(finished), "
             + "marker \(after.0), payload \(after.1) (want true, true)"
             + (failure.map { "; the publish failed: \($0)" } ?? ""))
+}
+
+// MARK: - P10 a cancelled shots job keeps what it stored (#435)
+
+if let (_, media, _) = project(shotsPath) {
+    let url = URL(fileURLWithPath: shotsPath)
+    let grid = AnalysisGrid(media: media)
+    func request(_ dir: URL) -> AnalysisRequest? {
+        AnalysisStamp.make(kind: .shots, media: media, url: url, input: nil, fullRange: false).map {
+            AnalysisRequest(
+                kind: .shots, cacheDir: dir, media: media, url: url, stamp: $0, input: nil,
+                ranges: [0...grid.lastIndex])
+        }
+    }
+    let wholeDir = folder("p10-whole"), cutDir = folder("p10-cancelled")
+    var halfway = false
+    var whole: Bool?, cut: Bool?, thrown: String?
+    do {
+        if let a = request(wholeDir) { whole = try AnalysisShots.run(a, cancelled: { false }) }
+        if let b = request(cutDir) {
+            cut = try AnalysisShots.run(
+                b, cancelled: { halfway }, progress: { if $0 >= 0.5 { halfway = true } })
+        }
+    } catch {
+        thrown = error.localizedDescription
+    }
+    let coverage = AnalysisStore.readMarker(.shots, media: media.id, in: cutDir)?.coverage ?? []
+    let wholeBytes = AnalysisStore.readPayload(
+        .shots, media: media.id, file: AnalysisShots.payloadName, in: wholeDir)
+    let cutBytes = AnalysisStore.readPayload(
+        .shots, media: media.id, file: AnalysisShots.payloadName, in: cutDir)
+    var k = -1
+    if coverage.count == 1, coverage[0].count == 2, coverage[0][0] == 0 { k = coverage[0][1] }
+    let span = (k + 1) * 16
+    let equal = k >= 0 && wholeBytes.map { $0.count >= span } == true
+        && cutBytes.map { $0.count >= span } == true
+        && wholeBytes!.prefix(span) == cutBytes!.prefix(span)
+    row("P10", thrown == nil && whole == true && cut == false && k > 0 && k < grid.lastIndex
+            && equal,
+        "the whole run answered \(String(describing: whole)); the run cancelled at half answered "
+            + "\(String(describing: cut)) (want false); its coverage \(coverage) (want one range "
+            + "[0, k], 0 < k < \(grid.lastIndex)); records 0…\(k) "
+            + "\(equal ? "byte-equal to the whole run's" : "DIFFER or are missing")"
+            + (thrown.map { "; threw \($0)" } ?? ""))
+} else {
+    row("P10", false, "the shots fixture did not probe")
+}
+
+// MARK: - P11 a cancelled job's publish only merges (#435)
+
+if let (_, media, _) = project(shotsPath) {
+    let s1 = base
+    let s0 = AnalysisStamp(
+        source: source, kind: .shots, version: 1, parameters: "q", osBuild: "25F80",
+        device: "cpu", reader: "raw", conversion: nil)
+    func request(_ dir: URL, _ stamp: AnalysisStamp) -> AnalysisRequest {
+        AnalysisRequest(
+            kind: .shots, cacheDir: dir, media: media, url: URL(fileURLWithPath: shotsPath),
+            stamp: stamp, input: nil, ranges: [0...29])
+    }
+    func publish(_ dir: URL, _ stamp: AnalysisStamp, _ range: ClosedRange<Int>) throws {
+        try AnalysisStore.publish(
+            kind: .shots, cacheDir: dir, mediaID: 1, stamp: stamp, covered: [range],
+            files: [AnalysisShots.payloadName]
+        ) { data in AnalysisShots.merge(&data, count: 30, records: [:], covered: [range]) }
+    }
+    func cancelled(_ dir: URL, _ stamp: AnalysisStamp, _ range: ClosedRange<Int>) {
+        AnalysisStore.publishCancelled(request(dir, stamp)) { try publish(dir, stamp, range) }
+    }
+    func bytes(_ dir: URL) -> (Data?, Data?) {
+        (try? Data(contentsOf: AnalysisStore.markerURL(.shots, media: 1, in: dir)),
+         AnalysisStore.readPayload(.shots, media: 1, file: AnalysisShots.payloadName, in: dir))
+    }
+    func marker(_ dir: URL) -> AnalysisMarker? { AnalysisStore.readMarker(.shots, media: 1, in: dir) }
+    do {
+        let a = folder("p11-a")
+        try publish(a, s1, 0...9)
+        let before = bytes(a)
+        cancelled(a, s0, 0...4)
+        let after = bytes(a)
+        let keptA = before.0 != nil && before.1 != nil && before.0 == after.0 && before.1 == after.1
+        cancelled(a, s1, 10...19)
+        let mergedB = marker(a)?.coverage == [[0, 19]] && marker(a)?.stamp?.matches(s1) == true
+        let c = folder("p11-c")
+        cancelled(c, s0, 0...4)
+        let freshC = marker(c)?.stamp?.matches(s0) == true && marker(c)?.coverage == [[0, 4]]
+        let d = folder("p11-d")
+        try publish(d, s1, 0...9)
+        try publish(d, s0, 0...4)
+        let replacedD = marker(d)?.stamp?.matches(s0) == true && marker(d)?.coverage == [[0, 4]]
+        row("P11", keptA && mergedB && freshC && replacedD,
+            "(a) a cancelled publish under another stamp over an S1 cache: marker and frames.bin "
+                + "\(keptA ? "byte-identical" : "CHANGED"); (b) under S1: coverage "
+                + "\(marker(a)?.coverage ?? []) (want [[0, 19]]); (c) on an empty cache: marker "
+                + "stamp S0 \(freshC) with coverage \(marker(c)?.coverage ?? []); (d) an ordinary "
+                + "publish under S0 over S1 replaces \(replacedD) (coverage "
+                + "\(marker(d)?.coverage ?? []))")
+    } catch {
+        row("P11", false, "publish failed: \(error.localizedDescription)")
+    }
+} else {
+    row("P11", false, "the shots fixture did not probe")
 }
 
 let answer = try JSONSerialization.data(withJSONObject: ["rows": rows])

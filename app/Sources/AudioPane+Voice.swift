@@ -4,17 +4,18 @@ import AppKit
 /// fixed chains of Apple's units, rendered offline per clip window and
 /// played in place of the clip's sound — after Voice Isolation, before every
 /// live stage (AU-143). Base-only: with an action selected it still writes
-/// the clip (AU-140). `set_audio`'s `voice` is its MCP mirror.
+/// the clip (AU-140). `set_audio`'s `voice` is its MCP mirror; Clip ▸ Voice ▸
+/// (`VoiceMenu.swift`, AU-158) is its menu half, built from the same
+/// `VoiceKind` list and writing through the same `VoiceProps.choosing`.
 extension AudioPane {
     /// The popup's kinds after "None", in E8's order.
     static let voiceKinds = VoiceKind.allCases
 
     /// What choosing popup item `index` writes over `current` (AU-146):
-    /// None clears; a kind keeps the amount (1 with none) and sends
-    /// `pitch: null`, so every kind starts at its own pitch.
+    /// `VoiceProps.choosing` for the item's kind, None for item 0.
     static func voiceChoice(_ index: Int, current: VoiceProps?) -> VoiceProps? {
         guard index > 0, index <= voiceKinds.count else { return nil }
-        return VoiceProps(kind: voiceKinds[index - 1], amount: current?.amount ?? 1, pitch: nil)
+        return VoiceProps.choosing(voiceKinds[index - 1], over: current)
     }
 
     func voiceSection() -> InspectorSection {

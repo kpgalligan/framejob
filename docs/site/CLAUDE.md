@@ -15,8 +15,11 @@ src/components/         AtAGlance (a page's facts), Shot (a screen in both looks
                         FeatureIndex (the filterable list); SiteTitle, ThemeSelect,
                         PageTitle and Hero are the theme's Starlight overrides
 src/assets/screens/     WebP captures, written only by scripts/import-screens.mjs
-src/styles/             boppa-llewyn.css (the theme, shared with Doctored's site) and
-                        frame-job.css (this site's components in it); README "Theme"
+src/assets/             logo.svg (the Frame Job mark, the splash hero) and
+                        boppa-llewyn-blocks.svg (the company mark, the header)
+src/styles/             tokens.css (the design system's --bl-* tokens, copied whole from the
+                        handoff), boppa-llewyn.css (the theme, shared with Doctored's site)
+                        and frame-job.css (this site's components in it); README "Theme"
 src/fonts/, public/fonts/  the theme's self-hosted faces and their licence
 src/site.ts             the header badge's version, read from the repository's VERSION
 ```
@@ -30,7 +33,7 @@ probably does. If the code cannot settle it, leave it out.
 
 Nothing dev-only, deferred or unbuilt is documented. That excludes the dev tools (`snapshot_ui`,
 `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`, `play_preview`, `graphic_memory`,
-`loudness_meter`, `land_recording`, `analysis_job`, `transcript_view`, `playback_rebuilds`,
+`loudness_meter`, `land_recording`, `analysis_job`, `transcript_view`, `playback_rebuilds`, `open_link`, `cache_ledger`,
 `assistant_send`, `assistant_answer`) and every `-RCDev` launch default.
 
 ## Who reads this
@@ -50,6 +53,10 @@ MCP pages and `tools=` in `AtAGlance` name agent tools, because those are the pr
 - Open with what the feature is for, in a sentence or two, before any steps.
 - British spelling in prose (colour, centre, grey, normalise), and the
   app's exact spelling for its own labels (the **Color** tab, **Normalize**).
+  The Leveler's own words are the one exception in prose: leveler, leveling and leveled follow
+  the app everywhere on the site, so no page spells the feature two ways (spec §11 #526 as
+  extended by #541). The JSON key stays `leveller`, in a code span.
+  `tools/proof/ai_docs_r2c_proof.py --only T2` holds it.
 - Contractions are fine. No marketing: never "powerful", "seamless", "effortless", "robust",
   "simply", "just", "easily", "unleash", "supercharge".
 - Prefer a full stop or a comma to an em dash.
@@ -139,6 +146,10 @@ pictures are of the real app. To refresh them:
 python3 tools/proof/screens.py --out <dir>                      # from the repository root
 node docs/site/scripts/import-screens.mjs <dir> --used
 ```
+
+`screens.py` captures at 2× on any display (`-RCDevCaptureScale 2`). To refresh a few screens,
+run it with `--only` and import those files without `--used`, which first empties
+`src/assets/screens/`.
 
 **This site is public.** `import-screens.mjs` refuses a capture whose layout dump holds a local
 path, and its `CROP` table is the only way past that, by cutting the region away. Settings needs

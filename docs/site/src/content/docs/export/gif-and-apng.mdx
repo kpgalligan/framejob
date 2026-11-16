@@ -69,6 +69,7 @@ Because the picture is never enlarged, rows bigger than the canvas come out as t
 - **Burn in timecode** still works.
 - Neither format has [chapters](/export/chapters/).
 - Both write the SDR version in an HDR project.
+- A very large one needs a lot of memory. Ten seconds at 4K measured about 11.5 GB as a GIF and about 7.9 GB as an APNG on an Apple M2 Max, and the queue's [memory wait](/export/export-queue/#the-encoder-memory-wait) counts only AV1 and VP9, so it never holds one of these back.
 
 ## With an agent
 

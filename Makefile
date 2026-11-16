@@ -18,7 +18,7 @@ DEBUG_APP_PATH := $(BUILD_DIR)/Build/Products/Debug/Frame Job Debug.app
 unexport RC_ASSEMBLYAI_KEY
 unexport ANTHROPIC_API_KEY
 
-.PHONY: all app app-debug dist rust codecs test lint fmt typecheck project run clean prices gate
+.PHONY: all app app-debug dist rust codecs test agent-test lint fmt typecheck project run clean prices gate
 
 all: app
 
@@ -35,15 +35,22 @@ codecs:
 	python3 tools/codecs/build_codecs.py
 
 # `assistant_lane_proof.py` is spec §11 AI-3's `make test`-reachable probe
-# (the agent lane); `rust` first, because it links the staticlib.
+# (the agent lane), and its B1 holds the release helper's first POST, configured
+# with the app's catalog and prompt, under the proofs' body bound (#594, spec §11
+# P-9, SA-9); it builds that helper through tools/agent/build_helper.sh, seconds
+# while its stamp matches; `rust` first, because it links the staticlib.
 # `prices_proof.py` is road map 13 P1's price function: the Python reader and
-# the helper's `bun test` (agent/build.sh test) against one fixture file, no
-# network. `budget_proof.py` is P3's proofs' ledger and monthly budgets (spec
+# the Swift helper's PricingTests and PriceTableTests (agent_test.py --filter)
+# against one fixture file, no network. `budget_proof.py` is P3's proofs' ledger and monthly budgets (spec
 # §11 P-6), over scratch ledgers only, no network. `inventory.py --check` checks the
 # menu inventory's sites against app/Sources, each found by its token and
 # enclosing function rather than its line, and its other citations by
 # anchor; no app, no build. `spec_index_proof.py` (issue batch B70) checks the
-# spec indexes' Lines cells against `wc -l` and a row for every spec file.
+# spec indexes' Lines cells against `wc -l`, a row for every spec file and
+# (#548) every decision row naming the file that holds its entry.
+# `spec_rule.py` (#585) is a spike's rule hash: the §11 entries each spike is
+# judged by, found by ID and hashed entry by entry, over scratch folders and
+# then the tree, where each spike must call `spec_rule.pin` by name; no app.
 # `proof_defaults.py` (issue batch B83, #238) is the defaults removal recipe
 # on a throwaway domain, its refusals over scratch folders, then the sweep of
 # the proofs' own idle domains, and of the two probes this target ran, out of
@@ -58,6 +65,21 @@ codecs:
 # first, because swift_build.py's selftest links the archives.
 # `acknowledgements.py --selftest` (spec §11 PUB-10) is the third-party notices'
 # generator over synthetic metadata, locks and package folders: no cargo, no network.
+# `ai_docs_r2c_proof.py --only T1,T2` (#556) is the spelling scan, spec §11 #526: the
+# string literals of app/Sources, core/src and graphic/src, and the site's pages,
+# sidebar.mjs, features.json and README.md; its tree rows launch no app and write nothing.
+# `mutant_anchors.py` (#554) reads every proof's mutant table without importing the proof
+# and counts each anchor in the file it names, exactly once; `--selftest` is the reader
+# over synthetic proofs in scratch trees. No app, no build.
+# `agent_test.py --selftest` (road map "swift-helper" SA1, spec §11 SA-12) is the suite's
+# scratch-path guard over scratch folders, no SwiftPM; then `make agent-test`, below.
+# `agent_build_proof.py` (SA3, spec §11 SA-8) is tools/agent/build_helper.sh's rules over toy
+# packages (seconds, no network): the stamp, the clone served at another path, a foreign scratch
+# path emptied, the tree from PROJECT_DIR, a failed build, the scrubbed environment.
+# `agent_helper_drive.py` (road map "swift-helper" SA2 and SA4, spec §11 SA-4..SA-6, SA-13) runs
+# the release helper the app bundles over scripted conversations on the stand-in API and fails any
+# difference from its recordings in tools/proof/agent_helper_recorded/: every event and every
+# request, key order included. Loopback only, dummy keys, nothing paid.
 test: rust codecs
 	cd core && cargo test --release
 	cd graphic && cargo test --release
@@ -65,9 +87,15 @@ test: rust codecs
 	python3 tools/proof/assistant_lane_proof.py
 	python3 tools/proof/assistant_prompt_proof.py --probe
 	python3 tools/proof/prices_proof.py
+	python3 tools/agent/agent_test.py --selftest
+	python3 tools/proof/agent_build_proof.py
+	$(MAKE) agent-test
+	python3 tools/proof/agent_helper_drive.py
 	python3 tools/proof/budget_proof.py
 	python3 tools/proof/capture_spike/inventory.py --check
 	python3 tools/proof/spec_index_proof.py
+	python3 tools/proof/spec_rule.py --selftest
+	python3 tools/proof/spec_rule.py
 	python3 tools/codecs/build_codecs.py --selftest
 	python3 tools/licenses/acknowledgements.py --selftest
 	python3 tools/proof/swift_build.py --selftest
@@ -79,6 +107,19 @@ test: rust codecs
 	python3 tools/proof/name_residue.py
 	python3 tools/proof/docs_site_proof.py --selftest
 	python3 tools/proof/docs_site_proof.py
+	python3 tools/proof/ai_docs_r2c_proof.py --only T1,T2
+	python3 tools/proof/mutant_anchors.py --selftest
+	python3 tools/proof/mutant_anchors.py
+
+# The Swift assistant helper's suite (agent/Tests; no network, dummy keys, nothing paid), road
+# map "swift-helper" SA1: `swift test` on agent/ with FJ_AGENT_STRICT=1 (its own targets'
+# warnings are errors, agent/Package.swift) on its own scratch path, build/agent-swift-test,
+# emptied first when it was made at another path (a lane's copy of build/; spec §11 SA-12). The
+# first run in a worktree fetches Slaude (from SwiftPM's cache when it holds it) and builds it in
+# debug, about two minutes. The app bundles the release helper tools/agent/build_helper.sh builds
+# on build/agent-swift (spec §11 SA-8), never this debug build.
+agent-test:
+	python3 tools/agent/agent_test.py
 
 lint:
 	cd core && cargo clippy --all-targets -- -D warnings
@@ -112,8 +153,8 @@ app-debug: rust codecs project
 # dev-tools marker must be absent from Distribution's binary and present in
 # Release's, which is its positive control; and each bundle's assistant helper
 # (Contents/Helpers/framejob-agent) must be present, signed with the hardened
-# runtime, hold exactly the allow-jit entitlement and not hold the marker
-# (road map 12 A4, D6–D13); and the Distribution app must be signed with
+# runtime, hold no entitlements and not hold the marker (road map 12 A4,
+# spec §11 SA-8, D6–D13); and the Distribution app must be signed with
 # exactly the audio-input and camera entitlements, never get-task-allow
 # (#145, spec §11 CAM-3, D14); and
 # each bundle's MCP proxy (Contents/Helpers/framejob-mcp) must be present,
@@ -129,8 +170,10 @@ app-debug: rust codecs project
 # (FRAMEJOB_UPDATER, compiled by this target alone) in Distribution's binary
 # and not in Release's, and no Sparkle load command in Release's; and both
 # bundles' Contents/Resources/Acknowledgements.txt naming every shipped crate,
-# npm package, pin, Sparkle, Bun, the model and each font (spec §11 PUB-10,
-# D42/D43). Until the owner's public key lands, D31 and P20 fail
+# pin, Sparkle, Slaude, the model and each font, and no other kind of entry
+# (spec §11 PUB-10, SA-10, D42/D43); and a `framejob://` link's dev switch out of Distribution's binary
+# and both bundles' one scheme, `framejob` (spec §11 G-49, D44–D47, P26, P27).
+# Until the owner's public key lands, D31 and P20 fail
 # by the owner's choice (PUB-8). The file-wide `unexport RC_ASSEMBLYAI_KEY`
 # above covers this recipe too. `published_check.py` is the check the publish
 # workflow runs over the app it is about to pack (spec §11 PUB-4), run here over
@@ -154,9 +197,9 @@ gate:
 # flag-OFF path, what Distribution ships, is compiled only by `make dist`, and
 # so is `FRAMEJOB_UPDATER` (AppDelegate+Updates.swift, Sparkle, Distribution
 # alone, spec §11 PUB-7): this check has no Sparkle module to import.
-# The last line is agent/'s `tsc --noEmit`, through bun (agent/build.sh),
-# which fails rather than skips when bun is missing. `codecs` first: the
-# bridging header includes the encoders' headers (CX-4), found by `-Xcc -I`.
+# It reads app/Sources alone: the assistant helper in agent/ is checked by its
+# own build and suite (spec §11 SA-11). `codecs` first: the bridging header
+# includes the encoders' headers (CX-4), found by `-Xcc -I`.
 typecheck: codecs
 	swiftc -typecheck -enable-batch-mode -j "$$(sysctl -n hw.logicalcpu)" \
 		-D FRAMEJOB_DEV_TOOLS \
@@ -165,11 +208,13 @@ typecheck: codecs
 		-import-objc-header app/Bridging/FrameJob-Bridging-Header.h \
 		-Xcc -Ibuild/codecs/include \
 		app/Sources/*.swift
-	/bin/sh agent/build.sh typecheck
 
 # Regenerates agent/prices/anthropic.json from LiteLLM's table over the
 # network (spec §11 P-1); the only writer of that file. Never a prerequisite
-# of app, test, typecheck or dist.
+# of app, test, typecheck or dist. A refresh moves the `cost` and `prices`
+# events of tools/proof/agent_helper_drive.py's recordings, so it is followed
+# by `python3 tools/proof/agent_helper_drive.py --record`, whose printed paths
+# must be only `dollars` and the bundled table's `as_of` (spec §11 SA-13).
 prices:
 	python3 agent/prices/update.py
 

@@ -2,7 +2,11 @@
 // that asks before a `.fjgraphic` is copied into a project (spec §11 G-47
 // (f)), and the two doors that put it up: the Finder's (`open(packageAt:)`,
 // from `ProjectDocumentController`) and the Graphic dialog's From File…
-// (`ask(packageAt:editor:)`).
+// (`ask(packageAt:editor:)`). A `framejob://` link's fetched file comes in
+// by the Finder's door too (`GraphicLinkController`, spec §11 G-49), with the
+// host it came from as `origin`, shown as the sheet's `graphicimport.origin`
+// line, and an `onRead` that is told the read's outcome and then owns showing
+// a refusal.
 //
 // **No second implementation.** The sheet shows a plan
 // (`GraphicImportPlan`, `GraphicPackageImport.swift`) and Import runs
@@ -34,6 +38,8 @@ final class GraphicImportSheetController: NSViewController {
 
     private let contents: GraphicPackageContents
     private let plan: GraphicImportPlan
+    /// `From: <host>`, for a package a link fetched (G-49 (g)); nil for a file.
+    private let origin: String?
     /// Weak, like every sheet's back-reference.
     private weak var editor: EditorViewController?
     private var imported: GraphicImportPlan?
@@ -42,9 +48,13 @@ final class GraphicImportSheetController: NSViewController {
     private let importButton: NSButton
     private static let width: CGFloat = 480
 
-    init(contents: GraphicPackageContents, plan: GraphicImportPlan, editor: EditorViewController) {
+    init(
+        contents: GraphicPackageContents, plan: GraphicImportPlan, editor: EditorViewController,
+        origin: String? = nil
+    ) {
         self.contents = contents
         self.plan = plan
+        self.origin = origin
         self.editor = editor
         importButton = StickerButton(title: "Import", style: .primary, target: nil, action: nil)
         super.init(nibName: nil, bundle: nil)
@@ -58,13 +68,19 @@ final class GraphicImportSheetController: NSViewController {
     // MARK: - The doors
 
     /// The Finder's door: once launch and restoration are done, the package read, then the
-    /// front project (else a new untitled one) asked. Main.
-    static func open(packageAt url: URL) {
+    /// front project (else a new untitled one) asked. `origin` is a link's host line; `onRead`
+    /// runs straight after the read with its error, and a refusal is then its to show. Main.
+    static func open(packageAt url: URL, origin: String? = nil, onRead: ((Error?) -> Void)? = nil) {
         ProjectDocumentController.whenSettled {
             let contents: GraphicPackageContents
             do {
                 contents = try GraphicPackageContents.read(at: url)
+                onRead?(nil)
             } catch {
+                if let onRead {
+                    onRead(error)
+                    return
+                }
                 if let window = frontEditor()?.view.window {
                     NSAlert(error: error).beginSheetModal(for: window, completionHandler: nil)
                 } else {
@@ -73,7 +89,7 @@ final class GraphicImportSheetController: NSViewController {
                 return
             }
             guard let editor = frontEditor() ?? untitledEditor() else { return }
-            present(contents, editor: editor)
+            present(contents, editor: editor, origin: origin)
         }
     }
 
@@ -111,7 +127,9 @@ final class GraphicImportSheetController: NSViewController {
         }
     }
 
-    private static func present(_ contents: GraphicPackageContents, editor: EditorViewController) {
+    private static func present(
+        _ contents: GraphicPackageContents, editor: EditorViewController, origin: String? = nil
+    ) {
         guard let document = editor.document else {
             NSSound.beep()
             return
@@ -119,7 +137,8 @@ final class GraphicImportSheetController: NSViewController {
         do {
             let plan = try GraphicImportPlan.make(contents, document: document)
             editor.presentAsSheet(
-                GraphicImportSheetController(contents: contents, plan: plan, editor: editor))
+                GraphicImportSheetController(
+                    contents: contents, plan: plan, editor: editor, origin: origin))
         } catch {
             alert(error, on: editor)
         }
@@ -140,6 +159,8 @@ final class GraphicImportSheetController: NSViewController {
         let title = label(contents.title, id: "graphicimport.title", bold: true)
         let description = label(contents.description ?? "", id: "graphicimport.description")
         description.isHidden = contents.description == nil
+        let from = label(origin ?? "", id: "graphicimport.origin")
+        from.isHidden = origin == nil
         let module = label(Self.moduleLine(plan.module), id: "graphicimport.module")
         let fonts = label(
             Self.filesLine("Fonts", plan.fonts), id: "graphicimport.fonts")
@@ -149,7 +170,7 @@ final class GraphicImportSheetController: NSViewController {
             "Importing copies these files into this project's graphics. It is not an Undo step.",
             id: "graphicimport.footnote")
         note.textColor = DS.textMuted
-        for field in [title, description, module, fonts, assets, note, messageLabel] {
+        for field in [title, description, from, module, fonts, assets, note, messageLabel] {
             field.preferredMaxLayoutWidth = contentWidth
         }
         messageLabel.font = DS.sans(12)
@@ -163,7 +184,8 @@ final class GraphicImportSheetController: NSViewController {
         cancelButton.setAccessibilityIdentifier("graphicimport.cancel")
         view = makeSheetView(
             title: "Import Graphic",
-            content: sheetColumn([title, description, module, fonts, assets, note, messageLabel]),
+            content: sheetColumn(
+                [title, description, from, module, fonts, assets, note, messageLabel]),
             buttonRow: makeButtonRow(cancel: cancelButton, apply: importButton),
             width: Self.width)
     }

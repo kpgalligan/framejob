@@ -47,7 +47,7 @@ Some of what a file holds has to be made first, so the export waits for it:
 
 - The masks of every [Remove Background](/effects/remove-background/#exports) clip in the range, with no time limit.
 - Each clip's cursor, from its [cursor file](/recording/cursor-files/).
-- The measured loudness of every clip with a gate, leveller or de-esser, for up to five minutes.
+- The measured loudness of every clip with a gate, leveler or de-esser, for up to five minutes.
 - The rendered sound of speed changes, Voice Isolation and voice effects.
 
 GIF and APNG files have no sound, so they don't wait for the last two. You can cancel during any of these waits. [Waiting for what it needs](/export/what-an-export-includes/#waiting-for-what-it-needs) lists which clips each wait covers, and what happens if something can't be made.
@@ -56,9 +56,7 @@ GIF and APNG files have no sound, so they don't wait for the last two. You can c
 
 Choose **Cancel**. The button greys out, and the status line reads "Stopping…" until the sheet closes and the partly written file is removed.
 
-:::caution
-A file you chose to replace in the save panel is removed as writing starts, so cancelling once the sheet says "Writing" loses it. Cancelling doesn't bring it back. Cancel before writing starts, during one of the waits above or while it says "Measuring loudness…", and the file stays as it was.
-:::
+A file you chose to replace in the save panel stays as it was until the export finishes. Frame Job writes the new file under a hidden name in the same folder and puts it in place of the old one only once it's complete, so cancelling at any point, even while the sheet says "Writing", leaves the old file untouched. The folder needs room for both files while the export runs.
 
 ## The finish report
 
@@ -89,7 +87,7 @@ The cursor count comes after the graphic count. A finished row in the Export Que
 | --- | --- |
 | "The export was not started: the graphic …" | A graphic in the range doesn't compile or has no module. Fix it and export again. |
 | "The export was stopped at frame … of the graphic …" | A graphic failed at that frame. No file is left. |
-| "Clip …'s loudness or speech has not been measured yet…" | A clip's gate, leveller or de-esser needs that measurement. Wait for the **Status** rows in those sections to show the clip's loudness, then export again. |
+| "Clip …'s loudness or speech has not been measured yet…" | A clip's gate, leveler or de-esser needs that measurement. Wait for the **Status** rows in those sections to show the clip's loudness, then export again. |
 | "Clip …'s retimed audio could not be rendered: …" | The sound of a speed change couldn't be made. |
 | "Clip …'s isolated voice could not be rendered: …" | Voice Isolation couldn't be rendered for that clip. |
 | "Clip …'s voice effect could not be rendered: …" | The voice effect couldn't be rendered for that clip. |
@@ -98,9 +96,11 @@ The cursor count comes after the graphic count. A finished row in the Export Que
 
 Other messages come from macOS or the file being written, and appear as they are.
 
-A failure is different from a cancel. A failed Animated GIF, Animated PNG or WebM export removes its partly written file, and so does a failed export with stems, a graphic that fails and a Mac with no encoder. Any other failure while writing can leave a partly written file at the path you chose. It isn't a finished export, so delete it.
+A failed export removes its partly written file, as a cancel does, and a partly written file is never left at the path you chose. A file you chose to replace in the save panel stays as it was, whenever the export fails.
 
-A file you chose to replace in the save panel is removed as writing starts, and it doesn't come back. If the export fails from that point on, you're left without the old file as well as the new one. Anything that stops it before then leaves the file as it was. The [600-frame limit](/export/gif-and-apng/#the-600-frame-limit) and the [same-shape rule](/export/transparency/#the-same-shape-rule) stop you in the Export sheet, before the save panel.
+If the finished file can't be put in place of the old one, for example because the old file is locked in the Finder, the export fails with "“…” could not be replaced with the new export: …. The file there is as it was." and the new file is removed.
+
+If Frame Job quits unexpectedly while it writes, a hidden file whose name starts `.framejob-export-` can be left in that folder. It isn't a finished export, so delete it. The [600-frame limit](/export/gif-and-apng/#the-600-frame-limit) and the [same-shape rule](/export/transparency/#the-same-shape-rule) stop you in the Export sheet, before the save panel.
 
 ## Quitting during an export
 

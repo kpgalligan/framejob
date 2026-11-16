@@ -45,9 +45,12 @@
 //! grades only inside the matte, which needs nothing here: the compositor
 //! weights its pass by the coverage like any matted layer's.
 //!
-//! Its stored transform, crop, corner, shadow, reflection, chroma,
-//! spotlight, obscure and motion placement are kept and do nothing;
-//! refusing them would make Paste Attributes fail from any moved clip.
+//! A crop, corner radius or chroma key is refused by `set_video` and
+//! `set_action_end` and left by Paste Attributes (spec §11 #536,
+//! `edit_props.rs`'s `sectionless_kind`); one stored in a file is kept and
+//! does nothing. Its stored transform, shadow, reflection, spotlight,
+//! obscure and motion placement are kept and do nothing; refusing them
+//! would make Paste Attributes fail from any moved clip.
 //!
 //! **The qualifier is its alone** (spec §11 GR-13): `video.qualifier`
 //! narrows which of the destination's pixels the pass grades, read before

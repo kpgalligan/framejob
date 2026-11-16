@@ -91,8 +91,8 @@ extension AgentServer {
         if outcome.clips.isEmpty {
             notes.append(
                 settings.scope == .selected
-                ? "None of those clips plays any sound, so nothing was analysed."
-                : "Nothing in this timeline is audible, so nothing was analysed.")
+                ? "None of those clips plays any sound, so nothing was analyzed."
+                : "Nothing in this timeline is audible, so nothing was analyzed.")
         }
         // Both waiters fold into ONE key, `pending_peaks` — the union of what
         // the level test and the voice test are each still waiting on — so a

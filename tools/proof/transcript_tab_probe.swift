@@ -31,6 +31,16 @@
 //       first word dropped, ⇧← extends from the anchor's word; the text cut
 //       to 3 words under the selection, ⇧→ stays inside the text and the
 //       next rebuild does not trap.
+//   T16 a voice cache replaced under shown cloud words (#444): preloaded
+//       `.assemblyai` words alpha [10.0, 10.4) s and beta [12.9, 13.3) s with
+//       an all-voiced cache show no pause and one paragraph; cache B (silent
+//       over [10.5, 12.8) s) written and announced, within 5 s one pause
+//       follows clip 3's alpha and beta starts a paragraph.
+//   T17 the same landing while the tab's cloud load is held
+//       (`TranscriptTabSource.loadHold`, as `word_onset_probe.swift`'s U10):
+//       the planted cloud transcript read with cache A, cache B announced
+//       during the hold; after the release the cloud words show with B's
+//       pause and paragraph break.
 import AppKit
 
 final class ProbeDocumentController: NSDocumentController {
@@ -305,6 +315,53 @@ func openEditor() -> (ProjectDocument, EditorViewController, NSWindow, Transcrip
     return (document, editor, window, pane)
 }
 
+/// Media 20's voice cache written whole (its `SpeechStamp` marker too, as
+/// `word_onset_probe.swift`'s `writeCaches` does) and, with `post`, announced.
+func writeSpeech(_ document: ProjectDocument, _ values: [Float], post: Bool) -> Bool {
+    guard let cache = document.cacheDirectory, let record = document.project.snapshot.media(20),
+        let url = document.mediaURLs()[20],
+        let stamp = MediaImporter.CacheStamp.stamp(for: record, url: url)
+    else { return false }
+    let file = MediaImporter.speechURL(for: 20, in: cache)
+    try? FileManager.default.createDirectory(
+        at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+    let ok = (try? values.withUnsafeBufferPointer { Data(buffer: $0) }.write(to: file)) != nil
+        && MediaImporter.writeStamp(
+            MediaImporter.SpeechStamp(stamp), to: MediaImporter.speechMarkerURL(for: 20, in: cache))
+    if post { MediaImporter.postCacheChange(media: 20, kind: MediaImporter.speechKind) }
+    return ok
+}
+
+/// Media 20's voice cache over its 120 s: 1 everywhere, 0 over `silent` (seconds).
+func speechCache(silent: Range<Double>? = nil) -> [Float] {
+    let chunk = Double(MediaSpeech.chunkTicks) / Double(SEC)
+    return (0..<MediaSpeech.chunkCount(duration: 120 * SEC)).map { k in
+        silent?.contains(Double(k) * chunk) == true ? 0 : 1
+    }
+}
+
+/// Media 20's cloud transcript planted in the package's cache folder, its marker
+/// the stamp `TranscriptReader.cached` serves (`filler_words_probe.swift`'s way).
+func plantTranscript(_ document: ProjectDocument, wordsJSON: String) -> Bool {
+    guard let cache = document.cacheDirectory, let record = document.project.snapshot.media(20),
+        let url = document.mediaURLs()[20],
+        let stamp = MediaImporter.CacheStamp.stamp(for: record, url: url)
+    else { return false }
+    let options = TranscriptOptions(
+        speechModels: TranscriptOptions.shippedModels, languageCode: nil, speakerLabels: false,
+        keytermsPrompt: [])
+    let header = MediaTranscript.Header(
+        provider: MediaTranscript.provider, transcriptID: "t_tab", requested: options,
+        speechModelUsed: "universal-3-5-pro", languageCode: "en_us", languageConfidence: 0.99,
+        audioDuration: 120, extractedSeconds: 120, uploadedFormat: "flac",
+        audioTrackStartMs: 0, fetchedAt: "2026-11-09T00:00:00Z", remoteDeleted: true)
+    guard let file = try? MediaTranscript.File(header: header, wordsJSON: Data(wordsJSON.utf8))
+    else { return false }
+    return MediaTranscript.write(file, for: 20, in: cache)
+        && MediaTranscript.writeStamp(
+            TranscriptStamp(source: stamp, options: file.header.requested), for: 20, in: cache)
+}
+
 if let (document, editor, window, pane) = openEditor() {
     let view = pane.transcriptView
     let model = { pane.source.model }
@@ -505,8 +562,84 @@ if let (document, editor, window, pane) = openEditor() {
     row("T14p", ordered && outside.isEmpty && answered > 0,
         notes.joined(separator: "; ") + " (text length \(length); want four offsets inside it, "
             + "both lefts equal, each left before each right, and every swept answer inside)")
+    // T16 a voice cache replaced under shown cloud words (#444): the pause
+    // token and the paragraph break follow the new cache at once.
+    let alphaBeta = [
+        TimelineTranscript.SourceWord(
+            text: "alpha", source: Ticks(10.0 * Double(SEC)), sourceEnd: Ticks(10.4 * Double(SEC)),
+            speaker: nil),
+        TimelineTranscript.SourceWord(
+            text: "beta", source: Ticks(12.9 * Double(SEC)), sourceEnd: Ticks(13.3 * Double(SEC)),
+            speaker: nil),
+    ]
+    let cloud = TimelineTranscript.MediaWords(
+        media: 20, engine: .assemblyai, language: "en_us", fillersReported: false, words: alphaBeta)
+    /// Clip 3's alpha and beta tokens, the pauses after alpha, and whether
+    /// beta starts a paragraph.
+    func alphaState() -> (alpha: Int?, beta: Int?, pauses: Int, broken: Bool, texts: [String]) {
+        let tokens = view.model.tokens
+        let alpha = tokens.firstIndex { $0.word.clip == 3 && $0.word.text == "alpha" }
+        let beta = tokens.firstIndex { $0.word.clip == 3 && $0.word.text == "beta" }
+        let pauses = alpha.map { a in view.pauses.filter { $0.after == a }.count } ?? 0
+        let broken = beta.map { b in view.model.paragraphs.contains { $0.firstToken == b } } ?? false
+        return (alpha, beta, pauses, broken, tokens.map(\.word.text))
+    }
+    pane.source.preload([20: cloud], pauses: [20: []], speech: [20: speechCache()])
+    _ = until(5) { pane.source.settled }
+    spin(0.3)
+    let t16Before = alphaState()
+    let t16Wrote = writeSpeech(document, speechCache(silent: 10.5..<12.8), post: true)
+    let t16Landed = until(5) {
+        let state = alphaState()
+        return pane.source.settled && state.pauses == 1 && state.broken
+    }
+    spin(0.2)
+    let t16After = alphaState()
+    row("T16", t16Before.alpha != nil && t16Before.beta == t16Before.alpha.map { $0 + 1 }
+            && t16Before.pauses == 0 && !t16Before.broken && t16Wrote && t16Landed
+            && t16After.pauses == 1 && t16After.broken,
+        "before the landing: alpha \(String(describing: t16Before.alpha)), beta "
+            + "\(String(describing: t16Before.beta)), pauses after alpha \(t16Before.pauses), beta "
+            + "starts a paragraph \(t16Before.broken) (want 0, false); cache written \(t16Wrote); "
+            + "after it: pauses after alpha \(t16After.pauses), beta starts a paragraph "
+            + "\(t16After.broken) (want 1, true), settled \(pane.source.settled)")
+
+    // T17 a cloud load in flight when the cache lands (#444): the load read
+    // cache A, the landing comes while it is held, and the merged words get
+    // cache B's pause and paragraph.
+    let t17Planted = plantTranscript(
+        document,
+        wordsJSON: #"[{"text":"alpha","start":10000,"end":10400,"confidence":0.9,"speaker":null},"#
+            + #"{"text":"beta","start":12900,"end":13300,"confidence":0.9,"speaker":null}]"#)
+    let t17A = writeSpeech(document, speechCache(), post: false)
+    inspector.select(.media)
+    spin(0.3)
+    let hold = DispatchSemaphore(value: 0)
+    TranscriptTabSource.loadHold = hold
+    inspector.select(.transcript)
+    spin(1.5)
+    let t17HeldEmpty = view.model.tokens.isEmpty
+    let t17B = writeSpeech(document, speechCache(silent: 10.5..<12.8), post: true)
+    spin(0.5)
+    TranscriptTabSource.loadHold = nil
+    hold.signal()
+    let t17Landed = until(15) {
+        let state = alphaState()
+        return pane.source.settled && state.pauses == 1 && state.broken
+    }
+    spin(0.2)
+    let t17After = alphaState()
+    let t17Cloud = t17After.texts == ["alpha", "beta", "alpha", "beta"]
+    row("T17", t17Planted && t17A && t17HeldEmpty && t17B && t17Landed && t17Cloud
+            && t17After.pauses == 1 && t17After.broken,
+        "transcript planted \(t17Planted), cache A \(t17A), nothing shown while held "
+            + "\(t17HeldEmpty), cache B \(t17B); after the release: words \(t17After.texts) (want "
+            + "the cloud ones), pauses after alpha \(t17After.pauses), beta starts a paragraph "
+            + "\(t17After.broken) (want 1, true), settled \(pane.source.settled)")
 } else {
-    for id in ["T4p", "T5", "T7", "T10", "T14p", "T15p"] { row(id, false, "the editor did not open on \(package)") }
+    for id in ["T4p", "T5", "T7", "T10", "T14p", "T15p", "T16", "T17"] {
+        row(id, false, "the editor did not open on \(package)")
+    }
 }
 
 if let data = try? JSONSerialization.data(withJSONObject: ["rows": rows], options: [.sortedKeys]),

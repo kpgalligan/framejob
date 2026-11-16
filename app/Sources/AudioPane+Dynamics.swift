@@ -125,13 +125,13 @@ extension AudioPane {
                 mixed: { binding.mixedAudio { $0.leveller.map(read) } }, enabled: on)
         }
         return InspectorSection(
-            id: "audio.leveller", title: "Leveller",
+            id: "audio.leveller", title: "Leveler",
             summary: { on() ? AudioPane.decibels(current().targetDb, "%.0f dB") : "off" },
-            reset: { binding.apply("Leveller", audio: AudioPatch(leveller: .some(nil))) },
+            reset: { binding.apply("Leveler", audio: AudioPatch(leveller: .some(nil))) },
             defaultExpanded: false,
             rows: [
                 inspectorCheckRow(
-                    "Ride the level", binding, name: "Leveller",
+                    "Ride the level", binding, name: "Leveler",
                     read: on,
                     ops: { value in
                         binding.ops(
@@ -139,16 +139,16 @@ extension AudioPane {
                     },
                     mixed: { binding.mixedAudio { $0.leveller != nil } }),
                 row(
-                    "Target", "Leveller Target", unit: " dB", decimals: 0, min: -20, max: 10,
+                    "Target", "Leveler Target", unit: " dB", decimals: 0, min: -20, max: 10,
                     quick: [-6, -3, 0, 3], read: { $0.targetDb }, write: { $0.targetDb = $1 }),
                 row(
-                    "Max Boost", "Leveller Max Boost", unit: " dB", decimals: 0, min: 0, max: 24,
+                    "Max Boost", "Leveler Max Boost", unit: " dB", decimals: 0, min: 0, max: 24,
                     quick: [6, 12, 18], read: { $0.maxUpDb }, write: { $0.maxUpDb = $1 }),
                 row(
-                    "Max Cut", "Leveller Max Cut", unit: " dB", decimals: 0, min: 0, max: 24,
+                    "Max Cut", "Leveler Max Cut", unit: " dB", decimals: 0, min: 0, max: 24,
                     quick: [3, 6, 12], read: { $0.maxDownDb }, write: { $0.maxDownDb = $1 }),
                 row(
-                    "Response", "Leveller Response", unit: " s", decimals: 1, min: 0.5, max: 10,
+                    "Response", "Leveler Response", unit: " s", decimals: 1, min: 0.5, max: 10,
                     quick: [1, 2, 4], read: { AudioPane.milliseconds($0.response) / 1000 },
                     write: { $0.response = AudioPane.ticks($1 * 1000) }),
                 inspectorRow(
@@ -269,7 +269,7 @@ extension AudioPane {
 
     /// The leveller's Status (AU-66 (g)) off its curves for the one selected
     /// clip: "Aims at −41.7 LUFS" (L + target), "Waits for its loudness",
-    /// "Waits for its speech", "Not levelling: <reason>"; "—" for several.
+    /// "Waits for its speech", "Not leveling: <reason>"; "—" for several.
     private func levellerStatus(target: Double) -> String {
         guard binding.isSingle, let clip = binding.primary, let document = binding.document
         else { return "—" }
@@ -278,10 +278,10 @@ extension AudioPane {
         switch curves[clip.id] {
         case nil: return "—"
         case .pending(let what): return "Waits for its \(what)"
-        case .unmeasurable(let reason): return "Not levelling: \(reason)"
+        case .unmeasurable(let reason): return "Not leveling: \(reason)"
         case .ready:
             return dynamicsStatus(
-                relative: target, acting: "Aims at", idle: "Not levelling", unit: "LUFS")
+                relative: target, acting: "Aims at", idle: "Not leveling", unit: "LUFS")
         }
     }
 

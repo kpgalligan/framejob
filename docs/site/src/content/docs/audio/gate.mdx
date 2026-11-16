@@ -68,15 +68,15 @@ Two readouts at the foot of the section show what the threshold means for this c
 
 ## Before the clip's loudness is measured
 
-The gate, the [leveller](/audio/leveller/) and the [de-esser](/audio/de-esser/) all depend on the clip's measured loudness. Until it's measured, the clip plays without them, and the preview picks them up by itself.
+The gate, the [leveler](/audio/leveler/) and the [de-esser](/audio/de-esser/) all depend on the clip's measured loudness. Until it's measured, the clip plays without them, and the preview picks them up by itself.
 
-An export waits until every gated, levelled or de-essed clip has been measured. After five minutes without a measurement it stops, saying that the clip's loudness or speech hasn't been measured yet, and to wait for the Status rows to show the clip's loudness and export again.
+An export waits until every gated, leveled or de-essed clip has been measured. After five minutes without a measurement it stops, saying that the clip's loudness or speech hasn't been measured yet, and to wait for the Status rows to show the clip's loudness and export again.
 
 A clip that can't be measured, because it's under 0.4 s or too quiet, plays and exports without them, and the export doesn't wait for it.
 
 ## Good to know
 
-- The gate runs after [noise reduction](/audio/noise-reduction/) and before the leveller, the de-esser and the [compressor](/audio/compressor/). See [How audio works](/audio/how-audio-works/).
+- The gate runs after [noise reduction](/audio/noise-reduction/) and before the leveler, the de-esser and the [compressor](/audio/compressor/). See [How audio works](/audio/how-audio-works/).
 - The gate doesn't look ahead, so a loud start after a long pause can lose its first moment while the gate opens. At the default **Attack**, that's about a millisecond.
 - There's no way to listen to only what the gate takes away, so judge it by playing the clip.
 - With an [action](/audio/animate-sound/) selected, these controls set where the action ends. The numbers glide across the action, and turning the gate on or off changes at the action's end.
@@ -89,7 +89,7 @@ A clip that can't be measured, because it's under 0.4 s or too quiet, plays and 
 ## Related
 
 - [Remove Silences](/cleanup/remove-silences/)
-- [Leveller](/audio/leveller/)
+- [Leveler](/audio/leveler/)
 - [De-esser](/audio/de-esser/)
 - [Noise Reduction](/audio/noise-reduction/)
 - [Enhance Voice](/audio/enhance-voice/)

@@ -8,13 +8,19 @@ import Foundation
 enum NormalizeChoice {
     static let modeKey = "FrameJobNormalizeMode"
     static let targetKey = "FrameJobNormalizeTargetLUFS"
+    /// Posted on main after either setter writes (object nil), so every open
+    /// Volume section re-titles its Normalize button (#406).
+    static let didChangeNotification = Notification.Name("FrameJobNormalizeChoiceDidChange")
 
     static var mode: AudioNormalize.Mode {
         get {
             UserDefaults.standard.string(forKey: modeKey).flatMap(AudioNormalize.Mode.init)
                 ?? .loudness
         }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: modeKey) }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: modeKey)
+            NotificationCenter.default.post(name: didChangeNotification, object: nil)
+        }
     }
 
     /// An unreadable or out-of-range stored value reads as the default.
@@ -28,6 +34,9 @@ enum NormalizeChoice {
             }
             return value
         }
-        set { UserDefaults.standard.set(newValue, forKey: targetKey) }
+        set {
+            UserDefaults.standard.set(newValue, forKey: targetKey)
+            NotificationCenter.default.post(name: didChangeNotification, object: nil)
+        }
     }
 }

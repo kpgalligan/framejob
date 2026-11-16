@@ -24,7 +24,9 @@ import Vision
 /// **A mask** is the size Vision answers, the job's first setting it; no
 /// observation is an all-zero mask; `found` is `MaskPack.found`. A job
 /// publishes at each range's end and every `publishInterval`, mid-range
-/// covering only through the last analysed frame done (`covered`).
+/// covering only through the last analysed frame done (`covered`), and so
+/// when it is cancelled (spec §11 CJ-21 as amended by #435). A frame's
+/// picture is made only when it is analysed (#437).
 enum AnalysisMasks {
     static let publishInterval: TimeInterval = 30
 
@@ -147,8 +149,12 @@ enum AnalysisMasks {
         var size: (width: Int, height: Int)?
         var before = 0
         for range in request.ranges {
+            // A range past the grid's last index covers none of it (#456).
+            let lo = max(0, range.lowerBound - widen)
+            let hi = min(grid.lastIndex, range.upperBound + widen)
+            guard lo <= hi else { continue }
             var job = Job(range: range, grid: grid)
-            let read = max(0, range.lowerBound - widen)...min(grid.lastIndex, range.upperBound + widen)
+            let read = lo...hi
             var previous: Int64?
             var lastPublish = Date()
             let finished = try AnalysisFrames.read(
@@ -161,7 +167,9 @@ enum AnalysisMasks {
                     progress(Double(before + k - range.lowerBound + 1) / Double(total))
                 }
                 guard analysed(pts, after: previous, rate: capped) else { return }
-                let mask = try autoreleasepool { try self.mask(picture, pts: pts, size: &size) }
+                let mask = try autoreleasepool {
+                    try picture.picture { try self.mask($0, pts: pts, size: &size) }
+                }
                 job.masks.append(mask)
                 job.analysedDone.append(k)
                 if Date().timeIntervalSince(lastPublish) >= publishInterval,
@@ -172,7 +180,17 @@ enum AnalysisMasks {
                     lastPublish = Date()
                 }
             }
-            guard finished else { return false }
+            guard finished else {
+                // Through the last analysed frame done (CJ-21 as amended by #435).
+                if let done = covered(range, analysedDone: job.analysedDone, finished: false),
+                    done.upperBound >= job.from
+                {
+                    AnalysisStore.publishCancelled(request) {
+                        try publish(request, &job, through: done, size: size)
+                    }
+                }
+                return false
+            }
             try publish(request, &job, through: range, size: size)
             before += range.count
         }

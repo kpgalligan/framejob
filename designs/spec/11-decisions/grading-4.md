@@ -396,6 +396,6 @@ nothing of Concat is opened, at design time or build time.
   Clips`. Amends GR-8's one title and extends GR-16's clearing, which named no button.
 - **GR-38 — The Qualifier's hint and tooltip spell "color", the app's label spelling (#515).** The
   hint reads `Click to pick the color to qualify · Esc to cancel` and Pick from Canvas's tooltip
-  `Click the preview to centre the ranges on a color (Esc cancels)`, as the Chroma Key's hint and
+  `Click the preview to center the ranges on a color (Esc cancels)` (amended by #526), as the Chroma Key's hint and
   the app's Color and Key Color labels do. Amends GR-13's quoted string only; it decided no
-  spelling. "Centre" stays, a GR-13 caption.
+  spelling. #526 decided it, and made GR-13's caption "Center".

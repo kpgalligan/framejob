@@ -398,7 +398,11 @@ def content(clip):
     out = dict(clip)
     out.pop("id", None)
     out.pop("track", None)
-    out.pop("linked", None)
+    # A link names an id too (spec §11 AU-90): whether a clip is linked is
+    # content, which clip it names is an id. The Rust's rule, not a dropped
+    # key (#403): a path that loses the pair must still read as different.
+    if out.get("linked") is not None:
+        out["linked"] = True
     actions = out.get("actions")
     if isinstance(actions, list):
         out["actions"] = [
@@ -552,11 +556,12 @@ class Frame:
 def fresh(mcp, width=640, height=360):
     """A new, empty document at a canvas small enough to decode quickly.
 
-    Every section starts with one. The app deadlocks somewhere past forty
-    open documents and nothing closes one (`tools/proof/README.md`), so the
-    count matters: this script opens sixteen — ten `new_project`, one per
-    section that builds its own fixture (section 7 builds two), and section
-    8's six `open_project` — which is why the README says to relaunch
+    Every section starts with one, and none of them is closed: a run leaves
+    its `new_project` documents open, one per section that builds its own
+    fixture (section 7 builds two). Section 8 is the other source — one
+    `open_project` per readable format version, more with every bump — and
+    it closes each one it opens (`close_project`, #403). `tools/proof/README.md`
+    records a deadlock with many documents open at once and says to relaunch
     between proof sessions rather than read a hang as a failure."""
     mcp.call_with("new_project", {})
     mcp.call_with("set_canvas", {"width": width, "height": height})
@@ -1498,6 +1503,17 @@ def versions_part(mcp):
             json.dump(document, handle, indent=1)
         return path
 
+    def close(path, what):
+        """Close a document this section opened, losing whatever it did to it.
+
+        The packages are written to FIXED paths, and `open_project` on a path
+        that is already open answers the open document rather than the file.
+        So a document left open is what a second run against the same
+        instance would be handed: the version-1 nest with the first run's
+        track still in it, and "one track" would read two (#403). A close
+        that is refused is a failure by name, and the section goes on."""
+        scoped_edit(mcp, "close_project", {"project": path, "discard": True}, what)
+
     # Version 1 gets the one shape serde cannot absorb with a default: a nest
     # clip whose `project` was a PATH STRING, which `migrate_1_to_2` rewrites
     # into a named empty Nest.
@@ -1508,8 +1524,9 @@ def versions_part(mcp):
     readable = list(range(1, CURRENT_VERSION + 1)) + [GRADING_BRANCH_VERSION]
     for version in readable:
         extra = (old_nest,) if version == 1 else ()
+        path = package(version, extra)
         try:
-            mcp.call_with("open_project", {"path": package(version, extra)})
+            mcp.call_with("open_project", {"path": path})
         except ToolError as error:
             check(False, f"a version-{version} file opens in the built app ({error})")
             continue
@@ -1518,10 +1535,13 @@ def versions_part(mcp):
               and reported["clips"][0]["text"]["content"] == f"v{version}",
               f"a version-{version} file opens in the built app and is stamped "
               f"{CURRENT_VERSION} in memory, its content intact")
+        close(path, f"the version-{version} document closes again")
 
     # The migrated nest is the interesting one: version 1's path string is
-    # now a real Nest, and phase 9 can scope into it.
-    mcp.call_with("open_project", {"path": package(1, (old_nest,))})
+    # now a real Nest, and phase 9 can scope into it. Opened again from the
+    # file, since the loop closed its document.
+    rescued = package(1, (old_nest,))
+    mcp.call_with("open_project", {"path": rescued})
     reported = project(mcp)
     check(len(reported["nests"]) == 1
           and reported["nests"][0]["name"] == "/gone/Old Group.framejob"
@@ -1537,6 +1557,7 @@ def versions_part(mcp):
     check(len(project(mcp)["nests"][0]["tracks"]) == 1,
           "…and edit in it, which is the one thing a project rescued from version 1 could "
           "never have had done to it before")
+    close(rescued, "the rescued version-1 document closes again")
 
     # ONE PAST the current version, read off the header so it moves with
     # every bump by itself (the trap `core/CLAUDE.md` records was a literal

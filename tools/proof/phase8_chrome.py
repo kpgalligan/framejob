@@ -128,14 +128,26 @@ and their scores are re-run here to say so. It drives the app's OWN controls —
 `mouseDown(with:)` on the checkbox — and touches `MediaPane.filter`, which is
 private, not at all.
 
-**The window is 1440 x 1100 and the height is measured, not picked.** At
+**The window is 1440 x 1175 and the height is measured, not picked.** At
 phase 2's 862 the inspector's visible height is about 480 pt, the six-row list
 overflows it and the pane grows a 16 pt legacy scroller — and the NARROWED
 renders, whose lists fit, do not. Every trailing-aligned thing in the panel
 then sits 16 pt further right in one render than in another, and a comparison
-of two states would be measuring a scroller. At 1100 no state overflows, the
-trailing edge is 1429.5 pt in all five renders (measured), and the diff is the
-feature.
+of two states would be measuring a scroller. It was 1100 until #454: the Media
+tab has since grown a Camera Log and a Cursor section under the list, and
+measured on 2026-11-09 the six-file fixture overflows at 1082 and fits at
+1084, 16 pt under the old window. 1175 is that floor plus one more two-row
+section (91 pt, the Camera Log header to the Cursor header in the render), so
+the next section the tab grows still fits. At 1175 no state overflows, the
+trailing edge is 1429.5 pt in all seven renders (measured), and the diff is
+the feature. **Section 7 opens by checking exactly that**, as one row of its
+own: a fixture that has outgrown the window, or a host whose screen clamps the
+window shorter than was asked (AppKit does — at 1258 pt on the display this
+was measured on), then fails that row FIRST, and it says a scroller is in the
+picture, with the seven edges and the rendered heights. The row gates nothing:
+the seven rows about hairlines and trailing edges still fail after it (136/144
+under `--no-focus` with the window at 1080), but they no longer stand alone
+looking like a layout regression in the band (which is how #454 read).
 
 **ONE CHECK IN SECTION 3 FAILED AGAINST THE BUILD THIS WAS WRITTEN FOR, and
 it was a real defect rather than a broken instrument — fixed in the review, so
@@ -190,10 +202,18 @@ in this tree rather than guessed:
     unlocked, **144/144 with 6 skipped** with it locked. Before this the
     locked run read 144/150, and six failures about a window being key look
     exactly like a regression in the thing section 4 exists to catch.
+  · **`--no-focus`.** A run that may not take the keyboard focus at all (an
+    agent's lane beside a person at the machine) passes `--no-focus`: the
+    `dispatch` probe is then NEVER launched — it is this script's one
+    `open -W -n` — and the seven rows that read its answer, the six above and
+    the sheet row, are skipped by name. Section 8's two rows about the probes
+    count the four that were asked for. The whole file is **151** rows since
+    #454 added section 7's scroller row, so `--no-focus` reads 144/144 with 7
+    skipped.
 
 Run it with no port and no media:
 
-    python3 tools/proof/phase8_chrome.py
+    python3 tools/proof/phase8_chrome.py [--no-focus]
 
 Renders, crops, the probe's requests and answers land in
 `tools/proof/work/chrome8/`.
@@ -231,9 +251,10 @@ SHADER = os.path.join(ROOT, "app", "Resources", "Shaders", "Compositor.metal")
 # one that photographs anything.
 
 WIDTH = 1440
-# See the header: 1100 rather than 862 so no state of the pane overflows its
-# scroll view and the trailing edge is the same in every render.
-HEIGHT = 1100
+# See the header: no state of the pane may overflow its scroll view, so the
+# trailing edge is the same in every render. Measured (#454): the six-file
+# fixture fits from 1084, and a two-row section is 91 pt; 1084 + 91.
+HEIGHT = 1175
 
 INSPECTOR_W = 304        # DS.panelWidth
 INSET = 10               # InspectorMetrics.inset
@@ -249,7 +270,7 @@ ACTION_BAND_H = 38       # MediaPane.actionRow's
 
 INSPECTOR_X = WIDTH - INSPECTOR_W                 # 1136
 CONTENT_X0 = INSPECTOR_X + INSET                  # 1146
-CONTENT_X1 = INSPECTOR_X + INSPECTOR_W - INSET    # 1430 — no scroller at 1100
+CONTENT_X1 = INSPECTOR_X + INSPECTOR_W - INSET    # 1430 — no scroller at HEIGHT
 
 # The two hairlines that bound the find band, MEASURED off a render and then
 # checked against each other: `BarView(border: .bottom)` draws one at the foot
@@ -2124,6 +2145,10 @@ def rows_equal(a, b, y0, y1, x0, x1):
 
 RESULTS = []
 SKIPS = []
+# `--no-focus`: section 4's `dispatch` probe is never launched (it is the one
+# `open -W -n` in this script, and it takes the keyboard focus), and the seven
+# rows that read its answer are skipped by name. See the header.
+NO_FOCUS = "--no-focus" in sys.argv[1:]
 
 
 def check(name, ok, detail=""):
@@ -2440,18 +2465,19 @@ def main():
     # grading-2 G2-1 appended Show Ungraded and Scopes to it, G2-4 Show
     # Selection after Show Ungraded, and hdr H-3 Show SDR Version after Show
     # Selection, so its tail is no longer Preview Window; road map "audio" AP7
-    # appended Loudness Meter after Scopes (spec §11 AU-75).
+    # appended Loudness Meter after Scopes (spec §11 AU-75); road map
+    # "creator-jobs" VR1 put Show Subjects after Show SDR Version (VR-13).
     last_separator = max((i for i, r in enumerate(view) if r["separator"]), default=-1)
     group = view[last_separator + 1:] if last_separator >= 0 else []
     check("its LAST group, after a separator, is the Preview Quality submenu and Preview "
-          "Window, then Show Ungraded, Show Selection, Show SDR Version, Scopes and Loudness "
-          "Meter — a group of their own, because all seven are about the PREVIEW rather than "
-          "about the editor's own panes",
-          len(group) == 7
+          "Window, then Show Ungraded, Show Selection, Show SDR Version, Show Subjects, Scopes "
+          "and Loudness Meter — a group of their own, because all eight are about the PREVIEW "
+          "rather than about the editor's own panes",
+          len(group) == 8
           and group[0].get("submenu", {}).get("title") == "Preview Quality"
           and [r["title"] for r in group[1:]]
-          == ["Preview Window", "Show Ungraded", "Show Selection", "Show SDR Version", "Scopes",
-              "Loudness Meter"],
+          == ["Preview Window", "Show Ungraded", "Show Selection", "Show SDR Version",
+              "Show Subjects", "Scopes", "Loudness Meter"],
           " | ".join(r["title"] or "(separator)" for r in view[last_separator:]))
 
     quality_rows = group[0].get("submenu", {}).get("items", []) if group else []
@@ -2599,11 +2625,19 @@ def main():
     # activate can never satisfy the precondition, so a locked console is
     # asked ONCE and the six readings that need the focus are skipped below.
     locked = console_locked()
-    if locked:
+    if NO_FOCUS:
+        # An answer left by an earlier run in this folder is not this run's:
+        # `run_probe` is what removes one, and it is not called.
+        stale = os.path.join(CHROME, "answer-dispatch.json")
+        if os.path.exists(stale):
+            os.remove(stale)
+        print("      (--no-focus: the dispatch probe is NOT launched, and the seven rows "
+              "that read\n       its answer are skipped by name)")
+    elif locked:
         print("      (the console is LOCKED, so the probe is asked once and the six readings "
               "that\n       need the keyboard focus are skipped by name)")
     dispatch, error, attempts, preconditions = None, None, 0, []
-    for attempts in range(1, 2 if locked else 4):
+    for attempts in range(1, 1 if NO_FOCUS else 2 if locked else 4):
         dispatch, error = run_probe(probe, "dispatch", {
             "mode": "dispatch", "package": packages["dispatch"]}, timeout=120, activate=True)
         first = next((s for s in (dispatch or {}).get("stages", [])
@@ -2615,7 +2649,9 @@ def main():
                 and first.get("editorIsMain") is True):
             break
     if dispatch is None:
-        check("the dispatch probe answered", False, error or "")
+        # A probe that was not asked has not failed to answer.
+        if not NO_FOCUS:
+            check("the dispatch probe answered", False, error or "")
         dispatch = {}
     stages = {s["stage"]: s for s in dispatch.get("stages", [])}
     alone, preview = stages.get("editor alone", {}), stages.get("preview key", {})
@@ -2630,11 +2666,16 @@ def main():
         """One of the six rows whose precondition is a key window. On a locked
         console it is not askable, and a row that is not askable is skipped by
         name rather than scored against an answer nothing could have given."""
-        if locked:
+        if NO_FOCUS:
+            skip(name, NOT_ASKED)
+        elif locked:
             skip(name, "the console is locked, and a process that cannot activate has "
                        "neither a key window nor a main one")
         else:
             check(name, ok, detail)
+
+    NOT_ASKED = ("run with --no-focus: the dispatch probe takes the keyboard focus, so it "
+                 "was not launched and there is no answer to read")
 
     focused("PRECONDITION: the probe activated and the editor is both key and main before the "
             "panel is opened — without this every reading below is NONE for a panel and a "
@@ -2644,11 +2685,16 @@ def main():
             + "; re-asked for the focus "
             + f"{alone.get('refocusEditor', dispatch.get('refocusEditor'))}"
             + f"/{dispatch.get('refocusPreview')} times before the two readings")
-    check("PRECONDITION: nothing put a SHEET up over the editor — a sheet is a window and "
-          "takes KEY, which is what the six-file fixture's deliberately absent files did "
-          "through `offerRelinkIfNeeded` before this mode was given a shape-clip package "
-          "of its own",
-          dispatch.get("attachedSheet") is False, f"attachedSheet {dispatch.get('attachedSheet')}")
+    # The sheet row needs no focus, but it is read out of the same probe's
+    # answer, so a run that never launched the probe cannot score it either.
+    (skip if NO_FOCUS else check)(
+        "PRECONDITION: nothing put a SHEET up over the editor — a sheet is a window and "
+        "takes KEY, which is what the six-file fixture's deliberately absent files did "
+        "through `offerRelinkIfNeeded` before this mode was given a shape-clip package "
+        "of its own",
+        *((NOT_ASKED,) if NO_FOCUS else
+          (dispatch.get("attachedSheet") is False,
+           f"attachedSheet {dispatch.get('attachedSheet')}")))
     focused("with the editor alone, ⌘E / ⌘T / ⌘0 all resolve to the editor's view controller",
             ready and set(alone.get("targets", {}).values()) == {"EditorViewController"},
             str(alone.get("targets")))
@@ -3004,6 +3050,30 @@ def main():
     six = images["six"]
     scale = six.scale
 
+    # The precondition of everything below (#454). The item tally is pinned to
+    # the content's trailing edge in every state of the pane, so its right
+    # edge IS the reading: a render whose pane overflowed its scroll view has
+    # a 16 pt legacy scroller and the tally ends 16 pt short. Two things put
+    # one there and neither is the find band — the Media tab growing a section
+    # (measure a new HEIGHT, as the header says), and a screen too short for
+    # the window asked for, which the rendered heights beside the edges show.
+    edges = {}
+    for tag, image in images.items():
+        ink = image.ink_box(CONTENT_X1 - 120, CONTENT_X1 + 4, TALLY_Y0, TALLY_Y0 + TALLY_H)
+        edges[tag] = ink[1] if ink else None
+    heights = sorted({image.height / image.scale for image in images.values()})
+    check("PRECONDITION: no render of the fixture grew a SCROLLER — the tally ends at the "
+          "content's trailing edge in all seven, so the pane fits the window in every state "
+          "and no comparison below is measuring 16 pt of scroller. A failure here is the "
+          "fixture outgrowing the window or the host clamping it, not the find band",
+          len(edges) == 7
+          and all(edge is not None and abs(edge - CONTENT_X1) <= 1 for edge in edges.values()),
+          "tally ends at "
+          + ", ".join(f"{tag} {edge:g}" if edge is not None else f"{tag} (no ink)"
+                      for tag, edge in edges.items())
+          + f" pt against {CONTENT_X1}; rendered "
+          + " / ".join(f"{h:g}" for h in heights) + f" pt tall, {HEIGHT} asked")
+
     check("two renders of one package are byte-identical — the first thing every chrome "
           "script checks, because a proof that scores differently on identical input is an "
           "ambiguity to find and not a race to out-wait",
@@ -3192,8 +3262,15 @@ def main():
           "not find — either would make every byte comparison above measure something else",
           not WARNINGS,
           "" if not WARNINGS else "\n".join("      " + w for w in WARNINGS))
+    # What this run ASKED for: five probes, or four under `--no-focus`, where
+    # `dispatch` is never launched. Both rows below count against that, so a
+    # run that skipped the launch neither fails them nor passes on an answer
+    # an earlier run left behind (section 4 removed it).
+    asked = [tag for tag in ("quality", "menu", "panel", "dispatch", "media")
+             if not (NO_FOCUS and tag == "dispatch")]
+    not_asked = "; dispatch: not asked (--no-focus)" if NO_FOCUS else ""
     answered = {}
-    for tag in ("quality", "menu", "panel", "dispatch", "media"):
+    for tag in asked:
         path = os.path.join(CHROME, f"answer-{tag}.json")
         if os.path.exists(path):
             with open(path) as f:
@@ -3202,18 +3279,18 @@ def main():
           "themselves — `open -n` is asked for a path but LaunchServices resolves bundle "
           "IDENTIFIERS, and a mutation run holds two copies of this bundle under one id, "
           "where a mutant that was never consulted would read exactly like a surviving one",
-          len(answered) == 5
+          len(answered) == len(asked)
           and all(os.path.realpath(p) == os.path.realpath(BUNDLE) for p in answered.values()),
-          "; ".join(f"{tag}: {os.path.relpath(path, ROOT) if path else 'none'}"
-                    for tag, path in answered.items()) or "no answers")
+          ("; ".join(f"{tag}: {os.path.relpath(path, ROOT) if path else 'none'}"
+                     for tag, path in answered.items()) or "no answers") + not_asked)
     failed = [tag for tag, ok, _ in PROBE_RUNS if not ok]
     check("every probe invocation answered — a mode that crashed or wrote nothing would "
           "have failed its own section's checks by name above, and this is the line that "
           "says how many ran",
-          not failed and len(PROBE_RUNS) >= 5,
+          not failed and len(PROBE_RUNS) >= len(asked),
           f"{len(PROBE_RUNS)} runs, "
           + ", ".join(f"{tag} {seconds:.1f} s" for tag, ok, seconds in PROBE_RUNS if ok)
-          + (f"; FAILED: {failed}" if failed else ""))
+          + (f"; FAILED: {failed}" if failed else "") + not_asked)
     harness_source = open(os.path.join(HERE, "harness", "main.swift")).read()
     check("the harness's twelfth argument is APPENDED after `expandSections`, so every "
           "earlier chrome script's positions still hold — read out of the harness's own "

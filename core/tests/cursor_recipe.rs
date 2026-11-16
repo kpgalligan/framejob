@@ -343,7 +343,7 @@ fn every_refusal_is_its_own_sentence() {
         ),
         (
             json!({ "click_color": "#ffg" }),
-            "video.cursor.click_color must be a CSS colour (spec §11 G-12), not \"#ffg\"",
+            "video.cursor.click_color must be a CSS color (spec §11 G-12), not \"#ffg\"",
         ),
     ] {
         assert_eq!(handle.errors(&set(cursor.clone())), sentence, "{cursor}");

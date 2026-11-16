@@ -168,13 +168,20 @@ extension GraphicDiagnostic {
     }
 }
 
-/// One drawn frame: premultiplied BGRA rows `stride` bytes apart.
+/// One drawn frame: premultiplied BGRA rows `stride` bytes apart. A DEEP one (spec §11 PR-15,
+/// `GraphicLibrary.rasterize(…, deep: true)`) holds `rgba16` instead, premultiplied RGBA at 16
+/// bits a channel with 65,535 as 1, rows `stride` bytes apart, and an empty `bgra`.
 struct GraphicRaster {
     let width: Int
     let height: Int
     let stride: Int
     let bgra: [UInt8]
     let warnings: [GraphicDiagnostic]
+    var rgba16: [UInt16] = []
+
+    var isDeep: Bool { !rgba16.isEmpty }
+    /// The bytes the raster holds, whichever form it is: what a budget counts.
+    var byteCount: Int { bgra.count + rgba16.count * MemoryLayout<UInt16>.stride }
 }
 
 /// `ReelTime`'s three members that name no `rc_*` symbol, moved out of `ReelCore.swift` (a pure

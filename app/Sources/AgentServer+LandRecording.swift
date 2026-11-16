@@ -176,7 +176,8 @@ extension AgentServer {
 
     /// The panel's door: `recordingEnded(.success)` on main, then up to 25 s
     /// for the panel to be idle again, then up to `followWait` seconds for its
-    /// follows — Enhance's and the polish's (CU-102 (c)) — to end. `landed` is `document` or `new_project` when the
+    /// follows — Enhance's with its measurement (`isUnderWay`, #546) and the polish's
+    /// (CU-102 (c)) — to end. `landed` is `document` or `new_project` when the
     /// recording's first file is in a project, else null; `note` the panel's.
     private func landThroughPanel(_ result: RecordingResult, followWait: Double) throws -> String {
         let before = try onMain { () throws -> Set<ObjectIdentifier> in
@@ -215,7 +216,7 @@ extension AgentServer {
             let until = Date().addingTimeInterval(followWait)
             while Date() < until,
                 onMain({
-                    RecordingEnhance.isPending(document) || RecordingPolish.isPending(document)
+                    RecordingEnhance.isUnderWay(document) || RecordingPolish.isPending(document)
                 })
             {
                 Thread.sleep(forTimeInterval: RecordingEnhance.checkInterval)
@@ -227,7 +228,7 @@ extension AgentServer {
                 "note": RecorderPanelController.shared.noteLabel.stringValue,
             ]
             if let document { fields["project"] = self.summary(document) }
-            fields["enhance_pending"] = document.map(RecordingEnhance.isPending) ?? false
+            fields["enhance_pending"] = document.map(RecordingEnhance.isUnderWay) ?? false
             fields["polish_pending"] = document.map(RecordingPolish.isPending) ?? false
             return try self.jsonResult(fields)
         }
@@ -258,8 +259,10 @@ extension AgentServer {
                 + "answering what record_screen would, enhance or enhance_error included; door "
                 + "panel hands the result to the recorder panel's recordingEnded, waits up to "
                 + "25 s for the panel to be idle and then up to follow_wait seconds for its "
-                + "follows to end, and answers {landed (document, new_project or null), note "
-                + "(the panel's), project, enhance_pending and polish_pending (read last)}. "
+                + "follows to end — Enhance's until its measurement has landed its step, its "
+                + "refusal or its Cancel — and answers {landed (document, new_project or null), "
+                + "note (the panel's), project, enhance_pending (the follow or that measurement) "
+                + "and polish_pending (read last)}. "
                 + "Refused by name: a "
                 + "path that will not probe, movie with other than one voice file, place with "
                 + "door panel, door panel while the recorder or the panel is not idle, "
@@ -331,8 +334,8 @@ extension AgentServer {
                 ],
                 "follow_wait": [
                     "type": "number", "minimum": 0, "maximum": 330,
-                    "description": "door panel only: seconds to wait for the follow to end "
-                        + "(default 0).",
+                    "description": "door panel only: seconds to wait for the follows and "
+                        + "Enhance's measurement to end (default 0).",
                 ],
             ].merging(Self.landRecordingCameraProperties) { own, _ in own },
             required: ["voice"])

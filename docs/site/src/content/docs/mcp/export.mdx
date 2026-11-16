@@ -86,6 +86,7 @@ A `done` result adds these keys.
 
 | Key | What it holds |
 | --- | --- |
+| `message` | The queue row's sentence, such as "Exported “cut.mp4”. Peak −1.0 dBTP · −16.0 LUFS." It names the file, then counts the stems when there are any ("and 2 stems"), then gives any warning and the loudness figures. |
 | `ok` | `true`. |
 | `bytes` | The file's size. |
 | `preset`, `container`, `codec` | What was written. |
@@ -142,7 +143,7 @@ Anything that goes wrong after that comes back from `export_status` as `failed`,
 | A graphic fails while it's drawn | "The export was stopped at frame … of the graphic "…": …. No file was written." |
 | A retimed clip's sound, an isolated voice or a voice effect couldn't be rendered | The sentence names the clip and the reason. |
 | A Remove Background clip's masks couldn't be made | "Clip …'s person masks could not be made: …." A picture set to **Foreground** says foreground masks. |
-| A clip's gate, leveller or de-esser needs a loudness that hasn't been measured | "Clip …'s loudness or speech has not been measured yet…". Wait for the clip's analysis, then export again. |
+| A clip's gate, leveler or de-esser needs a loudness that hasn't been measured | "Clip …'s loudness or speech has not been measured yet…". Wait for the clip's analysis, then export again. |
 | This Mac has no encoder for the preset | "This Mac cannot export with the “…” preset." |
 
 A graphic's warnings are different: they don't stop the export, and they arrive as `graphic_warnings` in the `done` result.
@@ -177,7 +178,7 @@ There's no frame-rate argument, so the sheet's [frame rate](/export/frame-rate/)
 
 ## Path handling
 
-The folder must exist. A `~` at the start is expanded, and an existing file at the path is replaced. It's removed as writing starts, so a job that fails or is cancelled from then on leaves neither file. Anything earlier, such as a refused call or a cancel while the job is measuring loudness, leaves it as it was.
+The folder must exist. A `~` at the start is expanded, and an existing file at the path is replaced when the job finishes. Until then the new file is written under a hidden name in the same folder, so a job that fails or is cancelled at any point leaves the existing file as it was. The folder needs room for both files while the job runs. A file that can't be replaced, such as one locked in the Finder, fails the job with "“…” could not be replaced with the new export: …. The file there is as it was."
 
 The file always ends in the preset's extension.
 
@@ -282,14 +283,14 @@ It works on `audio_wav` and `audio_aiff` only. On any other preset `export` retu
 
 A track is heard when it has sound in it and isn't muted or silenced by another track's solo. Each stem is named `<file> - <track name>.<ext>`, beside the mix, so `mix.wav` and a track called Voice give `mix - Voice.wav`. An unnamed track is `Track N`, and [Stem file names](/export/stems/#stem-file-names) has the other cases.
 
-A stem holds its tracks' sound before the master, with no loudness gain and no limiter, so the stems add up to the mix wherever the master changed nothing. Any file already at a stem's name is replaced.
+A stem holds its tracks' sound before the master, with no loudness gain and no limiter, so the stems add up to the mix wherever the master changed nothing. Any file already at a stem's name is replaced when the job finishes.
 
-The `done` result lists each one as `stems [{name, tracks, path}]`. `tracks` holds the ids of the timeline tracks in that stem.
+The `done` result lists each one as `stems [{name, tracks, path}]`. `tracks` holds the ids of the timeline tracks in that stem. Its `message` counts them, as the queue row does: "Exported “mix.wav” and 2 stems."
 
 - On any other preset `export` returns the error "h264 has no stems; stems applies to audio_m4a, audio_wav and audio_aiff", naming the preset.
 - With no track heard, the error is "stems: no track is heard, so there is no stem to write".
 - If a stem's file would be one of the project's media, the job fails before any stem is written, and `export_status` gives the reason.
-- A failed or cancelled job leaves neither the mix nor any stem it wrote. A file it hadn't yet replaced stays.
+- A failed or cancelled job leaves neither the mix nor any stem it wrote, and an existing mix or stem file stays as it was. If a file can't be replaced as the job finishes, the stems already put in place stay.
 
 ## Dynamic range
 

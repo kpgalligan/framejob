@@ -217,6 +217,12 @@ final class LevelMeterSink: @unchecked Sendable {
         ring.write(channels, count: count, frames: frames, start: start, sampleRate: sampleRate)
     }
 
+    /// AUDIO THREAD. The player's filler (spec §11 AU-161): its first frame
+    /// and how many frames it stood for, no samples.
+    func mark(start: Int64, frames: Int, sampleRate: Int) {
+        ring.mark(start: start, frames: frames, sampleRate: sampleRate)
+    }
+
     /// AUDIO THREAD. Measures one buffer of planar float channels and stores
     /// the result. Allocation-free, lock-free, and no read-modify-write: the
     /// buffer's own peak IS the value, and the hold and the decay belong to
@@ -288,8 +294,14 @@ struct MixChunk: Equatable {
     let sampleRate: Int
     let left: [Float]
     let right: [Float]
+    /// A MARK's length (spec §11 AU-161): the frames the player's filler
+    /// stood for, with `frames` 0 and no samples. 0 for audio.
+    var filler = 0
 
     var end: Int64 { start + Int64(frames) }
+    /// Where the track's stream stands after it: a mark's filler counted,
+    /// for continuity only.
+    var streamEnd: Int64 { end + Int64(filler) }
 }
 
 /// A tap's samples on their way to the main thread (spec §11 AU-70): one
@@ -318,6 +330,8 @@ final class MixRing: @unchecked Sendable {
         var sampleRate = 0
         /// Where its frames begin, counted from the ring's first write.
         var offset: Int64 = 0
+        /// A mark's length; `frames` is 0 then.
+        var filler = 0
     }
 
     private let left: UnsafeMutablePointer<Float>
@@ -375,6 +389,19 @@ final class MixRing: @unchecked Sendable {
         published.store(chunk + 1, ordering: .releasing)
     }
 
+    /// AUDIO THREAD: no lock, no allocation. A header and no frames: the
+    /// player's filler as a position (spec §11 AU-161).
+    func mark(start: Int64, frames: Int, sampleRate: Int) {
+        guard frames > 0 else { return }
+        let chunk = chunkClaim.load(ordering: .relaxed)
+        chunkClaim.store(chunk + 1, ordering: .relaxed)
+        atomicMemoryFence(ordering: .releasing)
+        headers[Int(chunk % Int64(Self.capacityChunks))] = Header(
+            start: start, frames: 0, channels: 1, sampleRate: sampleRate,
+            offset: frameClaim.load(ordering: .relaxed), filler: frames)
+        published.store(chunk + 1, ordering: .releasing)
+    }
+
     /// MAIN THREAD (the one consumer). Every chunk published since the last
     /// drain, oldest first; one overwritten before it was copied is left out
     /// and sets `overran`.
@@ -390,20 +417,22 @@ final class MixRing: @unchecked Sendable {
         while next < end {
             defer { next += 1 }
             let header = headers[Int(next % Int64(Self.capacityChunks))]
-            guard header.frames > 0, header.frames <= Self.capacityFrames,
-                (1...2).contains(header.channels)
+            // A mark has no frames and a length; audio has frames and none.
+            guard header.frames >= 0, header.frames <= Self.capacityFrames,
+                (1...2).contains(header.channels), (header.frames == 0) == (header.filler > 0)
             else { overran = true; continue }
             let l = copy(left, header)
             let r = header.channels == 2 ? copy(right, header) : []
             atomicMemoryFence(ordering: .acquiring)
             guard chunkClaim.load(ordering: .relaxed) <= next + Int64(Self.capacityChunks),
-                frameClaim.load(ordering: .relaxed)
-                    <= header.offset + Int64(Self.capacityFrames)
+                header.frames == 0
+                    || frameClaim.load(ordering: .relaxed)
+                        <= header.offset + Int64(Self.capacityFrames)
             else { overran = true; continue }
             chunks.append(
                 MixChunk(
                     start: header.start, frames: header.frames, channels: header.channels,
-                    sampleRate: header.sampleRate, left: l, right: r))
+                    sampleRate: header.sampleRate, left: l, right: r, filler: header.filler))
         }
         drained = end
         return (chunks, overran)

@@ -191,7 +191,7 @@ extension MediaImporter {
         let marker = syncFeaturesMarkerURL(for: media.id, in: cacheDir)
         let data = frames.withUnsafeBufferPointer { Data(buffer: $0) }
         let samples = pcm.map { $0.littleEndian }.withUnsafeBufferPointer { Data(buffer: $0) }
-        CacheLedger.shared.publish(in: cacheDir, for: pass) {
+        CacheLedger.shared.publish(in: cacheDir, for: pass, as: "sync-features") {
             guard ensureDirectory(file.deletingLastPathComponent()) else { return }
             guard (try? data.write(to: file, options: .atomic)) != nil,
                 (try? samples.write(to: samplesFile, options: .atomic)) != nil,

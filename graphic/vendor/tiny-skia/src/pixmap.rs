@@ -23,13 +23,94 @@ use crate::color::{premultiply_u8, ALPHA_U8_OPAQUE};
 /// Number of bytes per pixel.
 pub const BYTES_PER_PIXEL: usize = 4;
 
+// Frame Job (spec §11 PR-15): the door to a deep pixmap. Inside `with_deep_pixmaps`, on the calling
+// thread only, `Pixmap::new` makes the residual plane; everywhere else it makes today's 8-bit
+// pixmap. The flag is restored on the way out, on a panic too.
+#[cfg(feature = "std")]
+std::thread_local! {
+    static DEEP: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
+}
+
+/// Frame Job (spec §11 PR-15): runs `f` with every `Pixmap::new` on this thread deep.
+#[cfg(feature = "std")]
+pub fn with_deep_pixmaps<R>(f: impl FnOnce() -> R) -> R {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            DEEP.with(|deep| deep.set(self.0));
+        }
+    }
+    let _restore = Restore(DEEP.with(|deep| deep.replace(true)));
+    f()
+}
+
+fn deep_pixmaps() -> bool {
+    #[cfg(feature = "std")]
+    {
+        DEEP.with(|deep| deep.get())
+    }
+    #[cfg(not(feature = "std"))]
+    {
+        false
+    }
+}
+
+// Frame Job (spec §11 PR-15): a deep pixmap read at 8 bits. Each pixel holding a residual has R, G and B
+// rounded with PR-13's offset for its position (`origin` is the first pixel's), clamped to
+// [0, alpha]; alpha is already rounded. A value on a level never moves: the offset is under
+// half a level. The residual is zeroed.
+pub(crate) fn collapse(data: &mut [u8], lo: &mut [u8], width: usize, origin: (u32, u32)) {
+    for (i, (px, l)) in data.chunks_exact_mut(4).zip(lo.chunks_exact_mut(4)).enumerate() {
+        if l[0] | l[1] | l[2] | l[3] == 0 {
+            continue;
+        }
+        let (x, y) = ((i % width) as u32 + origin.0, (i / width) as u32 + origin.1);
+        let offset = crate::pipeline::dither_offset_256(x, y);
+        let alpha = px[3] as i32;
+        for c in 0..3 {
+            let v = ((px[c] as i32) << 8) + (l[c] as i8 as i32);
+            px[c] = ((v + offset + 128) >> 8).clamp(0, alpha) as u8;
+        }
+        l.fill(0);
+    }
+}
+
+// Frame Job (spec §11 PR-15): whether every byte is 0, without a branch a byte.
+fn is_zero(bytes: &[u8]) -> bool {
+    bytes.iter().fold(0u8, |all, byte| all | *byte) == 0
+}
+
+// Frame Job (spec §11 PR-15): `collapse` of a borrowed deep pixmap, as new 8-bit bytes.
+pub(crate) fn collapsed(data: &[u8], lo: &[u8], width: usize) -> Vec<u8> {
+    let (mut data, mut lo) = (data.to_vec(), lo.to_vec());
+    collapse(&mut data, &mut lo, width, (0, 0));
+    data
+}
+
 /// A container that owns premultiplied RGBA pixels.
 ///
 /// The data is not aligned, therefore width == stride.
-#[derive(Clone, PartialEq)]
+#[derive(PartialEq)]
 pub struct Pixmap {
     data: Vec<u8>,
+    // Frame Job (spec §11 PR-15): the residual plane, empty when the pixmap is 8-bit. A channel's
+    // value in 1/256 levels is `data × 256 + (lo as i8)`, 65280 being 1; `data` alone is the
+    // value rounded to 8 bits.
+    lo: Vec<u8>,
     size: IntSize,
+}
+
+// Frame Job (spec §11 PR-15): a copy is 8-bit. Only resvg's filters clone a pixmap, and they read the
+// copy's bytes, so a deep source is rounded with PR-13's offset here.
+impl Clone for Pixmap {
+    fn clone(&self) -> Self {
+        let data = if self.lo.is_empty() {
+            self.data.clone()
+        } else {
+            collapsed(&self.data, &self.lo, self.size.width() as usize)
+        };
+        Pixmap { data, lo: Vec::new(), size: self.size }
+    }
 }
 
 impl Pixmap {
@@ -49,6 +130,7 @@ impl Pixmap {
 
         Some(Pixmap {
             data: vec![0; data_len],
+            lo: if deep_pixmaps() { vec![0; data_len] } else { Vec::new() },
             size,
         })
     }
@@ -65,7 +147,7 @@ impl Pixmap {
             return None;
         }
 
-        Some(Pixmap { data, size })
+        Some(Pixmap { data, lo: Vec::new(), size })
     }
 
     /// Decodes a PNG data into a `Pixmap`.
@@ -186,6 +268,7 @@ impl Pixmap {
     pub fn as_ref(&self) -> PixmapRef<'_> {
         PixmapRef {
             data: &self.data,
+            lo: if self.lo.is_empty() { None } else { Some(&self.lo) },
             size: self.size,
         }
     }
@@ -194,7 +277,32 @@ impl Pixmap {
     pub fn as_mut(&mut self) -> PixmapMut<'_> {
         PixmapMut {
             data: &mut self.data,
+            lo: if self.lo.is_empty() { None } else { Some(&mut self.lo) },
             size: self.size,
+        }
+    }
+
+    /// Frame Job (spec §11 PR-15): copies the pixmap into `out` as premultiplied RGBA, 16 bits
+    /// a channel with 65535 as 1, rows `stride` values apart. A row's values past `width × 4`
+    /// are untouched. An 8-bit pixmap copies as `× 257`. Panics if `out` is too short.
+    pub fn copy_rgba16(&self, out: &mut [u16], stride: usize) {
+        let row = self.size.width() as usize * BYTES_PER_PIXEL;
+        for (y, hi) in self.data.chunks_exact(row).enumerate() {
+            let to = &mut out[y * stride..y * stride + row];
+            let lo = if self.lo.is_empty() { &[][..] } else { &self.lo[y * row..(y + 1) * row] };
+            // A row with no residual (an 8-bit pixmap's, an untouched or solid one) widens
+            // `data` alone; both loops are branch-free.
+            let flat = lo.is_empty() || is_zero(lo);
+            if flat {
+                for (t, h) in to.iter_mut().zip(hi) {
+                    *t = *h as u16 * 257;
+                }
+            } else {
+                for ((t, h), l) in to.iter_mut().zip(hi).zip(lo) {
+                    let v = ((*h as i32) << 8) + (*l as i8 as i32);
+                    *t = ((v * 257 + 128) >> 8) as u16;
+                }
+            }
         }
     }
 
@@ -219,7 +327,9 @@ impl Pixmap {
     /// Fills the entire pixmap with a specified color.
     pub fn fill(&mut self, color: Color) {
         let c = color.premultiply().to_color_u8();
-        for p in self.as_mut().pixels_mut() {
+        // Frame Job (spec §11 PR-15): a colour is on a level; the pixmap stays deep.
+        self.lo.fill(0);
+        for p in bytemuck::cast_slice_mut::<u8, PremultipliedColorU8>(&mut self.data) {
             *p = c;
         }
     }
@@ -235,6 +345,12 @@ impl Pixmap {
     ///
     /// Byteorder: RGBA
     pub fn data_mut(&mut self) -> &mut [u8] {
+        // Frame Job (spec §11 PR-15): an 8-bit reader or writer outside the pipeline (resvg's filters and
+        // image decoders) gets the pixmap rounded with PR-13's offset, 8-bit from here on.
+        if !self.lo.is_empty() {
+            collapse(&mut self.data, &mut self.lo, self.size.width() as usize, (0, 0));
+            self.lo = Vec::new();
+        }
         self.data.as_mut_slice()
     }
 
@@ -259,7 +375,9 @@ impl Pixmap {
     /// Consumes the internal data.
     ///
     /// Byteorder: RGBA
-    pub fn take(self) -> Vec<u8> {
+    pub fn take(mut self) -> Vec<u8> {
+        // Frame Job (spec §11 PR-15): as `data_mut`.
+        self.data_mut();
         self.data
     }
 
@@ -305,6 +423,7 @@ impl core::fmt::Debug for Pixmap {
 #[derive(Clone, Copy, PartialEq)]
 pub struct PixmapRef<'a> {
     data: &'a [u8],
+    pub(crate) lo: Option<&'a [u8]>,
     size: IntSize,
 }
 
@@ -322,7 +441,7 @@ impl<'a> PixmapRef<'a> {
             return None;
         }
 
-        Some(PixmapRef { data, size })
+        Some(PixmapRef { data, lo: None, size })
     }
 
     /// Creates a new `Pixmap` from the current data.
@@ -331,6 +450,8 @@ impl<'a> PixmapRef<'a> {
     pub fn to_owned(&self) -> Pixmap {
         Pixmap {
             data: self.data.to_vec(),
+            // Frame Job (spec §11 PR-15): the residual plane follows.
+            lo: self.lo.as_ref().map(|lo| lo.to_vec()).unwrap_or_default(),
             size: self.size,
         }
     }
@@ -386,6 +507,20 @@ impl<'a> PixmapRef<'a> {
         // TODO: to ScreenIntRect?
 
         let rect = self.rect().to_int_rect().intersect(&rect)?;
+        // Frame Job (spec §11 PR-15): a copy of a deep pixmap is 8-bit, as `Pixmap::clone`, with the
+        // offset of each pixel's place in this pixmap.
+        if let Some(lo) = self.lo {
+            let (w, rw) = (self.width() as usize * 4, rect.width() as usize * 4);
+            let (mut data, mut part) = (Vec::new(), Vec::new());
+            for y in 0..rect.height() as usize {
+                let from = (y + rect.y() as usize) * w + rect.x() as usize * 4;
+                data.extend_from_slice(&self.data[from..from + rw]);
+                part.extend_from_slice(&lo[from..from + rw]);
+            }
+            let origin = (rect.x() as u32, rect.y() as u32);
+            collapse(&mut data, &mut part, rect.width() as usize, origin);
+            return Some(Pixmap { data, lo: Vec::new(), size: rect.size() });
+        }
         let mut new = Pixmap::new(rect.width(), rect.height())?;
         {
             let old_pixels = self.pixels();
@@ -454,6 +589,7 @@ impl core::fmt::Debug for PixmapRef<'_> {
 #[derive(PartialEq)]
 pub struct PixmapMut<'a> {
     data: &'a mut [u8],
+    pub(crate) lo: Option<&'a mut [u8]>,
     size: IntSize,
 }
 
@@ -471,7 +607,7 @@ impl<'a> PixmapMut<'a> {
             return None;
         }
 
-        Some(PixmapMut { data, size })
+        Some(PixmapMut { data, lo: None, size })
     }
 
     /// Creates a new `Pixmap` from the current data.
@@ -480,6 +616,8 @@ impl<'a> PixmapMut<'a> {
     pub fn to_owned(&self) -> Pixmap {
         Pixmap {
             data: self.data.to_vec(),
+            // Frame Job (spec §11 PR-15): the residual plane follows.
+            lo: self.lo.as_ref().map(|lo| lo.to_vec()).unwrap_or_default(),
             size: self.size,
         }
     }
@@ -488,6 +626,7 @@ impl<'a> PixmapMut<'a> {
     pub fn as_ref(&self) -> PixmapRef<'_> {
         PixmapRef {
             data: self.data,
+            lo: self.lo.as_deref(),
             size: self.size,
         }
     }
@@ -512,7 +651,11 @@ impl<'a> PixmapMut<'a> {
     /// Fills the entire pixmap with a specified color.
     pub fn fill(&mut self, color: Color) {
         let c = color.premultiply().to_color_u8();
-        for p in self.pixels_mut() {
+        // Frame Job (spec §11 PR-15): a colour is on a level; the pixmap stays deep.
+        if let Some(lo) = self.lo.as_deref_mut() {
+            lo.fill(0);
+        }
+        for p in bytemuck::cast_slice_mut::<u8, PremultipliedColorU8>(self.data) {
             *p = c;
         }
     }
@@ -521,6 +664,10 @@ impl<'a> PixmapMut<'a> {
     ///
     /// Byteorder: RGBA
     pub fn data_mut(&mut self) -> &mut [u8] {
+        // Frame Job (spec §11 PR-15): as `Pixmap::data_mut`; a borrowed plane is zeroed, not dropped.
+        if let Some(lo) = self.lo.as_deref_mut() {
+            collapse(self.data, lo, self.size.width() as usize, (0, 0));
+        }
         self.data
     }
 
@@ -535,6 +682,7 @@ impl<'a> PixmapMut<'a> {
             size: self.size(),
             real_width: self.width() as usize,
             data: self.data,
+            lo: self.lo.as_deref_mut(),
         }
     }
 
@@ -550,6 +698,7 @@ impl<'a> PixmapMut<'a> {
             size: rect.size(),
             real_width: self.width() as usize,
             data: &mut self.data[offset..],
+            lo: self.lo.as_deref_mut().map(|lo| &mut lo[offset..]),
         })
     }
 }
@@ -576,6 +725,9 @@ impl core::fmt::Debug for PixmapMut<'_> {
 /// On the other hand, `PixmapMut.data` can access all it's data and it's stored linearly.
 pub struct SubPixmapMut<'a> {
     pub data: &'a mut [u8],
+    // Frame Job (spec §11 PR-15): the residual plane at the same offset; None for a mask or an 8-bit
+    // pixmap.
+    pub lo: Option<&'a mut [u8]>,
     pub size: IntSize,
     pub real_width: usize,
 }

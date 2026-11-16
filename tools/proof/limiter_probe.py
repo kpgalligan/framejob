@@ -52,7 +52,8 @@ MUTANTS = [
      "// Annex 2 at m: x[m − 5 … m + 6].\n                for phase in 0..<4 {",
      "// Annex 2 at m: x[m − 5 … m + 6].\n                for phase in 0..<0 {"),
     ("M5 gain-not-told", "L2", "AudioTapSchedule.swift",
-     "ceilingDb: $0.ceilingDb, volume: audio.volume,", "ceilingDb: $0.ceilingDb, volume: 1,"),
+     # Re-aimed (#554): the base volume is the local `volume` there now.
+     "ceilingDb: $0.ceilingDb, volume: volume,", "ceilingDb: $0.ceilingDb, volume: 1,"),
     ("M6 model-off", "L8", "AudioNormalize+Loudness.swift",
      "guard !reading.steps.isEmpty else {", "guard false else {"),
     ("M7 reset-incomplete", "L4", "AudioLimiterStage.swift",

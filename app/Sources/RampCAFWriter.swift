@@ -1,7 +1,8 @@
 import AudioToolbox
 
 /// 32-bit float LPCM CAF at 48 kHz, interleaved, through `ExtAudioFile`
-/// (the file type named, since the path ends `.partial`).
+/// (the file type named, since the path ends `.partial`). The path a render
+/// hands it is in its `RenderLanding` folder, outside the package (#553).
 final class RampCAFWriter {
     let channels: Int
     private var file: ExtAudioFileRef?

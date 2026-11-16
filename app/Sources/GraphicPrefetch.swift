@@ -69,7 +69,7 @@ final class GraphicPrefetch: @unchecked Sendable {
     static let entryCeiling = 1024
 
     /// One slot's raster as a worker made it. Guarded by `condition`.
-    private final class Entry {
+    final class Entry {
         let index: Int
         var bytes: Int
         var done = false
@@ -89,7 +89,7 @@ final class GraphicPrefetch: @unchecked Sendable {
 
     /// One export's prefetch. Guarded by `condition`; its workers hold it
     /// after `stop` has removed it from `sessions`.
-    private final class Session: @unchecked Sendable {
+    final class Session: @unchecked Sendable {
         let key: Int
         let start: CMTime
         let frameDuration: CMTime
@@ -157,7 +157,7 @@ final class GraphicPrefetch: @unchecked Sendable {
     }
 
     let condition = NSCondition()
-    private var sessions: [Int: Session] = [:]
+    var sessions: [Int: Session] = [:]
     /// The kept frames and the keys that keep (G-37 (c)).
     var kept = KeptFrames()
     var keeping: Set<Int> = []
@@ -230,14 +230,6 @@ final class GraphicPrefetch: @unchecked Sendable {
             thread.start()
         }
         return true
-    }
-
-    /// `stop(key)` for every background session, no other. Main only.
-    func stopBackground() {
-        condition.lock()
-        let keys = sessions.values.filter(\.background).map(\.key)
-        condition.unlock()
-        for key in keys { stop(key) }
     }
 
     /// Ends `key`'s session: its entries unused (a keeping key's finished
@@ -368,7 +360,7 @@ final class GraphicPrefetch: @unchecked Sendable {
     /// An entry's bytes out of the totals, once; a keeping key's finished
     /// raster then kept, room permitting (true when it is). Under `condition`.
     @discardableResult
-    private func release(_ entry: Entry, from session: Session) -> Bool {
+    func release(_ entry: Entry, from session: Session) -> Bool {
         guard entry.bytes > 0 else { return false }
         session.heldBytes -= entry.bytes
         heldTotal -= entry.bytes
@@ -376,7 +368,7 @@ final class GraphicPrefetch: @unchecked Sendable {
         entry.bytes = 0
         guard keeping.contains(session.key), entry.done,
             case .success(let raster)? = entry.raster, let textureKey = entry.textureKey,
-            raster.bgra.count <= budgetBytes - heldTotal
+            raster.byteCount <= budgetBytes - heldTotal
         else { return false }
         kept.insert(session.key, textureKey, raster)
         kept.trim(toFit: budgetBytes - heldTotal)
@@ -386,7 +378,7 @@ final class GraphicPrefetch: @unchecked Sendable {
     // MARK: - Workers
 
     /// One graphic layer a worker will draw.
-    private struct Job {
+    struct Job {
         let slot: Slot
         let entry: Entry
         let module: GraphicModule
@@ -416,7 +408,8 @@ final class GraphicPrefetch: @unchecked Sendable {
                 let size = layer.sourceSizeCG ?? CGSize(width: 640, height: 360)
                 let slot = Slot(
                     name: name, frame: frame, width: Int(size.width), height: Int(size.height),
-                    propsJSON: props, ctxJSON: ctx)
+                    propsJSON: props, ctxJSON: ctx,
+                    deep: resolved.deep)
                 wanted.append((slot, module))
             }
             guard !wanted.isEmpty else { continue }
@@ -476,16 +469,16 @@ final class GraphicPrefetch: @unchecked Sendable {
         defer { condition.unlock() }
         let slots = wanted.map(\.slot)
         while session.follows, aheadOrigin?.key == session.key, !session.stopped,
-            !roomAhead(for: slots) { condition.wait() }
+            !roomAhead(for: slots, key: session.key) { condition.wait() }
         guard !session.stopped else { return nil }
-        if session.background, !roomAhead(for: slots) {
+        if session.background, !roomAhead(for: slots, key: session.key) {
             (session.exhausted, session.end) = (true, "full")
             return nil
         }
         session.framesWithGraphics += 1
         var jobs: [Job] = []
         for (slot, module) in wanted where session.slots[slot] == nil {
-            let entry = Entry(index: index, bytes: slot.width * slot.height * 4)
+            let entry = Entry(index: index, bytes: rasterBytes(slot))
             session.slots[slot] = entry
             session.heldBytes += entry.bytes
             heldTotal += entry.bytes
@@ -503,7 +496,7 @@ final class GraphicPrefetch: @unchecked Sendable {
     /// between jobs, and the rest marked done. A texture key an earlier
     /// frame's entry rasterizes, or the key keeps, is left to the compositor.
     private func draw(
-        _ jobs: [Job], session: Session, resolved: (set: GraphicSet, budgetMs: Int)
+        _ jobs: [Job], session: Session, resolved: GraphicRegistry.Resolved
     ) {
         for (position, job) in jobs.enumerated() {
             condition.lock()
@@ -524,7 +517,7 @@ final class GraphicPrefetch: @unchecked Sendable {
             }
             let key = LayerRenderers.textureKey(
                 svg: drawn.svg, width: slot.width, height: slot.height,
-                libraryVersion: resolved.set.libraryVersion)
+                libraryVersion: resolved.set.libraryVersion, deep: slot.deep)
             condition.lock()
             job.entry.textureKey = key
             let keptAlready = keeping.contains(session.key) && kept.contains(session.key, key)
@@ -534,16 +527,7 @@ final class GraphicPrefetch: @unchecked Sendable {
                 job.entry.deferred = true
                 release(job.entry, from: session)
                 if session.background, !session.stopped {
-                    if session.slots[job.slot] === job.entry { session.slots[job.slot] = nil }
-                    if keptAlready, kept.raster(session.key, key) != nil {
-                        kept.markAhead(session.key, key, index: job.entry.index)
-                        session.alreadyKept += 1
-                    } else if let first = session.slots.values.first(where: {
-                        !$0.done && $0.textureKey == key && $0.index < job.entry.index
-                    }) {
-                        (first.sharers, first.sharedUpTo) =
-                            (first.sharers + 1, max(first.sharedUpTo, job.entry.index))
-                    }
+                    passDeferred(job, key: key, keptAlready: keptAlready, in: session)
                 }
                 condition.broadcast()
                 condition.unlock()
@@ -553,7 +537,7 @@ final class GraphicPrefetch: @unchecked Sendable {
             condition.unlock()
             let raster = Result<GraphicRaster, any Error>(catching: {
                 try resolved.set.library.rasterize(
-                    drawn.svg, width: slot.width, height: slot.height)
+                    drawn.svg, width: slot.width, height: slot.height, deep: slot.deep)
             })
             finish(job, in: session, raster: raster)
         }
@@ -565,15 +549,7 @@ final class GraphicPrefetch: @unchecked Sendable {
         condition.lock()
         job.entry.raster = raster
         job.entry.done = true
-        if session.background, !session.stopped {
-            if session.slots[job.slot] === job.entry { session.slots[job.slot] = nil }
-            if release(job.entry, from: session), let textureKey = job.entry.textureKey {
-                let entry = job.entry
-                kept.markAhead(session.key, textureKey, index: max(entry.index, entry.sharedUpTo))
-                (session.drawn, session.alreadyKept) =
-                    (session.drawn + 1, session.alreadyKept + entry.sharers)
-            }
-        }
+        if session.background, !session.stopped { passFinished(job, in: session) }
         condition.broadcast()
         condition.unlock()
     }

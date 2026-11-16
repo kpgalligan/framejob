@@ -265,6 +265,12 @@ extension AppDelegate {
         menu.addItem(
             item(
                 "Select All on Track", #selector(EditorViewController.selectAllClipsOnTrack(_:))))
+        menu.addItem(.separator())
+        // The Transcript tab's find bar (spec §11 TX-37) while that tab
+        // shows, and the Media tab's search field while that tab shows it
+        // (TX-45). It mirrors no edit, so it has no agent tool: Find moves
+        // only view state.
+        menu.addItem(item("Find…", #selector(EditorViewController.findInTranscript(_:)), "f"))
         return menu
     }
 
@@ -381,6 +387,10 @@ extension AppDelegate {
         // half of the Color sub-tab's Look section. No key equivalent, for
         // Remove Silences…' reason above.
         menu.addItem(submenuItem(lookMenu()))
+        // #390 (spec §11 AU-158): Voice ▸ right after Look ▸, the menu half of
+        // the Sound tab's Voice Effect section and a UI path `set_audio`'s
+        // `voice` names. No key equivalent, for Remove Silences…' reason above.
+        menu.addItem(submenuItem(voiceMenu()))
         // Road map "creator-jobs" CO3 (spec §11 CO-30 (e)), right after Look ▸:
         // the UI path `set_video`'s `cutout` and `analyze_cutout` name. No key
         // equivalent (the owner's answer, 2026-11-01).

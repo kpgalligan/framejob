@@ -132,7 +132,7 @@ A bad key or value is refused by its path with the group in it, such as `video.f
 **Sound.** These `audio` keys animate: `muted`, `pan`, `mono`, `channels`, `eq`, `hum`, `noise_reduction`, `gate`, `leveller`, `de_esser`, `compressor`, `limiter` and `isolation`, beside `volume` and the fades.
 
 - Numbers ramp.
-- A switch changes when the action ends: a group or an EQ slot turned on, `muted`, `mono`, `channels`, an EQ slope, hum's frequency and harmonics, and the leveller's response.
+- A switch changes when the action ends: a group or an EQ slot turned on, `muted`, `mono`, `channels`, an EQ slope, hum's frequency and harmonics, and the leveler's response.
 - `isolation` ramps from 0 on a clip with none.
 - `duck`, `keep_pitch`, the fade shapes and `voice` are stored but never animate.
 
@@ -149,6 +149,7 @@ See [Animate sound with actions](/audio/animate-sound/).
 | `text.words` | Word times belong to speech. Set them with `set_text`. |
 | `video.cutout.subject`, `video.cutout.quality` | They hold for the whole clip. Set them with `set_video`. A cutout's `edge`, `feather` and `background` do animate. |
 | Any `shape` key | Shapes can't be animated, so `shape` isn't a group here. |
+| `video.crop`, `video.corner_radius`, `video.chroma` on a text, shape, graphic or adjustment clip, and `video.corner_radius`, `video.chroma` on a nest clip | These clips have no section for them, so the end can't put one on, as `set_video` can't. Only a value the end would keep is an error: a `null`, a crop of all 0, a radius of 0 and `off` all work. A crop is allowed on a text, shape or graphic clip on a [matte track](/canvas/matte-tracks/), and on a nest clip. |
 
 ### Animating graphic props
 
@@ -207,6 +208,7 @@ Above ×12 the clip's audio is left out, and the call that takes it there answer
 - Only optional keys can go off. A required key such as `video.opacity` is refused.
 - `video.qualifier` on its own is refused too, and so are its `invert` and `blur`, which aren't ranges. A range set to `null` in `patch` only leaves the end state.
 - A path can't also be named in `patch`.
+- `audio.eq` and one of its slots can't both be named: switching the whole EQ off already switches every slot off.
 - `graphic` paths are refused: name the value a prop ends at in `patch`.
 - `video.cutout` is refused: `set_video` with `{cutout: null}` removes a cutout.
 - `video.motion`, `video.hide_silent` and `text.words` are refused here too.

@@ -7,8 +7,9 @@
 //! back from the code: Z1 the five clicks in two visits, Z2 the clamp at a
 //! corner, Z3 a ramp through S, Z4 Replace off and on, `is_zoom` through
 //! Replace's removals, Z7 a split mid-hold, Z8 a visit across a cut, Z9 the
-//! placed clip refused and its neighbours planned, Z10 reversed, and every
-//! refusal in CU-75's order.
+//! placed clip refused and its neighbours planned, Z10 reversed, Z11 a hold
+//! closed within one frame of a cut leaving no aim for a later cut (#447),
+//! and every refusal in CU-75's order.
 //!
 //! The fixture's cursor file maps one point to 2 movie px from the origin,
 //! so a file unit (points × 100) is 1/50 px; its movie is 1920 × 1080 on a
@@ -557,6 +558,88 @@ fn z8_a_kept_action_on_the_later_half_closes_the_visit_at_the_cut() {
     assert_eq!(answer["visits"], 2);
     let k = |c: u64, at: f64, d: f64, kind: &str| (c, s(at) * 6 / 10, s(d) * 6 / 10, kind.into());
     assert_eq!(spans(&answer)[1], k(10, 5.2, 0.8, "back"));
+}
+
+/// Three clips continuing one source: 10 on [0, 6) s, 11 on [6, 12) s and
+/// 12 on [12, 18) s.
+fn three() -> Handle {
+    project_with(
+        (1920, 1080),
+        vec![media(1, 1920, 1080)],
+        vec![
+            clip(10, 0, 6 * SEC, 0, json!({})),
+            clip(11, 6 * SEC, 6 * SEC, 6 * SEC, json!({})),
+            clip(12, 12 * SEC, 6 * SEC, 12 * SEC, json!({})),
+        ],
+    )
+}
+
+fn no_set_video(answer: &Value) {
+    assert!(
+        !ops(answer).iter().any(|o| o["op"] == "set_video"),
+        "a set_video from a stale aim: {:?}",
+        ops(answer)
+    );
+}
+
+#[test]
+fn z11a_a_hold_closed_within_a_frame_of_a_cut_sets_no_later_base() {
+    // The click at 5.98 s is closed by the cut into 11, which was not
+    // given: its Back would be 0.02 s, under a frame, so it is not planned.
+    // No hold spans the 12 s cut into 12, so nothing is in force there.
+    let handle = three();
+    let track = Track::open(&file(&[(5_980_000, 1500.0, 540.0)], &[], &[]));
+    let answer = plan(
+        &handle,
+        &[&track, &track],
+        json!({"clips": [10, 12], "follow": false}),
+    );
+    assert_eq!(answer["closed_at_cut"], 1);
+    assert_eq!(answer["bases_set"], 0);
+    no_set_video(&answer);
+}
+
+#[test]
+fn z11b_a_hold_closed_by_a_kept_action_within_a_frame_sets_no_base() {
+    // 11's kept action at 8–8.5 s closes the hold at the 6 s cut, its Back
+    // under a frame: the hold ends AT the cut, so it does not span it.
+    let mut b = clip(11, 6 * SEC, 6 * SEC, 6 * SEC, json!({}));
+    b["actions"] = json!([{"id": 95, "start": 2 * SEC, "duration": SEC / 2,
+                           "curve": "linear", "end": {"video": {"opacity": 0.5}}}]);
+    let handle = project_with(
+        (1920, 1080),
+        vec![media(1, 1920, 1080)],
+        vec![clip(10, 0, 6 * SEC, 0, json!({})), b],
+    );
+    let track = Track::open(&file(&[(5_980_000, 1500.0, 540.0)], &[], &[]));
+    let answer = plan(
+        &handle,
+        &[&track, &track],
+        json!({"clips": [10, 11], "follow": false}),
+    );
+    assert_eq!(answer["closed_at_cut"], 1);
+    assert_eq!(answer["bases_set"], 0);
+    no_set_video(&answer);
+}
+
+#[test]
+fn z11c_a_later_hold_spanning_a_cut_reads_only_its_own_aims() {
+    // As Z11a, plus a click at 12.3 s: its hold spans the 12 s cut, and its
+    // In lands on 12 at 12 s, so no action of THAT hold ends by the cut.
+    let handle = three();
+    let track = Track::open(&file(
+        &[(5_980_000, 1500.0, 540.0), (12_300_000, 960.0, 540.0)],
+        &[],
+        &[],
+    ));
+    let answer = plan(
+        &handle,
+        &[&track, &track],
+        json!({"clips": [10, 12], "follow": false}),
+    );
+    assert_eq!(answer["visits"], 2);
+    assert_eq!(answer["bases_set"], 0);
+    no_set_video(&answer);
 }
 
 #[test]

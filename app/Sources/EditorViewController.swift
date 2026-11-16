@@ -168,6 +168,7 @@ final class EditorViewController: NSViewController {
         self.document = document
         playback = Playback(recipeKey: document.recipeKey)
         super.init(nibName: nil, bundle: nil)
+        document.editors.add(self)
         let defaults = UserDefaults.standard
         if defaults.object(forKey: Self.snappingKey) != nil {
             snappingEnabled = defaults.bool(forKey: Self.snappingKey)
@@ -1051,6 +1052,7 @@ extension EditorViewController: NSUserInterfaceValidations {
             if let answer = validateIdentityAction(action, item: item) { return answer }
             if let answer = validateMotionAction(action, item: item) { return answer }
             if let answer = validateLookAction(action, item: item) { return answer }
+            if let answer = validateVoiceAction(action, item: item) { return answer }
             if let answer = validateBackgroundAction(action) { return answer }
             if let answer = validateSaveFrameAction(action) { return answer }
             if let answer = validatePreviewQualityAction(action, item: item) { return answer }
@@ -1074,6 +1076,7 @@ extension EditorViewController: NSUserInterfaceValidations {
             if let answer = validateSwitchSpeakerAction(action) { return answer }
             if let answer = validateFollowSubjectAction(action) { return answer }
             if let answer = validateRelayCaptionsAction(action) { return answer }
+            if let answer = validateTranscriptAction(action) { return answer }
             // The arms whose files are not `EditorViewController+…`: Remove
             // Silences' body and validator live at the foot of
             // SilenceSheetController.swift, beside the sheet, Remove Filler

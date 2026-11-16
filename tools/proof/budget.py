@@ -46,7 +46,7 @@ sys.path.insert(0, HERE)
 import prices  # noqa: E402
 
 LEDGER = os.path.expanduser("~/Library/Application Support/Frame Job Proofs/spend.jsonl")
-BUDGETS = {"anthropic": 25.00, "assemblyai": 5.00}
+BUDGETS = {"anthropic": 40.00, "assemblyai": 5.00}  # spec §11 P-3, as P-9 amends it
 FORMAT = 1
 CLOUD_ESTIMATE = os.path.join(ROOT, "app", "Sources", "CloudEstimate.swift")
 

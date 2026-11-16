@@ -1,4 +1,4 @@
-// Road map "creator-jobs" FC3 — rows P1–P9 of `sound_events_proof.py`, driven
+// Road map "creator-jobs" FC3 — rows P1–P10 of `sound_events_proof.py`, driven
 // through the app's own `SoundEvents`, `AnalysisSoundEvents`,
 // `AnalysisStore`, `AnalysisStamp`, `MediaImporter.speechReader` and
 // `AgentServer.soundEventsAnswer`.
@@ -447,9 +447,40 @@ if let (_, m) = media(at: wavURL) {
     } catch {
         row("P7", false, "threw \(error)")
     }
+
+    // P10: at the default interval, cancelled at half: the answered prefix is kept (#435).
+    do {
+        let cut = folder("p10")
+        guard let request = soundRequest(m, url: wavURL, cacheDir: cut, ranges: [0...grid.lastIndex]),
+            let reference = wholeRun
+        else { throw AnalysisSoundEvents.SoundError.reader("no whole run: \(wholeError)") }
+        var halfway = false
+        let finished = try AnalysisSoundEvents.run(
+            request, cancelled: { halfway }, progress: { if $0 >= 0.5 { halfway = true } })
+        let ranges = marker(cut, m.id)?.ranges ?? []
+        let windows = stored(cut, m.id) ?? []
+        let last = ranges.last?.upperBound ?? -1
+        let answered = ranges.allSatisfy { r in r.allSatisfy { k in
+            k < windows.count && windows[k].values.contains { !$0.isNaN }
+        } }
+        var worst: Float = 0
+        for r in ranges { for k in r where k < windows.count && k < reference.count {
+            worst = max(worst, difference(windows[k], reference[k]))
+        } }
+        row("P10", !finished && ranges.count == 1 && ranges.first?.lowerBound == 0 && last >= 0
+                && last < grid.lastIndex && answered && worst <= 0.01,
+            "at the default publish interval (\(AnalysisSoundEvents.publishInterval) s), cancelled "
+                + "at half: finished \(finished) (want false); coverage \(ranges) of "
+                + "0…\(grid.lastIndex) (want one range from 0, short of the end); every covered "
+                + "window answered \(answered); largest difference from a whole run \(worst) "
+                + "(want ≤ 0.01)")
+    } catch {
+        row("P10", false, "threw \(error)")
+    }
 } else {
     row("P6", false, "the WAV \(wavPath) did not probe")
     row("P7", false, "the WAV \(wavPath) did not probe")
+    row("P10", false, "the WAV \(wavPath) did not probe")
 }
 
 // MARK: - P8 the answer: 4 decimals, null for NaN, the cap

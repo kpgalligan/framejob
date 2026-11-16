@@ -296,15 +296,14 @@ pub(crate) fn absorb_media(
             // `remap_look_media` makes it no look.
             continue;
         };
-        let path = entry.path.trim().to_string();
-        if path.is_empty() {
+        // Matched and stored as given, never trimmed (spec §11 #534).
+        if entry.path.trim().is_empty() {
             return Err("a pasted media path must not be empty".to_string());
         }
-        let local = match project.media.iter().find(|m| m.path == path) {
+        let local = match project.media.iter().find(|m| m.path == entry.path) {
             Some(found) => found.id,
             None => {
                 let mut record = entry.clone();
-                record.path = path;
                 // An empty bookmark is not a bookmark — `add_media`'s rule.
                 record.bookmark = record.bookmark.filter(|b| !b.trim().is_empty());
                 // `add_media`'s own field checks, on the row as it would be

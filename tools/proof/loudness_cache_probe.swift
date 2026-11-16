@@ -7,7 +7,9 @@ import Foundation
 // AU-10..AU-15; the high band, AP6's AU-63), compiled with app/Sources
 // through swift_build. Arguments: the fixtures folder, a scratch folder.
 // Prints one "ok"/"FAIL" line per row, each row's name first (C1..C12), for
-// loudness_cache_probe.py to score.
+// loudness_cache_probe.py to score. C13 (#406): Normalize's tooltip follows
+// the mode in another window's Volume section with no rebuild. C14 (#595):
+// one programme fed in several bufferings writes the same cache bytes.
 
 final class ProbeDocumentController: NSDocumentController {
     override var defaultType: String? { ProjectDocument.projectTypeIdentifier }
@@ -375,7 +377,8 @@ do {
           "\(current != nil) \(stale != nil) \(grain != nil)")
 }
 
-// C10, C11: the memo over a probe document.
+// C10, C11: the memo over a probe document (C13 reuses it).
+var memoDocument: ProjectDocument?
 do {
     let package = scratch.appendingPathComponent("memo.framejob", isDirectory: true)
     try? FileManager.default.removeItem(at: package)
@@ -399,6 +402,7 @@ do {
         check("C10", "the probe document opens", false, "\(error)")
         exit(1)
     }
+    memoDocument = document
     let memo = ClipLoudness.Memo()
     let first = memo.answer(for: 2, in: document)
     let media = snapshot(rodeURL, 91, rodeMedia.duration)
@@ -484,4 +488,284 @@ do {
                   "h − z at most \(String(format: "%.2f", ratio)) dB")
         }
     }
+}
+
+// C14 (#595): `LoudnessBlocks` adds a block's sums once per cut, and a reader
+// buffer ending inside a block makes two cuts, so the Double sums can follow
+// the buffering. What the cache keeps is `Float(sum / n)`, and that is what
+// is scored: each feeding's `data` is the bytes of the whole feeding's. The
+// Double sums that differ are printed beside it, not scored, except for the
+// feeding a block at a time, which makes the whole's very cuts and so must
+// give its very bits. Then the product's own pass (C1's stereo cache, the
+// reader's buffers) against the same PCM in one buffer.
+
+/// `audio_ap6b_probe.swift`'s seeded noise.
+func lcgNoise(_ n: Int, seed: UInt64, scale: Float) -> [Float] {
+    var state = seed
+    return (0..<n).map { _ in
+        state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+        return (Float(Int64(bitPattern: state >> 11) % 2_000_000) / 1_000_000 - 1) * scale
+    }
+}
+
+/// One interleaved 32-bit float buffer of `frames` frames from `frame` on, at
+/// that frame's PTS — the flags `PeakBuckets.add` requires.
+func interleaved(_ samples: [Float], from frame: Int, frames: Int, channels: Int,
+                 rate: Double) -> CMSampleBuffer? {
+    var asbd = AudioStreamBasicDescription(
+        mSampleRate: rate, mFormatID: kAudioFormatLinearPCM,
+        mFormatFlags: kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked,
+        mBytesPerPacket: UInt32(4 * channels), mFramesPerPacket: 1,
+        mBytesPerFrame: UInt32(4 * channels), mChannelsPerFrame: UInt32(channels),
+        mBitsPerChannel: 32, mReserved: 0)
+    var format: CMAudioFormatDescription?
+    guard CMAudioFormatDescriptionCreate(
+        allocator: kCFAllocatorDefault, asbd: &asbd, layoutSize: 0, layout: nil,
+        magicCookieSize: 0, magicCookie: nil, extensions: nil,
+        formatDescriptionOut: &format) == noErr, let format else { return nil }
+    let bytes = frames * channels * 4
+    var block: CMBlockBuffer?
+    guard CMBlockBufferCreateWithMemoryBlock(
+        allocator: kCFAllocatorDefault, memoryBlock: nil, blockLength: bytes,
+        blockAllocator: kCFAllocatorDefault, customBlockSource: nil, offsetToData: 0,
+        dataLength: bytes, flags: kCMBlockBufferAssureMemoryNowFlag,
+        blockBufferOut: &block) == kCMBlockBufferNoErr, let block else { return nil }
+    let copied = samples.withUnsafeBytes { raw -> OSStatus in
+        guard let base = raw.baseAddress else { return -1 }
+        return CMBlockBufferReplaceDataBytes(
+            with: base + frame * channels * 4, blockBuffer: block, offsetIntoDestination: 0,
+            dataLength: bytes)
+    }
+    guard copied == kCMBlockBufferNoErr else { return nil }
+    var sample: CMSampleBuffer?
+    guard CMAudioSampleBufferCreateReadyWithPacketDescriptions(
+        allocator: kCFAllocatorDefault, dataBuffer: block, formatDescription: format,
+        sampleCount: frames,
+        presentationTimeStamp: CMTime(value: CMTimeValue(frame), timescale: CMTimeScale(rate)),
+        packetDescriptions: nil, sampleBufferOut: &sample) == noErr, let sample
+    else { return nil }
+    return sample
+}
+
+/// `samples` fed to a fresh `LoudnessBlocks` in buffers of `sizes` frames,
+/// cycled (nil: one buffer); nil when a buffer is not made or not taken.
+func fed(_ samples: [Float], channels: Int, rate: Double, duration: Ticks, sizes: [Int]?)
+    -> MediaImporter.LoudnessBlocks? {
+    var blocks = MediaImporter.LoudnessBlocks(duration: duration)
+    let frames = samples.count / channels
+    var at = 0
+    var k = 0
+    while at < frames {
+        let n = min(sizes.map { $0[k % $0.count] } ?? frames, frames - at)
+        guard let buffer = interleaved(samples, from: at, frames: n, channels: channels, rate: rate),
+            blocks.add(buffer) else { return nil }
+        at += n
+        k += 1
+    }
+    return blocks.failed ? nil : blocks
+}
+
+/// The reader's own buffers of `url`, `writeLoudness`' settings, fed to a
+/// fresh `LoudnessBlocks`, with the buffers' frame counts.
+func readerFed(_ url: URL, duration: Ticks) -> (MediaImporter.LoudnessBlocks, [Int])? {
+    let asset = AVURLAsset(url: url)
+    let box = TrackBox()
+    let done = DispatchSemaphore(value: 0)
+    Task.detached {
+        box.track = (try? await asset.loadTracks(withMediaType: .audio))?.first
+        done.signal()
+    }
+    done.wait()
+    guard let track = box.track, let reader = try? AVAssetReader(asset: asset) else { return nil }
+    let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+        AVFormatIDKey: kAudioFormatLinearPCM, AVLinearPCMBitDepthKey: 32,
+        AVLinearPCMIsFloatKey: true, AVLinearPCMIsBigEndianKey: false,
+        AVLinearPCMIsNonInterleaved: false])
+    output.alwaysCopiesSampleData = false
+    reader.add(output)
+    guard reader.startReading() else { return nil }
+    var blocks = MediaImporter.LoudnessBlocks(duration: duration)
+    var sizes: [Int] = []
+    while let sample = output.copyNextSampleBuffer() {
+        sizes.append(CMSampleBufferGetNumSamples(sample))
+        guard blocks.add(sample) else { return nil }
+    }
+    return reader.status == .completed && !blocks.failed ? (blocks, sizes) : nil
+}
+
+func floats(_ data: Data) -> [Float] {
+    data.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
+}
+
+/// How many values differ in their bits, and the first such as "index: a / b".
+func bitDiff<T: BinaryFloatingPoint>(_ a: [T], _ b: [T], bits: (T) -> UInt64)
+    -> (count: Int, first: String) {
+    guard a.count == b.count else { return (max(a.count, b.count), "counts \(a.count)/\(b.count)") }
+    var count = 0
+    var first = ""
+    for i in a.indices where bits(a[i]) != bits(b[i]) {
+        if count == 0 {
+            first = "\(i): " + String(format: "%.17g / %.17g", Double(a[i]), Double(b[i]))
+        }
+        count += 1
+    }
+    return (count, first)
+}
+
+/// The Double sums of `fed` against `whole`'s: how many differ in their bits,
+/// over the sums the channel count writes, and the first as "sum k block b".
+func sumDiff(_ fed: MediaImporter.LoudnessBlocks, _ whole: MediaImporter.LoudnessBlocks,
+             channels: Int) -> (count: Int, total: Int, first: String) {
+    let kept = channels == 2 ? Array(0..<6) : [0, 3]
+    var count = 0
+    var total = 0
+    var first = ""
+    for k in kept {
+        let (a, b) = (fed.blockSums[k], whole.blockSums[k])
+        total += b.count
+        let d = bitDiff(a, b) { UInt64($0.bitPattern) }
+        if count == 0, d.count > 0 { first = "sum \(k) block " + d.first }
+        count += d.count
+    }
+    return (count, total, first)
+}
+
+do {
+    let seconds = 3.0
+    let stereo48 = lcgNoise(Int(seconds * 48000) * 2, seed: 595, scale: 0.5)
+    let left48 = stride(from: 0, to: stereo48.count, by: 2).map { stereo48[$0] }
+    let mono44 = lcgNoise(Int(seconds * 44100), seed: 5950, scale: 0.5)
+    let programmes: [(String, [Float], Int, Double, Int)] = [
+        ("stereo 48 kHz", stereo48, 2, 48000, 480), ("mono 48 kHz", left48, 1, 48000, 480),
+        ("mono 44.1 kHz", mono44, 1, 44100, 441)]
+    for (name, samples, channels, rate, block) in programmes {
+        guard let whole = fed(samples, channels: channels, rate: rate, duration: ticks(seconds),
+                              sizes: nil) else {
+            check("C14", "\(name): the whole feeding is taken", false)
+            continue
+        }
+        let wholeFloats = floats(whole.data)
+        let feedings: [(String, [Int])] = [
+            ("a block at a time", [block]), ("4,096 frames", [4096]), ("1,024 frames", [1024]),
+            ("uneven", [1, 479, 481, 1000, 37, 4096, 263])]
+        for (feeding, sizes) in feedings {
+            guard let other = fed(samples, channels: channels, rate: rate,
+                                  duration: ticks(seconds), sizes: sizes) else {
+                check("C14", "\(name) \(feeding): every buffer is taken", false)
+                continue
+            }
+            let bytes = bitDiff(floats(other.data), wholeFloats) { UInt64($0.bitPattern) }
+            let sums = sumDiff(other, whole, channels: channels)
+            let detail = "\(bytes.count) of \(wholeFloats.count) Float values differ"
+                + (bytes.first.isEmpty ? "" : " (first \(bytes.first))")
+                + "; \(sums.count) of \(sums.total) Double sums differ in their bits"
+                + (sums.first.isEmpty ? "" : " (first \(sums.first))")
+            check("C14", "\(name) fed \(feeding) writes the whole feeding's cache bytes",
+                  other.data == whole.data && wholeFloats.count == 300 * (channels == 2 ? 8 : 3),
+                  detail)
+            if sizes == [block] {
+                check("C14", "\(name) fed \(feeding) makes the whole's cuts, so its Double sums "
+                        + "are the whole's bits",
+                      sums.count == 0,
+                      sums.count == 0 ? detail : "THE CUT MOVED: " + detail)
+            }
+        }
+    }
+    // The product's pass: C1's stereo cache, the reader's own buffers.
+    let product = try? Data(contentsOf: MediaImporter.loudnessURL(for: 2, in: stereoDir))
+    let one = fed(stereoPCM.samples, channels: 2, rate: stereoPCM.rate,
+                  duration: stereoMedia.duration, sizes: nil)
+    let reader = readerFed(stereoURL, duration: stereoMedia.duration)
+    if let product, let one, let reader {
+        let (readerBlocks, sizes) = reader
+        let bytes = bitDiff(floats(product), floats(one.data)) { UInt64($0.bitPattern) }
+        let sums = sumDiff(readerBlocks, one, channels: 2)
+        let straddle = sizes.dropLast().reduce(into: (at: 0, inside: 0)) { acc, n in
+            acc.at += n
+            if acc.at % 480 != 0 { acc.inside += 1 }
+        }.inside
+        check("C14", "the product's stereo cache (the reader's own buffers) is the bytes of the "
+                + "same PCM fed in one buffer",
+              product == one.data && readerBlocks.data == product,
+              "\(sizes.count) reader buffers (sizes \(Set(sizes).sorted())), \(straddle) ending "
+                + "inside a block; \(bytes.count) of \(floats(product).count) Float values differ"
+                + (bytes.first.isEmpty ? "" : " (first \(bytes.first))")
+                + "; the reader's buffers fed here: \(sums.count) of \(sums.total) Double sums "
+                + "differ in their bits" + (sums.first.isEmpty ? "" : " (first \(sums.first))")
+                + ", its bytes the product's \(readerBlocks.data == product)")
+    } else {
+        check("C14", "the product's stereo cache, the one-buffer feeding and the reader's feeding "
+                + "are made", false,
+              "product \(product != nil), one buffer \(one != nil), reader \(reader != nil)")
+    }
+}
+
+// C13 (#406, AU-15): Normalize's mode changed in one window's Volume section
+// re-titles the Normalize button in another's, with no rebuild of the other.
+
+/// A private stored property, by reflection.
+func reflected<T>(_ object: Any, _ name: String, as: T.Type) -> T? {
+    Mirror(reflecting: object).children.first { $0.label == name }?.value as? T
+}
+
+func walk(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(walk) }
+
+do {
+    let defaults = UserDefaults.standard
+    func clearChoice() {
+        defaults.removeObject(forKey: NormalizeChoice.modeKey)
+        defaults.removeObject(forKey: NormalizeChoice.targetKey)
+    }
+    clearChoice()
+    defer { clearChoice() }
+    guard let document = memoDocument else {
+        check("C13", "the memo document is open", false)
+        exit(1)
+    }
+    document.selection = [2]
+    document.selectAction(nil)
+    /// One window's inspector, its Clip pane on the Sound sub-tab, built and refreshed.
+    func soundPane() -> (InspectorViewController, ClipPane) {
+        let inspector = InspectorViewController()
+        inspector.document = document
+        inspector.binding.invalidate()
+        let pane = ClipPane(inspector: inspector)
+        pane.binding.invalidate()
+        pane.choose(.sound)
+        pane.rebuild()
+        pane.refresh()
+        return (inspector, pane)
+    }
+    func normalizeButton(_ pane: ClipPane) -> OptionButtonControl? {
+        walk(pane).compactMap { $0 as? OptionButtonControl }
+            .first { reflected($0, "title", as: String.self) == "Normalize" }
+    }
+    func modePopup(_ pane: ClipPane) -> OptionPopupControl? {
+        walk(pane).compactMap { $0 as? OptionPopupControl }
+            .first { reflected($0, "items", as: [String].self) == ["Peak", "Loudness"] }
+    }
+    let (inspectorA, paneA) = soundPane()
+    let (inspectorB, paneB) = soundPane()
+    let buttonB = normalizeButton(paneB)
+    // The popup's own menu action (`itemPicked:`, the item's tag the index), as
+    // a person's pick sends it: its `write` called through a reflected closure
+    // is handed the wrong index.
+    let popup = modePopup(paneA)
+    let picked = NSSelectorFromString("itemPicked:")
+    let write = popup?.responds(to: picked) == true ? popup : nil
+    let before = buttonB?.toolTip
+    let old = NormalizeChoice.mode
+    let other = AudioNormalize.Mode.allCases.first { $0 != old } ?? old
+    let item = NSMenuItem()
+    item.tag = AudioNormalize.Mode.allCases.firstIndex(of: other) ?? 0
+    _ = write?.perform(picked, with: item)
+    let after = buttonB?.toolTip
+    let want = AudioPane.normalizeTip()
+    check("C13", "Normalize's mode changed in one window re-titles the other window's Normalize "
+            + "button", buttonB != nil && write != nil && NormalizeChoice.mode == other
+            && before != nil && after == want && after != before,
+          "button B \(buttonB != nil), A's Mode write \(write != nil), mode \(old) → "
+            + "\(NormalizeChoice.mode), B's tooltip changed \(after != before), equals the new "
+            + "tip \(after == want)")
+    withExtendedLifetime((inspectorA, paneA, inspectorB, paneB)) {}
 }

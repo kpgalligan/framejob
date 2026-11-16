@@ -14,14 +14,24 @@ import AppKit
 /// keeps it and dismisses itself; `finished` is called once, on the main
 /// queue's next turn after `viewDidDisappear`. Cancel stops the render in
 /// flight, releases the run's render wants and dismisses at once: nothing
-/// changes.
+/// changes, and `stopped` is called in `finished`'s place, on the same turn
+/// (#546) — as it is for a run that answers no outcome. So exactly one of
+/// the two is called for a sheet that was shown and has gone.
+///
+/// **The dev hold** (`-RCDevMeasureHandBackHold <seconds>`, dev tools only):
+/// that one call waits that long after `viewDidDisappear`, so a proof can
+/// act in the gap between the sheet's end and its hand-back (#546).
 final class AudioMeasureSheetController: NSViewController {
+    /// The dev-only launch default that holds the hand-back (#546).
+    static let devHandBackHoldKey = "RCDevMeasureHandBackHold"
+
     /// The run, type-erased: `begin` sets its progress and starts it,
     /// answering whether an outcome came back (kept for `deliver`).
     private let begin: (@escaping (Int, Int) -> Void, @escaping (Bool) -> Void) -> Void
     private let cancelRun: () -> Void
     private let finishRun: () -> Void
     private let deliver: () -> Void
+    private let stopped: () -> Void
     private let sheetTitle: String
 
     private let bar = NSProgressIndicator()
@@ -37,7 +47,8 @@ final class AudioMeasureSheetController: NSViewController {
     private var hasOutcome = false
 
     init<Run: AudioMeasureRunning>(
-        run: Run, title: String, finished: @escaping (Run.Outcome) -> Void
+        run: Run, title: String, stopped: @escaping () -> Void = {},
+        finished: @escaping (Run.Outcome) -> Void
     ) {
         let box = AudioMeasureOutcomeBox<Run.Outcome>()
         begin = { progress, answered in
@@ -53,6 +64,7 @@ final class AudioMeasureSheetController: NSViewController {
             guard let outcome = box.outcome else { return }
             finished(outcome)
         }
+        self.stopped = stopped
         self.sheetTitle = title
         super.init(nibName: nil, bundle: nil)
     }
@@ -102,16 +114,22 @@ final class AudioMeasureSheetController: NSViewController {
         }
     }
 
-    /// The one hand-back: once, with the outcome, and never after Cancel. On
-    /// the next turn of the main queue, because while this runs the window
-    /// still reports this sheet as attached.
+    /// The one hand-back, once: `finished` with the outcome, or `stopped`
+    /// after Cancel or a run with no outcome. On the next turn of the main
+    /// queue, because while this runs the window still reports this sheet as
+    /// attached.
     override func viewDidDisappear() {
         super.viewDidDisappear()
         bar.stopAnimation(nil)
-        guard !answered, !cancelled, hasOutcome else { return }
+        guard !answered, cancelled || hasOutcome else { return }
         answered = true
-        let deliver = self.deliver
-        DispatchQueue.main.async { deliver() }
+        let handBack = hasOutcome ? deliver : stopped
+        var hold = 0.0
+        #if FRAMEJOB_DEV_TOOLS
+        hold = UserDefaults.standard.double(forKey: Self.devHandBackHoldKey)
+        #endif
+        guard hold > 0 else { return DispatchQueue.main.async { handBack() } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + hold) { handBack() }
     }
 
     @objc private func cancelClicked(_ sender: Any?) {

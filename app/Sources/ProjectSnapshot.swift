@@ -60,7 +60,7 @@ struct Fps: Codable, Equatable {
         if den == 1 { return String(num) }
         let value = double
         return String(format: value < 100 ? "%.3f" : "%.2f", value)
-            .replacingOccurrences(of: "0$", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "\\.?0+$", with: "", options: .regularExpression)
     }
 
     /// The rates the Document tab offers, in the order it lists them.

@@ -13,9 +13,11 @@ extension AudioPane {
 
     /// The one clip the readout is about: exactly one selected clip Normalize
     /// is offered for, else nothing ("—").
-    private var readoutClip: UInt32? {
+    private var readoutClip: UInt32? { readoutSnapshot?.id }
+
+    private var readoutSnapshot: ClipSnapshot? {
         let clips = AudioPane.normalizable(binding)
-        return clips.count == 1 && binding.clips.count == 1 ? clips[0].id : nil
+        return clips.count == 1 && binding.clips.count == 1 ? clips[0] : nil
     }
 
     private func loudnessAnswer() -> ClipLoudness.Answer {
@@ -57,27 +59,48 @@ extension AudioPane {
         return minus(String(format: "%.1f LUFS · ", lufs) + peakText)
     }
 
-    /// At volume (spec §11 AU-64 (g)): on a clip whose chain has a stage the
-    /// loudness cache leaves out, the last R0 measured for its plan and chain
-    /// (`ProcessedLoudness.Memo`) at the current volume and limiter, else the
-    /// cache figure marked approximate; any other clip, the cache figure.
-    private func atVolumeText(_ audio: AudioProps) -> (text: String, approximate: Bool) {
-        let cached = loudnessText(gain: audio.decibels, limiter: audio.limiter)
-        guard ProcessedLoudness.needsRender(audio), let clip = readoutClip,
+    /// At volume (spec §11 AU-64 (g), AU-159 (g)): on a clip that plays
+    /// through a stage the loudness cache leaves out, on the clip or at an
+    /// action's end (`ProcessedLoudness.needsRender`, read from the clip and
+    /// so the same whatever action is selected), the last R0 measured for
+    /// its plan and chain (`ProcessedLoudness.Memo`) at the clip's BASE
+    /// volume and limiter, else the cache figure at them marked approximate;
+    /// any other clip, the cache figure at the props the fields show. On a
+    /// clip an action's end sets a limiter on (AU-165 (c)), R0 is not how
+    /// that limiter bites at the base volume: the last verify render that
+    /// answered a press while the clip is at its volume and limiter, else R0
+    /// marked approximate with `endLimiterTip`.
+    private func atVolumeText(_ audio: AudioProps) -> (text: String, tip: String?) {
+        guard let snapshot = readoutSnapshot, ProcessedLoudness.needsRender(snapshot),
             let document = binding.document, case .reading = loudnessAnswer()
-        else { return (cached, false) }
-        guard let processed = ProcessedLoudness.Memo.shared.reading(for: clip, in: document) else {
-            return ("≈ " + cached, true)
+        else { return (loudnessText(gain: audio.decibels, limiter: audio.limiter), nil) }
+        let base = snapshot.audioProps
+        guard let processed = ProcessedLoudness.Memo.shared.reading(for: snapshot.id, in: document)
+        else {
+            let text = "≈ " + loudnessText(gain: base.decibels, limiter: base.limiter)
+            return (text, AudioPane.approximateTip)
+        }
+        let endLimiter = ProcessedLoudness.endSetsLimiter(snapshot)
+        if endLimiter, let verified = processed.verified,
+            verified.holds(volume: base.volume, limiter: base.limiter)
+        {
+            let text = levelText(
+                lufs: verified.lufs, truePeak: verified.truePeak, steps: [], peaks: [], gain: 0,
+                limiter: nil)
+            return (text, nil)
         }
         let text = levelText(
             lufs: StepLoudness.integrated(processed.steps), truePeak: processed.peaks.max() ?? 0,
-            steps: processed.steps, peaks: processed.peaks, gain: audio.decibels,
-            limiter: audio.limiter)
-        return (text, false)
+            steps: processed.steps, peaks: processed.peaks, gain: base.decibels,
+            limiter: base.limiter)
+        return endLimiter ? ("≈ " + text, AudioPane.endLimiterTip) : (text, nil)
     }
 
     static let approximateTip =
         "≈ before the clip's processing; Normalize or Enhance Voice measures through it."
+    static let endLimiterTip =
+        "≈ an action's limiter has not been measured at this volume; Normalize or Enhance Voice "
+        + "measures through it."
 
     private func minus(_ text: String) -> String {
         text.replacingOccurrences(of: "-", with: "−")
@@ -92,7 +115,7 @@ extension AudioPane {
         let readout = inspectorReadout(width: 160) { [weak self] in
             guard let self else { return "—" }
             let answer = self.atVolumeText(binding.audioProps)
-            atVolume?.toolTip = answer.approximate ? AudioPane.approximateTip : nil
+            atVolume?.toolTip = answer.tip
             return answer.text
         }
         atVolume = readout
@@ -106,18 +129,18 @@ extension AudioPane {
     }
 
     /// The Normalize row: Mode (Peak | Loudness) and Target (LUFS, −50…−5,
-    /// quick −14, −16, −23; live only in Loudness). A change re-titles
-    /// `button`'s tooltip and refreshes the pane.
+    /// quick −14, −16, −23; live only in Loudness). A change only stores:
+    /// `NormalizeChoice`'s post re-titles `button`'s tooltip and refreshes
+    /// every open pane (`normalizeChoiceChanged`, #406).
     func normalizeRow(updating button: OptionButtonControl) -> NSView {
+        normalizeButton = button
         button.toolTip = AudioPane.normalizeTip()
         let modes = AudioNormalize.Mode.allCases
         let popup = OptionPopupControl(
             width: 96, items: ["Peak", "Loudness"],
             read: { modes.firstIndex(of: NormalizeChoice.mode) ?? 0 },
-            write: { [weak self, weak button] index in
+            write: { index in
                 NormalizeChoice.mode = modes[max(0, min(index, modes.count - 1))]
-                button?.toolTip = AudioPane.normalizeTip()
-                self?.inspector?.refresh(isLive: false)
             },
             enabled: { true }, onEdit: {})
         let range = AudioNormalize.targetLUFSRange
@@ -126,10 +149,8 @@ extension AudioPane {
             min: range.lowerBound, max: range.upperBound,
             quick: AudioNormalize.targetLUFSQuickPicks,
             read: { NormalizeChoice.targetLUFS },
-            write: { [weak self, weak button] value in
+            write: { value in
                 NormalizeChoice.targetLUFS = min(max(value, range.lowerBound), range.upperBound)
-                button?.toolTip = AudioPane.normalizeTip()
-                self?.inspector?.refresh(isLive: false)
             },
             enabled: { NormalizeChoice.mode == .loudness }, onEdit: {})
         return inspectorRow("Normalize", [popup, target])

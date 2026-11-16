@@ -80,7 +80,9 @@ SNAPSHOT = os.path.join("Contents", "Resources", "agent-catalog.json")
 DOCS_URL = "https://code.claude.com/docs/en/mcp"
 
 MAIN_ANCHOR = "AgentLane.prepareAtLaunch()"
-YML_ANCHOR = 'script: /bin/sh "$PROJECT_DIR/agent/build.sh" helper'
+# The helper step's one line (its Bun form until road map "swift-helper" SA3, spec §11 SA-8).
+YML_ANCHOR = ('script: /bin/bash "$PROJECT_DIR/tools/agent/build_helper.sh" '
+              '"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers/framejob-agent"')
 PHASE = r"""      - name: MC1 Spike Write Agent Catalog
         basedOnDependencyAnalysis: false
         script: |

@@ -2,7 +2,8 @@
 
 `agent/prices/anthropic.json` is LiteLLM's Anthropic rows in US dollars per
 million tokens; `make prices` is its only writer, and nothing here re-derives
-a rate. `price` is `agent/src/pricing.ts`'s `price` in Python, step for step:
+a rate. `price` is the Swift helper's `Pricing.price`
+(`agent/Sources/FrameJobAgentKit/Pricing.swift`) in Python, step for step:
 the same checks in the same order, the same arithmetic in the same order, and
 the same answers — `{"kind": "dollars", "dollars", "rows"}` or
 `{"kind": "unknown", "cause", "detail"}`. Both readers run every case in
@@ -27,8 +28,8 @@ TABLE = os.path.join(ROOT, "agent", "prices", "anthropic.json")
 CASES = os.path.join(ROOT, "agent", "prices", "cases.json")
 
 TIER_THRESHOLD = 200_000
-DATED = re.compile(r"-[0-9]{8}\Z")  # ASCII digits and the true end, as pricing.ts
-# The order a class's cost is added in; pricing.ts uses the same.
+DATED = re.compile(r"-[0-9]{8}\Z")  # ASCII digits and the true end, as Pricing.swift
+# The order a class's cost is added in; Pricing.swift uses the same.
 CLASSES = (("input", "input"), ("cache_write_5m", "write5m"), ("cache_write_1h", "write1h"),
            ("cache_read", "read"), ("output", "output"))
 
@@ -181,7 +182,7 @@ def price(usage, model, table):
             tokens = tally[count_key]
             if tokens == 0:
                 continue
-            s += float(tokens) * float(chosen[rate_key])  # doubles, as pricing.ts
+            s += float(tokens) * float(chosen[rate_key])  # doubles, as Pricing.swift
         dollars += s / 1_000_000
     rows = []
     for key in keys:

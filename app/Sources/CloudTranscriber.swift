@@ -308,7 +308,7 @@ final class CloudTranscriber {
                 if words.isEmpty {
                     problems.append(
                         CaptionLayout.Problem(
-                            tag: "clip \(job.clip)", reason: "no speech was recognised in it"))
+                            tag: "clip \(job.clip)", reason: "no speech was recognized in it"))
                 } else {
                     clips.append(job.clip)
                 }

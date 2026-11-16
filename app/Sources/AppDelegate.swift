@@ -19,6 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         NSApp.mainMenu = buildMainMenu()
         // Shadow, backdrop and background colors all carry alpha.
         NSColorPanel.shared.showsAlpha = true
+        // A `framejob://` link, which may be what launched the app (spec §11 G-49 (j)).
+        GraphicLinkController.shared.install()
     }
 
     /// AppKit calls this only when the app is launched or reactivated with no

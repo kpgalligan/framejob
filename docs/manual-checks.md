@@ -121,7 +121,7 @@ the same way.
 **PB-15 — Loop goes round at the timeline's end, with its sound**
 - **Do:** 1. Put one clip with sound alone on a timeline. 2. Click **Loop** in the toolbar. 3. Press Home, then Space, and watch at least three passes.
 - **Expect:** playback goes round until you stop it, and the sound plays across each wrap. The picture shows no black flash at the wrap.
-- **Source:** #466 (spec §4.1); `docs_bugs_b1_proof.py` L1–L5 and `playhead_echo_probe.py` `loopend·1`–`·11` score the playhead through Motion Preview, `play_preview` and `editor.toggleLoop`, never the real button, the keys or the sound.
+- **Source:** #466 (spec §4.1); `docs_bugs_b1_proof.py` L1–L5 and `playhead_echo_probe.py` `loopend·1`–`·11` score the playhead through Motion Preview, `play_preview` and `editor.toggleLoop`, never the real button, the keys or the sound. #537, #520 (open, held): the playhead still holds about 0.5 s when playback starts from paused (#537), and about 0.5–0.7 s at each wrap (#520); `ai_docs_r2a_proof.py` H rows time the player's clock as MEASURE rows.
 
 **PB-16 — A package whose project.json is a folder shows a message, and the app stays open**
 - **Do:** 1. With a project open, make a copy of a saved `.framejob` package. In Terminal, replace the copy's `project.json` with a folder of that name. 2. Choose File ▸ Open… and pick the copy. 3. Double-click the copy in the Finder.
@@ -132,6 +132,16 @@ the same way.
 - **Do:** 1. Make a folder holding two movies, a `.txt`, a subfolder with a movie in it, and a hidden movie (`cp A.mov .h.mov` in Terminal). 2. Drag the folder from the Finder onto the Media tab. 3. Choose Edit ▸ Undo. 4. Drag the folder onto the Media tab together with another movie.
 - **Expect:** while dragging, the pointer shows the copy badge; the two movies are added in the Finder's order as one undo step, "Add 2 Media Files", with no alert; the undo takes both out; the mixed drop adds three.
 - **Source:** #497; `docs_bugs_b5_proof.py`'s D rows reach the drop's handler through a stub drag, not a Finder drag.
+
+**PB-18 — A title after the last video plays, and the playhead stays on it**
+- **Do:** 1. Put a 10 s movie on the timeline, then a text clip from 10 s to 15 s on the same track. 2. Click the ruler at 12 s. 3. Press Space, and let it play. 4. Click the ruler at 12 s again, and change the text's position in the inspector while paused there.
+- **Expect:** the playhead stays at 12 s after the click and after the edit, the title shows there, and playback runs on to 15 s.
+- **Source:** #523; `ai_docs_a1_proof.py` P1–P7 seek over MCP (`set_playhead`, `play_preview`'s `seek_to`), never with a mouse.
+
+**PB-19 — Closing projects gives their memory back**
+- **Do:** 1. Open Activity Monitor and find Frame Job's Memory and Threads columns. 2. Open five projects that each hold a movie with sound, and play each for a moment. 3. Note both figures. 4. Close four of them by the window's close button, wait ten seconds, and read the figures again.
+- **Expect:** Threads falls by about twenty and Memory by tens of megabytes; neither stays where it was with five open.
+- **Source:** #568, #592, spec §11 #568 and #592 (`document_close_probe.py` scores the player, the editor leaving its window by `close_project`'s door and by the close button, and the editor freed while the window is held; `open_documents_proof.py` O4 and O5 score the threads and the memory falling, and O6 counts no editor left, all in an instance driven in the background over MCP). A front app with a person at it, closing by the button, is measured only here.
 
 **JOB-60 — Remove Background's edges**
 - **Do:** On S-TH1, S-TH2 and S-TH5 (`samples/README.md`; until they exist, any recording of yourself in a busy room with hair, glasses and moving hands), turn Remove Background on and wait for Status to read Ready. Step through hair, hands in motion, glasses and the outline against the room at Edge −0.5, 0 and 0.5.
@@ -316,9 +326,9 @@ the same way.
 - **Source:** #463, #474.
 
 **TL-19 — A recording's camera drags on a real canvas**
-- **Do:** Land a screen recording with a camera. With the playhead past the first frame, drag the camera on the canvas, resize it by a corner, press ←, then Undo each. Play from the first frame after a drag.
-- **Expect:** The camera follows the pointer. Each is one undo step, and playback has no one-frame jump at the start.
-- **Source:** #469, spec §11 CI-17.
+- **Do:** Land a screen recording with a camera. With the playhead past the first frame, drag the camera on the canvas, resize it by a corner, press ←, then Undo each. Play from the first frame after a drag. Then ⇧-click the screen so both are selected and drag the camera again. Then click the camera alone, with no action selected, and type a Position X in the Picture tab's Transform rows. Play from the first frame after each. Select the camera's layout at its first frame, set Background to Keep in the Background section, then click the camera with no action selected and untick, then tick, Remove background.
+- **Expect:** The camera follows the pointer. Each is one undo step, and playback has no one-frame jump at the start. With the screen selected too, the camera moves on every frame, and so does the screen. The typed Position X moves the camera on every frame, with no one-frame jump. No error sheet; each is one undo step, and the background is off, then on, from the first frame.
+- **Source:** #469, #529, #530, spec §11 CI-17, #529, #530, #540.
 
 **TL-20 — A nest clip by hand**
 - **Do:** Nest a clip in a corner of the picture over a full-size clip. Click the corner picture, drag it, scale it by a corner, rotate it, then press Z and draw a band. Click elsewhere on the picture. Press C and double-click the nest.
@@ -346,14 +356,19 @@ the same way.
 - **Source:** road map "creator-jobs" CJ2b, spec §11 CJ-28, CJ-29.
 
 **JOB-10 — Reading and following a long transcript**
-- **Do:** With a long talking-head recording (sample S-TH1 once it exists), place it, choose View ▸ Transcript (⌃⌘T) and wait for the words. Play it for a few minutes from the middle; scroll the text by hand while it plays and wait; click a word, then a paragraph's timecode, while playing.
-- **Expect:** the highlighted word keeps time with the voice and the scrolling is calm, never jumping more than it needs to keep the word in sight; after your own scroll the text stays put for about three seconds, then follows again; a click moves the playhead to the word (or the paragraph) and playback goes on.
-- **Source:** road map "creator-jobs" TX2a, spec §11 TX-22.
+- **Do:** With a long talking-head recording (sample S-TH1 once it exists), place it, choose View ▸ Transcript (⌃⌘T) and wait for the words. Play it for a few minutes from the middle; scroll the text by hand while it plays and wait; click a word, then a paragraph's timecode, while playing. Then pause, drag the scroller's knob to the bottom and back to about the middle, and let playback run to the last words. Last, paused with the text scrolled to about the middle, drag the inspector's left edge slowly to its narrowest and then its widest, and let go.
+- **Expect:** the highlighted word keeps time with the voice and the scrolling is calm, never jumping more than it needs to keep the word in sight; after your own scroll the text stays put for about three seconds, then follows again; a click moves the playhead to the word (or the paragraph) and playback goes on; at the bottom the last words show, the knob's place matches how far through the text you are and it does not jump as you drag; at the last lines the text stays still while the highlight moves; while you drag the inspector's edge the words at the top of the text stay at the top (the lines re-wrap, but the text never jumps to another part of the transcript), and nothing moves when you let go.
+- **Source:** road map "creator-jobs" TX2a, spec §11 TX-22; #583, #584, #593, spec §11 TX-37 (d).
 
 **JOB-11 — Word cuts sound natural**
 - **Do:** With S-TH1 placed (a long talking head, once it exists), open View ▸ Transcript (⌃⌘T). Delete a dozen single words and a few runs of words from the middle, some just before a pause and some in fast speech: select, listen to the shaded range with Loop, press ⌫, then play across each cut. Then click a few pause tokens (" [x.x s]") after long pauses, press ⌫ on each, and play across them.
 - **Expect:** no kept word's start is clipped; no audible fragment of a deleted word is left; the pause after each cut sounds natural (no gasp, no doubled pause); in fast speech the end of the word before the cut is not eaten (TX-S3 chose the transcript's own edges, E0; since TX1b each on-device start is moved to where its sound begins, so a word after a pause starts on its sound, but in fast speech a start the voice model hears no gap before stays where the recogniser put it — note each cut that eats the word before, or leaves a slice of pause, with its time); each shortened pause sounds like a natural short pause, about 0.2 s of quiet each side, with no breath or word clipped.
-- **Source:** road map "creator-jobs" TX3a, TX1b and TX3b, spec §11 TX-30, TX-15, TX-34.
+- **Source:** road map "creator-jobs" TX3a, TX1b and TX3b, spec §11 TX-30, TX-15, TX-34; #442, spec §11 TX-46 (an on-device word's end is the recogniser's, so a long pause can keep a little more or less than the one-second rule says).
+
+**JOB-67 — Find in the Transcript tab with a real ⌘F**
+- **Do:** With a spoken clip placed and View ▸ Transcript (⌃⌘T) showing its words, press ⌘F. Type a word that occurs several times, then press Return a few times, ⇧Return once, click the bar's › and ‹, and press Esc. Then press Space, J, K and L. Open the bar again, click a marked word in the text, press Esc twice. Open it again, type a word, press Return once and then ⌘Return, then ⌫; press ⌘Z. Then click the Media tab (a project with a few files), click in the timeline, press ⌘F, type part of a file's name, press Return and then Space. Then open a second project with a spoken clip, open its Transcript find bar and type a word, so the cursor stays in its field; click in the first project's window, double-click a text clip on its canvas and press ⌘Return. Do it once in the light look and once in the dark, with the inspector dragged to its narrowest.
+- **Expect:** the bar opens above the text with the cursor in its field; every match is marked in yellow and the current one more strongly, with an outline, the words still easy to read in both looks; the count reads like "3 of 12" and nothing in the bar is cut off or overlaps at the narrowest width; Return, ⇧Return, › and ‹ move the current match and the text scrolls to it, the cursor staying in the field; the range and the playhead never move; Esc closes the bar, and Space, J, K and L work at once; the click selects the word and leaves the bar, the first Esc clears the selection and the second closes the bar; ⌘Return selects the current match's word (shaded on the timeline as the range), the playhead jumps to it, the bar stays open and ⌫ deletes the word as one Delete Words step, which ⌘Z puts back; on the Media tab ⌘F puts the cursor in Search by name with its text selected, typing narrows the list, Return leaves the field and Space plays; ⌘Return in the first project's canvas text starts a new line there, and the second project's transcript selects nothing and its playhead does not move.
+- **Source:** #434, spec §11 TX-37; #559, #560, spec §11 TX-43, TX-45; #603, spec §11 TX-48.
 
 ## Clip tab and action lane
 
@@ -597,6 +612,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** at 100 % and at 50 %, does the isolated voice sound clean and natural on your voice, or do you hear artefacts (and where)?
 - **Source:** road map "audio" AP5 (spec §11 AU-51, AU-53, AU-56); `tools/proof/audio_ap5_proof.py` I1–I10 measure alignment, the pause floor and the speech bands on exports, not how the voice sounds.
 
+**SE-46 — Voice Isolation and a voice effect sound right on a speed-changed clip**
+- **Do:** 1. Put your own voice recorded in an ordinary room (`samples/Rode-usb-mic.m4a`) on the timeline four times. 2. Set the first clip to ×1.25 and the second to ×2 with Keep pitch on, the third to ×2 with Keep pitch off, and give the fourth a speed ramp (Clip ▸ Speed Ramp…, Ramp Up to ×2). 3. On each, tick Isolate voice in the Clip tab's Voice Isolation section and wait for Status to read Ready. 4. Play each through headphones at Amount 100 %, then 80 %. 5. On the ×2 Keep pitch on clip change Amount to 50 % and play straight away, then again once Status reads Ready. 6. Add Voice Effect ▸ Space: Hall to the ×2 Keep pitch off clip, wait for Ready and play it. 7. Export and play the export.
+- **Expect:** each clip plays its voice at its speed with the room and hiss gone between words, as a clip at normal speed does; at 80 % there is no doubling, flanging or hollow "phasey" sound (the voice and what is left of the room stay in step); after the Amount change the clip plays without isolation for a moment and then switches over by itself; the Hall is heard on the sped-up voice, its tail shorter than at normal speed, with no burst of sound at the clip's first frame; the export sounds like the preview.
+- **Answer:** does an isolated voice on a speed-changed clip sound as clean as one at normal speed, and is the moment without isolation after an Amount change acceptable?
+- **Source:** spec §11 AU-55 and AU-145 as amended (#387); `tools/proof/audio_ap5_proof.py` I7a–I7e and `tools/proof/voice_proof.py` I11–I13 measure the pause floor, the alignment and the effect's signature on exports, not how the voice sounds.
+
 **SE-29 — The EQ presets, the hum notch and a channel pick sound right on a voice**
 - **Do:** 1. Import `samples/Rode-usb-mic.m4a` (or any voice recording) and select its clip; open the Clip tab's Sound sub-tab and its EQ section. 2. Press Rumble Cut, play through headphones, then add De-mud, then Presence, playing after each; tick and untick Bypass while it plays. 3. On a voice with mains hum (or the same clip with a 50 or 60 Hz hum mixed under it), tick Remove hum in the Hum section, pick the hum's Mains, and play it at Depth 12, 30 and 48. 4. On a stereo file with the voice on one side only, set Channels to Left Only (or Right Only, whichever holds the voice), then Swap Left and Right. 5. Look at the EQ section's curve at the inspector's narrowest and widest, in both appearances.
 - **Expect:** Rumble Cut takes the low rumble out of the pauses with the voice's weight intact; De-mud makes the voice clearer and less boomy without thinning it; Presence makes words easier to follow without hiss or harsh "s" sounds; Bypass switches between the dry and the EQ'd sound with no click; the hum fades away at 30 dB with the voice still sounding natural, and 48 dB takes no more of the voice than 12; the one-sided voice plays from both speakers at its own level with Left Only (or Right Only), and Swap puts it on the other side; the curve shows each preset's shape and the hum's notches, and greys when bypassed; the rows fit with nothing cut off.
@@ -607,7 +628,7 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Do:** 1. Open a project with speech on one track and music on another, with a gap of half a second or more between two clips on one track. 2. Choose View ▸ Loudness Meter (⌃⌘L) and play from the start. 3. Pause and continue; then click the ruler somewhere else while playing. 4. Click the column's Reset. 5. While playing, open the View menu and hold it open for 5 s. 6. Play through the gap. 7. Look at the column in light and dark appearance.
 - **Expect:** the M and S bars, the timeline bar's meter and the four figures move smoothly with no stutter; on steady material M and S settle near each other; the accent line sits at the Normalize target (−16 unless changed); a seek and Reset clear Integrated and True peak max and start again, while pause and continue, the held menu and the gap do not; at J or L speeds M and S read "—" and the footer says "Measured only at normal speed."; every label, figure and the footer fit the column in both appearances.
 - **Answer:** do the figures move smoothly, and do they reset only on a seek or Reset?
-- **Source:** road map "audio" AP7 (spec §11 AU-70…AU-76); `tools/proof/audio_ap7_proof.py` measures the arithmetic (T1–T16) and the player against an export (L1–L3), not how the column looks or moves.
+- **Source:** road map "audio" AP7 (spec §11 AU-70…AU-76); `tools/proof/audio_ap7_proof.py` measures the arithmetic (T1–T18) and the player against an export (L1–L3), not how the column looks or moves.
 
 **SE-31 — The gate and the de-esser at their defaults sound natural on a voice**
 - **Do:** 1. Import `samples/Rode-usb-mic.m4a` (or any voice recording with pauses and "s" sounds) and select its clip; wait for the Volume section's Loudness row to show a figure. 2. In the Gate section tick Gate pauses and play through headphones, then untick and tick it again while it plays; look at its Status and Loudness rows. 3. Set Hold to 0 and play a passage with quick words, then back to 50. 4. In the De-esser section tick Reduce sibilance and play a passage full of "s" and "sh" sounds; untick and tick it again while it plays. 5. Export the clip with both on and play the export. 6. Look at both sections at the inspector's narrowest and widest, in both appearances.
@@ -669,10 +690,10 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** do a track's compressor and limiter sound right in the preview and the file, and does the panel read clearly?
 - **Source:** road map "audio" AP10 part 2b (spec §11 AU-150…AU-156); `tools/proof/audio_ap10c_proof.py` measures the limiter's ceiling through a crossfade and a nest bus, the compressor's arithmetic, stems, a loudness target, WebM and the preview's overshoot (T1–T6, P1, U1) and `audio_ap10c_probe.swift` the stage, the sub-mixed read and the tap (B1–B5), not how it sounds or reads.
 
-**SE-41 — The leveller evens out a speaker moving off the mic** (provisional)
-- **Do:** 1. Record (or find) a voice where the speaker turns away from or leans back from the microphone for a few sentences and comes back, with pauses between phrases; or use `tools/proof/work/fixtures/ap6b-offmic.wav`, which `audio_ap6b_proof.py` makes (loud and quiet sentences by turns). 2. Put it on the timeline, open the Sound sub-tab's Leveller section, tick Ride the level and wait for its Status to read "Aims at …". 3. Play it on headphones from the clip's start, then from the middle of a sentence after a seek, then export Audio only (WAV) and play the file. 4. Set Response to 1 s and then 4 s and play again. 5. Look at the Leveller section in light and dark appearance.
+**SE-41 — The leveler evens out a speaker moving off the mic** (provisional)
+- **Do:** 1. Record (or find) a voice where the speaker turns away from or leans back from the microphone for a few sentences and comes back, with pauses between phrases; or use `tools/proof/work/fixtures/ap6b-offmic.wav`, which `audio_ap6b_proof.py` makes (loud and quiet sentences by turns). 2. Put it on the timeline, open the Sound sub-tab's Leveler section, tick Ride the level and wait for its Status to read "Aims at …". 3. Play it on headphones from the clip's start, then from the middle of a sentence after a seek, then export Audio only (WAV) and play the file. 4. Set Response to 1 s and then 4 s and play again. 5. Look at the Leveler section in light and dark appearance.
 - **Expect:** the quiet sentences come up and the loud ones come down, each from its first word, so the voice sits at a steady level; the room noise in the pauses does not swell up while nobody speaks; a phrase after a pause starts at its own level with no audible glide, jump or pumping rise into it; a 1 s response follows changes inside a sentence more closely, a 4 s one is gentler; the preview sounds the same after a seek as from the start, and the export sounds like the preview. The section reads "Ride the level", Target, Max Boost, Max Cut, Response, "Aims at … LUFS" and Loudness, nothing cut off.
-- **Answer:** does the levelled voice sound even and natural: pauses not swelling, and a phrase after a pause at its level with no audible glide?
+- **Answer:** does the leveled voice sound even and natural: pauses not swelling, and a phrase after a pause at its level with no audible glide?
 - **Source:** road map "audio" AP6 part 2 (spec §11 AU-66, AU-67); `tools/proof/audio_ap6b_proof.py` measures the speech's loudness range, each segment's start against its settled gain, the pauses' gain, the meter against the export, Enhance's rule and repeatability, and an action's target (P1–P8), not how it sounds.
 
 **SE-42 — A detached ducker keeps its voice and ducks the music once**
@@ -689,6 +710,18 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Do:** 1. Start a long File ▸ Export… (choose Export). 2. With the Exporting sheet on screen, press ⌘Q. 3. Minimise the window and press ⌘Q. 4. Press ⌘H, then choose Quit from the Dock menu. 5. Repeat step 3 with an unsaved change in the project.
 - **Expect:** each time, Frame Job stays open, the Exporting sheet keeps writing, and the finished file plays. In step 3 the window comes back out of the Dock. In step 4 Frame Job is shown again and comes to the front. Step 5 doesn't hang.
 - **Source:** #477 (spec §11 #477); `docs_bugs_b4_proof.py` T1/T2 ask the delegate directly, because no script may minimise a window or hide the app.
+
+**SE-45 — Clip ▸ Voice reads well: its headings, the checkmark and the dash** (provisional)
+- **Do:** 1. Put two clips with sound and a title on the timeline. 2. Select one sound clip and open Clip ▸ Voice. 3. Choose Radio and open the menu again. 4. Give the other sound clip Space: Echo in the Sound tab, select both sound clips and the title, and open the menu. 5. Select only the title and open the menu. 6. Look at the menu in light and dark appearance.
+- **Expect:** the headings Voice, Tone, Character and Space read as headings (dimmed, not selectable) over their effects, with a line and None at the foot; after step 3 Radio has a checkmark; in step 4 Radio and Echo each have a dash and nothing has a checkmark; in step 5 every item is greyed out. No item shows a keyboard shortcut.
+- **Answer:** does the Voice menu read clearly, with its headings, checkmark and dash where expected?
+- **Source:** #390 (spec §11 AU-158); `tools/proof/voice_proof.py` V12–V14 and M1–M5 read the items, their marks and what a choice writes, never how the open menu draws.
+
+**SE-47 — The inspector's foot says where Normalize, Enhance Voice and Match Audio left a clip** (provisional)
+- **Do:** 1. Make a quiet copy of `samples/Rode-usb-mic.m4a`: put it on the timeline, set its Volume to −15 dB, export Audio only (WAV) and add the export to the project (Normalize replaces a clip's volume, so a clip only turned down would come straight back). Put the recording on the timeline as well. 2. Select the quiet copy and press Normalize (Loudness, −16) in its Sound tab. 3. Press it again. 4. On the other copy, add an action from 1 s for 2 s whose end turns on Limit peaks at −24 dBTP, select the clip and choose Clip ▸ Enhance Voice. 5. Select both copies and choose Clip ▸ Match Audio…, the plain one as the reference. 6. Hover over each sentence, then click it. 7. Look at the foot in light and dark appearance, at the inspector's narrowest and widest.
+- **Expect:** after step 2 the foot reads "Normalize left “Rode-usb-mic.m4a” (0:00) … LU short of −16.0 LUFS, with its volume at the 32× ceiling." with no beep and no "Refused:"; step 3 beeps and reads "Normalize changed nothing. …"; step 4 names a limiter an action's end turns on; step 5 says "the reference's"; each tooltip holds the whole account, a clip on a line; a click, an undo or the next edit clears it. Each sentence reads whole within its three lines, or its tooltip finishes it.
+- **Answer:** does each sentence read clearly, say which clip and why, and go when it should?
+- **Source:** #609 (spec §11 AU-169); `audio_ap6_probe.py` E19 and `audio_ap12_probe.py` P13 score the sentences and when they are posted, and `audio_ap6_proof.py` part `foot` reads the foot's text after each door, never how it reads to a person.
 
 ## Speed ramps
 
@@ -932,6 +965,20 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Answer:** for each step, as expected, yes or no, and what happened instead; whether any Welcome window or extra project appeared; the browsers' names and what each did with the download.
 - **Source:** spec §11 G-47; `tools/proof/graphic_import_proof.py` measures the Info.plist rows, the import's checks, names, clashes and rollback, and a cold launch with the package as its open argument (L1, L2: the sheet on one untitled project, no Welcome window, the import landing once), not Launch Services' choice of app, a restored project at launch, a browser's download handling, or how the sheet reads.
 
+**GR-17 — A gradient graphic is smooth in a 10-bit or ProRes file, and unchanged in the preview**
+- **Setup:** A 1920 × 1080 project with a graphic that fills the canvas with a dark radial gradient (`#2A4F3D` at the centre to `#0D1512`), on a display you trust for dark tones, in a dim room.
+- **Do:** 1. Look at the paused preview at 100 %. 2. Export as ProRes 422 and as HEVC 10-bit; open each in QuickTime Player at full size and pause. 3. File ▸ Save Frame… as PNG; open it in Preview.
+- **Expect:** the preview looks as it did before (no rings, no visible grain, GR-12); the ProRes file and the saved frame show no rings and no grain at all; the HEVC 10-bit file shows no more banding than the same export of a camera gradient would.
+- **Answer:** for each of the three, rings or none, grain or none; whether the ProRes file looks cleaner than the preview.
+- **Source:** spec §11 PR-15, PR-20; `tools/proof/raster_dither_proof.py` measures the levels, the noise and the 8-bit paths' bytes (E1, D1–D7, DG), not how a dark gradient looks on a display.
+
+**GR-18 — A `framejob://` link on a web page sends a graphic to Frame Job**
+- **Setup:** GR-15's first package uploaded where anyone can download it over `https` (a public repository's raw file link, or any static host), and a page of your own with three links, each `<a href="framejob://graphic?src=…">` with `src` percent-encoded: one to that package, one to the same address written `http://`, one to an address on that host that answers 404. A fourth link written `framejob-debug://graphic?src=…` to the package. The installed Frame Job (Release or a published build) in /Applications, and a Debug build made with `make app-debug` in the same session (so both are registered).
+- **Do:** 1. With a project open in Frame Job, click the first link in Safari, then in Chrome. Press Cancel once and Import once. 2. Quit Frame Job and click the first link. Press Import. 3. Quit Frame Job and click the `http://` link. 4. With a project open, click the `http://` link, then the 404 link. 5. Click the fourth link. 6. Click the first link twice quickly.
+- **Expect:** 1. Each browser asks whether to open Frame Job (not Frame Job Debug); the Import Graphic sheet comes up on the front project with a line `From: <the host>` under the description, reading whole; Cancel copies nothing; Import lands the graphic as GR-16's step 2 does. 2. Frame Job starts and the sheet comes up on one new untitled project; note whether a Welcome window shows, and whether it closes when the project appears. 3. Frame Job starts and shows one alert, "This link cannot be opened." with "Src must be an https URL." under it; after OK, the Welcome window is up, and no project. 4. Each shows one alert as a sheet on the project's window: the `http://` one as in step 3, the 404 one "The graphic from <host> could not be opened." with "The server answered 404, not 200."; both read whole. 5. Frame Job Debug comes forward, never the installed Frame Job. 6. One sheet; the second click either shows "Frame Job is already fetching a graphic from <host>." or, if the first had finished, a second sheet after the first is closed.
+- **Answer:** for each step, as expected, yes or no, and what happened instead; each browser's name and its question's words; in step 2, what the Welcome window did; whether any link opened the wrong build.
+- **Source:** spec §11 G-49; `tools/proof/graphic_link_probe.py` measures every rule of the link and the fetch against a local listener, and `tools/proof/graphic_link_proof.py` the claimed scheme in the Info.plist, the sheet's `From:` line, an import landing, and the refusals through the dev tool `open_link`, not Launch Services' choice of app, the Apple Event's delivery, a launch by a link, the browser's question, a real certificate, or how the alert reads.
+
 ## Mattes
 
 **MAT-1 — A matte plays**
@@ -948,6 +995,13 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Do:** 1. In a 3840×2160 project, put two movies on one track, select both and Nest them. 2. Split the nest clip in the middle and add a cross dissolve at the split. 3. Play the dissolve at View ▸ Preview Quality ▸ Full, then at Quarter. 4. Put the same two movies, un-nested, on a second project's track with the same dissolve, and play that too. 5. Change both transitions to Zoom and play both again.
 - **Expect:** the nested dissolve plays without a stutter or a dark dip at its middle, and looks like the un-nested one; the nested zoom also plays without a dip, its picture as sharp as the un-nested zoom's to the eye.
 - **Source:** #252 (issue batch B90 phase 4, spec §11 MT-8).
+
+**MAT-4 — A 10-bit clip used as a Luma matte cuts smoothly in a ProRes file**
+- **Setup:** A 1920 × 1080 project, canvas background black: a full-canvas white rectangle shape on the back track and, on a track in front, a 10-bit ProRes or HEVC clip of a slow dark gradient (a sky at dusk; `precision_proof.py`'s `tools/proof/work/precision/media/ramp10_prores422hq.mov` is a full black-to-white ramp), its track set to Track ▸ Matte ▸ Luma. On a display you trust for dark tones, in a dim room.
+- **Do:** 1. Look at the paused preview at 100 %. 2. Export as ProRes 422 and as H.264; open each in QuickTime Player at full size and pause on the same frame. 3. File ▸ Save Frame… as PNG; open it in Preview.
+- **Expect:** the ProRes file and the saved frame show the gradient as smoothly as the clip itself on the canvas, with no steps; the preview and the H.264 file look as they did before this change (steps at most as fine as an 8-bit file shows).
+- **Answer:** for each of the four, steps or none; whether the ProRes file looks smoother than the H.264 one.
+- **Source:** spec §11 PR-19; `tools/proof/raster_dither_proof.py` measures the banding, the levels and the 8-bit row's bytes (GMc, GMs, GMe, GMf), not how a dark gradient looks on a display.
 
 ## Precision
 
@@ -980,6 +1034,13 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Do:** 1. Import an ordinary untagged H.264 movie (a phone or screen-capture clip whose `ffprobe` colour tags read `unknown`) into a project of its own size and park the playhead on a frame with dark areas. 2. Choose File ▸ Save Frame… three times, as PNG, JPEG and HEIC. 3. Export the project with the `h264` preset. 4. Open the three stills in Preview, each beside the export paused on the same frame in QuickTime Player.
 - **Expect:** every still looks the same as the export in the darks and shadows: no lifted or crushed blacks, no tint, the same brightness overall.
 - **Source:** issue batch B102 (spec §11 PR-11: every rendered frame's file is labelled BT.709, the tag every movie export carries); `frame_label_proof.py` F1 and F11 measure the label and the pixels, not how a viewer shows the file.
+
+**PRC-7 — A gradient shape is smooth in a ProRes file, and unchanged in the preview**
+- **Setup:** A 1920 × 1080 project with a background plate: a rectangle shape filling the canvas with a dark linear gradient (`#0D1512` to `#2A4F3D`), on a display you trust for dark tones, in a dim room.
+- **Do:** 1. Look at the paused preview at 100 %. 2. Export as ProRes 422 and as HEVC 10-bit; open each in QuickTime Player at full size and pause. 3. File ▸ Save Frame… as PNG with the shape alone on the frame (a gradient shape saves a 16-bit PNG by itself); open it in Preview.
+- **Expect:** the preview looks as it did before (no rings; a fine grain at most); the ProRes file and the saved frame show no rings and no grain at all; the HEVC 10-bit file shows no more banding than the same export of a camera gradient would.
+- **Answer:** for each of the three, rings or none, grain or none; whether the ProRes file looks cleaner than the preview.
+- **Source:** spec §11 PR-16, PR-21; `tools/proof/raster_dither_proof.py` measures the levels, the noise and the 8-bit paths' bytes (G0–G7, GV, GEa–GEc), not how a dark gradient looks on a display.
 
 ## Grading
 
@@ -1313,9 +1374,10 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 Needs your own Anthropic API key (Setup 3).
 
 **AS-1 — A real conversation**
+- **When:** with the Assistant section before a release, and again whenever the assistant helper or its pin of Slaude changes. Owed now: the Swift helper replaced the Bun helper on 2026-11-12 (road map "swift-helper", spec §11 SA-1), and this check has not yet been run on it.
 - **Do:** Open a project with a few clips; View ▸ Assistant (⌃⌘A); ask for a marker, a split at the playhead, a caption's text change and a move inside a nest.
 - **Expect:** the reply streams; each tool call shows one line; each edit is its own step in Edit ▸ Undo.
-- **Source:** #159.
+- **Source:** #159; road map "swift-helper" SA5 (spec §11 SA-1).
 
 **AS-2 — Allow, Deny and Stop**
 - **Do:** 1. Ask it to export; press Return; Deny. 2. Ask again; Allow. 3. Ask over an existing file. 4. Send something long and press Stop; ask for an export and press Stop while the question is up. 5. Ask for an export of a long project, Allow, and press Stop while it writes.
@@ -1328,19 +1390,22 @@ Needs your own Anthropic API key (Setup 3).
 - **Source:** #159.
 
 **AS-4 — What a turn cost**
+- **When:** with the Assistant section before a release, and again whenever the assistant helper or its pin of Slaude changes. Owed now: the Swift helper replaced the Bun helper on 2026-11-12 (road map "swift-helper", spec §11 SA-1), and this check has not yet been run on it.
 - **Do:** 1. Quit Frame Job and delete `~/Library/Application Support/Frame Job/anthropic-prices.json`. 2. Relaunch; send two messages. 3. Clear; send one more. 4. Open `~/Library/Application Support/Frame Job/spend.jsonl`.
 - **Expect:** each turn ends with `Cost: $… · Frame Job's estimate at LiteLLM prices (…)`, the three reading `(bundled table of …)`, then `(fetched <today>)`, then `(cached <today>)`; the ledger has one line per response, with no key and no message text; the month's total is near the Anthropic Console's for the same calls.
-- **Source:** road map 13 P2; spec §11 P-4, P-5.
+- **Source:** road map 13 P2; spec §11 P-4, P-5; road map "swift-helper" SA5 (spec §11 SA-1).
 
 **AS-5 — What a conversation and the month cost**
+- **When:** with the Assistant section before a release, and again whenever the assistant helper or its pin of Slaude changes. Owed now: the Swift helper replaced the Bun helper on 2026-11-12 (road map "swift-helper", spec §11 SA-1), and this check has not yet been run on it.
 - **Do:** With your real key, open Frame Job ▸ Settings… and keep it beside the window; View ▸ Assistant (⌃⌘A). 1. Read the tab's Spend row. 2. Send two messages. 3. Clear; send one more.
 - **Expect:** the Spend row starts at "Nothing yet"; after the messages it equals the sum of those turns' `Cost:` lines ("$… · Frame Job's estimate"); Clear puts it back to "Nothing yet" and the next turn starts a new sum. Settings' month line ("<Month> <year> (UTC): $… over N responses.") grows with each response while it is open, without flickering to "Reading the spend ledger…", and is near the Anthropic Console's total for the same UTC days.
-- **Source:** road map 13 P4; spec §11 P-4, P-7.
+- **Source:** road map 13 P4; spec §11 P-4, P-7; road map "swift-helper" SA5 (spec §11 SA-1).
 
 **AS-6 — A reply cut short**
+- **When:** with the Assistant section before a release, and again whenever the assistant helper or its pin of Slaude changes. Owed now: the Swift helper replaced the Bun helper on 2026-11-12 (road map "swift-helper", spec §11 SA-1), and this check has not yet been run on it.
 - **Do:** With your real key, ask for something long (a paragraph about each clip) and press Stop while the reply streams. Open `~/Library/Application Support/Frame Job/spend.jsonl`, then the Anthropic Console's usage for the same minutes. Then, with Compact off in Settings, keep a conversation going until the Context meter reads full.
 - **Expect:** the turn ends with `Cost: at least $… (a response was cut short) · Frame Job's estimate at LiteLLM prices (…)`; the ledger's last line carries `"partial": true`; the Console's charge for that request is at least that figure, and expect it above: the streamed output is not counted (spec §11 P-8). A reply that reaches the end of the window stops where it got to, and the red line "The reply was cut off because the conversation filled the model's context window." follows it.
-- **Source:** issue batch B15 (#162); spec §11 P-8; #484.
+- **Source:** issue batch B15 (#162); spec §11 P-8; #484; road map "swift-helper" SA5 (spec §11 SA-1).
 
 **AS-7 — Selecting the conversation, and a message of several lines**
 - **Do:** In light, then dark, after a turn with a tool call: 1. Drag from inside a reply down into the next person line and a tool line; ⌘C; paste into TextEdit. 2. In the composer type a line, ⇧Return, another, ⌥Return, a third, and keep adding lines past five. 3. Press Return. 4. With an input method that composes (Japanese, say), start a word so it is underlined and press Return. 5. Send something long and, while it is working, type in the composer and press Return.
@@ -1361,6 +1426,16 @@ Needs your own Anthropic API key (Setup 3).
 - **Do:** With a real recording that holds a false start, ask the assistant to take out the false starts.
 - **Expect:** it names the words before cutting, cuts only those, and one ⌘Z undoes the cuts it made together (it sends them as one `ripple_delete_ranges`, one undo step).
 - **Source:** #92 (spec §11 TR-5, TR-11).
+
+**AS-11 — The assistant looks at a deep frame**
+- **Do:** With a real key, in a 1920 × 1080 project of camera footage (a 10-bit iPhone clip, or an 8-bit one with a title over it), ask the assistant to look at the frame at the playhead without making it smaller and say what it shows.
+- **Expect:** its tool line shows `render_frame` done, and it describes the picture, with no error from the API about the image's size.
+- **Source:** #604 (spec §11 PR-22); `raster_dither_proof.py` BK1 measures the image's size against the API's limit, not what the API does with it.
+
+**AS-12 — The assistant looks at a 4K frame**
+- **Do:** With a real key, in a 3840 × 2160 project of camera footage (or 8-bit footage with a title over it), ask the assistant to look at the frame at the playhead without making it smaller (no `max_width`) and say what it shows. Then send it one more message, without pressing Clear.
+- **Expect:** its tool line shows `render_frame`; the tool's text has no sentence about scaling the image, and the file it names is 3840 × 2160. Then either it describes the picture from that image, or the tab shows `failed: The image is too large to send: …` (the image's base64 over 10 MB, so the assistant was given that sentence in place of the image), and the assistant calls `render_frame` again with a smaller `max_width` and then describes the picture. Note which, and the frame's footage, since no real 4K camera frame has been measured. Either way the next message is answered, with no API error about the image's size and no Clear needed.
+- **Source:** #618 (spec §11 PR-25, superseding #610's PR-23); #619 (spec §11 SA-14); `raster_dither_proof.py` BKk, BKp and BKj measure the unscaled image against the API's limits, not what the API does with it; `agent_helper_drive.py`'s `image-too-large` case holds the helper's sentence in place of an image past the limit on the stand-in, not what a model does with it.
 
 ## Agent connections
 
@@ -1455,7 +1530,7 @@ appearance is enough.
 **REL-2 — The downloaded build's microphone, recorder, assistant and MCP helper work**
 - **Do:** In the downloaded app: 1. File ▸ New Recording… with a microphone chosen; answer the Microphone and Screen Recording prompts; record a few seconds while speaking; stop. 2. Open the Assistant tab with your own Anthropic key set and send one short message. 3. Frame Job ▸ Settings… ▸ MCP ▸ Copy MCP Command; paste the line into Terminal, run it, then `claude mcp list`.
 - **Expect:** both prompts name Frame Job; your voice is in the recording's microphone file; the assistant answers (the helper did not die at launch); `claude mcp list` shows `framejob` connected, with its path inside `/Applications/Frame Job.app`.
-- **Source:** spec §11 PUB-4 (`published_check.py` holds that the entitlements are there; this is whether they do their job under a Developer ID signature).
+- **Source:** spec §11 PUB-4, SA-8 (`published_check.py` holds that the entitlements are there and that the Swift assistant helper holds none; this is whether they do their job under a Developer ID signature).
 
 **REL-3 — Permissions survive an update**
 - **Do:** With REL-2's grants given, download the NEXT release's DMG, replace the app in Applications, open it, and start a recording with the same microphone.
@@ -1474,7 +1549,7 @@ unlocked Mac; paste each score into the issue in the Source.
 
 **HS-1 — The chrome dispatch rows need an unlocked console**
 - **Do:** `python3 tools/proof/phase8_chrome.py` with the screen unlocked.
-- **Expect:** no skipped rows; section 4's six dispatch rows scored (the run is 150/150 unlocked).
+- **Expect:** no skipped rows; section 4's six dispatch rows scored (the run is 151/151 unlocked).
 - **Source:** #57.
 
 **HS-2 — The recorder's microphone rows with a wired or built-in microphone**
@@ -1494,9 +1569,9 @@ unlocked Mac; paste each score into the issue in the Source.
 - **Source:** #139 (road map 11's V3).
 
 **HS-5 — The screen catalog on a second display**
-- **Do:** Run `python3 tools/proof/screens.py` on a display at a different scale from the usual one, e.g. a Mac's built-in Retina screen (scale 2); every run so far was at scale 1 on one external display.
-- **Expect:** the run passes. Screens and prose that depend on the host are noted in the screen's prose, or filed.
-- **Source:** #139 (road map 11's V3).
+- **Do:** 1. On a Mac whose editor window opens on a 1× display, run `python3 tools/proof/screens.py --out A` (every screen). 2. Change the display arrangement so the window opens on the built-in Retina screen, and run `python3 tools/proof/screens.py --out B`. 3. Compare each capture in A with its pair in B: its pixel size, its layout dump, and by eye.
+- **Expect:** both runs pass. Every capture in A has the same pixel size as its pair in B (`screens.py` pins `-RCDevCaptureScale 2`). Each pair's layout dumps agree in every frame and string, `window_facts` aside. By eye nothing looks softer in A except the colour wheels' discs and the curves' hue strips, which are drawn at the window's scale and scaled up. The two windows' colour spaces differ (`window_facts.color_space`), so a pair's pixels differ across the whole image and are not compared. Screens and prose that depend on the host are noted in the screen's prose, or filed.
+- **Source:** #139 (road map 11's V3), #539.
 
 **HS-6 — AV1 on an M3 or later Mac**
 - **Do:** On an M3 or later Mac: 1. `python3 tools/proof/formats_probe.py`. 2. `python3 tools/proof/codec_import_proof.py` (it launches its own instance on a scratch socket). 3. Drop an AV1 MP4 into a project and play it.

@@ -23,6 +23,20 @@ CASES = ["while_true", "array_1e9", "deep_recursion", "string_50mb", "string_100
          "async_generator_function_constructor", "dynamic_import",
          "static_import", "webassembly", "uint8_leak", "returns_undefined"]
 
+# q5's mutant, as `mutant_anchors.py` reads it. The edit is made by the spike's own binary
+# (`mutant` in src/rows_stress.rs): `render` in counter.js renamed, and a wrapper with a
+# module-level call counter appended. The first row is that edit; the second pins the Rust
+# line that makes it, so this table and the Rust literal cannot drift apart unseen. Rust's
+# `replace` takes every occurrence and none silently, so `q5` counts the first anchor itself.
+COUNTER = "tools/proof/graphics_spike/graphics/counter.js"
+MUTANTS = {
+    "q5": [
+        (COUNTER, "export function render(", "function __render("),
+        ("tools/proof/graphics_spike/src/rows_stress.rs",
+         'counter.replace("export function render(", "function __render(")', None),
+    ],
+}
+
 
 def binary(profile="release"):
     return os.path.join(SPIKE, "target", profile, "graphics_spike")
@@ -117,6 +131,15 @@ def q4(say):
 
 def q5(say, mutant=False):
     arguments = ["q5", "--graphics", GRAPHICS, "--fonts", FONTS] + (["--mutant"] if mutant else [])
+    if mutant:
+        file, anchor, _ = MUTANTS["q5"][0]
+        with open(os.path.join(REPO, file)) as handle:
+            count = handle.read().count(anchor)
+        if count != 1:
+            reason = (f"q5's mutant could not be performed: {anchor!r} occurs {count} times in "
+                      f"{file}, not once")
+            say(f"  q5 MUTANT: {reason}")
+            return failed(reason)
     value, result = call(arguments, 900)
     if result["expired"]:
         return {"state": "expired", "reason": "q5 ran past 900 s", "measured": {}}

@@ -109,6 +109,8 @@ An argument Frame Job can't use is an error, and it's marked and treated like a 
 
 A message starting "internal error:" means something went wrong inside Frame Job. The project is unchanged.
 
+A message ending "failed on an internal exception (…). Frame Job is still running, but part of the call may have happened." means macOS raised an error inside that call. Frame Job answers the call with it and keeps running, but the call may have stopped part-way, so read the project back before you go on.
+
 [Patches](/mcp/patches/#patch-refusals-name-the-path) has more of these, and [Units and ids](/mcp/units-and-ids/) gives the rules they come from.
 
 ## Keyed tools with no key

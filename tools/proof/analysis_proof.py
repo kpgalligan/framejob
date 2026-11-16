@@ -26,6 +26,14 @@ cache's marker and `frames.bin`.
   and at once, both kept.
 - P9 a publish started while `CacheLedger.saveBegan` holds the folder writes no
   marker or payload until `saveEnded`, then both (CJ-22's one door).
+- P10 `AnalysisShots.run` over `shots.mov`'s whole grid cancelled at half
+  answers false and keeps what it stored (spec §11 CJ-21 as amended by #435):
+  one range [0, k], 0 < k < the last index, records 0…k byte-equal to a whole
+  run's.
+- P11 the cancel publish only merges: (a) inside `publishCancelled` under
+  another stamp over a cache leaves marker and `frames.bin` byte-identical;
+  (b) under the cache's own stamp it merges; (c) on an empty cache it writes;
+  (d) an ordinary publish under another stamp still replaces (CJ-22).
 
 **App rows** over MCP (`proof_app.binary()`, `RC_PROOF_APP`), each launch on a
 scratch `CFFIXED_USER_HOME`; Z1 is each launch's parity grep:
@@ -63,6 +71,18 @@ scratch `CFFIXED_USER_HOME`; Z1 is each launch's parity grep:
 - A12 with `clip`: a trimmed, a ×2 and a reversed placement each answer every
   cut in its window once, at `clip_time` and `timeline` as the clip's in,
   speed, start and the media's duration put it.
+- A13 (its own launch, hold 50 s) `get_media_analysis {media, kind: masks}` on
+  `hlg_4k.mov` (the third arm) refuses with "call again to continue"; within
+  15 s the masks marker covers one range [0, k], k < 599, and `masks.pack`
+  exists: a call past its wait keeps what the job analysed (#435).
+- A14 (a document made and closed on a plain launch, then opened on a launch
+  of its own with the job held 3 s and every save held 25 s after its package
+  is written and before it is swapped in, `-RCDevSaveHold`, spec §11 #429)
+  `analysis_job` X; `save_project` X; `analysis_job {wait}`: X landed, its
+  `save_waits` rose by one (its publish found the save in flight and waited),
+  the marker and payload are in the package after the save, and
+  `get_media_analysis` answers `cached: true` with the window's cut (60). A run
+  whose publish did not meet the save fails by that name.
 
 `--mutant NAME`: the named decision broken in a copy — `app/Sources` copied
 for the probe's rows, the tree copied and built (`tree_copy.py`,
@@ -97,12 +117,29 @@ HOME = WORK / "home"
 CALL_BOUND = 300
 BUILD_BOUND = 1500
 FRAME = 20_000  # ticks a frame at 30 fps
-P_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"]
+P_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11"]
 PLAIN = ["A1", "A2", "A3", "A4", "A8", "A9", "A10", "A12"]
 HELD = ["A5", "A6", "A7", "A11"]
-ROWS = P_ROWS + PLAIN + HELD + ["Z1"]
+TIMED_OUT = ["A13"]
+SAVE_HELD = ["A14"]
+APP_ROWS = PLAIN + HELD + TIMED_OUT + SAVE_HELD
+ROWS = P_ROWS + APP_ROWS + ["Z1"]
 HOLD = ["-RCDevAnalysisHold", "3"]
+LONG_HOLD = ["-RCDevAnalysisHold", "50"]   # A13: the job runs about 10 s inside the call's 60 s
+# A14: every save held this long, under the ledger's 30 s publish wait. The job is
+# held 3 s and then reads A14_FRAMES frames (about half a second), so its publish
+# comes well inside the hold; a run where it does not fails by name. The document
+# is made on a launch without the hold, so A14's is the one save held.
+SAVE_HOLD_SECONDS = 25
+A14_FRAMES = 100
+SAVE_HOLD = HOLD + ["-RCDevSaveHold", str(SAVE_HOLD_SECONDS)]
 CANNED = ["-RCDevAnalysisCanned", "YES"]
+
+# The analysis store's one write, inside the ledger and outside it.
+WRITE_INSIDE = ("let published = MediaImporter.CacheLedger.shared.publish(\n"
+                "            in: cacheDir, for: nil, "
+                "as: ledgerWriter(kind, media: mediaID)) { body() }")
+WRITE_OUTSIDE = "body(); let published = true"
 
 MUTANTS = {
     "stamp-no-os-build": (["P1"], [(
@@ -111,9 +148,13 @@ MUTANTS = {
         "app/Sources/AnalysisStamp.swift",
         "            && reader == other.reader && conversion == other.conversion\n", "")]),
     "write-outside-publish": (["P9"], [(
-        "app/Sources/AnalysisStore.swift",
-        "let published = MediaImporter.CacheLedger.shared.publish(in: cacheDir, for: nil) { body() }",
-        "body(); let published = true")]),
+        "app/Sources/AnalysisStore.swift", WRITE_INSIDE, WRITE_OUTSIDE)]),
+    "write-outside-publish-app": (["A14"], [(
+        "app/Sources/AnalysisStore.swift", WRITE_INSIDE, WRITE_OUTSIDE)]),
+    "save-not-announced": (["A14"], [(
+        "app/Sources/ProjectDocument+CacheSaves.swift",
+        "let save = MediaImporter.CacheLedger.shared.saveBegan(cacheDir: directory)",
+        "let save = 0")]),
     "partial-taken-covered": (["A3"], [(
         "app/Sources/AnalysisStore.swift",
         "return missing.isEmpty ? .hit(marker) : .miss(missing)",
@@ -121,8 +162,8 @@ MUTANTS = {
         ": .miss(missing)")]),
     "margin-unread": (["A9"], [(
         "app/Sources/ProjectDocument+Analysis.swift",
-        "let need = grid.need(indices, margin: kind.margin)",
-        "let need = grid.need(indices, margin: 0)")]),
+        ".map { [grid.need($0, margin: kind.margin)] } ?? []",
+        ".map { [grid.need($0, margin: 0)] } ?? []")]),
     "width-wrong": (["A7"], [(
         "app/Sources/AnalysisLane.swift", "static let pictureWidth = 1",
         "static let pictureWidth = 2")]),
@@ -135,6 +176,18 @@ MUTANTS = {
     "hold-no-cancel-poll": (["A6"], [(
         "app/Sources/AnalysisLane.swift", "while Date() < until, !cancelled() {",
         "while Date() < until {")]),
+    "cancel-unpublished-shots": (["P10"], [(
+        "app/Sources/AnalysisShots.swift",
+        "                if lastIndex >= coveredFrom {\n                    AnalysisStore.publishCancelled",
+        "                if false, lastIndex >= coveredFrom {\n                    AnalysisStore.publishCancelled")]),
+    "cancel-replaces-stamp": (["P11"], [(
+        "app/Sources/AnalysisStore.swift",
+        "        if replaces, Thread.current.threadDictionary[mergeOnlyKey] != nil { return false }\n",
+        "")]),
+    "cancel-unpublished-masks": (["A13"], [(
+        "app/Sources/AnalysisMasks.swift",
+        "                    done.upperBound >= job.from\n",
+        "                    done.upperBound >= job.from, false\n")]),
     "preroll-by-index": (["P7"], [(
         "app/Sources/AnalysisFrames.swift", "guard kept.count < 2 else { break }", "break")]),
 }
@@ -203,6 +256,15 @@ class Doc:
         client.call("new_project", path=str(self.path))
         self.call("set_canvas", width=1280, height=720, fps=[30, 1])
         self.call("save_project")
+
+    @classmethod
+    def opened(cls, client, name):
+        """The package an earlier launch's `Doc(client, name)` saved, opened."""
+        doc = cls.__new__(cls)
+        doc.client = client
+        doc.path = WORK / f"{name}.framejob"
+        client.call("open_project", path=str(doc.path))
+        return doc
 
     def call(self, tool, **arguments):
         return self.client.call_with(tool, {"project": str(self.path), **arguments})
@@ -550,10 +612,99 @@ def parity(log, tag):
     check("Z1", not lines, f"{tag}: grep 'Frame Job: ' printed {lines[:3] or 'nothing'}")
 
 
+def timed_out_rows(client):
+    """A13: a masks call past its wait keeps what its job analysed (#435)."""
+    doc = Doc(client, "timed-out")
+
+    def a13():
+        hlg = WORK / "media" / "hlg_4k.mov"
+        hlg.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(fixtures.hlg_4k(), hlg)
+        media = doc.call("import_media", path=str(hlg))["media"]
+        marker = doc.path / "cache/analysis/masks" / f"{media}.json"
+        pack = doc.path / "cache/analysis/masks" / str(media) / "masks.pack"
+        began = time.monotonic()
+        try:
+            answer = doc.call("get_media_analysis", media=media, kind="masks")
+            check("A13", False, f"the call landed inside its wait after "
+                  f"{time.monotonic() - began:.1f} s ({answer.get('cached')}, frames "
+                  f"{len(answer.get('frames') or [])}), so no job was cancelled past it")
+            return
+        except mcp.ToolError as error:
+            refused = str(error)
+        waited = time.monotonic() - began
+        coverage = None
+        for _ in range(150):
+            if marker.exists() and pack.exists():
+                coverage = json.loads(marker.read_text()).get("coverage")
+                break
+            time.sleep(0.1)
+        one = (coverage is not None and len(coverage) == 1 and coverage[0][0] == 0
+               and coverage[0][1] < 599)
+        check("A13", "call again to continue" in refused and one,
+              f"the call refused after {waited:.1f} s: {refused[:160]!r}; within 15 s the marker "
+              f"covers {coverage} (want one range [0, k], k < 599), masks.pack "
+              f"{'exists' if pack.exists() else 'MISSING'}")
+    attempt(a13, "A13")
+    doc.close()
+
+
+def save_held_prepare(client):
+    """A14's document, made where no save is held: its media imported, saved
+    clean (so no autosave is pending in the next launch) and closed."""
+    def body():
+        doc = Doc(client, "save-held")
+        state["save-held"] = doc.media("s")[0]
+        doc.call("save_project")
+        doc.close()
+    attempt(body, "A14")
+
+
+def save_held_rows(client):
+    """A14: a publish that meets a held save waits it out and is kept (#429)."""
+    def dev(**arguments):
+        return client.call_with("analysis_job", arguments)
+
+    def a14():
+        if "save-held" not in state:
+            return  # the prepare launch already failed the row
+        doc = Doc.opened(client, "save-held")
+        media = state["save-held"]
+        before = dev()["now"]
+        window = {"from": 0, "to": A14_FRAMES * FRAME}
+        cuts = [k for k in fixtures.SHOTS_CUTS if k < A14_FRAMES]
+        wanted = dev(project=str(doc.path), media=media, kind="shots", **window)
+        waits = (job(wanted, doc.path, media) or {}).get("save_waits")
+        saved = doc.call("save_project")
+        returned = dev()["now"]
+        row = job(dev(wait=30), doc.path, media) or {}
+        there = doc.marker(media) is not None and doc.payload(media) is not None
+        met = waits is not None and row.get("save_waits") == waits + 1
+        landed = not wanted["wanted"]["hit"] and row.get("outcome") == "landed"
+        after = doc.analysis(media=media, **window) if landed else {}
+        cached = after.get("cached") is True and frames(after) == cuts
+        started, ended = row.get("started_at"), row.get("ended_at")
+        spans = (f"the save call {before:.3f} → {returned:.3f}, the job "
+                 f"{'-' if started is None else format(started, '.3f')} → "
+                 f"{'-' if ended is None else format(ended, '.3f')}")
+        check("A14", landed and met and there and cached
+              and saved.get("ok", True) is not False,
+              f"outcome {row.get('outcome')}; save_waits {waits} → {row.get('save_waits')} "
+              f"({'the publish met the held save and waited' if met else 'the publish did NOT wait for a save'}); "
+              f"marker and payload after the save {'there' if there else 'MISSING'}; then "
+              f"cached {after.get('cached')}, cuts {frames(after)} (want {cuts}); {spans}; "
+              f"every save held {SAVE_HOLD_SECONDS} s")
+        doc.close()
+    attempt(a14, "A14")
+
+
 def app_rows(binary):
     plans = [("plain", [], plain_rows, set(PLAIN)),
              ("canned", CANNED, canned_rows, {"A8"}),
-             ("held", HOLD, held_rows, set(HELD))]
+             ("held", HOLD, held_rows, set(HELD)),
+             ("timed-out", LONG_HOLD, timed_out_rows, set(TIMED_OUT)),
+             ("save-held-prepare", [], save_held_prepare, set(SAVE_HELD)),
+             ("save-held", SAVE_HOLD, save_held_rows, set(SAVE_HELD))]
     for tag, arguments, body, rows in plans:
         if not selected & rows:
             continue
@@ -614,7 +765,7 @@ def main():
         if unknown:
             print(f"unknown rows: {sorted(unknown)}")
             return 2
-        if selected & set(PLAIN + HELD):
+        if selected & set(APP_ROWS):
             selected.add("Z1")
     remove_work()
     if not args.mutant:
@@ -637,7 +788,7 @@ def main():
     else:
         print(f"CJ2a — the analysis lane ({proof_app.config()} build)", flush=True)
     probe_rows(sources)
-    if selected & set(PLAIN + HELD):
+    if selected & set(APP_ROWS):
         if binary is None:
             binary = proof_app.binary()
         if binary.suffix == ".app":

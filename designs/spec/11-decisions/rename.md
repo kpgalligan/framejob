@@ -176,6 +176,9 @@ workflow FILE, whose name does not change.
   kpgalligan/rasterize to apply; no agent here writes `~/devel/rasterize`. Why: one diff
   applied to both is AI-1's rule, and Rasterize already sends Reelcut's user-agent. Risk
   accepted: the two trees differ by those three lines until Rasterize applies them.
+  **Amended by SA-11** (2026-11-12, road map "swift-helper" SA4): struck. There is no shared
+  `agent/src`, which SA4 deleted, and nothing is recorded for Rasterize to apply;
+  kpgalligan/rasterize#654 is the owner's to close.
 - **NM-11 — The mark and the icon.** `app/Assets.xcassets/AppIcon.appiconset` is replaced by
   `designs/frame-job/AppIcon.appiconset`, with its own `Contents.json`. `BrandMark` draws the
   content of `designs/frame-job/frame-job-icon.svg` without its tile: four `#1F8564` corner

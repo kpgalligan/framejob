@@ -147,7 +147,7 @@ enum IsolationRenderer {
             var written: Int64 = 0
             while written < frames {
                 if cancelled() { throw RenderError.cancelled }
-                var got = Int64(maxFrames)
+                var counts: [Int64] = []
                 for lane in lanes {
                     let status: AVAudioEngineManualRenderingStatus
                     do {
@@ -161,8 +161,9 @@ enum IsolationRenderer {
                     guard status == .success else {
                         throw RenderError.failed("renderOffline answered status \(status.rawValue)")
                     }
-                    got = min(got, Int64(lane.buffer.frameLength))
+                    counts.append(Int64(lane.buffer.frameLength))
                 }
+                let got = try roundFrames(counts)
                 if got == 0 { throw RenderError.failed("renderOffline rendered no frames") }
                 source.drop(before: lanes.map(\.feeder.next).min() ?? feedStart)
                 let from = max(0, discard - rendered)
@@ -193,6 +194,18 @@ enum IsolationRenderer {
             try? FileManager.default.removeItem(at: partial)
             throw reworded(error)
         }
+    }
+
+    /// One round's frame count: every lane's, when they agree. Lanes that
+    /// answer different counts would drift the channels apart, so the render
+    /// fails naming the first two counts that differ (AU-51, #409).
+    static func roundFrames(_ counts: [Int64]) throws -> Int64 {
+        guard let first = counts.first else { return 0 }
+        if let other = counts.first(where: { $0 != first }) {
+            throw RenderError.failed(
+                "the channels rendered different frame counts, \(first) and \(other)")
+        }
+        return first
     }
 
     /// The reader's and the writer's errors in this renderer's words.

@@ -7,7 +7,7 @@ import Foundation
 // compiled with app/Sources through swift_build, `app/Resources/Models`
 // beside the binary so the product's own speech pass runs. Arguments: the
 // fixtures folder (`rode.m4a`), a scratch folder. Prints one "ok"/"FAIL" line
-// per row, each row's name first (E1–E3, E6–E11), for audio_ap6_probe.py to
+// per row, each row's name first (E1–E3, E6–E19), for audio_ap6_probe.py to
 // score. Nothing here renders: the processed solve is the proof's (V2, V13).
 
 final class ProbeDocumentController: NSDocumentController {
@@ -63,11 +63,9 @@ func voice(floorGap: Double? = -40, pause: Int = 100, pausePeak: Double = -70,
     return steps
 }
 
-func enhance(_ steps: [Step], isolatable: Bool = true, current: AudioProps = AudioProps())
-    -> AudioEnhance.Choice?
-{
+func enhance(_ steps: [Step], current: AudioProps = AudioProps()) -> AudioEnhance.Choice? {
     let (r, mask) = reading(steps, lufs: L)
-    guard let m = AudioEnhance.measure(r, speech: mask, isolatable: isolatable) else { return nil }
+    guard let m = AudioEnhance.measure(r, speech: mask) else { return nil }
     let input = AudioEnhance.Input(
         readings: [AudioEnhance.Reading(clip: 7, media: 1, measurement: m, loudness: r,
                                         current: current)], problems: [])
@@ -86,7 +84,7 @@ let cleaning = ["compressor", "de_esser", "eq", "gate", "isolation", "noise_redu
 
 do {
     let noisy = enhance(voice(floorGap: -44))
-    check("E1", "floor − L −44 dB, isolatable: isolation 0.8, noise reduction 0, a gate",
+    check("E1", "floor − L −44 dB: isolation 0.8, noise reduction 0, a gate",
           noisy?.patch.isolation == IsolationCache.defaultAmount
             && noisy?.patch.noiseReduction == 0 && noisy?.patch.gate??.ratio == 4
             && keys(noisy) == cleaning,
@@ -101,10 +99,6 @@ do {
           quiet?.patch.isolation == 0 && quiet?.patch.noiseReduction == 0
             && quiet?.patch.gate.map { $0 == nil } == true && keys(quiet) == cleaning,
           "\(String(describing: quiet?.patch.dictionary))")
-    let dry = enhance(voice(floorGap: -44), isolatable: false)
-    check("E1", "noisy and not isolatable: noise reduction 0.5, isolation 0, a gate",
-          dry?.patch.noiseReduction == 0.5 && dry?.patch.isolation == 0
-            && dry?.patch.gate??.thresholdDb == -30, "\(String(describing: dry?.patch.dictionary))")
     let high = enhance(voice(floorGap: -20, pausePeak: -40))
     let low = enhance(voice(floorGap: -44, pausePeak: -100))
     check("E1", "the gate's threshold held to −6 and −40",
@@ -199,7 +193,7 @@ do {
           "\(keys(row)) \(row?.reasons.first { $0.hasPrefix("Noise") } ?? "")")
     let (r, mask) = reading(Array(voice().suffix(150)), lufs: L)
     check("E7", "under 1 s of speech measures nothing",
-          AudioEnhance.measure(r, speech: mask, isolatable: true) == nil)
+          AudioEnhance.measure(r, speech: mask) == nil)
 }
 
 // MARK: - E9 the measurement plan
@@ -300,7 +294,359 @@ do {
     for (name, audio) in plain {
         check("E10", "\(name) alone plans off the cache", !ProcessedLoudness.needsRender(audio))
     }
-    check("E10", "no audio props plans off the cache", !ProcessedLoudness.needsRender(nil))
+    check("E10", "no audio props plans off the cache",
+          !ProcessedLoudness.needsRender(Optional<AudioProps>.none))
+
+    // AU-159 (a): a stage only at an action's end. No base stage; one action
+    // from 1 s whose end is `end`, `duration` ticks long.
+    func clip(_ end: String, duration: Int = 1_200_000) -> ClipSnapshot? {
+        ReelJSON.decode(ClipSnapshot.self, from: """
+            {"id": 2, "track": 3, "start": 0, "duration": 6000000,
+             "source": {"kind": "media", "media": 1, "in": 0}, "audio": {},
+             "actions": [{"id": 90, "start": 600000, "duration": \(duration),
+                          "curve": "linear", "end": {"audio": \(end)}}]}
+            """)
+    }
+    let ends: [(String, String)] = [
+        ("eq", #"{"eq": {"high_pass": {"frequency": 80, "slope": 24}}}"#),
+        ("hum", #"{"hum": {}}"#), ("isolation", #"{"isolation": 0.5}"#),
+        ("noise_reduction", #"{"noise_reduction": 0.5}"#),
+        ("gate", #"{"gate": {"threshold_db": -20}}"#), ("de_esser", #"{"de_esser": {}}"#),
+        ("compressor", #"{"compressor": {}}"#), ("leveller", #"{"leveller": {}}"#),
+        // AU-165 (a): a limiter at an end, and a null keying the clip's off.
+        ("limiter", #"{"limiter": {"ceiling_db": -6}}"#), ("a null limiter", #"{"limiter": null}"#),
+    ]
+    let plainEnds: [(String, String)] = [
+        ("pan", #"{"pan": 0.5}"#), ("mono", #"{"mono": true}"#),
+        ("channels", #"{"channels": "left"}"#),
+        ("volume", #"{"volume": 2}"#), ("a null eq", #"{"eq": null}"#),
+        ("a null gate", #"{"gate": null}"#), ("isolation 0", #"{"isolation": 0}"#),
+        ("noise_reduction 0", #"{"noise_reduction": 0}"#),
+    ]
+    for (name, end) in ends {
+        let snapshot = clip(end)
+        check("E10", "\(name) only at an action's end renders",
+              snapshot?.actions.count == 1 && !ProcessedLoudness.needsRender(snapshot?.audio)
+                && ProcessedLoudness.needsRender(snapshot))
+    }
+    for (name, end) in plainEnds {
+        let snapshot = clip(end)
+        check("E10", "\(name) at an action's end alone plans off the cache",
+              snapshot?.actions.count == 1 && !ProcessedLoudness.needsRender(snapshot))
+    }
+    let still = clip(#"{"gate": {"threshold_db": -20}}"#, duration: 0)
+    check("E10", "a gate at the end of an action of no duration plans off the cache",
+          still?.actions.first?.duration == 0 && !ProcessedLoudness.needsRender(still))
+    let stillLimiter = clip(#"{"limiter": {"ceiling_db": -6}}"#, duration: 0)
+    check("E10", "a limiter at the end of an action of no duration plans off the cache",
+          stillLimiter?.actions.first?.duration == 0 && !ProcessedLoudness.needsRender(stillLimiter))
+    check("E10", "no clip plans off the cache",
+          !ProcessedLoudness.needsRender(Optional<ClipSnapshot>.none))
+
+    // E15 (AU-165 (a), (b)): which clips an action's end sets a limiter on,
+    // and which solves are checked by render.
+    var nullStored = false
+    if case .some(.none) = clip(#"{"limiter": null}"#)?.actions.first?.end.audio?.limiter {
+        nullStored = true
+    }
+    let based = ReelJSON.decode(ClipSnapshot.self, from: """
+        {"id": 2, "track": 3, "start": 0, "duration": 6000000,
+         "source": {"kind": "media", "media": 1, "in": 0}, "audio": {"limiter": {}},
+         "actions": [{"id": 90, "start": 600000, "duration": 1200000,
+                      "curve": "linear", "end": {"audio": {"pan": 0.5}}}]}
+        """)
+    // The last column is AU-168 (a)'s `endLimiterOn`: a null keys the clip's
+    // own limiter off, so it turns none on.
+    let sets: [(String, ClipSnapshot?, Bool, Bool)] = [
+        ("a limiter at an end", clip(#"{"limiter": {"ceiling_db": -6}}"#), true, true),
+        ("a null limiter at an end (keyed off)", clip(#"{"limiter": null}"#), true, false),
+        ("a limiter beside a gate at an end",
+         clip(#"{"gate": {"threshold_db": -20}, "limiter": {}}"#), true, true),
+        ("a limiter at the end of an action of no duration", stillLimiter, false, false),
+        ("an end with no limiter key", clip(#"{"gate": {"threshold_db": -20}}"#), false, false),
+        ("the clip's own limiter, an end without one", based, false, false),
+        ("no clip", nil, false, false),
+    ]
+    for (name, snapshot, wanted, on) in sets {
+        check("E15", "endSetsLimiter: \(name) \(wanted ? "sets" : "does not set") one",
+              ProcessedLoudness.endSetsLimiter(snapshot) == wanted
+                && (name == "no clip" || snapshot != nil))
+        check("E15", "endLimiterOn: \(name) \(on ? "turns" : "does not turn") one on",
+              ProcessedLoudness.endLimiterOn(snapshot) == on
+                && (name == "no clip" || snapshot != nil))
+    }
+    check("E15", "a null limiter at an end decodes as a stored null", nullStored)
+    let verifies: [(LimiterProps?, Bool, Bool)] = [
+        (LimiterProps(), false, true), (LimiterProps(), true, true), (nil, true, true),
+        (nil, false, false),
+    ]
+    for (limiter, end, wanted) in verifies {
+        check("E15", "verifiesByRender with \(limiter == nil ? "no" : "a") limiter and "
+                + "\(end ? "an" : "no") action-end limiter: \(wanted)",
+              LoudnessMeasureRun.verifiesByRender(limiter: limiter, endLimiter: end) == wanted)
+    }
+
+    // E17 (AU-165 (b)): AU-24's question at a volume the loop steps to.
+    let ceiling = pow(10, AudioNormalize.ceilingDBTP / 20)
+    let peak = pow(10, -18.5 / 20)
+    let under = ceiling / peak * pow(10, -0.01 / 20)
+    let over = ceiling / peak * pow(10, 0.01 / 20)
+    check("E17", "no limiter, R0's peak 0.01 dB under −1 dBTP at the volume: stays off",
+          !LoudnessMeasureRun.limiterGoesOn(nil, truePeak: peak, volume: under))
+    check("E17", "no limiter, R0's peak 0.01 dB over −1 dBTP at the volume: goes on",
+          LoudnessMeasureRun.limiterGoesOn(nil, truePeak: peak, volume: over))
+    check("E17", "a limiter already on is not asked again",
+          !LoudnessMeasureRun.limiterGoesOn(LimiterProps(), truePeak: peak, volume: over * 4))
+    let chosen = AudioNormalize.ceilingLimiter(nil)
+    let lowered = AudioNormalize.ceilingLimiter(LimiterProps(ceilingDb: -0.5, release: 1_200))
+    let kept = AudioNormalize.ceilingLimiter(LimiterProps(ceilingDb: -3, release: 1_200))
+    check("E17", "the limiter that goes on is AU-24's: the default at −1 dBTP; a clip's own "
+            + "lowered to −1 or kept under it",
+          chosen == LimiterProps(ceilingDb: -1) && lowered == LimiterProps(ceilingDb: -1, release: 1_200)
+            && kept == LimiterProps(ceilingDb: -3, release: 1_200),
+          "\(chosen), \(lowered), \(kept)")
+}
+
+// MARK: - E18 what stopped a verified solve away from its target (AU-167, #607)
+
+do {
+    let t = -16.0
+    let cases: [(String, Double, Double, AudioNormalize.Limit?)] = [
+        ("×2, 0.11 LU short", 2, t - 0.11, .verifyRenders),
+        ("×2, 0.11 LU over", 2, t + 0.11, .verifyRenders),
+        ("×2, 0.09 LU short", 2, t - 0.09, nil),
+        ("×2, 0.09 LU over", 2, t + 0.09, nil),
+        ("×32, 0.11 LU short", 32, t - 0.11, .maxGain),
+        ("×32, 0.09 LU short", 32, t - 0.09, nil),
+        ("×32, 0.11 LU over", 32, t + 0.11, .verifyRenders),
+        ("×31.9, 5 LU short", 31.9, t - 5, .verifyRenders),
+    ]
+    for (name, volume, result, wanted) in cases {
+        let got = AudioNormalize.verifiedLimit(volume: volume, resultLUFS: result, targetLUFS: t)
+        check("E18", "verifiedLimit at \(name): \(wanted?.rawValue ?? "nil")", got == wanted,
+              got?.rawValue ?? "nil")
+    }
+    // The tools' note: today's sentence for the ceiling's clips, byte for byte.
+    // A row's R0 is −39.4 LUFS unless given: ×32 of it, −9.3, reaches −16.
+    func result(_ clip: UInt32, _ limit: AudioNormalize.Limit?, r0: Double? = -39.4)
+        -> AudioNormalize.LoudnessResult
+    {
+        var r = AudioNormalize.LoudnessResult(
+            clip: clip, media: 1, measuredLUFS: -41.6, truePeakDBTP: -18.5,
+            volume: limit == .maxGain ? 32 : 2, resultLUFS: -29.1, resultTruePeakDBTP: -3.5,
+            limit: limit, limiter: LimiterProps(ceilingDb: -1))
+        r.processedLUFS = r0
+        r.renders = r0 == nil ? 0 : 4
+        return r
+    }
+    func note(_ rows: [AudioNormalize.LoudnessResult], _ ends: Set<UInt32> = [],
+              _ target: Double = -16) -> String? {
+        AudioNormalize.limitNote(rows, endLimiters: ends, targetLUFS: target)
+    }
+    let ceilingOnly = "Clip(s) 3, 5 stopped short of -16.0 LUFS: the volume that reaches it would "
+        + "pass the 32× ceiling (limited_by max_gain). result_lufs says where each landed."
+    let none = note([result(3, nil)])
+    let ceiling = note([result(3, .maxGain), result(4, nil), result(5, .maxGain)])
+    let verify = note([result(6, nil), result(7, .verifyRenders)], [], -24.417) ?? ""
+    let both = note([result(3, .maxGain), result(7, .verifyRenders)]) ?? ""
+    let tail = "result_lufs says where each landed."
+    check("E18", "limitNote: no limit, no note", none == nil, none ?? "nil")
+    check("E18", "limitNote: the ceiling's clips alone keep today's sentence exactly",
+          ceiling == ceilingOnly, ceiling ?? "nil")
+    check("E18", "limitNote: a verify bound's clip named with verify_renders and a limiter, no "
+            + "max_gain, the tail once",
+          verify.hasPrefix("Clip(s) 7 ") && verify.contains("-24.417 LUFS")
+            && verify.contains("(limited_by verify_renders)") && verify.contains("limiter")
+            && !verify.contains("max_gain") && verify.hasSuffix(tail)
+            && verify.components(separatedBy: tail).count == 2, verify)
+    check("E18", "limitNote: both, each clip in its own sentence, the tail once",
+          both.hasPrefix("Clip(s) 3 stopped short of -16.0 LUFS") && both.contains("Clip(s) 7 ")
+            && both.contains("(limited_by max_gain)") && both.contains("(limited_by verify_renders)")
+            && both.hasSuffix(tail) && both.components(separatedBy: tail).count == 2, both)
+    // AU-168 (b), (c): a limiter an action's end turns on, named in the
+    // ceiling's place when R0 at ×32 would have reached the target.
+    let reach = 20 * log10(AudioNormalize.maxGain)
+    let mixed = note([result(3, .maxGain), result(5, .maxGain)], [5]) ?? ""
+    let allHeld = note([result(3, .maxGain), result(5, .maxGain)], [3, 5]) ?? ""
+    let quiet = note([result(3, .maxGain, r0: -50), result(5, .maxGain, r0: -50)], [3, 5])
+    let near = note([result(5, .maxGain, r0: -16 - 0.05 - reach)], [5]) ?? ""
+    let far = note([result(5, .maxGain, r0: -16 - 0.15 - reach)], [5]) ?? ""
+    let cacheRow = note([result(5, .maxGain, r0: nil)], [5]) ?? ""
+    let others = [result(6, nil), result(7, .verifyRenders)]
+    let action = "Clip(s) 5 stopped short of -16.0 LUFS at the 32× ceiling (limited_by max_gain), "
+        + "but the likely reason is a limiter an action's end turns on"
+    check("E18", "limitNote: of two ceiling clips, the one an action's limiter is on for named "
+            + "with that limiter, the other in the ceiling's sentence, the tail once",
+          mixed.hasPrefix("Clip(s) 3 stopped short of -16.0 LUFS: the volume that reaches it "
+            + "would pass") && mixed.contains(action)
+            && mixed.components(separatedBy: "would pass").count == 2
+            && mixed.components(separatedBy: "(limited_by max_gain)").count == 3
+            && mixed.hasSuffix(tail) && mixed.components(separatedBy: tail).count == 2, mixed)
+    check("E18", "limitNote: both under an action's limiter, one sentence naming it, no "
+            + "\"would pass\"",
+          allHeld.hasPrefix("Clip(s) 3, 5 stopped short of -16.0 LUFS at the 32× ceiling "
+            + "(limited_by max_gain), but the likely reason is a limiter an action's end")
+            && allHeld.contains("no volume reaches the target") && !allHeld.contains("would pass")
+            && allHeld.hasSuffix(tail), allHeld)
+    check("E18", "limitNote: R0 at −50, ×32 of it short of −16 anyway: the ceiling's sentence "
+            + "byte for byte, though an action's limiter is on",
+          quiet == ceilingOnly, quiet ?? "nil")
+    check("E18", "limitNote: ×32 of R0 0.05 LU short of −16 names the limiter, 0.15 LU short "
+            + "the ceiling",
+          near.hasPrefix(action) && far.hasPrefix("Clip(s) 5 stopped short of -16.0 LUFS: the "
+            + "volume that reaches it would pass"), near + " | " + far)
+    check("E18", "limitNote: a row with no R0 (off the cache) keeps the ceiling's sentence",
+          cacheRow.contains("would pass") && !cacheRow.contains("action"), cacheRow)
+    // match_audio's target is the reference's measured loudness, unrounded.
+    let measuredTarget = note([result(3, .maxGain), result(7, .verifyRenders)], [],
+                              -15.999999999117435) ?? ""
+    check("E18", "limitNote: a target read from a measurement written to 0.001 LU, as -16.0",
+          measuredTarget.hasPrefix("Clip(s) 3 stopped short of -16.0 LUFS: ")
+            && measuredTarget.contains("Clip(s) 7 ended more than 0.1 LU from -16.0 LUFS: ")
+            && !measuredTarget.contains("99999"), measuredTarget)
+    check("E18", "limitNote: the clips set only bites on max_gain: a landed and a verify "
+            + "bound's clip in it change nothing",
+          note(others, [6, 7], -24.417) == note(others, [], -24.417)
+            && note(others, [6, 7], -24.417) != nil, note(others, [6, 7], -24.417) ?? "nil")
+    // Enhance's loudness reason, by case.
+    func row(_ lufs: Double, _ limit: AudioNormalize.Limit?) -> AudioNormalize.LoudnessResult {
+        var r = AudioNormalize.LoudnessResult(
+            clip: 1, media: 1, measuredLUFS: -41.6, truePeakDBTP: -18.5, volume: 20.8,
+            resultLUFS: lufs, resultTruePeakDBTP: -3.5, limit: limit,
+            limiter: LimiterProps(ceilingDb: -1))
+        r.processedLUFS = -39.4
+        r.renders = 4
+        return r
+    }
+    func reason(_ lufs: Double, _ limit: AudioNormalize.Limit?, endLimiter: Bool = false)
+        -> String
+    {
+        AudioEnhance.loudnessReason(
+            row(lufs, limit), limiter: LimiterProps(ceilingDb: -1), target: -24,
+            endLimiter: endLimiter)
+    }
+    let landed = reason(-24.05, nil)
+    let capped = reason(-29.1, .maxGain)
+    let short = reason(-29.55, .verifyRenders)
+    let over = reason(-23.8, .verifyRenders)
+    let held = reason(-29.1, .maxGain, endLimiter: true)
+    let shortHeld = reason(-29.55, .verifyRenders, endLimiter: true)
+    check("E18", "the reason: landed ends at its renders", landed.hasSuffix("(4 renders)."), landed)
+    check("E18", "the reason: the ceiling's clause kept",
+          capped.hasSuffix("(4 renders), short of −24.0 LUFS: the volume would pass 32×."), capped)
+    check("E18", "the reason: at ×32 under an action's limiter, that limiter as the likely "
+            + "reason, no \"would pass\" (AU-168 (d))",
+          held.hasSuffix("(4 renders), short of −24.0 LUFS at 32×, likely because a limiter an "
+            + "action's end turns on holds the sound down harder as the volume rises, so no "
+            + "volume reaches it.") && !held.contains("would pass"), held)
+    check("E18", "the reason: the verify bound's clause the same with an action's limiter on",
+          shortHeld == short, shortHeld)
+    check("E18", "the reason: the verify bound short of the target names a limiter, not the ceiling",
+          short.contains("(4 renders), short of −24.0 LUFS: ") && short.contains("limiter holds")
+            && !short.contains("would pass"), short)
+    check("E18", "the reason: the verify bound over the target says over",
+          over.contains("(4 renders), over −24.0 LUFS: ") && !over.contains("would pass"), over)
+}
+
+// MARK: - E16 the verified figure's test (AU-165 (c))
+
+do {
+    let figures = ProcessedLoudness.Verified(
+        volume: 2, limiter: nil, lufs: -30, truePeak: 0.1)
+    let near = 2 * pow(10, 0.04 / 20)
+    let far = 2 * pow(10, 0.06 / 20)
+    check("E16", "holds at its own volume and limiter, and 0.04 dB away",
+          figures.holds(volume: 2, limiter: nil) && figures.holds(volume: near, limiter: nil))
+    check("E16", "does not hold 0.06 dB away, nor under another limiter, nor at volume 0",
+          !figures.holds(volume: far, limiter: nil)
+            && !figures.holds(volume: 2, limiter: LimiterProps())
+            && !figures.holds(volume: 0, limiter: nil))
+    let limited = ProcessedLoudness.Verified(
+        volume: 2, limiter: LimiterProps(), lufs: -30, truePeak: 0.1)
+    check("E16", "a limited render holds under the same limiter, not with none",
+          limited.holds(volume: 2, limiter: LimiterProps()) && !limited.holds(volume: 2, limiter: nil))
+}
+
+// MARK: - E13, E14 the memo's key and a clip's actions (AU-159 (g))
+
+do {
+    /// One 10 s clip of media 1 with `audio` and `actions`.
+    func project(audio: String, actions: String) -> ReelProject? {
+        try? ReelProject.from(json: """
+            {"version": \(RC_FORMAT_VERSION),
+             "canvas": {"width": 320, "height": 180, "fps": [30, 1], "background": [0, 0, 0, 1]},
+             "media": [{"id": 1, "path": "/fixtures/ap6.wav", "kind": "audio",
+                        "duration": 36000000, "has_video": false, "has_audio": true}],
+             "tracks": [{"id": 3, "name": "Track 1"}],
+             "clips": [{"id": 2, "track": 3, "start": 0, "duration": 6000000,
+                        "source": {"kind": "media", "media": 1, "in": 0}, "audio": \(audio),
+                        "actions": [\(actions)]}],
+             "nests": [], "next_id": 100}
+            """)
+    }
+    func action(_ id: Int, at start: Int, _ end: String) -> String {
+        """
+        {"id": \(id), "start": \(start), "duration": 600000, "curve": "linear",
+         "end": {"audio": \(end)}}
+        """
+    }
+    func key(_ project: ReelProject?) -> ProcessedLoudness.Key? {
+        project.flatMap { ProcessedLoudness.key(clip: 2, project: $0, document: 0) }
+    }
+    func applied(_ project: ReelProject?, _ patch: AudioPatch) -> ReelProject? {
+        guard let project, case .applied(let next)? = try? project.applying(
+            .setAudio(clips: [2], patch: patch)) else { return nil }
+        return next
+    }
+
+    // E13: R0's trial (no base limiter, volume 1) against the same clip after
+    // the solve wrote its volume and limiter. The clip has a base gate and an
+    // action whose end is a pan, so its segment has automation points, and
+    // the core writes the base limiter into every one.
+    let trial = project(audio: #"{"gate": {}}"#, actions: action(90, at: 600_000, #"{"pan": 0.5}"#))
+    let solved = applied(trial, AudioPatch(volume: 2, limiter: .some(LimiterProps())))
+    let rawTrial = trial.flatMap { ProcessedLoudness.measurementPlan($0.planJSON, clip: 2)?.json }
+    let rawSolved = solved.flatMap { ProcessedLoudness.measurementPlan($0.planJSON, clip: 2)?.json }
+    check("E13", "the key R0 was stored under is the clip's key after the solve wrote its "
+            + "volume and limiter, though the two measurement plans differ (the base limiter is "
+            + "in every automation point)",
+          key(trial) != nil && key(trial) == key(solved) && rawTrial != nil
+            && rawTrial != rawSolved && rawTrial?.contains("\"automation\"") == true
+            && rawSolved?.contains("\"limiter\":{") == true,
+          "keys equal \(key(trial) == key(solved)), plans differ \(rawTrial != rawSolved)")
+
+    // E14: the key follows an action's audio.
+    let gate20 = project(audio: "{}", actions: action(90, at: 600_000, #"{"gate": {"threshold_db": -20}}"#))
+    let gate30 = project(audio: "{}", actions: action(90, at: 600_000, #"{"gate": {"threshold_db": -30}}"#))
+    check("E14", "another gate threshold at an action's end is another key",
+          key(gate20) != nil && key(gate30) != nil && key(gate20) != key(gate30))
+    let limit6 = project(audio: #"{"gate": {}}"#,
+                         actions: action(90, at: 600_000, #"{"limiter": {"ceiling_db": -6}}"#))
+    let limit3 = project(audio: #"{"gate": {}}"#,
+                         actions: action(90, at: 600_000, #"{"limiter": {"ceiling_db": -3}}"#))
+    check("E14", "another limiter ceiling at an action's end is another key",
+          key(limit6) != nil && key(limit3) != nil && key(limit6) != key(limit3))
+    let loud = project(audio: #"{"gate": {}}"#,
+                       actions: action(90, at: 600_000, #"{"pan": 0.5, "volume": 0.5}"#))
+    let quiet = project(audio: #"{"gate": {}}"#,
+                        actions: action(90, at: 600_000, #"{"pan": 0.5, "volume": 0.8}"#))
+    check("E14", "another volume at an action's end is the same key (the fader's)",
+          key(loud) != nil && key(loud) == key(quiet))
+    // A limiter one action switches on and a later one keys off: the key-off
+    // is a stored null, and taking it away leaves the limiter on to the end.
+    let on = action(90, at: 600_000, #"{"limiter": {"ceiling_db": -6}}"#)
+    let keyedOff = project(audio: #"{"gate": {}}"#,
+                           actions: on + "," + action(91, at: 2_400_000, #"{"pan": 0.1, "limiter": null}"#))
+    let leftOn = project(audio: #"{"gate": {}}"#,
+                         actions: on + "," + action(91, at: 2_400_000, #"{"pan": 0.1}"#))
+    var stored = false
+    if case .some(.none) = keyedOff?.snapshot.clip(2)?.actions.last?.end.audio?.limiter {
+        stored = true
+    }
+    check("E14", "a limiter keyed off at a later action's end is another key than the limiter "
+            + "left on",
+          stored && key(keyedOff) != nil && key(leftOn) != nil && key(keyedOff) != key(leftOn),
+          "the null stored \(stored)")
 }
 
 // MARK: - E11 the solved row keeps a volume within 0.05 dB
@@ -309,11 +655,13 @@ do {
     let (r, _) = reading(voice(), lufs: L)
     let limiter = LimiterProps()
     func solvedVolume(_ db: Double, limiter solvedLimiter: LimiterProps? = LimiterProps(),
-                      current: Double = 2) -> Double? {
+                      current: Double = 2, own: LimiterProps? = LimiterProps()) -> Double? {
+        // `limiter` the reading's chosen one (Enhance's, made up when the clip has
+        // none); `own` the clip's own as read, which the keep rule compares (#400).
         let read = AudioNormalize.LoudnessReading(
             clip: 1, media: 1, lufs: L, truePeak: r.truePeak, steps: r.steps,
             stepPeaks: r.stepPeaks, limiter: limiter, materialLUFS: L - 3,
-            currentVolume: current)
+            currentVolume: current, currentLimiter: own)
         let solve = AudioNormalize.Solved(
             volume: current * pow(10, db / 20), limiter: solvedLimiter, resultLUFS: -16,
             resultTruePeakDBTP: -1, limit: nil, renders: 2)
@@ -331,6 +679,13 @@ do {
           "kept \(f3(kept)), moved \(f3(moved))")
     check("E11", "a different solved limiter writes the solve", other.map { $0 != 2 } == true,
           "\(f3(other))")
+    // #400: a first press on a clip with no limiter of its own, whose reading
+    // carries the chosen default one, writes the solve.
+    let unlimited = solvedVolume(0.04, own: nil)
+    check("E11", "a clip with no limiter of its own writes the solve 0.04 dB away, though the "
+            + "chosen limiter equals the solve's",
+          unlimited.map { abs($0 - 2 * pow(10, 0.04 / 20)) < 1e-12 } == true,
+          "\(f3(unlimited))")
     // A cache row whose own volume is 0.02 dB from the plan's: never kept.
     let first = AudioNormalize.plan(
         AudioNormalize.LoudnessInput(readings: [
@@ -459,14 +814,74 @@ do {
     _ = done.wait(timeout: .now() + 300)
 }
 
+// MARK: - E12 the processed memo names its document (#401)
+
+do {
+    // A second document over a copy of the same package: the same clip, plan
+    // and chain, another document.
+    let copy = scratch.appendingPathComponent("enhance-2.framejob", isDirectory: true)
+    try? FileManager.default.removeItem(at: copy)
+    let other = ProjectDocument()
+    var opened = false
+    do {
+        try FileManager.default.copyItem(at: package, to: copy)
+        try other.read(from: copy, ofType: ProjectDocument.projectTypeIdentifier)
+        opened = true
+    } catch {
+        check("E12", "the second document opens", false, "\(error)")
+    }
+    if opened {
+        let deadline = Date().addingTimeInterval(0.2)
+        while Date() < deadline {
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.01))
+        }
+        let steps = [0.25, 0.5, 0.75]
+        let peaks = [0.1, 0.2, 0.3]
+        let key = ProcessedLoudness.key(
+            clip: 2, project: document.editedProject, document: document.recipeKey)
+        if let key { ProcessedLoudness.Memo.shared.store(key, steps: steps, peaks: peaks) }
+        let mine = ProcessedLoudness.Memo.shared.reading(for: 2, in: document)
+        let theirs = ProcessedLoudness.Memo.shared.reading(for: 2, in: other)
+        check("E12", "an R0 stored for one document's clip is not read by another open "
+                + "document's same clip",
+              key != nil && mine?.steps == steps && mine?.peaks == peaks && theirs == nil
+                && document.recipeKey != other.recipeKey,
+              "key \(key != nil), this document's \(mine.map { "\($0.steps)" } ?? "nil"), the "
+                + "other's \(theirs.map { "\($0.steps)" } ?? "nil")")
+    }
+    withExtendedLifetime(other) {}
+}
+
+// MARK: - E16 the memo keeps the verify render beside its R0 (AU-165 (c))
+
+do {
+    let key = ProcessedLoudness.key(
+        clip: 2, project: document.editedProject, document: document.recipeKey)
+    let figures = ProcessedLoudness.Verified(volume: 1.5, limiter: nil, lufs: -28, truePeak: 0.2)
+    var stored = false
+    var dropped = false
+    if let key {
+        let memo = ProcessedLoudness.Memo.shared
+        memo.store(key, steps: [0.25], peaks: [0.1])
+        memo.storeVerified(key, figures)
+        stored = memo.reading(for: 2, in: document)?.verified == figures
+        memo.store(key, steps: [0.5], peaks: [0.2])
+        let after = memo.reading(for: 2, in: document)
+        dropped = after?.verified == nil && after?.steps == [0.5]
+    }
+    check("E16", "the memo answers the verify render stored beside an R0, and the next R0 for "
+            + "the key drops it",
+          key != nil && stored && dropped, "stored \(stored), dropped \(dropped)")
+}
+
 // MARK: - E7 the skips, by name
 
 do {
     let input = AudioEnhance.read(from: document, clips: [99, 3, 4, 5, 6])
     let reasons = input?.problems.map { $0.description } ?? []
     let want = ["clip 99: is not a clip", "clip 3: plays for under 0.4 s",
-                "clip 4: has under 1 s of speech", "clip 5: is still being analysed — its loudness",
-                "clip 6: is still being analysed — its speech has not been detected yet"]
+                "clip 4: has under 1 s of speech", "clip 5: is still being analyzed — its loudness",
+                "clip 6: is still being analyzed — its speech has not been detected yet"]
     check("E7", "five skips, each by name: not a clip, 0.3 s, 0.5 s of speech, no loudness file, "
             + "no speech",
           input?.readings.isEmpty == true && reasons.count == 5
@@ -493,8 +908,7 @@ do {
     print("  note E6 measured: L \(f3(m.lufs)) LUFS, TP \(f3(dB(m.truePeak))) dBTP, speech "
           + "\(m.speechSteps) steps, pause \(m.pauseSteps), floor \(f3(m.floorLUFS)) LUFS "
           + "(F \(f3(m.floorGapDB)) dB), pause peak \(f3(m.pausePeakMedianDB)) dBFS, speech peak "
-          + "\(f3(m.peakMedianDB)) dBFS, sibilant share \(f3(m.sibilantShare)), isolatable "
-          + "\(m.isolatable)")
+          + "\(f3(m.peakMedianDB)) dBFS, sibilant share \(f3(m.sibilantShare))")
     let set = choice.patch.dictionary
     let json = (try? JSONSerialization.data(withJSONObject: set, options: [.sortedKeys]))
         .flatMap { String(data: $0, encoding: .utf8) } ?? "?"
@@ -520,7 +934,8 @@ do {
     check("E6", "its job renders through the chosen patch, carrying the limiter and the volume",
           jobs.count == 1 && jobs.first?.chain == choice.patch
             && jobs.first?.reading.limiter == choice.limiter
-            && jobs.first?.reading.currentVolume == owner.current.volume,
+            && jobs.first?.reading.currentVolume == owner.current.volume
+            && jobs.first?.reading.currentLimiter == owner.current.limiter,
           "\(jobs.count) jobs")
     let real = ProcessedLoudness.measurementPlan(document.editedProject.planJSON, clip: 2)
     check("E9", "the owner's clip has a measurement plan of its one track over its span",
@@ -554,4 +969,129 @@ do {
           enhanced?.compressor != nil && enhanced?.gate != nil && second?.patch == choice.patch
             && second?.limiter == choice.limiter && answer == "identity",
           "second press \(answer)")
+}
+
+// MARK: - E19 the app's own sentence for a measured press (AU-169, #609)
+
+do {
+    let t = -16.0
+    let reach = 20 * log10(AudioNormalize.maxGain)
+    /// A row `short` LU from −16 (negative: over), at ×32 for `max_gain`.
+    func row(_ clip: UInt32, _ limit: AudioNormalize.Limit?, short: Double, r0: Double? = -39.4)
+        -> AudioNormalize.LoudnessResult
+    {
+        var r = AudioNormalize.LoudnessResult(
+            clip: clip, media: 1, measuredLUFS: -41.6, truePeakDBTP: -18.5,
+            volume: limit == .maxGain ? 32 : 2, resultLUFS: t - short, resultTruePeakDBTP: -3.5,
+            limit: limit, limiter: nil)
+        r.processedLUFS = r0
+        return r
+    }
+    let labels: [UInt32: String] = [3: "“rode” (0:00)", 5: "“rode” (0:12)", 7: "“talk” (1:05)"]
+    func facts(_ rows: [AudioNormalize.LoudnessResult], skipped: [AudioNormalize.Problem] = [],
+               reference: Bool = false, command: String = "Normalize")
+        -> AudioMeasureNotice.Facts
+    {
+        AudioMeasureNotice.Facts(
+            command: command, targetLUFS: reference ? -18.2 : t, reference: reference,
+            rows: rows, skipped: skipped)
+    }
+    func say(_ f: AudioMeasureNotice.Facts, ends: Set<UInt32> = [], changed: Bool = true)
+        -> AudioMeasureNotice?
+    {
+        AudioMeasureNotice.make(f, labels: labels, endLimiters: ends, changed: changed)
+    }
+    /// A tooltip on the probe's one line.
+    func oneLine(_ detail: String?) -> String {
+        detail?.replacingOccurrences(of: "\n", with: " ⏎ ") ?? "nil"
+    }
+    let quiet = AudioNormalize.Problem(
+        clip: 7, reason: "is under −70 LUFS over the part of it that plays, so there is no "
+            + "loudness to normalize.")
+    let short = AudioNormalize.Problem(clip: 9, reason: "plays for under 0.4 s.")
+
+    let none = say(facts([row(3, nil, short: 0.02)]))
+    check("E19", "no limit and no skip: no notice", none == nil, "\(String(describing: none))")
+    let ceiling = say(facts([row(3, .maxGain, short: 13.6)]))?.text ?? ""
+    check("E19", "the ceiling, one clip: named with its start, the distance, the ceiling",
+          ceiling == "Normalize left “rode” (0:00) 13.6 LU short of −16.0 LUFS, with its volume "
+            + "at the 32× ceiling.", ceiling)
+    let held = say(facts([row(3, .maxGain, short: 13.6)]), ends: [3])?.text ?? ""
+    check("E19", "an action's limiter at the ×32 stop, R0 reaching: that limiter named",
+          held == "Normalize left “rode” (0:00) 13.6 LU short of −16.0 LUFS at the 32× ceiling, "
+            + "likely because a limiter an action's end turns on holds the sound down.", held)
+    let tooQuiet = say(facts([row(3, .maxGain, short: 13.6, r0: t - 0.15 - reach)]), ends: [3])?
+        .text ?? ""
+    check("E19", "R0 too quiet to reach at ×32: the ceiling, though an action's limiter is on",
+          tooQuiet.hasSuffix(", with its volume at the 32× ceiling."), tooQuiet)
+    let bound = say(facts([row(3, .verifyRenders, short: 0.4)]))?.text ?? ""
+    let over = say(facts([row(3, .verifyRenders, short: -0.3)]))?.text ?? ""
+    check("E19", "the verify bound short of the target, and over it",
+          bound == "Normalize left “rode” (0:00) 0.4 LU short of −16.0 LUFS, likely because a "
+            + "limiter holds the sound down harder as the volume rises."
+            && over.hasPrefix("Normalize left “rode” (0:00) 0.3 LU over −16.0 LUFS, likely"),
+          bound + " | " + over)
+    let close = say(facts([row(3, .maxGain, short: 0.03)]))?.text ?? ""
+    check("E19", "a cache row 0.03 LU short reads less than 0.1 LU",
+          close.contains("left “rode” (0:00) less than 0.1 LU short of −16.0 LUFS"), close)
+    let three = say(
+        facts([row(3, .maxGain, short: 2), row(5, .verifyRenders, short: -0.4),
+               row(7, .maxGain, short: 9), row(8, nil, short: 0)]), ends: [7])
+    check("E19", "three clips away: counted, the furthest (largest distance) named with its "
+            + "cause, the tooltip the sentence and a line per clip",
+          three?.text == "Normalize left 3 clips away from −16.0 LUFS; the furthest, “talk” "
+            + "(1:05), is 9.0 LU short at the 32× ceiling, likely because a limiter an action's "
+            + "end turns on holds the sound down."
+            && three?.detail.components(separatedBy: "\n").count == 4
+            && three?.detail.contains("\n“rode” (0:12) is 0.4 LU over −16.0 LUFS, likely") == true,
+          oneLine(three?.detail))
+    let tie = say(facts([row(3, .maxGain, short: 5), row(5, .maxGain, short: 5)]))?.text ?? ""
+    check("E19", "two clips of one recording at the same distance: the first, by its start",
+          tie.contains("the furthest, “rode” (0:00), is 5.0 LU short"), tie)
+    // The row lands at −20.0, 1.8 LU short of the reference's −18.2.
+    let match = say(facts([row(3, .maxGain, short: 4)], reference: true, command: "Match Audio"))?
+        .text ?? ""
+    check("E19", "Match: the reference's target",
+          match.hasPrefix("Match Audio left “rode” (0:00) 1.8 LU short of the reference's "
+            + "−18.2 LUFS"), match)
+    let oneSkip = say(facts([row(3, nil, short: 0)], skipped: [quiet]))
+    check("E19", "one skip beside a landed clip: the command skipped it, with the plan's reason",
+          oneSkip?.text == "Normalize skipped “talk” (1:05): " + quiet.reason
+            && oneSkip?.detail == oneSkip?.text, oneSkip?.text ?? "nil")
+    let skips = say(facts([row(3, .maxGain, short: 13.6)], skipped: [quiet, short]))
+    check("E19", "a clip away and two skips: \"It skipped 2 clips, the first …\", an unnamed id "
+            + "as clip N, the tooltip a line per skip",
+          skips?.text.hasSuffix(" It skipped 2 clips, the first “talk” (1:05): " + quiet.reason)
+            == true
+            && skips?.detail.hasSuffix("\nSkipped clip 9: plays for under 0.4 s.") == true,
+          oneLine(skips?.detail))
+    let nothing = say(facts([], skipped: [quiet], command: "Enhance Voice"), changed: false)
+    check("E19", "every clip skipped: changed nothing, then the skip",
+          nothing?.text == "Enhance Voice changed nothing. It skipped “talk” (1:05): "
+            + quiet.reason, nothing?.text ?? "nil")
+    let identity = say(facts([row(3, .maxGain, short: 13.6)]), changed: false)?.text ?? ""
+    check("E19", "an identity: changed nothing, then where the clip is",
+          identity == "Normalize changed nothing. “rode” (0:00) is 13.6 LU short of −16.0 LUFS, "
+            + "with its volume at the 32× ceiling.", identity)
+    let identityMany = say(
+        facts([row(3, .maxGain, short: 2), row(5, .maxGain, short: 3)]), changed: false)?.text
+        ?? ""
+    check("E19", "an identity over two clips: \"2 clips are away\"",
+          identityMany.hasPrefix("Normalize changed nothing. 2 clips are away from −16.0 LUFS; "
+            + "the furthest, “rode” (0:12),"), identityMany)
+    // Over a project: the label and the action limiters read from the snapshot.
+    let snapshot = document.editedProject.snapshot
+    let named = snapshot.clip(2).map { snapshot.name(of: $0) } ?? "?"
+    let fromSnapshot = AudioMeasureNotice.make(
+        facts([row(2, .maxGain, short: 13.6)], skipped: [AudioNormalize.Problem(
+            clip: 400, reason: "is not a clip in this project.")]),
+        in: snapshot, changed: true)?.text ?? ""
+    check("E19", "over a project: the clip's name and m:ss start, an id with no clip as clip N",
+          fromSnapshot.hasPrefix("Normalize left “\(named)” (0:00) 13.6 LU short")
+            && fromSnapshot.hasSuffix("It skipped clip 400: is not a clip in this project."),
+          fromSnapshot)
+    let clocks = [0, 12 * ReelTime.perSecond + 1, 61 * ReelTime.perSecond, -5]
+        .map(AudioMeasureNotice.clock)
+    check("E19", "the clock: m:ss, whole seconds down, never negative",
+          clocks == ["0:00", "0:12", "1:01", "0:00"], clocks.joined(separator: " "))
 }

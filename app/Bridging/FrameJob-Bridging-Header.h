@@ -12,5 +12,7 @@
 #include <vpx/vp8cx.h>
 // libvpx's macro and variadic call, wrapped for Swift (spec §11 CX-16 (9)).
 #include "FrameJobVPX.h"
+// The `@try` shim a tool call runs inside (spec §11 #525).
+#include "FrameJobObjCCatch.h"
 
 #endif

@@ -1,13 +1,14 @@
-"""The acknowledgements generator's selftest (#376, spec §11 PUB-10): no cargo, no network,
-scratch only. Run through the generator, never alone:
+"""The acknowledgements generator's selftest (#376, spec §11 PUB-10, SA-10): no cargo, no
+network, no SwiftPM, scratch only. Run through the generator, never alone:
 
-    python3 tools/licenses/acknowledgements.py --selftest | --mutant dev-edges|nested-unchecked|bun-unchecked
+    python3 tools/licenses/acknowledgements.py --selftest | --mutant dev-edges|nested-unchecked|slaude-missing-ok
 
-Rows: D0 T1 the render; G1 G2 the crate walk; N1 N2 the npm walk; L1–L4 the licence texts;
-F1 the font revision; B1 the Bun pin. A `--mutant` (acknowledgements.EXPECTED) must fail
-exactly its rows.
+Rows: D0 T1 the render; G1 G2 the crate walk; L1–L4 the licence texts; F1 the font revision;
+S1 S2 Slaude's entry from a synthetic SwiftPM scratch path. A `--mutant`
+(acknowledgements.EXPECTED) must fail exactly its rows.
 """
 
+import json
 import shutil
 import struct
 import tempfile
@@ -66,27 +67,6 @@ def selftest(mutant=None):
             f"dev edges and first-party are excluded: {sorted(names)}")
         row("G2", "buildonly" in names, f"build edges are included: {sorted(names)}")
 
-        lock = """{ "workspaces": { "": { "dependencies": { "a": "^1", }, "devDependencies": {
-    "dev": "^1", }, }, }, "packages": { "a": ["a@1.2.0", "", { "dependencies": { "b": "^2", },
-    "peerDependencies": { "p": "^1" }, "optionalPeers": ["p"], }, "sha512-x"], "b": ["b@2.0.1",
-    "", {}, "y"], "dev": ["dev@1.0.0", "", {}, "z"], "p": ["p@1.0.0", "", {}, "w"], } }"""
-        got = ack.npm_packages(lock)
-        row("N1", got == [("a", "1.2.0", "node_modules/a"), ("b", "2.0.1", "node_modules/b")],
-            f"a trailing-comma lock skips dev deps and optional peers: {got}")
-        nested = """{ "workspaces": { "": { "dependencies": { "@s/a": "^1", "c": "^1" } } },
-    "packages": { "@s/a": ["@s/a@1.0.0", "", { "dependencies": { "b": "^1" } }, "x"],
-    "@s/a/b": ["b@1.0.0", "", { "dependencies": { "d": "^1", "e": "^1" } }, "x"],
-    "@s/a/e": ["e@3.0.0", "", {}, "x"], "b": ["b@2.0.1", "", {}, "x"],
-    "c": ["c@1.0.0", "", { "dependencies": { "b": "^2" } }, "x"],
-    "d": ["d@1.0.0", "", {}, "x"], "e": ["e@1.0.0", "", {}, "x"] } }"""
-        got = ack.npm_packages(nested)
-        want = [("@s/a", "1.0.0", "node_modules/@s/a"),
-                ("b", "1.0.0", "node_modules/@s/a/node_modules/b"),
-                ("b", "2.0.1", "node_modules/b"), ("c", "1.0.0", "node_modules/c"),
-                ("d", "1.0.0", "node_modules/d"),
-                ("e", "3.0.0", "node_modules/@s/a/node_modules/e")]
-        row("N2", got == want, f"nested keys resolve to the nearest chain and its folder: {got}")
-
         (scratch / "bare").mkdir()
         texts = ack.licence_texts(scratch / "bare", "bare", "MIT", ["Ann <ann@example.com>"])
         row("L1", len(texts) == 1 and texts[0][1].startswith("Copyright (c) Ann <ann@example")
@@ -115,12 +95,36 @@ def selftest(mutant=None):
         got = ack.font_revision(scratch / "font.ttf")
         row("F1", got == "1.500", f"the font revision is read from a synthetic sfnt: {got}")
 
-        pinned = ack.BUN_LICENSE_VERSION
-        other = "0.0.1" if pinned != "0.0.1" else "0.0.2"
-        why, note = failure(lambda: ack.bun_check(other, True)), ack.bun_check(other, False)
-        row("B1", why is not None and other in why and note is not None
-            and pinned in note and ack.bun_check(pinned, True) is None,
-            f"a Bun mismatch fails under --strict-bun ({why}) and is noted without it")
+        revision = "4c6c2ca435350741796c3d461720a61e7149b378"
+        state = {"object": {"dependencies": [{
+            "packageRef": {"identity": "slaude", "kind": "remoteSourceControl",
+                           "location": "https://github.com/kpgalligan/Slaude", "name": "Slaude"},
+            "state": {"checkoutState": {"revision": revision}, "name": "sourceControlCheckout"},
+            "subpath": "Slaude"}]}, "version": 7}
+        swiftpm = scratch / "agent-swift"
+        put(swiftpm / "workspace-state.json", json.dumps(state))
+        sdk = "upstream/anthropic-sdk-python"
+        vendored = f"{sdk}/src/anthropic/_vendor/httpx_aiohttp"
+        for name in ("LICENSE", f"{sdk}/LICENSE", f"{sdk}/LICENSE-MIT", f"{vendored}/LICENSE",
+                     f"{vendored}/NOTICE.md", ".git/NOTICE", "Sources/Anthropic/Client.swift"):
+            put(swiftpm / "checkouts" / "Slaude" / name, f"{name}\n")
+        why = failure(lambda: ack._slaude(swiftpm))
+        entry = ack._slaude(swiftpm) if why is None else None
+        labels = [label for label, _ in entry.texts] if entry else why
+        row("S1", entry is not None and (entry.kind, entry.name, entry.version)
+            == ("package", "slaude", revision)
+            and labels == ["LICENSE", f"{sdk}/LICENSE", f"{sdk}/LICENSE-MIT"]
+            and "== package slaude " + revision + " ==" in ack.render([entry]),
+            f"a synthetic scratch path gives the entry and its three texts: "
+            f"{(entry.kind, entry.name, entry.version) if entry else None}, {labels}")
+        shutil.rmtree(swiftpm / "checkouts")
+        missing = None
+        try:
+            entry = ack._slaude(swiftpm)
+        except Failed as error:
+            missing, entry = str(error), None
+        row("S2", missing is not None and str(swiftpm / "checkouts" / "Slaude") in missing,
+            f"a missing checkout fails, naming it: {missing or f'answered {entry!r}'}")
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
 

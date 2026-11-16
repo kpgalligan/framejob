@@ -3989,8 +3989,9 @@ def run_ds(client, state):
         if not same:
             misses.append(fmt)
     # The settings, not the run: since #326 the answer is `export_status`'s, whose
-    # `export_id` (a new one per export) and `elapsed` differ on every run.
-    per_run = ("path", "bytes", "export_id", "elapsed")
+    # `export_id` (a new one per export) and `elapsed` differ on every run, and whose
+    # `message` (spec §11 #395) is the queue row's sentence, naming the run's own file.
+    per_run = ("path", "bytes", "export_id", "elapsed", "message")
     keep = lambda got: {k: v for k, v in reply(got).items() if k not in per_run}
     figures.append(f"h264 settings {keep(plain)} / {keep(sdr)}")
     if plain_out is None or sdr_out is None or keep(plain) != keep(sdr) or not keep(plain):

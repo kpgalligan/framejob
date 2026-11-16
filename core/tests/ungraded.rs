@@ -50,8 +50,9 @@ fn graded_shape(handle: Handle, track: u32, color: Value) -> (Handle, u32) {
     (next, id)
 }
 
-/// A graded, wheeled, curved media clip with a look on track 1; a graded shape with a filter,
-/// a chroma key and an opacity (all kept) on track 2, with an action whose
+/// A graded, wheeled, curved media clip with a look on track 1; a graded shape with a filter
+/// and an opacity (both kept; a shape takes no chroma key, spec §11 #524) on track 2, with an
+/// action whose
 /// end grades it further, gains it, curves it and gives it a look; a graded shape inside a nest
 /// on track 3; a graded shape on a luma-matte track 4; an adjustment clip
 /// whose only grades are a look, a gamma push and a blue curve on track 5.
@@ -79,8 +80,7 @@ fn graded() -> Handle {
     let handle = handle
         .apply(&json!({"op": "set_video", "clips": [toned], "patch": {
             "opacity": 0.8,
-            "filters": [{"kind": "sepia", "amount": 0.6}],
-            "chroma": {"key": [0, 1, 0], "tolerance": 0.3, "softness": 0.1, "spill": 0.2}}}))
+            "filters": [{"kind": "sepia", "amount": 0.6}]}}))
         .apply(&json!({"op": "add_action", "clip": toned, "at": 0, "duration": SEC}));
     let action = {
         let value = handle.value();

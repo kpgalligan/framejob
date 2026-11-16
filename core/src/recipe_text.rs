@@ -477,8 +477,9 @@ pub(crate) const BURN_IN_CLIP: u32 = 0;
 ///
 /// # Two readings that are not bugs
 ///
-/// **It is NON-DROP, and there is no drop-frame anywhere in this crate.**
-/// A 29.97 fps burn-in therefore reads about 3.6 seconds behind wall clock
+/// **It is NON-DROP at an NTSC rate, and there is no drop-frame anywhere in
+/// this crate**; any other fractional rate counts real seconds (spec §11
+/// #532, `time::format_timecode`). A 29.97 fps burn-in therefore reads about 3.6 seconds behind wall clock
 /// at the one-hour mark — that drift IS the definition of non-drop
 /// (`time::Fps::nominal`), it is what the toolbar's timecode field has
 /// displayed since M1, and it is what `parse_timecode` reads back. Do not

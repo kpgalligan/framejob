@@ -276,7 +276,7 @@ road map's draft CU-31 is CU3c's (the stream's cursor only In the picture).
   as all eight defaults. `set_video` accepts `cursor` on any clip and refuses, through
   `props_check::in_range`, "video.cursor.scale must be between 0.25 and 8, not 9" and likewise for
   `smoothing` (0–1), `hide_idle` (0.5–30) and `click_size` (0.25–4), and "video.cursor.click_color
-  must be a CSS colour (spec §11 G-12), not "#ffg"". **In an action:** `scale` and `click_size`
+  must be a CSS color (spec §11 G-12), not "#ffg"" (amended by #526). **In an action:** `scale` and `click_size`
   animate; `show`, `style`, `clicks` and `click_color` switch at the action's end; `smoothing` and
   `hide_idle` are the clip's — the recipe reads them from the BASE `clip.video.cursor` (0 and null
   when it has none), as `audio_track.rs` reads a base `audio.mono`, so an end may carry them (CI-3)
@@ -367,8 +367,8 @@ taken as recommended).
   `k` survive a voice cache landing.
 - **TX-11 — A word is shown but not editable when cutting it would break something**, and the
   first rule that applies is its `why`: inside a nest ("Inside nest <name>: open it (⌘↓) to cut its
-  words.", naming the OUTERMOST enclosing nest); under a transition ("Under a transition: a cut here
-  would leave one clip's tail under its neighbour.", when the word's `[start, max(end, start + 1))`
+  words.", naming the OUTERMOST enclosing nest); under a transition ("Near an overlap between two
+  clips: a cut here would leave one clip's tail under the other." (amended by #521), when the word's `[start, max(end, start + 1))`
   meets a `SilenceDetector.overlapWalls(snapshot)` wall of the container); on a locked track
   ("Track <name> is locked: a cut would leave these words in place and move everything after
   them.", the word's container track). A ramped clip's words are editable (SR-18 (e)).

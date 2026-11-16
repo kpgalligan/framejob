@@ -28,7 +28,8 @@ Rows:
   front of it, the old one unchanged; a hand-edited `keyboard-keys.js` makes the run write
   `keyboard-keys-2`.
 - O5 `render_frame` 30 frames into an overlay differs from the same frame with the Shortcuts
-  track hidden, and only in the frame's bottom half.
+  track hidden, and only in the frame's bottom half; each is read to the nearest 8-bit level
+  (`png_read.rgba8`), since the overlay's frame is a 16-bit PNG (spec §11 PR-20).
 - O6 every overlay of every fixture here lasts at least D_min(n) frames, on the grid.
 - O7 Clip ▸ Add Shortcut Overlays by `perform_menu_item` gives the project
   `add_shortcut_overlays` gives with the defaults on a copy, one undo step that restores the
@@ -59,6 +60,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE / "graphics_spike"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import png_read  # noqa: E402
 import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 
@@ -287,10 +289,11 @@ def o1_o5(client, files):
 
 
 def decode_png(path):
-    run = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-f", "rawvideo",
-                          "-pix_fmt", "rgba", "-"], capture_output=True, timeout=120,
-                         env=bounded.child_env())
-    return run.stdout if run.returncode == 0 and len(run.stdout) == W * H * 4 else None
+    """The frame's RGBA in 8-bit levels (`png_read.rgba8`): since spec §11 PR-20 the frame
+    with an overlay is a 16-bit PNG and the one with the track hidden an 8-bit one, so both
+    are read to the nearest level, which ffmpeg's own `rgba` conversion is not (#566)."""
+    found = png_read.rgba8(path, env=bounded.child_env())
+    return found[2] if found is not None and found[:2] == (W, H) else None
 
 
 def o5(doc, track, at):

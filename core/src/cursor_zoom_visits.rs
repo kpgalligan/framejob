@@ -112,6 +112,9 @@ pub(crate) struct Planned {
     pub to: Ticks,
     pub kind: Kind,
     pub aim: Option<(f64, f64)>,
+    /// The index into [`Plan::holds`] of the hold that planned it, so the
+    /// aim in force at a cut is read only from the hold spanning it.
+    pub hold: usize,
 }
 
 /// A time no hold crosses; `counted` for a cut, not for the run's end.
@@ -127,7 +130,8 @@ pub(crate) struct Plan {
     pub actions: Vec<Planned>,
     pub visits: usize,
     pub closed: usize,
-    /// Each hold's span, its zoom-in's start to its zoom back's end.
+    /// Each hold's span, its zoom-in's start to its zoom back's end,
+    /// indexed by `Planned::hold`.
     pub holds: Vec<(Ticks, Ticks)>,
 }
 
@@ -234,11 +238,13 @@ fn plan_chain(
     let first = anchors[0].0;
     let mut region = frame.clamp(first.p);
     let hold_start = first.t - timing.lead;
+    let hold = out.holds.len();
     out.actions.push(Planned {
         from: hold_start,
         to: first.t,
         kind: Kind::In,
         aim: Some(region),
+        hold,
     });
     let mut busy = first.t;
     let mut next = 1;
@@ -257,6 +263,7 @@ fn plan_chain(
                         to: a.t,
                         kind: Kind::Pan,
                         aim: Some(region),
+                        hold,
                     });
                     busy = a.t;
                 }
@@ -286,6 +293,7 @@ fn plan_chain(
                         to: end,
                         kind: Kind::Follow,
                         aim: Some(region),
+                        hold,
                     });
                     busy = end;
                     last_follow = Some(t);
@@ -304,6 +312,7 @@ fn plan_chain(
             to,
             kind: Kind::Back,
             aim: None,
+            hold,
         });
     }
     out.holds.push((hold_start, to));

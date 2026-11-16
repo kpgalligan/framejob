@@ -22,6 +22,15 @@ import AppKit
 /// the step acts (`tick`): Cancel on the Measuring Sound sheet, no outcome or
 /// a stale answer can never leave a timer that puts the sheet back up, and
 /// `isPending` never depends on the sheet.
+///
+/// **The measurement is held apart from the follow** (#546). `.enhance` ends
+/// the follow and then measures, for seconds, under the Measuring Sound
+/// sheet, which hands its answer back a main-queue turn after it has gone.
+/// From that step until the answer, the refusal or the Cancel has landed the
+/// document `isMeasuring` (`Measurement`), and `isUnderWay` is the follow or
+/// the measurement: what the polish's follow waits on (CU-101 (a)), so it
+/// cannot commit in the gap and make Enhance's answer stale, and what
+/// `land_recording` waits on and answers as `enhance_pending`.
 enum RecordingEnhance {
     /// One check every half second, the landing's own retry interval.
     static let checkInterval: TimeInterval = RecorderPanelController.landingRetryInterval
@@ -39,7 +48,7 @@ enum RecordingEnhance {
     /// The panel box's tooltip (AU-69 (a)), naming AU-68's step.
     static let boxTooltip =
         "After the recording lands, run Clip ▸ Enhance Voice on the microphone's clip as its own "
-        + "undo step, \"Enhance Voice\", once its sound has been analysed."
+        + "undo step, \"Enhance Voice\", once its sound has been analyzed."
 
     /// What one check decides (AU-68 (d)).
     enum Step: Equatable {
@@ -75,18 +84,31 @@ enum RecordingEnhance {
         }.map(\.id).sorted()
     }
 
-    /// The clips still in the open container. Main.
-    static func present(_ clips: [UInt32], in document: ProjectDocument) -> [UInt32] {
-        let snapshot = document.editedProject.snapshot
+    /// The landing's container: the nest `scope` names, or the top level (#458). A follow-up
+    /// reads its clips here, never in the open container, so a nest opened during its wait is
+    /// busy rather than a drop. The open container's own view when it is the landing's. Main.
+    static func container(of document: ProjectDocument, scope: UInt32?) -> ReelProject {
+        if document.scope == scope { return document.editedProject }
+        return scope.flatMap { document.project.scoped($0) } ?? document.project
+    }
+
+    /// The clips still in the landing's container. Main.
+    static func present(_ clips: [UInt32], in document: ProjectDocument, scope: UInt32?)
+        -> [UInt32]
+    {
+        let snapshot = container(of: document, scope: scope).snapshot
         return clips.filter { snapshot.clip($0) != nil }
     }
 
     /// Each clip's media has a current loudness cache, and its speech saved,
     /// or a current speech cache, or no speech model at all (AU-68 (b)). False
-    /// for no clips, a missing file or no cache folder. Main.
-    static func isAnalysed(_ clips: [UInt32], in document: ProjectDocument) -> Bool {
+    /// for no clips, a missing file or no cache folder. The clips are read in the landing's
+    /// container. Main.
+    static func isAnalysed(_ clips: [UInt32], in document: ProjectDocument, scope: UInt32?)
+        -> Bool
+    {
         guard !clips.isEmpty, let cacheDir = document.cacheDirectory else { return false }
-        let snapshot = document.editedProject.snapshot
+        let snapshot = container(of: document, scope: scope).snapshot
         for id in clips {
             guard let clip = snapshot.clip(id), let media = snapshot.media(for: clip),
                 let url = mediaURL(for: media)
@@ -172,6 +194,58 @@ enum RecordingEnhance {
         follows[document.recipeKey] != nil
     }
 
+    // MARK: - The measurement
+
+    /// The measurements under way, counted by the document's `recipeKey`.
+    private static var measuring: [Int: Int] = [:]
+
+    /// One `.enhance` step's measurement: counted from its making until
+    /// `end()`, once. Releasing it unended also uncounts it, so a hand-back
+    /// that is dropped without being called cannot hold the polish. Made and
+    /// ended on main.
+    final class Measurement {
+        private let key: Int
+        private var ended = false
+
+        init(_ document: ProjectDocument) {
+            key = document.recipeKey
+            RecordingEnhance.measuring[key, default: 0] += 1
+        }
+
+        func end() {
+            guard !ended else { return }
+            ended = true
+            RecordingEnhance.uncount(key)
+        }
+
+        deinit {
+            guard !ended else { return }
+            let key = self.key
+            if Thread.isMainThread {
+                RecordingEnhance.uncount(key)
+            } else {
+                DispatchQueue.main.async { RecordingEnhance.uncount(key) }
+            }
+        }
+    }
+
+    private static func uncount(_ key: Int) {
+        let left = (measuring[key] ?? 0) - 1
+        measuring[key] = left > 0 ? left : nil
+    }
+
+    /// True from a follow's `.enhance` step until what it measured has
+    /// landed: the step, a refusal, or the sheet's Cancel. Main.
+    static func isMeasuring(_ document: ProjectDocument) -> Bool {
+        measuring[document.recipeKey] != nil
+    }
+
+    /// The follow's timer runs, or its measurement has not landed yet: Enhance
+    /// Voice may still step on `document`. Main.
+    static func isUnderWay(_ document: ProjectDocument) -> Bool {
+        isPending(document) || isMeasuring(document)
+    }
+
     /// The timer of `document`'s follow, nil with none — what the probe reads
     /// back after a step (P5). Main.
     static func timer(of document: ProjectDocument) -> Timer? {
@@ -179,22 +253,27 @@ enum RecordingEnhance {
     }
 
     /// One firing: decide, and on any step but `.wait` end the follow FIRST
-    /// (the type doc), then act. Main.
+    /// (the type doc), then act. `.enhance` holds a `Measurement` until
+    /// `enhanceLanded` calls back. Main.
     static func tick(_ document: ProjectDocument) {
         guard let follow = follows[document.recipeKey] else { return }
-        let clips = present(follow.clips, in: document)
+        let clips = present(follow.clips, in: document, scope: follow.scope)
         let window = RecorderPanelController.editor(of: document)?.view.window
         let busy =
             isBusy(document, scope: follow.scope) || window == nil || window?.attachedSheet != nil
         let step = decide(
-            clips: clips, analysed: isAnalysed(clips, in: document), busy: busy,
+            clips: clips, analysed: isAnalysed(clips, in: document, scope: follow.scope),
+            busy: busy,
             elapsed: Date().timeIntervalSince(follow.started))
         guard step != .wait else { return }
         end(follow, key: document.recipeKey)
         switch step {
         case .enhance(let ids):
             guard let window else { return refuse(notReadySentence, in: document) }
-            AudioMeasureDoor.enhanceLanded(document: document, clips: ids, window: window)
+            let measurement = Measurement(document)
+            AudioMeasureDoor.enhanceLanded(document: document, clips: ids, window: window) {
+                measurement.end()
+            }
         case .giveUp:
             refuse(notReadySentence, in: document)
         case .drop, .wait:

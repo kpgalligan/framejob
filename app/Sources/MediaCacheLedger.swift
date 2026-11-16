@@ -167,24 +167,43 @@ extension MediaImporter {
         /// is current. Waits up to `waitLimit` for a save to end; answers
         /// false, without running `body`, when that wait runs out or the pass
         /// is superseded. `body` never calls the ledger.
+        ///
+        /// `writer` names the caller, and every caller names itself: `thumbs`,
+        /// `peaks`, `loudness`, `sync-features`, `speech`, `device-transcript`,
+        /// an offline render's folder (`ramp-audio`, `isolated`, `voiced`),
+        /// `analysis/<kind>/<media>`. Under dev tools the publishes that found
+        /// a save in flight when the call came are counted per folder and
+        /// writer, whatever the answer, and an armed writer is first held at
+        /// its gate (`CacheLedgerDev`, spec §11 #552, #429); the product reads
+        /// the name nowhere.
         @discardableResult
-        func publish(in cacheDir: URL, for pass: CachePass?, _ body: () -> Void) -> Bool {
+        func publish(
+            in cacheDir: URL, for pass: CachePass?, as writer: String, _ body: () -> Void
+        ) -> Bool {
             let directory = cacheDir.standardizedFileURL.path
+            #if FRAMEJOB_DEV_TOOLS
+            CacheLedgerDev.shared.arrive(directory, writer)
+            #endif
             let deadline = Date().addingTimeInterval(Self.waitLimit)
             condition.lock()
+            #if FRAMEJOB_DEV_TOOLS
+            let met = saveExpiryLocked(directory) != nil
+            #endif
+            var refused = false
             while let expiry = saveExpiryLocked(directory) {
                 guard Date() < deadline else {
-                    condition.unlock()
-                    return false
+                    refused = true
+                    break
                 }
                 condition.wait(until: min(deadline, expiry))
             }
-            if let pass, !currentLocked(pass) {
-                condition.unlock()
-                return false
-            }
-            publishing[directory, default: 0] += 1
+            if !refused, let pass, !currentLocked(pass) { refused = true }
+            if !refused { publishing[directory, default: 0] += 1 }
             condition.unlock()
+            #if FRAMEJOB_DEV_TOOLS
+            if met { CacheLedgerDev.shared.noteWait(directory, writer) }
+            #endif
+            if refused { return false }
             body()
             condition.lock()
             publishing[directory, default: 1] -= 1

@@ -3,7 +3,10 @@ import AppKit
 /// The Transcript tab's view (road map "creator-jobs" TX2a, spec §11 TX-21,
 /// TX-22; TX-S2's candidate (b)): a custom `NSView` laid out by TextKit 2 —
 /// an `NSTextLayoutManager` over an `NSTextContentStorage`, with viewport
-/// layout, so only the fragments in sight are laid out and drawn.
+/// layout, so a rebuild lays out and draws only the fragments in sight. The
+/// rest is laid out once afterwards, in the run loop's idle time
+/// (`layOutAll()` in `+Layout`, spec §11 TX-37 (d) as amended by #583, #593), so
+/// the view is as tall as the whole text and the scroller's knob is true.
 ///
 /// **Not an `NSText`** (TX-21): `handleEditorKey` gives up on an `NSText`
 /// first responder, and `SpaceKey.route` hands Space to the transport for any
@@ -29,6 +32,13 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
     /// A click on a pause token (spec §11 TX-34); nil when a person's clear
     /// dropped it. Never a rebuild's re-mapping.
     var onSelectPause: ((Int?) -> Void)?
+    /// Esc with nothing selected (spec §11 TX-37 (e)): true when the pane
+    /// took it, to close the find bar.
+    var onEscape: (() -> Bool)?
+    /// Find's matches and the current one (TX-37), drawn by `+Find`; set only
+    /// through `setFind`.
+    var findMatches: [TranscriptFind.Match] = []
+    var findCurrent: Int?
     /// The clock the 3 s follow pause reads (TX-22). Internal: a probe sets it.
     var now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
 
@@ -60,6 +70,24 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
     private(set) var pauseRanges: [NSRange] = []
     private(set) var pauseSelection: Int?
     var highlighted: Int?
+    /// Whether every paragraph is laid out in one run from the top, so the
+    /// view's height is the text's own (TX-37 (d), #583). False from a
+    /// rebuild or a width change until `layOutAll()` has run.
+    var laidOutWhole = false
+    /// The pending idle pass (`scheduleWholeLayout()`), its only owner.
+    var wholeLayoutObserver: CFRunLoopObserver?
+    /// The last rebuild's or width change's anchor, kept for the idle pass:
+    /// the top token, its offset from the visible top as it was BEFORE the
+    /// rebuild or the width change (#593), and the clip's y after that one's
+    /// own restore.
+    var wholeLayoutAnchor: (token: Int, offset: CGFloat, clipY: CGFloat)?
+    /// Whether a rebuild schedules the idle pass. Internal: a probe clears it
+    /// to keep a view whose far text is an estimate.
+    var laysOutWhenIdle = true
+    /// Calls of `layOut(through:)` and idle passes run. Internal: a probe
+    /// reads them.
+    var layoutSteps = 0
+    var wholeLayouts = 0
     /// The timecode style the last `show` used, for a restyle.
     private var shownStyle: (fps: Fps, frames: Bool)?
     private var observed: [NSObjectProtocol] = []
@@ -82,6 +110,7 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
 
     deinit {
         for token in observed { NotificationCenter.default.removeObserver(token) }
+        if let pending = wholeLayoutObserver { CFRunLoopObserverInvalidate(pending) }
     }
 
     override var isFlipped: Bool { true }
@@ -93,7 +122,9 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
     /// Lays `tokens` out, keeping the top visible token's identity at its
     /// offset from the visible top, else the nearest later start; with them
     /// `pauses` (TX-34), a selected pause re-mapped by the identities of the
-    /// tokens on its two sides.
+    /// tokens on its two sides. Only the viewport is laid out here; the rest
+    /// follows in idle time (`scheduleWholeLayout()`), re-anchored on the
+    /// same word at the offset it had before this call.
     func show(
         _ tokens: TranscriptTokens, pauses: [TranscriptCut.Pause] = [], fps: Fps, timecodeFrames: Bool
     ) {
@@ -110,6 +141,8 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
             guard after + 1 < model.tokens.count else { return nil }
             return (model.tokens[after].word.id, model.tokens[after + 1].word.id)
         }
+        laidOutWhole = false
+        wholeLayoutAnchor = nil
         model = tokens
         self.pauses = pauses.filter { $0.after + 1 < tokens.tokens.count }
         shownStyle = (fps, timecodeFrames)
@@ -137,7 +170,9 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
             let rect = rects(forToken: index).first
         {
             scroll(to: rect.minY - offset)
+            wholeLayoutAnchor = (index, offset, enclosingScrollView?.contentView.bounds.minY ?? 0)
         }
+        scheduleWholeLayout()
         needsDisplay = true
     }
 
@@ -260,12 +295,39 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
 
     // MARK: - Viewport layout
 
+    /// A new width lays every line out again, so the word at the visible top
+    /// is taken first and kept there (#593): the text is laid out from the
+    /// top through it, as a far scroll does (#558), and it is put back at its
+    /// offset at once, so a divider drag, which no idle pass interrupts,
+    /// shows the same words; then it is the pass's anchor, stamped with the
+    /// clip's y after this arm's own scroll. A rebuild's anchor still waiting
+    /// for its pass, or an earlier step's of the same drag, is the one taken
+    /// (`standingAnchor()`): an autohiding scroller changes the width during
+    /// or right after a rebuild. The viewport goes to the top first: TextKit 2
+    /// lays a viewport out where it is, so one left past the end of the text
+    /// laid out puts the anchor's paragraph there, over its real place
+    /// (measured: word 18,000 of 27,000 at 85,985 pt where a layout from the
+    /// top at the new width puts it at 76,025).
     override func setFrameSize(_ newSize: NSSize) {
         let widthChanged = newSize.width != frame.width
+        let anchor = widthChanged ? standingAnchor() : nil
         super.setFrameSize(newSize)
         if widthChanged {
             fitContainer()
-            layoutViewport()
+            if let anchor {
+                scroll(to: 0)
+                layOut(through: tokenRange(anchor.token))
+            } else {
+                layoutViewport()
+            }
+            if let anchor, let rect = rects(forToken: anchor.token).first {
+                scroll(to: rect.minY - anchor.offset)
+                wholeLayoutAnchor = (
+                    anchor.token, anchor.offset, enclosingScrollView?.contentView.bounds.minY ?? 0
+                )
+            }
+            laidOutWhole = false
+            scheduleWholeLayout()
         }
     }
 
@@ -382,12 +444,18 @@ final class TranscriptView: NSView, NSTextViewportLayoutControllerDelegate {
 
     /// Scrolls the enclosing clip view so `y` is the visible top, clamped.
     func scroll(to y: CGFloat) {
-        guard let scroll = enclosingScrollView else { return }
+        guard let scroll = enclosingScrollView, let target = clampedScroll(y) else { return }
         let clip = scroll.contentView
-        let bottom = max(0, frame.height - clip.bounds.height)
-        clip.scroll(to: NSPoint(x: 0, y: min(max(0, y), bottom)))
+        clip.scroll(to: NSPoint(x: 0, y: target))
         scroll.reflectScrolledClipView(clip)
         layoutViewport()
+    }
+
+    /// Where a scroll to `y` would come to rest: between the top and the
+    /// view's bottom at the visible bottom. Nil outside a scroll view.
+    func clampedScroll(_ y: CGFloat) -> CGFloat? {
+        guard let clip = enclosingScrollView?.contentView else { return nil }
+        return min(max(0, y), max(0, frame.height - clip.bounds.height))
     }
 
     /// Sets the word selection; a range clears the pause selection.

@@ -224,10 +224,13 @@ do {
             previous = pts
             lastFrameEnd = now()
         }
-        readSize = [picture.width, picture.height]
         let ks = served(pts, after: previous)
         guard !ks.isEmpty else { return }
-        let faces = try analyse(picture)
+        // The picture is made only for a served frame (#437).
+        let faces = try picture.picture { made in
+            readSize = [made.width, made.height]
+            return try analyse(made)
+        }
         for k in ks { samples[k] = (pts, faces) }
     }
 } catch { die("read: \(error.localizedDescription)") }

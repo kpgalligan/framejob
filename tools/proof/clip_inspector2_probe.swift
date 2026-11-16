@@ -139,13 +139,17 @@ for (key, want) in kinds {
 
 let picture = ["video.shadow", "video.filters", "video.reflection", "video.spotlight",
                "video.obscure"]
+// The Picture tab as `ClipPane.makeSections()` lists it today: `video.behind_subject` and
+// `video.hide_silent` on every picture, `video.layout` and `video.cutout` on a media clip.
 let expected: [(String, ClipSubTab, [String])] = [
     ("text", .text, ["text.content", "text.font", "text.style", "text.outline",
                      "text.backdrop", "text.box", "text.animation", "text.presets"]),
-    ("text", .picture, ["video.transform"] + picture),
-    ("text", .clip, ["clip.timing", "video.motion"]),
-    ("av", .picture, ["video.transform", "video.crop", "video.corner", "video.chroma"]
+    ("text", .picture, ["video.transform", "video.behind_subject", "video.hide_silent"]
         + picture),
+    ("text", .clip, ["clip.timing", "video.motion"]),
+    ("av", .picture, ["video.transform", "video.behind_subject", "video.layout",
+                      "video.hide_silent", "video.crop", "video.corner", "video.chroma",
+                      "video.cutout"] + picture),
     ("av", .color, ["video.light", "video.color", "video.wheels", "video.curves", "video.look"]),
     ("av", .sound, ["audio.volume", "audio.fades", "audio.duck", "audio.isolation",
                     "audio.voice", "audio.channels", "audio.eq", "audio.hum", "audio.noise",
@@ -201,7 +205,7 @@ if let (document, controller) = editor("av", select: [2]) {
             + "\(document.selectedAction.map { "\($0)" } ?? "nil")")
 }
 
-// MARK: - T4 the two renamed titles
+// MARK: - T4 the renamed titles
 
 func title(_ key: String, _ tab: ClipSubTab, _ id: String) -> String? {
     guard let pane = clipPane(key, select: [2]) else { return nil }
@@ -214,6 +218,9 @@ check("T4 video.motion is titled \"Motion presets\"", motion == "Motion presets"
       "\(motion ?? "nil")")
 let reveal = title("text", .text, "text.animation")
 check("T4 text.animation is titled \"Reveal\"", reveal == "Reveal", "\(reveal ?? "nil")")
+// Spec §11 #526 as extended by #541: the id keeps its spelling, the title does not.
+let leveler = title("av", .sound, "audio.leveller")
+check("T4 audio.leveller is titled \"Leveler\"", leveler == "Leveler", "\(leveler ?? "nil")")
 
 // MARK: - T5 the badge count
 

@@ -82,10 +82,10 @@ FILTERS_CLAUSE = ("filters (an ARRAY of {kind, amount}, at most 4; sepia, noir, 
                   "apply in list order, after blur, sharpen and pixelate, which apply first wherever "
                   "they sit — kind is ")
 LOG_TIP = "How this file's log footage is converted to the project's color"
-COLOR_SENTENCE = ("Sets how a video file's camera log footage is converted to the project's colour, "
+COLOR_SENTENCE = ("Sets how a video file's camera log footage is converted to the project's color, "
                   "Rec. 709 or HLG in an HDR project — the Media tab's Camera Log popup.")
 QUALIFIER_HINT = "Click to pick the color to qualify · Esc to cancel"
-PICK_TIP = "Click the preview to centre the ranges on a color (Esc cancels)"
+PICK_TIP = "Click the preview to center the ranges on a color (Esc cancels)"
 KEY_HINT = "Click to pick the key color · Esc to cancel"
 HUE_OFF = {"video": {"qualifier": {"hue": None}}}
 

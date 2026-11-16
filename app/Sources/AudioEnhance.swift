@@ -41,8 +41,6 @@ enum AudioEnhance {
     static let minimumSpeechSteps = 100
     /// 0.5 s of pause: under it there is no floor.
     static let minimumPauseSteps = 50
-    /// Noise reduction's amount where isolation cannot serve the clip.
-    static let noiseReductionAmount = 0.5
 
     /// One clip's measurements (AU-61), before any rule.
     struct Measurement: Equatable {
@@ -60,8 +58,6 @@ enum AudioEnhance {
         let sibilantShare: Double
         /// The median speech-step true peak, dBFS.
         let peakMedianDB: Double
-        /// Every segment of the clip `IsolationCache.isolatable`.
-        let isolatable: Bool
         /// The speech's short-term loudness range, LU (AU-67); nil under 3 s.
         let speechRangeLU: Double?
 
@@ -146,7 +142,7 @@ enum AudioEnhance {
                 for: id, snapshot: snapshot, segments: segments, loader: loader)
             guard case .reading(let loudness) = answer else {
                 if answer == .pending {
-                    skip(id, "is still being analysed — its loudness has not been measured "
+                    skip(id, "is still being analyzed — its loudness has not been measured "
                         + "yet. Try again in a moment.")
                 } else {
                     problems.append(
@@ -171,15 +167,12 @@ enum AudioEnhance {
             guard let media = snapshot.media(mediaID),
                 let spans = media.speech ?? speechSpans(media, cache: document.cacheDirectory)
             else {
-                skip(id, "is still being analysed — its speech has not been detected yet. Try "
+                skip(id, "is still being analyzed — its speech has not been detected yet. Try "
                     + "again in a moment.")
                 continue
             }
             let mask = speechMask(sources: loudness.stepSources, spans: spans)
-            guard
-                let measurement = measure(
-                    loudness, speech: mask, isolatable: own.allSatisfy(IsolationCache.isolatable))
-            else {
+            guard let measurement = measure(loudness, speech: mask) else {
                 skip(id, "has under 1 s of speech over the part of it that plays, too little "
                     + "to measure a voice from.")
                 continue
@@ -217,9 +210,7 @@ enum AudioEnhance {
 
     /// AU-61's figures from a reading and its speech mask; nil without a
     /// loudness or under `minimumSpeechSteps` of speech.
-    static func measure(_ reading: ClipLoudness.Reading, speech: [Bool], isolatable: Bool)
-        -> Measurement?
-    {
+    static func measure(_ reading: ClipLoudness.Reading, speech: [Bool]) -> Measurement? {
         guard let lufs = reading.lufs else { return nil }
         let count = min(reading.steps.count, reading.stepPeaks.count, speech.count)
         var speechPeaks: [Double] = []
@@ -244,7 +235,7 @@ enum AudioEnhance {
             pauseSteps: pauseLevels.count, floorLUFS: floored ? median(pauseLevels) : nil,
             pausePeakMedianDB: floored ? median(pausePeaks) : nil,
             sibilantShare: Double(sibilant) / Double(speechPeaks.count),
-            peakMedianDB: median(speechPeaks), isolatable: isolatable,
+            peakMedianDB: median(speechPeaks),
             speechRangeLU: speechRange(steps: reading.steps, speech: speech))
     }
 
@@ -273,19 +264,12 @@ enum AudioEnhance {
                 let measured = "the pauses' floor is \(lufs(floor)), \(db(gap)) under the "
                     + "voice's \(lufs(m.lufs))"
                 if gap > noisyGapDB {
-                    if m.isolatable {
-                        patch.isolation = IsolationCache.defaultAmount
-                        patch.noiseReduction = 0
-                        reasons.append("Noise: \(measured), above the \(db(noisyGapDB)) line, "
-                            + "so voice isolation at \(percent(IsolationCache.defaultAmount)) "
-                            + "and noise reduction off.")
-                    } else {
-                        patch.noiseReduction = noiseReductionAmount
-                        patch.isolation = 0
-                        reasons.append("Noise: \(measured), above the \(db(noisyGapDB)) line; "
-                            + "isolation cannot serve this clip at its speed, so noise "
-                            + "reduction at \(percent(noiseReductionAmount)).")
-                    }
+                    // Isolation serves a clip at any speed (AU-55 as amended).
+                    patch.isolation = IsolationCache.defaultAmount
+                    patch.noiseReduction = 0
+                    reasons.append("Noise: \(measured), above the \(db(noisyGapDB)) line, "
+                        + "so voice isolation at \(percent(IsolationCache.defaultAmount)) "
+                        + "and noise reduction off.")
                     let opens = (m.pausePeakMedianDB ?? -.infinity) + gateAbovePausePeakDB - m.lufs
                     let threshold = min(
                         max(opens.rounded(), gateThresholdRange.lowerBound),
@@ -339,7 +323,8 @@ enum AudioEnhance {
     }
 
     /// Each choice as a measurement job (AU-64 (b)): the clip's cache
-    /// reading carrying the chosen limiter and its current volume, rendered
+    /// reading carrying the chosen limiter, its current volume and its own
+    /// limiter (the keep rule's, AU-64 (f), #400), rendered
     /// through the chosen settings.
     static func jobs(_ input: Input, _ choices: [Choice]) -> [LoudnessMeasureRun.Job] {
         choices.compactMap { choice in
@@ -351,7 +336,8 @@ enum AudioEnhance {
                 reading: AudioNormalize.LoudnessReading(
                     clip: choice.clip, media: choice.media, lufs: m.lufs, truePeak: m.truePeak,
                     steps: reading.loudness.steps, stepPeaks: reading.loudness.stepPeaks,
-                    limiter: choice.limiter, currentVolume: reading.current.volume),
+                    limiter: choice.limiter, currentVolume: reading.current.volume,
+                    currentLimiter: reading.current.limiter),
                 chain: choice.patch)
         }
     }
@@ -360,10 +346,11 @@ enum AudioEnhance {
     /// AU-64): each choice's patch with its solve's volume and limiter, one
     /// `set_audio` per clip; a clip the run skipped is under `skipped`. Pure.
     /// A non-finite target falls back to the default and is reported as
-    /// `targetLUFS`.
+    /// `targetLUFS`. `endLimiters`, the clips an action's end turns a
+    /// limiter on for, shape the loudness reason (AU-168 (d)).
     static func plan(
         _ input: Input, choices: [Choice], outcome: LoudnessMeasureRun.Outcome,
-        targetLUFS: Double
+        targetLUFS: Double, endLimiters: Set<UInt32>
     ) -> Plan {
         let target = targetLUFS.isFinite ? targetLUFS : AudioNormalize.defaultTargetLUFS
         let solved = AudioNormalize.plan(outcome.input, targetLUFS: target, solved: outcome.solved)
@@ -376,7 +363,9 @@ enum AudioEnhance {
             var patch = choice.patch
             patch.limiter = .some(result.limiter ?? choice.limiter)
             patch.volume = result.volume
-            let loudness = loudnessReason(result, limiter: choice.limiter, target: target)
+            let loudness = loudnessReason(
+                result, limiter: choice.limiter, target: target,
+                endLimiter: endLimiters.contains(choice.clip))
             ops.append(.setAudio(clips: [choice.clip], patch: patch))
             rows.append(
                 Row(
