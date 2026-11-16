@@ -7,7 +7,7 @@ This handoff moves the documentation site (`docs/site/`) from the old Boppa Llew
 - **Type:** Geist for text, Geist Mono for eyebrows, code, keys and versions. No serif anywhere.
 - **Colour:** neutral greys, with the logo green as the one accent. The app icons and the company mark supply the rest of the colour.
 - **Shape:** 6/10/16 px corners. Hairlines separate things; shadows are limited to a 1 px card shadow and the screenshot window.
-- **Brand:** the company mark (three toy blocks) and the name in the header, with the product after it: **Boppa Llewyn / Frame Job**.
+- **Brand:** the company mark (three toy blocks) and the name in the header, with the product after it as its wordmark: **Boppa Llewyn / Frame Job**, where "Frame Job" is the outlined wordmark with the coral playhead.
 
 Decisions confirmed by the owner:
 
@@ -32,6 +32,7 @@ Not yet confirmed: which palette ships. This handoff ships **Neutral Light** for
 | `Docs Theme.html` | **The spec.** Content page (Split clips) and splash, light and dark, desktop and phone. |
 | `tokens.css` | Every colour, shadow, spacing, radius and font token as `--bl-*` custom properties: Neutral Light under `[data-theme='light']`, Neutral Dark under `[data-theme='dark']`, the three alternate palettes at the end. Generated from the design system; copy it into the site whole rather than retyping values. The type scale is in its closing comment. |
 | `assets/boppa-llewyn-blocks.svg` | The company mark, 1024 × 1024 on the cream app-icon plate. |
+| `assets/frame-job-wordmark.svg` | Frame Job's wordmark: the name in outlined Geist 650 at −0.04em with the coral playhead. The letters are `fill="currentColor"`; the viewBox is 1140 units tall at 1000 units per em, with the baseline 40 units above the bottom. The same artwork as the company website's. |
 
 ## What changes, file by file
 
@@ -44,13 +45,26 @@ All paths are under `docs/site/`.
 | `src/fonts/font-face.css`, `public/fonts/` | Cormorant Garamond and IBM Plex removed; Geist and Geist Mono added (below). |
 | `astro.config.mjs` | `logo` points at the blocks mark; the two `preload` links name the Geist files; `expressiveCode.styleOverrides` follow "Code blocks". |
 | `src/assets/boppa-llewyn-blocks.svg` | New: copied from this folder. `src/assets/logo.svg` (the Frame Job mark) stays, for the splash hero and anywhere the product is shown. |
-| `src/components/SiteTitle.astro` | The lockup (below). |
+| `src/assets/frame-job-wordmark.svg` | New: copied from this folder. |
+| `src/components/SiteTitle.astro` | The lockup (below), with the wordmark in place of the site title. |
+| `src/components/Hero.astro` | The splash title renders the wordmark in place of the text (below). |
 | `src/components/Shot.astro` | One new optional prop, `frame`, for full-window captures (below). |
 | `src/content/docs/index.mdx` | The editor-window `Shot` gains `frame`. No other content changes. |
 | `README.md` ("Theme") | Rewritten to describe the new system: the families, the palette pair, the files. |
 | `CLAUDE.md` | The `src/fonts/, public/fonts/` row names the new faces, if it names them. |
 
-`ThemeSelect.astro`, `PageTitle.astro` and `Hero.astro` keep their markup; they change through CSS only. `public/favicon.svg` stays the Frame Job icon, because the tab belongs to the product.
+`ThemeSelect.astro` and `PageTitle.astro` keep their markup; they change through CSS only. `public/favicon.svg` stays the Frame Job icon, because the tab belongs to the product.
+
+## Product wordmark
+
+The product name in the header and on the splash is the app's wordmark, not live text: Geist 650, outlined, with the coral piece of the app's icon. For Frame Job that's the playhead, set between "Frame" and "Job". It's the same artwork as the company website uses for its Frame Job page and card.
+
+- **Inline it, don't use `<img>`.** Import the file raw (`import wordmark from '../assets/frame-job-wordmark.svg?raw'`) and inline it with `set:html`, so the letters' `fill="currentColor"` follows the text colour in both looks. The playhead stays `#f4653f`.
+- **Strip and hide.** Before inlining, remove the file's `<title>`, `role`, `aria-label`, `width` and `height`, and add `aria-hidden="true" focusable="false"`. Put the name beside it in a visually hidden span, so the link's and the heading's accessible names stay "Frame Job": `<span class="product-wordmark"><span class="sr-only">Frame Job</span>{svg}</span>`.
+- **Size and baseline:** `.product-wordmark svg { display: inline-block; height: 1.14em; width: auto; vertical-align: -0.04em; margin-top: -0.1em; overflow: visible; }`, with `.product-wordmark { position: relative; display: inline-block; }`. It takes the font size of whatever holds it (17 px in the lockup, 64 px on the splash) and sits on that line's baseline. Its caps are as tall as Geist's at the same size, and the playhead rises 0.25em above them. Starlight already ships an `sr-only` class.
+- **Never** retype it in live text, recolour the playhead or retrack it. Below a 14 px font size, use the name in text.
+
+The company website's handoff, `designs/design_handoff_product_wordmarks/` in the website repository, has the full rules, the other apps' wordmarks and a ready-made Astro component.
 
 ## Fonts
 
@@ -130,7 +144,7 @@ Hairlines are `--bl-line`; a hover strengthens a border to `--bl-line-strong`. N
 
 **Header** (64 px). Solid `--bl-surface` with a `--bl-line` bottom border, no blur. Gaps of 24 px.
 
-- **Lockup** (`SiteTitle.astro`): the blocks mark at 32 px, then **Boppa Llewyn** in Geist 600 17 / 24 px at −0.02em, a `/` in `--bl-ink-subtle` weight 400, the site title (**Frame Job**) in weight 500, and the version badge. Gap 8 px. The badge is mono 500 12 / 16 px, `--bl-ink-subtle`, padding 2 px 8 px, pill-shaped, drawn with an inset 1 px `--bl-line-strong` ring. Below 50rem the company name and the slash hide, leaving the mark, **Frame Job** and the badge. The lockup still links to the docs home.
+- **Lockup** (`SiteTitle.astro`): the blocks mark at 32 px, then **Boppa Llewyn** in Geist 600 17 / 24 px at −0.02em, a `/` in `--bl-ink-subtle` weight 400, the Frame Job wordmark at 17 px ("Product wordmark", below), and the version badge. Gap 8 px. The badge is mono 500 12 / 16 px, `--bl-ink-subtle`, padding 2 px 8 px, pill-shaped, drawn with an inset 1 px `--bl-line-strong` ring. Below 50rem the company name and the slash hide, leaving the mark, the wordmark and the badge. The lockup still links to the docs home.
 - **Search** (desktop): a 260 × 36 px field on `--bl-surface-sunken` with a `--bl-line` border, `--bl-radius-md`, the placeholder in `--bl-ink-subtle` 14 px, and the ⌘K keys as small `kbd` (20 px tall). Below 50rem it's a 36 px icon button.
 - **Theme toggle and GitHub link**: 36 px square ghost buttons, `--bl-radius-md`, icon in `--bl-ink-muted`; hover `--bl-surface-sunken` with `--bl-ink`. The toggle keeps its two-state behaviour and its storage key.
 - **Menu button** (below 50rem): the same 36 px ghost button, keeping the 44 px hit area the current CSS gives it.
@@ -205,7 +219,7 @@ Keep the two syntax themes (`github-light`, `github-dark-default`) and `useStarl
 - **Hero band**: full viewport width on `--bl-band`, with text in `--bl-on-band`. One way to bleed past the content width is `box-shadow: 0 0 0 100vmax var(--bl-band); clip-path: inset(0 -100vmax)` on `.hero`.
   - Content stays in the 1120 px container (`--bl-content-width`), padded 96 px top and bottom (64 px and 16 px sides below 50rem).
   - Two columns, `1fr 192px`, 48 px apart. The Frame Job mark (the existing hero image) shows at 192 px, and above the text at 96 px below 50rem.
-- **Hero text**: the eyebrow is `eyebrow` in `--bl-on-band` at 80% opacity; the title is `display`; the tagline is `lede` in `--bl-on-band` at 86% opacity, at most 34em wide, 24 px below the title; the actions sit 32 px below it, 12 px apart.
+- **Hero text**: the eyebrow is `eyebrow` in `--bl-on-band` at 80% opacity; the title is the wordmark at the `display` size, 64 px (40 px below 50rem); the tagline is `lede` in `--bl-on-band` at 86% opacity, at most 34em wide, 24 px below the title; the actions sit 32 px below it, 12 px apart.
 - **Below the hero**: 64 px down, the framed editor-window Shot at the full container width. Then the requirements paragraph in `--bl-ink-muted`, 680 px wide, 48 px below. Then "Start here" as an `h2` with a `--bl-line` rule and 64 px above it, and the link cards in two columns (one below 50rem).
 
 **Focus**. One rule everywhere: `outline: 2px solid var(--bl-focus); outline-offset: 2px`. It replaces the current two-ring box shadow and holds 3:1 on every surface in both looks.
@@ -216,7 +230,7 @@ Keep the two syntax themes (`github-light`, `github-dark-default`) and `useStarl
 
 ## Doctored's site
 
-`boppa-llewyn.css` is shared rule for rule with Doctored's documentation site (`public-docs/src/styles/custom.css` in the Doctored repository), and its header says to change both together. This handoff covers Frame Job only. Port the finished file to Doctored in a change of its own; until then, the two sites look different. Doctored's lockup reads **Boppa Llewyn / Doctored** with the same mark.
+`boppa-llewyn.css` is shared rule for rule with Doctored's documentation site (`public-docs/src/styles/custom.css` in the Doctored repository), and its header says to change both together. This handoff covers Frame Job only. Port the finished file to Doctored in a change of its own; until then, the two sites look different. Doctored's lockup reads **Boppa Llewyn / Doctored**, with the same mark and Doctored's own wordmark (its coral pulse).
 
 ## Out of scope
 
