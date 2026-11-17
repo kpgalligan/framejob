@@ -1,18 +1,19 @@
 ---
 /* Boppa Llewyn header lockup, as on Doctored's site: the company mark (three toy blocks), the
-   company's name, a slash, the product's name and a mono version badge — "Boppa Llewyn / Frame
-   Job v0.3". Below 50rem the company's name and the slash hide. Starlight's own SiteTitle renders
+   company's name, a slash, the product's wordmark and a mono version badge — "Boppa Llewyn /
+   Frame Job v0.3". Below 50rem the company's name and the slash hide. Starlight's own SiteTitle renders
    the logo image and the title text only, and cannot carry the rest. */
 import { Image } from 'astro:assets';
 import { logos } from 'virtual:starlight/user-images';
 import { APP_VERSION } from '../site';
+import ProductWordmark from './ProductWordmark.astro';
 
 /* The mark is an SVG drawn on a 1024px square: the header shows it at 32px, and one file serves
    every pixel density, so it takes no `densities`. Its alt is empty because the company's name
    follows it as text. */
 const iconAttrs = { width: 32, height: 32, alt: '' };
 
-const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
+const { siteTitleHref } = Astro.locals.starlightRoute;
 ---
 
 <a href={siteTitleHref} class="site-title sl-flex">
@@ -30,9 +31,7 @@ const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
   <span class="sep" aria-hidden="true">
     /
   </span>
-  <span class="wordmark" translate="no">
-    {siteTitle}
-  </span>
+  <ProductWordmark />
   <span class="version" translate="no">
     v{APP_VERSION}
   </span>
@@ -63,11 +62,6 @@ const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
     .sep {
       color: var(--bl-ink-subtle);
       font-weight: 400;
-    }
-
-    .wordmark {
-      overflow: hidden;
-      font-weight: 500;
     }
 
     .version {

@@ -1,0 +1,43 @@
+---
+/* Frame Job's wordmark: the name in outlined Geist 650 with the coral playhead, inlined so the
+   letters' `fill="currentColor"` takes the surrounding text colour in both looks. It takes the
+   font size of whatever holds it and sits on that line's baseline. The SVG is hidden from
+   assistive technology and the name is beside it as hidden text, so a link's or heading's
+   accessible name stays "Frame Job". Never retype it in live text, recolour the playhead or
+   retrack it; below a 14px font size, use the name in text. */
+import raw from '../assets/frame-job-wordmark.svg?raw';
+
+/** The product's name, read by assistive technology in place of the artwork. */
+const NAME = 'Frame Job';
+
+/* The file's own <title>, role, aria-label, width and height go; the root tag gains
+   aria-hidden and focusable. The size comes from the CSS below, never from the file. */
+const svg = raw
+  .replace(/<title>[\s\S]*?<\/title>/, '')
+  .replace(/<svg\b[^>]*>/, (tag) =>
+    tag
+      .replace(/\s(?:role|aria-label|width|height)="[^"]*"/g, '')
+      .replace(/>$/, ' aria-hidden="true" focusable="false">'),
+  );
+---
+
+<span class="product-wordmark" translate="no">
+  <span class="sr-only">{NAME}</span>
+  <Fragment set:html={svg} />
+</span>
+
+<style>
+  .product-wordmark {
+    position: relative;
+    display: inline-block;
+  }
+
+  .product-wordmark :global(svg) {
+    display: inline-block;
+    height: 1.14em;
+    width: auto;
+    vertical-align: -0.04em;
+    margin-top: -0.1em;
+    overflow: visible;
+  }
+</style>

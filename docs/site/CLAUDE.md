@@ -12,11 +12,14 @@ sidebar.mjs             every page's place in the navigation, in order
 src/content/docs/       the pages: <section>/<page>.mdx
 src/data/features.json  THE FEATURE LIST: what /features/ renders and what the proof reads
 src/components/         AtAGlance (a page's facts), Shot (a screen in both looks),
-                        FeatureIndex (the filterable list); SiteTitle, ThemeSelect,
-                        PageTitle and Hero are the theme's Starlight overrides
+                        FeatureIndex (the filterable list), ProductWordmark (Frame Job's
+                        outlined wordmark, inlined); SiteTitle, ThemeSelect, PageTitle and
+                        Hero are the theme's Starlight overrides
 src/assets/screens/     WebP captures, written only by scripts/import-screens.mjs
-src/assets/             logo.svg (the Frame Job mark, the splash hero) and
-                        boppa-llewyn-blocks.svg (the company mark, the header)
+src/assets/             logo.svg (the Frame Job mark, the splash hero),
+                        boppa-llewyn-blocks.svg (the company mark, the header) and
+                        frame-job-wordmark.svg (the product's wordmark, the header and the
+                        splash title; copied from the handoff, never retyped as text)
 src/styles/             tokens.css (the design system's --bl-* tokens, copied whole from the
                         handoff), boppa-llewyn.css (the theme, shared with Doctored's site)
                         and frame-job.css (this site's components in it); README "Theme"
