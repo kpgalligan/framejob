@@ -300,8 +300,9 @@ extension AgentServer {
     // MARK: - Catalog
 
     func transcriptViewTool() -> [String: Any] {
-        tool(
-            "transcript_view",
+        // The description and the properties are typed lets: as one expression inside `tool(`,
+        // Xcode 26.6's compiler could not type-check them in reasonable time.
+        let description: String =
             "DEV TOOL (absent from Distribution builds). What a project's Transcript tab shows "
                 + "(spec §11 TX-23, TX-27), after optionally setting its bar's Words from and "
                 + "Language, pressing its Read, focusing its view, selecting tokens and clicking "
@@ -329,57 +330,60 @@ extension AgentServer {
                 + "select_pause together with words_from or language, read together with "
                 + "words_from or language, "
                 + "stop_after while Stop is not shown, and read while Read is not shown."
-                + Self.transcriptFindProse,
-            Self.transcriptFindProperties.merging([
-                "focus": [
-                    "type": "boolean",
-                    "description": "true makes the transcript view first responder, as a click "
-                        + "in it does.",
-                ],
-                "select": [
-                    "type": ["array", "null"], "items": ["type": "integer"],
-                    "minItems": 2, "maxItems": 2,
-                    "description": "[first, last] token indices, inclusive, to select as a "
-                        + "person does (the selection widened, its cut made the in/out range); "
-                        + "null clears the selection.",
-                ],
-                "click": [
-                    "type": "integer", "minimum": 0,
-                    "description": "A token index to click: it alone is selected and the "
-                        + "playhead moves to its frame-snapped start, playback going on if it "
-                        + "was playing.",
-                ],
-                "select_pause": [
-                    "type": "integer", "minimum": 0,
-                    "description": "A pause token's index (pauses[].index) to click: the word "
-                        + "selection is cleared, the pause selected, its cut made the in/out range "
-                        + "and the playhead moved to the cut's start.",
-                ],
-                "wait": [
-                    "type": "number", "minimum": 0, "maximum": 60,
-                    "description": "Seconds (0–60, default 0) to wait for the tab's source to "
-                        + "settle before answering.",
-                ],
-                "words_from": [
-                    "type": ["integer", "null"],
-                    "description": "The bar's Words from: a track id of the edited container, "
-                        + "or null for All tracks.",
-                ],
-                "language": [
-                    "type": ["string", "null"],
-                    "description": "The bar's Language: an installed recognition language "
-                        + "(en-US, en, or its name), or null for Automatic, the Mac's default.",
-                ],
-                "stop_after": [
-                    "type": "number", "minimum": 0, "maximum": 60,
-                    "description": "Seconds (0–60) after the answer at which the bar's Stop is "
-                        + "pressed through its own path; refused while Stop is not shown.",
-                ],
-                "read": [
-                    "type": "boolean",
-                    "description": "true presses the bar's Read, shown after Stop.",
-                ],
-            ]) { own, _ in own })
+                + Self.transcriptFindProse
+        let own: [String: Any] = [
+            "focus": [
+                "type": "boolean",
+                "description": "true makes the transcript view first responder, as a click "
+                    + "in it does.",
+            ],
+            "select": [
+                "type": ["array", "null"], "items": ["type": "integer"],
+                "minItems": 2, "maxItems": 2,
+                "description": "[first, last] token indices, inclusive, to select as a "
+                    + "person does (the selection widened, its cut made the in/out range); "
+                    + "null clears the selection.",
+            ],
+            "click": [
+                "type": "integer", "minimum": 0,
+                "description": "A token index to click: it alone is selected and the "
+                    + "playhead moves to its frame-snapped start, playback going on if it "
+                    + "was playing.",
+            ],
+            "select_pause": [
+                "type": "integer", "minimum": 0,
+                "description": "A pause token's index (pauses[].index) to click: the word "
+                    + "selection is cleared, the pause selected, its cut made the in/out range "
+                    + "and the playhead moved to the cut's start.",
+            ],
+            "wait": [
+                "type": "number", "minimum": 0, "maximum": 60,
+                "description": "Seconds (0–60, default 0) to wait for the tab's source to "
+                    + "settle before answering.",
+            ],
+            "words_from": [
+                "type": ["integer", "null"],
+                "description": "The bar's Words from: a track id of the edited container, "
+                    + "or null for All tracks.",
+            ],
+            "language": [
+                "type": ["string", "null"],
+                "description": "The bar's Language: an installed recognition language "
+                    + "(en-US, en, or its name), or null for Automatic, the Mac's default.",
+            ],
+            "stop_after": [
+                "type": "number", "minimum": 0, "maximum": 60,
+                "description": "Seconds (0–60) after the answer at which the bar's Stop is "
+                    + "pressed through its own path; refused while Stop is not shown.",
+            ],
+            "read": [
+                "type": "boolean",
+                "description": "true presses the bar's Read, shown after Stop.",
+            ],
+        ]
+        return tool(
+            "transcript_view", description,
+            Self.transcriptFindProperties.merging(own) { kept, _ in kept })
     }
 }
 #endif
