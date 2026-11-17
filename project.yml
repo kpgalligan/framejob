@@ -163,7 +163,7 @@ targets:
         NSPrincipalClass: NSApplication
         NSHighResolutionCapable: true
         ATSApplicationFontsPath: Fonts
-        NSHumanReadableCopyright: ""
+        NSHumanReadableCopyright: "Copyright © 2026 Boppa Llewyn."
         # Sparkle's feed and EdDSA public key (spec §11 PUB-6, PUB-8): set in
         # Distribution alone, empty in Debug and Release (PUB-7). No
         # SUEnableAutomaticChecks and no SUAutomaticallyUpdate: Sparkle's own

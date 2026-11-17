@@ -470,6 +470,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** did the Contribute window wait behind the app you were using without interrupting it, and was it clear on return why it was there?
 - **Source:** Contribute, in the code Tips (spec §11 TIP-4, TIP-8; `tips_proof.py` W4, L4, L5).
 
+**CH-11 — The Welcome lockup's wordmark**
+- **Do:** 1. Close every project so Welcome shows, in the light appearance. 2. Look at the lockup, then switch to the dark appearance and look again. 3. Turn VoiceOver on (⌘F5), move to the lockup with VO-→ and listen; turn it off. 4. Open Frame Job ▸ About Frame Job.
+- **Expect:** 1–2. Under the mark, "Frame Job" in a heavy sans with a red playhead standing between the two words, centred under the mark, about as wide and as far below it as the old type; the letters black in light and white in dark, the playhead red in both, no edges or holes where letters touch. 3. VoiceOver says "Frame Job" once, as text, never "image", and the mark is skipped. 4. The About panel shows the mark and, under the version, "Copyright © 2026 Boppa Llewyn."
+- **Answer:** does the wordmark sit right under the mark in both appearances, and match the documentation site's header? What did VoiceOver say, word for word? What did the About panel's copyright read?
+- **Source:** spec §11 NM-16 (`designs/design_handoff_app_brand/`); `tools/proof/wordmark_proof.py` W2–W6 measure the size, the spacing, the accessibility element and the colours, not how it looks or what VoiceOver says.
+
 ## Sound and export
 
 **SE-1 — M3's inspector sections and sheets**

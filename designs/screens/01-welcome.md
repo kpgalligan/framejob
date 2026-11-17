@@ -13,7 +13,8 @@ a person sees after launching it. From here they start work — by opening a vid
 starting an empty project, or recording the screen.
 
 Top to bottom, centred on a dark ground: the Frame Job mark (four green corner
-brackets round a yellow frame, a red playhead through it), "Frame Job" in large type, the
+brackets round a yellow frame, a red playhead through it), "Frame Job" set in its
+wordmark (a heavy sans with a red playhead standing between the two words), the
 line "Open a file. Start cutting.", and a two-line note that opening a movie makes
 an untitled project at the movie's own size and rate, with the file as the first
 clip on Track 1. Below that sit three square buttons: "Open Video…" (filled
@@ -24,7 +25,7 @@ PNG, JPEG and HEIC.
 This capture has no list of recent projects: the proof instance is launched with
 recent documents turned off, so that part of the window is absent here.
 
-In the light capture the ground is white, the wordmark black, and the tagline and
+In the light capture the ground is white, the wordmark's letters black (its playhead stays red), and the tagline and
 note dark grey; "New Project" and "New Recording…" are white square buttons with
 a thin black outline and no shadow, "Open Video…" a flat blue block, and the
 file-type row is light grey.

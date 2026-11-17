@@ -128,18 +128,17 @@ final class BrandMarkView: NSView {
 
 // MARK: - BrandLockupView
 
-/// The stacked lockup: the mark 88 tall, a 14pt gap, then "Frame Job" in
-/// the house display face at 52, both centred.
-/// This is the welcome screen's masthead.
+/// The stacked lockup, the welcome screen's masthead (spec §11 NM-16): the mark 88 tall, then
+/// Frame Job's product wordmark at a 44 pt font size, both centred, the wordmark's cap line
+/// 35 pt below the mark's ink, and the whole 158 pt tall, as the lockup was before.
 ///
-/// A stack view rather than hand-written constraints because the two pieces
-/// have very different widths and only one of them may set the lockup's:
-/// centring them with inequalities lets a text field answer a narrow parent
-/// by wrapping instead of resisting, and the lockup then collapses to the
-/// mark's 88pt with "Frame Job" broken over two lines.
+/// A stack view rather than hand-written constraints because the two pieces have very
+/// different widths and only one of them may set the lockup's. The wordmark is drawn, so it
+/// never wraps; the label it falls back to is held to one line for the same reason.
 final class BrandLockupView: NSStackView {
     static let markSize: CGFloat = 88
-    static let wordSize: CGFloat = 52
+    /// The wordmark's font size: caps 31.2 pt tall and 213 pt wide, the old label's size.
+    static let wordmarkFontSize: CGFloat = 44
 
     /// The clear space the lockup asks for on every side, a fixed 38 pt.
     /// Callers place the lockup with at least this much around it. The value
@@ -147,36 +146,68 @@ final class BrandLockupView: NSStackView {
     /// column's height does not change when the mark does.
     static var clearSpace: CGFloat { 38 }
 
-    /// The gap the handoff specifies, and the `line-height` the mock's
-    /// wordmark sits in — needed together, see `wordmarkTopOffset`.
-    private static let gap: CGFloat = 14
-    private static let mockLineHeight: CGFloat = 0.82
+    /// From the mark's ink (the brackets' foot) down to the wordmark's cap line: where the
+    /// handoff's reference capture puts it (the old label's was 35.5).
+    private static let capLineBelowMarkInk: CGFloat = 35
+    /// The lockup's height before NM-16 (the 88 pt mark, a 0.06 pt gap and the old label's
+    /// 70 pt line), kept so that the Welcome column, which is centred, does not move: the
+    /// shorter wordmark leaves the difference as space below it.
+    static let height: CGFloat = 158
+    /// The mark view's inset below its ink: the design box ends 90 units under the brackets'
+    /// foot (924 against 834 in the SVG's viewBox), scaled from the 824-unit box to the view.
+    private static var markInsetBelowInk: CGFloat { 90 * markSize / BrandMark.designBox }
 
     private let markView = BrandMarkView(size: BrandLockupView.markSize)
-    private let wordmark: NSTextField
 
     init() {
-        let font = DS.display(BrandLockupView.wordSize)
-        wordmark = NSTextField(
-            labelWithAttributedString: NSAttributedString(
-                string: "Frame Job",
-                attributes: [
-                    .font: font,
-                    // -0.015em, the tracking the lockup is drawn with.
-                    .kern: -0.015 * BrandLockupView.wordSize,
-                    .foregroundColor: DS.textStrong,
-                ]))
         super.init(frame: .zero)
 
-        // The mark and the word say the same thing; letting both speak would
-        // make VoiceOver read "Frame Job" twice. The label carries it.
+        // The mark and the wordmark say the same thing; letting both speak would make
+        // VoiceOver read "Frame Job" twice. The wordmark carries it.
         markView.setAccessibilityElement(false)
-        // One line, always — see the class note above.
-        wordmark.maximumNumberOfLines = 1
+
+        let name = "Frame Job"
+        let wordmark: NSView
+        let capLineFromTop: CGFloat
+        let wordmarkHeight: CGFloat
+        if let artwork = WordmarkArtwork.frameJob {
+            let view = ProductWordmarkView(
+                artwork: artwork, name: name, fontSize: BrandLockupView.wordmarkFontSize,
+                textColor: DS.textStrong)
+            capLineFromTop = view.capLineFromTop
+            wordmarkHeight = view.intrinsicContentSize.height
+            wordmark = view
+        } else {
+            // Unreachable while the compiled-in data parses (wordmark_proof.py checks it): the
+            // name as the label it was before NM-16.
+            assertionFailure("Frame Job's wordmark data does not parse")
+            let size: CGFloat = 52
+            let font = DS.display(size)
+            let label = NSTextField(
+                labelWithAttributedString: NSAttributedString(
+                    string: name,
+                    attributes: [
+                        .font: font,
+                        .kern: -0.015 * size,
+                        .foregroundColor: DS.textStrong,
+                    ]))
+            label.maximumNumberOfLines = 1
+            capLineFromTop = font.ascender - font.capHeight
+            wordmarkHeight = label.intrinsicContentSize.height
+            wordmark = label
+        }
 
         orientation = .vertical
         alignment = .centerX
-        spacing = BrandLockupView.wordmarkTopOffset(font)
+        // Set from the named distances, never as their answer (about 9 pt for the wordmark):
+        // the cap line's 36 pt, less what the mark view keeps below its ink and what the
+        // wordmark keeps above its caps. Clamped, since a stack takes no negative spacing.
+        spacing = max(
+            0,
+            BrandLockupView.capLineBelowMarkInk - BrandLockupView.markInsetBelowInk
+                - capLineFromTop)
+        edgeInsets.bottom = max(
+            0, BrandLockupView.height - BrandLockupView.markSize - spacing - wordmarkHeight)
         addArrangedSubview(markView)
         addArrangedSubview(wordmark)
     }
@@ -184,23 +215,5 @@ final class BrandLockupView: NSStackView {
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("BrandLockupView does not support NSCoder")
-    }
-
-    /// The spacing that puts the wordmark where the mock puts it.
-    ///
-    /// The mock measures its 14pt gap to the wordmark's LINE BOX, which its
-    /// `line-height: 0.82` crops to little more than the cap line. An AppKit
-    /// label keeps the face's whole ascent and descent instead, so stacking
-    /// the two boxes 14pt apart would open an optical gap half again as
-    /// large. Give back the half-leading the mock hides — with Darker
-    /// Grotesque at 52 that is 13.9 of the 14, so the two boxes end up all
-    /// but touching and the INK lands 26pt apart, as drawn. Written as the
-    /// subtraction rather than as its answer so it stays right if the size or
-    /// the fallback face changes; clamped at 0 because a face with even more
-    /// leading than this one would ask for a negative stack spacing.
-    private static func wordmarkTopOffset(_ font: NSFont) -> CGFloat {
-        let lineBox = wordSize * mockLineHeight
-        let halfLeading = ((font.ascender - font.descender) - lineBox) / 2
-        return max(0, gap - halfLeading)
     }
 }

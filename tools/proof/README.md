@@ -33625,3 +33625,38 @@ code having changed. The site: `check-pages.mjs` 367 pages and 0 problems, `docs
 0 problems, and `pnpm build` 368 pages with every internal link valid. No mutant was added or
 re-run: the change adds no decision to the app and moves no anchor, and `mutant_anchors.py`
 counts all nineteen as before.
+
+## The Welcome lockup's product wordmark and the About copyright (`wordmark_proof.py`, `wordmark_probe.swift`; nine mutants; spec §11 NM-16)
+
+From the app brand handoff (`designs/design_handoff_app_brand/`). D1 holds the compiled-in path
+data (`ProductWordmark+FrameJob.swift`) equal, token for token, to the handoff's
+`frame-job-wordmark.json`; T1 holds `project.yml`'s copyright line. The probe builds over
+`app/Sources` and measures `WordmarkArtwork.frameJob` (W1), `ProductWordmarkView` at 44 pt
+(W2: 213.136 × 50.16, baseline 48.4, cap line 17.16), `BrandLockupView`'s arrangement, the cap
+line 35 pt below the mark's ink and the lockup's old 158 pt height, each within the 1 pt grid a
+windowless stack rounds to (W3), one accessibility element reading "Frame Job" (W4), the
+letters' and the playhead's colours drawn in Aqua and Dark Aqua (W5), and the nonzero fill where
+the overlapping glyphs make the two winding rules disagree (W6). How it looks and what VoiceOver
+says are CH-11.
+
+    python3 tools/proof/wordmark_proof.py [--only IDS] [--mutant NAME]
+
+Mutants: `data-corrupt` (D1, W1), `baseline-off` (W2), `cap-line-26` and `height-shrinks` (W3),
+`both-speak` and `wordmark-silent` (W4), `coral-letters` (W5), `even-odd` (W6).
+
+Recorded 2026-11-17: 9/9 on the final code, W3 reading the cap line 34.772 pt below the mark's
+ink and the lockup 158.000 pt tall, W6 finding 139 sampled overlap points, all drawn filled; all
+nine mutants caught on their named rows (`both-speak` first written as removing
+`markView.setAccessibilityElement(false)`, which survived because a plain `NSView` is no
+accessibility element by default; it now makes the mark one). The live check, by measuring
+`screens.py --only 01-welcome`'s 2× captures of the Debug app row by row and column by column:
+the first build (cap line 36, the README's figure, and no height kept) put the mark 10 px lower
+and the tagline 10 px higher than the "before" capture, the lockup being 10.7 pt shorter in a
+centred column, and the wordmark 4 px lower against the mark than the handoff's reference; with
+the cap line at 35 and the lockup kept 158 pt tall, every ink band in both looks lands on the
+reference's rows (the mark 221–358, the wordmark 406–492, the tagline 603, the buttons 794–849)
+and the wordmark on its columns (506–931), and the rest on the "before" capture's rows, on Debug and, after `make gate` (PASS, 781 s), on Release (`RC_PROOF_APP=release`), whose light capture is byte-identical to Debug's; `screens.py` 6/6 and no `Frame Job: ` line on both. The
+built Debug app's `NSHumanReadableCopyright` reads "Copyright © 2026 Boppa Llewyn.". This was
+the first build on Xcode 26.6 (macOS SDK 26.5), which needed its Metal Toolchain downloaded and
+`AgentServer+TranscriptView.swift`'s catalog entry split into typed pieces, the new compiler
+timing out on it as one expression; `make typecheck` stayed at the four baseline warnings.

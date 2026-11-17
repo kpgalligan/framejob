@@ -5059,7 +5059,15 @@ under `// MARK: - Frame Job's own pieces (not in Rasterize's copy)` is
 Frame Job's alone (#359): add there, and leave the copied functions' bodies
 as Rasterize has them. `BrandMark.swift` is
 Frame Job's own: the mark of `designs/frame-job/frame-job-icon.svg` without
-its tile (spec §11 NM-11).
+its tile (spec §11 NM-11), and `BrandLockupView`, Welcome's masthead: the mark
+over the product wordmark (NM-16). `ProductWordmark.swift` is the wordmark
+(`WordmarkArtwork`, its paths parsed from absolute M/L/C/Z data, nonzero;
+`ProductWordmarkView`, sized by a font size, its baseline reported, read by
+VoiceOver once as static text); `ProductWordmark+FrameJob.swift` is Frame
+Job's path data, compiled in from
+`designs/design_handoff_app_brand/frame-job-wordmark.json` rather than a
+resource so the harness and the probes draw it too, and
+`tools/proof/wordmark_proof.py` D1 holds the two equal.
 `Controls.swift`'s `BlockSlider` is the timeline's zoom slider. Four known
 divergences, each recorded: `makeButtonRow` gives its `leading` views
 compression resistance `.defaultLow`, so a footnote gives way before a button

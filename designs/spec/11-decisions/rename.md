@@ -282,3 +282,27 @@ workflow FILE, whose name does not change.
   2026-10-13). **Amends** NM-7, NM-14 and P-6. Under NM-12's prose rule the old name appears
   here only in its kept classes: old folders, domains, prefixes and paths. A later change may
   drop the kept sites once no instrument runs a tree from before rename R1.
+- **NM-16 — The Welcome lockup draws the product wordmark; the About panel names Boppa
+  Llewyn.** Recorded 2026-11-17, before the code, from the owner's app brand handoff
+  (`designs/design_handoff_app_brand/`). The words stay NM-11's "Frame Job"; what changes is how
+  they are drawn. `BrandLockupView` keeps `BrandMarkView` at 88 pt and replaces its
+  Darker Grotesque label with `ProductWordmarkView`: "Frame Job" in outlined Geist 650 at
+  −0.04em with the icon's coral playhead between the words, drawn at a 44 pt font size
+  (213.1 × 50.2 pt, its baseline 48.4 pt below its top), the letters in `DS.textStrong` and the
+  playhead in `DS.coral` in both appearances, filled by the nonzero rule, its cap line 35 pt
+  below the mark's ink, and the lockup kept at its old 158 pt height with the difference as
+  space under the wordmark, so the centred Welcome column does not move. VoiceOver reads it once, as static text "Frame Job"; the mark stays
+  hidden. If the artwork cannot be parsed the lockup shows the old label, and Debug asserts.
+  `NSHumanReadableCopyright` reads "Copyright © 2026 Boppa Llewyn.", so the About panel shows
+  it under the drawn mark. **Deviations from the handoff:** the cap line is 35 pt below the
+  ink, where the handoff's reference capture (`reference/welcome-after.*.webp`) puts it, the
+  old label's being 35.5, not its README's 36, which put the wordmark a point lower than its
+  own reference; the README's "nothing else moves" needs the old height kept, which it does not
+  say. And the path data is compiled into
+  `ProductWordmark+FrameJob.swift` from the handoff's `frame-job-wordmark.json` rather than
+  shipped as a bundle resource, because the offscreen harness and the probes compile
+  `app/Sources` into bare executables that have no bundle, and a missing resource there would
+  trap in Debug or silently draw the fallback; `tools/proof/wordmark_proof.py` row D1 holds
+  the compiled data equal to the handoff's JSON. **Why:** the app, the documentation site and
+  boppallewyn.com show one wordmark. **Risk accepted:** how the lockup looks and what
+  VoiceOver reads are a person's checks (`docs/manual-checks.md`).
