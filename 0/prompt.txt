@@ -1,0 +1,33 @@
+push it once the gate passes
+
+---
+
+What about the app launch dialog itself?
+
+---
+
+I've installed 26.6
+
+---
+
+<task-notification>
+<task-id>bwufyloxw</task-id>
+<tool-use-id>toolu_01Wqq7JmS5EuXmFaRx6ozXsp</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kevingalligan-devel-framejob/d372f4f5-88fe-469c-88f8-483ebb43658f/tasks/bwufyloxw.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the wordmark proof whole and every mutant once on the final code" completed (exit code 0)</summary>
+</task-notification>
+
+---
+
+Is there any scratch data that can be cleaned up?
+
+---
+
+<task-notification>
+<task-id>bigrf20m8</task-id>
+<tool-use-id>toolu_01B9CVozLGtxW8UL4X64bb3H</tool-use-id>
+<output-file>/private/tmp/claude-501/-Users-kevingalligan-devel-framejob/d372f4f5-88fe-469c-88f8-483ebb43658f/tasks/bigrf20m8.output</output-file>
+<status>completed</status>
+<summary>Background command "Run the gate on the worktree" completed (exit code 0)</summary>
+</task-notification>
