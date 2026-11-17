@@ -1,0 +1,89 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M7KRT2PCS4CPEXVB0CZPJSA0",
+  "session_id": "d372f4f5-88fe-469c-88f8-483ebb43658f",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-17T03:29:03.85789Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "save_step_count": 1,
+  "files_touched": [
+    "docs/site/CLAUDE.md",
+    "docs/site/README.md",
+    "docs/site/src/assets/frame-job-wordmark.svg",
+    "docs/site/src/components/Hero.astro",
+    "docs/site/src/components/ProductWordmark.astro",
+    "docs/site/src/components/SiteTitle.astro"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-fable-5-2",
+  "turn_id": "1cb8cbdd9cb6",
+  "checkpoint_transcript_start": 1058,
+  "transcript_lines_at_start": 1058,
+  "compact_transcript_start": 142,
+  "token_usage": {
+    "input_tokens": 72,
+    "cache_creation_tokens": 281640,
+    "cache_read_tokens": 8553282,
+    "output_tokens": 17995,
+    "api_call_count": 32,
+    "subagent_tokens": {
+      "input_tokens": 0,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 0,
+      "output_tokens": 0,
+      "api_call_count": 0
+    }
+  },
+  "redaction": {
+    "replacements": 12,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 15,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01N2QZqXaLBMcoe9kpyxwpty",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "fablecode"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "63517e5ad4ab",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 386,
+        "end": 387,
+        "entry_ids": [
+          "e398a8a8-0ec4-4551-826a-3905cb92c316"
+        ],
+        "tool_use_id": "toolu_01N2QZqXaLBMcoe9kpyxwpty"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01N2QZqXaLBMcoe9kpyxwpty"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: fablecode",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 35
+  }
+}
